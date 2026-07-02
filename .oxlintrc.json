@@ -94,13 +94,6 @@
         "typescript/no-unsafe-return": "off",
         "typescript/no-unsafe-type-assertion": "off"
       }
-    },
-    {
-      "files": ["**/*.test.ts", "**/*.test.tsx"],
-      // expect(service.method) trips unbound-method by construction
-      "rules": {
-        "typescript/unbound-method": "off"
-      }
     }
   ],
   "ignorePatterns": ["**/node_modules/**", "**/dist/**", ".worktrees/**", "**/*.json"]

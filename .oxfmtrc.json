@@ -1,7 +1,5 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  // oxfmt owns every format in the repo; bun.lock is excluded because bun
-  // regenerates it and formatting would only create churn
   "ignorePatterns": ["bun.lock"],
   "proseWrap": "always",
   "semi": true,
