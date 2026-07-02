@@ -10,5 +10,8 @@
     "verbatimModuleSyntax": true,
     "noEmit": true,
     "types": ["bun"]
-  }
+  },
+  // inherited by every package (relative to this file) so the jest-extended
+  // matcher augmentation in test-setup.ts is visible to per-package tsc
+  "files": ["test-setup.ts"]
 }

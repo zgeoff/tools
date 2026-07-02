@@ -40,6 +40,9 @@
       "error",
       { "prefer": "type-imports", "fixStyle": "separate-type-imports" }
     ],
+    "no-duplicate-imports": ["error", { "allowSeparateTypeImports": true }],
+    // oxfmt's sortImports owns import declaration order; lint only member order
+    "sort-imports": ["error", { "ignoreDeclarationSort": true }],
 
     // allows destructuring for omitting properties
     "no-unused-vars": ["error", { "ignoreRestSiblings": true }],
