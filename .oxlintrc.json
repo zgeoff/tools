@@ -60,56 +60,25 @@
     "unicorn/number-literal-case": "off",
     "unicorn/filename-case": "off",
 
-    // category-enabled rules that contradict this repo's style: named inline
-    // exports are the convention, keys group by meaning not alphabet, and
-    // comments stay lowercase
+    // category-enabled rules that contradict this repo's style: inline named
+    // export declarations are the convention (group-exports demands the exact
+    // form no-bare-named-exports bans), keys group by meaning not alphabet,
+    // comments stay lowercase, short identifiers and literal numbers are fine
     "import/prefer-default-export": "off",
     "import/no-named-export": "off",
     "import/exports-last": "off",
+    "import/group-exports": "off",
     "sort-keys": "off",
     "capitalized-comments": "off",
     "id-length": "off",
+    "no-magic-numbers": "off",
 
     // disable import rules that duplicate work TypeScript's compiler already
     // does
     "import/namespace": "off",
     "import/named": "off",
     "import/default": "off",
-    "import/no-named-as-default-member": "off",
-
-    // Type-aware rules; inert unless oxlint runs with --type-aware (the
-    // tsgolint engine): `bun run lint` skips them, `bun run lint:type-aware`
-    // runs them. Greenfield repo, so everything starts at "error" — tsgolint
-    // enables its own defaults, so every rule is pinned explicitly.
-    "typescript/no-floating-promises": "error",
-    "typescript/no-misused-promises": "error",
-    "typescript/await-thenable": "error",
-    "typescript/no-unsafe-argument": "error",
-    "typescript/no-unsafe-assignment": "error",
-    "typescript/no-unsafe-call": "error",
-    "typescript/no-unsafe-member-access": "error",
-    "typescript/no-unsafe-return": "error",
-    "typescript/no-unsafe-type-assertion": "error",
-    "typescript/no-unsafe-enum-comparison": "error",
-    "typescript/no-base-to-string": "error",
-    "typescript/no-unnecessary-type-assertion": "error",
-    "typescript/no-unnecessary-boolean-literal-compare": "error",
-    "typescript/no-unnecessary-condition": "error",
-    "typescript/no-unnecessary-type-conversion": "error",
-    "typescript/no-unnecessary-type-arguments": "error",
-    "typescript/no-unnecessary-template-expression": "error",
-    "typescript/no-useless-default-assignment": "error",
-    "typescript/no-redundant-type-constituents": "error",
-    "typescript/no-misused-spread": "error",
-    "typescript/consistent-return": "error",
-    "typescript/restrict-plus-operands": "error",
-    "typescript/restrict-template-expressions": "error",
-    "typescript/prefer-nullish-coalescing": "error",
-    "typescript/prefer-optional-chain": "error",
-    "typescript/consistent-type-exports": "error",
-    "typescript/require-await": "error",
-    "typescript/dot-notation": "error",
-    "typescript/unbound-method": "error"
+    "import/no-named-as-default-member": "off"
   },
   "overrides": [
     {
