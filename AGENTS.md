@@ -21,23 +21,47 @@ experimental `--type-check` (fast, run it locally), while `typecheck` runs real 
 
 - Tests run with `bun test`. jest-extended matchers are registered globally by `test-setup.ts` (via
   bunfig `[test] preload`) — use them directly in any test file, no imports needed.
-- Never use `describe` — write flat `test('does a thing', …)` blocks.
+- Never use `describe` — write flat `test('it does a thing', …)` blocks.
 - Reach for jest-extended matchers instead of hand-rolling assertions. Frequently useful:
-  - arrays: `toIncludeAllMembers`, `toIncludeSameMembers`, `toPartiallyContain`,
-    `toIncludeAllPartialMembers`, `toSatisfyAll`
-  - objects: `toContainEntry`, `toContainEntries`, `toContainAllKeys`, `toBeFrozen`
-  - strings: `toStartWith`, `toEndWith`, `toInclude`, `toEqualCaseInsensitive`,
-    `toEqualIgnoringWhitespace`
-  - values: `toBeNil`, `toBeOneOf`, `toSatisfy`, `toBeWithin`, `toBeEmpty`
-  - dates: `toBeAfter`, `toBeBefore`, `toBeBetween`, `toBeValidDate`
-  - mocks: `toHaveBeenCalledOnce`, `toHaveBeenCalledExactlyOnceWith`, `toHaveBeenCalledBefore`,
-    `toHaveBeenCalledAfter`
-  - errors/async: `toThrowWithMessage`, `toResolve`, `toReject` (the async two return promises —
-    always `await`)
+  - arrays
+    - `toIncludeAllMembers`
+    - `toIncludeSameMembers`
+    - `toPartiallyContain`
+    - `toIncludeAllPartialMembers`
+    - `toSatisfyAll`
+  - objects
+    - `toContainEntry`
+    - `toContainEntries`
+    - `toContainAllKeys`
+    - `toBeFrozen`
+  - strings
+    - `toStartWith`
+    - `toEndWith`
+    - `toInclude`
+    - `toEqualCaseInsensitive`
+    - `toEqualIgnoringWhitespace`
+  - values
+    - `toBeNil`
+    - `toBeOneOf`
+    - `toSatisfy`
+    - `toBeWithin`
+    - `toBeEmpty`
+  - dates
+    - `toBeAfter`
+    - `toBeBefore`
+    - `toBeBetween`
+    - `toBeValidDate`
+  - mocks
+    - `toHaveBeenCalledOnce`
+    - `toHaveBeenCalledExactlyOnceWith`
+    - `toHaveBeenCalledBefore`
+    - `toHaveBeenCalledAfter`
+  - errors/async
+    - `toThrowWithMessage`
+    - `toResolve` (returns a promise — always `await`)
+    - `toReject` (returns a promise — always `await`)
 - Matchers also work asymmetrically inside `toEqual`/`toMatchObject`
   (`status: expect.toBeOneOf([…])`).
-- The full audit (`packages/example/test/jest-extended.test.ts`) exercises a representative spread —
-  every audited matcher works on bun, including the mock call-order ones.
 - Known gaps: `expect.pass`/`expect.fail` are unimplemented upstream and excluded from our types.
   It's `toEqualCaseInsensitive` — not `…Insensitively` as some docs claim; unknown matcher names
   fail typecheck here (upstream's own types are looser and would let typos through).
