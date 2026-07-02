@@ -1,0 +1,6 @@
+[install]
+# pnpm-style symlinked node_modules — no phantom dependencies
+linker = "isolated"
+
+# supply-chain guard: only install versions published >= 7 days ago
+minimumReleaseAge = 604800
