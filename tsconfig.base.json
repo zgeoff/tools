@@ -13,5 +13,5 @@
   },
   // inherited by every package (relative to this file) so the jest-extended
   // matcher augmentation is visible to per-package tsc
-  "files": ["packages/bun-test-extended/src/augmentation.ts"]
+  "files": ["packages/bun-test-extended/src/augment-bun-test.ts"]
 }

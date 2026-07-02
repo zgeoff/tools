@@ -1,7 +1,7 @@
 // side-effect import so jest-extended's ambient CustomMatchers global is in
 // the program even when this file is included standalone by another package
 import 'jest-extended';
-import type { JestExtendedMatcherName } from './matcher-names.ts';
+import type { JestExtendedMatcherName } from './types.ts';
 
 // Augment bun:test with only the matchers bun's builtin interfaces don't
 // already declare — bun implements many jest-extended-style matchers natively

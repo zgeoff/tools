@@ -1,8 +1,8 @@
-import './augmentation.ts';
+import './augment-bun-test.ts';
 import { expect } from 'bun:test';
 import matchers from 'jest-extended';
-import { withJestContext } from './jest-context.ts';
-import type { JestExtendedMatcher } from './jest-context.ts';
+import type { JestExtendedMatcher } from './types.ts';
+import { withJestContext } from './with-jest-context.ts';
 
 const matcherEntries: readonly [string, JestExtendedMatcher][] = Object.entries(matchers);
 

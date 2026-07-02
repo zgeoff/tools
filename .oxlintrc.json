@@ -79,7 +79,10 @@
 
     // preload-style modules (matcher registration, type augmentation) are
     // side-effect imports by design
-    "import/no-unassigned-import": ["error", { "allow": ["jest-extended", "**/augmentation.ts"] }],
+    "import/no-unassigned-import": [
+      "error",
+      { "allow": ["jest-extended", "**/augment-bun-test.ts"] }
+    ],
 
     // disable import rules that duplicate work TypeScript's compiler already
     // does

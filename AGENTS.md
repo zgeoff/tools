@@ -17,9 +17,17 @@ Type errors are checked by two engines on purpose: `lint:type-aware` includes ts
 experimental `--type-check` (fast, run it locally), while `typecheck` runs real `tsc` per package
 (ground truth). CI runs both until tsgolint earns trust; if they ever disagree, believe `tsc`.
 
+## Code style
+
+- One primary export per file, and the file name kebab-cases that export (`with-jest-context.ts`
+  exports `withJestContext`). Exceptions: `index.ts` entrypoints, `types.ts` for a package's shared
+  types, and side-effect-only modules, which are named for what they do (`augment-bun-test.ts`).
+
 ## Testing
 
 - Never use `describe` — write flat `test('it does a thing', …)` blocks.
+- Tests declare their own data inline — no fixtures shared between tests, even if that means
+  duplication.
 - Reach for jest-extended matchers instead of hand-rolling assertions. Frequently useful:
   - arrays
     - `toIncludeAllMembers`

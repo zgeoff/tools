@@ -1,3 +1,5 @@
+import type { CustomMatcher } from 'bun:test';
+
 // Every jest-extended matcher except `pass`/`fail` (unimplemented upstream).
 // Listed explicitly because jest-extended's CustomMatchers carries a string
 // index signature that makes `keyof` useless.
@@ -76,3 +78,9 @@ export type JestExtendedMatcherName =
   | 'toSatisfyAny'
   | 'toStartWith'
   | 'toThrowWithMessage';
+
+export type JestExtendedMatcher = CustomMatcher<unknown, unknown[]>;
+
+// bun:test declares MatcherContext without exporting it; recover it from the
+// `this` parameter of the exported CustomMatcher type.
+export type MatcherContext = ThisParameterType<JestExtendedMatcher>;

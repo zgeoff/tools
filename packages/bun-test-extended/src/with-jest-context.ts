@@ -1,11 +1,5 @@
-import type { CustomMatcher } from 'bun:test';
 import { matcherHint, printExpected, printReceived, printWithType } from 'jest-matcher-utils';
-
-export type JestExtendedMatcher = CustomMatcher<unknown, unknown[]>;
-
-// bun:test declares MatcherContext without exporting it; recover it from the
-// `this` parameter of the exported CustomMatcher type.
-type MatcherContext = ThisParameterType<JestExtendedMatcher>;
+import type { JestExtendedMatcher, MatcherContext } from './types.ts';
 
 // The exact util functions jest-extended matchers destructure off `this.utils`.
 const jestMatcherUtils = { matcherHint, printExpected, printReceived, printWithType };
