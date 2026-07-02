@@ -1,0 +1,42 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  // oxfmt owns JS/TS only; Prettier remains the formatter for JSON, Markdown,
+  // and YAML.
+  "ignorePatterns": [
+    "**/*.json",
+    "**/*.jsonc",
+    "**/*.md",
+    "**/*.mdx",
+    "**/*.css",
+    "**/*.scss",
+    "**/*.html",
+    "**/*.yml",
+    "**/*.yaml"
+  ],
+  "semi": true,
+  "trailingComma": "all",
+  "singleQuote": true,
+  "printWidth": 100,
+  "tabWidth": 2,
+  "useTabs": false,
+  "bracketSpacing": true,
+  "arrowParens": "always",
+  "sortImports": {
+    "groups": [
+      "side_effect",
+      "test-libs",
+      "builtin",
+      "external",
+      "unknown",
+      ["parent", "sibling", "index"]
+    ],
+    "customGroups": [
+      {
+        "groupName": "test-libs",
+        "elementNamePattern": ["bun:test"]
+      }
+    ],
+    "newlinesBetween": false,
+    "sortSideEffects": false
+  }
+}
