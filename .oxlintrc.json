@@ -1,0 +1,100 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "promise"],
+  "jsPlugins": ["./oxlint-local-plugin.js", "@stylistic/eslint-plugin"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error",
+    "pedantic": "error",
+    "style": "error"
+  },
+  "env": {
+    "node": true,
+    "es2024": true
+  },
+  "rules": {
+    // repo-specific AST rules from oxlint-local-plugin.js
+    "local/no-top-level-arrow": "error",
+    "local/no-nested-function-declaration": "error",
+    "local/no-bare-named-exports": "error",
+    "local/no-inline-param-object-types": "error",
+    "local/no-destructured-params": "error",
+
+    // enforced comment style — line comments unless JSDoc or exclamation
+    "@stylistic/multiline-comment-style": [
+      "error",
+      "separate-lines",
+      { "checkJSDoc": false, "checkExclamation": false }
+    ],
+
+    // restriction-category cherry-picks
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "import/no-cycle": "error",
+
+    "no-shadow": "error",
+
+    // separate type-only imports from value imports
+    "typescript/consistent-type-imports": [
+      "error",
+      { "prefer": "type-imports", "fixStyle": "separate-type-imports" }
+    ],
+
+    // allows destructuring for omitting properties
+    "no-unused-vars": ["error", { "ignoreRestSiblings": true }],
+
+    // consistent function syntax — declarations top level, arrows for inside
+    // blocks and callbacks
+    "func-style": ["error", "declaration", { "allowArrowFunctions": true }],
+    "no-inner-declarations": ["error", "functions"],
+    "prefer-arrow-callback": ["error", { "allowNamedFunctions": false, "allowUnboundThis": false }],
+
+    // stylistic
+    "curly": ["error", "all"],
+    "unicorn/prefer-ternary": ["error", "only-single-line"],
+    "unicorn/prefer-node-protocol": "error",
+    "unicorn/no-array-sort": "error",
+    "unicorn/no-nested-ternary": "off",
+    "unicorn/no-useless-undefined": ["error", { "checkArguments": false }],
+    "unicorn/no-null": "off",
+    "unicorn/number-literal-case": "off",
+    "unicorn/filename-case": "off",
+
+    // category-enabled rules that contradict this repo's style: inline named
+    // export declarations are the convention (group-exports demands the exact
+    // form no-bare-named-exports bans), keys group by meaning not alphabet,
+    // comments stay lowercase, short identifiers and literal numbers are fine
+    "import/prefer-default-export": "off",
+    "import/no-named-export": "off",
+    "import/exports-last": "off",
+    "import/group-exports": "off",
+    "sort-keys": "off",
+    "capitalized-comments": "off",
+    "id-length": "off",
+    "no-magic-numbers": "off",
+
+    // disable import rules that duplicate work TypeScript's compiler already
+    // does
+    "import/namespace": "off",
+    "import/named": "off",
+    "import/default": "off",
+    "import/no-named-as-default-member": "off"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.js", "**/*.cjs", "**/*.mjs"],
+      // untyped JS is `any` end to end, so the unsafe-* rules flag every
+      // expression
+      "rules": {
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off",
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    }
+  ],
+  "ignorePatterns": ["**/node_modules/**", "**/dist/**", ".worktrees/**", "**/*.json"]
+}
