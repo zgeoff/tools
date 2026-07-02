@@ -19,8 +19,6 @@ experimental `--type-check` (fast, run it locally), while `typecheck` runs real 
 
 ## Testing
 
-- Tests run with `bun test`. jest-extended matchers are registered globally by `test-setup.ts` (via
-  bunfig `[test] preload`) — use them directly in any test file, no imports needed.
 - Never use `describe` — write flat `test('it does a thing', …)` blocks.
 - Reach for jest-extended matchers instead of hand-rolling assertions. Frequently useful:
   - arrays

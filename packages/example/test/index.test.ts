@@ -3,4 +3,5 @@ import { greet } from '../src/index.ts';
 
 test('greets by name', () => {
   expect(greet('world')).toBe('Hello, world!');
+  expect(greet('world')).toStartWith('Hello');
 });
