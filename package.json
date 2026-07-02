@@ -1,7 +1,6 @@
 {
   "name": "tools",
   "private": true,
-  "type": "module",
   "workspaces": {
     "packages": [
       "packages/*"
@@ -13,22 +12,18 @@
       "@stylistic/eslint-plugin": "5.10.0",
       "oxfmt": "0.56.0",
       "oxlint": "1.71.0",
-      "oxlint-tsgolint": "0.23.0",
-      "prettier": "3.8.4"
+      "oxlint-tsgolint": "0.23.0"
     }
   },
+  "type": "module",
   "scripts": {
     "typecheck": "bun run --filter '*' typecheck",
     "test": "bun test",
     "build": "bun run --filter '*' build",
     "lint": "oxlint",
     "lint:type-aware": "oxlint --type-aware",
-    "format": "bun run format:js && bun run format:rest",
-    "format:check": "bun run format:js:check && bun run format:rest:check",
-    "format:js": "oxfmt .",
-    "format:js:check": "oxfmt --check .",
-    "format:rest": "prettier --write . '!**/*.{js,jsx,ts,tsx,cjs,mjs}'",
-    "format:rest:check": "prettier --check . '!**/*.{js,jsx,ts,tsx,cjs,mjs}'"
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "catalog:",
@@ -37,7 +32,6 @@
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
-    "prettier": "catalog:",
     "typescript": "catalog:"
   }
 }
