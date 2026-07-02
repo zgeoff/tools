@@ -1,5 +1,5 @@
 {
-  "name": "@tools/example",
+  "name": "@zgeoff/bun-test-extended",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -8,6 +8,10 @@
   },
   "scripts": {
     "typecheck": "tsc"
+  },
+  "dependencies": {
+    "jest-extended": "catalog:",
+    "jest-matcher-utils": "catalog:"
   },
   "devDependencies": {
     "@types/bun": "catalog:",
