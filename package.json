@@ -15,8 +15,7 @@
   "scripts": {
     "typecheck": "bun run --filter '*' typecheck",
     "test": "bun test",
-    "build": "bun run --filter '*' build",
-    "check:pinned": "bun scripts/check-pinned.ts"
+    "build": "bun run --filter '*' build"
   },
   "devDependencies": {
     "typescript": "catalog:",
