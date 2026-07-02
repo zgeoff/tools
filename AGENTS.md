@@ -7,6 +7,8 @@
 - Use [Conventional Commits](https://www.conventionalcommits.org/) for all commit messages.
 - When the work is ready, open a PR against `main` using the PR template
   (`.github/PULL_REQUEST_TEMPLATE.md`).
+- PR descriptions are condensed by default: lead paragraph ≤2 sentences, one-line bullets, ≤150
+  words. Write the short version first — do not draft long and trim.
 - After pushing, link the opened PR's URL in your response so it's one click away.
 
 ## Type checking
