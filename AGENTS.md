@@ -9,6 +9,12 @@
   (`.github/PULL_REQUEST_TEMPLATE.md`).
 - After pushing, link the opened PR's URL in your response so it's one click away.
 
+## Type checking
+
+Type errors are checked by two engines on purpose: `lint:type-aware` includes tsgolint's
+experimental `--type-check` (fast, run it locally), while `typecheck` runs real `tsc` per package
+(ground truth). CI runs both until tsgolint earns trust; if they ever disagree, believe `tsc`.
+
 ## Dependencies
 
 - Pin exact versions — no `^`/`~` ranges. Shared versions live in the root catalog; workspace

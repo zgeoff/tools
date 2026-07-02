@@ -20,8 +20,9 @@
     "typecheck": "bun run --filter '*' typecheck",
     "test": "bun test",
     "build": "bun run --filter '*' build",
-    "lint": "oxlint",
-    "lint:type-aware": "oxlint --type-aware",
+    "lint": "oxlint --report-unused-disable-directives-severity error",
+    "lint:fix": "oxlint --fix",
+    "lint:type-aware": "oxlint --type-aware --type-check --report-unused-disable-directives-severity error",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
   },
