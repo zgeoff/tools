@@ -1,6 +1,11 @@
 ## Description
 
 <!--
+If this PR resolves an issue, start with a `Closes #n` line so the
+issue auto-closes on merge. Omit if there's no issue.
+-->
+
+<!--
 Lead paragraph: ≤2 sentences, what changed and why. Then bullets:
 one line each, no **bold-label:** prefixes, no semicolon chains.
 Cover decisions, deviations, and tradeoffs — not a diff inventory;
