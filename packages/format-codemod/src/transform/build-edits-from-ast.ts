@@ -30,6 +30,7 @@ function walk(file: SourceFile, node: ASTNode): Edit[] {
  */
 function getStatementLists(node: ASTNode): (readonly ASTNode[])[] {
   const bodies: (readonly ASTNode[])[] = [];
+
   const hasBlockBody =
     node.type === 'Program' || node.type === 'BlockStatement' || node.type === 'ClassBody';
 
@@ -51,7 +52,13 @@ function buildPairEdits(file: SourceFile, container: ASTNode, body: readonly AST
     const prev = body[i];
     const next = body[i + 1];
 
-    if (prev !== undefined && next !== undefined && needsBlankLine(container, prev, next)) {
+    if (
+      prev !== undefined &&
+      next !== undefined &&
+      (needsBlankLine(container, prev, next) ||
+        isMultiline(file.src, prev) ||
+        isMultiline(file.src, next))
+    ) {
       const edit = planGapEdit(file, prev, next);
 
       if (edit !== null) {
@@ -61,6 +68,19 @@ function buildPairEdits(file: SourceFile, container: ASTNode, body: readonly AST
   }
 
   return edits;
+}
+
+/**
+ * A statement that spans multiple lines is separated from both neighbours —
+ * its shape already reads as a paragraph, so it gets paragraph spacing.
+ * Single-line statements may sit tight.
+ */
+function isMultiline(src: string, node: ASTNode): boolean {
+  return (
+    typeof node.start === 'number' &&
+    typeof node.end === 'number' &&
+    src.slice(node.start, node.end).includes('\n')
+  );
 }
 
 /**
@@ -80,8 +100,9 @@ const CONTROL_FLOW_TYPES = new Set([
 /**
  * The "always" rules: a blank line between class members, after a var block
  * before a non-var statement, before a return, after a function/class
- * declaration, and on both sides of a control-flow block — its closing brace
- * ends a visual unit just like its opening keyword starts one. There are no
+ * declaration, on both sides of a control-flow block — its closing brace
+ * ends a visual unit just like its opening keyword starts one — and at the
+ * boundary between a call statement and a mutation statement. There are no
  * "never" rules, so any match means one blank.
  */
 function needsBlankLine(container: ASTNode, prev: ASTNode, next: ASTNode): boolean {
@@ -101,7 +122,36 @@ function needsBlankLine(container: ASTNode, prev: ASTNode, next: ASTNode): boole
     return true;
   }
 
-  return CONTROL_FLOW_TYPES.has(next.type) || CONTROL_FLOW_TYPES.has(prev.type);
+  return (
+    isCallMutationBoundary(prev, next) ||
+    CONTROL_FLOW_TYPES.has(next.type) ||
+    CONTROL_FLOW_TYPES.has(prev.type)
+  );
+}
+
+const CALL_TYPES: readonly string[] = ['CallExpression', 'AwaitExpression'];
+
+const MUTATION_TYPES: readonly string[] = ['AssignmentExpression', 'UpdateExpression'];
+
+/**
+ * A transition between a call statement ("do something") and a mutation
+ * statement (assignment or increment, "track something") — the two read as
+ * different kinds of work, so a blank line marks the switch. Runs of the same
+ * kind stay tight.
+ */
+function isCallMutationBoundary(prev: ASTNode, next: ASTNode): boolean {
+  return (
+    (isExpressionStatementOf(prev, CALL_TYPES) && isExpressionStatementOf(next, MUTATION_TYPES)) ||
+    (isExpressionStatementOf(prev, MUTATION_TYPES) && isExpressionStatementOf(next, CALL_TYPES))
+  );
+}
+
+function isExpressionStatementOf(node: ASTNode, types: readonly string[]): boolean {
+  const { expression } = node;
+
+  return (
+    node.type === 'ExpressionStatement' && isASTNode(expression) && types.includes(expression.type)
+  );
 }
 
 const VAR_DECL_KINDS = new Set(['const', 'let', 'var']);

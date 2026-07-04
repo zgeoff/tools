@@ -5,6 +5,7 @@ test('it returns a program with node offsets for valid TypeScript', () => {
   const parsed = parseSource('const a = 1;\n', 'file.ts');
 
   expect(typeof parsed).not.toBe('string');
+
   expect(parsed).toMatchObject({
     program: { type: 'Program', body: [expect.objectContaining({ start: 0, end: 12 })] },
   });

@@ -7,6 +7,7 @@ test('it pads after a var block before a non-var statement and keeps consecutive
 
   expect(parseError).toBeNil();
   expect(edits).toBe(1);
+
   expect(output).toMatchInlineSnapshot(`
     "function f() {
       const x = 1;
@@ -160,6 +161,54 @@ test('it pads inside switch cases, both braced and bare', () => {
     }
     "
   `);
+});
+
+test('it pads both sides of a multiline statement', () => {
+  const src = `function f() {\n  doFirst();\n  callWith(\n    argOne,\n    argTwo,\n  );\n  doLast();\n}\n`;
+  const { output } = transform(src);
+
+  expect(output).toMatchInlineSnapshot(`
+    "function f() {
+      doFirst();
+
+      callWith(
+        argOne,
+        argTwo,
+      );
+
+      doLast();
+    }
+    "
+  `);
+});
+
+test('it separates a multiline declaration from an adjacent single-line one', () => {
+  const src = `function f() {\n  const a = build(\n    partOne,\n    partTwo,\n  );\n  const b = build(partOne, partTwo);\n  use(a, b);\n}\n`;
+  const { output } = transform(src);
+
+  expect(output).toInclude('  );\n\n  const b = build(partOne, partTwo);');
+});
+
+test('it keeps adjacent single-line statements of the same kind tight', () => {
+  const src = `function f() {\n  doFirst();\n  doSecond();\n}\n`;
+  const { output, edits } = transform(src);
+
+  expect(edits).toBe(0);
+  expect(output).toBe(src);
+});
+
+test('it pads the boundary between a call statement and an assignment', () => {
+  const src = `function f(edits) {\n  let tail = 0;\n  for (const e of edits) {\n    push(e.end, tail);\n    tail = e.start;\n  }\n}\n`;
+  const { output } = transform(src);
+
+  expect(output).toInclude('    push(e.end, tail);\n\n    tail = e.start;');
+});
+
+test('it keeps runs of assignments and increments glued', () => {
+  const src = `function f() {\n  let x = 0;\n  let y = 0;\n  x = 1;\n  y = 2;\n  x++;\n  y--;\n}\n`;
+  const { output } = transform(src);
+
+  expect(output).toInclude('  x = 1;\n  y = 2;\n  x++;\n  y--;');
 });
 
 test('it keeps a trailing same-line line comment attached to the preceding var', () => {

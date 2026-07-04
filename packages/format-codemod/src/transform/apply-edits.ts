@@ -11,6 +11,7 @@ export function applyEdits(src: string, edits: readonly Edit[]): string {
 
   for (const e of edits) {
     segments.push(src.slice(e.end, tail), e.replacement);
+
     tail = e.start;
   }
 

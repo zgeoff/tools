@@ -18,12 +18,15 @@ no "never" rules.
 - before any `return`
 - after a `function` or `class` declaration
 - on both sides of a control-flow block: `if`, `for`, `for…in`, `for…of`, `while`, `switch`, `try`
+- on both sides of any statement that spans multiple lines
+- at the boundary between a call statement and an assignment/increment statement (either order)
 
 **`@stylistic/lines-between-class-members`** — one blank line between class members.
 
 ### Notes
 
-- **Consecutive `const`/`let`/`var` declarations stay glued** (no blank between them).
+- **Consecutive single-line `const`/`let`/`var` declarations stay glued** (no blank between them); a
+  multiline declaration is separated like any other multiline statement.
 - **Bare declarations only.** `export const`, `export function`, and `export class` are not matched
   — ESLint's selectors do not look through `export`, and neither does this. `await using` is
   likewise not a var declaration.

@@ -118,14 +118,17 @@ test('it does not descend into node_modules when expanding a directory', () => {
   const nested = path.join(dir, 'node_modules', 'dep');
 
   fs.mkdirSync(nested, { recursive: true });
+
   fs.writeFileSync(
     path.join(nested, 'unpadded.ts'),
     'export function f() {\n  const a = 1;\n  return a;\n}\n',
   );
+
   fs.writeFileSync(
     path.join(dir, 'clean.ts'),
     'const a = 1;\n\nexport function f() {\n  return a;\n}\n',
   );
+
   const { status, stderr } = runCLI(['--check', dir]);
 
   expect(status).toBe(0);

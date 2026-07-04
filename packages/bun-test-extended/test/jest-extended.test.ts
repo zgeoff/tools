@@ -147,6 +147,7 @@ test('it checks entries with toContainEntry and toContainEntries', () => {
   const target: Record<string, unknown> = { id: 1, name: 'x', tags: ['a'] };
 
   expect(target).toContainEntry(['id', 1]);
+
   expect(target).toContainEntries([
     ['id', 1],
     ['name', 'x'],

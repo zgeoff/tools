@@ -3,6 +3,7 @@ import { planGapEdit } from '../src/transform/plan-gap-edit.ts';
 
 test('it plans a splice that widens a single-newline gap to one blank line', () => {
   const src = 'const a = 1;\nuse(a);\n';
+
   const edit = planGapEdit(
     { src, comments: [] },
     { type: 'VariableDeclaration', start: 0, end: 12 },
@@ -14,6 +15,7 @@ test('it plans a splice that widens a single-newline gap to one blank line', () 
 
 test('it returns null when the gap already holds exactly one blank line', () => {
   const src = 'const a = 1;\n\nuse(a);\n';
+
   const edit = planGapEdit(
     { src, comments: [] },
     { type: 'VariableDeclaration', start: 0, end: 12 },
@@ -25,6 +27,7 @@ test('it returns null when the gap already holds exactly one blank line', () => 
 
 test('it preserves the next statement indentation in the replacement', () => {
   const src = '{\n  const a = 1;\n  use(a);\n}\n';
+
   const edit = planGapEdit(
     { src, comments: [] },
     { type: 'VariableDeclaration', start: 4, end: 16 },
@@ -36,6 +39,7 @@ test('it preserves the next statement indentation in the replacement', () => {
 
 test('it returns null when the statements share a physical line', () => {
   const src = 'const a = 1; use(a);\n';
+
   const edit = planGapEdit(
     { src, comments: [] },
     { type: 'VariableDeclaration', start: 0, end: 12 },
@@ -48,6 +52,7 @@ test('it returns null when the statements share a physical line', () => {
 test('it returns null when the gap holds anything besides whitespace and comments', () => {
   // a fabricated gap that swallows a stray token — must never be resized
   const src = 'const a = 1; @ \nuse(a);\n';
+
   const edit = planGapEdit(
     { src, comments: [] },
     { type: 'VariableDeclaration', start: 0, end: 12 },
@@ -59,6 +64,7 @@ test('it returns null when the gap holds anything besides whitespace and comment
 
 test('it keeps a trailing same-line comment attached to the previous statement', () => {
   const src = 'const a = 1; // note\nuse(a);\n';
+
   const edit = planGapEdit(
     { src, comments: [{ start: 13, end: 20 }] },
     { type: 'VariableDeclaration', start: 0, end: 12 },
@@ -70,6 +76,7 @@ test('it keeps a trailing same-line comment attached to the previous statement',
 
 test('it keeps multiple same-line trailing comments together on the previous line', () => {
   const src = 'const a = 1; /* x */ /* y */\nuse(a);\n';
+
   const edit = planGapEdit(
     {
       src,
@@ -87,6 +94,7 @@ test('it keeps multiple same-line trailing comments together on the previous lin
 
 test('it puts the blank line before a leading comment of the next statement', () => {
   const src = 'const a = 1;\n// about use\nuse(a);\n';
+
   const edit = planGapEdit(
     { src, comments: [{ start: 13, end: 25 }] },
     { type: 'VariableDeclaration', start: 0, end: 12 },
@@ -98,6 +106,7 @@ test('it puts the blank line before a leading comment of the next statement', ()
 
 test('it returns null when a leading comment is already preceded by a blank line', () => {
   const src = 'const a = 1;\n\n// about use\nuse(a);\n';
+
   const edit = planGapEdit(
     { src, comments: [{ start: 14, end: 26 }] },
     { type: 'VariableDeclaration', start: 0, end: 12 },

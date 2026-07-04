@@ -111,6 +111,7 @@ class MyersDiff {
       const round = this.unwindRound(pos, d);
 
       ops.push(...round.ops);
+
       pos = round.pos;
     }
 
@@ -151,6 +152,7 @@ class MyersDiff {
 
     while (x > prev.x && y > prev.y) {
       ops.push({ kind: ' ', text: this.a[x - 1] ?? '' });
+
       x--;
       y--;
     }
