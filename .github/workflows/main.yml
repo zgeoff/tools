@@ -48,10 +48,11 @@ jobs:
       # Release PRs bump package.json versions, which bun.lock also records —
       # sync the lockfile on the PR branch so --frozen-lockfile checks pass,
       # and format the generated changelogs/manifests so format:check passes.
+      # The branch name is deterministic while separate-pull-requests is off.
       - if: steps.release.outputs.prs_created == 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+          ref: release-please--branches--main
           token: ${{ steps.app-token.outputs.token || github.token }}
       - if: steps.release.outputs.prs_created == 'true'
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -70,28 +71,37 @@ jobs:
 
       # Merging with the App token makes the push trigger this workflow again,
       # which is the run that tags, creates GitHub releases, and publishes.
+      # Discovers open release PRs itself rather than reading step outputs:
+      # a PR can be left open by an earlier run (prs_created false), and a
+      # step's env block is template-evaluated even when its if-condition is
+      # false, so fallible expressions like fromJSON must not appear in env.
       # GitHub recomputes mergeability asynchronously after the sync push, so
       # wait for it to settle instead of merging blind.
-      - name: Auto-merge release PR
-        if: steps.release.outputs.prs_created == 'true' && steps.app-token.outputs.token != ''
+      - name: Auto-merge release PRs
+        if: steps.app-token.outputs.token != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          PR_NUMBER: ${{ fromJSON(steps.release.outputs.pr).number }}
         run: |
-          for _ in $(seq 1 12); do
-            state=$(gh pr view "$PR_NUMBER" --json mergeable --jq .mergeable)
-            if [ "$state" = "MERGEABLE" ]; then
-              gh pr merge "$PR_NUMBER" --squash
-              exit 0
-            fi
-            if [ "$state" = "CONFLICTING" ]; then
-              echo "release PR $PR_NUMBER has conflicts" >&2
+          for pr in $(gh pr list --repo "$GITHUB_REPOSITORY" --head release-please--branches--main --json number --jq '.[].number'); do
+            merged=''
+            for _ in $(seq 1 12); do
+              state=$(gh pr view "$pr" --repo "$GITHUB_REPOSITORY" --json mergeable --jq .mergeable)
+              if [ "$state" = "MERGEABLE" ]; then
+                gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --squash
+                merged=1
+                break
+              fi
+              if [ "$state" = "CONFLICTING" ]; then
+                echo "release PR #$pr has conflicts" >&2
+                exit 1
+              fi
+              sleep 5
+            done
+            if [ -z "$merged" ]; then
+              echo "release PR #$pr mergeability never settled" >&2
               exit 1
             fi
-            sleep 5
           done
-          echo "release PR $PR_NUMBER mergeability never settled" >&2
-          exit 1
 
       - if: steps.release.outputs.releases_created == 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
