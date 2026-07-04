@@ -1,6 +1,7 @@
+import { applyEdits } from './apply-edits.ts';
 import { buildEditsFromAst } from './build-edits-from-ast.ts';
 import { parseSource } from './parse-source.ts';
-import type { Edit, TransformResult } from './types.ts';
+import type { TransformResult } from './types.ts';
 
 export interface TransformOptions {
   // Picks the parse dialect: `.tsx` enables JSX, anything else is plain
@@ -16,19 +17,8 @@ export function transform(src: string, options?: TransformOptions): TransformRes
   if (typeof parsed === 'string') {
     return { output: src, edits: 0, parseError: parsed };
   }
-  const editList = buildEditsFromAst(src, parsed.program);
+  const editList = buildEditsFromAst(src, parsed);
   const output = applyEdits(src, editList);
 
   return { output, edits: editList.length, parseError: null };
-}
-
-// Edits are pre-sorted last-to-first so earlier splices never shift later offsets.
-function applyEdits(src: string, edits: readonly Edit[]): string {
-  let out = src;
-
-  for (const e of edits) {
-    out = out.slice(0, e.start) + e.replacement + out.slice(e.end);
-  }
-
-  return out;
 }

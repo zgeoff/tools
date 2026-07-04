@@ -1,4 +1,4 @@
-import type { AstNode, Edit } from './types.ts';
+import type { AstNode, CommentSpan, Edit, SourceFile } from './types.ts';
 
 // Every rule is "exactly one blank line", so a compliant gap always holds two
 // newlines: one ending the previous statement's line, one for the blank.
@@ -6,29 +6,32 @@ const MIN_NEWLINES = 2;
 
 // Plans the single whitespace splice that gives the gap between two statements
 // exactly one blank line, or null when the gap is already compliant or unsafe
-// to touch.
-export function planGapEdit(src: string, prev: AstNode, next: AstNode): Edit | null {
-  const gapStart = getNodeEnd(prev);
-  const gapEnd = getNodeStart(next);
-  const gap = src.slice(gapStart, gapEnd);
+// to touch. Comment positions come from the parser rather than lexical
+// scanning, so comment-lookalike text can't mislead the classification.
+export function planGapEdit(file: SourceFile, prev: AstNode, next: AstNode): Edit | null {
+  const gap = buildGap(file, prev, next);
 
-  if (stripCommentsAndWhitespace(gap) !== '') {
+  if (!isSafeToResize(gap)) {
     return null;
   }
 
-  // The two statements share a physical line, which happens when a leading
-  // semicolon (`;(expr)` ASI guard) terminates the previous statement: babel
-  // folds that `;` into the prior node, so the gap falls between `;` and `(`.
-  // A blank-only codemod cannot separate them without orphaning the `;`, so skip.
-  if (!gap.includes('\n')) {
-    return null;
-  }
+  return planBlankLineEdit(gap);
+}
 
-  if (/\/\/|\/\*/u.test(gap)) {
-    return planCommentGap(src, gapStart, gapEnd);
-  }
+// The gap between two statements: the trivia region and the comments in it.
+interface Gap {
+  readonly src: string;
+  readonly start: number;
+  readonly end: number;
+  readonly comments: readonly CommentSpan[];
+}
 
-  return planWhitespaceGap(gap, gapStart, gapEnd);
+function buildGap(file: SourceFile, prev: AstNode, next: AstNode): Gap {
+  const start = getNodeEnd(prev);
+  const end = getNodeStart(next);
+  const comments = file.comments.filter((c) => c.start >= start && c.end <= end);
+
+  return { src: file.src, start, end, comments };
 }
 
 function getNodeEnd(n: AstNode): number {
@@ -47,60 +50,77 @@ function getNodeStart(n: AstNode): number {
   return n.start;
 }
 
-function stripCommentsAndWhitespace(s: string): string {
-  return s
-    .replaceAll(/\/\*[\s\S]*?\*\//gu, '')
-    .replaceAll(/\/\/[^\n]*/gu, '')
-    .replaceAll(/\s+/gu, '');
+// A gap is resizable only when it holds nothing but trivia and spans a line
+// break. Same-line statements happen when a leading semicolon (`;(expr)` ASI
+// guard) terminates the previous statement: the parser folds that `;` into the
+// prior node, so the gap falls between `;` and `(` — a blank-only codemod
+// cannot separate them without orphaning the `;`.
+function isSafeToResize(gap: Gap): boolean {
+  return isTriviaOnly(gap) && gap.src.slice(gap.start, gap.end).includes('\n');
 }
 
-// A trailing same-line comment stays attached to the previous statement, so the
-// gap is measured from just past it; any comment after that point is a leading
-// comment for the next statement.
-function planCommentGap(src: string, gapStart: number, gapEnd: number): Edit | null {
-  const gap = src.slice(gapStart, gapEnd);
-  const trailing = /^[ \t]*(?:\/\/[^\n]*|\/\*[\s\S]*?\*\/)/u.exec(gap);
-  let effectiveStart = gapStart;
+// True when everything in the gap outside the comment spans is whitespace —
+// the exact form of "this gap holds only trivia".
+function isTriviaOnly(gap: Gap): boolean {
+  let cursor = gap.start;
 
-  if (trailing !== null) {
-    effectiveStart = gapStart + trailing[0].length;
-  }
-  const rest = src.slice(effectiveStart, gapEnd);
-
-  if (/\/\/|\/\*/u.test(rest)) {
-    return planLeadingCommentEdit(rest, effectiveStart);
+  for (const c of gap.comments) {
+    if (gap.src.slice(cursor, c.start).trim() !== '') {
+      return false;
+    }
+    cursor = c.end;
   }
 
-  return planWhitespaceGap(rest, effectiveStart, gapEnd);
+  return gap.src.slice(cursor, gap.end).trim() === '';
 }
 
-// The gap opens with a comment that belongs to the next statement: the blank
-// line goes before that comment, preserving whatever whitespace leads into it.
-function planLeadingCommentEdit(rest: string, restStart: number): Edit | null {
-  const m = /^(?<leading>\s*)(?:\/\/|\/\*)/u.exec(rest);
-  const leading = m?.groups?.['leading'];
+// Comments starting on the previous statement's line stay attached to it; the
+// gap is measured from just past the last of them. Any comment after that
+// point is a leading comment for the next statement, and the blank line goes
+// before it.
+function planBlankLineEdit(gap: Gap): Edit | null {
+  const effectiveStart = skipTrailingComments(gap);
+  const leadingComment = gap.comments.find((c) => c.start >= effectiveStart);
 
-  if (leading === undefined) {
-    return null;
+  if (leadingComment !== undefined) {
+    return planLeadingCommentEdit(gap.src, effectiveStart, leadingComment.start);
   }
-  const leadingNewlines = (leading.match(/\n/gu) ?? []).length;
+
+  return planWhitespaceGap(gap.src.slice(effectiveStart, gap.end), effectiveStart, gap.end);
+}
+
+function skipTrailingComments(gap: Gap): number {
+  let pos = gap.start;
+
+  for (const c of gap.comments) {
+    if (gap.src.slice(pos, c.start).includes('\n')) {
+      break;
+    }
+    pos = c.end;
+  }
+
+  return pos;
+}
+
+// The blank line goes before the next statement's leading comment, preserving
+// whatever whitespace leads into it.
+function planLeadingCommentEdit(src: string, restStart: number, commentStart: number): Edit | null {
+  const leading = src.slice(restStart, commentStart);
+  const leadingNewlines = countNewlines(leading);
 
   if (leadingNewlines >= MIN_NEWLINES) {
     return null;
   }
-  const additional = MIN_NEWLINES - leadingNewlines;
 
   return {
     start: restStart,
-    end: restStart + leading.length,
-    replacement: `${'\n'.repeat(additional)}${leading}`,
+    end: commentStart,
+    replacement: `${'\n'.repeat(MIN_NEWLINES - leadingNewlines)}${leading}`,
   };
 }
 
 function planWhitespaceGap(gap: string, gapStart: number, gapEnd: number): Edit | null {
-  const newlines = (gap.match(/\n/gu) ?? []).length;
-
-  if (newlines >= MIN_NEWLINES) {
+  if (countNewlines(gap) >= MIN_NEWLINES) {
     return null;
   }
   const lastNL = gap.lastIndexOf('\n');
@@ -109,4 +129,8 @@ function planWhitespaceGap(gap: string, gapStart: number, gapEnd: number): Edit 
   const newGap = `${trimmed}${'\n'.repeat(MIN_NEWLINES)}${indent}`;
 
   return { start: gapStart, end: gapEnd, replacement: newGap };
+}
+
+function countNewlines(s: string): number {
+  return (s.match(/\n/gu) ?? []).length;
 }

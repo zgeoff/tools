@@ -1,20 +1,22 @@
 import { planGapEdit } from './plan-gap-edit.ts';
-import type { AstNode, Edit } from './types.ts';
+import type { AstNode, Edit, ParsedSource, SourceFile } from './types.ts';
 
 // Sorted last-to-first so applying splices in order never shifts later offsets.
-export function buildEditsFromAst(src: string, ast: AstNode): Edit[] {
-  return walk(src, ast).toSorted((a, b) => b.start - a.start);
+export function buildEditsFromAst(src: string, parsed: ParsedSource): Edit[] {
+  const file: SourceFile = { src, comments: parsed.comments };
+
+  return walk(file, parsed.program).toSorted((a, b) => b.start - a.start);
 }
 
-function walk(src: string, node: AstNode): Edit[] {
+function walk(file: SourceFile, node: AstNode): Edit[] {
   const edits: Edit[] = [];
 
   for (const body of getStatementLists(node)) {
-    edits.push(...buildPairEdits(src, node, body));
+    edits.push(...buildPairEdits(file, node, body));
   }
 
   for (const child of collectChildNodes(node)) {
-    edits.push(...walk(src, child));
+    edits.push(...walk(file, child));
   }
 
   return edits;
@@ -38,7 +40,7 @@ function getStatementLists(node: AstNode): (readonly AstNode[])[] {
   return bodies;
 }
 
-function buildPairEdits(src: string, container: AstNode, body: readonly AstNode[]): Edit[] {
+function buildPairEdits(file: SourceFile, container: AstNode, body: readonly AstNode[]): Edit[] {
   const edits: Edit[] = [];
 
   for (let i = 0; i < body.length - 1; i++) {
@@ -46,7 +48,7 @@ function buildPairEdits(src: string, container: AstNode, body: readonly AstNode[
     const next = body[i + 1];
 
     if (prev !== undefined && next !== undefined && needsBlankLine(container, prev, next)) {
-      const edit = planGapEdit(src, prev, next);
+      const edit = planGapEdit(file, prev, next);
 
       if (edit !== null) {
         edits.push(edit);

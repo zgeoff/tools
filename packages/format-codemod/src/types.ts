@@ -22,6 +22,13 @@ export interface ParsedSource {
   readonly comments: readonly CommentSpan[];
 }
 
+// The raw text and its comment spans together — what gap planning needs to
+// classify inter-statement trivia without re-lexing.
+export interface SourceFile {
+  readonly src: string;
+  readonly comments: readonly CommentSpan[];
+}
+
 export interface Edit {
   readonly start: number;
   readonly end: number;
