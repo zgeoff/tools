@@ -3,6 +3,12 @@ import type { ParsedSource } from '../types.ts';
 import { buildEditsFromAST } from './build-edits-from-ast.ts';
 import { parseSource } from './parse-source.ts';
 
+/**
+ * Narrows the parser's ParsedSource-or-error-message union for fixtures that
+ * are known-valid TypeScript, sparing every test the same narrowing dance.
+ * The throw is unreachable today but makes a fixture that stops parsing fail
+ * loudly with the parser's own message.
+ */
 function parse(src: string): ParsedSource {
   const parsed = parseSource(src, 'file.ts');
 
