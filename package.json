@@ -27,14 +27,15 @@
     "lint": "oxlint --report-unused-disable-directives-severity error",
     "lint:fix": "oxlint --fix",
     "lint:type-aware": "oxlint --type-aware --type-check --report-unused-disable-directives-severity error",
-    "format": "oxfmt .",
-    "format:check": "oxfmt --check ."
+    "format": "oxfmt . && format-codemod --quiet .",
+    "format:check": "oxfmt --check . && format-codemod --check --quiet ."
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "catalog:",
     "@tsconfig/strictest": "catalog:",
     "@types/bun": "catalog:",
     "@zgeoff/bun-test-extended": "workspace:*",
+    "@zgeoff/format-codemod": "workspace:*",
     "lefthook": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",

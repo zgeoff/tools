@@ -76,6 +76,11 @@
     "capitalized-comments": "off",
     "id-length": "off",
     "no-magic-numbers": "off",
+    // prefer-ternary (only-single-line, above) wants ternaries where they fit
+    // on one line; no-ternary would ban the same code
+    "no-ternary": "off",
+    // this repo builds node/bun CLI tooling — node builtins are the platform
+    "import/no-nodejs-modules": "off",
 
     // preload-style modules (matcher registration, type augmentation) are
     // side-effect imports by design

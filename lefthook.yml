@@ -12,6 +12,10 @@ pre-commit:
       glob: '*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,json,jsonc,md,css,yml,yaml,html}'
       run: bunx oxfmt --no-error-on-unmatched-pattern {staged_files}
       stage_fixed: true
+    - name: format-codemod
+      glob: '*.{ts,tsx}'
+      run: bunx format-codemod --quiet {staged_files}
+      stage_fixed: true
 
 pre-push:
   parallel: true
