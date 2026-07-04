@@ -28,6 +28,24 @@
       { "checkJSDoc": false, "checkExclamation": false }
     ],
 
+    // own-line comments get a blank line above so they don't crowd the
+    // previous statement; comments opening a block/object/class/etc are exempt
+    "@stylistic/lines-around-comment": [
+      "error",
+      {
+        "beforeLineComment": true,
+        "beforeBlockComment": true,
+        "allowBlockStart": true,
+        "allowObjectStart": true,
+        "allowArrayStart": true,
+        "allowClassStart": true,
+        "allowEnumStart": true,
+        "allowInterfaceStart": true,
+        "allowModuleStart": true,
+        "allowTypeStart": true
+      }
+    ],
+
     // restriction-category cherry-picks
     "typescript/no-explicit-any": "error",
     "typescript/no-non-null-assertion": "error",

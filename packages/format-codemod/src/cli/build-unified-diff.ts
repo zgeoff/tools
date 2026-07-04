@@ -36,8 +36,8 @@ interface Position {
 
 /**
  * Myers O((N+M)·D) line diff. D is the edit distance — for padding diffs just
- * the handful of inserted blanks — so this stays near-linear, and unlike the
- * old greedy resync it can't mis-pair repeated lines.
+ * the handful of inserted blanks — so this stays near-linear, and being a
+ * minimal diff it never mis-pairs repeated lines.
  */
 class MyersDiff {
   private readonly a: readonly string[];

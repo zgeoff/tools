@@ -46,7 +46,8 @@ export function parseCLIArgs(argv: readonly string[]): CLIArgs | string {
 }
 
 /**
- * --check wins over --dry when both are passed, matching the old flag order.
+ * --check wins over --dry when both are passed — the stricter mode's
+ * no-writes guarantee must hold.
  */
 function pickMode(check: boolean, dry: boolean): CLIMode {
   if (check) {

@@ -5,6 +5,7 @@ import type { CLIMode, FileReport } from './types.ts';
 
 export function checkFile(file: string, mode: CLIMode): FileReport {
   const src = fs.readFileSync(file, 'utf8');
+
   // byteLength, not src.length: bench throughput is measured in bytes and the
   // two diverge on any non-ASCII source.
   const bytes = Buffer.byteLength(src);

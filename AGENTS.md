@@ -37,6 +37,11 @@ experimental `--type-check` (fast, run it locally), while `typecheck` runs real 
   JSDoc blocks (`/** … */`) so editors surface them on hover; `//` is for statement-level commentary
   inside bodies. Attach the block to the declaration it describes — a doc above the wrong `const`
   binds to that const.
+- Comments describe the code as it is. Never reference its history ("the old implementation",
+  "previously", "now uses") or the change that produced it — that context lives in commit messages
+  and goes stale the moment it merges.
+- Own-line comments get a blank line above them (`@stylistic/lines-around-comment`, auto-fixed)
+  unless they open a block/object/class body.
 
 ## Testing
 
