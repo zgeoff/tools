@@ -1,30 +1,25 @@
 import { buildEditsFromAst } from './build-edits-from-ast.ts';
 import { parseSource } from './parse-source.ts';
-import type { AstNode, Edit, TransformResult } from './types.ts';
+import type { Edit, TransformResult } from './types.ts';
 
-// Pure transform: source string in, edited source string out, no I/O. On a parse
-// error the input is returned untouched alongside the error message.
-export function transform(src: string): TransformResult {
-  const parsed = tryParse(src);
+export interface TransformOptions {
+  // Picks the parse dialect: `.tsx` enables JSX, anything else is plain
+  // TypeScript. Defaults to 'source.ts' — JSX callers must say so.
+  readonly filename?: string;
+}
+
+// Pure transform: source string in, edited source string out, no I/O. On a
+// parse error the input is returned untouched alongside the error message.
+export function transform(src: string, options?: TransformOptions): TransformResult {
+  const parsed = parseSource(src, options?.filename ?? 'source.ts');
 
   if (typeof parsed === 'string') {
     return { output: src, edits: 0, parseError: parsed };
   }
-  const program = parsed.program ?? parsed;
-  const editList = buildEditsFromAst(src, program);
+  const editList = buildEditsFromAst(src, parsed.program);
   const output = applyEdits(src, editList);
 
   return { output, edits: editList.length, parseError: null };
-}
-
-// The parse-error message, or the AST — AstNode is always an object, so the
-// string return is unambiguous.
-function tryParse(src: string): AstNode | string {
-  try {
-    return parseSource(src);
-  } catch (error) {
-    return error instanceof Error ? error.message : String(error);
-  }
 }
 
 // Edits are pre-sorted last-to-first so earlier splices never shift later offsets.

@@ -5,7 +5,7 @@ import { handleDiff } from './handle-diff.ts';
 
 export function checkFile(file: string, mode: CliMode): FileReport {
   const src = fs.readFileSync(file, 'utf8');
-  const result = transform(src);
+  const result = transform(src, { filename: file });
 
   if (result.parseError !== null) {
     console.error(`PARSE-ERR ${file}  ${result.parseError}`);

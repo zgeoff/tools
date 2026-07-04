@@ -1,4 +1,4 @@
-// The fields of the babel AST this transform reads; the index signature carries
+// The fields of the oxc AST this transform reads; the index signature carries
 // every other node property so the generic child walk can recurse untyped. The
 // codemod never mutates the tree, so everything is readonly.
 export interface AstNode {
@@ -9,8 +9,17 @@ export interface AstNode {
   readonly body?: readonly AstNode[] | AstNode;
   readonly consequent?: readonly AstNode[];
   readonly declaration?: AstNode;
-  readonly program?: AstNode;
   readonly [key: string]: unknown;
+}
+
+export interface CommentSpan {
+  readonly start: number;
+  readonly end: number;
+}
+
+export interface ParsedSource {
+  readonly program: AstNode;
+  readonly comments: readonly CommentSpan[];
 }
 
 export interface Edit {

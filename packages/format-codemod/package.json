@@ -30,7 +30,7 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "@babel/parser": "7.29.0"
+    "oxc-parser": "0.137.0"
   },
   "devDependencies": {
     "@types/bun": "catalog:",

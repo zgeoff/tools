@@ -47,6 +47,36 @@ test('it leaves a leading-semicolon ASI statement intact instead of orphaning th
   expect(output).toInclude('(store as Stub).set(v)\n\n  return v');
 });
 
+test('it parses old-style type assertions in a .ts file', () => {
+  const src = 'const setup = init();\nconst x = <string>getValue();\nuse(x);\n';
+  const { output, parseError } = transform(src, { filename: 'file.ts' });
+
+  expect(parseError).toBeNil();
+  expect(output).toInclude('const x = <string>getValue();\n\nuse(x);');
+});
+
+test('it parses generic arrow functions in a .ts file', () => {
+  const src = 'const id = <T>(a: T): T => a;\nid(1);\n';
+  const { parseError, edits } = transform(src, { filename: 'file.ts' });
+
+  expect(parseError).toBeNil();
+  expect(edits).toBe(1);
+});
+
+test('it parses JSX when the filename says .tsx', () => {
+  const src = 'const el = <div>hi</div>;\nrender(el);\n';
+  const { output, parseError } = transform(src, { filename: 'file.tsx' });
+
+  expect(parseError).toBeNil();
+  expect(output).toBe('const el = <div>hi</div>;\n\nrender(el);\n');
+});
+
+test('it defaults to the plain TypeScript dialect when no filename is given', () => {
+  const { parseError } = transform('const x = <string>v;\nuse(x);\n');
+
+  expect(parseError).toBeNil();
+});
+
 test('it handles multi-line template literals without corrupting offsets', () => {
   const src = 'function f() {\n  const t = `a\nb\nc`;\n  return t;\n}\n';
   const { output, parseError } = transform(src);
