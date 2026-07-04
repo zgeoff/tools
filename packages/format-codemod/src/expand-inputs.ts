@@ -1,10 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+// Deduped: overlapping patterns ('src/**/*.ts' plus a file inside src/) must
+// not process — or report — the same file twice.
 export async function expandInputs(patterns: readonly string[]): Promise<string[]> {
   const lists = await Promise.all(patterns.map((p) => expandPattern(p)));
 
-  return lists.flat();
+  return [...new Set(lists.flat())];
 }
 
 function expandPattern(p: string): Promise<string[]> {
