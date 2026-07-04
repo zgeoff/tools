@@ -40,8 +40,6 @@ experimental `--type-check` (fast, run it locally), while `typecheck` runs real 
 - Comments describe the code as it is. Never reference its history ("the old implementation",
   "previously", "now uses") or the change that produced it — that context lives in commit messages
   and goes stale the moment it merges.
-- Own-line comments get a blank line above them (`@stylistic/lines-around-comment`, auto-fixed)
-  unless they open a block/object/class body.
 
 ## Testing
 
