@@ -7,6 +7,12 @@ on:
         description: Ref of zgeoff/tools to sync the shared partial from
         type: string
         default: main
+    secrets:
+      token:
+        description: >-
+          PAT or GitHub App token used to open the sync PR. Without it the default GITHUB_TOKEN is
+          used, and GitHub suppresses workflow runs on the resulting PR.
+        required: false
 
 jobs:
   sync:
@@ -32,6 +38,7 @@ jobs:
           bash scripts/build-agents-md.sh agents/shared.md agents/project.md AGENTS.md
       - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
+          token: ${{ secrets.token || github.token }}
           branch: sync-agents-md
           commit-message: 'chore: sync AGENTS.md from zgeoff/tools'
           title: 'chore: sync AGENTS.md from zgeoff/tools'
