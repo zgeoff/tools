@@ -1,4 +1,4 @@
-import type { Edit } from './types.ts';
+import type { Edit } from '../types.ts';
 
 // Edits arrive pre-sorted last-to-first (buildEditsFromAst's contract), so each
 // splice's offsets stay valid without adjustment. Segments are collected and

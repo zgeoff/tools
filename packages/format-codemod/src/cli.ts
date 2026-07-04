@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import { buildBenchStatsFromReports } from './cli/build-bench-stats-from-reports.ts';
+import { expandInputs } from './cli/expand-inputs.ts';
 import { parseCliArgs } from './cli/parse-cli-args.ts';
 import { printHelp } from './cli/print-help.ts';
 import { processFile } from './cli/process-file.ts';
-import { expandInputs } from './expand-inputs.ts';
-import type { FileReport } from './types.ts';
+import type { FileReport } from './cli/types.ts';
 
 const parsedArgs = parseCliArgs(process.argv.slice(2));
 
@@ -43,6 +43,25 @@ if (version) {
   process.exit(0);
 }
 
+// All stream writes live here: modules below the entry return what to print.
+function printReport(file: string, report: FileReport): void {
+  if (report.stdout !== null) {
+    process.stdout.write(report.stdout);
+  }
+
+  if (report.message !== null) {
+    console.error(report.message);
+  }
+
+  if (!quiet && report.outcome === 'ok') {
+    console.error(`OK    ${file}`);
+  }
+
+  if (!quiet && report.outcome === 'skipped') {
+    console.error(`SKIP  ${file}  declaration file`);
+  }
+}
+
 const t0 = Date.now();
 const files = await expandInputs(inputs);
 
@@ -57,12 +76,7 @@ for (const file of files) {
   const report = processFile(file, mode);
 
   reports.push(report);
-
-  if (!quiet && report.outcome === 'ok') {
-    console.error(`OK    ${file}`);
-  } else if (!quiet && report.outcome === 'skipped') {
-    console.error(`SKIP  ${file}  declaration file`);
-  }
+  printReport(file, report);
 }
 
 const failures = reports.filter((r) => r.outcome === 'failed').length;

@@ -1,4 +1,4 @@
-import type { BenchStats, FileReport } from '../types.ts';
+import type { BenchStats, FileReport } from './types.ts';
 
 export function buildBenchStatsFromReports(reports: readonly FileReport[], ms: number): BenchStats {
   const bytes = reports.reduce((sum, r) => sum + r.bytes, 0);

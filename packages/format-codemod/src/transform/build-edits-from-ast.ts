@@ -1,5 +1,5 @@
+import type { AstNode, Edit, ParsedSource, SourceFile } from '../types.ts';
 import { planGapEdit } from './plan-gap-edit.ts';
-import type { AstNode, Edit, ParsedSource, SourceFile } from './types.ts';
 
 // Sorted last-to-first so applying splices in order never shifts later offsets.
 export function buildEditsFromAst(src: string, parsed: ParsedSource): Edit[] {

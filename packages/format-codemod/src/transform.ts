@@ -1,6 +1,6 @@
-import { applyEdits } from './apply-edits.ts';
-import { buildEditsFromAst } from './build-edits-from-ast.ts';
-import { parseSource } from './parse-source.ts';
+import { applyEdits } from './transform/apply-edits.ts';
+import { buildEditsFromAst } from './transform/build-edits-from-ast.ts';
+import { parseSource } from './transform/parse-source.ts';
 import type { TransformResult } from './types.ts';
 
 export interface TransformOptions {

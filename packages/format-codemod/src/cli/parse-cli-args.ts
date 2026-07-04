@@ -1,5 +1,5 @@
 import { parseArgs } from 'node:util';
-import type { CliMode } from '../types.ts';
+import type { CliMode } from './types.ts';
 
 export interface CliArgs {
   readonly mode: CliMode;

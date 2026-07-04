@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { transform } from '../transform.ts';
-import type { CliMode, FileReport } from '../types.ts';
 import { handleDiff } from './handle-diff.ts';
+import type { CliMode, FileReport } from './types.ts';
 
 export function checkFile(file: string, mode: CliMode): FileReport {
   const src = fs.readFileSync(file, 'utf8');
@@ -11,15 +11,18 @@ export function checkFile(file: string, mode: CliMode): FileReport {
   const result = transform(src, { filename: file });
 
   if (result.parseError !== null) {
-    console.error(`PARSE-ERR ${file}  ${result.parseError}`);
-
-    return { outcome: 'failed', bytes, parsed: false };
+    return {
+      outcome: 'failed',
+      bytes,
+      parsed: false,
+      message: `PARSE-ERR ${file}  ${result.parseError}`,
+      stdout: null,
+    };
   }
 
   if (result.edits === 0 || result.output === src) {
-    return { outcome: 'ok', bytes, parsed: true };
+    return { outcome: 'ok', bytes, parsed: true, message: null, stdout: null };
   }
-  handleDiff({ file, src, result }, mode);
 
-  return { outcome: 'changed', bytes, parsed: true };
+  return { outcome: 'changed', bytes, parsed: true, ...handleDiff({ file, src, result }, mode) };
 }

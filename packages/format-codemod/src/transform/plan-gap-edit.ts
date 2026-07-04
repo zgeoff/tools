@@ -1,4 +1,4 @@
-import type { AstNode, CommentSpan, Edit, SourceFile } from './types.ts';
+import type { AstNode, CommentSpan, Edit, SourceFile } from '../types.ts';
 
 // Every rule is "exactly one blank line", so a compliant gap always holds two
 // newlines: one ending the previous statement's line, one for the blank.

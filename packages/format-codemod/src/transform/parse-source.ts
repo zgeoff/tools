@@ -1,5 +1,5 @@
 import { parseSync } from 'oxc-parser';
-import type { AstNode, ParsedSource } from './types.ts';
+import type { AstNode, ParsedSource } from '../types.ts';
 
 // The filename picks the dialect — `.tsx` enables JSX, anything else parses as
 // plain TypeScript, so `.ts`-only syntax like `<string>value` assertions and
