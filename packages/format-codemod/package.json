@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/format-codemod",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Enforce blank-line padding conventions in TypeScript via a fast text-splice codemod",
   "license": "MIT",
   "repository": {
