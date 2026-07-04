@@ -27,8 +27,8 @@
     "lint": "oxlint --report-unused-disable-directives-severity error",
     "lint:fix": "oxlint --fix",
     "lint:type-aware": "oxlint --type-aware --type-check --report-unused-disable-directives-severity error",
-    "format": "oxfmt . && format-codemod --quiet .",
-    "format:check": "oxfmt --check . && format-codemod --check --quiet ."
+    "format": "oxfmt . && bun packages/format-codemod/src/cli.ts --quiet .",
+    "format:check": "oxfmt --check . && bun packages/format-codemod/src/cli.ts --check --quiet ."
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "catalog:",

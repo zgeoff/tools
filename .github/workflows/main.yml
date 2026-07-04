@@ -25,6 +25,10 @@ jobs:
       contents: write
       pull-requests: write
       id-token: write
+    env:
+      # The gates lefthook would run are this workflow's checks job — and its
+      # pre-push hook would reject the bot's lockfile-sync push.
+      LEFTHOOK: '0'
     steps:
       # GITHUB_TOKEN events don't trigger workflows, so release PRs are
       # created and merged with a GitHub App token (see RELEASING.md).
@@ -42,7 +46,8 @@ jobs:
           token: ${{ steps.app-token.outputs.token || github.token }}
 
       # Release PRs bump package.json versions, which bun.lock also records —
-      # sync the lockfile on the PR branch so --frozen-lockfile checks pass.
+      # sync the lockfile on the PR branch so --frozen-lockfile checks pass,
+      # and format the generated changelogs/manifests so format:check passes.
       - if: steps.release.outputs.prs_created == 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -55,10 +60,11 @@ jobs:
       - if: steps.release.outputs.prs_created == 'true'
         run: |
           bun install
-          if ! git diff --quiet bun.lock; then
+          bun run format
+          if ! git diff --quiet; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "chore: sync lockfile with release versions" bun.lock
+            git commit -am "chore: sync lockfile and format release files"
             git push
           fi
 
