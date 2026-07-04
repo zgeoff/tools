@@ -42,6 +42,9 @@ experimental `--type-check` (fast, run it locally), while `typecheck` runs real 
 - Comments describe the code as it is. Never reference its history ("the old implementation",
   "previously", "now uses") or the change that produced it — that context lives in commit messages
   and goes stale the moment it merges.
+- Comments don't name other declarations — renames silently strand the reference. State the role or
+  contract instead: "callers must pass edits sorted last-to-first", not "(buildEditsFromAST's
+  contract)". A declaration's own parameters and signature types are fine to name in its doc.
 
 ## Testing
 

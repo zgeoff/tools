@@ -179,7 +179,7 @@ function buildHunks(ops: readonly DiffOp[]): Hunk[] {
 const CONTEXT_LINES = 3;
 
 /**
- * Each changed op pulls CONTEXT_LINES of surrounding ops into its window;
+ * Each changed op pulls a context radius of surrounding ops into its window;
  * overlapping or adjacent windows merge into one hunk.
  */
 function buildWindows(ops: readonly DiffOp[]): Window[] {
