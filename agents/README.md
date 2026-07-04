@@ -38,6 +38,26 @@ Rebuild with `bash scripts/build-agents-md.sh agents/shared.md agents/project.md
    ```
 
 The sync workflow re-vendors the shared partial and rebuilds `AGENTS.md`, opening a PR only when
-something changed. PRs opened with the default `GITHUB_TOKEN` don't trigger the target repo's own
-`pull_request` workflows; if downstream checks must run on sync PRs, pass a GitHub App or PAT token
-to the stub instead.
+something changed.
+
+## Sync PRs and CI
+
+GitHub suppresses workflow runs for events created by the automatic `GITHUB_TOKEN` (its
+anti-recursion rule), so by default a sync PR arrives with **no checks**: the target repo's
+`pull_request` workflows never fire. Fine when merging on sight — checks still run on `main` after
+merge. But if the repo has branch protection with required checks, the sync PR can never satisfy
+them and is unmergeable.
+
+To make checks run, open the PR with a different identity: create a fine-grained PAT (or GitHub App
+token) with contents + pull-requests write on the repo, store it as a repo secret, and pass it to
+the stub:
+
+```yaml
+jobs:
+  sync:
+    uses: zgeoff/tools/.github/workflows/sync-agents.yml@main
+    secrets:
+      token: ${{ secrets.SYNC_TOKEN }}
+```
+
+With a token supplied, the `permissions` block on the stub job is no longer needed.
