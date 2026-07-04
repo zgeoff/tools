@@ -17,8 +17,10 @@ if (typeof parsedArgs === 'string') {
 const { mode, quiet, bench, help, version, inputs } = parsedArgs;
 
 if (help || (inputs.length === 0 && !version)) {
+  const exitCode = inputs.length === 0 ? 2 : 0;
+
   printHelp();
-  process.exit(inputs.length === 0 ? 2 : 0);
+  process.exit(exitCode);
 }
 
 function isPackageJSON(value: unknown): value is { version: string } {
@@ -97,5 +99,7 @@ if (failures > 0) {
 }
 
 if (mode === 'check') {
-  process.exit(anyChange ? 1 : 0);
+  const exitCode = anyChange ? 1 : 0;
+
+  process.exit(exitCode);
 }

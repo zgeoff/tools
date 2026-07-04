@@ -20,6 +20,8 @@
     "local/no-bare-named-exports": "error",
     "local/no-inline-param-object-types": "error",
     "local/no-destructured-params": "error",
+    "local/no-ternary-args": "error",
+    "local/no-await-args": "error",
 
     // enforced comment style — line comments unless JSDoc or exclamation
     "@stylistic/multiline-comment-style": [

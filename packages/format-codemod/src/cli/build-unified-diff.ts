@@ -124,11 +124,11 @@ class MyersDiff {
     const ops = this.buildEqualOps(pos, prev);
 
     if (d > 0) {
-      ops.push(
-        moveDown
-          ? { kind: '+', text: this.b[prev.y] ?? '' }
-          : { kind: '-', text: this.a[prev.x] ?? '' },
-      );
+      const changeOp: DiffOp = moveDown
+        ? { kind: '+', text: this.b[prev.y] ?? '' }
+        : { kind: '-', text: this.a[prev.x] ?? '' };
+
+      ops.push(changeOp);
     }
 
     return { ops, pos: prev };
