@@ -1,6 +1,11 @@
 import { createRequire } from 'node:module';
 import type { AstNode } from './types.ts';
 
+// Throws on syntax errors — callers own the recovery strategy.
+export function parseSource(src: string): AstNode {
+  return babelParser.parse(src, PARSER_OPTIONS);
+}
+
 // @babel/parser is CommonJS; createRequire loads it without the ESM/CJS interop
 // dance. We parse with it directly rather than through jscodeshift, whose j()
 // routes the parse through recast — recast remaps node offsets and they drift
@@ -60,8 +65,3 @@ const PARSER_OPTIONS = {
     'typescript',
   ],
 };
-
-// Throws on syntax errors — callers own the recovery strategy.
-export function parseSource(src: string): AstNode {
-  return babelParser.parse(src, PARSER_OPTIONS);
-}

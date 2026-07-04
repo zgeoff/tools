@@ -1,6 +1,21 @@
-import { collectEdits } from './collect-edits.ts';
+import { buildEditsFromAst } from './build-edits-from-ast.ts';
 import { parseSource } from './parse-source.ts';
 import type { AstNode, Edit, TransformResult } from './types.ts';
+
+// Pure transform: source string in, edited source string out, no I/O. On a parse
+// error the input is returned untouched alongside the error message.
+export function transform(src: string): TransformResult {
+  const parsed = tryParse(src);
+
+  if (typeof parsed === 'string') {
+    return { output: src, edits: 0, parseError: parsed };
+  }
+  const program = parsed.program ?? parsed;
+  const editList = buildEditsFromAst(src, program);
+  const output = applyEdits(src, editList);
+
+  return { output, edits: editList.length, parseError: null };
+}
 
 // The parse-error message, or the AST — AstNode is always an object, so the
 // string return is unambiguous.
@@ -21,19 +36,4 @@ function applyEdits(src: string, edits: readonly Edit[]): string {
   }
 
   return out;
-}
-
-// Pure transform: source string in, edited source string out, no I/O. On a parse
-// error the input is returned untouched alongside the error message.
-export function transform(src: string): TransformResult {
-  const parsed = tryParse(src);
-
-  if (typeof parsed === 'string') {
-    return { output: src, edits: 0, parseError: parsed };
-  }
-  const program = parsed.program ?? parsed;
-  const editList = collectEdits(src, program);
-  const output = applyEdits(src, editList);
-
-  return { output, edits: editList.length, parseError: null };
 }

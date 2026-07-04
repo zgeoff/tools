@@ -4,20 +4,47 @@ import type { AstNode, Edit } from './types.ts';
 // newlines: one ending the previous statement's line, one for the blank.
 const MIN_NEWLINES = 2;
 
-function nodeStart(n: AstNode): number {
-  if (typeof n.start !== 'number') {
-    throw new TypeError('AST node is missing a start position');
+// Plans the single whitespace splice that gives the gap between two statements
+// exactly one blank line, or null when the gap is already compliant or unsafe
+// to touch.
+export function planGapEdit(src: string, prev: AstNode, next: AstNode): Edit | null {
+  const gapStart = getNodeEnd(prev);
+  const gapEnd = getNodeStart(next);
+  const gap = src.slice(gapStart, gapEnd);
+
+  if (stripCommentsAndWhitespace(gap) !== '') {
+    return null;
   }
 
-  return n.start;
+  // The two statements share a physical line, which happens when a leading
+  // semicolon (`;(expr)` ASI guard) terminates the previous statement: babel
+  // folds that `;` into the prior node, so the gap falls between `;` and `(`.
+  // A blank-only codemod cannot separate them without orphaning the `;`, so skip.
+  if (!gap.includes('\n')) {
+    return null;
+  }
+
+  if (/\/\/|\/\*/u.test(gap)) {
+    return planCommentGap(src, gapStart, gapEnd);
+  }
+
+  return planWhitespaceGap(gap, gapStart, gapEnd);
 }
 
-function nodeEnd(n: AstNode): number {
+function getNodeEnd(n: AstNode): number {
   if (typeof n.end !== 'number') {
     throw new TypeError('AST node is missing an end position');
   }
 
   return n.end;
+}
+
+function getNodeStart(n: AstNode): number {
+  if (typeof n.start !== 'number') {
+    throw new TypeError('AST node is missing a start position');
+  }
+
+  return n.start;
 }
 
 function stripCommentsAndWhitespace(s: string): string {
@@ -27,18 +54,24 @@ function stripCommentsAndWhitespace(s: string): string {
     .replaceAll(/\s+/gu, '');
 }
 
-function planWhitespaceGap(gap: string, gapStart: number, gapEnd: number): Edit | null {
-  const newlines = (gap.match(/\n/gu) ?? []).length;
+// A trailing same-line comment stays attached to the previous statement, so the
+// gap is measured from just past it; any comment after that point is a leading
+// comment for the next statement.
+function planCommentGap(src: string, gapStart: number, gapEnd: number): Edit | null {
+  const gap = src.slice(gapStart, gapEnd);
+  const trailing = /^[ \t]*(?:\/\/[^\n]*|\/\*[\s\S]*?\*\/)/u.exec(gap);
+  let effectiveStart = gapStart;
 
-  if (newlines >= MIN_NEWLINES) {
-    return null;
+  if (trailing !== null) {
+    effectiveStart = gapStart + trailing[0].length;
   }
-  const lastNL = gap.lastIndexOf('\n');
-  const indent = lastNL === -1 ? '' : gap.slice(lastNL + 1);
-  const trimmed = gap.slice(0, gap.length - indent.length).replace(/\n*$/u, '');
-  const newGap = `${trimmed}${'\n'.repeat(MIN_NEWLINES)}${indent}`;
+  const rest = src.slice(effectiveStart, gapEnd);
 
-  return { start: gapStart, end: gapEnd, replacement: newGap };
+  if (/\/\/|\/\*/u.test(rest)) {
+    return planLeadingCommentEdit(rest, effectiveStart);
+  }
+
+  return planWhitespaceGap(rest, effectiveStart, gapEnd);
 }
 
 // The gap opens with a comment that belongs to the next statement: the blank
@@ -64,49 +97,16 @@ function planLeadingCommentEdit(rest: string, restStart: number): Edit | null {
   };
 }
 
-// A trailing same-line comment stays attached to the previous statement, so the
-// gap is measured from just past it; any comment after that point is a leading
-// comment for the next statement.
-function planCommentGap(src: string, gapStart: number, gapEnd: number): Edit | null {
-  const gap = src.slice(gapStart, gapEnd);
-  const trailing = /^[ \t]*(?:\/\/[^\n]*|\/\*[\s\S]*?\*\/)/u.exec(gap);
-  let effectiveStart = gapStart;
+function planWhitespaceGap(gap: string, gapStart: number, gapEnd: number): Edit | null {
+  const newlines = (gap.match(/\n/gu) ?? []).length;
 
-  if (trailing !== null) {
-    effectiveStart = gapStart + trailing[0].length;
-  }
-  const rest = src.slice(effectiveStart, gapEnd);
-
-  if (/\/\/|\/\*/u.test(rest)) {
-    return planLeadingCommentEdit(rest, effectiveStart);
-  }
-
-  return planWhitespaceGap(rest, effectiveStart, gapEnd);
-}
-
-// Plans the single whitespace splice that gives the gap between two statements
-// exactly one blank line, or null when the gap is already compliant or unsafe
-// to touch.
-export function planGapEdit(src: string, prev: AstNode, next: AstNode): Edit | null {
-  const gapStart = nodeEnd(prev);
-  const gapEnd = nodeStart(next);
-  const gap = src.slice(gapStart, gapEnd);
-
-  if (stripCommentsAndWhitespace(gap) !== '') {
+  if (newlines >= MIN_NEWLINES) {
     return null;
   }
+  const lastNL = gap.lastIndexOf('\n');
+  const indent = lastNL === -1 ? '' : gap.slice(lastNL + 1);
+  const trimmed = gap.slice(0, gap.length - indent.length).replace(/\n*$/u, '');
+  const newGap = `${trimmed}${'\n'.repeat(MIN_NEWLINES)}${indent}`;
 
-  // The two statements share a physical line, which happens when a leading
-  // semicolon (`;(expr)` ASI guard) terminates the previous statement: babel
-  // folds that `;` into the prior node, so the gap falls between `;` and `(`.
-  // A blank-only codemod cannot separate them without orphaning the `;`, so skip.
-  if (!gap.includes('\n')) {
-    return null;
-  }
-
-  if (/\/\/|\/\*/u.test(gap)) {
-    return planCommentGap(src, gapStart, gapEnd);
-  }
-
-  return planWhitespaceGap(gap, gapStart, gapEnd);
+  return { start: gapStart, end: gapEnd, replacement: newGap };
 }

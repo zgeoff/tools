@@ -1,11 +1,5 @@
-function scanTo(lines: readonly string[], from: number, sentinel: string | undefined): number {
-  let j = from;
-
-  while (j < lines.length && lines[j] !== sentinel) {
-    j++;
-  }
-
-  return j;
+export function buildUnifiedDiff(a: string, b: string, label: string): string {
+  return new LineDiff(a, b, label).render();
 }
 
 // Minimal line-based diff; enough to preview --dry output without a dep.
@@ -63,6 +57,12 @@ class LineDiff {
   }
 }
 
-export function unifiedDiff(a: string, b: string, label: string): string {
-  return new LineDiff(a, b, label).render();
+function scanTo(lines: readonly string[], from: number, sentinel: string | undefined): number {
+  let j = from;
+
+  while (j < lines.length && lines[j] !== sentinel) {
+    j++;
+  }
+
+  return j;
 }

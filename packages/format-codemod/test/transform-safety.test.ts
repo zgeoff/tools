@@ -38,13 +38,13 @@ test('returns the input untouched with a message when the source cannot parse', 
 });
 
 test('leaves a leading-semicolon ASI statement intact instead of orphaning the semicolon', () => {
-  const src = `function f() {\n  const g = "1.15"\n  ;(cfg as Mock).set(g)\n  return g\n}\n`;
+  const src = `function f() {\n  const v = "1"\n  ;(store as Stub).set(v)\n  return v\n}\n`;
   const { output } = transform(src);
 
   // the const and the `;(expr)` share a line via the leading semicolon, so that
   // pair must stay untouched; the blank before `return` is still added
-  expect(output).toInclude('  const g = "1.15"\n  ;(cfg as Mock).set(g)');
-  expect(output).toInclude('(cfg as Mock).set(g)\n\n  return g');
+  expect(output).toInclude('  const v = "1"\n  ;(store as Stub).set(v)');
+  expect(output).toInclude('(store as Stub).set(v)\n\n  return v');
 });
 
 test('handles multi-line template literals without corrupting offsets', () => {

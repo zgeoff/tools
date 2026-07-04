@@ -22,6 +22,13 @@ experimental `--type-check` (fast, run it locally), while `typecheck` runs real 
 - One primary export per file, and the file name kebab-cases that export (`with-jest-context.ts`
   exports `withJestContext`). Exceptions: `index.ts` entrypoints, `types.ts` for a package's shared
   types, and side-effect-only modules, which are named for what they do (`augment-bun-test.ts`).
+- Function names start with a verb (`expandInputs`, `planGapEdit`, `parseSource`). Pure transforms
+  and value-producers are `build<Result>From<Source>` (`buildEditsFromAst`,
+  `buildBenchStatsFromReports`); drop the `From<Source>` suffix only when there's no meaningful
+  single source (`buildUnifiedDiff`). Avoid the bare `to<Result>` prefix.
+- Module order: imports, then the primary export, then private helpers in composition order
+  (depth-first). Don't lead with helpers. Types for the primary export's signature may sit just
+  above it.
 
 ## Testing
 

@@ -2,7 +2,8 @@
 
 Enforce a small set of blank-line padding conventions in TypeScript via a fast text-splice codemod.
 It parses each file once with `@babel/parser`, applies only positional whitespace edits, and skips
-type-aware analysis, so it runs far faster than a full lint pass (sub-second over ~2,000 files).
+type-aware analysis, so it runs far faster than a full lint pass — fast enough to sit in a
+pre-commit hook or a `format` pipeline without being noticed.
 
 ## Rules implemented
 
