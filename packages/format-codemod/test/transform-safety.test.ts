@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { transform } from '../src/transform.ts';
 
-test('is a no-op when run again on already-formatted code', () => {
+test('it is a no-op when run again on already-formatted code', () => {
   const src = `const a = 1;\ndoA();\nfunction f() {\n  const x = 1;\n  return x;\n}\nclass C {\n  a = 1;\n  m() {}\n}\n`;
   const once = transform(src).output;
   const twice = transform(once).output;
@@ -10,7 +10,7 @@ test('is a no-op when run again on already-formatted code', () => {
   expect(twice).toBe(once);
 });
 
-test('stays idempotent across many transform cycles', () => {
+test('it stays idempotent across many transform cycles', () => {
   let s = `function f(xs) {\n  const seen = [];\n  setup();\n  if (ready) {\n    go();\n  }\n  for (const x of xs) {\n    use(x);\n  }\n  return seen;\n}\n`;
 
   for (let i = 0; i < 5; i++) {
@@ -21,7 +21,7 @@ test('stays idempotent across many transform cycles', () => {
   expect(after).toBe(s);
 });
 
-test('preserves spacing exactly when the input is already compliant', () => {
+test('it preserves spacing exactly when the input is already compliant', () => {
   const compliant = `function f() {\n  const x = 1;\n\n  return x;\n}\n`;
   const { output, edits } = transform(compliant);
 
@@ -29,7 +29,7 @@ test('preserves spacing exactly when the input is already compliant', () => {
   expect(edits).toBe(0);
 });
 
-test('returns the input untouched with a message when the source cannot parse', () => {
+test('it returns the input untouched with a message when the source cannot parse', () => {
   const { output, edits, parseError } = transform('const x = ;;;@@@!');
 
   expect(output).toBe('const x = ;;;@@@!');
@@ -37,7 +37,7 @@ test('returns the input untouched with a message when the source cannot parse', 
   expect(parseError).toInclude('Unexpected token');
 });
 
-test('leaves a leading-semicolon ASI statement intact instead of orphaning the semicolon', () => {
+test('it leaves a leading-semicolon ASI statement intact instead of orphaning the semicolon', () => {
   const src = `function f() {\n  const v = "1"\n  ;(store as Stub).set(v)\n  return v\n}\n`;
   const { output } = transform(src);
 
@@ -47,7 +47,7 @@ test('leaves a leading-semicolon ASI statement intact instead of orphaning the s
   expect(output).toInclude('(store as Stub).set(v)\n\n  return v');
 });
 
-test('handles multi-line template literals without corrupting offsets', () => {
+test('it handles multi-line template literals without corrupting offsets', () => {
   const src = 'function f() {\n  const t = `a\nb\nc`;\n  return t;\n}\n';
   const { output, parseError } = transform(src);
 

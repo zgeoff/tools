@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { transform } from '../src/transform.ts';
 
-test('pads after a var block before a non-var statement and keeps consecutive vars glued', () => {
+test('it pads after a var block before a non-var statement and keeps consecutive vars glued', () => {
   const src = `function f() {\n  const x = 1;\n  const y = 2;\n  let z = 3;\n  doStuff(x, y, z);\n}\n`;
   const { output, edits, parseError } = transform(src);
 
@@ -19,7 +19,7 @@ test('pads after a var block before a non-var statement and keeps consecutive va
   `);
 });
 
-test('pads before a return statement', () => {
+test('it pads before a return statement', () => {
   const src = `function f() {\n  doFirst();\n  return 1;\n}\n`;
   const { output } = transform(src);
 
@@ -33,7 +33,7 @@ test('pads before a return statement', () => {
   `);
 });
 
-test('pads before control-flow blocks but leaves a guard clause tight after one', () => {
+test('it pads before control-flow blocks but leaves a guard clause tight after one', () => {
   const src = `function f(xs) {\n  setup();\n  if (ready) {\n    go();\n  }\n  cleanup();\n  for (const x of xs) {\n    use(x);\n  }\n}\n`;
   const { output } = transform(src);
 
@@ -54,7 +54,7 @@ test('pads before control-flow blocks but leaves a guard clause tight after one'
   `);
 });
 
-test('pads after bare function and class declarations', () => {
+test('it pads after bare function and class declarations', () => {
   const src = `function afterFnDecl() {}\nafterFnDecl();\nclass Thing {}\nnew Thing();\n`;
   const { output } = transform(src);
 
@@ -69,14 +69,14 @@ test('pads after bare function and class declarations', () => {
   `);
 });
 
-test('pads after a bare var declaration at the top level', () => {
+test('it pads after a bare var declaration at the top level', () => {
   const src = `const A = 1;\ndoA();\n`;
   const { output } = transform(src);
 
   expect(output).toBe('const A = 1;\n\ndoA();\n');
 });
 
-test('does not pad after exported declarations (ESLint does not look through export)', () => {
+test('it does not pad after exported declarations (ESLint does not look through export)', () => {
   const src = `export const A = 1;\ndoA();\nexport function f() {}\ndoF();\nexport class C {}\ndoC();\n`;
   const { output, edits } = transform(src);
 
@@ -84,7 +84,7 @@ test('does not pad after exported declarations (ESLint does not look through exp
   expect(output).toBe(src);
 });
 
-test('does not treat await using as a var declaration', () => {
+test('it does not treat await using as a var declaration', () => {
   const src = `async function f() {\n  await using handle = acquire();\n  process(handle);\n}\n`;
   const { output, edits } = transform(src);
 
@@ -92,7 +92,7 @@ test('does not treat await using as a var declaration', () => {
   expect(output).toBe(src);
 });
 
-test('inserts a blank line between adjacent class members', () => {
+test('it inserts a blank line between adjacent class members', () => {
   const src = `class C {\n  a = 1;\n  b = 2;\n  m() {}\n}\n`;
   const { output } = transform(src);
 
@@ -108,7 +108,7 @@ test('inserts a blank line between adjacent class members', () => {
   `);
 });
 
-test('pads every member kind in a mixed class body', () => {
+test('it pads every member kind in a mixed class body', () => {
   const src = `class Mixed {\n  private a = 1;\n  constructor() {\n    this.a = 10;\n  }\n  method() {\n    return this.a;\n  }\n  get accessor() {\n    return this.a;\n  }\n}\n`;
   const { output } = transform(src);
 
@@ -132,14 +132,14 @@ test('pads every member kind in a mixed class body', () => {
   `);
 });
 
-test('preserves indentation when inserting a blank line in a class body', () => {
+test('it preserves indentation when inserting a blank line in a class body', () => {
   const src = `class C {\n    a = 1;\n    b = 2;\n}\n`;
   const { output } = transform(src);
 
   expect(output).toInclude('    a = 1;\n\n    b = 2;');
 });
 
-test('pads inside switch cases, both braced and bare', () => {
+test('it pads inside switch cases, both braced and bare', () => {
   const src = `function f(n) {\n  switch (n) {\n    case 1: {\n      const a = 1;\n      return a;\n    }\n    case 2:\n      const b = 2;\n      return b;\n  }\n}\n`;
   const { output } = transform(src);
 
@@ -161,14 +161,14 @@ test('pads inside switch cases, both braced and bare', () => {
   `);
 });
 
-test('keeps a trailing same-line line comment attached to the preceding var', () => {
+test('it keeps a trailing same-line line comment attached to the preceding var', () => {
   const src = `function f() {\n  const TIMEOUT_MS = 5000; // five seconds\n  doStuff(TIMEOUT_MS);\n}\n`;
   const { output } = transform(src);
 
   expect(output).toInclude('  const TIMEOUT_MS = 5000; // five seconds\n\n  doStuff(TIMEOUT_MS);');
 });
 
-test('keeps a trailing block comment attached to the preceding var', () => {
+test('it keeps a trailing block comment attached to the preceding var', () => {
   const src = `function f() {\n  const X = 1; /* note */\n  return X;\n}\n`;
   const { output } = transform(src);
 
@@ -182,7 +182,7 @@ test('keeps a trailing block comment attached to the preceding var', () => {
   `);
 });
 
-test('puts the blank line before a leading comment that belongs to the next statement', () => {
+test('it puts the blank line before a leading comment that belongs to the next statement', () => {
   const src = `function f() {\n  const x = 1;\n  // explains the next line\n  return x;\n}\n`;
   const { output } = transform(src);
 
