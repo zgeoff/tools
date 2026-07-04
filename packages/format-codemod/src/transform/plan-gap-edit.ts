@@ -1,12 +1,6 @@
 import type { ASTNode, CommentSpan, Edit, SourceFile } from '../types.ts';
 
 /**
- * Every rule is "exactly one blank line", so a compliant gap always holds two
- * newlines: one ending the previous statement's line, one for the blank.
- */
-const MIN_NEWLINES = 2;
-
-/**
  * Plans the single whitespace splice that gives the gap between two statements
  * exactly one blank line, or null when the gap is already compliant or unsafe
  * to touch. Comment positions come from the parser rather than lexical
@@ -113,6 +107,12 @@ function skipTrailingComments(gap: Gap): number {
 
   return pos;
 }
+
+/**
+ * Every rule is "exactly one blank line", so a compliant gap always holds two
+ * newlines: one ending the previous statement's line, one for the blank.
+ */
+const MIN_NEWLINES = 2;
 
 /**
  * The blank line goes before the next statement's leading comment, preserving

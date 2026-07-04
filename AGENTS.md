@@ -31,8 +31,10 @@ experimental `--type-check` (fast, run it locally), while `typecheck` runs real 
   `astNode`). File names are unaffected: kebab-case lowercases everything (`parse-cli-args.ts`
   exports `parseCLIArgs`).
 - Module order: imports, then the primary export, then private helpers in composition order
-  (depth-first). Don't lead with helpers. Types for the primary export's signature may sit just
-  above it.
+  (depth-first). Don't lead with helpers. Non-function supporting declarations (consts, interfaces,
+  type aliases) sit directly above the first declaration that uses them — never below their last
+  use, and never leading the file (types for the primary export's signature are the one exception:
+  they may sit just above it).
 - Comments that document a declaration (function, class, interface, member, module-scope const) are
   JSDoc blocks (`/** … */`) so editors surface them on hover; `//` is for statement-level commentary
   inside bodies. Attach the block to the declaration it describes — a doc above the wrong `const`

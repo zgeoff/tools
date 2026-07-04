@@ -174,6 +174,11 @@ function buildHunks(ops: readonly DiffOp[]): Hunk[] {
 }
 
 /**
+ * Context lines per hunk, matching diff -u / git defaults.
+ */
+const CONTEXT_LINES = 3;
+
+/**
  * Each changed op pulls CONTEXT_LINES of surrounding ops into its window;
  * overlapping or adjacent windows merge into one hunk.
  */
@@ -240,8 +245,3 @@ function formatRange(line: number, count: number): string {
 function renderHunk(h: Hunk): string {
   return `${h.header}${h.lines.join('')}`;
 }
-
-/**
- * Context lines per hunk, matching diff -u / git defaults.
- */
-const CONTEXT_LINES = 3;
