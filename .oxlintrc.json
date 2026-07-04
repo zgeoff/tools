@@ -129,6 +129,14 @@
   },
   "overrides": [
     {
+      "files": ["**/*.test.ts"],
+      // one co-located suite per module with inline test data: file length
+      // scales with coverage, not complexity
+      "rules": {
+        "max-lines": "off"
+      }
+    },
+    {
       "files": ["**/*.js", "**/*.cjs", "**/*.mjs"],
       // untyped JS is `any` end to end, so the unsafe-* rules flag every
       // expression
