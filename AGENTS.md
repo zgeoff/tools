@@ -111,15 +111,16 @@ verb. The prefix is a contract — a reader should know the function's shape wit
 
 **Framework conventions** — where the ecosystem's prefix is load-bearing, it wins:
 
-| Prefix      | Contract                                                                                                                | Example       |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------- | ------------- |
-| `use<X>`    | React hook — the prefix drives rules-of-hooks linting; helpers inside a hook follow the normal taxonomy                 | `useDebounce` |
-| `on<Event>` | event callback (React's conventional `handle<Event>` collides with the banlist — use `on<Event>` locally and for props) | `onRowClick`  |
+| Prefix          | Contract                                                                                                                | Example          |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| `use<X>`        | React hook — the prefix drives rules-of-hooks linting; helpers inside a hook follow the normal taxonomy                 | `useDebounce`    |
+| `on<Event>`     | event-callback prop or parameter                                                                                        | `onRowClick`     |
+| `handle<Event>` | local implementation passed to an `on<Event>` prop — the idiomatic React pair; the `handle` ban applies everywhere else | `handleRowClick` |
 
-**Banned** — each is a vaguer or synonymous form of a listed verb; use that one instead: `handle`,
-`process`, `manage`, `do`, `perform` (say what it does), `execute` (→ `run`), `compute` (→ `build`),
-`fetch` (→ `read`), `save`/`store` (→ `write`), `delete` (→ `remove`), `search`/`lookup` (→
-`find`/`get`).
+**Banned** — each is a vaguer or synonymous form of a listed verb; use that one instead: `handle`
+(except React's `handle<Event>`, above), `process`, `manage`, `do`, `perform` (say what it does),
+`execute` (→ `run`), `compute` (→ `build`), `fetch` (→ `read`), `save`/`store` (→ `write`), `delete`
+(→ `remove`), `search`/`lookup` (→ `find`/`get`).
 
 Algorithm-native vocabulary (`walk`, `backtrack`, `slideDiagonal`) is allowed inside the module
 implementing that algorithm — forcing list verbs onto textbook terms hides the algorithm.
