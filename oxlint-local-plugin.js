@@ -56,6 +56,19 @@ const plugin = {
         ':matches(FunctionDeclaration, FunctionExpression, ArrowFunctionExpression) > ObjectPattern.params',
       ],
     ),
+    'no-ternary-args': banSelectors(
+      'suggestion',
+      'Extract this ternary to a named const instead of passing it as an argument.',
+      [
+        'CallExpression > ConditionalExpression.arguments',
+        'NewExpression > ConditionalExpression.arguments',
+      ],
+    ),
+    'no-await-args': banSelectors(
+      'suggestion',
+      'Await into a named const instead of awaiting inside an argument list.',
+      ['CallExpression > AwaitExpression.arguments', 'NewExpression > AwaitExpression.arguments'],
+    ),
   },
 };
 

@@ -20,12 +20,32 @@
     "local/no-bare-named-exports": "error",
     "local/no-inline-param-object-types": "error",
     "local/no-destructured-params": "error",
+    "local/no-ternary-args": "error",
+    "local/no-await-args": "error",
 
     // enforced comment style — line comments unless JSDoc or exclamation
     "@stylistic/multiline-comment-style": [
       "error",
       "separate-lines",
       { "checkJSDoc": false, "checkExclamation": false }
+    ],
+
+    // own-line comments get a blank line above so they don't crowd the
+    // previous statement; comments opening a block/object/class/etc are exempt
+    "@stylistic/lines-around-comment": [
+      "error",
+      {
+        "beforeLineComment": true,
+        "beforeBlockComment": true,
+        "allowBlockStart": true,
+        "allowObjectStart": true,
+        "allowArrayStart": true,
+        "allowClassStart": true,
+        "allowEnumStart": true,
+        "allowInterfaceStart": true,
+        "allowModuleStart": true,
+        "allowTypeStart": true
+      }
     ],
 
     // restriction-category cherry-picks
@@ -46,6 +66,17 @@
 
     // allows destructuring for omitting properties
     "no-unused-vars": ["error", { "ignoreRestSiblings": true }],
+
+    // destructuring reads well at declaration sites, but satisfying it on
+    // assignments forces the parenthesized `({ x } = y)` form — plain member
+    // assignment instead
+    "prefer-destructuring": [
+      "error",
+      {
+        "VariableDeclarator": { "array": true, "object": true },
+        "AssignmentExpression": { "array": false, "object": false }
+      }
+    ],
 
     // consistent function syntax — declarations top level, arrows for inside
     // blocks and callbacks
@@ -76,6 +107,11 @@
     "capitalized-comments": "off",
     "id-length": "off",
     "no-magic-numbers": "off",
+    // prefer-ternary (only-single-line, above) wants ternaries where they fit
+    // on one line; no-ternary would ban the same code
+    "no-ternary": "off",
+    // this repo builds node/bun CLI tooling — node builtins are the platform
+    "import/no-nodejs-modules": "off",
 
     // preload-style modules (matcher registration, type augmentation) are
     // side-effect imports by design
@@ -92,6 +128,14 @@
     "import/no-named-as-default-member": "off"
   },
   "overrides": [
+    {
+      "files": ["**/*.test.ts"],
+      // one co-located suite per module with inline test data: file length
+      // scales with coverage, not complexity
+      "rules": {
+        "max-lines": "off"
+      }
+    },
     {
       "files": ["**/*.js", "**/*.cjs", "**/*.mjs"],
       // untyped JS is `any` end to end, so the unsafe-* rules flag every
