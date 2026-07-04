@@ -37,7 +37,7 @@ jobs:
         if: vars.RELEASE_APP_ID != ''
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          app-id: ${{ vars.RELEASE_APP_ID }}
+          client-id: ${{ vars.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
       - id: release
@@ -70,11 +70,28 @@ jobs:
 
       # Merging with the App token makes the push trigger this workflow again,
       # which is the run that tags, creates GitHub releases, and publishes.
+      # GitHub recomputes mergeability asynchronously after the sync push, so
+      # wait for it to settle instead of merging blind.
       - name: Auto-merge release PR
         if: steps.release.outputs.prs_created == 'true' && steps.app-token.outputs.token != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: gh pr merge ${{ fromJSON(steps.release.outputs.pr).number }} --squash
+          PR_NUMBER: ${{ fromJSON(steps.release.outputs.pr).number }}
+        run: |
+          for _ in $(seq 1 12); do
+            state=$(gh pr view "$PR_NUMBER" --json mergeable --jq .mergeable)
+            if [ "$state" = "MERGEABLE" ]; then
+              gh pr merge "$PR_NUMBER" --squash
+              exit 0
+            fi
+            if [ "$state" = "CONFLICTING" ]; then
+              echo "release PR $PR_NUMBER has conflicts" >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "release PR $PR_NUMBER mergeability never settled" >&2
+          exit 1
 
       - if: steps.release.outputs.releases_created == 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
