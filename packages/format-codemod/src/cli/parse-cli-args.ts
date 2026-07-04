@@ -1,8 +1,8 @@
 import { parseArgs } from 'node:util';
-import type { CliMode } from './types.ts';
+import type { CLIMode } from './types.ts';
 
-export interface CliArgs {
-  readonly mode: CliMode;
+export interface CLIArgs {
+  readonly mode: CLIMode;
   readonly quiet: boolean;
   readonly bench: boolean;
   readonly help: boolean;
@@ -12,9 +12,9 @@ export interface CliArgs {
 
 // Strict parsing: an unknown flag is a usage error, not a silent no-op. That
 // matters because the default mode writes files — a typo'd --check must never
-// fall through to an in-place rewrite. CliArgs is always an object, so the
+// fall through to an in-place rewrite. CLIArgs is always an object, so the
 // string (error message) return is unambiguous.
-export function parseCliArgs(argv: readonly string[]): CliArgs | string {
+export function parseCLIArgs(argv: readonly string[]): CLIArgs | string {
   try {
     const { values, positionals } = parseArgs({
       args: [...argv],
@@ -44,7 +44,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs | string {
 }
 
 // --check wins over --dry when both are passed, matching the old flag order.
-function pickMode(check: boolean, dry: boolean): CliMode {
+function pickMode(check: boolean, dry: boolean): CLIMode {
   if (check) {
     return 'check';
   }

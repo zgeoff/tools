@@ -1,4 +1,4 @@
-import type { AstNode, CommentSpan, Edit, SourceFile } from '../types.ts';
+import type { ASTNode, CommentSpan, Edit, SourceFile } from '../types.ts';
 
 // Every rule is "exactly one blank line", so a compliant gap always holds two
 // newlines: one ending the previous statement's line, one for the blank.
@@ -8,7 +8,7 @@ const MIN_NEWLINES = 2;
 // exactly one blank line, or null when the gap is already compliant or unsafe
 // to touch. Comment positions come from the parser rather than lexical
 // scanning, so comment-lookalike text can't mislead the classification.
-export function planGapEdit(file: SourceFile, prev: AstNode, next: AstNode): Edit | null {
+export function planGapEdit(file: SourceFile, prev: ASTNode, next: ASTNode): Edit | null {
   const gap = buildGap(file, prev, next);
 
   if (!isSafeToResize(gap)) {
@@ -26,7 +26,7 @@ interface Gap {
   readonly comments: readonly CommentSpan[];
 }
 
-function buildGap(file: SourceFile, prev: AstNode, next: AstNode): Gap {
+function buildGap(file: SourceFile, prev: ASTNode, next: ASTNode): Gap {
   const start = getNodeEnd(prev);
   const end = getNodeStart(next);
   const comments = file.comments.filter((c) => c.start >= start && c.end <= end);
@@ -34,7 +34,7 @@ function buildGap(file: SourceFile, prev: AstNode, next: AstNode): Gap {
   return { src: file.src, start, end, comments };
 }
 
-function getNodeEnd(n: AstNode): number {
+function getNodeEnd(n: ASTNode): number {
   if (typeof n.end !== 'number') {
     throw new TypeError('AST node is missing an end position');
   }
@@ -42,7 +42,7 @@ function getNodeEnd(n: AstNode): number {
   return n.end;
 }
 
-function getNodeStart(n: AstNode): number {
+function getNodeStart(n: ASTNode): number {
   if (typeof n.start !== 'number') {
     throw new TypeError('AST node is missing a start position');
   }

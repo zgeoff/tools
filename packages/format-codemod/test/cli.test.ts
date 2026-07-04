@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 // what the root format pipeline and the pre-commit hook consume.
 const cliPath = fileURLToPath(new URL('../src/cli.ts', import.meta.url));
 
-function runCli(args: readonly string[]): {
+function runCLI(args: readonly string[]): {
   status: number | null;
   stderr: string;
 } {
@@ -25,7 +25,7 @@ test('it exits cleanly in check mode when files are already padded', () => {
   const file = path.join(dir, 'clean.ts');
 
   fs.writeFileSync(file, 'const a = 1;\n\nexport function f() {\n  return a;\n}\n');
-  const { status } = runCli(['--check', file]);
+  const { status } = runCLI(['--check', file]);
 
   expect(status).toBe(0);
 });
@@ -36,7 +36,7 @@ test('it exits with the diff code in check mode when a file needs padding and le
   const src = 'export function f() {\n  const a = 1;\n  return a;\n}\n';
 
   fs.writeFileSync(file, src);
-  const { status, stderr } = runCli(['--check', file]);
+  const { status, stderr } = runCLI(['--check', file]);
 
   expect(status).toBe(1);
   expect(stderr).toInclude('DIFF');
@@ -48,7 +48,7 @@ test('it fails the batch in check mode when a file cannot be parsed', () => {
   const file = path.join(dir, 'broken.ts');
 
   fs.writeFileSync(file, 'const = (((\n');
-  const { status, stderr } = runCli(['--check', file]);
+  const { status, stderr } = runCLI(['--check', file]);
 
   expect(status).toBe(2);
   expect(stderr).toInclude('PARSE-ERR');
@@ -57,7 +57,7 @@ test('it fails the batch in check mode when a file cannot be parsed', () => {
 test('it fails the batch when a named file does not exist', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
   const missing = path.join(dir, 'missing.ts');
-  const { status, stderr } = runCli(['--check', missing]);
+  const { status, stderr } = runCLI(['--check', missing]);
 
   expect(status).toBe(2);
   expect(stderr).toInclude('ERROR');
@@ -70,7 +70,7 @@ test('it still checks the remaining files after one fails to parse', () => {
 
   fs.writeFileSync(broken, 'const = (((\n');
   fs.writeFileSync(unpadded, 'export function f() {\n  const a = 1;\n  return a;\n}\n');
-  const { status, stderr } = runCli(['--check', broken, unpadded]);
+  const { status, stderr } = runCLI(['--check', broken, unpadded]);
 
   expect(status).toBe(2);
   expect(stderr).toInclude('PARSE-ERR');
@@ -83,7 +83,7 @@ test('it rejects an unknown flag with a usage error and leaves files untouched',
   const src = 'export function f() {\n  const a = 1;\n  return a;\n}\n';
 
   fs.writeFileSync(file, src);
-  const { status, stderr } = runCli(['--chekc', file]);
+  const { status, stderr } = runCLI(['--chekc', file]);
 
   expect(status).toBe(2);
   expect(stderr).toInclude("'--chekc'");
@@ -95,7 +95,7 @@ test('it formats .tsx files containing JSX', () => {
   const file = path.join(dir, 'component.tsx');
 
   fs.writeFileSync(file, 'const el = <div>hi</div>;\nexport function C() {\n  return el;\n}\n');
-  const { status, stderr } = runCli(['--check', file]);
+  const { status, stderr } = runCLI(['--check', file]);
 
   expect(status).toBe(1);
   expect(stderr).toInclude('DIFF');
@@ -106,7 +106,7 @@ test('it processes a file only once when patterns overlap', () => {
   const file = path.join(dir, 'unpadded.ts');
 
   fs.writeFileSync(file, 'export function f() {\n  const a = 1;\n  return a;\n}\n');
-  const { stderr } = runCli(['--check', dir, file]);
+  const { stderr } = runCLI(['--check', dir, file]);
 
   expect(stderr.match(/DIFF/gu)).toHaveLength(1);
 });
@@ -124,7 +124,7 @@ test('it does not descend into node_modules when expanding a directory', () => {
     path.join(dir, 'clean.ts'),
     'const a = 1;\n\nexport function f() {\n  return a;\n}\n',
   );
-  const { status, stderr } = runCli(['--check', dir]);
+  const { status, stderr } = runCLI(['--check', dir]);
 
   expect(status).toBe(0);
   expect(stderr).not.toInclude('node_modules');

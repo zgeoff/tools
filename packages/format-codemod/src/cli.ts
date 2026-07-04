@@ -2,12 +2,12 @@
 import fs from 'node:fs';
 import { buildBenchStatsFromReports } from './cli/build-bench-stats-from-reports.ts';
 import { expandInputs } from './cli/expand-inputs.ts';
-import { parseCliArgs } from './cli/parse-cli-args.ts';
+import { parseCLIArgs } from './cli/parse-cli-args.ts';
 import { printHelp } from './cli/print-help.ts';
 import { processFile } from './cli/process-file.ts';
 import type { FileReport } from './cli/types.ts';
 
-const parsedArgs = parseCliArgs(process.argv.slice(2));
+const parsedArgs = parseCLIArgs(process.argv.slice(2));
 
 if (typeof parsedArgs === 'string') {
   console.error(parsedArgs);
@@ -20,7 +20,7 @@ if (help || (inputs.length === 0 && !version)) {
   process.exit(inputs.length === 0 ? 2 : 0);
 }
 
-function isPackageJson(value: unknown): value is { version: string } {
+function isPackageJSON(value: unknown): value is { version: string } {
   return (
     typeof value === 'object' &&
     value !== null &&
@@ -32,10 +32,10 @@ function isPackageJson(value: unknown): value is { version: string } {
 // Stays in the entry module: it resolves package.json relative to
 // import.meta.url, and only this file sits at the same depth in src/ and dist/.
 if (version) {
-  const pkgUrl = new URL('../package.json', import.meta.url);
-  const parsed: unknown = JSON.parse(fs.readFileSync(pkgUrl, 'utf8'));
+  const pkgURL = new URL('../package.json', import.meta.url);
+  const parsed: unknown = JSON.parse(fs.readFileSync(pkgURL, 'utf8'));
 
-  if (!isPackageJson(parsed)) {
+  if (!isPackageJSON(parsed)) {
     throw new TypeError('Invalid package.json');
   }
 

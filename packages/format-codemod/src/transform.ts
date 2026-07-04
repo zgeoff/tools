@@ -1,5 +1,5 @@
 import { applyEdits } from './transform/apply-edits.ts';
-import { buildEditsFromAst } from './transform/build-edits-from-ast.ts';
+import { buildEditsFromAST } from './transform/build-edits-from-ast.ts';
 import { parseSource } from './transform/parse-source.ts';
 import type { TransformResult } from './types.ts';
 
@@ -17,7 +17,7 @@ export function transform(src: string, options?: TransformOptions): TransformRes
   if (typeof parsed === 'string') {
     return { output: src, edits: 0, parseError: parsed };
   }
-  const editList = buildEditsFromAst(src, parsed);
+  const editList = buildEditsFromAST(src, parsed);
   const output = applyEdits(src, editList);
 
   return { output, edits: editList.length, parseError: null };

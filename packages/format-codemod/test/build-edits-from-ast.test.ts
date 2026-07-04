@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { buildEditsFromAst } from '../src/transform/build-edits-from-ast.ts';
+import { buildEditsFromAST } from '../src/transform/build-edits-from-ast.ts';
 import { parseSource } from '../src/transform/parse-source.ts';
 import type { ParsedSource } from '../src/types.ts';
 
@@ -15,7 +15,7 @@ function parse(src: string): ParsedSource {
 
 test('it returns edits sorted last-to-first', () => {
   const src = 'const a = 1;\nuse(a);\nconst b = 2;\nuse(b);\n';
-  const edits = buildEditsFromAst(src, parse(src));
+  const edits = buildEditsFromAST(src, parse(src));
 
   expect(edits).toHaveLength(2);
   expect(edits.map((e) => e.start)).toEqual([33, 12]);
@@ -23,7 +23,7 @@ test('it returns edits sorted last-to-first', () => {
 
 test('it collects edits from statement lists nested inside functions and blocks', () => {
   const src = 'function f() {\n  if (x) {\n    const a = 1;\n    use(a);\n  }\n}\n';
-  const edits = buildEditsFromAst(src, parse(src));
+  const edits = buildEditsFromAST(src, parse(src));
 
   expect(edits).toEqual([{ start: 42, end: 47, replacement: '\n\n    ' }]);
 });
@@ -31,11 +31,11 @@ test('it collects edits from statement lists nested inside functions and blocks'
 test('it returns no edits for already-compliant source', () => {
   const src = 'const a = 1;\n\nuse(a);\n';
 
-  expect(buildEditsFromAst(src, parse(src))).toBeEmpty();
+  expect(buildEditsFromAST(src, parse(src))).toBeEmpty();
 });
 
 test('it does not match exported declarations', () => {
   const src = 'export const a = 1;\nuse(a);\n';
 
-  expect(buildEditsFromAst(src, parse(src))).toBeEmpty();
+  expect(buildEditsFromAST(src, parse(src))).toBeEmpty();
 });

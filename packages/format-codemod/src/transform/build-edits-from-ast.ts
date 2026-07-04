@@ -1,14 +1,14 @@
-import type { AstNode, Edit, ParsedSource, SourceFile } from '../types.ts';
+import type { ASTNode, Edit, ParsedSource, SourceFile } from '../types.ts';
 import { planGapEdit } from './plan-gap-edit.ts';
 
 // Sorted last-to-first so applying splices in order never shifts later offsets.
-export function buildEditsFromAst(src: string, parsed: ParsedSource): Edit[] {
+export function buildEditsFromAST(src: string, parsed: ParsedSource): Edit[] {
   const file: SourceFile = { src, comments: parsed.comments };
 
   return walk(file, parsed.program).toSorted((a, b) => b.start - a.start);
 }
 
-function walk(file: SourceFile, node: AstNode): Edit[] {
+function walk(file: SourceFile, node: ASTNode): Edit[] {
   const edits: Edit[] = [];
 
   for (const body of getStatementLists(node)) {
@@ -24,8 +24,8 @@ function walk(file: SourceFile, node: AstNode): Edit[] {
 
 // The statement lists this node directly contains — the sequences whose
 // adjacent pairs the padding rules apply to.
-function getStatementLists(node: AstNode): (readonly AstNode[])[] {
-  const bodies: (readonly AstNode[])[] = [];
+function getStatementLists(node: ASTNode): (readonly ASTNode[])[] {
+  const bodies: (readonly ASTNode[])[] = [];
   const hasBlockBody =
     node.type === 'Program' || node.type === 'BlockStatement' || node.type === 'ClassBody';
 
@@ -40,7 +40,7 @@ function getStatementLists(node: AstNode): (readonly AstNode[])[] {
   return bodies;
 }
 
-function buildPairEdits(file: SourceFile, container: AstNode, body: readonly AstNode[]): Edit[] {
+function buildPairEdits(file: SourceFile, container: ASTNode, body: readonly ASTNode[]): Edit[] {
   const edits: Edit[] = [];
 
   for (let i = 0; i < body.length - 1; i++) {
@@ -76,7 +76,7 @@ const CONTROL_FLOW_TYPES = new Set([
 // after a function/class declaration, and before a control-flow block. The
 // config has no "never" rules, so any match means one blank. Control-flow is
 // gated on `next` only (not `prev`), so guard clauses stay tight after a block.
-function needsBlankLine(container: AstNode, prev: AstNode, next: AstNode): boolean {
+function needsBlankLine(container: ASTNode, prev: ASTNode, next: ASTNode): boolean {
   if (container.type === 'ClassBody') {
     return true;
   }
@@ -101,7 +101,7 @@ const VAR_DECL_KINDS = new Set(['const', 'let', 'var']);
 // Bare variable declarations only. ESLint's padding-line-between-statements does
 // not look through `export`, so `export const x = 1` is NOT a `const` for the
 // rule — matching that keeps the codemod faithful to the ESLint config.
-function isVarDecl(node: AstNode): boolean {
+function isVarDecl(node: ASTNode): boolean {
   if (node.type === 'VariableDeclaration') {
     return node.kind !== undefined && VAR_DECL_KINDS.has(node.kind);
   }
@@ -112,30 +112,30 @@ function isVarDecl(node: AstNode): boolean {
 // Bare function/class declarations only. As with var declarations, ESLint's
 // `prev: ['function', 'class']` does not match `export function`/`export class`
 // (those parse as ExportNamedDeclaration), so neither do we.
-function isFnOrClassDecl(node: AstNode): boolean {
+function isFnOrClassDecl(node: ASTNode): boolean {
   return node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration';
 }
 
-function collectChildNodes(node: AstNode): AstNode[] {
-  const children: AstNode[] = [];
+function collectChildNodes(node: ASTNode): ASTNode[] {
+  const children: ASTNode[] = [];
 
   for (const key of Object.keys(node)) {
     if (key !== 'loc' && key !== 'parent') {
-      children.push(...collectAstNodes(node[key]));
+      children.push(...collectASTNodes(node[key]));
     }
   }
 
   return children;
 }
 
-function collectAstNodes(value: unknown): AstNode[] {
+function collectASTNodes(value: unknown): ASTNode[] {
   if (!Array.isArray(value)) {
-    return isAstNode(value) ? [value] : [];
+    return isASTNode(value) ? [value] : [];
   }
-  const nodes: AstNode[] = [];
+  const nodes: ASTNode[] = [];
 
   for (const item of value) {
-    if (isAstNode(item)) {
+    if (isASTNode(item)) {
       nodes.push(item);
     }
   }
@@ -143,7 +143,7 @@ function collectAstNodes(value: unknown): AstNode[] {
   return nodes;
 }
 
-function isAstNode(value: unknown): value is AstNode {
+function isASTNode(value: unknown): value is ASTNode {
   return (
     typeof value === 'object' && value !== null && 'type' in value && typeof value.type === 'string'
   );

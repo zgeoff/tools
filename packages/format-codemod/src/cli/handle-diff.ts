@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { buildUnifiedDiff } from './build-unified-diff.ts';
-import type { CliMode, FileEdit } from './types.ts';
+import type { CLIMode, FileEdit } from './types.ts';
 
 export interface DiffOutput {
   readonly message: string | null;
@@ -10,7 +10,7 @@ export interface DiffOutput {
 // Reached only when the file needs edits. Write mode saves the file here — the
 // one file-system effect below the entry; what to print is returned, never
 // printed, because the entry owns the output streams.
-export function handleDiff(edit: FileEdit, mode: CliMode): DiffOutput {
+export function handleDiff(edit: FileEdit, mode: CLIMode): DiffOutput {
   if (mode === 'check') {
     return { message: `DIFF  ${edit.file}  ${edit.result.edits} edit(s)`, stdout: null };
   }
