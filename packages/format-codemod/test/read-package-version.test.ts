@@ -2,7 +2,6 @@ import { expect, test } from 'bun:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { readPackageVersion } from '../src/cli/read-package-version.ts';
 
 test('it reads the version field from a package manifest', () => {
@@ -11,7 +10,7 @@ test('it reads the version field from a package manifest', () => {
 
   fs.writeFileSync(manifest, '{"name":"x","version":"1.2.3"}');
 
-  expect(readPackageVersion(pathToFileURL(manifest))).toBe('1.2.3');
+  expect(readPackageVersion(manifest)).toBe('1.2.3');
 });
 
 test('it throws when the file is not a package manifest', () => {
@@ -20,8 +19,5 @@ test('it throws when the file is not a package manifest', () => {
 
   fs.writeFileSync(manifest, '{"name":"x"}');
 
-  expect(() => readPackageVersion(pathToFileURL(manifest))).toThrowWithMessage(
-    TypeError,
-    'Invalid package.json',
-  );
+  expect(() => readPackageVersion(manifest)).toThrowWithMessage(TypeError, 'Invalid package.json');
 });

@@ -124,7 +124,7 @@ function needsBlankLine(container: ASTNode, prev: ASTNode, next: ASTNode): boole
 
   return (
     isNewHeaded(prev) !== isNewHeaded(next) ||
-    isCallMutationBoundary(prev, next) ||
+    isKindBoundary(prev, next) ||
     CONTROL_FLOW_TYPES.has(next.type) ||
     CONTROL_FLOW_TYPES.has(prev.type)
   );
@@ -208,16 +208,29 @@ const CALL_TYPES: readonly string[] = ['CallExpression', 'AwaitExpression'];
 const MUTATION_TYPES: readonly string[] = ['AssignmentExpression', 'UpdateExpression'];
 
 /**
- * A transition between a call statement ("do something") and a mutation
- * statement (assignment or increment, "track something") — the two read as
- * different kinds of work, so a blank line marks the switch. Runs of the same
- * kind stay tight.
+ * A transition between statement kinds — declaring ("name something"),
+ * calling ("do something"), mutating ("track something") — reads as a switch
+ * to a different kind of work, so a blank line marks it. Runs of one kind
+ * stay tight, and kindless statements (control flow, returns, throws) don't
+ * force a boundary here — their own rules govern them.
  */
-function isCallMutationBoundary(prev: ASTNode, next: ASTNode): boolean {
-  return (
-    (isExpressionStatementOf(prev, CALL_TYPES) && isExpressionStatementOf(next, MUTATION_TYPES)) ||
-    (isExpressionStatementOf(prev, MUTATION_TYPES) && isExpressionStatementOf(next, CALL_TYPES))
-  );
+function isKindBoundary(prev: ASTNode, next: ASTNode): boolean {
+  const prevKind = getStatementKind(prev);
+  const nextKind = getStatementKind(next);
+
+  return prevKind !== null && nextKind !== null && prevKind !== nextKind;
+}
+
+function getStatementKind(node: ASTNode): string | null {
+  if (isVarDecl(node)) {
+    return 'declaration';
+  }
+
+  if (isExpressionStatementOf(node, CALL_TYPES)) {
+    return 'call';
+  }
+
+  return isExpressionStatementOf(node, MUTATION_TYPES) ? 'mutation' : null;
 }
 
 function isExpressionStatementOf(node: ASTNode, types: readonly string[]): boolean {

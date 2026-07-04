@@ -28,6 +28,7 @@ test('it exits cleanly in check mode when files are already padded', () => {
   const file = path.join(dir, 'clean.ts');
 
   fs.writeFileSync(file, 'const a = 1;\n\nexport function f() {\n  return a;\n}\n');
+
   const { status } = runCLI(['--check', file]);
 
   expect(status).toBe(0);
@@ -39,6 +40,7 @@ test('it exits with the diff code in check mode when a file needs padding and le
   const src = 'export function f() {\n  const a = 1;\n  return a;\n}\n';
 
   fs.writeFileSync(file, src);
+
   const { status, stderr } = runCLI(['--check', file]);
 
   expect(status).toBe(1);
@@ -51,6 +53,7 @@ test('it fails the batch in check mode when a file cannot be parsed', () => {
   const file = path.join(dir, 'broken.ts');
 
   fs.writeFileSync(file, 'const = (((\n');
+
   const { status, stderr } = runCLI(['--check', file]);
 
   expect(status).toBe(2);
@@ -73,6 +76,7 @@ test('it still checks the remaining files after one fails to parse', () => {
 
   fs.writeFileSync(broken, 'const = (((\n');
   fs.writeFileSync(unpadded, 'export function f() {\n  const a = 1;\n  return a;\n}\n');
+
   const { status, stderr } = runCLI(['--check', broken, unpadded]);
 
   expect(status).toBe(2);
@@ -86,6 +90,7 @@ test('it rejects an unknown flag with a usage error and leaves files untouched',
   const src = 'export function f() {\n  const a = 1;\n  return a;\n}\n';
 
   fs.writeFileSync(file, src);
+
   const { status, stderr } = runCLI(['--chekc', file]);
 
   expect(status).toBe(2);
@@ -98,6 +103,7 @@ test('it formats .tsx files containing JSX', () => {
   const file = path.join(dir, 'component.tsx');
 
   fs.writeFileSync(file, 'const el = <div>hi</div>;\nexport function C() {\n  return el;\n}\n');
+
   const { status, stderr } = runCLI(['--check', file]);
 
   expect(status).toBe(1);
@@ -109,6 +115,7 @@ test('it processes a file only once when patterns overlap', () => {
   const file = path.join(dir, 'unpadded.ts');
 
   fs.writeFileSync(file, 'export function f() {\n  const a = 1;\n  return a;\n}\n');
+
   const { stderr } = runCLI(['--check', dir, file]);
 
   expect(stderr.match(/DIFF/gu)).toHaveLength(1);
@@ -126,6 +133,7 @@ test('it only reports files that would change in quiet mode', () => {
 
   fs.writeFileSync(path.join(dir, 'clean.ts'), 'const a = 1;\n\nuse(a);\n');
   fs.writeFileSync(path.join(dir, 'unpadded.ts'), 'const a = 1;\nuse(a);\n');
+
   const { stderr } = runCLI(['--check', '--quiet', dir]);
 
   expect(stderr).toInclude('DIFF');

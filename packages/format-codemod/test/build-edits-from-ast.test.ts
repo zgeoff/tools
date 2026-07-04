@@ -17,8 +17,8 @@ test('it returns edits sorted last-to-first', () => {
   const src = 'const a = 1;\nuse(a);\nconst b = 2;\nuse(b);\n';
   const edits = buildEditsFromAST(src, parse(src));
 
-  expect(edits).toHaveLength(2);
-  expect(edits.map((e) => e.start)).toEqual([33, 12]);
+  expect(edits).toHaveLength(3);
+  expect(edits.map((e) => e.start)).toEqual([33, 20, 12]);
 });
 
 test('it collects edits from statement lists nested inside functions and blocks', () => {

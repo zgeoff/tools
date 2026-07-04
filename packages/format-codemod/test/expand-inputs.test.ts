@@ -11,6 +11,7 @@ test('it expands a directory to the ts and tsx files beneath it', async () => {
   fs.writeFileSync(path.join(dir, 'a.ts'), '');
   fs.writeFileSync(path.join(dir, 'nested', 'b.tsx'), '');
   fs.writeFileSync(path.join(dir, 'c.js'), '');
+
   const files = await expandInputs([dir]);
 
   expect(files.map((f) => path.basename(f))).toIncludeSameMembers(['a.ts', 'b.tsx']);
@@ -24,6 +25,7 @@ test('it never descends into node_modules or .git', async () => {
   fs.writeFileSync(path.join(dir, 'node_modules', 'dep', 'a.ts'), '');
   fs.writeFileSync(path.join(dir, '.git', 'b.ts'), '');
   fs.writeFileSync(path.join(dir, 'keep.ts'), '');
+
   const files = await expandInputs([dir]);
 
   expect(files.map((f) => path.basename(f))).toEqual(['keep.ts']);
@@ -35,6 +37,7 @@ test('it treats an existing bracketed path as a literal file, not a glob', async
 
   fs.mkdirSync(bracketed);
   fs.writeFileSync(path.join(bracketed, 'page.tsx'), '');
+
   const files = await expandInputs([path.join(bracketed, 'page.tsx')]);
 
   expect(files).toEqual([path.join(bracketed, 'page.tsx')]);
@@ -45,6 +48,7 @@ test('it expands glob patterns for paths that do not exist literally', async () 
 
   fs.writeFileSync(path.join(dir, 'a.ts'), '');
   fs.writeFileSync(path.join(dir, 'b.ts'), '');
+
   const files = await expandInputs([path.join(dir, '*.ts')]);
 
   expect(files).toHaveLength(2);
@@ -55,6 +59,7 @@ test('it dedupes files matched by overlapping patterns', async () => {
   const file = path.join(dir, 'a.ts');
 
   fs.writeFileSync(file, '');
+
   const files = await expandInputs([dir, file]);
 
   expect(files).toHaveLength(1);

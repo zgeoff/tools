@@ -19,7 +19,8 @@ no "never" rules.
 - after a `function` or `class` declaration
 - on both sides of a control-flow block: `if`, `for`, `for…in`, `for…of`, `while`, `switch`, `try`
 - on both sides of any statement that spans multiple lines
-- at the boundary between a call statement and an assignment/increment statement (either order)
+- at the boundary between statement kinds — a `const`/`let`/`var` declaration, a call statement, an
+  assignment/increment statement — in any order; runs of one kind stay tight
 - at the boundary between an instantiation-headed statement (`new` at the head of its expression
   chain, as in `new X(…)` or `new X(…).method()`) and any other statement kind — `new` in argument
   position doesn't count, and runs of instantiations stay glued

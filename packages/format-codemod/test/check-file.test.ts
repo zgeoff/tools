@@ -24,6 +24,7 @@ test('it rewrites the file and reports the write in write mode', () => {
   const file = path.join(dir, 'unpadded.ts');
 
   fs.writeFileSync(file, 'const a = 1;\nuse(a);\n');
+
   const report = checkFile(file, 'write');
 
   expect(report).toMatchObject({ outcome: 'changed', message: expect.toInclude('WROTE') });
@@ -35,6 +36,7 @@ test('it reports the diff without touching the file in check mode', () => {
   const file = path.join(dir, 'unpadded.ts');
 
   fs.writeFileSync(file, 'const a = 1;\nuse(a);\n');
+
   const report = checkFile(file, 'check');
 
   expect(report).toMatchObject({ outcome: 'changed', message: expect.toInclude('DIFF') });
@@ -46,6 +48,7 @@ test('it returns the unified diff as stdout payload in dry mode', () => {
   const file = path.join(dir, 'unpadded.ts');
 
   fs.writeFileSync(file, 'const a = 1;\nuse(a);\n');
+
   const report = checkFile(file, 'dry');
 
   expect(report.stdout).toInclude('@@ -1,2 +1,3 @@');

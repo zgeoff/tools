@@ -10,6 +10,7 @@ test('it reports the edit count without writing in check mode', () => {
   const src = 'const a = 1;\nuse(a);\n';
 
   fs.writeFileSync(file, src);
+
   const result = { output: 'const a = 1;\n\nuse(a);\n', edits: 1, parseError: null };
   const out = applyDiffMode({ file, src, result }, 'check');
 
@@ -23,6 +24,7 @@ test('it returns a unified diff for stdout without writing in dry mode', () => {
   const src = 'const a = 1;\nuse(a);\n';
 
   fs.writeFileSync(file, src);
+
   const result = { output: 'const a = 1;\n\nuse(a);\n', edits: 1, parseError: null };
   const out = applyDiffMode({ file, src, result }, 'dry');
 
@@ -37,6 +39,7 @@ test('it writes the transformed output to disk in write mode', () => {
   const src = 'const a = 1;\nuse(a);\n';
 
   fs.writeFileSync(file, src);
+
   const result = { output: 'const a = 1;\n\nuse(a);\n', edits: 1, parseError: null };
   const out = applyDiffMode({ file, src, result }, 'write');
 

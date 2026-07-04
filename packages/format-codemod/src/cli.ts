@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { fileURLToPath } from 'node:url';
 import { buildBenchStatsFromReports } from './cli/build-bench-stats-from-reports.ts';
 import { expandInputs } from './cli/expand-inputs.ts';
 import { parseCLIArgs } from './cli/parse-cli-args.ts';
@@ -27,9 +28,9 @@ if (help || (inputs.length === 0 && !version)) {
 // The manifest URL resolves here, not in the helper: only this file sits at
 // the same depth in src/ and dist/, so '../package.json' is correct in both.
 if (version) {
-  const pkgURL = new URL('../package.json', import.meta.url);
+  const pkgPath = fileURLToPath(new URL('../package.json', import.meta.url));
 
-  process.stdout.write(`${readPackageVersion(pkgURL)}\n`);
+  process.stdout.write(`${readPackageVersion(pkgPath)}\n`);
   process.exit(0);
 }
 

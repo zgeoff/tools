@@ -204,6 +204,20 @@ test('it pads the boundary between a call statement and an assignment', () => {
   expect(output).toInclude('    push(e.end, tail);\n\n    tail = e.start;');
 });
 
+test('it pads the boundary between a call statement and a following declaration', () => {
+  const src = `function f(file, src) {\n  writeFile(file, src);\n  const result = buildResult(src);\n  use(result);\n}\n`;
+  const { output } = transform(src);
+
+  expect(output).toInclude('  writeFile(file, src);\n\n  const result = buildResult(src);');
+});
+
+test('it pads the boundary between a mutation and a following declaration', () => {
+  const src = `function f() {\n  let tail = 0;\n  tail = 1;\n  const next = tail;\n  use(next);\n}\n`;
+  const { output } = transform(src);
+
+  expect(output).toInclude('  tail = 1;\n\n  const next = tail;');
+});
+
 test('it keeps runs of assignments and increments glued', () => {
   const src = `function f() {\n  let x = 0;\n  let y = 0;\n  x = 1;\n  y = 2;\n  x++;\n  y--;\n}\n`;
   const { output } = transform(src);
