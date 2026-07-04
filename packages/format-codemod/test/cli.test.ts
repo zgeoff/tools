@@ -13,13 +13,14 @@ const cliPath = fileURLToPath(new URL('../src/cli.ts', import.meta.url));
  */
 function runCLI(args: readonly string[]): {
   status: number | null;
+  stdout: string;
   stderr: string;
 } {
   const result = spawnSync(process.execPath, [cliPath, ...args], {
     encoding: 'utf8',
   });
 
-  return { status: result.status, stderr: result.stderr };
+  return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 }
 
 test('it exits cleanly in check mode when files are already padded', () => {
@@ -111,6 +112,24 @@ test('it processes a file only once when patterns overlap', () => {
   const { stderr } = runCLI(['--check', dir, file]);
 
   expect(stderr.match(/DIFF/gu)).toHaveLength(1);
+});
+
+test('it prints the package version for --version', () => {
+  const { status, stdout } = runCLI(['--version']);
+
+  expect(status).toBe(0);
+  expect(stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/u);
+});
+
+test('it only reports files that would change in quiet mode', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+
+  fs.writeFileSync(path.join(dir, 'clean.ts'), 'const a = 1;\n\nuse(a);\n');
+  fs.writeFileSync(path.join(dir, 'unpadded.ts'), 'const a = 1;\nuse(a);\n');
+  const { stderr } = runCLI(['--check', '--quiet', dir]);
+
+  expect(stderr).toInclude('DIFF');
+  expect(stderr).not.toInclude('OK ');
 });
 
 test('it does not descend into node_modules when expanding a directory', () => {

@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-import fs from 'node:fs';
 import { buildBenchStatsFromReports } from './cli/build-bench-stats-from-reports.ts';
 import { expandInputs } from './cli/expand-inputs.ts';
 import { parseCLIArgs } from './cli/parse-cli-args.ts';
 import { printHelp } from './cli/print-help.ts';
+import { printReport } from './cli/print-report.ts';
+import { readPackageVersion } from './cli/read-package-version.ts';
 import { tryCheckFile } from './cli/try-check-file.ts';
 import type { FileReport } from './cli/types.ts';
 
@@ -23,49 +24,13 @@ if (help || (inputs.length === 0 && !version)) {
   process.exit(exitCode);
 }
 
-function isPackageJSON(value: unknown): value is { version: string } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'version' in value &&
-    typeof value.version === 'string'
-  );
-}
-
-// Stays in the entry module: it resolves package.json relative to
-// import.meta.url, and only this file sits at the same depth in src/ and dist/.
+// The manifest URL resolves here, not in the helper: only this file sits at
+// the same depth in src/ and dist/, so '../package.json' is correct in both.
 if (version) {
   const pkgURL = new URL('../package.json', import.meta.url);
 
-  const parsed: unknown = JSON.parse(fs.readFileSync(pkgURL, 'utf8'));
-
-  if (!isPackageJSON(parsed)) {
-    throw new TypeError('Invalid package.json');
-  }
-
-  process.stdout.write(`${parsed.version}\n`);
+  process.stdout.write(`${readPackageVersion(pkgURL)}\n`);
   process.exit(0);
-}
-
-/**
- * All stream writes live here: modules below the entry return what to print.
- */
-function printReport(file: string, report: FileReport): void {
-  if (report.stdout !== null) {
-    process.stdout.write(report.stdout);
-  }
-
-  if (report.message !== null) {
-    console.error(report.message);
-  }
-
-  if (!quiet && report.outcome === 'ok') {
-    console.error(`OK    ${file}`);
-  }
-
-  if (!quiet && report.outcome === 'skipped') {
-    console.error(`SKIP  ${file}  declaration file`);
-  }
 }
 
 const t0 = Date.now();
@@ -82,7 +47,7 @@ for (const file of files) {
   const report = tryCheckFile(file, mode);
 
   reports.push(report);
-  printReport(file, report);
+  printReport(file, report, quiet);
 }
 
 const failures = reports.filter((r) => r.outcome === 'failed').length;
