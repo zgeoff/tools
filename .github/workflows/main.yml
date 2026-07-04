@@ -21,9 +21,84 @@ jobs:
   release:
     needs: checks
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
     steps:
-      # Stub until release tooling lands — see #8. Release tooling decides
-      # what changed and what to publish; workflows stay unfiltered.
-      - run: |
-          echo "release: stubbed pending release tooling (#8)"
-          exit 0
+      # GITHUB_TOKEN events don't trigger workflows, so release PRs are
+      # created and merged with a GitHub App token (see RELEASING.md).
+      # Without the App configured, the PR is left open for manual merge.
+      - id: app-token
+        if: vars.RELEASE_APP_ID != ''
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ steps.app-token.outputs.token || github.token }}
+
+      # Release PRs bump package.json versions, which bun.lock also records —
+      # sync the lockfile on the PR branch so --frozen-lockfile checks pass.
+      - if: steps.release.outputs.prs_created == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+          token: ${{ steps.app-token.outputs.token || github.token }}
+      - if: steps.release.outputs.prs_created == 'true'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - if: steps.release.outputs.prs_created == 'true'
+        run: |
+          bun install
+          if ! git diff --quiet bun.lock; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore: sync lockfile with release versions" bun.lock
+            git push
+          fi
+
+      # Merging with the App token makes the push trigger this workflow again,
+      # which is the run that tags, creates GitHub releases, and publishes.
+      - name: Auto-merge release PR
+        if: steps.release.outputs.prs_created == 'true' && steps.app-token.outputs.token != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: gh pr merge ${{ fromJSON(steps.release.outputs.pr).number }} --squash
+
+      - if: steps.release.outputs.releases_created == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - if: steps.release.outputs.releases_created == 'true'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      # npm does the publish: trusted publishing (OIDC) needs npm >= 11.5.1,
+      # and bun publish has no OIDC support (oven-sh/bun#15601).
+      - if: steps.release.outputs.releases_created == 'true'
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+      - if: steps.release.outputs.releases_created == 'true'
+        run: npm install --global npm@latest
+      - if: steps.release.outputs.releases_created == 'true'
+        run: bun install --frozen-lockfile
+      - name: Publish released packages
+        if: steps.release.outputs.releases_created == 'true'
+        run: |
+          echo '${{ steps.release.outputs.paths_released }}' | jq -r '.[]' | while read -r path; do
+            name=$(jq -r .name "$path/package.json")
+            if [ "$(jq -r '.private // false' "$path/package.json")" = "true" ]; then
+              echo "skipping $name: private"
+              continue
+            fi
+            if [ -n "$(jq -r '.scripts.build // empty' "$path/package.json")" ]; then
+              (cd "$path" && bun run build)
+            fi
+            # bun packs the tarball: it resolves catalog:/workspace: protocols
+            # to exact versions, which npm pack would ship verbatim and break.
+            (cd "$path" && bun pm pack && npm publish ./*.tgz --provenance --access public)
+          done
