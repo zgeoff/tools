@@ -1,68 +1,232 @@
-export function buildUnifiedDiff(a: string, b: string, label: string): string {
-  return new LineDiff(a, b, label).render();
+// A real unified diff — @@ hunk headers with context — so --dry output can be
+// applied with patch(1). Inputs are expected to end with a newline, which
+// TypeScript sources do and the transform preserves.
+export function buildUnifiedDiff(before: string, after: string, label: string): string {
+  const ops = new MyersDiff(splitLines(before), splitLines(after)).buildOps();
+  const hunks = buildHunks(ops);
+
+  if (hunks.length === 0) {
+    return '';
+  }
+
+  return [`--- ${label}\n`, `+++ ${label}\n`, ...hunks.map((h) => renderHunk(h))].join('');
 }
 
-// Minimal line-based diff; enough to preview --dry output without a dep.
-class LineDiff {
+function splitLines(s: string): string[] {
+  const lines = s.split('\n');
+
+  if (lines.at(-1) === '') {
+    lines.pop();
+  }
+
+  return lines;
+}
+
+interface DiffOp {
+  readonly kind: ' ' | '-' | '+';
+  readonly text: string;
+}
+
+interface Position {
+  readonly x: number;
+  readonly y: number;
+}
+
+// Myers O((N+M)·D) line diff. D is the edit distance — for padding diffs just
+// the handful of inserted blanks — so this stays near-linear, and unlike the
+// old greedy resync it can't mis-pair repeated lines.
+class MyersDiff {
   private readonly a: readonly string[];
 
   private readonly b: readonly string[];
 
-  private readonly out: string[];
+  private readonly v = new Map<number, number>([[1, 0]]);
 
-  private i = 0;
+  private readonly trace: Map<number, number>[] = [];
 
-  private k = 0;
-
-  constructor(a: string, b: string, label: string) {
-    this.a = a.split('\n');
-    this.b = b.split('\n');
-    this.out = [`--- ${label}\n`, `+++ ${label}\n`];
+  constructor(a: readonly string[], b: readonly string[]) {
+    this.a = a;
+    this.b = b;
   }
 
-  render(): string {
-    while (this.i < this.a.length || this.k < this.b.length) {
-      this.step();
-    }
+  buildOps(): DiffOp[] {
+    this.computeTrace();
 
-    return this.out.join('');
+    return this.backtrack();
   }
 
-  private step(): void {
-    if (this.a[this.i] === this.b[this.k]) {
-      this.i++;
-      this.k++;
-    } else {
-      this.emitAdded();
-      this.emitRemoved();
+  // One snapshot of v per edit-distance round; the round that reaches the end
+  // stops the search and the snapshots drive the backtrack.
+  private computeTrace(): void {
+    for (let d = 0; d <= this.a.length + this.b.length; d++) {
+      this.trace.push(new Map(this.v));
+
+      if (this.stepRound(d)) {
+        return;
+      }
     }
   }
 
-  private emitAdded(): void {
-    const j = scanTo(this.b, this.k, this.a[this.i]);
+  private stepRound(d: number): boolean {
+    for (let k = -d; k <= d; k += 2) {
+      const x = this.slideDiagonal(this.pickX(k, d), k);
 
-    while (this.k < j) {
-      this.out.push(`+${this.b[this.k]}\n`);
-      this.k++;
+      this.v.set(k, x);
+
+      if (x >= this.a.length && x - k >= this.b.length) {
+        return true;
+      }
     }
+
+    return false;
   }
 
-  private emitRemoved(): void {
-    const m = scanTo(this.a, this.i, this.b[this.k]);
+  private pickX(k: number, d: number): number {
+    const moveDown = k === -d || (k !== d && (this.v.get(k - 1) ?? 0) < (this.v.get(k + 1) ?? 0));
 
-    while (this.i < m) {
-      this.out.push(`-${this.a[this.i]}\n`);
-      this.i++;
+    return moveDown ? (this.v.get(k + 1) ?? 0) : (this.v.get(k - 1) ?? 0) + 1;
+  }
+
+  private slideDiagonal(x: number, k: number): number {
+    let nx = x;
+
+    while (nx < this.a.length && nx - k < this.b.length && this.a[nx] === this.b[nx - k]) {
+      nx++;
+    }
+
+    return nx;
+  }
+
+  private backtrack(): DiffOp[] {
+    const ops: DiffOp[] = [];
+    let pos: Position = { x: this.a.length, y: this.b.length };
+
+    for (let d = this.trace.length - 1; d >= 0; d--) {
+      pos = this.unwindRound(ops, pos, d);
+    }
+
+    return ops.toReversed();
+  }
+
+  private unwindRound(ops: DiffOp[], pos: Position, d: number): Position {
+    const { prev, moveDown } = this.findPrevious(pos, d);
+
+    this.pushEqualOps(ops, pos, prev);
+
+    if (d > 0) {
+      ops.push(
+        moveDown
+          ? { kind: '+', text: this.b[prev.y] ?? '' }
+          : { kind: '-', text: this.a[prev.x] ?? '' },
+      );
+    }
+
+    return prev;
+  }
+
+  private findPrevious(pos: Position, d: number): { prev: Position; moveDown: boolean } {
+    const v = this.trace[d] ?? new Map<number, number>();
+    const k = pos.x - pos.y;
+    const moveDown = k === -d || (k !== d && (v.get(k - 1) ?? 0) < (v.get(k + 1) ?? 0));
+    const prevK = moveDown ? k + 1 : k - 1;
+    const prevX = v.get(prevK) ?? 0;
+
+    return { prev: { x: prevX, y: prevX - prevK }, moveDown };
+  }
+
+  // The diagonal walk back from pos to prev — the lines both sides share.
+  private pushEqualOps(ops: DiffOp[], pos: Position, prev: Position): void {
+    let { x, y } = pos;
+
+    while (x > prev.x && y > prev.y) {
+      ops.push({ kind: ' ', text: this.a[x - 1] ?? '' });
+      x--;
+      y--;
     }
   }
 }
 
-function scanTo(lines: readonly string[], from: number, sentinel: string | undefined): number {
-  let j = from;
+interface Window {
+  from: number;
+  to: number;
+}
 
-  while (j < lines.length && lines[j] !== sentinel) {
-    j++;
+interface Hunk {
+  readonly header: string;
+  readonly lines: readonly string[];
+}
+
+function buildHunks(ops: readonly DiffOp[]): Hunk[] {
+  return buildWindows(ops).map((w) => buildHunk(ops, w));
+}
+
+// Each changed op pulls CONTEXT_LINES of surrounding ops into its window;
+// overlapping or adjacent windows merge into one hunk.
+function buildWindows(ops: readonly DiffOp[]): Window[] {
+  const windows: Window[] = [];
+
+  for (let i = 0; i < ops.length; i++) {
+    if (ops[i]?.kind !== ' ') {
+      extendWindows(windows, i, ops.length);
+    }
   }
 
-  return j;
+  return windows;
 }
+
+function extendWindows(windows: Window[], changeIndex: number, total: number): void {
+  const from = Math.max(0, changeIndex - CONTEXT_LINES);
+  const to = Math.min(total, changeIndex + CONTEXT_LINES + 1);
+  const last = windows.at(-1);
+
+  if (last !== undefined && from <= last.to) {
+    last.to = to;
+  } else {
+    windows.push({ from, to });
+  }
+}
+
+function buildHunk(ops: readonly DiffOp[], w: Window): Hunk {
+  const { aLine, bLine } = countPrecedingLines(ops, w.from);
+  const slice = ops.slice(w.from, w.to);
+  const aCount = slice.filter((o) => o.kind !== '+').length;
+  const bCount = slice.filter((o) => o.kind !== '-').length;
+
+  return {
+    header: `@@ -${formatRange(aLine, aCount)} +${formatRange(bLine, bCount)} @@\n`,
+    lines: slice.map((o) => `${o.kind}${o.text}\n`),
+  };
+}
+
+function countPrecedingLines(
+  ops: readonly DiffOp[],
+  from: number,
+): { aLine: number; bLine: number } {
+  let aLine = 0;
+  let bLine = 0;
+
+  for (const op of ops.slice(0, from)) {
+    if (op.kind !== '+') {
+      aLine++;
+    }
+
+    if (op.kind !== '-') {
+      bLine++;
+    }
+  }
+
+  return { aLine, bLine };
+}
+
+// An empty range anchors to the line before it (already correct 0-based);
+// a populated one is 1-based.
+function formatRange(line: number, count: number): string {
+  return count === 0 ? `${line},0` : `${line + 1},${count}`;
+}
+
+function renderHunk(h: Hunk): string {
+  return `${h.header}${h.lines.join('')}`;
+}
+
+// Context lines per hunk, matching diff -u / git defaults.
+const CONTEXT_LINES = 3;
