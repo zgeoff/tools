@@ -1,6 +1,8 @@
-// A real unified diff — @@ hunk headers with context — so --dry output can be
-// applied with patch(1). Inputs are expected to end with a newline, which
-// TypeScript sources do and the transform preserves.
+/**
+ * A real unified diff — @@ hunk headers with context — so --dry output can be
+ * applied with patch(1). Inputs are expected to end with a newline, which
+ * TypeScript sources do and the transform preserves.
+ */
 export function buildUnifiedDiff(before: string, after: string, label: string): string {
   const ops = new MyersDiff(splitLines(before), splitLines(after)).buildOps();
   const hunks = buildHunks(ops);
@@ -32,9 +34,11 @@ interface Position {
   readonly y: number;
 }
 
-// Myers O((N+M)·D) line diff. D is the edit distance — for padding diffs just
-// the handful of inserted blanks — so this stays near-linear, and unlike the
-// old greedy resync it can't mis-pair repeated lines.
+/**
+ * Myers O((N+M)·D) line diff. D is the edit distance — for padding diffs just
+ * the handful of inserted blanks — so this stays near-linear, and unlike the
+ * old greedy resync it can't mis-pair repeated lines.
+ */
 class MyersDiff {
   private readonly a: readonly string[];
 
@@ -55,8 +59,10 @@ class MyersDiff {
     return this.backtrack();
   }
 
-  // One snapshot of v per edit-distance round; the round that reaches the end
-  // stops the search and the snapshots drive the backtrack.
+  /**
+   * One snapshot of v per edit-distance round; the round that reaches the end
+   * stops the search and the snapshots drive the backtrack.
+   */
   private computeTrace(): void {
     for (let d = 0; d <= this.a.length + this.b.length; d++) {
       this.trace.push(new Map(this.v));
@@ -105,7 +111,7 @@ class MyersDiff {
       const round = this.unwindRound(pos, d);
 
       ops.push(...round.ops);
-      ({ pos } = round);
+      pos = round.pos;
     }
 
     return ops.toReversed();
@@ -136,7 +142,9 @@ class MyersDiff {
     return { prev: { x: prevX, y: prevX - prevK }, moveDown };
   }
 
-  // The diagonal walk back from pos to prev — the lines both sides share.
+  /**
+   * The diagonal walk back from pos to prev — the lines both sides share.
+   */
   private buildEqualOps(pos: Position, prev: Position): DiffOp[] {
     const ops: DiffOp[] = [];
     let { x, y } = pos;
@@ -165,8 +173,10 @@ function buildHunks(ops: readonly DiffOp[]): Hunk[] {
   return buildWindows(ops).map((w) => buildHunk(ops, w));
 }
 
-// Each changed op pulls CONTEXT_LINES of surrounding ops into its window;
-// overlapping or adjacent windows merge into one hunk.
+/**
+ * Each changed op pulls CONTEXT_LINES of surrounding ops into its window;
+ * overlapping or adjacent windows merge into one hunk.
+ */
 function buildWindows(ops: readonly DiffOp[]): Window[] {
   const windows: Window[] = [];
 
@@ -219,8 +229,10 @@ function countPrecedingLines(
   return { aLine, bLine };
 }
 
-// An empty range anchors to the line before it (already correct 0-based);
-// a populated one is 1-based.
+/**
+ * An empty range anchors to the line before it (already correct 0-based);
+ * a populated one is 1-based.
+ */
 function formatRange(line: number, count: number): string {
   return count === 0 ? `${line},0` : `${line + 1},${count}`;
 }
@@ -229,5 +241,7 @@ function renderHunk(h: Hunk): string {
   return `${h.header}${h.lines.join('')}`;
 }
 
-// Context lines per hunk, matching diff -u / git defaults.
+/**
+ * Context lines per hunk, matching diff -u / git defaults.
+ */
 const CONTEXT_LINES = 3;

@@ -1,7 +1,9 @@
 import type { ASTNode, Edit, ParsedSource, SourceFile } from '../types.ts';
 import { planGapEdit } from './plan-gap-edit.ts';
 
-// Sorted last-to-first so applying splices in order never shifts later offsets.
+/**
+ * Sorted last-to-first so applying splices in order never shifts later offsets.
+ */
 export function buildEditsFromAST(src: string, parsed: ParsedSource): Edit[] {
   const file: SourceFile = { src, comments: parsed.comments };
 
@@ -22,8 +24,10 @@ function walk(file: SourceFile, node: ASTNode): Edit[] {
   return edits;
 }
 
-// The statement lists this node directly contains — the sequences whose
-// adjacent pairs the padding rules apply to.
+/**
+ * The statement lists this node directly contains — the sequences whose
+ * adjacent pairs the padding rules apply to.
+ */
 function getStatementLists(node: ASTNode): (readonly ASTNode[])[] {
   const bodies: (readonly ASTNode[])[] = [];
   const hasBlockBody =
@@ -59,8 +63,10 @@ function buildPairEdits(file: SourceFile, container: ASTNode, body: readonly AST
   return edits;
 }
 
-// ESLint maps the `for` keyword to all three for-forms and `while` to the
-// while loop only (`do-while` is a separate `do` selector this config omits).
+/**
+ * ESLint maps the `for` keyword to all three for-forms and `while` to the
+ * while loop only (`do-while` is a separate `do` selector this config omits).
+ */
 const CONTROL_FLOW_TYPES = new Set([
   'IfStatement',
   'ForStatement',
@@ -71,11 +77,13 @@ const CONTROL_FLOW_TYPES = new Set([
   'TryStatement',
 ]);
 
-// The "always" half of the ESLint padding config: a blank line between class
-// members, after a var block before a non-var statement, before a return,
-// after a function/class declaration, and before a control-flow block. The
-// config has no "never" rules, so any match means one blank. Control-flow is
-// gated on `next` only (not `prev`), so guard clauses stay tight after a block.
+/**
+ * The "always" half of the ESLint padding config: a blank line between class
+ * members, after a var block before a non-var statement, before a return,
+ * after a function/class declaration, and before a control-flow block. The
+ * config has no "never" rules, so any match means one blank. Control-flow is
+ * gated on `next` only (not `prev`), so guard clauses stay tight after a block.
+ */
 function needsBlankLine(container: ASTNode, prev: ASTNode, next: ASTNode): boolean {
   if (container.type === 'ClassBody') {
     return true;
@@ -98,9 +106,11 @@ function needsBlankLine(container: ASTNode, prev: ASTNode, next: ASTNode): boole
 
 const VAR_DECL_KINDS = new Set(['const', 'let', 'var']);
 
-// Bare variable declarations only. ESLint's padding-line-between-statements does
-// not look through `export`, so `export const x = 1` is NOT a `const` for the
-// rule — matching that keeps the codemod faithful to the ESLint config.
+/**
+ * Bare variable declarations only. ESLint's padding-line-between-statements does
+ * not look through `export`, so `export const x = 1` is NOT a `const` for the
+ * rule — matching that keeps the codemod faithful to the ESLint config.
+ */
 function isVarDecl(node: ASTNode): boolean {
   if (node.type === 'VariableDeclaration') {
     return node.kind !== undefined && VAR_DECL_KINDS.has(node.kind);
@@ -109,9 +119,11 @@ function isVarDecl(node: ASTNode): boolean {
   return false;
 }
 
-// Bare function/class declarations only. As with var declarations, ESLint's
-// `prev: ['function', 'class']` does not match `export function`/`export class`
-// (those parse as ExportNamedDeclaration), so neither do we.
+/**
+ * Bare function/class declarations only. As with var declarations, ESLint's
+ * `prev: ['function', 'class']` does not match `export function`/`export class`
+ * (those parse as ExportNamedDeclaration), so neither do we.
+ */
 function isFnOrClassDecl(node: ASTNode): boolean {
   return node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration';
 }

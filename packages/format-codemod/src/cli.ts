@@ -43,7 +43,9 @@ if (version) {
   process.exit(0);
 }
 
-// All stream writes live here: modules below the entry return what to print.
+/**
+ * All stream writes live here: modules below the entry return what to print.
+ */
 function printReport(file: string, report: FileReport): void {
   if (report.stdout !== null) {
     process.stdout.write(report.stdout);

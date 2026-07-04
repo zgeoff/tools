@@ -7,9 +7,11 @@ export interface DiffOutput {
   readonly stdout: string | null;
 }
 
-// Reached only when the file needs edits. Write mode saves the file here — the
-// one file-system effect below the entry; what to print is returned, never
-// printed, because the entry owns the output streams.
+/**
+ * Reached only when the file needs edits. Write mode saves the file here — the
+ * one file-system effect below the entry; what to print is returned, never
+ * printed, because the entry owns the output streams.
+ */
 export function handleDiff(edit: FileEdit, mode: CLIMode): DiffOutput {
   if (mode === 'check') {
     return { message: `DIFF  ${edit.file}  ${edit.result.edits} edit(s)`, stdout: null };

@@ -1,8 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-// Deduped: overlapping patterns ('src/**/*.ts' plus a file inside src/) must
-// not process — or report — the same file twice.
+/**
+ * Deduped: overlapping patterns (a `src/**` glob plus a file inside src/) must
+ * not process — or report — the same file twice.
+ */
 export async function expandInputs(patterns: readonly string[]): Promise<string[]> {
   const lists = await Promise.all(patterns.map((p) => expandPattern(p)));
 
@@ -30,11 +32,13 @@ function expandPattern(p: string): Promise<string[]> {
   return Promise.resolve([p]);
 }
 
-// Keeps directory expansion out of dependency trees and nested git dirs — a bare
-// `format-codemod .` at a repo root must not descend into installed packages.
-// Node passes directories to `exclude` (pruning descent); Bun filters final
-// matches — segment matching handles both, and Dirents in case withFileTypes
-// semantics ever leak through.
+/**
+ * Keeps directory expansion out of dependency trees and nested git dirs — a bare
+ * `format-codemod .` at a repo root must not descend into installed packages.
+ * Node passes directories to `exclude` (pruning descent); Bun filters final
+ * matches — segment matching handles both, and Dirents in case withFileTypes
+ * semantics ever leak through.
+ */
 function isExcluded(
   entry: string | { readonly name: string; readonly parentPath?: string },
 ): boolean {

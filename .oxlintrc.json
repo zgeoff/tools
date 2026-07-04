@@ -47,6 +47,17 @@
     // allows destructuring for omitting properties
     "no-unused-vars": ["error", { "ignoreRestSiblings": true }],
 
+    // destructuring reads well at declaration sites, but satisfying it on
+    // assignments forces the parenthesized `({ x } = y)` form — plain member
+    // assignment instead
+    "prefer-destructuring": [
+      "error",
+      {
+        "VariableDeclarator": { "array": true, "object": true },
+        "AssignmentExpression": { "array": false, "object": false }
+      }
+    ],
+
     // consistent function syntax — declarations top level, arrows for inside
     // blocks and callbacks
     "func-style": ["error", "declaration", { "allowArrowFunctions": true }],

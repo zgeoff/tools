@@ -1,8 +1,10 @@
 import type { Edit } from '../types.ts';
 
-// Edits arrive pre-sorted last-to-first (buildEditsFromAST's contract), so each
-// splice's offsets stay valid without adjustment. Segments are collected and
-// joined once instead of re-copying the whole string per edit.
+/**
+ * Edits arrive pre-sorted last-to-first (buildEditsFromAST's contract), so each
+ * splice's offsets stay valid without adjustment. Segments are collected and
+ * joined once instead of re-copying the whole string per edit.
+ */
 export function applyEdits(src: string, edits: readonly Edit[]): string {
   const segments: string[] = [];
   let tail = src.length;
