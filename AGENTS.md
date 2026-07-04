@@ -84,22 +84,23 @@ verb. The prefix is a contract — a reader should know the function's shape wit
 
 **Effectful** — touches the world (filesystem, streams, processes, registries):
 
-| Prefix     | Contract                                                   | Example           |
-| ---------- | ---------------------------------------------------------- | ----------------- |
-| `apply`    | perform previously planned changes                         | `applyEdits`      |
-| `create`   | bring a resource into existence (file, directory, process) | `createWorkDir`   |
-| `read`     | pull raw content from filesystem or network into memory    | `readSource`      |
-| `load`     | read **and** parse into a ready structure                  | `loadConfig`      |
-| `write`    | persist to the filesystem                                  | `writeOutput`     |
-| `remove`   | delete a resource                                          | `removeStaleDist` |
-| `update`   | mutate existing state or resource in place                 | `updateIndex`     |
-| `print`    | write to stdout/stderr                                     | `printHelp`       |
-| `run`      | execute a subprocess, task, or whole pipeline              | `runCLI`          |
-| `check`    | evaluate and report findings; effects allowed per mode     | `checkFile`       |
-| `try<X>`   | X with failures captured as a value instead of a throw     | `tryCheckFile`    |
-| `register` | add to a registry the caller doesn't own                   | `registerMatcher` |
-| `assert`   | throw when an invariant doesn't hold                       | `assertSpan`      |
-| `emit`     | dispatch an event or notification                          | `emitProgress`    |
+| Prefix     | Contract                                                                                                                                | Example           |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| `apply`    | perform previously planned changes                                                                                                      | `applyEdits`      |
+| `create`   | bring a resource into existence (file, directory, process)                                                                              | `createWorkDir`   |
+| `read`     | pull raw content from filesystem or network into memory                                                                                 | `readSource`      |
+| `load`     | read **and** parse into a ready structure                                                                                               | `loadConfig`      |
+| `write`    | persist to the filesystem                                                                                                               | `writeOutput`     |
+| `remove`   | delete a resource                                                                                                                       | `removeStaleDist` |
+| `update`   | mutate existing state or resource in place                                                                                              | `updateIndex`     |
+| `print`    | write to stdout/stderr                                                                                                                  | `printHelp`       |
+| `run`      | execute a subprocess, task, or whole pipeline                                                                                           | `runCLI`          |
+| `check`    | evaluate and report findings; effects allowed per mode                                                                                  | `checkFile`       |
+| `try<X>`   | X with failures captured as a value instead of a throw                                                                                  | `tryCheckFile`    |
+| `register` | add to a registry the caller doesn't own                                                                                                | `registerMatcher` |
+| `assert`   | throw when an invariant doesn't hold                                                                                                    | `assertSpan`      |
+| `emit`     | dispatch an event or notification                                                                                                       | `emitProgress`    |
+| `send`     | transmit a payload to a remote receiver (fire-and-forget or RPC — no resource semantics; REST mutations are `create`/`update`/`remove`) | `sendWebhook`     |
 
 **Wrappers and factories:**
 
@@ -107,6 +108,13 @@ verb. The prefix is a contract — a reader should know the function's shape wit
 | --------- | ----------------------------------------- | ----------------- |
 | `with<X>` | HOF that runs a callback inside a context | `withJestContext` |
 | `make<X>` | factory whose result is itself a function | `makeExcluder`    |
+
+**Framework conventions** — where the ecosystem's prefix is load-bearing, it wins:
+
+| Prefix      | Contract                                                                                                                | Example       |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------- | ------------- |
+| `use<X>`    | React hook — the prefix drives rules-of-hooks linting; helpers inside a hook follow the normal taxonomy                 | `useDebounce` |
+| `on<Event>` | event callback (React's conventional `handle<Event>` collides with the banlist — use `on<Event>` locally and for props) | `onRowClick`  |
 
 **Banned** — each is a vaguer or synonymous form of a listed verb; use that one instead: `handle`,
 `process`, `manage`, `do`, `perform` (say what it does), `execute` (→ `run`), `compute` (→ `build`),
