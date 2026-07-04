@@ -34,6 +34,7 @@ function isPackageJSON(value: unknown): value is { version: string } {
 // import.meta.url, and only this file sits at the same depth in src/ and dist/.
 if (version) {
   const pkgURL = new URL('../package.json', import.meta.url);
+
   const parsed: unknown = JSON.parse(fs.readFileSync(pkgURL, 'utf8'));
 
   if (!isPackageJSON(parsed)) {

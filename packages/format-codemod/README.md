@@ -20,6 +20,9 @@ no "never" rules.
 - on both sides of a control-flow block: `if`, `for`, `for…in`, `for…of`, `while`, `switch`, `try`
 - on both sides of any statement that spans multiple lines
 - at the boundary between a call statement and an assignment/increment statement (either order)
+- at the boundary between an instantiation-headed statement (`new` at the head of its expression
+  chain, as in `new X(…)` or `new X(…).method()`) and any other statement kind — `new` in argument
+  position doesn't count, and runs of instantiations stay glued
 
 **`@stylistic/lines-between-class-members`** — one blank line between class members.
 

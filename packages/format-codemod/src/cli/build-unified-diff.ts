@@ -5,6 +5,7 @@
  */
 export function buildUnifiedDiff(before: string, after: string, label: string): string {
   const ops = new MyersDiff(splitLines(before), splitLines(after)).buildOps();
+
   const hunks = buildHunks(ops);
 
   if (hunks.length === 0) {

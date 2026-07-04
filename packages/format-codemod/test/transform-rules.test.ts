@@ -211,6 +211,44 @@ test('it keeps runs of assignments and increments glued', () => {
   expect(output).toInclude('  x = 1;\n  y = 2;\n  x++;\n  y--;');
 });
 
+test('it pads the boundary between an instantiation-headed and a call-headed declaration', () => {
+  const src = `function f(before, after) {\n  const ops = new MyersDiff(splitLines(before), splitLines(after)).buildOps();\n  const hunks = buildHunks(ops);\n  use(hunks);\n}\n`;
+  const { output } = transform(src);
+
+  expect(output).toInclude('.buildOps();\n\n  const hunks = buildHunks(ops);');
+});
+
+test('it keeps adjacent instantiation-headed declarations glued', () => {
+  const src = `function f(opts) {\n  const parser = new Parser(opts);\n  const printer = new Printer(opts);\n  use(parser, printer);\n}\n`;
+  const { output } = transform(src);
+
+  expect(output).toInclude(
+    '  const parser = new Parser(opts);\n  const printer = new Printer(opts);',
+  );
+});
+
+test('it pads the boundary between an instantiation and a plain assignment', () => {
+  const src = `function f() {\n  let tail = 0;\n  const trace = new Map();\n  tail = trace.size;\n  use(tail);\n}\n`;
+  const { output } = transform(src);
+
+  expect(output).toInclude('  const trace = new Map();\n\n  tail = trace.size;');
+});
+
+test('it pads the boundary between a bare instantiation statement and a call statement', () => {
+  const src = `function f(config) {\n  new Logger(config);\n  start();\n}\n`;
+  const { output } = transform(src);
+
+  expect(output).toInclude('  new Logger(config);\n\n  start();');
+});
+
+test('it treats new in argument position as part of a call statement', () => {
+  const src = `function f() {\n  use(new Date());\n  log('done');\n}\n`;
+  const { output, edits } = transform(src);
+
+  expect(edits).toBe(0);
+  expect(output).toBe(src);
+});
+
 test('it keeps a trailing same-line line comment attached to the preceding var', () => {
   const src = `function f() {\n  const TIMEOUT_MS = 5000; // five seconds\n  doStuff(TIMEOUT_MS);\n}\n`;
   const { output } = transform(src);

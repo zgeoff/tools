@@ -102,8 +102,8 @@ const CONTROL_FLOW_TYPES = new Set([
  * before a non-var statement, before a return, after a function/class
  * declaration, on both sides of a control-flow block — its closing brace
  * ends a visual unit just like its opening keyword starts one — and at the
- * boundary between a call statement and a mutation statement. There are no
- * "never" rules, so any match means one blank.
+ * boundary between statement kinds: call vs mutation, and instantiation vs
+ * anything else. There are no "never" rules, so any match means one blank.
  */
 function needsBlankLine(container: ASTNode, prev: ASTNode, next: ASTNode): boolean {
   if (container.type === 'ClassBody') {
@@ -123,10 +123,84 @@ function needsBlankLine(container: ASTNode, prev: ASTNode, next: ASTNode): boole
   }
 
   return (
+    isNewHeaded(prev) !== isNewHeaded(next) ||
     isCallMutationBoundary(prev, next) ||
     CONTROL_FLOW_TYPES.has(next.type) ||
     CONTROL_FLOW_TYPES.has(prev.type)
   );
+}
+
+/**
+ * A statement whose value expression is headed by `new` does construction —
+ * a different kind of work from calling, mutating, or plain declaring, so it
+ * is boundary-padded from all of them while runs of instantiations stay
+ * tight. Only the head of the expression chain decides: `new` in argument
+ * position is incidental and doesn't count.
+ */
+function isNewHeaded(node: ASTNode): boolean {
+  return getStatementValues(node).some(
+    (value) => getExpressionHead(value).type === 'NewExpression',
+  );
+}
+
+/**
+ * The value expressions a statement is built around: declaration initializers,
+ * an assignment's right-hand side, or the expression itself. Statements with
+ * no value expression (control flow, returns, declarations without
+ * initializers) yield none.
+ */
+function getStatementValues(node: ASTNode): ASTNode[] {
+  if (node.type === 'VariableDeclaration') {
+    return collectASTNodes(node['declarations'])
+      .map((declarator) => declarator['init'])
+      .filter((init): init is ASTNode => isASTNode(init));
+  }
+
+  const { expression } = node;
+
+  if (node.type !== 'ExpressionStatement' || !isASTNode(expression)) {
+    return [];
+  }
+
+  const { right } = expression;
+
+  if (expression.type === 'AssignmentExpression' && isASTNode(right)) {
+    return [right];
+  }
+
+  return [expression];
+}
+
+/**
+ * Wrapper node types whose named property leads toward the head of an
+ * expression chain — `a.b().c` unwraps call by call, member by member, down
+ * to `a`.
+ */
+const HEAD_PROPERTY: Readonly<Record<string, string>> = {
+  CallExpression: 'callee',
+  MemberExpression: 'object',
+  ChainExpression: 'expression',
+  AwaitExpression: 'argument',
+  TSNonNullExpression: 'expression',
+  ParenthesizedExpression: 'expression',
+};
+
+function getExpressionHead(node: ASTNode): ASTNode {
+  let current = node;
+  let property = HEAD_PROPERTY[current.type];
+
+  while (property !== undefined) {
+    const inner = current[property];
+
+    if (!isASTNode(inner)) {
+      break;
+    }
+
+    current = inner;
+    property = HEAD_PROPERTY[current.type];
+  }
+
+  return current;
 }
 
 const CALL_TYPES: readonly string[] = ['CallExpression', 'AwaitExpression'];
