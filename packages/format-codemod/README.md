@@ -17,7 +17,7 @@ no "never" rules.
 - after a `const`/`let`/`var` block, before any non-var statement
 - before any `return`
 - after a `function` or `class` declaration
-- before a control-flow block: `if`, `for`, `for…in`, `for…of`, `while`, `switch`, `try`
+- on both sides of a control-flow block: `if`, `for`, `for…in`, `for…of`, `while`, `switch`, `try`
 
 **`@stylistic/lines-between-class-members`** — one blank line between class members.
 
@@ -27,8 +27,6 @@ no "never" rules.
 - **Bare declarations only.** `export const`, `export function`, and `export class` are not matched
   — ESLint's selectors do not look through `export`, and neither does this. `await using` is
   likewise not a var declaration.
-- **Control-flow padding keys on the _next_ statement only**, so a guard clause stays tight after
-  the block above it (no blank inserted _after_ a control-flow block).
 - **`.d.ts` files are skipped.**
 
 ## CLI

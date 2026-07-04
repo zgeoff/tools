@@ -16,6 +16,7 @@ test('it stays idempotent across many transform cycles', () => {
   for (let i = 0; i < 5; i++) {
     s = transform(s).output;
   }
+
   const after = transform(s).output;
 
   expect(after).toBe(s);

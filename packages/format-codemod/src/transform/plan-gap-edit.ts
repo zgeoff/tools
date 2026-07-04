@@ -72,6 +72,7 @@ function isTriviaOnly(gap: Gap): boolean {
     if (gap.src.slice(cursor, c.start).trim() !== '') {
       return false;
     }
+
     cursor = c.end;
   }
 
@@ -102,6 +103,7 @@ function skipTrailingComments(gap: Gap): number {
     if (gap.src.slice(pos, c.start).includes('\n')) {
       break;
     }
+
     pos = c.end;
   }
 
@@ -137,6 +139,7 @@ function planWhitespaceGap(gap: string, gapStart: number, gapEnd: number): Edit 
   if (countNewlines(gap) >= MIN_NEWLINES) {
     return null;
   }
+
   const lastNL = gap.lastIndexOf('\n');
   const indent = lastNL === -1 ? '' : gap.slice(lastNL + 1);
   const trimmed = gap.slice(0, gap.length - indent.length).replace(/\n*$/u, '');

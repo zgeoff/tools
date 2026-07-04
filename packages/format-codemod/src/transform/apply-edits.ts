@@ -13,6 +13,7 @@ export function applyEdits(src: string, edits: readonly Edit[]): string {
     segments.push(src.slice(e.end, tail), e.replacement);
     tail = e.start;
   }
+
   segments.push(src.slice(0, tail));
 
   return segments.toReversed().join('');

@@ -78,11 +78,11 @@ const CONTROL_FLOW_TYPES = new Set([
 ]);
 
 /**
- * The "always" half of the ESLint padding config: a blank line between class
- * members, after a var block before a non-var statement, before a return,
- * after a function/class declaration, and before a control-flow block. The
- * config has no "never" rules, so any match means one blank. Control-flow is
- * gated on `next` only (not `prev`), so guard clauses stay tight after a block.
+ * The "always" rules: a blank line between class members, after a var block
+ * before a non-var statement, before a return, after a function/class
+ * declaration, and on both sides of a control-flow block — its closing brace
+ * ends a visual unit just like its opening keyword starts one. There are no
+ * "never" rules, so any match means one blank.
  */
 function needsBlankLine(container: ASTNode, prev: ASTNode, next: ASTNode): boolean {
   if (container.type === 'ClassBody') {
@@ -101,7 +101,7 @@ function needsBlankLine(container: ASTNode, prev: ASTNode, next: ASTNode): boole
     return true;
   }
 
-  return CONTROL_FLOW_TYPES.has(next.type);
+  return CONTROL_FLOW_TYPES.has(next.type) || CONTROL_FLOW_TYPES.has(prev.type);
 }
 
 const VAR_DECL_KINDS = new Set(['const', 'let', 'var']);
@@ -144,6 +144,7 @@ function collectASTNodes(value: unknown): ASTNode[] {
   if (!Array.isArray(value)) {
     return isASTNode(value) ? [value] : [];
   }
+
   const nodes: ASTNode[] = [];
 
   for (const item of value) {

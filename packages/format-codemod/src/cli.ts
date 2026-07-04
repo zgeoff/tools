@@ -13,6 +13,7 @@ if (typeof parsedArgs === 'string') {
   console.error(parsedArgs);
   process.exit(2);
 }
+
 const { mode, quiet, bench, help, version, inputs } = parsedArgs;
 
 if (help || (inputs.length === 0 && !version)) {

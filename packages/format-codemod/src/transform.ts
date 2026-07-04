@@ -21,6 +21,7 @@ export function transform(src: string, options?: TransformOptions): TransformRes
   if (typeof parsed === 'string') {
     return { output: src, edits: 0, parseError: parsed };
   }
+
   const editList = buildEditsFromAST(src, parsed);
   const output = applyEdits(src, editList);
 

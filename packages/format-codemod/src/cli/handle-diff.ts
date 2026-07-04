@@ -20,6 +20,7 @@ export function handleDiff(edit: FileEdit, mode: CLIMode): DiffOutput {
   if (mode === 'dry') {
     return { message: null, stdout: buildUnifiedDiff(edit.src, edit.result.output, edit.file) };
   }
+
   fs.writeFileSync(edit.file, edit.result.output);
 
   return { message: `WROTE ${edit.file}  ${edit.result.edits} edit(s)`, stdout: null };

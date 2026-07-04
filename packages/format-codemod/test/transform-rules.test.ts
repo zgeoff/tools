@@ -33,7 +33,7 @@ test('it pads before a return statement', () => {
   `);
 });
 
-test('it pads before control-flow blocks but leaves a guard clause tight after one', () => {
+test('it pads both sides of a control-flow block', () => {
   const src = `function f(xs) {\n  setup();\n  if (ready) {\n    go();\n  }\n  cleanup();\n  for (const x of xs) {\n    use(x);\n  }\n}\n`;
   const { output } = transform(src);
 
@@ -44,6 +44,7 @@ test('it pads before control-flow blocks but leaves a guard clause tight after o
       if (ready) {
         go();
       }
+
       cleanup();
 
       for (const x of xs) {
