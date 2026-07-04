@@ -21,6 +21,7 @@
   "type": "module",
   "scripts": {
     "prepare": "lefthook install --force || true",
+    "build:agents": "bash scripts/build-agents-md.sh agents/shared.md agents/project.md AGENTS.md",
     "typecheck": "bun run --filter '*' typecheck",
     "test": "bun test",
     "build": "bun run --filter '*' build",

@@ -17,6 +17,7 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
+      - run: bun run build:agents && git diff --exit-code AGENTS.md
       - run: bun run format:check
       - run: bun run lint:type-aware
       - run: bun run typecheck

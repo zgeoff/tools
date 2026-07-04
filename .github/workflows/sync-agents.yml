@@ -1,0 +1,39 @@
+name: Sync AGENTS.md
+
+on:
+  workflow_call:
+    inputs:
+      tools-ref:
+        description: Ref of zgeoff/tools to sync the shared partial from
+        type: string
+        default: main
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: zgeoff/tools
+          ref: ${{ inputs.tools-ref }}
+          path: .agents-sync
+          sparse-checkout: |
+            agents/shared.md
+            scripts/build-agents-md.sh
+          sparse-checkout-cone-mode: false
+      - run: |
+          install -D .agents-sync/agents/shared.md agents/shared.md
+          install -D .agents-sync/scripts/build-agents-md.sh scripts/build-agents-md.sh
+          rm -rf .agents-sync
+          bash scripts/build-agents-md.sh agents/shared.md agents/project.md AGENTS.md
+      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          branch: sync-agents-md
+          commit-message: 'chore: sync AGENTS.md from zgeoff/tools'
+          title: 'chore: sync AGENTS.md from zgeoff/tools'
+          body: Automated rebuild of AGENTS.md from the shared partial in zgeoff/tools.
+          delete-branch: true
