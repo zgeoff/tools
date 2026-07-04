@@ -10,6 +10,9 @@
 - PR descriptions are condensed by default: lead paragraph ≤2 sentences, one-line bullets, ≤150
   words. Write the short version first — do not draft long and trim.
 - After pushing, link the opened PR's URL in your response so it's one click away.
+- A PR is not "ready" until its checks are green: after opening or updating one, watch CI
+  (`gh pr checks <n> --watch`) and only report it ready once checks pass — otherwise report the
+  failure and what you're doing about it.
 
 ## Type checking
 

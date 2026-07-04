@@ -12,9 +12,11 @@ pre-commit:
       glob: '*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,json,jsonc,md,css,yml,yaml,html}'
       run: bunx oxfmt --no-error-on-unmatched-pattern {staged_files}
       stage_fixed: true
+    # Runs from source: the built bin only exists after a workspace build,
+    # which fresh installs don't reliably perform.
     - name: format-codemod
       glob: '*.{ts,tsx}'
-      run: bunx format-codemod --quiet {staged_files}
+      run: bun packages/format-codemod/src/cli.ts --quiet {staged_files}
       stage_fixed: true
 
 pre-push:
