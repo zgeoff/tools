@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { parseCLIArgs } from '../src/cli/parse-cli-args.ts';
+import { parseCLIArgs } from './parse-cli-args.ts';
 
 test('it collects positionals as inputs and defaults to write mode', () => {
   const args = parseCLIArgs(['src/a.ts', 'src/b.tsx']);

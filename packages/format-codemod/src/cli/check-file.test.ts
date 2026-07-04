@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { checkFile } from '../src/cli/check-file.ts';
+import { checkFile } from './check-file.ts';
 
 test('it reports ok with nothing to print for a compliant file', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'check-file-'));

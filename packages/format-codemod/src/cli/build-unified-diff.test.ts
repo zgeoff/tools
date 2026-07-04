@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { buildUnifiedDiff } from '../src/cli/build-unified-diff.ts';
+import { buildUnifiedDiff } from './build-unified-diff.ts';
 
 test('it returns an empty string when both sides are identical', () => {
   expect(buildUnifiedDiff('a\nb\n', 'a\nb\n', 'x.ts')).toBe('');

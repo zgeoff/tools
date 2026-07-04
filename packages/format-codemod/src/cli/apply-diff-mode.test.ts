@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { applyDiffMode } from '../src/cli/apply-diff-mode.ts';
+import { applyDiffMode } from './apply-diff-mode.ts';
 
 test('it reports the edit count without writing in check mode', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'handle-diff-'));

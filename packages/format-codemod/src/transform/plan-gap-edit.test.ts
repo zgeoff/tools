@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { planGapEdit } from '../src/transform/plan-gap-edit.ts';
+import { planGapEdit } from './plan-gap-edit.ts';
 
 test('it plans a splice that widens a single-newline gap to one blank line', () => {
   const src = 'const a = 1;\nuse(a);\n';

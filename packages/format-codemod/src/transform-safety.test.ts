@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { transform } from '../src/transform.ts';
+import { transform } from './transform.ts';
 
 test('it is a no-op when run again on already-formatted code', () => {
   const src = `const a = 1;\ndoA();\nfunction f() {\n  const x = 1;\n  return x;\n}\nclass C {\n  a = 1;\n  m() {}\n}\n`;

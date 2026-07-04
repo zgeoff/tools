@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { expandInputs } from '../src/cli/expand-inputs.ts';
+import { expandInputs } from './expand-inputs.ts';
 
 test('it expands a directory to the ts and tsx files beneath it', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'expand-inputs-'));

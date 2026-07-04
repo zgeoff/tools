@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { tryCheckFile } from '../src/cli/try-check-file.ts';
+import { tryCheckFile } from './try-check-file.ts';
 
 test('it skips declaration files without reading them', () => {
   const report = tryCheckFile('does-not-even-exist.d.ts', 'check');

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const cliPath = fileURLToPath(new URL('../src/cli.ts', import.meta.url));
+const cliPath = fileURLToPath(new URL('cli.ts', import.meta.url));
 
 /**
  * Runs the CLI from source under bun; the exit-code contract asserted here is

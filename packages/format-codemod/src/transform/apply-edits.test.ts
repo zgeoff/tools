@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { applyEdits } from '../src/transform/apply-edits.ts';
+import { applyEdits } from './apply-edits.ts';
 
 test('it returns the input unchanged when there are no edits', () => {
   expect(applyEdits('const a = 1;\n', [])).toBe('const a = 1;\n');

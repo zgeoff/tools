@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { buildBenchStatsFromReports } from '../src/cli/build-bench-stats-from-reports.ts';
+import { buildBenchStatsFromReports } from './build-bench-stats-from-reports.ts';
 
 test('it sums bytes and counts parsed files across reports', () => {
   const reports = [

@@ -11,5 +11,7 @@
   // the base config injects the bun-test-extended matcher augmentation via
   // "files"; declaration emit must cover this package's sources only
   "files": [],
-  "include": ["src"]
+  "include": ["src"],
+  // co-located test files never ship; declaration emit skips them
+  "exclude": ["src/**/*.test.ts"]
 }

@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
-import { buildEditsFromAST } from '../src/transform/build-edits-from-ast.ts';
-import { parseSource } from '../src/transform/parse-source.ts';
-import type { ParsedSource } from '../src/types.ts';
+import type { ParsedSource } from '../types.ts';
+import { buildEditsFromAST } from './build-edits-from-ast.ts';
+import { parseSource } from './parse-source.ts';
 
 function parse(src: string): ParsedSource {
   const parsed = parseSource(src, 'file.ts');

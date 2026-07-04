@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { transform } from '../src/transform.ts';
+import { transform } from './transform.ts';
 
 test('it pads after a var block before a non-var statement and keeps consecutive vars glued', () => {
   const src = `function f() {\n  const x = 1;\n  const y = 2;\n  let z = 3;\n  doStuff(x, y, z);\n}\n`;

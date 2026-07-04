@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { parseSource } from '../src/transform/parse-source.ts';
+import { parseSource } from './parse-source.ts';
 
 test('it returns a program with node offsets for valid TypeScript', () => {
   const parsed = parseSource('const a = 1;\n', 'file.ts');

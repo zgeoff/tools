@@ -134,6 +134,9 @@ implementing that algorithm — forcing list verbs onto textbook terms hides the
 
 - Never use `describe` — write flat `test(…)` blocks with behavioural titles that start with "it"
   (`test('it pads before a return statement', …)`).
+- Test files are co-located with the module they test (`parse-source.ts` beside
+  `parse-source.test.ts`) — no `test/`, `tests/` or `__tests__` directories. Declaration emit
+  excludes `*.test.ts`, so they never ship.
 - Run `bun test` from the repo root: the jest-extended preload lives in the root `bunfig.toml`, so
   package-cwd runs are missing the extra matchers.
 - Tests declare their own data inline — no fixtures shared between tests, even if that means
