@@ -4,7 +4,7 @@ import { buildBenchStatsFromReports } from './cli/build-bench-stats-from-reports
 import { expandInputs } from './cli/expand-inputs.ts';
 import { parseCLIArgs } from './cli/parse-cli-args.ts';
 import { printHelp } from './cli/print-help.ts';
-import { processFile } from './cli/process-file.ts';
+import { tryCheckFile } from './cli/try-check-file.ts';
 import type { FileReport } from './cli/types.ts';
 
 const parsedArgs = parseCLIArgs(process.argv.slice(2));
@@ -76,7 +76,7 @@ if (files.length === 0) {
 const reports: FileReport[] = [];
 
 for (const file of files) {
-  const report = processFile(file, mode);
+  const report = tryCheckFile(file, mode);
 
   reports.push(report);
   printReport(file, report);

@@ -22,10 +22,8 @@ experimental `--type-check` (fast, run it locally), while `typecheck` runs real 
 - One primary export per file, and the file name kebab-cases that export (`with-jest-context.ts`
   exports `withJestContext`). Exceptions: `index.ts` entrypoints, `types.ts` for a package's shared
   types, and side-effect-only modules, which are named for what they do (`augment-bun-test.ts`).
-- Function names start with a verb (`expandInputs`, `planGapEdit`, `parseSource`). Pure transforms
-  and value-producers are `build<Result>From<Source>` (`buildEditsFromAST`,
-  `buildBenchStatsFromReports`); drop the `From<Source>` suffix only when there's no meaningful
-  single source (`buildUnifiedDiff`).
+- Function names start with a verb from the closed list below (see "Function naming") — the prefix
+  declares the function's contract.
 - Acronyms stay uppercase in identifiers (`runCLI`, `parseCLIArgs`, `ASTNode`, `pkgURL`,
   `isPackageJSON`) — except when one starts a camelCase name, where it lowercases whole (`cliPath`,
   `astNode`). File names are unaffected: kebab-case lowercases everything (`parse-cli-args.ts`
@@ -45,6 +43,78 @@ experimental `--type-check` (fast, run it locally), while `typecheck` runs real 
 - Comments don't name other declarations — renames silently strand the reference. State the role or
   contract instead: "callers must pass edits sorted last-to-first", not "(buildEditsFromAST's
   contract)". A declaration's own parameters and signature types are fine to name in its doc.
+
+### Function naming
+
+The verb list is closed: pick from it, or extend this file in the same PR that introduces the new
+verb. The prefix is a contract — a reader should know the function's shape without opening it.
+
+**Predicates** — return boolean, no side effects:
+
+| Prefix   | Contract                | Example          |
+| -------- | ----------------------- | ---------------- |
+| `is`     | type or state test      | `isVarDecl`      |
+| `has`    | containment, possession | `hasBlankLine`   |
+| `can`    | capability              | `canResize`      |
+| `should` | policy decision         | `shouldSkipFile` |
+| `needs`  | requirement             | `needsBlankLine` |
+
+**Pure producers** — result comes from arguments alone, no side effects:
+
+| Prefix                        | Contract                                                                  | Example             |
+| ----------------------------- | ------------------------------------------------------------------------- | ------------------- |
+| `build<Result>[From<Source>]` | default constructor for values; drop `From<Source>` when no single source | `buildEditsFromAST` |
+| `parse`                       | unstructured input → structure, invalid input reported                    | `parseSource`       |
+| `plan`                        | compute an action without performing it                                   | `planGapEdit`       |
+| `pick`                        | select among known alternatives                                           | `pickMode`          |
+| `find`                        | search that can miss — null/undefined on miss                             | `findPrevious`      |
+| `get`                         | cheap access that cannot miss (throwing on a broken invariant is fine)    | `getNodeEnd`        |
+| `collect`                     | gather from a traversal or scan                                           | `collectChildNodes` |
+| `count`                       | how many                                                                  | `countNewlines`     |
+| `split`                       | one value → parts                                                         | `splitLines`        |
+| `merge`                       | parts → one value                                                         | `mergeWindows`      |
+| `sort`                        | reorder                                                                   | `sortEdits`         |
+| `format`                      | value → human-readable string                                             | `formatRange`       |
+| `render`                      | structure → output text or markup                                         | `renderHunk`        |
+| `normalize`                   | variant forms → the canonical form                                        | `normalizePath`     |
+| `resolve`                     | follow indirection to a concrete value                                    | `resolveBinPath`    |
+| `expand`                      | compact form → full form                                                  | `expandInputs`      |
+| `to<Result>`                  | cheap representation change                                               | `toPosixPath`       |
+| `transform`                   | a package's own source→source operation                                   | `transform`         |
+
+**Effectful** — touches the world (filesystem, streams, processes, registries):
+
+| Prefix     | Contract                                                   | Example           |
+| ---------- | ---------------------------------------------------------- | ----------------- |
+| `apply`    | perform previously planned changes                         | `applyEdits`      |
+| `create`   | bring a resource into existence (file, directory, process) | `createWorkDir`   |
+| `read`     | pull raw content from filesystem or network into memory    | `readSource`      |
+| `load`     | read **and** parse into a ready structure                  | `loadConfig`      |
+| `write`    | persist to the filesystem                                  | `writeOutput`     |
+| `remove`   | delete a resource                                          | `removeStaleDist` |
+| `update`   | mutate existing state or resource in place                 | `updateIndex`     |
+| `print`    | write to stdout/stderr                                     | `printHelp`       |
+| `run`      | execute a subprocess, task, or whole pipeline              | `runCLI`          |
+| `check`    | evaluate and report findings; effects allowed per mode     | `checkFile`       |
+| `try<X>`   | X with failures captured as a value instead of a throw     | `tryCheckFile`    |
+| `register` | add to a registry the caller doesn't own                   | `registerMatcher` |
+| `assert`   | throw when an invariant doesn't hold                       | `assertSpan`      |
+| `emit`     | dispatch an event or notification                          | `emitProgress`    |
+
+**Wrappers and factories:**
+
+| Prefix    | Contract                                  | Example           |
+| --------- | ----------------------------------------- | ----------------- |
+| `with<X>` | HOF that runs a callback inside a context | `withJestContext` |
+| `make<X>` | factory whose result is itself a function | `makeExcluder`    |
+
+**Banned** — each is a vaguer or synonymous form of a listed verb; use that one instead: `handle`,
+`process`, `manage`, `do`, `perform` (say what it does), `execute` (→ `run`), `compute` (→ `build`),
+`fetch` (→ `read`), `save`/`store` (→ `write`), `delete` (→ `remove`), `search`/`lookup` (→
+`find`/`get`).
+
+Algorithm-native vocabulary (`walk`, `backtrack`, `slideDiagonal`) is allowed inside the module
+implementing that algorithm — forcing list verbs onto textbook terms hides the algorithm.
 
 ## Testing
 

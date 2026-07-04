@@ -12,7 +12,7 @@ export interface DiffOutput {
  * one file-system effect below the entry; what to print is returned, never
  * printed, because the entry owns the output streams.
  */
-export function handleDiff(edit: FileEdit, mode: CLIMode): DiffOutput {
+export function applyDiffMode(edit: FileEdit, mode: CLIMode): DiffOutput {
   if (mode === 'check') {
     return { message: `DIFF  ${edit.file}  ${edit.result.edits} edit(s)`, stdout: null };
   }

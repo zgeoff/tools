@@ -6,7 +6,7 @@ import type { CLIMode, FileReport } from './types.ts';
  * validated nothing, and a throw would kill the process mid-batch with the
  * remaining files silently skipped.
  */
-export function processFile(file: string, mode: CLIMode): FileReport {
+export function tryCheckFile(file: string, mode: CLIMode): FileReport {
   if (file.endsWith('.d.ts')) {
     return { outcome: 'skipped', bytes: 0, parsed: false, message: null, stdout: null };
   }

@@ -86,7 +86,7 @@ function isTriviaOnly(gap: Gap): boolean {
  * before it.
  */
 function planBlankLineEdit(gap: Gap): Edit | null {
-  const effectiveStart = skipTrailingComments(gap);
+  const effectiveStart = getEffectiveGapStart(gap);
   const leadingComment = gap.comments.find((c) => c.start >= effectiveStart);
 
   if (leadingComment !== undefined) {
@@ -96,7 +96,7 @@ function planBlankLineEdit(gap: Gap): Edit | null {
   return planWhitespaceGap(gap.src.slice(effectiveStart, gap.end), effectiveStart, gap.end);
 }
 
-function skipTrailingComments(gap: Gap): number {
+function getEffectiveGapStart(gap: Gap): number {
   let pos = gap.start;
 
   for (const c of gap.comments) {
