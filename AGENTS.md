@@ -19,20 +19,24 @@ experimental `--type-check` (fast, run it locally), while `typecheck` runs real 
 
 ## Code style
 
+Mechanically enforced rules (oxfmt, oxlint, format-codemod) aren't repeated here — this file covers
+what tooling can't check.
+
 - One primary export per file, and the file name kebab-cases that export (`with-jest-context.ts`
   exports `withJestContext`). Exceptions: `index.ts` entrypoints, `types.ts` for a package's shared
   types, and side-effect-only modules, which are named for what they do (`augment-bun-test.ts`).
-- Function names start with a verb from the closed list below (see "Function naming") — the prefix
-  declares the function's contract.
-- Acronyms stay uppercase in identifiers (`runCLI`, `parseCLIArgs`, `ASTNode`, `pkgURL`,
-  `isPackageJSON`) — except when one starts a camelCase name, where it lowercases whole (`cliPath`,
-  `astNode`). File names are unaffected: kebab-case lowercases everything (`parse-cli-args.ts`
-  exports `parseCLIArgs`).
 - Module order: imports, then the primary export, then private helpers in composition order
   (depth-first). Don't lead with helpers. Non-function supporting declarations (consts, interfaces,
   type aliases) sit directly above the first declaration that uses them — never below their last
   use, and never leading the file (types for the primary export's signature are the one exception:
   they may sit just above it).
+- Acronyms stay uppercase in identifiers (`runCLI`, `parseCLIArgs`, `ASTNode`, `pkgURL`,
+  `isPackageJSON`) — except when one starts a camelCase name, where it lowercases whole (`cliPath`,
+  `astNode`). File names are unaffected: kebab-case lowercases everything (`parse-cli-args.ts`
+  exports `parseCLIArgs`).
+
+### Comments
+
 - Comments that document a declaration (function, class, interface, member, module-scope const) are
   JSDoc blocks (`/** … */`) so editors surface them on hover; `//` is for statement-level commentary
   inside bodies. Attach the block to the declaration it describes — a doc above the wrong `const`
@@ -46,8 +50,9 @@ experimental `--type-check` (fast, run it locally), while `typecheck` runs real 
 
 ### Function naming
 
-The verb list is closed: pick from it, or extend this file in the same PR that introduces the new
-verb. The prefix is a contract — a reader should know the function's shape without opening it.
+Every function name starts with a prefix from the closed list below: pick from it, or extend this
+file in the same PR that introduces the new verb. The prefix is a contract — a reader should know
+the function's shape without opening it.
 
 **Predicates** — return boolean, no side effects:
 
@@ -102,7 +107,7 @@ verb. The prefix is a contract — a reader should know the function's shape wit
 | `emit`     | dispatch an event or notification                                                                                                       | `emitProgress`    |
 | `send`     | transmit a payload to a remote receiver (fire-and-forget or RPC — no resource semantics; REST mutations are `create`/`update`/`remove`) | `sendWebhook`     |
 
-**Wrappers and factories:**
+**Wrappers and factories** — the result is behaviour, not data:
 
 | Prefix    | Contract                                  | Example           |
 | --------- | ----------------------------------------- | ----------------- |
@@ -127,9 +132,15 @@ implementing that algorithm — forcing list verbs onto textbook terms hides the
 
 ## Testing
 
-- Never use `describe` — write flat `test('it does a thing', …)` blocks.
+- Never use `describe` — write flat `test(…)` blocks with behavioural titles that start with "it"
+  (`test('it pads before a return statement', …)`).
+- Run `bun test` from the repo root: the jest-extended preload lives in the root `bunfig.toml`, so
+  package-cwd runs are missing the extra matchers.
 - Tests declare their own data inline — no fixtures shared between tests, even if that means
   duplication.
+- Tests are mock-free: pure modules assert on return values, file-touching ones use `mkdtemp` trees,
+  and CLI behaviour is asserted end-to-end by spawning the real binary. If a module is hard to test
+  without mocking, move its I/O to the caller.
 - Reach for jest-extended matchers instead of hand-rolling assertions. Frequently useful:
   - arrays
     - `toIncludeAllMembers`
