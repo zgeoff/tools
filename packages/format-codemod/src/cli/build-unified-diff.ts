@@ -102,16 +102,18 @@ class MyersDiff {
     let pos: Position = { x: this.a.length, y: this.b.length };
 
     for (let d = this.trace.length - 1; d >= 0; d--) {
-      pos = this.unwindRound(ops, pos, d);
+      const round = this.unwindRound(pos, d);
+
+      ops.push(...round.ops);
+      ({ pos } = round);
     }
 
     return ops.toReversed();
   }
 
-  private unwindRound(ops: DiffOp[], pos: Position, d: number): Position {
+  private unwindRound(pos: Position, d: number): { ops: DiffOp[]; pos: Position } {
     const { prev, moveDown } = this.findPrevious(pos, d);
-
-    this.pushEqualOps(ops, pos, prev);
+    const ops = this.buildEqualOps(pos, prev);
 
     if (d > 0) {
       ops.push(
@@ -121,7 +123,7 @@ class MyersDiff {
       );
     }
 
-    return prev;
+    return { ops, pos: prev };
   }
 
   private findPrevious(pos: Position, d: number): { prev: Position; moveDown: boolean } {
@@ -135,7 +137,8 @@ class MyersDiff {
   }
 
   // The diagonal walk back from pos to prev — the lines both sides share.
-  private pushEqualOps(ops: DiffOp[], pos: Position, prev: Position): void {
+  private buildEqualOps(pos: Position, prev: Position): DiffOp[] {
+    const ops: DiffOp[] = [];
     let { x, y } = pos;
 
     while (x > prev.x && y > prev.y) {
@@ -143,12 +146,14 @@ class MyersDiff {
       x--;
       y--;
     }
+
+    return ops;
   }
 }
 
 interface Window {
-  from: number;
-  to: number;
+  readonly from: number;
+  readonly to: number;
 }
 
 interface Hunk {
@@ -167,23 +172,19 @@ function buildWindows(ops: readonly DiffOp[]): Window[] {
 
   for (let i = 0; i < ops.length; i++) {
     if (ops[i]?.kind !== ' ') {
-      extendWindows(windows, i, ops.length);
+      const from = Math.max(0, i - CONTEXT_LINES);
+      const to = Math.min(ops.length, i + CONTEXT_LINES + 1);
+      const last = windows.at(-1);
+
+      if (last !== undefined && from <= last.to) {
+        windows[windows.length - 1] = { from: last.from, to };
+      } else {
+        windows.push({ from, to });
+      }
     }
   }
 
   return windows;
-}
-
-function extendWindows(windows: Window[], changeIndex: number, total: number): void {
-  const from = Math.max(0, changeIndex - CONTEXT_LINES);
-  const to = Math.min(total, changeIndex + CONTEXT_LINES + 1);
-  const last = windows.at(-1);
-
-  if (last !== undefined && from <= last.to) {
-    last.to = to;
-  } else {
-    windows.push({ from, to });
-  }
 }
 
 function buildHunk(ops: readonly DiffOp[], w: Window): Hunk {

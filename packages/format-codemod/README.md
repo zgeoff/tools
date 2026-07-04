@@ -1,9 +1,10 @@
 # @zgeoff/format-codemod
 
 Enforce a small set of blank-line padding conventions in TypeScript via a fast text-splice codemod.
-It parses each file once with `@babel/parser`, applies only positional whitespace edits, and skips
-type-aware analysis, so it runs far faster than a full lint pass — fast enough to sit in a
-pre-commit hook or a `format` pipeline without being noticed.
+It parses each file once with [oxc-parser](https://oxc.rs) (native, so parsing is effectively free),
+plans positional whitespace splices from node and comment spans, and skips type-aware analysis, so
+it runs far faster than a full lint pass — fast enough to sit in a pre-commit hook or a `format`
+pipeline without being noticed.
 
 ## Rules implemented
 
@@ -43,6 +44,9 @@ format-codemod [options] <file|dir|glob> ...
   --help
 ```
 
+Flags are strict: an unknown flag is a usage error (exit 2), never a silent no-op — the default mode
+writes files, so a typo'd `--check` must not fall through to a rewrite.
+
 ### Examples
 
 ```bash
@@ -55,12 +59,24 @@ format-codemod .                             # whole repo, in place
 Globs use Node 22's built-in `fs.glob`. A literal path is resolved as a file before the glob
 heuristic runs, so bracketed names (Next.js routes like `[slug]/page.tsx`) are handled correctly
 rather than read as glob character classes. A directory argument expands to `**/*.{ts,tsx}` beneath
-it; `node_modules` and `.git` are never descended into.
+it; `node_modules` and `.git` are never descended into, and overlapping patterns are deduped so a
+file is processed once.
+
+`--dry` prints a real unified diff — `@@` hunk headers with three lines of context — that applies
+cleanly with `patch(1)`.
+
+## Dialect handling
+
+The filename picks the parse dialect: `.tsx` enables JSX, everything else parses as plain
+TypeScript. That means `.ts`-only syntax — old-style type assertions (`<string>value`), un-comma'd
+generic arrows (`<T>(a: T) => a`) — parses correctly instead of being misread as JSX.
 
 ## Trivia handling
 
+Comment positions come from the parser, not lexical scanning:
+
 - Trailing same-line comments stay attached to the previous statement: `const X = 1; // note` keeps
-  the blank line _after_ the comment.
+  the blank line _after_ the comment (several same-line comments all stay together).
 - Leading comments stay attached to the next statement: the blank line goes _before_ the comment.
 - Indentation of the next statement is preserved.
 - Two statements that share a physical line are left untouched — for example a leading-semicolon
@@ -77,7 +93,10 @@ code is a no-op.
 ```ts
 import { transform } from '@zgeoff/format-codemod';
 
-const { output, edits, parseError } = transform(source);
+const { output, edits, parseError } = transform(source, { filename: 'component.tsx' });
 // edits: number of splices applied
 // parseError: error message if the source could not be parsed; source returned untouched
 ```
+
+`filename` is optional and only drives dialect selection (default `'source.ts'` — plain TypeScript,
+no JSX); nothing is read from disk.
