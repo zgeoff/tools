@@ -77,6 +77,40 @@ test('it still checks the remaining files after one fails to parse', () => {
   expect(stderr).toInclude('DIFF');
 });
 
+test('it rejects an unknown flag with a usage error and leaves files untouched', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const file = path.join(dir, 'unpadded.ts');
+  const src = 'export function f() {\n  const a = 1;\n  return a;\n}\n';
+
+  fs.writeFileSync(file, src);
+  const { status, stderr } = runCli(['--chekc', file]);
+
+  expect(status).toBe(2);
+  expect(stderr).toInclude("'--chekc'");
+  expect(fs.readFileSync(file, 'utf8')).toBe(src);
+});
+
+test('it formats .tsx files containing JSX', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const file = path.join(dir, 'component.tsx');
+
+  fs.writeFileSync(file, 'const el = <div>hi</div>;\nexport function C() {\n  return el;\n}\n');
+  const { status, stderr } = runCli(['--check', file]);
+
+  expect(status).toBe(1);
+  expect(stderr).toInclude('DIFF');
+});
+
+test('it processes a file only once when patterns overlap', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const file = path.join(dir, 'unpadded.ts');
+
+  fs.writeFileSync(file, 'export function f() {\n  const a = 1;\n  return a;\n}\n');
+  const { stderr } = runCli(['--check', dir, file]);
+
+  expect(stderr.match(/DIFF/gu)).toHaveLength(1);
+});
+
 test('it does not descend into node_modules when expanding a directory', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
   const nested = path.join(dir, 'node_modules', 'dep');
