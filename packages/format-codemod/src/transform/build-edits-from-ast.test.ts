@@ -45,3 +45,16 @@ test('it does not match exported declarations', () => {
 
   expect(buildEditsFromAST(src, parse(src))).toBeEmpty();
 });
+
+test('it does not pad between adjacent imports even when one is multiline', () => {
+  const src = "import {\n  a,\n  b,\n} from 'x';\nimport { c } from 'y';\n";
+
+  expect(buildEditsFromAST(src, parse(src))).toBeEmpty();
+});
+
+test('it pads between the last import and the first statement', () => {
+  const src = "import {\n  a,\n  b,\n} from 'x';\nuse(a);\n";
+  const edits = buildEditsFromAST(src, parse(src));
+
+  expect(edits).toEqual([{ start: 30, end: 31, replacement: '\n\n' }]);
+});

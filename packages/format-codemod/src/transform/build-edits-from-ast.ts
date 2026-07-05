@@ -1,4 +1,7 @@
 import type { ASTNode, Edit, ParsedSource, SourceFile } from '../types.ts';
+import { collectASTNodes } from './collect-ast-nodes.ts';
+import { collectChildNodes } from './collect-child-nodes.ts';
+import { isASTNode } from './is-ast-node.ts';
 import { planGapEdit } from './plan-gap-edit.ts';
 
 /**
@@ -55,6 +58,7 @@ function buildPairEdits(file: SourceFile, container: ASTNode, body: readonly AST
     if (
       prev !== undefined &&
       next !== undefined &&
+      !isImportPair(prev, next) &&
       (needsBlankLine(container, prev, next) ||
         isMultiline(file.src, prev) ||
         isMultiline(file.src, next))
@@ -68,6 +72,16 @@ function buildPairEdits(file: SourceFile, container: ASTNode, body: readonly AST
   }
 
   return edits;
+}
+
+/**
+ * Adjacent imports are never padded, whatever their shape: the interior of an
+ * import block belongs to the import sorter, and blank lines inserted there
+ * would be reordered or stripped out from under us. The boundary between the
+ * last import and the first real statement is still padded as usual.
+ */
+function isImportPair(prev: ASTNode, next: ASTNode): boolean {
+  return prev.type === 'ImportDeclaration' && next.type === 'ImportDeclaration';
 }
 
 /**
@@ -263,38 +277,4 @@ function isVarDecl(node: ASTNode): boolean {
  */
 function isFnOrClassDecl(node: ASTNode): boolean {
   return node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration';
-}
-
-function collectChildNodes(node: ASTNode): ASTNode[] {
-  const children: ASTNode[] = [];
-
-  for (const key of Object.keys(node)) {
-    if (key !== 'loc' && key !== 'parent') {
-      children.push(...collectASTNodes(node[key]));
-    }
-  }
-
-  return children;
-}
-
-function collectASTNodes(value: unknown): ASTNode[] {
-  if (!Array.isArray(value)) {
-    return isASTNode(value) ? [value] : [];
-  }
-
-  const nodes: ASTNode[] = [];
-
-  for (const item of value) {
-    if (isASTNode(item)) {
-      nodes.push(item);
-    }
-  }
-
-  return nodes;
-}
-
-function isASTNode(value: unknown): value is ASTNode {
-  return (
-    typeof value === 'object' && value !== null && 'type' in value && typeof value.type === 'string'
-  );
 }
