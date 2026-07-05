@@ -161,3 +161,23 @@ test('it does not descend into node_modules when expanding a directory', () => {
   expect(status).toBe(0);
   expect(stderr).not.toInclude('node_modules');
 });
+
+test('it skips files matching --ignore globs', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const generated = path.join(dir, 'generated');
+  const unpadded = 'export function f() {\n  const a = 1;\n  return a;\n}\n';
+
+  fs.mkdirSync(generated);
+  fs.writeFileSync(path.join(generated, 'out.ts'), unpadded);
+
+  fs.writeFileSync(
+    path.join(dir, 'clean.ts'),
+    'const a = 1;\n\nexport function f() {\n  return a;\n}\n',
+  );
+
+  const { status, stderr } = runCLI(['--check', '--ignore', path.join(dir, 'generated/**'), dir]);
+
+  expect(status).toBe(0);
+  expect(stderr).not.toInclude('generated');
+  expect(fs.readFileSync(path.join(generated, 'out.ts'), 'utf8')).toBe(unpadded);
+});

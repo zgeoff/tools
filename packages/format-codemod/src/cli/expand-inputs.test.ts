@@ -71,3 +71,26 @@ test('it passes a missing literal path through so the CLI can report it', async 
 
   expect(files).toEqual([missing]);
 });
+
+test('it skips files matching an ignore glob during directory expansion', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'expand-inputs-'));
+
+  fs.mkdirSync(path.join(dir, 'generated'));
+  fs.writeFileSync(path.join(dir, 'keep.ts'), '');
+  fs.writeFileSync(path.join(dir, 'generated', 'out.ts'), '');
+
+  const files = await expandInputs([dir], [path.join(dir, 'generated/**')]);
+
+  expect(files.map((f) => path.basename(f))).toEqual(['keep.ts']);
+});
+
+test('it applies ignore globs to explicit file arguments', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'expand-inputs-'));
+  const file = path.join(dir, 'a.gen.ts');
+
+  fs.writeFileSync(file, '');
+
+  const files = await expandInputs([file], ['**/*.gen.ts']);
+
+  expect(files).toBeEmpty();
+});

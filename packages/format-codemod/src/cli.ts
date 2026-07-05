@@ -16,7 +16,7 @@ if (typeof parsedArgs === 'string') {
   process.exit(2);
 }
 
-const { mode, quiet, bench, help, version, inputs } = parsedArgs;
+const { mode, quiet, bench, help, version, ignore, inputs } = parsedArgs;
 
 if (help || (inputs.length === 0 && !version)) {
   const exitCode = inputs.length === 0 ? 2 : 0;
@@ -35,7 +35,7 @@ if (version) {
 }
 
 const t0 = Date.now();
-const files = await expandInputs(inputs);
+const files = await expandInputs(inputs, ignore);
 
 if (files.length === 0) {
   console.error('no files matched');

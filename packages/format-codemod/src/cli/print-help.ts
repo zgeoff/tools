@@ -5,10 +5,11 @@ usage:
   format-codemod [options] <file|dir|glob> ...
 
 options:
-  --check     exit 1 if any file would change (no writes)
-  --dry       print unified diff to stdout (no writes)
-  --bench     print parse stats as JSON to stderr
-  --quiet     only print files that would change
+  --check            exit 1 if any file would change (no writes)
+  --dry              print unified diff to stdout (no writes)
+  --bench            print parse stats as JSON to stderr
+  --quiet            only print files that would change
+  --ignore <glob>    skip files matching the glob (repeatable)
   --version
   --help
 
@@ -21,5 +22,6 @@ examples:
   format-codemod 'src/**/*.ts'
   format-codemod --check 'src/**/*.{ts,tsx}'
   format-codemod --dry path/to/file.ts
+  format-codemod --ignore 'src/generated/**' .
 `);
 }

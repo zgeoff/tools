@@ -7,6 +7,7 @@ export interface CLIArgs {
   readonly bench: boolean;
   readonly help: boolean;
   readonly version: boolean;
+  readonly ignore: readonly string[];
   readonly inputs: readonly string[];
 }
 
@@ -27,6 +28,7 @@ export function parseCLIArgs(argv: readonly string[]): CLIArgs | string {
         quiet: { type: 'boolean', default: false },
         version: { type: 'boolean', default: false },
         help: { type: 'boolean', default: false },
+        ignore: { type: 'string', multiple: true, default: [] },
       },
       allowPositionals: true,
       strict: true,
@@ -38,6 +40,7 @@ export function parseCLIArgs(argv: readonly string[]): CLIArgs | string {
       bench: values.bench,
       help: values.help,
       version: values.version,
+      ignore: values.ignore,
       inputs: positionals,
     };
   } catch (error) {
