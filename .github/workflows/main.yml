@@ -89,7 +89,10 @@ jobs:
       # after creating it), and a step's env block is template-evaluated
       # even when its if-condition is false, so fallible expressions like
       # fromJSON must never appear in env. Mergeability is recomputed
-      # asynchronously after the sync push — poll until it settles.
+      # asynchronously after the sync push — poll until it settles — and a
+      # MERGEABLE read can be stale ("Base branch was modified" from the
+      # merge mutation), so the merge attempt itself retries inside the
+      # same loop rather than trusting any single read.
       - name: Auto-merge release PRs
         if: steps.app-token.outputs.token != ''
         env:
@@ -99,19 +102,18 @@ jobs:
             merged=''
             for _ in $(seq 1 12); do
               state=$(gh pr view "$pr" --repo "$GITHUB_REPOSITORY" --json mergeable --jq .mergeable)
-              if [ "$state" = "MERGEABLE" ]; then
-                gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --squash
-                merged=1
-                break
-              fi
               if [ "$state" = "CONFLICTING" ]; then
                 echo "release PR #$pr has conflicts" >&2
                 exit 1
               fi
+              if [ "$state" = "MERGEABLE" ] && gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --squash; then
+                merged=1
+                break
+              fi
               sleep 5
             done
             if [ -z "$merged" ]; then
-              echo "release PR #$pr mergeability never settled" >&2
+              echo "release PR #$pr never became mergeable" >&2
               exit 1
             fi
           done
