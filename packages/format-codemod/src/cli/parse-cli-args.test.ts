@@ -31,3 +31,10 @@ test('it returns an error message for an unknown flag', () => {
   expect(args).toBeString();
   expect(args).toInclude("'--chekc'");
 });
+
+test('it collects repeated --ignore patterns and defaults to none', () => {
+  const args = parseCLIArgs(['--ignore', 'dist/**', '--ignore', '**/*.gen.ts', 'a.ts']);
+
+  expect(args).toMatchObject({ ignore: ['dist/**', '**/*.gen.ts'], inputs: ['a.ts'] });
+  expect(parseCLIArgs(['a.ts'])).toContainEntry(['ignore', []]);
+});
