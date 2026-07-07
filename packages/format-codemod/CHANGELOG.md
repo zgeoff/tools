@@ -2,10 +2,11 @@
 
 ## [0.0.4](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.0.3...@zgeoff/format-codemod@0.0.4) (2026-07-07)
 
-
 ### Features
 
-* **lint:** replace prefer-destructuring with house destructuring policy ([#36](https://github.com/zgeoff/tools/issues/36)) ([893e8ce](https://github.com/zgeoff/tools/commit/893e8ce17151fa87817278b8f1a67158012d9911))
+- **lint:** replace prefer-destructuring with house destructuring policy
+  ([#36](https://github.com/zgeoff/tools/issues/36))
+  ([893e8ce](https://github.com/zgeoff/tools/commit/893e8ce17151fa87817278b8f1a67158012d9911))
 
 ## [0.0.3](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.0.2...@zgeoff/format-codemod@0.0.3) (2026-07-07)
 
