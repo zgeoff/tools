@@ -2,10 +2,11 @@
 
 ## [0.0.3](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.0.2...@zgeoff/format-codemod@0.0.3) (2026-07-07)
 
-
 ### Features
 
-* **format-codemod:** pad using-declaration and awaitedness boundaries ([#33](https://github.com/zgeoff/tools/issues/33)) ([1b8ff92](https://github.com/zgeoff/tools/commit/1b8ff920af639976df9094a2a61335105ee800f5))
+- **format-codemod:** pad using-declaration and awaitedness boundaries
+  ([#33](https://github.com/zgeoff/tools/issues/33))
+  ([1b8ff92](https://github.com/zgeoff/tools/commit/1b8ff920af639976df9094a2a61335105ee800f5))
 
 ## [0.0.2](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.0.1...@zgeoff/format-codemod@0.0.2) (2026-07-05)
 

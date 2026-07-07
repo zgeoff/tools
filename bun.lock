@@ -31,7 +31,7 @@
     },
     "packages/format-codemod": {
       "name": "@zgeoff/format-codemod",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "bin": {
         "format-codemod": "./dist/cli.js",
       },
