@@ -1,6 +1,6 @@
-// Repo-local lint rules, loaded through oxlint's jsPlugins (ESLint v9 rule
-// API). Each rule bans an AST shape that no native oxlint rule can express,
-// using esquery selectors.
+// Custom lint rules, loaded through oxlint's jsPlugins (ESLint v9 rule API).
+// Each rule bans an AST shape that no native oxlint rule can express, using
+// esquery selectors.
 
 function banSelectors(type, message, selectors) {
   return {
@@ -17,7 +17,7 @@ function banSelectors(type, message, selectors) {
 }
 
 const plugin = {
-  meta: { name: 'local' },
+  meta: { name: 'zgeoff' },
   rules: {
     'no-top-level-arrow': banSelectors(
       'problem',
