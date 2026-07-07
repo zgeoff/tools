@@ -1,4 +1,4 @@
 {
   "packages/bun-test-extended": "0.0.2",
-  "packages/format-codemod": "0.0.2"
+  "packages/format-codemod": "0.0.3"
 }
