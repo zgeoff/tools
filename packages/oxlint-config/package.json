@@ -1,0 +1,31 @@
+{
+  "name": "@zgeoff/oxlint-config",
+  "version": "0.0.1",
+  "description": "Shareable oxlint config: strict categories, house-style rules, and a custom JS plugin",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zgeoff/tools.git",
+    "directory": "packages/oxlint-config"
+  },
+  "files": [
+    "oxlintrc.json",
+    "plugin.js",
+    "index.js"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./oxlintrc.json": "./oxlintrc.json",
+    "./plugin": "./plugin.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@stylistic/eslint-plugin": "catalog:"
+  },
+  "peerDependencies": {
+    "oxlint": ">=1.71.0"
+  }
+}

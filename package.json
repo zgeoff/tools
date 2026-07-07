@@ -32,11 +32,11 @@
     "format:check": "oxfmt --check . && bun packages/format-codemod/src/cli.ts --check --quiet ."
   },
   "devDependencies": {
-    "@stylistic/eslint-plugin": "catalog:",
     "@tsconfig/strictest": "catalog:",
     "@types/bun": "catalog:",
     "@zgeoff/bun-test-extended": "workspace:*",
     "@zgeoff/format-codemod": "workspace:*",
+    "@zgeoff/oxlint-config": "workspace:*",
     "lefthook": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
