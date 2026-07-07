@@ -86,12 +86,83 @@ test('it does not pad after exported declarations (ESLint does not look through 
   expect(output).toBe(src);
 });
 
-test('it does not treat await using as a var declaration', () => {
-  const src = `async function f() {\n  await using handle = acquire();\n  process(handle);\n}\n`;
+test('it pads after a using block before a statement of another kind', () => {
+  const src = `async function f() {\n  await using handle = acquire();\n  use(handle);\n}\n`;
+  const { output } = transform(src);
+
+  expect(output).toInclude('  await using handle = acquire();\n\n  use(handle);');
+});
+
+test('it keeps runs of same-flavour using declarations glued', () => {
+  const src = `async function f() {\n  await using a = await acquireA();\n  await using b = await acquireB();\n  use(a, b);\n}\n`;
+  const { output } = transform(src);
+
+  expect(output).toInclude(
+    '  await using a = await acquireA();\n  await using b = await acquireB();\n\n  use(a, b);',
+  );
+});
+
+test('it pads the boundary between an await using and a plain using declaration', () => {
+  const src = `async function f() {\n  await using a = await acquireA();\n  using b = acquireB();\n  use(a, b);\n}\n`;
+  const { output } = transform(src);
+
+  expect(output).toInclude('  await using a = await acquireA();\n\n  using b = acquireB();');
+});
+
+test('it pads the boundary between a using declaration and a const block', () => {
+  const src = `async function f() {\n  using scope = createScope();\n  const a = build(scope);\n  use(a);\n}\n`;
+  const { output } = transform(src);
+
+  expect(output).toInclude('  using scope = createScope();\n\n  const a = build(scope);');
+});
+
+test('it pads the boundary between awaited and non-awaited declarations', () => {
+  const src = `async function f(db) {\n  const viewer = await createViewer(db);\n  const admin = await createAdmin(db);\n  const client = buildClient(viewer);\n  const limits = buildLimits(client);\n  use(admin, limits);\n}\n`;
+  const { output } = transform(src);
+
+  expect(output).toInclude(
+    '  const viewer = await createViewer(db);\n  const admin = await createAdmin(db);\n\n  const client = buildClient(viewer);\n  const limits = buildLimits(client);',
+  );
+});
+
+test('it treats an await inside the head chain as awaited', () => {
+  const src = `async function f(client) {\n  const profile = (await client.getProfile()).data;\n  const rest = await splitRecords(profile);\n  use(rest);\n}\n`;
   const { output, edits } = transform(src);
 
-  expect(edits).toBe(0);
-  expect(output).toBe(src);
+  expect(edits).toBe(1);
+
+  expect(output).toInclude(
+    '  const profile = (await client.getProfile()).data;\n  const rest = await splitRecords(profile);',
+  );
+});
+
+test('it treats await in argument position as non-awaited', () => {
+  const src = `async function f(client) {\n  const label = buildLabel(await client.getSuffix());\n  const mode = pickMode(client);\n  use(label, mode);\n}\n`;
+  const { output, edits } = transform(src);
+
+  expect(edits).toBe(1);
+
+  expect(output).toInclude(
+    '  const label = buildLabel(await client.getSuffix());\n  const mode = pickMode(client);',
+  );
+});
+
+test('it pads the boundary between awaited and non-awaited call statements', () => {
+  const src = `async function f(client, tracer) {\n  await client.warmCache();\n  await tracer.mark();\n  client.resetRetries();\n  tracer.stop();\n}\n`;
+  const { output } = transform(src);
+
+  expect(output).toInclude(
+    '  await client.warmCache();\n  await tracer.mark();\n\n  client.resetRetries();\n  tracer.stop();',
+  );
+});
+
+test('it pads the boundary between awaited and non-awaited assignments', () => {
+  const src = `async function f(client) {\n  let pending = null;\n  let retries = 0;\n  pending = client.ping();\n  retries += 1;\n  pending = await client.flush();\n  use(pending, retries);\n}\n`;
+  const { output } = transform(src);
+
+  expect(output).toInclude(
+    '  pending = client.ping();\n  retries += 1;\n\n  pending = await client.flush();',
+  );
 });
 
 test('it inserts a blank line between adjacent class members', () => {
