@@ -67,6 +67,7 @@ test('it dedupes files matched by overlapping patterns', async () => {
 
 test('it passes a missing literal path through so the CLI can report it', async () => {
   const missing = path.join(os.tmpdir(), 'expand-inputs-none', 'missing.ts');
+
   const files = await expandInputs([missing]);
 
   expect(files).toEqual([missing]);

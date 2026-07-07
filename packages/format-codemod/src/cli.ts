@@ -35,6 +35,7 @@ if (version) {
 }
 
 const t0 = Date.now();
+
 const files = await expandInputs(inputs, ignore);
 
 if (files.length === 0) {
