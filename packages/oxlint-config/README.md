@@ -9,7 +9,7 @@ await arguments.
 ## Usage
 
 ```sh
-bun add -d @zgeoff/oxlint-config oxlint
+bun add -d @zgeoff/oxlint-config oxlint @stylistic/eslint-plugin
 ```
 
 Extend it from `.oxlintrc.json` — `extends` resolves file paths only, so point at the file inside
@@ -36,6 +36,10 @@ The plugin is addressable on its own at `@zgeoff/oxlint-config/plugin` for confi
 ## Notes
 
 - The config enables the `typescript`, `unicorn`, `oxc`, `import`, and `promise` plugins and loads
-  `@stylistic/eslint-plugin` (a dependency of this package) through `jsPlugins`.
+  `@stylistic/eslint-plugin` through `jsPlugins`. oxlint resolves `jsPlugins` specifiers from the
+  project root, not from the config file that names them — so `@stylistic/eslint-plugin` must be a
+  direct dependency of the consuming project. Hoisting package managers (bun's default linker, npm)
+  resolve it transitively anyway, but isolated layouts (pnpm, `bun install --linker isolated`) fail
+  with `Cannot find module '@stylistic/eslint-plugin'` unless it's installed directly.
 - Type-aware rules activate under `oxlint --type-aware` (requires `oxlint-tsgolint`); the config
   works without it.
