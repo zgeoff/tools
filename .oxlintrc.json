@@ -20,6 +20,7 @@
     "local/no-bare-named-exports": "error",
     "local/no-inline-param-object-types": "error",
     "local/no-destructured-params": "error",
+    "local/no-pick-destructuring": "error",
     "local/no-ternary-args": "error",
     "local/no-await-args": "error",
 
@@ -67,8 +68,16 @@
     // allows destructuring for omitting properties
     "no-unused-vars": ["error", { "ignoreRestSiblings": true }],
 
-    // "style" category default; house style is direct member access
-    "prefer-destructuring": "off",
+    // arrays: destructure instead of indexing; objects: house style is direct
+    // member access, so never required (the omit-via-rest exception lives in
+    // local/no-pick-destructuring)
+    "prefer-destructuring": [
+      "error",
+      {
+        "VariableDeclarator": { "array": true, "object": false },
+        "AssignmentExpression": { "array": false, "object": false }
+      }
+    ],
 
     // consistent function syntax — declarations top level, arrows for inside
     // blocks and callbacks

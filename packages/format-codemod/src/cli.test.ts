@@ -29,7 +29,7 @@ test('it exits cleanly in check mode when files are already padded', () => {
 
   fs.writeFileSync(file, 'const a = 1;\n\nexport function f() {\n  return a;\n}\n');
 
-  const { status } = runCLI(['--check', file]);
+  const status = runCLI(['--check', file]).status;
 
   expect(status).toBe(0);
 });
@@ -41,7 +41,9 @@ test('it exits with the diff code in check mode when a file needs padding and le
 
   fs.writeFileSync(file, src);
 
-  const { status, stderr } = runCLI(['--check', file]);
+  const result = runCLI(['--check', file]);
+  const status = result.status;
+  const stderr = result.stderr;
 
   expect(status).toBe(1);
   expect(stderr).toInclude('DIFF');
@@ -54,7 +56,9 @@ test('it fails the batch in check mode when a file cannot be parsed', () => {
 
   fs.writeFileSync(file, 'const = (((\n');
 
-  const { status, stderr } = runCLI(['--check', file]);
+  const result = runCLI(['--check', file]);
+  const status = result.status;
+  const stderr = result.stderr;
 
   expect(status).toBe(2);
   expect(stderr).toInclude('PARSE-ERR');
@@ -63,7 +67,9 @@ test('it fails the batch in check mode when a file cannot be parsed', () => {
 test('it fails the batch when a named file does not exist', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
   const missing = path.join(dir, 'missing.ts');
-  const { status, stderr } = runCLI(['--check', missing]);
+  const result = runCLI(['--check', missing]);
+  const status = result.status;
+  const stderr = result.stderr;
 
   expect(status).toBe(2);
   expect(stderr).toInclude('ERROR');
@@ -77,11 +83,11 @@ test('it still checks the remaining files after one fails to parse', () => {
   fs.writeFileSync(broken, 'const = (((\n');
   fs.writeFileSync(unpadded, 'export function f() {\n  const a = 1;\n  return a;\n}\n');
 
-  const { status, stderr } = runCLI(['--check', broken, unpadded]);
+  const result = runCLI(['--check', broken, unpadded]);
 
-  expect(status).toBe(2);
-  expect(stderr).toInclude('PARSE-ERR');
-  expect(stderr).toInclude('DIFF');
+  expect(result.status).toBe(2);
+  expect(result.stderr).toInclude('PARSE-ERR');
+  expect(result.stderr).toInclude('DIFF');
 });
 
 test('it rejects an unknown flag with a usage error and leaves files untouched', () => {
@@ -91,7 +97,9 @@ test('it rejects an unknown flag with a usage error and leaves files untouched',
 
   fs.writeFileSync(file, src);
 
-  const { status, stderr } = runCLI(['--chekc', file]);
+  const result = runCLI(['--chekc', file]);
+  const status = result.status;
+  const stderr = result.stderr;
 
   expect(status).toBe(2);
   expect(stderr).toInclude("'--chekc'");
@@ -104,7 +112,9 @@ test('it formats .tsx files containing JSX', () => {
 
   fs.writeFileSync(file, 'const el = <div>hi</div>;\nexport function C() {\n  return el;\n}\n');
 
-  const { status, stderr } = runCLI(['--check', file]);
+  const result = runCLI(['--check', file]);
+  const status = result.status;
+  const stderr = result.stderr;
 
   expect(status).toBe(1);
   expect(stderr).toInclude('DIFF');
@@ -116,13 +126,15 @@ test('it processes a file only once when patterns overlap', () => {
 
   fs.writeFileSync(file, 'export function f() {\n  const a = 1;\n  return a;\n}\n');
 
-  const { stderr } = runCLI(['--check', dir, file]);
+  const stderr = runCLI(['--check', dir, file]).stderr;
 
   expect(stderr.match(/DIFF/gu)).toHaveLength(1);
 });
 
 test('it prints the package version for --version', () => {
-  const { status, stdout } = runCLI(['--version']);
+  const result = runCLI(['--version']);
+  const status = result.status;
+  const stdout = result.stdout;
 
   expect(status).toBe(0);
   expect(stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/u);
@@ -134,7 +146,7 @@ test('it only reports files that would change in quiet mode', () => {
   fs.writeFileSync(path.join(dir, 'clean.ts'), 'const a = 1;\n\nuse(a);\n');
   fs.writeFileSync(path.join(dir, 'unpadded.ts'), 'const a = 1;\nuse(a);\n');
 
-  const { stderr } = runCLI(['--check', '--quiet', dir]);
+  const stderr = runCLI(['--check', '--quiet', dir]).stderr;
 
   expect(stderr).toInclude('DIFF');
   expect(stderr).not.toInclude('OK ');
@@ -156,7 +168,9 @@ test('it does not descend into node_modules when expanding a directory', () => {
     'const a = 1;\n\nexport function f() {\n  return a;\n}\n',
   );
 
-  const { status, stderr } = runCLI(['--check', dir]);
+  const result = runCLI(['--check', dir]);
+  const status = result.status;
+  const stderr = result.stderr;
 
   expect(status).toBe(0);
   expect(stderr).not.toInclude('node_modules');
@@ -175,9 +189,9 @@ test('it skips files matching --ignore globs', () => {
     'const a = 1;\n\nexport function f() {\n  return a;\n}\n',
   );
 
-  const { status, stderr } = runCLI(['--check', '--ignore', path.join(dir, 'generated/**'), dir]);
+  const result = runCLI(['--check', '--ignore', path.join(dir, 'generated/**'), dir]);
 
-  expect(status).toBe(0);
-  expect(stderr).not.toInclude('generated');
+  expect(result.status).toBe(0);
+  expect(result.stderr).not.toInclude('generated');
   expect(fs.readFileSync(path.join(generated, 'out.ts'), 'utf8')).toBe(unpadded);
 });

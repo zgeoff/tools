@@ -19,7 +19,7 @@ export interface CLIArgs {
  */
 export function parseCLIArgs(argv: readonly string[]): CLIArgs | string {
   try {
-    const { values, positionals } = parseArgs({
+    const parsed = parseArgs({
       args: [...argv],
       options: {
         check: { type: 'boolean', default: false },
@@ -35,13 +35,13 @@ export function parseCLIArgs(argv: readonly string[]): CLIArgs | string {
     });
 
     return {
-      mode: pickMode(values.check, values.dry),
-      quiet: values.quiet,
-      bench: values.bench,
-      help: values.help,
-      version: values.version,
-      ignore: values.ignore,
-      inputs: positionals,
+      mode: pickMode(parsed.values.check, parsed.values.dry),
+      quiet: parsed.values.quiet,
+      bench: parsed.values.bench,
+      help: parsed.values.help,
+      version: parsed.values.version,
+      ignore: parsed.values.ignore,
+      inputs: parsed.positionals,
     };
   } catch (error) {
     return error instanceof Error ? error.message : String(error);
