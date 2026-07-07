@@ -120,11 +120,12 @@ class MyersDiff {
   }
 
   private unwindRound(pos: Position, d: number): { ops: DiffOp[]; pos: Position } {
-    const { prev, moveDown } = this.findPrevious(pos, d);
+    const previous = this.findPrevious(pos, d);
+    const prev = previous.prev;
     const ops = this.buildEqualOps(pos, prev);
 
     if (d > 0) {
-      const changeOp: DiffOp = moveDown
+      const changeOp: DiffOp = previous.moveDown
         ? { kind: '+', text: this.b[prev.y] ?? '' }
         : { kind: '-', text: this.a[prev.x] ?? '' };
 
@@ -149,7 +150,8 @@ class MyersDiff {
    */
   private buildEqualOps(pos: Position, prev: Position): DiffOp[] {
     const ops: DiffOp[] = [];
-    let { x, y } = pos;
+    let x = pos.x;
+    let y = pos.y;
 
     while (x > prev.x && y > prev.y) {
       ops.push({ kind: ' ', text: this.a[x - 1] ?? '' });
@@ -206,13 +208,13 @@ function buildWindows(ops: readonly DiffOp[]): Window[] {
 }
 
 function buildHunk(ops: readonly DiffOp[], w: Window): Hunk {
-  const { aLine, bLine } = countPrecedingLines(ops, w.from);
+  const preceding = countPrecedingLines(ops, w.from);
   const slice = ops.slice(w.from, w.to);
   const aCount = slice.filter((o) => o.kind !== '+').length;
   const bCount = slice.filter((o) => o.kind !== '-').length;
 
   return {
-    header: `@@ -${formatRange(aLine, aCount)} +${formatRange(bLine, bCount)} @@\n`,
+    header: `@@ -${formatRange(preceding.aLine, aCount)} +${formatRange(preceding.bLine, bCount)} @@\n`,
     lines: slice.map((o) => `${o.kind}${o.text}\n`),
   };
 }

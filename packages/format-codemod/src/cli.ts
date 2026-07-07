@@ -16,9 +16,12 @@ if (typeof parsedArgs === 'string') {
   process.exit(2);
 }
 
-const { mode, quiet, bench, help, version, ignore, inputs } = parsedArgs;
+const mode = parsedArgs.mode;
+const quiet = parsedArgs.quiet;
+const bench = parsedArgs.bench;
+const inputs = parsedArgs.inputs;
 
-if (help || (inputs.length === 0 && !version)) {
+if (parsedArgs.help || (inputs.length === 0 && !parsedArgs.version)) {
   const exitCode = inputs.length === 0 ? 2 : 0;
 
   printHelp();
@@ -27,7 +30,7 @@ if (help || (inputs.length === 0 && !version)) {
 
 // The manifest URL resolves here, not in the helper: only this file sits at
 // the same depth in src/ and dist/, so '../package.json' is correct in both.
-if (version) {
+if (parsedArgs.version) {
   const pkgPath = fileURLToPath(new URL('../package.json', import.meta.url));
 
   process.stdout.write(`${readPackageVersion(pkgPath)}\n`);
@@ -36,7 +39,7 @@ if (version) {
 
 const t0 = Date.now();
 
-const files = await expandInputs(inputs, ignore);
+const files = await expandInputs(inputs, parsedArgs.ignore);
 
 if (files.length === 0) {
   console.error('no files matched');

@@ -77,13 +77,13 @@ function getStatementValues(node: ASTNode): ASTNode[] {
       .filter((init): init is ASTNode => isASTNode(init));
   }
 
-  const { expression } = node;
+  const expression = node['expression'];
 
   if (node.type !== 'ExpressionStatement' || !isASTNode(expression)) {
     return [];
   }
 
-  const { right } = expression;
+  const right = expression['right'];
 
   if (expression.type === 'AssignmentExpression' && isASTNode(right)) {
     return [right];
@@ -198,7 +198,7 @@ function getStatementKind(node: ASTNode): string | null {
 }
 
 function isExpressionStatementOf(node: ASTNode, types: readonly string[]): boolean {
-  const { expression } = node;
+  const expression = node['expression'];
 
   return (
     node.type === 'ExpressionStatement' && isASTNode(expression) && types.includes(expression.type)
