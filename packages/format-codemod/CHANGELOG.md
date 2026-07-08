@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.5](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.0.4...@zgeoff/format-codemod@0.0.5) (2026-07-08)
+
+
+### Features
+
+* **format-codemod:** read ignore globs from a .formatignore file ([#43](https://github.com/zgeoff/tools/issues/43)) ([b453ffc](https://github.com/zgeoff/tools/commit/b453ffcdb8d143cd27198fbaebd3c0cd2b411a87))
+
 ## [0.0.4](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.0.3...@zgeoff/format-codemod@0.0.4) (2026-07-07)
 
 ### Features
