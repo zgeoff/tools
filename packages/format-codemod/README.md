@@ -50,10 +50,11 @@ no "never" rules.
 ```bash
 format-codemod [options] <file|dir|glob> ...
 
-  --check     exit 1 if any file would change; do not write
-  --dry       print unified diff to stdout; do not write
-  --bench     print parse stats as JSON to stderr
-  --quiet     only print files that would change
+  --check            exit 1 if any file would change; do not write
+  --dry              print unified diff to stdout; do not write
+  --bench            print parse stats as JSON to stderr
+  --quiet            only print files that would change
+  --ignore <glob>    skip files matching the glob (repeatable)
   --version
   --help
 ```
@@ -78,6 +79,24 @@ file is processed once.
 
 `--dry` prints a real unified diff — `@@` hunk headers with three lines of context — that applies
 cleanly with `patch(1)`.
+
+### Ignoring files
+
+A `.formatignore` file in the working directory supplies ignore globs without bloating the command
+line — one per line, with blank lines and `#`-prefixed comment lines skipped:
+
+```gitignore
+# committed codegen
+src/generated/**
+
+# build output
+dist/**
+```
+
+Each line uses the same glob semantics as `--ignore` (Node's `path.matchesGlob`, tried against both
+the expanded path and the path relative to the working directory). It is not a gitignore dialect:
+`!` negation and directory-anchoring rules are not supported. `--ignore` flags remain available and
+merge additively with the file's globs.
 
 ## Dialect handling
 

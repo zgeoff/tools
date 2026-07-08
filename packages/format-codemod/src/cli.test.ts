@@ -11,13 +11,17 @@ const cliPath = fileURLToPath(new URL('cli.ts', import.meta.url));
  * Runs the CLI from source under bun; the exit-code contract asserted here is
  * what the root format pipeline and the pre-commit hook consume.
  */
-function runCLI(args: readonly string[]): {
+function runCLI(
+  args: readonly string[],
+  cwd?: string,
+): {
   status: number | null;
   stdout: string;
   stderr: string;
 } {
   const result = spawnSync(process.execPath, [cliPath, ...args], {
     encoding: 'utf8',
+    cwd,
   });
 
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
@@ -194,4 +198,39 @@ test('it skips files matching --ignore globs', () => {
   expect(result.status).toBe(0);
   expect(result.stderr).not.toInclude('generated');
   expect(fs.readFileSync(path.join(generated, 'out.ts'), 'utf8')).toBe(unpadded);
+});
+
+test('it skips files matching globs from a .formatignore in the working directory', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const unpadded = 'export function f() {\n  const a = 1;\n  return a;\n}\n';
+
+  fs.mkdirSync(path.join(dir, 'generated'));
+  fs.writeFileSync(path.join(dir, 'generated/out.ts'), unpadded);
+  fs.writeFileSync(path.join(dir, '.formatignore'), '# codegen\ngenerated/**\n');
+
+  fs.writeFileSync(
+    path.join(dir, 'clean.ts'),
+    'const a = 1;\n\nexport function f() {\n  return a;\n}\n',
+  );
+
+  const result = runCLI(['--check', '.'], dir);
+
+  expect(result.status).toBe(0);
+  expect(result.stderr).not.toInclude('generated');
+});
+
+test('it merges .formatignore globs with --ignore flags', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const unpadded = 'export function f() {\n  const a = 1;\n  return a;\n}\n';
+
+  fs.mkdirSync(path.join(dir, 'generated'));
+  fs.mkdirSync(path.join(dir, 'vendored'));
+  fs.writeFileSync(path.join(dir, 'generated/out.ts'), unpadded);
+  fs.writeFileSync(path.join(dir, 'vendored/dep.ts'), unpadded);
+  fs.writeFileSync(path.join(dir, '.formatignore'), 'generated/**\n');
+
+  const result = runCLI(['--check', '--ignore', 'vendored/**', '.'], dir);
+
+  expect(result.status).toBe(2);
+  expect(result.stderr).toInclude('no files matched');
 });

@@ -13,6 +13,11 @@ options:
   --version
   --help
 
+files:
+  .formatignore      read from the working directory when present: one glob per
+                     line, blank lines and # comments skipped, merged with
+                     --ignore
+
 exit codes:
   0  clean
   1  files would change (--check)

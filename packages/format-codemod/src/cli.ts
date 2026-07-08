@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url';
 import { buildBenchStatsFromReports } from './cli/build-bench-stats-from-reports.ts';
 import { expandInputs } from './cli/expand-inputs.ts';
+import { loadFormatIgnore } from './cli/load-format-ignore.ts';
 import { parseCLIArgs } from './cli/parse-cli-args.ts';
 import { printHelp } from './cli/print-help.ts';
 import { printReport } from './cli/print-report.ts';
@@ -39,7 +40,9 @@ if (parsedArgs.version) {
 
 const t0 = Date.now();
 
-const files = await expandInputs(inputs, parsedArgs.ignore);
+const ignore = [...loadFormatIgnore(process.cwd()), ...parsedArgs.ignore];
+
+const files = await expandInputs(inputs, ignore);
 
 if (files.length === 0) {
   console.error('no files matched');
