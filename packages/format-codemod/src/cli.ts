@@ -39,7 +39,6 @@ if (parsedArgs.version) {
 }
 
 const t0 = Date.now();
-
 const ignore = [...loadFormatIgnore(process.cwd()), ...parsedArgs.ignore];
 
 const files = await expandInputs(inputs, ignore);

@@ -73,6 +73,5 @@ test('it measures bytes, not UTF-16 code units', () => {
   const file = path.join(dir, 'unicode.ts');
 
   fs.writeFileSync(file, "const emoji = '🎉';\n");
-
   expect(checkFile(file, 'check').bytes).toBe(Buffer.byteLength("const emoji = '🎉';\n"));
 });

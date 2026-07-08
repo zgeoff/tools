@@ -54,15 +54,13 @@ function buildPairEdits(file: SourceFile, container: ASTNode, body: readonly AST
     const prev = body[i];
     const next = body[i + 1];
 
-    if (
-      prev !== undefined &&
-      next !== undefined &&
-      !isImportPair(prev, next) &&
-      (needsBlankLine(container, prev, next) ||
+    if (prev !== undefined && next !== undefined && !isImportPair(prev, next)) {
+      const pad =
+        needsBlankLine(container, prev, next) ||
         isMultiline(file.src, prev) ||
-        isMultiline(file.src, next))
-    ) {
-      const edit = planGapEdit(file, prev, next);
+        isMultiline(file.src, next);
+
+      const edit = planGapEdit({ file, prev, next, pad });
 
       if (edit !== null) {
         edits.push(edit);
@@ -74,8 +72,8 @@ function buildPairEdits(file: SourceFile, container: ASTNode, body: readonly AST
 }
 
 /**
- * Adjacent imports are never padded, whatever their shape: the interior of an
- * import block belongs to the import sorter, and blank lines inserted there
+ * Adjacent imports are never padded or collapsed, whatever their shape: the
+ * interior of an import block belongs to the import sorter, and edits there
  * would be reordered or stripped out from under us. The boundary between the
  * last import and the first real statement is still padded as usual.
  */

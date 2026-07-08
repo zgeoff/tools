@@ -1,19 +1,32 @@
 import type { ASTNode, CommentSpan, Edit, SourceFile } from '../types.ts';
 
 /**
- * Plans the single whitespace splice that gives the gap between two statements
- * exactly one blank line, or null when the gap is already compliant or unsafe
- * to touch. Comment positions come from the parser rather than lexical
- * scanning, so comment-lookalike text can't mislead the classification.
+ * A pair of adjacent statements in a file and the gap shape they take: one
+ * blank line between them when `pad` is set, none otherwise.
  */
-export function planGapEdit(file: SourceFile, prev: ASTNode, next: ASTNode): Edit | null {
-  const gap = buildGap(file, prev, next);
+export interface GapEditInput {
+  readonly file: SourceFile;
+  readonly prev: ASTNode;
+  readonly next: ASTNode;
+  readonly pad: boolean;
+}
+
+/**
+ * Plans the single whitespace splice that gives the gap between two statements
+ * its target shape, or null when the gap is already compliant or unsafe to
+ * touch. Collapsing never crosses a comment: prose between statements marks
+ * grouping the padding rules can't see, so a comment-bearing gap only ever
+ * grows. Comment positions come from the parser rather than lexical scanning,
+ * so comment-lookalike text can't mislead the classification.
+ */
+export function planGapEdit(input: GapEditInput): Edit | null {
+  const gap = buildGap(input.file, input.prev, input.next);
 
   if (!isSafeToResize(gap)) {
     return null;
   }
 
-  return planBlankLineEdit(gap);
+  return input.pad ? planBlankLineEdit(gap) : planCollapseEdit(gap);
 }
 
 /**
@@ -150,4 +163,25 @@ function planWhitespaceGap(gap: string, gapStart: number, gapEnd: number): Edit 
 
 function countNewlines(s: string): number {
   return (s.match(/\n/gu) ?? []).length;
+}
+
+/**
+ * Every collapse target is "no blank line", so a compliant gap holds exactly
+ * one newline: the one ending the previous statement's line. Comment-bearing
+ * gaps are never collapsed — the author's spacing around prose stands.
+ */
+function planCollapseEdit(gap: Gap): Edit | null {
+  if (gap.comments.length > 0) {
+    return null;
+  }
+
+  const text = gap.src.slice(gap.start, gap.end);
+
+  if (countNewlines(text) < MIN_NEWLINES) {
+    return null;
+  }
+
+  const indent = text.slice(text.lastIndexOf('\n') + 1);
+
+  return { start: gap.start, end: gap.end, replacement: `\n${indent}` };
 }

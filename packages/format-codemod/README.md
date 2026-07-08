@@ -9,12 +9,17 @@ pipeline without being noticed.
 ## Rules implemented
 
 Mirrors a subset of ESLint's `padding-line-between-statements` plus
-`@stylistic/lines-between-class-members`. Every rule is "always exactly one blank line"; there are
-no "never" rules.
+`@stylistic/lines-between-class-members`. Blank lines are canonical: every rule is "always exactly
+one blank line", and a gap no rule matches is collapsed to none — vertical spacing is machine-owned
+end to end. Two kinds of gap are exempt from collapse: a gap holding any comment keeps its
+author-written spacing, and the interior of an import block belongs to the import sorter.
 
 **`padding-line-between-statements`** — insert one blank line:
 
 - after a `const`/`let`/`var` block, before any non-var statement
+- after a directive prologue (`'use strict'`, `'use client'`); runs of directives stay glued
+- after the last import of a block, before the first non-import statement; the interior of an import
+  block is never touched — it belongs to the import sorter
 - before any `return`
 - after a `function` or `class` declaration
 - on both sides of a control-flow block: `if`, `for`, `for…in`, `for…of`, `while`, `switch`, `try`
@@ -34,6 +39,10 @@ no "never" rules.
 
 **`@stylistic/lines-between-class-members`** — one blank line between class members.
 
+**Collapse** — a blank line between two statements that no rule separates is removed, so runs of
+same-kind statements sit flush. A gap holding any comment — trailing, leading, or on its own line —
+is never collapsed: prose between statements marks intentional grouping the rules can't see.
+
 ### Notes
 
 - **Consecutive single-line `const`/`let`/`var` declarations stay glued** (no blank between them); a
@@ -41,8 +50,8 @@ no "never" rules.
 - **Bare declarations only.** `export const`, `export function`, and `export class` are not matched
   — ESLint's selectors do not look through `export`, and neither does this. `using`/`await using`
   declarations are not var declarations; they form their own statement kind.
-- **The `using` and awaited-boundary rules go beyond ESLint** — `padding-line-between-statements`
-  cannot express either, so on these the codemod is the spec.
+- **The `using`, awaited-boundary, and collapse rules go beyond ESLint** —
+  `padding-line-between-statements` cannot express them, so on these the codemod is the spec.
 - **`.d.ts` files are skipped.**
 
 ## CLI
@@ -111,6 +120,7 @@ Comment positions come from the parser, not lexical scanning:
 - Trailing same-line comments stay attached to the previous statement: `const X = 1; // note` keeps
   the blank line _after_ the comment (several same-line comments all stay together).
 - Leading comments stay attached to the next statement: the blank line goes _before_ the comment.
+- A gap holding any comment is never collapsed, only grown.
 - Indentation of the next statement is preserved.
 - Two statements that share a physical line are left untouched — for example a leading-semicolon
   `;(expr)` whose `;` terminates the previous statement. A blank-only edit cannot separate them

@@ -18,27 +18,20 @@ const CONTROL_FLOW_TYPES = new Set([
 
 /**
  * The "always" rules: a blank line between class members, after a var or
- * using block before a statement of any other kind, before a return, after a
+ * using block before a statement of any other kind, after a directive
+ * prologue, after the last import of a block, before a return, after a
  * function/class declaration, on both sides of a control-flow block — its
  * closing brace ends a visual unit just like its opening keyword starts one —
  * and at the boundary between statement kinds: call vs mutation,
- * instantiation vs anything else, and awaited vs non-awaited. There are no
- * "never" rules, so any match means one blank.
+ * instantiation vs anything else, and awaited vs non-awaited. Any match means
+ * exactly one blank line; a pair matching no rule sits flush.
  */
 export function needsBlankLine(container: ASTNode, prev: ASTNode, next: ASTNode): boolean {
   if (container.type === 'ClassBody') {
     return true;
   }
 
-  if ((isVarDecl(prev) && !isVarDecl(next)) || (isUsingDecl(prev) && !isUsingDecl(next))) {
-    return true;
-  }
-
-  if (next.type === 'ReturnStatement') {
-    return true;
-  }
-
-  if (isFnOrClassDecl(prev)) {
+  if (isRunEnd(prev, next) || next.type === 'ReturnStatement' || isFnOrClassDecl(prev)) {
     return true;
   }
 
@@ -49,6 +42,30 @@ export function needsBlankLine(container: ASTNode, prev: ASTNode, next: ASTNode)
     CONTROL_FLOW_TYPES.has(next.type) ||
     CONTROL_FLOW_TYPES.has(prev.type)
   );
+}
+
+/**
+ * Statements that glue into a homogeneous run — var declarations, using
+ * declarations, directives, imports — take a blank line where the run ends:
+ * after the last statement of the run, before the first of any other kind.
+ */
+function isRunEnd(prev: ASTNode, next: ASTNode): boolean {
+  return (
+    (isVarDecl(prev) && !isVarDecl(next)) ||
+    (isUsingDecl(prev) && !isUsingDecl(next)) ||
+    (isDirective(prev) && !isDirective(next)) ||
+    (prev.type === 'ImportDeclaration' && next.type !== 'ImportDeclaration')
+  );
+}
+
+/**
+ * A directive-prologue statement (`'use strict'`, `'use client'`). The parser
+ * marks these with a `directive` field, so string-expression statements deeper
+ * in a body don't count. Runs of directives stay tight; the boundary after the
+ * last one is padded.
+ */
+function isDirective(node: ASTNode): boolean {
+  return typeof node['directive'] === 'string';
 }
 
 /**
@@ -164,7 +181,6 @@ function hasAwaitInHeadChain(node: ASTNode): boolean {
 }
 
 const CALL_TYPES: readonly string[] = ['CallExpression', 'AwaitExpression'];
-
 const MUTATION_TYPES: readonly string[] = ['AssignmentExpression', 'UpdateExpression'];
 
 /**

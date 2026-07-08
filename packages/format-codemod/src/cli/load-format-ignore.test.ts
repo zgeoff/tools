@@ -14,7 +14,6 @@ test('it reads one glob per line', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
 
   fs.writeFileSync(path.join(dir, '.formatignore'), 'dist/**\nsrc/generated/**\n');
-
   expect(loadFormatIgnore(dir)).toStrictEqual(['dist/**', 'src/generated/**']);
 });
 
@@ -33,6 +32,5 @@ test('it trims surrounding whitespace including CRLF line endings', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
 
   fs.writeFileSync(path.join(dir, '.formatignore'), 'dist/**\r\n  build/**  \r\n');
-
   expect(loadFormatIgnore(dir)).toStrictEqual(['dist/**', 'build/**']);
 });

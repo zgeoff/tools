@@ -1,7 +1,6 @@
 import type { TransformResult } from '../types.ts';
 
 export type CLIMode = 'write' | 'check' | 'dry';
-
 export type FileOutcome = 'ok' | 'changed' | 'failed' | 'skipped';
 
 /**

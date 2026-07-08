@@ -58,3 +58,35 @@ test('it pads between the last import and the first statement', () => {
 
   expect(edits).toEqual([{ start: 30, end: 31, replacement: '\n\n' }]);
 });
+
+test('it plans a collapse for a blank line no rule requires', () => {
+  const src = 'use(a);\n\nuse(b);\n';
+  const edits = buildEditsFromAST(src, parse(src));
+
+  expect(edits).toEqual([{ start: 7, end: 9, replacement: '\n' }]);
+});
+
+test('it does not collapse a blank line between adjacent imports', () => {
+  const src = "import { a } from 'x';\n\nimport { c } from 'y';\n";
+
+  expect(buildEditsFromAST(src, parse(src))).toBeEmpty();
+});
+
+test('it keeps the blank line between a single-line import and the first statement', () => {
+  const src = "import { a } from 'x';\n\nuse(a);\n";
+
+  expect(buildEditsFromAST(src, parse(src))).toBeEmpty();
+});
+
+test('it pads between a single-line import and a flush first statement', () => {
+  const src = "import { a } from 'x';\nuse(a);\n";
+  const edits = buildEditsFromAST(src, parse(src));
+
+  expect(edits).toEqual([{ start: 22, end: 23, replacement: '\n\n' }]);
+});
+
+test('it does not collapse around a multiline statement', () => {
+  const src = 'use(a);\n\ncallWith(\n  argOne,\n  argTwo,\n);\n\nuse(b);\n';
+
+  expect(buildEditsFromAST(src, parse(src))).toBeEmpty();
+});
