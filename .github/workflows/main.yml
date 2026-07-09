@@ -3,6 +3,16 @@ name: Main
 on:
   push:
     branches: [main]
+  # Recovery path for a release that tagged but failed to publish: skips the
+  # release-please steps and re-runs only the publish steps for the given
+  # package dirs. Already-published versions are skipped, so listing extra
+  # paths is safe.
+  workflow_dispatch:
+    inputs:
+      republish_paths:
+        description: 'JSON array of package dirs to republish, e.g. ["packages/format-codemod"]'
+        required: true
+        type: string
 
 jobs:
   checks:
@@ -45,7 +55,7 @@ jobs:
       # left open to merge by hand and the chain continues from there.
       - name: Mint GitHub App token
         id: app-token
-        if: vars.RELEASE_APP_ID != ''
+        if: github.event_name == 'push' && vars.RELEASE_APP_ID != ''
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           client-id: ${{ vars.RELEASE_APP_ID }}
@@ -53,6 +63,7 @@ jobs:
 
       - name: Run release-please
         id: release
+        if: github.event_name == 'push'
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           token: ${{ steps.app-token.outputs.token || github.token }}
@@ -94,7 +105,7 @@ jobs:
       # merge mutation), so the merge attempt itself retries inside the
       # same loop rather than trusting any single read.
       - name: Auto-merge release PRs
-        if: steps.app-token.outputs.token != ''
+        if: github.event_name == 'push' && steps.app-token.outputs.token != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -119,37 +130,43 @@ jobs:
           done
 
       - name: Check out merged release
-        if: steps.release.outputs.releases_created == 'true'
+        if: steps.release.outputs.releases_created == 'true' || inputs.republish_paths != ''
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Set up bun for publish
-        if: steps.release.outputs.releases_created == 'true'
+        if: steps.release.outputs.releases_created == 'true' || inputs.republish_paths != ''
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: .bun-version
       # npm does the publishing, not bun: trusted publishing (OIDC) needs
-      # npm >= 11.5.1, and bun publish has no OIDC support
-      # (oven-sh/bun#15601). node 24's bundled npm can lag that minimum,
-      # hence the upgrade.
+      # npm >= 11.5.1 — node 24 bundles at least 11.16 — and bun publish has
+      # no OIDC support (oven-sh/bun#15601). Never upgrade the bundled npm in
+      # place: a cross-major overlay prunes transitive deps that
+      # libnpmpublish needs at publish time (sigstore).
       - name: Set up node
-        if: steps.release.outputs.releases_created == 'true'
+        if: steps.release.outputs.releases_created == 'true' || inputs.republish_paths != ''
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 24
-      - name: Upgrade npm for trusted publishing
-        if: steps.release.outputs.releases_created == 'true'
-        run: npm install --global npm@latest
       - name: Install dependencies
-        if: steps.release.outputs.releases_created == 'true'
+        if: steps.release.outputs.releases_created == 'true' || inputs.republish_paths != ''
         run: bun install --frozen-lockfile
+      # The registry-version check makes the loop idempotent: a re-run after
+      # a partial publish (some packages shipped, one failed) skips the ones
+      # already on npm instead of erroring on the republish.
       - name: Publish released packages
-        if: steps.release.outputs.releases_created == 'true'
+        if: steps.release.outputs.releases_created == 'true' || inputs.republish_paths != ''
         env:
-          PATHS_RELEASED: ${{ steps.release.outputs.paths_released }}
+          PATHS_RELEASED: ${{ steps.release.outputs.paths_released || inputs.republish_paths }}
         run: |
           for path in $(printf '%s' "${PATHS_RELEASED:-[]}" | jq -r '.[]'); do
             name=$(jq -r .name "$path/package.json")
+            version=$(jq -r .version "$path/package.json")
             if [ "$(jq -r '.private // false' "$path/package.json")" = "true" ]; then
               echo "skipping $name: private"
+              continue
+            fi
+            if [ "$(npm view "$name@$version" version 2>/dev/null)" = "$version" ]; then
+              echo "skipping $name@$version: already published"
               continue
             fi
             if [ -n "$(jq -r '.scripts.build // empty' "$path/package.json")" ]; then
