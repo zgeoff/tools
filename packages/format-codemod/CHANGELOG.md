@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.6](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.0.5...@zgeoff/format-codemod@0.0.6) (2026-07-09)
+
+### Features
+
+- **format-codemod:** collapse blank lines no padding rule requires
+  ([#45](https://github.com/zgeoff/tools/issues/45))
+  ([6da9013](https://github.com/zgeoff/tools/commit/6da90139cf4fb3b29d6215d06493b8ce5e0ce6a7))
+
 ## [0.0.5](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.0.4...@zgeoff/format-codemod@0.0.5) (2026-07-08)
 
 ### Features
