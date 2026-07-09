@@ -22,9 +22,9 @@ const CONTROL_FLOW_TYPES = new Set([
  * prologue, after the last import of a block, before a return, after a
  * function/class declaration, on both sides of a control-flow block — its
  * closing brace ends a visual unit just like its opening keyword starts one —
- * and at the boundary between statement kinds: call vs mutation,
- * instantiation vs anything else, and awaited vs non-awaited. Any match means
- * exactly one blank line; a pair matching no rule sits flush.
+ * and at the boundary between statement kinds: bare call vs method call vs
+ * mutation, instantiation vs anything else, and awaited vs non-awaited. Any
+ * match means exactly one blank line; a pair matching no rule sits flush.
  */
 export function needsBlankLine(container: ASTNode, prev: ASTNode, next: ASTNode): boolean {
   if (container.type === 'ClassBody') {
@@ -207,10 +207,49 @@ function getStatementKind(node: ASTNode): string | null {
   }
 
   if (isExpressionStatementOf(node, CALL_TYPES)) {
-    return 'call';
+    return pickCallKind(node);
   }
 
   return isExpressionStatementOf(node, MUTATION_TYPES) ? 'mutation' : null;
+}
+
+/**
+ * Call statements split into two kinds by the first call a reader meets:
+ * `expect(x).toBe(y)` opens with a bare function, `fs.writeFileSync(...)`
+ * opens with a member. The deepest call in the head chain decides, so a
+ * member call chained onto a bare call's result is still a bare call, and a
+ * wrapping await doesn't change the kind.
+ */
+function pickCallKind(node: ASTNode): 'bare-call' | 'method-call' {
+  const expression = node['expression'];
+  const callee = isASTNode(expression) ? findDeepestCallee(expression) : null;
+
+  return callee?.type === 'MemberExpression' ? 'method-call' : 'bare-call';
+}
+
+/**
+ * The callee of the deepest CallExpression on the walk from an expression to
+ * its head — the call performed first in reading order — or null when the
+ * head chain holds no call (a bare `await value`, for example).
+ */
+function findDeepestCallee(expression: ASTNode): ASTNode | null {
+  let callee: ASTNode | null = null;
+  let current: ASTNode | undefined = expression;
+
+  while (current !== undefined) {
+    const candidate: unknown = current.type === 'CallExpression' ? current['callee'] : undefined;
+
+    if (isASTNode(candidate)) {
+      callee = candidate;
+    }
+
+    const property: string | undefined = HEAD_PROPERTY[current.type];
+    const inner: unknown = property === undefined ? undefined : current[property];
+
+    current = isASTNode(inner) ? inner : undefined;
+  }
+
+  return callee;
 }
 
 function isExpressionStatementOf(node: ASTNode, types: readonly string[]): boolean {

@@ -22,5 +22,6 @@ test('it passes readable files through to the transform', () => {
   const file = path.join(dir, 'unpadded.ts');
 
   fs.writeFileSync(file, 'const a = 1;\nuse(a);\n');
+
   expect(tryCheckFile(file, 'check')).toContainEntry(['outcome', 'changed']);
 });

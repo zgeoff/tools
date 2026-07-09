@@ -9,6 +9,7 @@ test('it reads the version field from a package manifest', () => {
   const manifest = path.join(dir, 'package.json');
 
   fs.writeFileSync(manifest, '{"name":"x","version":"1.2.3"}');
+
   expect(readPackageVersion(manifest)).toBe('1.2.3');
 });
 
@@ -17,5 +18,6 @@ test('it throws when the file is not a package manifest', () => {
   const manifest = path.join(dir, 'package.json');
 
   fs.writeFileSync(manifest, '{"name":"x"}');
+
   expect(() => readPackageVersion(manifest)).toThrowWithMessage(TypeError, 'Invalid package.json');
 });

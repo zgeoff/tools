@@ -26,6 +26,7 @@ if (parsedArgs.help || (inputs.length === 0 && !parsedArgs.version)) {
   const exitCode = inputs.length === 0 ? 2 : 0;
 
   printHelp();
+
   process.exit(exitCode);
 }
 
@@ -54,6 +55,7 @@ for (const file of files) {
   const report = tryCheckFile(file, mode);
 
   reports.push(report);
+
   printReport(file, report, quiet);
 }
 

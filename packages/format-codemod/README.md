@@ -25,8 +25,11 @@ author-written spacing, and the interior of an import block belongs to the impor
 - on both sides of a control-flow block: `if`, `for`, `for…in`, `for…of`, `while`, `switch`, `try`
 - on both sides of any statement that spans multiple lines
 - at the boundary between statement kinds — a `const`/`let`/`var` declaration, a
-  `using`/`await using` declaration, a call statement, an assignment/increment statement — in any
-  order; runs of one kind stay tight
+  `using`/`await using` declaration, a bare-call statement, a method-call statement, an
+  assignment/increment statement — in any order; runs of one kind stay tight. Call statements split
+  by the first call in reading order: `expect(x).toBe(y)` opens with a bare function,
+  `fs.writeFileSync(…)` opens with a member, and a member call chained onto a bare call's result is
+  still a bare call
 - after a `using`/`await using` block, before any statement of another kind
 - at the boundary between an instantiation-headed statement (`new` at the head of its expression
   chain, as in `new X(…)` or `new X(…).method()`) and any other statement kind — `new` in argument
@@ -50,7 +53,7 @@ is never collapsed: prose between statements marks intentional grouping the rule
 - **Bare declarations only.** `export const`, `export function`, and `export class` are not matched
   — ESLint's selectors do not look through `export`, and neither does this. `using`/`await using`
   declarations are not var declarations; they form their own statement kind.
-- **The `using`, awaited-boundary, and collapse rules go beyond ESLint** —
+- **The `using`, awaited-boundary, call-kind, and collapse rules go beyond ESLint** —
   `padding-line-between-statements` cannot express them, so on these the codemod is the spec.
 - **`.d.ts` files are skipped.**
 

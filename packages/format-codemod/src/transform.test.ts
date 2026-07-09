@@ -524,6 +524,25 @@ test('it keeps a blank line when a trailing comment sits on the previous line', 
   expect(output).toBe(src);
 });
 
+test('it pads the boundary between a method call and a bare call', () => {
+  const src = `function f(file) {\n  fs.writeFileSync(file, 'const a = 1;');\n  expect(tryCheckFile(file, 'check')).toContainEntry(['outcome', 'changed']);\n}\n`;
+  const output = transform(src).output;
+
+  expect(output).toInclude(
+    "  fs.writeFileSync(file, 'const a = 1;');\n\n  expect(tryCheckFile(file, 'check')).toContainEntry(['outcome', 'changed']);",
+  );
+});
+
+test('it keeps runs of method calls and runs of bare calls glued', () => {
+  const src = `function f(a, b) {\n  fs.rmSync(a);\n  fs.rmSync(b);\n\n  use(a);\n  log(b);\n}\n`;
+  const result = transform(src);
+  const output = result.output;
+  const edits = result.edits;
+
+  expect(edits).toBe(0);
+  expect(output).toBe(src);
+});
+
 test('it pads after a directive prologue', () => {
   const src = `'use strict';\ndoStuff();\n`;
   const output = transform(src).output;
