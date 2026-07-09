@@ -123,6 +123,56 @@ test('it does not pad between two statements of the same kind', () => {
   expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
 
+test('it pads at the boundary between a method call and a bare call', () => {
+  const pair = parsePair("fs.writeFileSync(file, src);\nexpect(check(file)).toBe('changed');");
+
+  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+});
+
+test('it does not pad between two method calls', () => {
+  const pair = parsePair('fs.writeFileSync(a, x);\nfs.writeFileSync(b, y);');
+
+  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+});
+
+test('it treats a member call chained onto a bare call result as a bare call', () => {
+  const pair = parsePair('expect(a).toBe(1);\nuse(b);');
+
+  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+});
+
+test('it keeps the call kind through a wrapping await', () => {
+  const pair = parsePair('await db.users.create(a);\nawait expect(p).toReject();');
+
+  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+});
+
+test('it does not pad between two awaited method calls', () => {
+  const pair = parsePair('await db.users.create(a);\nawait db.sessions.create(b);');
+
+  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+});
+
+test('it pads between two adjacent type aliases', () => {
+  const pair = parsePair("type A = 'x' | 'y';\ntype B = 'z';");
+
+  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+});
+
+test('it pads between two adjacent exported type aliases', () => {
+  const pair = parsePair("export type A = 'x' | 'y';\nexport type B = 'z';");
+
+  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+});
+
+test('it pads on both sides of an interface declaration', () => {
+  const before = parsePair('use(x);\ninterface A { x: number }');
+  const after = parsePair('interface A { x: number }\nuse(x);');
+
+  expect(needsBlankLine(before.container, before.prev, before.next)).toBeTrue();
+  expect(needsBlankLine(after.container, after.prev, after.next)).toBeTrue();
+});
+
 test('it pads at the boundary between an instantiation and a call-headed declaration', () => {
   const pair = parsePair('const a = new Map();\nconst b = build();');
 

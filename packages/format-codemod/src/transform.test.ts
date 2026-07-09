@@ -480,3 +480,114 @@ test('it handles multi-line template literals without corrupting offsets', () =>
   expect(parseError).toBeNil();
   expect(output).toBe('function f() {\n  const t = `a\nb\nc`;\n\n  return t;\n}\n');
 });
+
+test('it removes a blank line between statements of the same kind', () => {
+  const src = `async function f(db, userID, sessionID) {\n  await db.userCollection.create({ id: userID });\n\n  await db.sessionCollection.create({ id: sessionID, userID });\n}\n`;
+  const output = transform(src).output;
+
+  expect(output).toInclude(
+    '  await db.userCollection.create({ id: userID });\n  await db.sessionCollection.create({ id: sessionID, userID });',
+  );
+});
+
+test('it removes blank lines splitting a run of single-line declarations', () => {
+  const src = `function f() {\n  const a = 1;\n\n  const b = 2;\n\n  const c = 3;\n  use(a, b, c);\n}\n`;
+  const output = transform(src).output;
+
+  expect(output).toInclude('  const a = 1;\n  const b = 2;\n  const c = 3;\n\n  use(a, b, c);');
+});
+
+test('it collapses several blank lines between same-kind statements to flush', () => {
+  const src = `function f() {\n  doFirst();\n\n\n\n  doSecond();\n}\n`;
+  const output = transform(src).output;
+
+  expect(output).toInclude('  doFirst();\n  doSecond();');
+});
+
+test('it keeps a blank line when the gap holds a comment', () => {
+  const src = `function f() {\n  doFirst();\n\n  // the second phase\n  doSecond();\n}\n`;
+  const result = transform(src);
+  const output = result.output;
+  const edits = result.edits;
+
+  expect(edits).toBe(0);
+  expect(output).toBe(src);
+});
+
+test('it keeps a blank line when a trailing comment sits on the previous line', () => {
+  const src = `function f() {\n  doFirst(); // kicks off\n\n  doSecond();\n}\n`;
+  const result = transform(src);
+  const output = result.output;
+  const edits = result.edits;
+
+  expect(edits).toBe(0);
+  expect(output).toBe(src);
+});
+
+test('it pads the boundary between a method call and a bare call', () => {
+  const src = `function f(file) {\n  fs.writeFileSync(file, 'const a = 1;');\n  expect(tryCheckFile(file, 'check')).toContainEntry(['outcome', 'changed']);\n}\n`;
+  const output = transform(src).output;
+
+  expect(output).toInclude(
+    "  fs.writeFileSync(file, 'const a = 1;');\n\n  expect(tryCheckFile(file, 'check')).toContainEntry(['outcome', 'changed']);",
+  );
+});
+
+test('it keeps runs of method calls and runs of bare calls glued', () => {
+  const src = `function f(a, b) {\n  fs.rmSync(a);\n  fs.rmSync(b);\n\n  use(a);\n  log(b);\n}\n`;
+  const result = transform(src);
+  const output = result.output;
+  const edits = result.edits;
+
+  expect(edits).toBe(0);
+  expect(output).toBe(src);
+});
+
+test('it pads between adjacent single-line exported type aliases', () => {
+  const src = `export type CLIMode = 'write' | 'check' | 'dry';\nexport type FileOutcome = 'ok' | 'changed';\n`;
+  const output = transform(src).output;
+
+  expect(output).toBe(
+    `export type CLIMode = 'write' | 'check' | 'dry';\n\nexport type FileOutcome = 'ok' | 'changed';\n`,
+  );
+});
+
+test('it does not collapse the blank line around a type alias', () => {
+  const src = `type Mode = 'a' | 'b';\n\nuse(mode);\n`;
+  const result = transform(src);
+  const output = result.output;
+  const edits = result.edits;
+
+  expect(edits).toBe(0);
+  expect(output).toBe(src);
+});
+
+test('it pads a single-line interface apart from its neighbours', () => {
+  const src = `use(a);\ninterface Marker { kind: string }\nuse(b);\n`;
+  const output = transform(src).output;
+
+  expect(output).toBe(`use(a);\n\ninterface Marker { kind: string }\n\nuse(b);\n`);
+});
+
+test('it pads after a directive prologue', () => {
+  const src = `'use strict';\ndoStuff();\n`;
+  const output = transform(src).output;
+
+  expect(output).toBe(`'use strict';\n\ndoStuff();\n`);
+});
+
+test('it keeps adjacent directives glued', () => {
+  const src = `'use strict';\n\n'use client';\ndoStuff();\n`;
+  const output = transform(src).output;
+
+  expect(output).toBe(`'use strict';\n'use client';\n\ndoStuff();\n`);
+});
+
+test('it is a no-op when run again on code with removed blank lines', () => {
+  const src = `function f() {\n  doFirst();\n\n  doSecond();\n\n  doThird();\n}\n`;
+  const once = transform(src).output;
+  const twice = transform(once).output;
+
+  expect(once).not.toBe(src);
+  expect(twice).toBe(once);
+});
