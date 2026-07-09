@@ -4,7 +4,7 @@ Shareable [oxlint](https://oxc.rs/docs/guide/usage/linter.html) config: every ca
 restriction-rule cherry-picks, comment-style enforcement via `@stylistic`, and a bundled JS plugin
 (`zgeoff/*` rules) banning AST shapes no native oxlint rule can express — top-level arrows, nested
 function declarations, bare named exports, destructured and inline-typed parameters, ternary and
-await arguments.
+await arguments, and awaits hidden inside a control-flow condition or a `&&`/`||`/`??` chain.
 
 ## Usage
 
