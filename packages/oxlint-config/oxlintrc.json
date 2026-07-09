@@ -23,6 +23,8 @@
     "zgeoff/no-pick-destructuring": "error",
     "zgeoff/no-ternary-args": "error",
     "zgeoff/no-await-args": "error",
+    "zgeoff/no-await-in-condition": "error",
+    "zgeoff/no-await-in-logical": "error",
 
     // enforced comment style — line comments unless JSDoc or exclamation
     "@stylistic/multiline-comment-style": [

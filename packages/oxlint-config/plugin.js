@@ -75,6 +75,19 @@ const plugin = {
       'Await into a named const instead of awaiting inside an argument list.',
       ['CallExpression > AwaitExpression.arguments', 'NewExpression > AwaitExpression.arguments'],
     ),
+    'no-await-in-condition': banSelectors(
+      'suggestion',
+      'Await into a named const before the statement instead of inside a control-flow condition.',
+      [
+        ':matches(IfStatement, WhileStatement, DoWhileStatement, ForStatement, ConditionalExpression) > AwaitExpression.test',
+        'SwitchStatement > AwaitExpression.discriminant',
+      ],
+    ),
+    'no-await-in-logical': banSelectors(
+      'suggestion',
+      'Await into a named const instead of chaining it after a && / || / ?? operator.',
+      ['LogicalExpression > AwaitExpression'],
+    ),
   },
 };
 
