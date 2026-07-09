@@ -57,5 +57,15 @@ Once that's saved, CI publishes all future versions with no tokens.
   run.
 - `npm publish` 404/403 on a package's first CI release: trusted publisher not configured for that
   package, or the first manual publish never happened.
+- Tagged and GitHub-released but the npm publish failed: re-run just the publish via
+
+  ```sh
+  gh workflow run main.yml -f republish_paths='["packages/<pkg>"]'
+  ```
+
+  Versions already on the registry are skipped, so listing extra paths is safe. Re-running the
+  failed job instead won't help when the failure is deterministic — a re-run uses the workflow file
+  as of the original commit.
+
 - Version bumps feel off pre-1.0: intentional — `feat:` bumps patch and breaking changes bump minor
   until 1.0 (`bump-patch-for-minor-pre-major`, `bump-minor-pre-major`).
