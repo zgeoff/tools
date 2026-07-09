@@ -19,7 +19,7 @@
     },
     "packages/bun-test-extended": {
       "name": "@zgeoff/bun-test-extended",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "dependencies": {
         "jest-extended": "catalog:",
         "jest-matcher-utils": "catalog:",
