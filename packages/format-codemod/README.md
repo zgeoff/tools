@@ -22,6 +22,9 @@ author-written spacing, and the interior of an import block belongs to the impor
   block is never touched — it belongs to the import sorter
 - before any `return`
 - after a `function` or `class` declaration
+- on both sides of a type alias or interface declaration — every one is its own paragraph, so runs
+  are padded apart, not glued; this is the one rule that looks through `export` (`export type X = …`
+  pads like `type X = …`)
 - on both sides of a control-flow block: `if`, `for`, `for…in`, `for…of`, `while`, `switch`, `try`
 - on both sides of any statement that spans multiple lines
 - at the boundary between statement kinds — a `const`/`let`/`var` declaration, a

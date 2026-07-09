@@ -1,5 +1,6 @@
 import type { ASTNode } from '../types.ts';
 import { collectASTNodes } from './collect-ast-nodes.ts';
+import { collectHeadChain } from './collect-head-chain.ts';
 import { isASTNode } from './is-ast-node.ts';
 
 /**
@@ -20,8 +21,9 @@ const CONTROL_FLOW_TYPES = new Set([
  * The "always" rules: a blank line between class members, after a var or
  * using block before a statement of any other kind, after a directive
  * prologue, after the last import of a block, before a return, after a
- * function/class declaration, on both sides of a control-flow block — its
- * closing brace ends a visual unit just like its opening keyword starts one —
+ * function/class declaration, on both sides of a type alias or interface
+ * declaration, on both sides of a control-flow block — its closing brace
+ * ends a visual unit just like its opening keyword starts one —
  * and at the boundary between statement kinds: bare call vs method call vs
  * mutation, instantiation vs anything else, and awaited vs non-awaited. Any
  * match means exactly one blank line; a pair matching no rule sits flush.
@@ -32,6 +34,10 @@ export function needsBlankLine(container: ASTNode, prev: ASTNode, next: ASTNode)
   }
 
   if (isRunEnd(prev, next) || next.type === 'ReturnStatement' || isFnOrClassDecl(prev)) {
+    return true;
+  }
+
+  if (isTypeDecl(prev) || isTypeDecl(next)) {
     return true;
   }
 
@@ -68,6 +74,28 @@ function isDirective(node: ASTNode): boolean {
   return typeof node['directive'] === 'string';
 }
 
+const TYPE_DECL_TYPES = new Set(['TSTypeAliasDeclaration', 'TSInterfaceDeclaration']);
+
+/**
+ * Type aliases and interfaces take a blank line on both sides — every one is
+ * its own paragraph, so runs of them are padded apart rather than glued. The
+ * breathing room belongs to the declaration, not its wrapper, so this looks
+ * through `export`.
+ */
+function isTypeDecl(node: ASTNode): boolean {
+  if (TYPE_DECL_TYPES.has(node.type)) {
+    return true;
+  }
+
+  const declaration = node.declaration;
+
+  return (
+    node.type === 'ExportNamedDeclaration' &&
+    isASTNode(declaration) &&
+    TYPE_DECL_TYPES.has(declaration.type)
+  );
+}
+
 /**
  * A statement whose value expression is headed by `new` does construction —
  * a different kind of work from calling, mutating, or plain declaring, so it
@@ -77,7 +105,7 @@ function isDirective(node: ASTNode): boolean {
  */
 function isNewHeaded(node: ASTNode): boolean {
   return getStatementValues(node).some(
-    (value) => getExpressionHead(value).type === 'NewExpression',
+    (value) => collectHeadChain(value).at(-1)?.type === 'NewExpression',
   );
 }
 
@@ -110,38 +138,6 @@ function getStatementValues(node: ASTNode): ASTNode[] {
 }
 
 /**
- * Wrapper node types whose named property leads toward the head of an
- * expression chain — `a.b().c` unwraps call by call, member by member, down
- * to `a`.
- */
-const HEAD_PROPERTY: Readonly<Record<string, string>> = {
-  CallExpression: 'callee',
-  MemberExpression: 'object',
-  ChainExpression: 'expression',
-  AwaitExpression: 'argument',
-  TSNonNullExpression: 'expression',
-  ParenthesizedExpression: 'expression',
-};
-
-function getExpressionHead(node: ASTNode): ASTNode {
-  let current = node;
-  let property = HEAD_PROPERTY[current.type];
-
-  while (property !== undefined) {
-    const inner = current[property];
-
-    if (!isASTNode(inner)) {
-      break;
-    }
-
-    current = inner;
-    property = HEAD_PROPERTY[current.type];
-  }
-
-  return current;
-}
-
-/**
  * A statement that suspends on `await` — an `await using` declaration, or any
  * statement whose value expression passes through an await on the way to its
  * head. Suspension is a different kind of work from synchronous statements,
@@ -155,29 +151,9 @@ function isAwaitHeaded(node: ASTNode): boolean {
     return true;
   }
 
-  return getStatementValues(node).some((value) => hasAwaitInHeadChain(value));
-}
-
-/**
- * True when the walk from an expression down to its head passes through an
- * AwaitExpression — `await f()`, `(await f()).prop`, `(await f()).method()` —
- * as opposed to an await buried outside the head chain.
- */
-function hasAwaitInHeadChain(node: ASTNode): boolean {
-  let current: ASTNode | undefined = node;
-
-  while (current !== undefined) {
-    if (current.type === 'AwaitExpression') {
-      return true;
-    }
-
-    const property: string | undefined = HEAD_PROPERTY[current.type];
-    const inner: unknown = property === undefined ? undefined : current[property];
-
-    current = isASTNode(inner) ? inner : undefined;
-  }
-
-  return false;
+  return getStatementValues(node).some((value) =>
+    collectHeadChain(value).some((link) => link.type === 'AwaitExpression'),
+  );
 }
 
 const CALL_TYPES: readonly string[] = ['CallExpression', 'AwaitExpression'];
@@ -233,23 +209,13 @@ function pickCallKind(node: ASTNode): 'bare-call' | 'method-call' {
  * head chain holds no call (a bare `await value`, for example).
  */
 function findDeepestCallee(expression: ASTNode): ASTNode | null {
-  let callee: ASTNode | null = null;
-  let current: ASTNode | undefined = expression;
+  const deepestCall = collectHeadChain(expression).findLast(
+    (link) => link.type === 'CallExpression',
+  );
 
-  while (current !== undefined) {
-    const candidate: unknown = current.type === 'CallExpression' ? current['callee'] : undefined;
+  const callee = deepestCall?.['callee'];
 
-    if (isASTNode(candidate)) {
-      callee = candidate;
-    }
-
-    const property: string | undefined = HEAD_PROPERTY[current.type];
-    const inner: unknown = property === undefined ? undefined : current[property];
-
-    current = isASTNode(inner) ? inner : undefined;
-  }
-
-  return callee;
+  return isASTNode(callee) ? callee : null;
 }
 
 function isExpressionStatementOf(node: ASTNode, types: readonly string[]): boolean {

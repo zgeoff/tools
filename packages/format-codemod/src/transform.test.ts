@@ -543,6 +543,32 @@ test('it keeps runs of method calls and runs of bare calls glued', () => {
   expect(output).toBe(src);
 });
 
+test('it pads between adjacent single-line exported type aliases', () => {
+  const src = `export type CLIMode = 'write' | 'check' | 'dry';\nexport type FileOutcome = 'ok' | 'changed';\n`;
+  const output = transform(src).output;
+
+  expect(output).toBe(
+    `export type CLIMode = 'write' | 'check' | 'dry';\n\nexport type FileOutcome = 'ok' | 'changed';\n`,
+  );
+});
+
+test('it does not collapse the blank line around a type alias', () => {
+  const src = `type Mode = 'a' | 'b';\n\nuse(mode);\n`;
+  const result = transform(src);
+  const output = result.output;
+  const edits = result.edits;
+
+  expect(edits).toBe(0);
+  expect(output).toBe(src);
+});
+
+test('it pads a single-line interface apart from its neighbours', () => {
+  const src = `use(a);\ninterface Marker { kind: string }\nuse(b);\n`;
+  const output = transform(src).output;
+
+  expect(output).toBe(`use(a);\n\ninterface Marker { kind: string }\n\nuse(b);\n`);
+});
+
 test('it pads after a directive prologue', () => {
   const src = `'use strict';\ndoStuff();\n`;
   const output = transform(src).output;

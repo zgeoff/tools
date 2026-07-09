@@ -153,6 +153,26 @@ test('it does not pad between two awaited method calls', () => {
   expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
 
+test('it pads between two adjacent type aliases', () => {
+  const pair = parsePair("type A = 'x' | 'y';\ntype B = 'z';");
+
+  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+});
+
+test('it pads between two adjacent exported type aliases', () => {
+  const pair = parsePair("export type A = 'x' | 'y';\nexport type B = 'z';");
+
+  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+});
+
+test('it pads on both sides of an interface declaration', () => {
+  const before = parsePair('use(x);\ninterface A { x: number }');
+  const after = parsePair('interface A { x: number }\nuse(x);');
+
+  expect(needsBlankLine(before.container, before.prev, before.next)).toBeTrue();
+  expect(needsBlankLine(after.container, after.prev, after.next)).toBeTrue();
+});
+
 test('it pads at the boundary between an instantiation and a call-headed declaration', () => {
   const pair = parsePair('const a = new Map();\nconst b = build();');
 
