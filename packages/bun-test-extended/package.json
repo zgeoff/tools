@@ -10,16 +10,22 @@
   },
   "files": [
     "src",
-    "!src/*.test.ts"
+    "!src/*.test.ts",
+    "dist"
   ],
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepare": "bun run build",
     "typecheck": "tsc"
   },
   "dependencies": {
