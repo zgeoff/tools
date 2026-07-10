@@ -2,9 +2,10 @@
 
 Shareable [oxlint](https://oxc.rs/docs/guide/usage/linter.html) config: every category at `error`,
 restriction-rule cherry-picks, comment-style enforcement via `@stylistic`, and a bundled JS plugin
-(`zgeoff/*` rules) banning AST shapes no native oxlint rule can express — top-level arrows, nested
+(`zgeoff/*` rules) banning shapes no native oxlint rule can express — top-level arrows, nested
 function declarations, bare named exports, destructured and inline-typed parameters, ternary and
-await arguments, and awaits hidden inside a control-flow condition or a `&&`/`||`/`??` chain.
+await arguments, awaits hidden inside a control-flow condition or a `&&`/`||`/`??` chain, and
+single-line `/** … */` blocks (auto-fixed to multi-line; inline `@type`/`@lends` casts exempt).
 
 ## Usage
 
