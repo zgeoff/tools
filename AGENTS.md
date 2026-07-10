@@ -112,6 +112,7 @@ the function's shape without opening it.
 | `try<X>`   | X with failures captured as a value instead of a throw                                                                                  | `tryCheckFile`    |
 | `register` | add to a registry the caller doesn't own                                                                                                | `registerMatcher` |
 | `assert`   | throw when an invariant doesn't hold                                                                                                    | `assertSpan`      |
+| `require`  | throw unless a runtime condition holds — a guard real input can trip (`assert` covers invariants)                                       | `requireAuth`     |
 | `emit`     | dispatch an event or notification                                                                                                       | `emitProgress`    |
 | `send`     | transmit a payload to a remote receiver (fire-and-forget or RPC — no resource semantics; REST mutations are `create`/`update`/`remove`) | `sendWebhook`     |
 
