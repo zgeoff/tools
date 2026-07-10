@@ -2,10 +2,11 @@
 
 ## [0.0.4](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.0.3...@zgeoff/oxlint-config@0.0.4) (2026-07-10)
 
-
 ### Features
 
-* **oxlint-config:** add no-single-line-jsdoc rule with autofix ([#57](https://github.com/zgeoff/tools/issues/57)) ([fca1eab](https://github.com/zgeoff/tools/commit/fca1eab39083b54aacf7de4e27e48c1f7dcc0954))
+- **oxlint-config:** add no-single-line-jsdoc rule with autofix
+  ([#57](https://github.com/zgeoff/tools/issues/57))
+  ([fca1eab](https://github.com/zgeoff/tools/commit/fca1eab39083b54aacf7de4e27e48c1f7dcc0954))
 
 ## [0.0.3](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.0.2...@zgeoff/oxlint-config@0.0.3) (2026-07-09)
 
