@@ -49,6 +49,10 @@
       "dependencies": {
         "@stylistic/eslint-plugin": "catalog:",
       },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
       "peerDependencies": {
         "oxlint": ">=1.71.0",
       },

@@ -25,6 +25,7 @@
     "zgeoff/no-await-args": "error",
     "zgeoff/no-await-in-condition": "error",
     "zgeoff/no-await-in-logical": "error",
+    "zgeoff/no-single-line-jsdoc": "error",
 
     // enforced comment style — line comments unless JSDoc or exclamation
     "@stylistic/multiline-comment-style": [
@@ -142,8 +143,9 @@
     {
       "files": ["**/*.js", "**/*.cjs", "**/*.mjs"],
       // untyped JS is `any` end to end, so the unsafe-* rules flag every
-      // expression
+      // expression and strict-boolean-expressions every conditional
       "rules": {
+        "typescript/strict-boolean-expressions": "off",
         "typescript/no-unsafe-argument": "off",
         "typescript/no-unsafe-assignment": "off",
         "typescript/no-unsafe-call": "off",
