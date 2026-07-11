@@ -135,11 +135,22 @@ the function's shape without opening it.
 Algorithm-native vocabulary (`walk`, `backtrack`, `slideDiagonal`) is allowed inside the module
 implementing that algorithm — forcing list verbs onto textbook terms hides the algorithm.
 
-## Testing
+## Dependencies
 
-The mock and test-data rules here are the default regime, written for pure modules and CLIs; a
-project partial may define its own regimes for HTTP-client or database-backed packages, and those
-take precedence in the packages they name. The rest applies everywhere.
+- Pin exact versions — no `^`/`~` ranges. (`bun add` saves exact automatically via `exact = true` in
+  bunfig.toml — the rule applies to hand-written edits.)
+
+## Type checking
+
+Type errors are checked by two engines on purpose: `lint:type-aware` includes tsgolint's
+experimental `--type-check` (fast, run it locally), while `typecheck` runs real `tsc` per package
+(ground truth). CI runs both until tsgolint earns trust; if they ever disagree, believe `tsc`.
+
+## Workspace dependencies
+
+- Shared versions live in the root catalog; workspace packages reference them via `catalog:`.
+
+## Testing
 
 - Never use `describe` — write flat `test(…)` blocks with behavioural titles that start with "it"
   (`test('it pads before a return statement', …)`).
@@ -196,18 +207,3 @@ take precedence in the packages they name. The rest applies everywhere.
 - Known gaps: `expect.pass`/`expect.fail` are unimplemented upstream and excluded from our types.
   It's `toEqualCaseInsensitive` — not `…Insensitively` as some docs claim; unknown matcher names
   fail typecheck here (upstream's own types are looser and would let typos through).
-
-## Dependencies
-
-- Pin exact versions — no `^`/`~` ranges. (`bun add` saves exact automatically via `exact = true` in
-  bunfig.toml — the rule applies to hand-written edits.)
-
-## Type checking
-
-Type errors are checked by two engines on purpose: `lint:type-aware` includes tsgolint's
-experimental `--type-check` (fast, run it locally), while `typecheck` runs real `tsc` per package
-(ground truth). CI runs both until tsgolint earns trust; if they ever disagree, believe `tsc`.
-
-## Workspace dependencies
-
-- Shared versions live in the root catalog; workspace packages reference them via `catalog:`.
