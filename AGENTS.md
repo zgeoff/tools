@@ -72,6 +72,8 @@ the function's shape without opening it.
 | `build<Result>[From<Source>]` | default constructor for values; drop `From<Source>` when no single source | `buildEditsFromAST` |
 | `define<X>`                   | identity; its only job is compile-time constraint of its literal argument | `defineErrors`      |
 | `parse`                       | unstructured input → structure, invalid input reported                    | `parseSource`       |
+| `encode`                      | structure → its defined compact or wire form, reversed by `decode`        | `encodeState`       |
+| `decode`                      | `encode`'s output → the original structure, malformed input reported      | `decodeState`       |
 | `plan`                        | compute an action without performing it                                   | `planGapEdit`       |
 | `pick`                        | select among known alternatives                                           | `pickMode`          |
 | `find`                        | search that can miss — null/undefined on miss                             | `findPrevious`      |
