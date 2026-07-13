@@ -92,6 +92,8 @@ the function's shape without opening it.
 | `normalize`                   | variant forms → the canonical form                                        | `normalizePath`     |
 | `resolve`                     | follow indirection to a concrete value                                    | `resolveBinPath`    |
 | `expand`                      | compact form → full form                                                  | `expandInputs`      |
+| `compress`                    | value → its reversible compact encoding                                   | `compressGraph`     |
+| `decompress`                  | reverse a `compress` encoding (non-encoded shorthand is `expand`)         | `decompressGraph`   |
 | `to<Result>`                  | cheap representation change                                               | `toPosixPath`       |
 | `transform`                   | a package's own source→source operation                                   | `transform`         |
 
@@ -127,16 +129,17 @@ the function's shape without opening it.
 
 **Framework conventions** — where the ecosystem's prefix is load-bearing, it wins:
 
-| Prefix          | Contract                                                                                                                | Example          |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| `use<X>`        | React hook — the prefix drives rules-of-hooks linting; helpers inside a hook follow the normal taxonomy                 | `useDebounce`    |
-| `on<Event>`     | event-callback prop or parameter                                                                                        | `onRowClick`     |
-| `handle<Event>` | local implementation passed to an `on<Event>` prop — the idiomatic React pair; the `handle` ban applies everywhere else | `handleRowClick` |
+| Prefix                   | Contract                                                                                                                | Example          |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| `use<X>`                 | React hook — the prefix drives rules-of-hooks linting; helpers inside a hook follow the normal taxonomy                 | `useDebounce`    |
+| `on<Event>`              | event-callback prop or parameter                                                                                        | `onRowClick`     |
+| `handle<Event>`          | local implementation passed to an `on<Event>` prop — the idiomatic React pair; the `handle` ban applies everywhere else | `handleRowClick` |
+| `handle<LifecycleEvent>` | implementation of an engine lifecycle callback, keyed by the engine's lifecycle-event enum                              | `handleTick`     |
 
 **Banned** — each is a vaguer or synonymous form of a listed verb; use that one instead: `handle`
-(except React's `handle<Event>`, above), `process`, `manage`, `do`, `perform` (say what it does),
-`execute` (→ `run`), `compute` (→ `build`), `fetch` (→ `read`), `save`/`store` (→ `write`), `delete`
-(→ `remove`), `search`/`lookup` (→ `find`/`get`).
+(except the `handle<Event>` framework conventions), `process`, `manage`, `do`, `perform` (say what
+it does), `execute` (→ `run`), `compute` (→ `build`), `fetch` (→ `read`), `save`/`store` (→
+`write`), `delete` (→ `remove`), `search`/`lookup` (→ `find`/`get`).
 
 Algorithm-native vocabulary (`walk`, `backtrack`, `slideDiagonal`) is allowed inside the module
 implementing that algorithm — forcing list verbs onto textbook terms hides the algorithm.
