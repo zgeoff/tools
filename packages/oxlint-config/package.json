@@ -11,6 +11,7 @@
   "files": [
     "oxlintrc.json",
     "plugin.js",
+    "function-verb.js",
     "index.js"
   ],
   "type": "module",
