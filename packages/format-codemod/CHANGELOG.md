@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.7](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.0.6...@zgeoff/format-codemod@0.0.7) (2026-07-15)
+
+
+### Features
+
+* **oxlint-config:** add function-verb rule enforcing the naming taxonomy ([#70](https://github.com/zgeoff/tools/issues/70)) ([c51c848](https://github.com/zgeoff/tools/commit/c51c8482bd92eaa26d621cce620a06f222abe010))
+
 ## [0.0.6](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.0.5...@zgeoff/format-codemod@0.0.6) (2026-07-09)
 
 ### Features
