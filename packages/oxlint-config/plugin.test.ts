@@ -13,7 +13,7 @@ interface LintResult {
   output: string;
 }
 
-type RuleSettings = Record<string, unknown>;
+type RuleSettings = Readonly<Record<string, unknown>>;
 
 async function createLintTree(source: string, rules: RuleSettings): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'oxlint-config-test-'));
@@ -62,16 +62,21 @@ function collectBannedVerbs(markdown: string): string[] {
   const start = markdown.indexOf('**Banned**');
   const end = markdown.indexOf('Algorithm-native');
   const paragraph = markdown.slice(start, end);
-  const matches = [...paragraph.matchAll(/`(?<verb>[a-z]+)`/gu)];
+  const banned: string[] = [];
 
-  return matches
-    .filter((match) => {
-      const preceding = paragraph.slice(0, match.index);
+  for (const match of paragraph.matchAll(/`(?<verb>[a-z]+)`/gu)) {
+    const preceding = paragraph.slice(0, match.index);
+    const verb = match.groups?.['verb'];
 
-      return countOccurrences(preceding, '(') === countOccurrences(preceding, ')');
-    })
-    .map((match) => match.groups?.['verb'])
-    .filter((verb): verb is string => verb !== undefined);
+    if (
+      verb !== undefined &&
+      countOccurrences(preceding, '(') === countOccurrences(preceding, ')')
+    ) {
+      banned.push(verb);
+    }
+  }
+
+  return banned;
 }
 
 function countOccurrences(text: string, part: string): number {
