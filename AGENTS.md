@@ -19,6 +19,24 @@
 - A PR is ready only when its checks are green: watch CI (`gh pr checks <n> --watch`) after opening
   or updating, and report a failure with what you're doing about it.
 
+## Review bots
+
+Applies where AI review bots (CodeRabbit, cubic, or similar) review PRs; each bot's behaviour is
+configured by its config file at the repo root.
+
+- A PR is ready only after every bot review is read and every finding is answered on its own
+  thread: a fixed finding's reply cites the commit that fixed it; a declined finding's reply states
+  the reason — when a finding contradicts this file, this file wins and the reply names the rule.
+  Reviews land within a few minutes of opening; read them with `gh pr view <n> --comments` and
+  `gh api repos/<owner>/<repo>/pulls/<n>/comments`.
+- Resolve a thread once its reply is posted, fixed and declined alike (GraphQL
+  `resolveReviewThread`). A finding the agent cannot confidently judge is escalation, not
+  disposition: reply saying so and leave the thread open for a human.
+- Never teach a bot through chat (`@coderabbitai` learnings and the like) — a correction to bot
+  behaviour is an edit to its config file, reviewed in a PR.
+- Bots review a PR once, at open; an agent invokes a re-review only when asked, never on its own
+  initiative.
+
 ## Code style
 
 Mechanically enforced rules (oxfmt, oxlint, format-codemod) aren't repeated here — this file covers
