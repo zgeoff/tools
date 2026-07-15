@@ -12,6 +12,7 @@ export function buildEditsFromAST(src: string, parsed: ParsedSource): Edit[] {
   return walk(file, parsed.program).toSorted((a, b) => b.start - a.start);
 }
 
+// oxlint-disable-next-line zgeoff/function-verb -- algorithm-native traversal vocabulary
 function walk(file: SourceFile, node: ASTNode): Edit[] {
   const edits: Edit[] = [];
 

@@ -26,6 +26,7 @@
     "zgeoff/no-await-in-condition": "error",
     "zgeoff/no-await-in-logical": "error",
     "zgeoff/no-single-line-jsdoc": "error",
+    "zgeoff/function-verb": "error",
 
     // enforced comment style — line comments unless JSDoc or exclamation
     "@stylistic/multiline-comment-style": [

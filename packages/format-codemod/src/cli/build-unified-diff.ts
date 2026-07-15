@@ -55,7 +55,7 @@ class MyersDiff {
   }
 
   buildOps(): DiffOp[] {
-    this.computeTrace();
+    this.updateTrace();
 
     return this.backtrack();
   }
@@ -64,7 +64,7 @@ class MyersDiff {
    * One snapshot of v per edit-distance round; the round that reaches the end
    * stops the search and the snapshots drive the backtrack.
    */
-  private computeTrace(): void {
+  private updateTrace(): void {
     for (let d = 0; d <= this.a.length + this.b.length; d++) {
       this.trace.push(new Map(this.v));
 
@@ -74,6 +74,7 @@ class MyersDiff {
     }
   }
 
+  // oxlint-disable-next-line zgeoff/function-verb -- Myers-native vocabulary
   private stepRound(d: number): boolean {
     for (let k = -d; k <= d; k += 2) {
       const x = this.slideDiagonal(this.pickX(k, d), k);
@@ -94,6 +95,7 @@ class MyersDiff {
     return moveDown ? (this.v.get(k + 1) ?? 0) : (this.v.get(k - 1) ?? 0) + 1;
   }
 
+  // oxlint-disable-next-line zgeoff/function-verb -- Myers-native vocabulary
   private slideDiagonal(x: number, k: number): number {
     let nx = x;
 
@@ -104,6 +106,7 @@ class MyersDiff {
     return nx;
   }
 
+  // oxlint-disable-next-line zgeoff/function-verb -- Myers-native vocabulary
   private backtrack(): DiffOp[] {
     const ops: DiffOp[] = [];
     let pos: Position = { x: this.a.length, y: this.b.length };
@@ -119,6 +122,7 @@ class MyersDiff {
     return ops.toReversed();
   }
 
+  // oxlint-disable-next-line zgeoff/function-verb -- Myers-native vocabulary
   private unwindRound(pos: Position, d: number): { ops: DiffOp[]; pos: Position } {
     const previous = this.findPrevious(pos, d);
     const prev = previous.prev;

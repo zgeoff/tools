@@ -1,9 +1,11 @@
+import functionVerb from './function-verb.js';
+
 // Custom lint rules, loaded through oxlint's jsPlugins (ESLint v9 rule API).
 // Each rule bans a shape no native oxlint rule can express — esquery selectors
 // for AST shapes, a source-comment scan where the target isn't
 // esquery-selectable.
 
-function banSelectors(type, message, selectors) {
+function buildBanRule(type, message, selectors) {
   return {
     meta: { type, messages: { banned: message }, schema: [] },
     create(context) {
@@ -96,7 +98,7 @@ const noSingleLineJSDoc = {
 const plugin = {
   meta: { name: 'zgeoff' },
   rules: {
-    'no-top-level-arrow': banSelectors(
+    'no-top-level-arrow': buildBanRule(
       'problem',
       'Declare top-level functions with the `function` keyword instead of assigning an arrow function.',
       [
@@ -106,19 +108,19 @@ const plugin = {
         "Program > ExpressionStatement > AssignmentExpression[right.type='ArrowFunctionExpression']",
       ],
     ),
-    'no-nested-function-declaration': banSelectors(
+    'no-nested-function-declaration': buildBanRule(
       'problem',
       'Use an arrow function here; reserve the `function` keyword for top-level declarations.',
       [
         'FunctionDeclaration:not(Program > FunctionDeclaration):not(Program > ExportNamedDeclaration > FunctionDeclaration):not(Program > ExportDefaultDeclaration > FunctionDeclaration)',
       ],
     ),
-    'no-bare-named-exports': banSelectors(
+    'no-bare-named-exports': buildBanRule(
       'problem',
       'Export declarations inline instead of listing names in `export { ... }`.',
       ['ExportNamedDeclaration[specifiers.length>0][declaration=null][source=null]'],
     ),
-    'no-inline-param-object-types': banSelectors(
+    'no-inline-param-object-types': buildBanRule(
       'problem',
       'Give this parameter a named interface or type alias instead of an inline object-literal type.',
       [
@@ -126,7 +128,7 @@ const plugin = {
         'TSMethodSignature > Identifier.params > TSTypeAnnotation > TSTypeLiteral',
       ],
     ),
-    'no-destructured-params': banSelectors(
+    'no-destructured-params': buildBanRule(
       'suggestion',
       'Accept the parameter whole instead of destructuring it in the signature.',
       [
@@ -134,12 +136,12 @@ const plugin = {
         ':matches(FunctionDeclaration, FunctionExpression, ArrowFunctionExpression) > AssignmentPattern.params > ObjectPattern',
       ],
     ),
-    'no-pick-destructuring': banSelectors(
+    'no-pick-destructuring': buildBanRule(
       'suggestion',
       'Use direct member access; destructure an object only with a rest element to omit properties.',
       ['VariableDeclarator > ObjectPattern:not(:has(> RestElement))'],
     ),
-    'no-ternary-args': banSelectors(
+    'no-ternary-args': buildBanRule(
       'suggestion',
       'Extract this ternary to a named const instead of passing it as an argument.',
       [
@@ -147,12 +149,12 @@ const plugin = {
         'NewExpression > ConditionalExpression.arguments',
       ],
     ),
-    'no-await-args': banSelectors(
+    'no-await-args': buildBanRule(
       'suggestion',
       'Await into a named const instead of awaiting inside an argument list.',
       ['CallExpression > AwaitExpression.arguments', 'NewExpression > AwaitExpression.arguments'],
     ),
-    'no-await-in-condition': banSelectors(
+    'no-await-in-condition': buildBanRule(
       'suggestion',
       'Await into a named const before the statement instead of inside a control-flow condition.',
       [
@@ -160,12 +162,13 @@ const plugin = {
         'SwitchStatement > AwaitExpression.discriminant',
       ],
     ),
-    'no-await-in-logical': banSelectors(
+    'no-await-in-logical': buildBanRule(
       'suggestion',
       'Await into a named const instead of chaining it after a && / || / ?? operator.',
       ['LogicalExpression > AwaitExpression'],
     ),
     'no-single-line-jsdoc': noSingleLineJSDoc,
+    'function-verb': functionVerb,
   },
 };
 
