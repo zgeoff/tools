@@ -22,9 +22,9 @@
 Applies where AI review bots (CodeRabbit, cubic, or similar) review PRs; each bot's behaviour is
 configured by its config file at the repo root.
 
-- A PR is ready only after every bot review is read and every finding is answered on its own
-  thread: a fixed finding's reply cites the commit that fixed it; a declined finding's reply states
-  the reason — when a finding contradicts this file, this file wins and the reply names the rule.
+- A PR is ready only after every bot review is read and every finding is answered on its own thread:
+  a fixed finding's reply cites the commit that fixed it; a declined finding's reply states the
+  reason — when a finding contradicts this file, this file wins and the reply names the rule.
   Reviews land within a few minutes of opening; read them with `gh pr view <n> --comments` and
   `gh api repos/<owner>/<repo>/pulls/<n>/comments`.
 - Resolve a thread once its reply is posted, fixed and declined alike (GraphQL
