@@ -215,6 +215,30 @@ test('it matches a verb only at a camelCase boundary', async () => {
   expect(result.exitCode).toBe(1);
 });
 
+test('it accepts a digit as the boundary after a verb', async () => {
+  const source = [
+    'export function run2FA(): void {}',
+    '',
+    'export function get2FAVerificationURI(): string {',
+    "  return '';",
+    '}',
+    '',
+  ].join('\n');
+
+  const result = await runLint(source, false, { 'zgeoff/function-verb': 'error' });
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it flags a banned verb at a digit boundary', async () => {
+  const source = 'export function save2FABackupCodes(): void {}\n';
+
+  const result = await runLint(source, false, { 'zgeoff/function-verb': 'error' });
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude("banned verb 'save'");
+});
+
 test('it skips PascalCase names, object-literal properties, getters, and setters', async () => {
   const source = [
     'export function Component(): null {',

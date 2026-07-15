@@ -105,7 +105,8 @@ function isVerbMatch(name, verb, bareAllowed) {
     return bareAllowed;
   }
 
-  return name.startsWith(verb) && /[A-Z]/u.test(name.charAt(verb.length));
+  // a digit also ends the verb: acronyms like 2FA start camelCase segments
+  return name.startsWith(verb) && /[A-Z0-9]/u.test(name.charAt(verb.length));
 }
 
 function findAllowedVerb(name, verbs) {
