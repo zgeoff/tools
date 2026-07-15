@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.6](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.0.5...@zgeoff/oxlint-config@0.0.6) (2026-07-15)
+
+
+### Bug Fixes
+
+* **oxlint-config:** treat a digit as a camelCase boundary after a verb ([#72](https://github.com/zgeoff/tools/issues/72)) ([f803bfa](https://github.com/zgeoff/tools/commit/f803bfa2e60375d000e23d8877c417480b7c9f9c))
+
 ## [0.0.5](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.0.4...@zgeoff/oxlint-config@0.0.5) (2026-07-15)
 
 ### Features
