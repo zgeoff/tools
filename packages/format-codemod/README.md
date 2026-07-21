@@ -38,8 +38,11 @@ between two kinds takes a blank line:
 - `const`/`let`/`var` declarations
 - `using`/`await using` declarations
 - bare calls and method calls — two distinct kinds, split by the first call in reading order:
-  `expect(x).toBe(y)` opens with a bare function, `fs.writeFileSync(…)` opens with a member, and a
+  `use(x).report()` opens with a bare function, `fs.writeFileSync(…)` opens with a member, and a
   member call chained onto a bare call's result is still a bare call
+- `expect` assertions — a statement whose first call in reading order is `expect` or an `expect.*`
+  helper (`expect(x).toBe(y)`, `expect.assertions(1)`) is its own kind, so a run of assertions stays
+  glued while the boundary with any acting statement is padded
 - assignments and increments
 
 Two axes overlay the kinds and pad their own boundaries:
