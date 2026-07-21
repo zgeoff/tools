@@ -194,6 +194,7 @@ test('it counts a single call with toHaveBeenCalledOnce', () => {
   const fn = mock(() => null);
 
   fn();
+
   expect(fn).toHaveBeenCalledOnce();
 });
 
@@ -201,6 +202,7 @@ test('it checks the single call and its args with toHaveBeenCalledExactlyOnceWit
   const fn = mock((value: string) => value);
 
   fn('a');
+
   expect(fn).toHaveBeenCalledExactlyOnceWith('a');
 });
 
@@ -210,6 +212,7 @@ test('it orders mock calls with toHaveBeenCalledBefore and toHaveBeenCalledAfter
 
   first();
   second();
+
   expect(first).toHaveBeenCalledBefore(second);
   expect(second).toHaveBeenCalledAfter(first);
 });

@@ -25,7 +25,8 @@ const CONTROL_FLOW_TYPES = new Set([
  * declaration, on both sides of a control-flow block — its closing brace
  * ends a visual unit just like its opening keyword starts one —
  * and at the boundary between statement kinds: bare call vs method call vs
- * mutation, instantiation vs anything else, and awaited vs non-awaited. Any
+ * expect assertion vs mutation, instantiation vs anything else, and awaited
+ * vs non-awaited. Any
  * match means exactly one blank line; a pair matching no rule sits flush.
  */
 export function needsBlankLine(container: ASTNode, prev: ASTNode, next: ASTNode): boolean {
@@ -183,15 +184,34 @@ function getStatementKind(node: ASTNode): string | null {
   }
 
   if (isExpressionStatementOf(node, CALL_TYPES)) {
-    return pickCallKind(node);
+    return isExpectHeaded(node) ? 'expect' : pickCallKind(node);
   }
 
   return isExpressionStatementOf(node, MUTATION_TYPES) ? 'mutation' : null;
 }
 
 /**
+ * An assertion statement: the first call a reader meets is `expect` itself or
+ * an `expect.*` helper (`expect.soft(x)`, `expect.assertions(1)`). Asserting
+ * is observation rather than action, so a run of assertions stays tight — one
+ * checklist — while the boundary with any acting statement is padded.
+ */
+function isExpectHeaded(node: ASTNode): boolean {
+  const expression = node['expression'];
+  const callee = isASTNode(expression) ? findDeepestCallee(expression) : null;
+
+  if (callee === null) {
+    return false;
+  }
+
+  const head = collectHeadChain(callee).at(-1);
+
+  return head?.type === 'Identifier' && head['name'] === 'expect';
+}
+
+/**
  * Call statements split into two kinds by the first call a reader meets:
- * `expect(x).toBe(y)` opens with a bare function, `fs.writeFileSync(...)`
+ * `use(x).report()` opens with a bare function, `fs.writeFileSync(...)`
  * opens with a member. The deepest call in the head chain decides, so a
  * member call chained onto a bare call's result is still a bare call, and a
  * wrapping await doesn't change the kind.

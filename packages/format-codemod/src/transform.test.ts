@@ -591,3 +591,22 @@ test('it is a no-op when run again on code with removed blank lines', () => {
   expect(once).not.toBe(src);
   expect(twice).toBe(once);
 });
+
+test('it pads expect runs apart from acting statements and keeps them glued', () => {
+  const src = `function f() {\n  advance();\n  expect(store.getState().generation).toBe(1);\n  expect(store.getState().initialized).toBeFalse();\n  advance();\n  expect(store.getState().generation).toBe(2);\n}\n`;
+  const output = transform(src).output;
+
+  expect(output).toMatchInlineSnapshot(`
+    "function f() {
+      advance();
+
+      expect(store.getState().generation).toBe(1);
+      expect(store.getState().initialized).toBeFalse();
+
+      advance();
+
+      expect(store.getState().generation).toBe(2);
+    }
+    "
+  `);
+});

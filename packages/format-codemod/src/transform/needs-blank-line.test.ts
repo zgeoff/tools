@@ -124,7 +124,7 @@ test('it does not pad between two statements of the same kind', () => {
 });
 
 test('it pads at the boundary between a method call and a bare call', () => {
-  const pair = parsePair("fs.writeFileSync(file, src);\nexpect(check(file)).toBe('changed');");
+  const pair = parsePair('fs.writeFileSync(file, src);\ncheck(file);');
 
   expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
 });
@@ -136,7 +136,7 @@ test('it does not pad between two method calls', () => {
 });
 
 test('it treats a member call chained onto a bare call result as a bare call', () => {
-  const pair = parsePair('expect(a).toBe(1);\nuse(b);');
+  const pair = parsePair('parse(a).check();\nuse(b);');
 
   expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
@@ -229,6 +229,44 @@ test('it pads at the boundary between awaited and non-awaited assignments', () =
 
 test('it does not pad between kindless statements', () => {
   const pair = parsePair('debugger;\ndebugger;');
+
+  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+});
+
+test('it pads at the boundary between a bare call and an expect statement', () => {
+  const before = parsePair('advance();\nexpect(x).toBe(1);');
+  const after = parsePair('expect(x).toBe(1);\nadvance();');
+
+  expect(needsBlankLine(before.container, before.prev, before.next)).toBeTrue();
+  expect(needsBlankLine(after.container, after.prev, after.next)).toBeTrue();
+});
+
+test('it does not pad between two expect statements', () => {
+  const pair = parsePair('expect(x).toBe(1);\nexpect(x).toBeFalse();');
+
+  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+});
+
+test('it treats an expect.* helper call as an expect statement', () => {
+  const pair = parsePair('expect.assertions(1);\nexpect(x).toBe(1);');
+
+  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+});
+
+test('it pads at the boundary between a method call and an expect.* helper call', () => {
+  const pair = parsePair('store.reset();\nexpect.assertions(1);');
+
+  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+});
+
+test('it treats a wrapping await as not changing the expect kind', () => {
+  const pair = parsePair('await expect(p).toReject();\nawait expect(q).toReject();');
+
+  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+});
+
+test('it treats expect in argument position as not making an expect statement', () => {
+  const pair = parsePair('use(expect(x));\nrun(y);');
 
   expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
