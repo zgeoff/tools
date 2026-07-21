@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/bun-test-extended",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "jest-extended matchers for bun test, with working failure messages and bun-aware types",
   "license": "MIT",
   "repository": {
