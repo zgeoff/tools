@@ -2,10 +2,11 @@
 
 ## [0.0.8](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.0.7...@zgeoff/format-codemod@0.0.8) (2026-07-21)
 
-
 ### Features
 
-* **format-codemod:** give expect statements their own padding kind ([#74](https://github.com/zgeoff/tools/issues/74)) ([b68662f](https://github.com/zgeoff/tools/commit/b68662f4a367cb89d3d45350d863a0d1f2560d88))
+- **format-codemod:** give expect statements their own padding kind
+  ([#74](https://github.com/zgeoff/tools/issues/74))
+  ([b68662f](https://github.com/zgeoff/tools/commit/b68662f4a367cb89d3d45350d863a0d1f2560d88))
 
 ## [0.0.7](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.0.6...@zgeoff/format-codemod@0.0.7) (2026-07-15)
 

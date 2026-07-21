@@ -19,7 +19,7 @@
     },
     "packages/bun-test-extended": {
       "name": "@zgeoff/bun-test-extended",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "dependencies": {
         "jest-extended": "catalog:",
         "jest-matcher-utils": "catalog:",
@@ -31,7 +31,7 @@
     },
     "packages/format-codemod": {
       "name": "@zgeoff/format-codemod",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "bin": {
         "format-codemod": "./dist/cli.js",
       },
