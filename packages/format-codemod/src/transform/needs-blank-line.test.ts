@@ -5,12 +5,6 @@ import { isASTNode } from './is-ast-node.ts';
 import { needsBlankLine } from './needs-blank-line.ts';
 import { parseSource } from './parse-source.ts';
 
-/**
- * Parses a two-statement fixture inside an async function body and returns
- * the block container with the first two statements, so each test can probe
- * one adjacent pair. Throws with the parser's message if the fixture is
- * broken — unreachable for the known-valid fixtures below.
- */
 function parsePair(body: string): { container: ASTNode; prev: ASTNode; next: ASTNode } {
   const parsed = parseSource(`async function f(x) {\n${body}\n}`, 'file.ts');
 

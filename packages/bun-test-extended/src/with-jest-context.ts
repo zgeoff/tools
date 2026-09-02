@@ -4,12 +4,9 @@ import type { JestExtendedMatcher, MatcherContext } from './types.ts';
 // The exact util functions jest-extended matchers destructure off `this.utils`.
 const jestMatcherUtils = { matcherHint, printExpected, printReceived, printWithType };
 
-// jest-extended matchers destructure `this.utils` (e.g. `const { printReceived } =
-// this.utils`) and expect jest's util signatures. Bun's native utils are brand-checked
-// — calling them unbound throws "Expected this to be instanceof ExpectMatcherUtils"
-// — so every failing assertion would crash instead of printing its message. Hand
-// each matcher a context whose `utils` come from the real jest-matcher-utils package
-// and whose remaining methods (`equals`, …) stay bound to the native context.
+// jest-extended matchers destructure `this.utils`, and Bun's native utils are
+// brand-checked: called unbound they throw "Expected this to be instanceof
+// ExpectMatcherUtils", so a failing assertion would crash instead of printing
 export function withJestContext(matcher: JestExtendedMatcher): JestExtendedMatcher {
   return function jestContextAdapter(
     this: Readonly<MatcherContext>,

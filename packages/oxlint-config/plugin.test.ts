@@ -26,8 +26,8 @@ async function createLintTree(source: string, rules: RuleSettings): Promise<stri
   return dir;
 }
 
-async function runLint(source: string, fix: boolean, rules?: RuleSettings): Promise<LintResult> {
-  const dir = await createLintTree(source, rules ?? { 'zgeoff/no-single-line-jsdoc': 'error' });
+async function runLint(source: string, fix: boolean, rules: RuleSettings): Promise<LintResult> {
+  const dir = await createLintTree(source, rules);
 
   const fixArgs = fix ? ['--fix'] : [];
   const args = [oxlintBin, '-c', '.oxlintrc.json', ...fixArgs, 'sample.ts'];
@@ -39,11 +39,6 @@ async function runLint(source: string, fix: boolean, rules?: RuleSettings): Prom
   return { exitCode, stdout, output };
 }
 
-/**
- * Collects the allowed verbs from the taxonomy tables in the shared agents
- * partial: every table row between the section heading and the banned
- * paragraph, with `<X>` templates reduced to their leading verb.
- */
 function collectTaxonomyVerbs(markdown: string): string[] {
   const start = markdown.indexOf('### Function naming');
   const end = markdown.indexOf('**Banned**');
@@ -53,11 +48,6 @@ function collectTaxonomyVerbs(markdown: string): string[] {
   return [...new Set(verbs)];
 }
 
-/**
- * Collects the banned verbs from the shared agents partial: the backticked
- * words in the banned paragraph, excluding parenthesized asides (replacement
- * pointers and the framework-convention carve-out).
- */
 function collectBannedVerbs(markdown: string): string[] {
   const start = markdown.indexOf('**Banned**');
   const end = markdown.indexOf('Algorithm-native');
@@ -83,45 +73,53 @@ function countOccurrences(text: string, part: string): number {
   return text.split(part).length - 1;
 }
 
-test('it flags a single-line JSDoc block', async () => {
-  const result = await runLint('/** Documents the export. */\nexport const answer = 42;\n', false);
+const noJSDoc = { 'zgeoff/no-jsdoc': 'error' };
+const maxRun = { 'zgeoff/max-consecutive-line-comments': 'error' };
+
+test('it flags a multi-line JSDoc block', async () => {
+  const source = '/**\n * Documents the export.\n */\nexport const answer = 42;\n';
+
+  const result = await runLint(source, false, noJSDoc);
 
   expect(result.exitCode).toBe(1);
-  expect(result.stdout).toInclude('no-single-line-jsdoc');
+  expect(result.stdout).toInclude('no-jsdoc');
 });
 
-test('it expands a single-line block to multi-line under --fix', async () => {
-  const result = await runLint('/** Documents the export. */\nexport const answer = 42;\n', true);
+test('it flags a single-line JSDoc block', async () => {
+  const result = await runLint(
+    '/** Documents the export. */\nexport const answer = 42;\n',
+    false,
+    noJSDoc,
+  );
 
-  expect(result.exitCode).toBe(0);
-  expect(result.output).toBe('/**\n * Documents the export.\n */\nexport const answer = 42;\n');
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('no-jsdoc');
 });
 
-test('it preserves indentation when fixing an indented block', async () => {
-  const source = 'class Box {\n  /** Holds the value. */\n  value = 1;\n}\n';
+test('it flags a JSDoc block inside a class body', async () => {
+  const source = 'class Box {\n  /**\n   * Holds the value.\n   */\n  value = 1;\n}\n';
 
-  const result = await runLint(source, true);
+  const result = await runLint(source, false, noJSDoc);
 
-  expect(result.exitCode).toBe(0);
-  expect(result.output).toBe('class Box {\n  /**\n   * Holds the value.\n   */\n  value = 1;\n}\n');
+  expect(result.exitCode).toBe(1);
 });
 
-test('it leaves multi-line blocks, line comments, and plain block comments alone', async () => {
+test('it leaves line comments and plain block comments alone', async () => {
   const source = [
-    '/**',
-    ' * Already multi-line.',
-    ' */',
-    'export const a = 1;',
-    '',
     '// line comment',
     'export const b = 2;',
     '',
     '/* plain block */',
     'export const c = 3;',
     '',
+    '/*',
+    ' * plain multi-line block',
+    ' */',
+    'export const d = 4;',
+    '',
   ].join('\n');
 
-  const result = await runLint(source, false);
+  const result = await runLint(source, false, noJSDoc);
 
   expect(result.exitCode).toBe(0);
 });
@@ -129,19 +127,83 @@ test('it leaves multi-line blocks, line comments, and plain block comments alone
 test('it exempts inline @type and @lends casts', async () => {
   const source = 'export const config = /** @type {const} */ ({ port: 3000 });\n';
 
-  const result = await runLint(source, false);
+  const result = await runLint(source, false, noJSDoc);
 
   expect(result.exitCode).toBe(0);
 });
 
-test('it reports but does not fix a block sharing its line with code', async () => {
-  const source =
-    'export function isReady(/** milliseconds */ delay: number): boolean {\n  return delay > 0;\n}\n';
+test('it flags a run of four line comments and accepts three', async () => {
+  const four = '// one\n// two\n// three\n// four\nexport const a = 1;\n';
+  const three = '// one\n// two\n// three\nexport const a = 1;\n';
 
-  const result = await runLint(source, true);
+  const fourResult = await runLint(four, false, maxRun);
+  const threeResult = await runLint(three, false, maxRun);
+
+  expect(fourResult.exitCode).toBe(1);
+  expect(fourResult.stdout).toInclude('max-consecutive-line-comments');
+  expect(fourResult.stdout).toInclude('4 lines; the limit is 3');
+  expect(threeResult.exitCode).toBe(0);
+});
+
+test('it honours the max option', async () => {
+  const source = '// one\n// two\nexport const a = 1;\n';
+
+  const result = await runLint(source, false, {
+    'zgeoff/max-consecutive-line-comments': ['error', { max: 1 }],
+  });
 
   expect(result.exitCode).toBe(1);
-  expect(result.output).toBe(source);
+});
+
+test('it ends a run at a blank line, a statement, or a trailing comment', async () => {
+  const source = [
+    '// one',
+    '// two',
+    '',
+    '// three',
+    '// four',
+    'export const a = 1; // trailing',
+    '// five',
+    '// six',
+    '',
+  ].join('\n');
+
+  const result = await runLint(source, false, maxRun);
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it neither counts a tool directive nor joins the prose around it', async () => {
+  const source = [
+    '// one',
+    '// two',
+    '// oxlint-disable-next-line no-console -- baseline',
+    '// three',
+    '// four',
+    'console.log(1);',
+    '',
+  ].join('\n');
+
+  const result = await runLint(source, false, maxRun);
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it counts an indented run inside a block', async () => {
+  const source = [
+    'export function run(): void {',
+    '  // one',
+    '  // two',
+    '  // three',
+    '  // four',
+    '  return;',
+    '}',
+    '',
+  ].join('\n');
+
+  const result = await runLint(source, false, maxRun);
+
+  expect(result.exitCode).toBe(1);
 });
 
 test('it flags a function whose name lacks a taxonomy verb', async () => {

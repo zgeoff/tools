@@ -3,9 +3,6 @@ import { collectChildNodes } from './collect-child-nodes.ts';
 import { needsBlankLine } from './needs-blank-line.ts';
 import { planGapEdit } from './plan-gap-edit.ts';
 
-/**
- * Sorted last-to-first so applying splices in order never shifts later offsets.
- */
 export function buildEditsFromAST(src: string, parsed: ParsedSource): Edit[] {
   const file: SourceFile = { src, comments: parsed.comments };
 
@@ -27,10 +24,6 @@ function walk(file: SourceFile, node: ASTNode): Edit[] {
   return edits;
 }
 
-/**
- * The statement lists this node directly contains — the sequences whose
- * adjacent pairs the padding rules apply to.
- */
 function getStatementLists(node: ASTNode): (readonly ASTNode[])[] {
   const bodies: (readonly ASTNode[])[] = [];
 
@@ -72,21 +65,12 @@ function buildPairEdits(file: SourceFile, container: ASTNode, body: readonly AST
   return edits;
 }
 
-/**
- * Adjacent imports are never padded or collapsed, whatever their shape: the
- * interior of an import block belongs to the import sorter, and edits there
- * would be reordered or stripped out from under us. The boundary between the
- * last import and the first real statement is still padded as usual.
- */
+// the interior of an import block belongs to the import sorter, which would
+// reorder or strip any edit made there
 function isImportPair(prev: ASTNode, next: ASTNode): boolean {
   return prev.type === 'ImportDeclaration' && next.type === 'ImportDeclaration';
 }
 
-/**
- * A statement that spans multiple lines is separated from both neighbours —
- * its shape already reads as a paragraph, so it gets paragraph spacing.
- * Single-line statements may sit tight.
- */
 function isMultiline(src: string, node: ASTNode): boolean {
   return (
     typeof node.start === 'number' &&

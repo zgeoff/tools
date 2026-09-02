@@ -148,15 +148,6 @@ function planReport(name, verbs, exemptNames) {
   };
 }
 
-/**
- * Enforces the function-naming taxonomy on function declarations,
- * function-valued variables, and class methods. Object-literal properties are
- * exempt — they overwhelmingly implement externally-defined shapes (rule
- * visitors, route tables) whose names the author doesn't choose — as are
- * names not starting with a lowercase letter (components, classes).
- * Options: `verbs` appends repo-local verbs to the shipped taxonomy;
- * `exemptNames` skips exact names.
- */
 const functionVerb = {
   meta: {
     type: 'suggestion',

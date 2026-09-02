@@ -7,10 +7,6 @@ import { fileURLToPath } from 'node:url';
 
 const cliPath = fileURLToPath(new URL('cli.ts', import.meta.url));
 
-/**
- * Runs the CLI from source under bun; the exit-code contract asserted here is
- * what the root format pipeline and the pre-commit hook consume.
- */
 function runCLI(
   args: readonly string[],
   cwd?: string,

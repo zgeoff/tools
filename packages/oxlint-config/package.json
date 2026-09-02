@@ -12,6 +12,8 @@
     "oxlintrc.json",
     "plugin.js",
     "function-verb.js",
+    "max-consecutive-line-comments.js",
+    "no-jsdoc.js",
     "index.js"
   ],
   "type": "module",

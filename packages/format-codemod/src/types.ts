@@ -1,8 +1,3 @@
-/**
- * The fields of the oxc AST this transform reads; the index signature carries
- * every other node property so the generic child walk can recurse untyped. The
- * codemod never mutates the tree, so everything is readonly.
- */
 export interface ASTNode {
   readonly type: string;
   readonly kind?: string;
@@ -24,10 +19,6 @@ export interface ParsedSource {
   readonly comments: readonly CommentSpan[];
 }
 
-/**
- * The raw text and its comment spans together — what gap planning needs to
- * classify inter-statement trivia without re-lexing.
- */
 export interface SourceFile {
   readonly src: string;
   readonly comments: readonly CommentSpan[];
