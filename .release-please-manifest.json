@@ -1,5 +1,5 @@
 {
-  "packages/bun-test-extended": "0.0.4",
-  "packages/format-codemod": "0.0.8",
-  "packages/oxlint-config": "0.0.6"
+  "packages/bun-test-extended": "0.1.0",
+  "packages/format-codemod": "0.1.0",
+  "packages/oxlint-config": "0.1.0"
 }

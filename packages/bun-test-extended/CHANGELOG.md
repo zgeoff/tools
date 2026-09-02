@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.0](https://github.com/zgeoff/tools/compare/@zgeoff/bun-test-extended@0.0.4...@zgeoff/bun-test-extended@0.1.0) (2026-09-02)
+
+### ⚠ BREAKING CHANGES
+
+- **oxlint-config:** zgeoff/no-single-line-jsdoc no longer exists; a consumer that names it must
+  drop the entry.
+
+### Features
+
+- **oxlint-config:** ban JSDoc blocks and cap line-comment runs
+  ([#78](https://github.com/zgeoff/tools/issues/78))
+  ([98319f3](https://github.com/zgeoff/tools/commit/98319f3a93e6f3991cb82bf74524effd5adb0fad))
+
 ## [0.0.4](https://github.com/zgeoff/tools/compare/@zgeoff/bun-test-extended@0.0.3...@zgeoff/bun-test-extended@0.0.4) (2026-07-21)
 
 ### Features
