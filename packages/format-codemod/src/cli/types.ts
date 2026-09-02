@@ -4,11 +4,6 @@ export type CLIMode = 'write' | 'check' | 'dry';
 
 export type FileOutcome = 'ok' | 'changed' | 'failed' | 'skipped';
 
-/**
- * Everything the entry needs to report one file: the outcome for exit-code
- * logic, sizes for --bench, and the text to print — modules below the entry
- * never write to stdout/stderr themselves.
- */
 export interface FileReport {
   readonly outcome: FileOutcome;
   readonly bytes: number;

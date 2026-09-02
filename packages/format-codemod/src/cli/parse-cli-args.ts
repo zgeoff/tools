@@ -11,12 +11,6 @@ export interface CLIArgs {
   readonly inputs: readonly string[];
 }
 
-/**
- * Strict parsing: an unknown flag is a usage error, not a silent no-op. That
- * matters because the default mode writes files — a typo'd --check must never
- * fall through to an in-place rewrite. CLIArgs is always an object, so the
- * string (error message) return is unambiguous.
- */
 export function parseCLIArgs(argv: readonly string[]): CLIArgs | string {
   try {
     const parsed = parseArgs({
@@ -48,10 +42,6 @@ export function parseCLIArgs(argv: readonly string[]): CLIArgs | string {
   }
 }
 
-/**
- * --check wins over --dry when both are passed — the stricter mode's
- * no-writes guarantee must hold.
- */
 function pickMode(check: boolean, dry: boolean): CLIMode {
   if (check) {
     return 'check';

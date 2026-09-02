@@ -1,12 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-/**
- * Deduped: overlapping patterns (a `src/**` glob plus a file inside src/) must
- * not process — or report — the same file twice. Ignore globs filter the final
- * list uniformly, so a file is skipped whether it arrived via a directory,
- * a glob, or an explicit path argument.
- */
 export async function expandInputs(
   patterns: readonly string[],
   ignore: readonly string[] = [],
@@ -37,13 +31,8 @@ function expandPattern(p: string): Promise<string[]> {
   return Promise.resolve([p]);
 }
 
-/**
- * Keeps directory expansion out of dependency trees and nested git dirs — a bare
- * `format-codemod .` at a repo root must not descend into installed packages.
- * Node passes directories to `exclude` (pruning descent); Bun filters final
- * matches — segment matching handles both, and Dirents in case withFileTypes
- * semantics ever leak through.
- */
+// Node passes directories to `exclude` (pruning descent) while Bun filters
+// final matches, so the check matches a segment and accepts a Dirent
 function isExcluded(
   entry: string | { readonly name: string; readonly parentPath?: string },
 ): boolean {
@@ -52,11 +41,6 @@ function isExcluded(
   return p.split(/[\\/]/u).some((seg) => seg === 'node_modules' || seg === '.git');
 }
 
-/**
- * A pattern is tried against the path both as expanded and relative to the
- * working directory, so `dist/**` ignores dist/ files whether the caller
- * passed a relative or an absolute input.
- */
 function isIgnored(file: string, patterns: readonly string[]): boolean {
   if (patterns.length === 0) {
     return false;

@@ -4,9 +4,9 @@ Shareable [oxlint](https://oxc.rs/docs/guide/usage/linter.html) config: every ca
 restriction-rule cherry-picks, comment-style enforcement via `@stylistic`, and a bundled JS plugin
 (`zgeoff/*` rules) banning shapes no native oxlint rule can express — top-level arrows, nested
 function declarations, bare named exports, destructured and inline-typed parameters, ternary and
-await arguments, awaits hidden inside a control-flow condition or a `&&`/`||`/`??` chain, and
-single-line `/** … */` blocks (auto-fixed to multi-line; inline `@type`/`@lends` casts exempt).
-`zgeoff/function-verb` enforces the function-naming taxonomy from the shared agent guidelines.
+await arguments, awaits hidden inside a control-flow condition or a `&&`/`||`/`??` chain, every
+JSDoc block, and any run of more than three line comments. `zgeoff/function-verb` enforces the
+function-naming taxonomy from the shared agent guidelines.
 
 ## Usage
 
@@ -50,6 +50,23 @@ Options extend the shipped set per repo:
 {
   "rules": {
     "zgeoff/function-verb": ["error", { "verbs": ["walk"], "exemptNames": ["main"] }],
+  },
+}
+```
+
+## `zgeoff/no-jsdoc` and `zgeoff/max-consecutive-line-comments`
+
+A comment holds only what neither the code, a type, a test name, nor the subsystem doc can hold: the
+reason a line does the non-obvious thing. `no-jsdoc` reports every `/** … */` block (inline
+`@type`/`@lends` casts exempt). `max-consecutive-line-comments` reports a run of own-line `//`
+comments longer than `max` (default 3); tool directives (`oxlint-`, `eslint-`, `@ts-`, …) neither
+count nor join the prose around them. Neither rule fixes: a deleted comment is a decision, not a
+whitespace change.
+
+```jsonc
+{
+  "rules": {
+    "zgeoff/max-consecutive-line-comments": ["error", { "max": 3 }],
   },
 }
 ```

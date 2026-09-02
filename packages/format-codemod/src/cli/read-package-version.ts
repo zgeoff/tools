@@ -1,10 +1,5 @@
 import fs from 'node:fs';
 
-/**
- * Reads the version field of the package manifest at the given path, throwing
- * when the file isn't a manifest. Callers own the path so it resolves against
- * their own location.
- */
 export function readPackageVersion(pkgPath: string): string {
   const parsed: unknown = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 

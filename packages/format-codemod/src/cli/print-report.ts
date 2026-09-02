@@ -1,10 +1,5 @@
 import type { FileReport } from './types.ts';
 
-/**
- * Prints one file's outcome: the stdout payload (--dry diffs) to stdout,
- * messages and per-file progress to stderr. Quiet drops the OK/SKIP noise but
- * never the messages.
- */
 export function printReport(file: string, report: FileReport, quiet: boolean): void {
   if (report.stdout !== null) {
     process.stdout.write(report.stdout);
