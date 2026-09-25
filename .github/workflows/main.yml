@@ -23,7 +23,7 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
-      - run: bash scripts/check-sync-manifest.sh
+      - run: bun run check:sync
       - run: bun run format:check
       - run: bun run lint:type-aware
       - run: bun run typecheck

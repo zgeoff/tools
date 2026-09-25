@@ -34,5 +34,16 @@
         "target": ".editorconfig"
       }
     ]
+  },
+  {
+    "name": "workflow-bun-pr",
+    "description": "The pull-request workflow that runs the shared Bun checks",
+    "optIn": true,
+    "files": [
+      {
+        "source": "sync/workflow-callers/pr.yml",
+        "target": ".github/workflows/pr.yml"
+      }
+    ]
   }
 ]

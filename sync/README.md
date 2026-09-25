@@ -22,6 +22,12 @@ A target under `.github/workflows/` needs the line `repo-sync delivers this file
 in its source. Without it, the workflow never overwrites a workflow file the repo wrote itself.
 `scripts/check-sync-manifest.sh` checks these rules in CI.
 
+Files under [`workflow-callers/`](./workflow-callers/) are opt-in entries: each is a short workflow
+that calls a reusable workflow in this repo, and a repo lists the ones it runs in the stub's
+`include` input. A caller reads repo-specific values from repo variables, which its header comment
+names, since the copy itself is verbatim. `workflow-bun-pr` runs
+[`bun-checks.yml`](../.github/workflows/bun-checks.yml), the standard Bun pull-request checks.
+
 A sync branch is force-pushed on every run, so a commit a person adds to it is lost on the next run.
 Edit the source here instead.
 
