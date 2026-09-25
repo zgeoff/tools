@@ -1,0 +1,24 @@
+# repo-sync delivers this file from zgeoff/tools
+#
+# Runs the shared Bun pull-request checks. Two optional repo variables change
+# them: BUN_CHECK_SCRIPTS, a space-separated list of package scripts that
+# replaces the standard list (audit deadcode format:check lint typecheck test),
+# and NODE_VERSION, which sets up Node next to Bun.
+name: PR
+
+on:
+  pull_request:
+
+concurrency:
+  group: pr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: zgeoff/tools/.github/workflows/bun-checks.yml@main
+    with:
+      scripts: ${{ vars.BUN_CHECK_SCRIPTS }}
+      node-version: ${{ vars.NODE_VERSION }}
