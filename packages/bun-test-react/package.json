@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/bun-test-react",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "bun test preloads for React client code: happy-dom with Bun's fetch stack, jest-dom matchers, and per-test unmount and zustand reset",
   "license": "MIT",
   "repository": {
