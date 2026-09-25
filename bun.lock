@@ -34,7 +34,7 @@
     },
     "packages/commitlint-config": {
       "name": "@zgeoff/commitlint-config",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "devDependencies": {
         "@commitlint/cli": "catalog:",
         "@types/bun": "catalog:",
@@ -60,7 +60,7 @@
     },
     "packages/oxfmt-config": {
       "name": "@zgeoff/oxfmt-config",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "devDependencies": {
         "@types/bun": "catalog:",
         "typescript": "catalog:",
