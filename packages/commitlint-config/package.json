@@ -1,0 +1,32 @@
+{
+  "name": "@zgeoff/commitlint-config",
+  "version": "0.0.0",
+  "description": "Shared commitlint rules: Conventional Commit types with a lower-case header of at most 72 characters",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zgeoff/tools.git",
+    "directory": "packages/commitlint-config"
+  },
+  "files": [
+    "index.js"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./index.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "typecheck": "tsc"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "catalog:",
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "@commitlint/cli": ">=21.0.0"
+  }
+}
