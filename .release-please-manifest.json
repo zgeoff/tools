@@ -4,5 +4,6 @@
   "packages/oxlint-config": "0.1.0",
   "packages/tsconfig": "1.0.0",
   "packages/commitlint-config": "0.1.0",
-  "packages/oxfmt-config": "0.1.0"
+  "packages/oxfmt-config": "0.1.0",
+  "packages/bun-test-react": "0.1.0"
 }
