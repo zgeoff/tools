@@ -12,8 +12,16 @@
     "packages/bun-test-extended": {
       "component": "@zgeoff/bun-test-extended"
     },
+    "packages/commitlint-config": {
+      "component": "@zgeoff/commitlint-config",
+      "initial-version": "0.1.0"
+    },
     "packages/format-codemod": {
       "component": "@zgeoff/format-codemod"
+    },
+    "packages/oxfmt-config": {
+      "component": "@zgeoff/oxfmt-config",
+      "initial-version": "0.1.0"
     },
     "packages/oxlint-config": {
       "component": "@zgeoff/oxlint-config"
