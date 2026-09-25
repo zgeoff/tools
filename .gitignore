@@ -4,3 +4,4 @@ dist/
 *.tsbuildinfo
 .env
 .env.*
+packages/tsconfig/.test-*
