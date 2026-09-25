@@ -35,7 +35,7 @@
     },
     "packages/bun-test-react": {
       "name": "@zgeoff/bun-test-react",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@happy-dom/global-registrator": "catalog:",
         "@testing-library/jest-dom": "catalog:",
