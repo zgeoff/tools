@@ -1,0 +1,64 @@
+{
+  "name": "@zgeoff/bun-test-react",
+  "version": "0.0.0",
+  "description": "bun test preloads for React client code: happy-dom with Bun's fetch stack, jest-dom matchers, and per-test unmount and zustand reset",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zgeoff/tools.git",
+    "directory": "packages/bun-test-react"
+  },
+  "files": [
+    "src",
+    "!src/*.test.ts",
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./zustand": {
+      "types": "./dist/zustand.d.ts",
+      "default": "./src/zustand.ts"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepare": "bun run build",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@happy-dom/global-registrator": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
+    "happy-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@testing-library/react": "catalog:",
+    "@types/bun": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "zustand": "catalog:"
+  },
+  "peerDependencies": {
+    "@testing-library/react": ">=16.0.0",
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0",
+    "zustand": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "zustand": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "bun": ">=1.3"
+  }
+}

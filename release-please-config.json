@@ -12,6 +12,10 @@
     "packages/bun-test-extended": {
       "component": "@zgeoff/bun-test-extended"
     },
+    "packages/bun-test-react": {
+      "component": "@zgeoff/bun-test-react",
+      "initial-version": "0.1.0"
+    },
     "packages/commitlint-config": {
       "component": "@zgeoff/commitlint-config",
       "initial-version": "0.1.0"
