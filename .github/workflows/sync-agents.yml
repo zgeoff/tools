@@ -1,3 +1,5 @@
+# Deprecated: repo-sync.yml delivers the agents entry. This file stays until
+# every downstream stub calls repo-sync instead.
 name: Sync AGENTS.md
 
 on:

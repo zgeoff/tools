@@ -1,0 +1,38 @@
+[
+  {
+    "name": "agents",
+    "description": "The shared AGENTS.md partial and the script that builds AGENTS.md from it and agents/project.md",
+    "files": [
+      {
+        "source": "agents/shared.md",
+        "target": "agents/shared.md"
+      },
+      {
+        "source": "scripts/build-agents-md.sh",
+        "target": "scripts/build-agents-md.sh",
+        "mode": "0755"
+      }
+    ],
+    "build": "bash scripts/build-agents-md.sh agents/shared.md agents/project.md AGENTS.md"
+  },
+  {
+    "name": "pr-template",
+    "description": "The pull-request template",
+    "files": [
+      {
+        "source": ".github/PULL_REQUEST_TEMPLATE.md",
+        "target": ".github/PULL_REQUEST_TEMPLATE.md"
+      }
+    ]
+  },
+  {
+    "name": "editorconfig",
+    "description": "The root .editorconfig",
+    "files": [
+      {
+        "source": ".editorconfig",
+        "target": ".editorconfig"
+      }
+    ]
+  }
+]
