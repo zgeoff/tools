@@ -74,3 +74,24 @@ test('it rejects a body that starts on the line after the header', async () => {
   expect(result.exitCode).toBe(1);
   expect(result.stdout.toString()).toInclude('[body-leading-blank]');
 });
+
+test('it accepts a breaking-change header', async () => {
+  await using project = await setupTest();
+
+  const result = Bun.spawnSync([project.commitlint, '--cwd', project.dir], {
+    stdin: Buffer.from('feat(core)!: remove the old api\n'),
+  });
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it rejects a header with no type', async () => {
+  await using project = await setupTest();
+
+  const result = Bun.spawnSync([project.commitlint, '--cwd', project.dir], {
+    stdin: Buffer.from(': add the react variant\n'),
+  });
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout.toString()).toInclude('[type-empty]');
+});

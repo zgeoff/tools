@@ -38,9 +38,13 @@ test('it sorts test libraries ahead of builtins, packages and relative imports',
     ].join('\n'),
   );
 
-  Bun.spawnSync([project.oxfmt, '-c', 'oxfmt.config.ts', 'sample.test.ts'], { cwd: project.dir });
+  const result = Bun.spawnSync([project.oxfmt, '-c', 'oxfmt.config.ts', 'sample.test.ts'], {
+    cwd: project.dir,
+  });
 
   const formatted = await readFile(join(project.dir, 'sample.test.ts'), 'utf8');
+
+  expect(result.exitCode).toBe(0);
 
   expect(formatted).toBe(
     [
@@ -64,9 +68,13 @@ test('it writes single quotes, semicolons and trailing commas', async () => {
     'export const names = [\n  "alpha",\n  "beta-with-a-long-name-that-wraps",\n  "gamma-with-another-long-name"\n]\n',
   );
 
-  Bun.spawnSync([project.oxfmt, '-c', 'oxfmt.config.ts', 'sample.ts'], { cwd: project.dir });
+  const result = Bun.spawnSync([project.oxfmt, '-c', 'oxfmt.config.ts', 'sample.ts'], {
+    cwd: project.dir,
+  });
 
   const formatted = await readFile(join(project.dir, 'sample.ts'), 'utf8');
+
+  expect(result.exitCode).toBe(0);
 
   expect(formatted).toBe(
     "export const names = ['alpha', 'beta-with-a-long-name-that-wraps', 'gamma-with-another-long-name'];\n",
@@ -80,7 +88,9 @@ test('it leaves the files repo-sync delivers unformatted', async () => {
   await writeFile(join(project.dir, 'AGENTS.md'), '*  generated   list item\n');
   await writeFile(join(project.dir, 'agents/shared.md'), '*  shared   list item\n');
 
-  Bun.spawnSync([project.oxfmt, '-c', 'oxfmt.config.ts', '.'], { cwd: project.dir });
+  const result = Bun.spawnSync([project.oxfmt, '-c', 'oxfmt.config.ts', '.'], { cwd: project.dir });
+
+  expect(result.exitCode).toBe(0);
 
   const agents = await readFile(join(project.dir, 'AGENTS.md'), 'utf8');
   const shared = await readFile(join(project.dir, 'agents/shared.md'), 'utf8');

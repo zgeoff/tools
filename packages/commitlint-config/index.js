@@ -1,4 +1,11 @@
 const config = {
+  parserPreset: {
+    parserOpts: {
+      headerPattern: /^(?<type>\w*)(?:\((?<scope>.*)\))?!?: (?<subject>.*)$/u,
+      breakingHeaderPattern: /^(?<type>\w*)(?:\((?<scope>.*)\))?!: (?<subject>.*)$/u,
+      headerCorrespondence: ['type', 'scope', 'subject'],
+    },
+  },
   rules: {
     'body-leading-blank': [2, 'always'],
     'footer-leading-blank': [2, 'always'],
@@ -27,6 +34,7 @@ const config = {
       ],
     ],
     'type-case': [2, 'always', 'lower-case'],
+    'type-empty': [2, 'never'],
   },
 };
 
