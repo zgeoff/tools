@@ -168,7 +168,7 @@ this file as its guidelines. A repo that runs another review bot names it and it
   behaviour is an edit to its config, reviewed in a PR.
 - Bots review a PR once, at open; an agent invokes a re-review only when asked. The exception is a
   PR that got no review at all, such as one opened before the bot was installed: request it once
-  with `@coderabbitai review`.
+  with that bot's documented trigger, such as `@coderabbitai review` for CodeRabbit.
 
 ## Type checking
 
