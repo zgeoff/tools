@@ -1,95 +1,91 @@
-import { afterEach, expect, test } from 'bun:test';
+import { expect, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-const tsc = join(import.meta.dir, '../../node_modules/.bin/tsc');
-const projects: string[] = [];
-
-afterEach(async () => {
-  await Promise.all(projects.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
-});
-
 // The project sits inside this repo so `extends` resolves @zgeoff/tsconfig through the
 // workspace link in the root node_modules, the way a consumer's install resolves it.
-async function writeProject(variant: string, source: string): Promise<string> {
+async function setupTest(variant: string, source: string) {
   const dir = await mkdtemp(join(import.meta.dir, '.test-'));
 
-  projects.push(dir);
+  await writeFile(
+    join(dir, 'tsconfig.json'),
+    JSON.stringify({ extends: `@zgeoff/tsconfig/${variant}`, include: ['index.ts'] }),
+  );
 
-  const config = { extends: `@zgeoff/tsconfig/${variant}`, include: ['index.ts'] };
-
-  await writeFile(join(dir, 'tsconfig.json'), JSON.stringify(config));
   await writeFile(join(dir, 'index.ts'), source);
 
-  return dir;
-}
-
-function runTSC(dir: string, args: readonly string[]): { code: number; output: string } {
-  const result = Bun.spawnSync([tsc, '-p', dir, ...args]);
-
   return {
-    code: result.exitCode,
-    output: `${result.stdout.toString()}${result.stderr.toString()}`,
+    tsc: join(import.meta.dir, '../../node_modules/.bin/tsc'),
+    dir,
+    async [Symbol.asyncDispose]() {
+      await rm(dir, { recursive: true, force: true });
+    },
   };
 }
 
-function isShowConfig(value: unknown): value is { compilerOptions: object } {
-  return typeof value === 'object' && value !== null && 'compilerOptions' in value;
-}
-
-function readCompilerOptions(dir: string): object {
-  const parsed: unknown = JSON.parse(runTSC(dir, ['--showConfig']).output);
-
-  if (!isShowConfig(parsed)) {
-    throw new Error(`tsc --showConfig printed no compilerOptions for ${dir}`);
-  }
-
-  return parsed.compilerOptions;
-}
-
 test('it layers the bundler-mode options over the strictest flags', async () => {
-  const dir = await writeProject('base.json', 'export {};\n');
+  await using project = await setupTest('base.json', 'export {};\n');
 
-  expect(readCompilerOptions(dir)).toContainEntries([
-    ['strict', true],
-    ['noUncheckedIndexedAccess', true],
-    ['exactOptionalPropertyTypes', true],
-    ['module', 'preserve'],
-    ['moduleResolution', 'bundler'],
-    ['verbatimModuleSyntax', true],
-    ['noEmit', true],
-  ]);
+  const result = Bun.spawnSync([project.tsc, '-p', project.dir, '--showConfig']);
+  const config: unknown = JSON.parse(result.stdout.toString());
+
+  expect(config).toMatchObject({
+    compilerOptions: {
+      strict: true,
+      noUncheckedIndexedAccess: true,
+      exactOptionalPropertyTypes: true,
+      module: 'preserve',
+      moduleResolution: 'bundler',
+      verbatimModuleSyntax: true,
+      noEmit: true,
+    },
+  });
 });
 
 test('it rejects an unchecked index access under the base config', async () => {
-  const dir = await writeProject(
+  await using project = await setupTest(
     'base.json',
     'const names: string[] = [];\nexport const length: number = names[0].length;\n',
   );
 
-  const result = runTSC(dir, []);
+  const result = Bun.spawnSync([project.tsc, '-p', project.dir]);
 
-  expect(result.code).not.toBe(0);
-  expect(result.output).toInclude('TS2532');
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout.toString()).toInclude('TS2532');
 });
 
 test('it leaves the DOM out of the base config', async () => {
-  const dir = await writeProject('base.json', 'export const body = document.body;\n');
+  await using project = await setupTest('base.json', 'export const body = document.body;\n');
 
-  const result = runTSC(dir, []);
+  const result = Bun.spawnSync([project.tsc, '-p', project.dir]);
 
-  expect(result.code).not.toBe(0);
-  expect(result.output).toInclude("Cannot find name 'document'");
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout.toString()).toInclude("Cannot find name 'document'");
 });
 
-test('it adds the DOM and the automatic JSX runtime in the react config', async () => {
-  const dir = await writeProject('react.json', 'export const body: HTMLElement = document.body;\n');
+test('it type-checks DOM code under the react config', async () => {
+  await using project = await setupTest(
+    'react.json',
+    'export const body: HTMLElement = document.body;\n',
+  );
 
-  expect(runTSC(dir, [])).toEqual({ code: 0, output: '' });
+  const result = Bun.spawnSync([project.tsc, '-p', project.dir]);
 
-  expect(readCompilerOptions(dir)).toContainEntries([
-    ['jsx', 'react-jsx'],
-    ['lib', ['es2024', 'dom', 'dom.iterable']],
-    ['strict', true],
-  ]);
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('');
+});
+
+test('it sets the automatic JSX runtime and the DOM libs in the react config', async () => {
+  await using project = await setupTest('react.json', 'export {};\n');
+
+  const result = Bun.spawnSync([project.tsc, '-p', project.dir, '--showConfig']);
+  const config: unknown = JSON.parse(result.stdout.toString());
+
+  expect(config).toMatchObject({
+    compilerOptions: {
+      jsx: 'react-jsx',
+      lib: ['es2024', 'dom', 'dom.iterable'],
+      strict: true,
+    },
+  });
 });
