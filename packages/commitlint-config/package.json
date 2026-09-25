@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/commitlint-config",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Shared commitlint rules: Conventional Commit types with a lower-case header of at most 72 characters",
   "license": "MIT",
   "repository": {
