@@ -1,0 +1,213 @@
+# Reusable workflow: keeps the shared files listed in sync/manifest.json current
+# in the caller. One job per manifest entry copies that entry's files from this
+# repository to their target paths, runs the entry's `build` command when it has
+# one, and opens a pull request on the branch sync/<name> when a file changed.
+# A change to a shared file reaches every repo as one reviewable pull request
+# per entry, and a new shared file is a manifest entry here with no change
+# downstream.
+#
+# Callers install sync/repo-sync.yml as .github/workflows/repo-sync.yml and set
+# the REPO_SYNC_APP_CLIENT_ID and REPO_SYNC_APP_PRIVATE_KEY secrets. The job
+# mints a GitHub App token from them to push the branch and open the pull
+# request, so the caller's own workflows run on it; a push with the default
+# GITHUB_TOKEN starts no workflow run. This repository is public, so reading
+# it needs no token.
+#
+# A manifest entry marked `"optIn": true` reaches a caller only when the caller
+# lists its name in the `include` input. `include` fails the run on a name that
+# is not an opt-in entry, because listing it has no effect. `skip` leaves out
+# any entry, opt-in or not.
+name: Repo sync (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      tools-ref:
+        description: Ref of zgeoff/tools to sync from
+        type: string
+        required: false
+        default: main
+      skip:
+        description: Comma-separated manifest entry names to leave alone
+        type: string
+        required: false
+        default: ''
+      include:
+        description: Comma-separated opt-in manifest entry names to sync
+        type: string
+        required: false
+        default: ''
+    secrets:
+      REPO_SYNC_APP_CLIENT_ID:
+        required: true
+      REPO_SYNC_APP_PRIVATE_KEY:
+        required: true
+
+jobs:
+  prepare:
+    name: Read the manifest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      entries: ${{ steps.manifest.outputs.entries }}
+    steps:
+      - name: Check out the manifest
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: zgeoff/tools
+          ref: ${{ inputs.tools-ref }}
+          sparse-checkout: sync/manifest.json
+          sparse-checkout-cone-mode: false
+
+      - name: Drop the skipped and the unrequested entries
+        id: manifest
+        env:
+          SKIP: ${{ inputs.skip }}
+          INCLUDE: ${{ inputs.include }}
+        run: |
+          set -euo pipefail
+          result=$(jq -c --arg skip "$SKIP" --arg include "$INCLUDE" \
+            'def names: split(",") | map(gsub("\\s"; "")) | map(select(. != ""));
+             ($skip | names) as $skip
+             | ($include | names) as $include
+             | [.[] | select(.optIn == true) | .name] as $optIn
+             | {
+                 unknown: [$include[] | select(. as $n | $optIn | index($n) | not)],
+                 both: [$include[] | select(. as $n | $skip | index($n))],
+                 entries: [.[]
+                   | select(.name as $n | $skip | index($n) | not)
+                   | select((.optIn != true) or (.name as $n | $include | index($n)))
+                   | del(.optIn)
+                   | .workflows = (any(.files[]; .target | startswith(".github/workflows/")))]
+               }' \
+            sync/manifest.json)
+          # The colons go, so a value cannot start a workflow command in the log.
+          unknown=$(printf '%s' "$result" | jq -r '.unknown | join(", ") | gsub(":"; " ")')
+          if [ -n "$unknown" ]; then
+            echo "::error::include lists no opt-in manifest entry: $unknown"
+            exit 1
+          fi
+          both=$(printf '%s' "$result" | jq -r '.both | join(", ") | gsub(":"; " ")')
+          if [ -n "$both" ]; then
+            echo "::error::skip and include both list: $both"
+            exit 1
+          fi
+          entries=$(printf '%s' "$result" | jq -c '.entries')
+          echo "entries=$entries" >> "$GITHUB_OUTPUT"
+
+  sync:
+    name: Sync ${{ matrix.entry.name }}
+    needs: prepare
+    if: ${{ success() && needs.prepare.outputs.entries != '[]' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        entry: ${{ fromJSON(needs.prepare.outputs.entries) }}
+    steps:
+      - name: Mint a write token for the caller
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        with:
+          client-id: ${{ secrets.REPO_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.REPO_SYNC_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          # Contents write alone cannot push a file under .github/workflows/.
+          # Only an entry with such a target asks for workflows write.
+          permission-workflows: ${{ matrix.entry.workflows && 'write' || '' }}
+
+      - name: Check out the caller
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Check out zgeoff/tools
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: zgeoff/tools
+          ref: ${{ inputs.tools-ref }}
+          path: .repo-sync
+          persist-credentials: false
+
+      # A workflow the repo wrote itself can share a target's path. Overwriting
+      # it would drop the repo's own jobs in a pull request that reads as a
+      # routine sync, so the entry fails instead. The job overwrites an existing
+      # workflow file only when repo-sync wrote it, which the marker line shows,
+      # or when it calls the same shared workflow as the source.
+      - name: Copy the entry's files to their targets
+        env:
+          NAME: ${{ matrix.entry.name }}
+          FILES: ${{ toJSON(matrix.entry.files) }}
+          MARKER: repo-sync delivers this file from zgeoff/tools
+        run: |
+          set -euo pipefail
+          trap 'rm -rf .repo-sync' EXIT
+          rows=$(printf '%s' "$FILES" | jq -r '.[] | [.source, .target, (.mode // "0644")] | @tsv')
+          conflicts=0
+          while IFS=$'\t' read -r source target mode; do
+            if [[ "$target" == .github/workflows/* && -f "$target" ]] && ! grep -qF "$MARKER" "$target"; then
+              calls=$(grep -oE 'zgeoff/tools/\.github/workflows/[^@[:space:]]+' ".repo-sync/$source" | sort -u || true)
+              if [ -z "$calls" ] || ! grep -qFf <(printf '%s\n' "$calls") "$target"; then
+                echo "::error file=$target::$target is the repo's own workflow, so $NAME does not overwrite it. Move its jobs to a file with another name, or add $NAME to skip."
+                conflicts=1
+                continue
+              fi
+            fi
+            mkdir -p "$(dirname "$target")"
+            install -m "$mode" ".repo-sync/$source" "$target"
+          done <<< "$rows"
+          exit "$conflicts"
+
+      # The build runs in the caller's checkout with the runner's stock tools
+      # (bash, git, jq); the manifest README states that contract.
+      - name: Run the entry's build
+        if: matrix.entry.build
+        env:
+          BUILD: ${{ matrix.entry.build }}
+        run: bash -euo pipefail -c "$BUILD"
+
+      - name: Commit and push the copy
+        id: push
+        env:
+          NAME: ${{ matrix.entry.name }}
+          BRANCH: sync/${{ matrix.entry.name }}
+        run: |
+          set -euo pipefail
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git checkout -B "$BRANCH"
+          git add -A
+          if git diff --cached --quiet; then
+            # Nothing to sync; delete any stale sync branch so its pull request closes.
+            echo "$NAME matches the source; nothing to sync."
+            git push origin --delete "$BRANCH" 2>/dev/null || true
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -m "chore: sync $NAME from zgeoff/tools"
+          # The branch was recreated from the base and does not fast-forward the
+          # remote, so force-push.
+          git push --force origin "$BRANCH"
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Open the pull request
+        if: steps.push.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          NAME: ${{ matrix.entry.name }}
+          BRANCH: sync/${{ matrix.entry.name }}
+          BASE: ${{ github.ref_name }}
+          DESCRIPTION: ${{ matrix.entry.description }}
+        run: |
+          set -euo pipefail
+          if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')" ]; then
+            echo "A pull request is open for $BRANCH; the push updated it."
+            exit 0
+          fi
+          gh pr create --base "$BASE" --head "$BRANCH" \
+            --title "chore: sync $NAME from zgeoff/tools" \
+            --body "$DESCRIPTION. Copied from zgeoff/tools by the repo-sync workflow; edit the source there, not this copy."

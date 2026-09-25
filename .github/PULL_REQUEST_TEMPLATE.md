@@ -16,7 +16,8 @@ words. No narrative about prior attempts or review cycles.
 ## Testing
 
 - [ ] `bun run typecheck` passes
-- [ ] `bun test` passes
+- [ ] `bun run test` passes
+- [ ] `bun run lint` passes
 - [ ] New tests added for new functionality
 
 ## Context
