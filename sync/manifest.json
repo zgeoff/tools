@@ -45,5 +45,32 @@
         "target": ".github/workflows/pr.yml"
       }
     ]
+  },
+  {
+    "name": "skill-testing",
+    "description": "The shared testing skill; a repo keeps its own rules in a project-testing skill",
+    "optIn": true,
+    "files": [
+      {
+        "source": "sync/skills/testing/SKILL.md",
+        "target": ".claude/skills/testing/SKILL.md"
+      }
+    ]
+  },
+  {
+    "name": "skill-docs-writing",
+    "description": "The shared docs-writing skill and its prose check script; a repo keeps its own rules in a project-docs-writing skill",
+    "optIn": true,
+    "files": [
+      {
+        "source": "sync/skills/docs-writing/SKILL.md",
+        "target": ".claude/skills/docs-writing/SKILL.md"
+      },
+      {
+        "source": "sync/skills/docs-writing/scripts/check-prose.sh",
+        "target": ".claude/skills/docs-writing/scripts/check-prose.sh",
+        "mode": "0755"
+      }
+    ]
   }
 ]
