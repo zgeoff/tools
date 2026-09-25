@@ -37,6 +37,7 @@
     "@zgeoff/bun-test-extended": "workspace:*",
     "@zgeoff/format-codemod": "workspace:*",
     "@zgeoff/oxlint-config": "workspace:*",
+    "@zgeoff/tsconfig": "workspace:*",
     "lefthook": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",

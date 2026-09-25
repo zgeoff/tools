@@ -10,6 +10,7 @@
         "@zgeoff/bun-test-extended": "workspace:*",
         "@zgeoff/format-codemod": "workspace:*",
         "@zgeoff/oxlint-config": "workspace:*",
+        "@zgeoff/tsconfig": "workspace:*",
         "lefthook": "catalog:",
         "oxfmt": "catalog:",
         "oxlint": "catalog:",
@@ -55,6 +56,17 @@
       },
       "peerDependencies": {
         "oxlint": ">=1.71.0",
+      },
+    },
+    "packages/tsconfig": {
+      "name": "@zgeoff/tsconfig",
+      "version": "0.0.0",
+      "dependencies": {
+        "@tsconfig/strictest": "catalog:",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
       },
     },
   },
@@ -304,6 +316,8 @@
     "@zgeoff/format-codemod": ["@zgeoff/format-codemod@workspace:packages/format-codemod"],
 
     "@zgeoff/oxlint-config": ["@zgeoff/oxlint-config@workspace:packages/oxlint-config"],
+
+    "@zgeoff/tsconfig": ["@zgeoff/tsconfig@workspace:packages/tsconfig"],
 
     "acorn": ["acorn@8.17.0", "", { "bin": { "acorn": "bin/acorn" } }, "sha512-xRQbDb9BnwDafYNn6Vwl839DYVjqXYb1XVGtWAZ1kcDc6iwAL4hg3B1dZlRiuENFeO2H53gFG3in621AdERVAg=="],
 

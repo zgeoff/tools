@@ -1,0 +1,33 @@
+{
+  "name": "@zgeoff/tsconfig",
+  "version": "0.0.0",
+  "description": "Shared strict TypeScript configs for Bun repos: a bundler-mode base and a React variant",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zgeoff/tools.git",
+    "directory": "packages/tsconfig"
+  },
+  "files": [
+    "base.json",
+    "react.json"
+  ],
+  "type": "module",
+  "exports": {
+    "./base.json": "./base.json",
+    "./react.json": "./react.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@tsconfig/strictest": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}

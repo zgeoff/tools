@@ -17,6 +17,9 @@
     },
     "packages/oxlint-config": {
       "component": "@zgeoff/oxlint-config"
+    },
+    "packages/tsconfig": {
+      "component": "@zgeoff/tsconfig"
     }
   }
 }
