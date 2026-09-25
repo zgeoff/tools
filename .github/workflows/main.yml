@@ -34,9 +34,12 @@ jobs:
     runs-on: ubuntu-latest
     # Two pushes close together start two runs; without a queue, one run can
     # merge the release PR while the other is still formatting it.
+    # queue: max keeps every waiting run; the default replaces a waiting run,
+    # which would cancel a pending republish dispatch.
     concurrency:
       group: release
       cancel-in-progress: false
+      queue: max
     permissions:
       contents: write
       pull-requests: write
@@ -127,6 +130,14 @@ jobs:
             done
             if ! gh pr checks "$pr" --repo "$GITHUB_REPOSITORY" --watch --fail-fast --interval 10; then
               echo "release PR #$pr has failing checks" >&2
+              exit 1
+            fi
+            # --watch exits 0 when a check was cancelled, so require every
+            # check to have passed or been skipped.
+            unfinished=$(gh pr checks "$pr" --repo "$GITHUB_REPOSITORY" --json name,bucket \
+              --jq '[.[] | select(.bucket != "pass" and .bucket != "skipping") | .name] | join(", ")')
+            if [ -n "$unfinished" ]; then
+              echo "release PR #$pr has checks that did not pass: $unfinished" >&2
               exit 1
             fi
             merged=''
