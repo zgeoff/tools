@@ -95,16 +95,20 @@ jobs:
           SCRIPTS: ${{ inputs.scripts }}
         run: |
           set -euo pipefail
-          scripts="${SCRIPTS:-audit deadcode format:check lint typecheck test}"
+          # A value of only whitespace parses to no names and gets the standard list too.
+          read -ra list <<< "$SCRIPTS"
+          if [ "${#list[@]}" -eq 0 ]; then
+            list=(audit deadcode format:check lint typecheck test)
+          fi
           missing=""
-          for name in $scripts; do
+          for name in "${list[@]}"; do
             jq -e --arg name "$name" '.scripts[$name]' package.json > /dev/null || missing="$missing $name"
           done
           if [ -n "$missing" ]; then
             echo "::error::package.json defines no script named:$missing. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list."
             exit 1
           fi
-          for name in $scripts; do
+          for name in "${list[@]}"; do
             echo "::group::bun run $name"
             bun run "$name"
             echo "::endgroup::"
