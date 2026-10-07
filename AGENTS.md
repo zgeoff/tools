@@ -186,8 +186,9 @@ experimental `--type-check` (fast, run it locally), while `typecheck` runs real 
   (`test('it pads before a return statement', …)`). A file that tests several units prefixes each
   title with `#<unit>` in place of "it" (`test('#parseSource rejects an empty file', …)`).
 - Test files are co-located with the module they test (`parse-source.ts` beside
-  `parse-source.test.ts`) — no `test/`, `tests/` or `__tests__` directories. Declaration emit
-  excludes `*.test.ts`, so they never ship.
+  `parse-source.test.ts`) — no `test/`, `tests/` or `__tests__` directories, except a root `e2e/`
+  for the end-to-end suites that run the whole program. Declaration emit excludes `*.test.ts`, so
+  they never ship.
 - Run `bun test` from the repo root: the jest-extended preload lives in the root `bunfig.toml`, so
   package-cwd runs are missing the extra matchers.
 - Tests declare their own data inline — no fixtures shared between tests, even if that means
