@@ -133,11 +133,12 @@ never appear in a test file.
 When `setupTest()` acquires anything that needs releasing, it returns `Symbol.asyncDispose` and the
 test holds it with `await using`, so teardown runs whether the test passes or throws. Gather several
 resources in one `AsyncDisposableStack`: it releases them in reverse order, so a server stops before
-the database it reads is closed.
+the database it reads is closed. Hold the stack with `await using` while setup runs, and hand it to
+the test with `stack.move()`, so a setup step that throws still releases what the stack holds.
 
 ```ts
 async function setupTest() {
-  const stack = new AsyncDisposableStack();
+  await using stack = new AsyncDisposableStack();
   const dir = await mkdtemp(join(tmpdir(), 'notes-'));
 
   stack.defer(() => rm(dir, { recursive: true, force: true }));
@@ -147,7 +148,9 @@ async function setupTest() {
   stack.defer(() => db.close());
   applyNotesMigrations(db);
 
-  return { dir, db, [Symbol.asyncDispose]: () => stack.disposeAsync() };
+  const owned = stack.move();
+
+  return { dir, db, [Symbol.asyncDispose]: () => owned.disposeAsync() };
 }
 
 test('it lists a note after it is saved', async () => {

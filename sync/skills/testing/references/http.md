@@ -22,7 +22,7 @@ server.listen({
   onUnhandledRequest: (request, print) => {
     const { hostname } = new URL(request.url);
 
-    if (hostname === '127.0.0.1' || hostname === 'localhost') {
+    if (['127.0.0.1', '[::1]', 'localhost'].includes(hostname)) {
       return;
     }
 
