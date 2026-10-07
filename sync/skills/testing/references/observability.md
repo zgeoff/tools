@@ -1,43 +1,58 @@
 # Observability testing
 
 Metrics, spans, error reports, and log lines are outputs with callers: dashboards, alerts, and the
-person reading an incident. Tests read them back through in-memory or loopback receivers that the
-test registers, and they run the real SDK, never a spy on it. Each receiver comes down in
-`onTestFinished`, as the [testing skill](../SKILL.md#cleanup) requires.
+person reading an incident. Tests read them back through in-memory or loopback receivers, and they
+run the real SDK, never a spy on it.
 
 ## Metrics
 
+The OpenTelemetry API hands out a no-op meter while no meter provider is registered, and a meter
+created at module load keeps that no-op meter for the whole run. Instrumented code therefore calls
+`metrics.getMeter(…)` when it records, not at module load.
+
 A counter's suite has two tests:
 
-1. `it records <metric> per <attribute>`: record the counter two or three times with distinct
-   attributes, then read the points back through an in-memory metric reader registered in the test
-   and assert each point's attributes and value.
+1. `it records <metric> per <attribute>`: register a meter provider with an in-memory reader through
+   the repo's metrics test util, record the counter two or three times with distinct attributes,
+   then read the points back and assert each point's attributes and value. The util calls
+   `metrics.disable()` and shuts the provider down in `onTestFinished`.
 2. `it stays inert without a registered meter provider`: call the record function with no provider
    registered and assert that it does not throw.
 
 ## Spans
 
-Capture spans with OpenTelemetry's `InMemorySpanExporter` behind a `SimpleSpanProcessor`, registered
-on a tracer provider in the test. Tear down in this order: `trace.disable()`, then
-`await provider.shutdown()`. In the other order, the global registration outlives the provider and
-leaks into every later test in the process.
+A tracer that code gets at module load binds to the first tracer provider it sees, and a provider
+registered by a later test never reaches it. So the preload registers one tracer provider for the
+whole run, with an `InMemorySpanExporter` behind a `SimpleSpanProcessor`, and clears the exporter
+after each test. A test reads the spans its code finished from that exporter.
 
 ```ts
-const exporter = new InMemorySpanExporter();
-const provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] });
+// register-tracing.ts, listed in the bunfig.toml preload
+new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(spanExporter)] }).register();
 
-provider.register();
-onTestFinished(async () => {
-  trace.disable();
-  await provider.shutdown();
+afterEach(() => {
+  spanExporter.reset();
 });
 ```
+
+```ts
+test('it records a span for each note it saves', async () => {
+  await using ctx = await setupTest();
+
+  await saveNote(ctx.db, { title: 'groceries' });
+
+  expect(spanExporter.getFinishedSpans().map((span) => span.name)).toStrictEqual(['notes.save']);
+});
+```
+
+A test never registers its own tracer provider. `register()` also installs the global context
+manager and propagator, so a test that registers one leaves them behind for every later test.
 
 ## Error reports
 
 Assert error reporting against the real Sentry SDK. Initialise it with a well-formed fake DSN,
-`disableDefaultIntegrations: true`, and a `beforeSend` that records the event and returns `null`, so
-no event leaves the process. `waitFor` the recorder before asserting, because the SDK sends
+`defaultIntegrations: false`, and a `beforeSend` that records the event and returns `null`, so no
+event leaves the process. `waitFor` the recorder before asserting, because the SDK sends
 asynchronously.
 
 ## Log lines
