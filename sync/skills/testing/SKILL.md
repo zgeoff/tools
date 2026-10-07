@@ -66,10 +66,11 @@ These decide a case that the rules below leave open.
   the place of "it": `#archiveNote rejects a note that is already archived`. A file that tests one
   unit uses no prefix.
 - A test body arranges, acts, then asserts, and a blank line separates each phase. Phase comments
-  such as `// act` never appear. A test acts once. A body with two independent act-and-assert pairs
-  holds two tests, so split it. When a second act depends on the first, the first act moves into
-  `setupTest()` as arrangement, nothing asserts on it, and the test acts once. A pure function's
-  test may collapse the three phases into one `expect` line.
+  such as `// act` never appear. A test acts once: it has one act phase, which may hold several
+  calls whose combined result the assertions check, such as the two runs that a determinism test
+  compares. A body with two independent act-and-assert pairs holds two tests, so split it. When a
+  second act depends on the first, the first act becomes arrangement, as `setupTest` describes. A
+  pure function's test may collapse the three phases into one `expect` line.
 - `test.each` serves a closed decision table only: rows of plain data, and a title template that
   starts with "it" and interpolates the input that varies. Any other set of cases gets a separate
   `test()` for each case.
@@ -136,8 +137,10 @@ never appear in a test file.
   the value scenario data, and it moves into the test body. Boot data carries a one-line comment
   that names what needs it.
 - An earlier act that the test's one act depends on, such as starting the session that the test
-  attaches to, is arrangement. `setupTest()` runs it and returns the handles it produced, and no
-  assertion checks it: the test that covers that act is a separate test.
+  attaches to, is arrangement. No assertion checks it, because a separate test covers that act.
+  `setupTest()` runs it and returns the handles it produced. An earlier act that carries scenario
+  data, such as saving the note that the test then archives, stays in the arrange phase of the test
+  body instead, because `setupTest()` never carries scenario data.
 - A test file declares one function, `setupTest()`, and nothing else. A helper the tests want goes
   one of three ways: inline it where it is used, swap it for a registered matcher, or move it to the
   shared test utils with tests of its own. A file with nothing to wire has no `setupTest()`.
