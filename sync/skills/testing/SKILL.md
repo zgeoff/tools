@@ -214,10 +214,12 @@ Reordering the tests or choosing unique keys hides the gap and leaves it for the
 - Plain inputs stay inline at the call site: arguments, options bags, config values. Write the
   literal again in the next test. A module-level fixture, a baseline object shared between tests, or
   a constant that only names a literal (`const EMPTY = ''`) never appears in a test file.
-- A domain type that crosses a module boundary gets a factory, `create-mock-<type>.ts`, in the
-  shared test utils as soon as a test needs one. A type that another package owns, such as an SDK
-  result, is in the same position on first use. A type private to the module under test stays an
-  inline literal.
+- A domain type that crosses a module boundary gets a factory, `build-mock-<type>.ts` exporting
+  `buildMock<Type>`, in the shared test utils as soon as a test needs one. A factory returns a value
+  and brings no resource into existence, so it takes the `build` prefix from the AGENTS.md naming
+  table. A composite that writes rows creates a resource and keeps `create`. A type that another
+  package owns, such as an SDK result, is in the same position on first use. A type private to the
+  module under test stays an inline literal.
 - A factory returns a complete plain object. Fields whose value is arbitrary default to
   `@faker-js/faker` values, which prove the unit does not depend on one particular value.
   Constrained fields, such as an enum or a discriminator, take a fixed default. A deterministic
@@ -235,7 +237,7 @@ Reordering the tests or choosing unique keys hides the gap and leaves it for the
 - The test that uses a factory's value calls the factory itself. A helper that presets overrides is
   a second set of defaults that the reader cannot see.
 - A runtime stand-in, such as a stub connection, a fake worker context, or a recorder, lives in the
-  shared test utils under a name for what it impersonates (`create-stub-<thing>.ts`). It has its own
+  shared test utils under a name for what it impersonates (`build-stub-<thing>.ts`). It has its own
   tests, which pin the assumptions it makes about the real thing.
 
 ### Composites
