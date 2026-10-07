@@ -284,12 +284,15 @@ Reordering the tests or choosing unique keys hides the gap and leaves it for the
   `it applies overrides on top of the defaults`.
 - The test that uses a factory's value calls the factory itself. A helper that presets overrides is
   a second set of defaults that the reader cannot see.
-- A runtime stand-in, such as a stub connection, a fake worker context, or a recorder, lives in the
-  shared test utils under a name for what it impersonates. Its prefix follows the AGENTS.md naming
-  table. A stand-in that starts something long-running, such as a stub server, is
-  `start-stub-<thing>.ts`. A stand-in that creates a resource, such as a stub repository on disk, is
-  `create-stub-<thing>.ts`. Every other stand-in is `build-stub-<thing>.ts`. It has its own tests,
-  which pin the assumptions it makes about the real thing.
+- A runtime stand-in that implements behaviour or assumptions about a dependency lives in the shared
+  test utils under a name for what it impersonates. Its prefix follows the AGENTS.md naming table. A
+  stand-in that starts something long-running, such as a stub server, is `start-stub-<thing>.ts`. A
+  stand-in that creates a resource, such as a stub repository on disk, is `create-stub-<thing>.ts`.
+  Every other stand-in is `build-stub-<thing>.ts`. It has its own tests, which pin the assumptions
+  it makes about the real thing.
+- Keep bare call recorders (`mock()` with no implementation) and no-op callbacks (`() => {}`)
+  inline, including a recorder inside an object such as `{ sendEvent: mock() }`. Never extract a
+  wrapper or add a test whose only purpose is to check that the mocking library records calls.
 
 ### Composites
 
@@ -463,8 +466,8 @@ A failure branch runs on a real failure:
   conflicting row for a constraint, or a held lock with a short `lock_timeout`.
 
 A spy that makes one method of a real object reject never appears. A branch that neither a dead
-transport nor real state can reach shows a missing seam: put that dependency behind an injected
-boundary.
+transport nor real state can reach shows a missing injection point: put that dependency behind an
+injected boundary.
 
 ### Module mocks
 
