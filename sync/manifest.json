@@ -48,12 +48,28 @@
   },
   {
     "name": "skill-testing",
-    "description": "The shared testing skill; a repo keeps its own rules in a project-testing skill",
+    "description": "The shared testing skill and its references; a repo keeps its own rules in a project-testing skill",
     "optIn": true,
     "files": [
       {
         "source": "sync/skills/testing/SKILL.md",
         "target": ".claude/skills/testing/SKILL.md"
+      },
+      {
+        "source": "sync/skills/testing/references/database.md",
+        "target": ".claude/skills/testing/references/database.md"
+      },
+      {
+        "source": "sync/skills/testing/references/frontend.md",
+        "target": ".claude/skills/testing/references/frontend.md"
+      },
+      {
+        "source": "sync/skills/testing/references/http.md",
+        "target": ".claude/skills/testing/references/http.md"
+      },
+      {
+        "source": "sync/skills/testing/references/observability.md",
+        "target": ".claude/skills/testing/references/observability.md"
       }
     ]
   },
