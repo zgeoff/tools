@@ -182,8 +182,8 @@ test('it lists a note after it is saved', async () => {
 
 When every resource that `setupTest()` acquires closes synchronously, such as an in-memory SQLite
 handle, `setupTest()` returns `Symbol.dispose` from a `DisposableStack`, and the test holds it with
-a plain `using`. Neither the setup nor the test is then async. One resource that closes
-asynchronously makes the whole setup take the async form.
+a plain `using`. The setup is then not async, and the test is async only when its own act or
+assertion awaits. One resource that closes asynchronously makes the whole setup take the async form.
 
 ```ts
 function setupTest() {
