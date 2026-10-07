@@ -11,7 +11,8 @@ experimental `--type-check` (fast, run it locally), while `typecheck` runs real 
 ## Testing
 
 - Never use `describe` — write flat `test(…)` blocks with behavioural titles that start with "it"
-  (`test('it pads before a return statement', …)`).
+  (`test('it pads before a return statement', …)`). A file that tests several units prefixes each
+  title with `#<unit>` in place of "it" (`test('#parseSource rejects an empty file', …)`).
 - Test files are co-located with the module they test (`parse-source.ts` beside
   `parse-source.test.ts`) — no `test/`, `tests/` or `__tests__` directories. Declaration emit
   excludes `*.test.ts`, so they never ship.
@@ -60,7 +61,7 @@ experimental `--type-check` (fast, run it locally), while `typecheck` runs real 
     - `toThrowWithMessage`
     - `toResolve` (returns a promise — always `await`)
     - `toReject` (returns a promise — always `await`)
-- Matchers also work asymmetrically inside `toEqual`/`toMatchObject`
+- Matchers also work asymmetrically inside `toStrictEqual`/`toMatchObject`
   (`status: expect.toBeOneOf([…])`).
 - Known gaps: `expect.pass`/`expect.fail` are unimplemented upstream and excluded from our types.
   It's `toEqualCaseInsensitive` — not `…Insensitively` as some docs claim; unknown matcher names
