@@ -1,11 +1,12 @@
 ---
 name: testing
 description:
-  Testing rules for zgeoff Bun repos — the three package regimes, flat behavioural tests, a
-  setupTest with onTestFinished cleanup, inline data and tested factories, strict assertions and
-  inline snapshots, injected time, no sleeps, real filesystems and transports, and the narrow cases
+  Testing rules for zgeoff repos — the three package regimes, flat behavioural tests, a setupTest
+  with onTestFinished cleanup, inline data and tested factories, strict assertions and inline
+  snapshots, controlled time, condition waits, real filesystems and transports, and the narrow cases
   for module mocks. References cover real databases, React and TanStack clients, HTTP mocking with
-  MSW, and observability. Load when designing, writing, or reviewing tests.
+  MSW, observability, and native Go and NixOS conventions. Load when designing, writing, or
+  reviewing tests.
 ---
 
 # Testing
@@ -22,6 +23,14 @@ This skill is the shared base that repo-sync delivers from zgeoff/tools: edit it
 downstream copy. When the repo has a `project-testing` skill, load it as well. That skill adds this
 repo's harnesses, regimes, and stricter rules. A project skill never relaxes a rule here; a repo
 that needs an exception changes this skill.
+
+## Languages and runners
+
+Apply the behavioral principles across languages. The syntax, matchers, hooks, and file conventions
+in this file describe Bun tests. For Go, read [Go testing](./references/go.md); for Nix evaluation
+and VM tests, read [NixOS testing](./references/nixos.md). Those mappings preserve isolation,
+explicit scenarios, independent expectations, real boundaries, and meaningful failures through the
+native runner's mechanisms.
 
 ## Regimes
 
@@ -356,10 +365,11 @@ pass, and it returns data, never clients, apps, or servers.
   invalid for many reasons and `success: false` passes for all of them:
 
   ```ts
-  expect(result.error?.issues).toPartiallyContain(expect.objectContaining({ path: ['title'] }));
+  expect(result.error?.issues).toPartiallyContain({ path: ['title'] });
   ```
 
-  Never read `issues[0]`, which ties the test to issue order.
+  Pass the expected partial object directly. Never read `issues[0]`, which ties the test to issue
+  order.
 
 - An acceptance test asserts `result.data`. For a schema that passes values through, assert
   `toStrictEqual(payload)`. For one that transforms, assert the transformed value. A bare
@@ -477,6 +487,21 @@ slower by its full length on every run, and it still fails on a slow machine. Wh
 nothing observable to wait on, the code lacks a signal: add one, such as an event, a log marker, or
 a state flag, and wait on that.
 
+### Native timers and scenario delays
+
+A test of a native runtime or kernel timer uses the shortest faithful configurable deadline through
+the real mechanism. Configure startup-only settings in an isolated child process. Include a failure
+control that proves an unprotected operation crosses the deadline; a nominal timeout value alone
+does not prove expiry. Keep default configuration coverage separate. Wait out the real default only
+when the runtime cannot expose a shorter faithful deadline, and run that case through an explicit
+script.
+
+A real delay may define an end-to-end workload rate or a seeded fault-injection offset. State the
+rate or fault purpose and preserve replay information. A claim that a fault lands mid-operation
+needs evidence of overlap and checks of the fault and recovery. Use phase-targeted checks for known
+races. A delay that only guesses when a service settles remains a condition wait; elapsed age must
+matter to the contract to justify a dwell.
+
 ## Boundaries
 
 Stand-ins replace a boundary, never the code inside it. A test never stubs `fetch`, an HTTP client,
@@ -489,13 +514,27 @@ including serialisation and error handling.
 | A CLI                                          | The real binary, spawned end to end                                                   |
 | The filesystem                                 | A real `mkdtemp` tree per test                                                        |
 | A database                                     | The real engine, isolated per test, as [database](./references/database.md) describes |
-| An HTTP or RPC service                         | MSW handlers, as [HTTP mocking](./references/http.md) describes                       |
+| A remote HTTP or RPC service                   | MSW handlers, as [HTTP mocking](./references/http.md) describes                       |
 | A service with a cheap container               | The real service in a container                                                       |
 | An SDK with a command layer                    | A stand-in at the command layer                                                       |
 | A queue or pub/sub without a faithful emulator | A wrapper with queryable state, as [HTTP mocking](./references/http.md) describes     |
 
 A module that is hard to test without a stand-in takes its I/O from its caller: test the pure core
 with values, and test the I/O edge against the real boundary.
+
+### Real applications and transport
+
+A CLI, SDK, or server-side client of a service in the same repo tests against the real application
+wiring, with isolated data and stand-ins at host boundaries the runtime cannot run. A child process
+reaches that application through a real listener. Frontend component tests keep the MSW boundary in
+[frontend testing](./references/frontend.md), with the real SDK and RPC serialization.
+
+Use a tested real network stand-in where interception cannot exercise the contract: certificate
+verification, TLS or tunnel behavior, Unix sockets whose native options interception loses, or
+requests from a child process, container, or VM outside the intercepted process. Confirm a claimed
+interceptor limitation with the installed versions. Keep real routing and serialization,
+schema-backed rich mock state, and visible failures for unexpected calls. Ordinary remote HTTP
+behavior keeps MSW where it applies.
 
 ### Filesystem
 
@@ -504,6 +543,19 @@ grows. A test pays that for real behaviour: `fs.watch`, permissions, symlinks, `
 `Bun.write`, which an in-memory filesystem fakes or misses. Take every path from the temp root and
 pass it into the module. Never steer a module through `process.cwd()` or through a `HOME` value set
 after startup, because Bun reads some of those once at startup.
+
+### Program-fixed paths and global resources
+
+Kernel or program contracts may impose a path inside the test environment, such as a certificate
+trust directory, procfs, or a VM mount point. State which contract fixes it. Use a fresh test-owned
+namespace or resource with checked ownership; choose a disposable environment when ownership cannot
+be guaranteed. Each test creates fresh scenario resources and cleans them up.
+
+Distinct names for machine-global resources allocate a namespace, like `mkdtemp`; they never replace
+row or store isolation. Refuse collisions with resources this run does not own before overwriting,
+truncating, mounting, or deleting them. Register cleanup immediately after successful acquisition,
+and release only what this run acquired. A generated name is not proof of ownership. Cleanup remains
+safe after partial failure, interruption, and explicit shutdown.
 
 ### Infrastructure failures
 
