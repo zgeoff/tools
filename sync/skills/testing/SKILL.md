@@ -2,10 +2,10 @@
 name: testing
 description:
   Testing rules for zgeoff Bun repos — the three package regimes, flat behavioural tests, a
-  disposable setupTest, inline data and tested factories, strict assertions and inline snapshots,
-  injected time, no sleeps, real filesystems and transports, and the narrow cases for module mocks.
-  References cover real databases, React and TanStack clients, HTTP mocking with MSW, and
-  observability. Load when designing, writing, or reviewing tests.
+  setupTest with onTestFinished cleanup, inline data and tested factories, strict assertions and
+  inline snapshots, injected time, no sleeps, real filesystems and transports, and the narrow cases
+  for module mocks. References cover real databases, React and TanStack clients, HTTP mocking with
+  MSW, and observability. Load when designing, writing, or reviewing tests.
 ---
 
 # Testing
@@ -13,9 +13,10 @@ description:
 `bun test` loads every test file into one process, so state that one file leaves behind is state the
 next file sees. The repo's `bunfig.toml` preload owns that process: it registers the matchers, the
 mock server lifecycle, and every reset that returns shared state to a clean baseline after each
-test. A test file holds no lifecycle hooks. A test exercises real behaviour through real code, and
-it reaches for a stand-in only at a boundary the test cannot cross. When existing tests break these
-rules, you align them while you work on the code they cover.
+test. Per-test resources register cleanup with `onTestFinished` where they are acquired. A test
+exercises real behaviour through real code, and it reaches for a stand-in only at a boundary the
+test cannot cross. When existing tests break these rules, you align them while you work on the code
+they cover.
 
 This skill is the shared base that repo-sync delivers from zgeoff/tools: edit it there, never in a
 downstream copy. When the repo has a `project-testing` skill, load it as well. That skill adds this
@@ -155,16 +156,59 @@ never appear in a test file.
 - Each test file keeps its own `setupTest()`. A shared one gathers a flag for every suite that uses
   it.
 
-When `setupTest()` acquires a resource that closes asynchronously, it returns `Symbol.asyncDispose`
-and the test holds it with `await using`, so teardown runs whether the test passes or throws. Gather
-several resources in one `AsyncDisposableStack`: it releases them in reverse order, so a server
-stops before the database it reads is closed. Hold the stack with `await using` while setup runs,
-and hand it to the test with `stack.move()`, so a setup step that throws still releases what the
-stack holds.
+Register cleanup with `onTestFinished` immediately after each successful resource acquisition, so a
+later setup step or assertion that throws still releases the resource. `setupTest()` returns named
+properties; it adds no disposal symbol solely to forward cleanup. The test holds the result in a
+plain `const`.
 
 ```ts
 async function setupTest() {
-  await using stack = new AsyncDisposableStack();
+  const dir = await mkdtemp(join(tmpdir(), 'notes-'));
+
+  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+
+  return { dir };
+}
+
+test('it reads an empty file as no entries', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.dir, 'entries.txt'), '');
+
+  expect(await readEntries(ctx.dir)).toStrictEqual([]);
+});
+```
+
+Synchronous acquisition and cleanup keep `setupTest()` synchronous. An async cleanup callback does
+not make setup async. Hold the result in one binding and read its members; never destructure it. The
+binding names are fixed: `ctx` for `setupTest()`, `hook` for `renderHook(…)`, and `rendered` for
+`render(…)`.
+
+### Cleanup
+
+Each kind of state has one cleanup tool.
+
+| State                                                   | Cleanup                                           |
+| ------------------------------------------------------- | ------------------------------------------------- |
+| A resource that `setupTest()` or the test body acquires | `onTestFinished(…)` immediately after acquisition |
+| Process state the test body changes                     | `onTestFinished(…)` immediately after the change  |
+| State that a preload reset covers                       | Nothing                                           |
+
+`try`/`finally` never appears in a test. `onTestFinished` runs on failure as well, keeps teardown
+beside the acquisition, and needs no `?.` guard for a resource the test never reached. A shared test
+util may register `onTestFinished` for its callers. These helpers must run inside a test.
+
+When resources have cleanup dependencies, register one callback that closes them in the required
+order. Every cleanup must run even if another cleanup throws. Use a disposable stack when reverse
+acquisition order matches those dependencies, and register its disposal immediately. Do not hold
+that stack with `using` or `await using`, or transfer it with `move()`.
+
+```ts
+async function setupTest() {
+  const stack = new AsyncDisposableStack();
+
+  onTestFinished(() => stack.disposeAsync());
+
   const dir = await mkdtemp(join(tmpdir(), 'notes-'));
 
   stack.defer(() => rm(dir, { recursive: true, force: true }));
@@ -174,70 +218,22 @@ async function setupTest() {
   stack.defer(() => db.close());
   applyNotesMigrations(db);
 
-  const owned = stack.move();
-
-  return { dir, db, [Symbol.asyncDispose]: () => owned.disposeAsync() };
+  return { dir, db };
 }
-
-test('it lists a note after it is saved', async () => {
-  await using ctx = await setupTest();
-
-  await saveNote(ctx.db, { title: 'groceries' });
-
-  expect(listNoteTitles(ctx.db)).toStrictEqual(['groceries']);
-});
 ```
 
-When every resource that `setupTest()` acquires closes synchronously, such as an in-memory SQLite
-handle, `setupTest()` returns `Symbol.dispose` from a `DisposableStack`, and the test holds it with
-a plain `using`. The setup is then not async, and the test is async only when its own body awaits.
-One resource that closes asynchronously makes the whole setup take the async form.
+If the scenario needs an explicit shutdown before the next action, call it in the test body. Keep
+fallback cleanup registered and make it safe after shutdown. Fixture callers need no `using` or
+`await using` declaration.
 
-```ts
-function setupTest() {
-  using stack = new DisposableStack();
-  const db = new Database(':memory:');
-
-  stack.defer(() => db.close());
-  applyNotesMigrations(db);
-
-  const owned = stack.move();
-
-  return { db, [Symbol.dispose]: () => owned.dispose() };
-}
-
-test('it counts the notes in the store', () => {
-  using ctx = setupTest();
-
-  insertNote(ctx.db, { title: 'groceries' });
-
-  expect(countNotes(ctx.db)).toBe(1);
-});
-```
-
-A `setupTest()` that acquires nothing returns no dispose method, and the test holds it with a plain
-`const`. Hold the result in one binding and read its members; never destructure it. The binding
-names are fixed: `ctx` for `setupTest()`, `hook` for `renderHook(…)`, and `rendered` for
-`render(…)`.
-
-### Cleanup
-
-Each kind of state has one cleanup tool.
-
-| State                                  | Cleanup                                                                                                     |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| A resource that `setupTest()` acquires | Its dispose, through `using ctx`, or `await using ctx` when a resource closes asynchronously                |
-| A resource that the test body opens    | `onTestFinished(…)` on the line after the open, or `using` or `await using` when the resource is disposable |
-| Process state the test body changes    | `onTestFinished(…)` on the line after the change                                                            |
-| State that a preload reset covers      | Nothing                                                                                                     |
-
-`try`/`finally` never appears in a test. `onTestFinished` runs on failure as well, it keeps teardown
-beside the line it reverses, and it needs no `?.` guard for a resource the test never reached. A
-shared test util may register `onTestFinished` for its callers.
+`onTestFinished` runs after all `afterEach` hooks, including the preload's resets. Cleanup uses
+captured paths and handles, rather than environment overrides that those resets remove. Tests that
+use this hook run sequentially within each file: do not enable `test.concurrent`, `--concurrent`, or
+`concurrentTestGlob` for them. Separate worker processes and CI jobs can still run in parallel.
 
 ```ts
 test('it reads a note written by another connection', async () => {
-  await using ctx = await setupTest();
+  const ctx = await setupTest();
 
   const writer = new Database(join(ctx.dir, 'notes.db'));
   onTestFinished(() => writer.close());
@@ -387,7 +383,7 @@ pass, and it returns data, never clients, apps, or servers.
 
 ```ts
 test('it rejects a note owned by another user', async () => {
-  await using ctx = await setupTest();
+  const ctx = await setupTest();
 
   const note = await saveNote(ctx.db, { ownerID: 'user_a', title: 'private' });
 
