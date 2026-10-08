@@ -56,6 +56,10 @@
         "target": ".claude/skills/testing/SKILL.md"
       },
       {
+        "source": "sync/skills/testing/references/claude-code-mods.md",
+        "target": ".claude/skills/testing/references/claude-code-mods.md"
+      },
+      {
         "source": "sync/skills/testing/references/database.md",
         "target": ".claude/skills/testing/references/database.md"
       },
