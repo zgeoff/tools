@@ -47,7 +47,7 @@ test('it rejects an ignore list that holds a non-string', () => {
 
   expect(parseSkillGateRules(text)).toStrictEqual({
     ok: false,
-    error: '`ignore` must be an array of strings',
+    error: '`ignore` must be an array of non-empty strings',
   });
 });
 
@@ -65,10 +65,28 @@ test('it rejects a gate with no skills', () => {
 
   expect(parseSkillGateRules(text)).toStrictEqual({
     ok: false,
-    error: 'gate "**/*.test.ts" needs a non-empty `skills` array',
+    error: 'gate "**/*.test.ts" needs a non-empty `skills` array of non-empty strings',
   });
 });
 
 test('it rejects a JSON value that is not an object', () => {
   expect(parseSkillGateRules('[]')).toStrictEqual({ ok: false, error: 'must hold a JSON object' });
+});
+
+test('it rejects an empty ignore segment, which would match every path', () => {
+  const text = JSON.stringify({ ignore: [''], gates: [] });
+
+  expect(parseSkillGateRules(text)).toStrictEqual({
+    ok: false,
+    error: '`ignore` must be an array of non-empty strings',
+  });
+});
+
+test('it rejects an empty skill name', () => {
+  const text = JSON.stringify({ gates: [{ match: '**/*.md', skills: [''] }] });
+
+  expect(parseSkillGateRules(text)).toStrictEqual({
+    ok: false,
+    error: 'gate "**/*.md" needs a non-empty `skills` array of non-empty strings',
+  });
 });

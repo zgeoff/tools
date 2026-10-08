@@ -245,3 +245,35 @@ test('it stays silent on a payload without a file path', async () => {
   expect(result.status).toBe(0);
   expect(result.stdout).toBe('');
 });
+
+test('it gates a project file whose name starts with two dots', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, '.claude/skills/testing'), { recursive: true });
+  await writeFile(join(ctx.dir, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(ctx.dir, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+  );
+
+  const result = spawnSync('bun', [ctx.hookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.dir },
+    input: JSON.stringify({
+      cwd: ctx.dir,
+      transcript_path: join(ctx.dir, 'transcript.jsonl'),
+      tool_input: { file_path: join(ctx.dir, '..dots.test.ts') },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: `Load the \`testing\` skill with the Skill tool before editing ${join(ctx.dir, '..dots.test.ts')}, then retry the edit. .claude/skill-gate.json lists the skills each path needs.`,
+    },
+  });
+});
