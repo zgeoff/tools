@@ -68,11 +68,11 @@ These decide a case that the rules below leave open.
   unit uses no prefix.
 - A test body arranges, acts, then asserts. The formatter owns spacing, including gaps between
   phases; keep its layout when it joins statements from different phases. Phase comments such as
-  `// act` never appear. A test acts once: it has one act phase, which may hold several calls whose
-  combined result the assertions check, such as the two runs that a determinism test compares. A
-  body with two independent act-and-assert pairs holds two tests, so split it. When a second act
-  depends on the first, the first act becomes arrangement, as `setupTest` describes. A pure
-  function's test may collapse the three phases into one `expect` line.
+  `// act` never appear. An ordinary test acts once: it has one act phase, which may hold several
+  calls whose combined result the assertions check, such as the two runs that a determinism test
+  compares. A body with two independent act-and-assert pairs holds two tests, so split it. When a
+  second act depends on the first, the first act becomes arrangement, as `setupTest` describes. A
+  pure function's test may collapse the three phases into one `expect` line.
 - `test.each` serves a closed decision table only: rows of plain data, and a title template that
   starts with "it" and interpolates the input that varies or an accurate descriptive label for that
   input. The row supplies the actual values to the test. Any other set of cases gets a separate
@@ -96,8 +96,15 @@ test.each([
 
 An end-to-end suite splits by user journey, one file per journey: `e2e/tui-spawn.test.ts` beside
 `e2e/tui-attach.test.ts`. A journey test may chain dependent act-and-assert phases, because each
-step of the journey needs the state that the step before it left. This holds only in `e2e/`: every
-other test acts once.
+step of the journey needs the state that the step before it left. Ordinary tests outside `e2e/` act
+once. Generated sequences follow [Property tests](#property-tests).
+
+An outer harness may reuse expensive hosts, services, and immutable fixture inputs across journeys.
+Each journey keeps its own file, setup, scenario, and cleanup. Reset shared infrastructure to a
+clean baseline before each journey; test that the reset removes dirty state, including after failure
+or interruption. Recreate the environment when a reset cannot restore the baseline. The harness owns
+infrastructure startup and shutdown; test files keep the hook rules in
+[Setup and cleanup](#setup-and-cleanup).
 
 Keep command construction importable. Test argument and flag-position cases through the real parser
 in module tests; keep binary journeys that check the assembled program.
@@ -113,7 +120,7 @@ failure:
 expect(listOpenNotes(store)).toSatisfyAll((note: Note) => note.archivedAt === null);
 ```
 
-Two loops stay legal, because each checks a set the module owns rather than a set of inputs:
+Two loops that check a set the module owns stay legal:
 
 - A completeness loop that walks a module's own registry, such as checking that every exported
   renderer has a preview.
@@ -124,6 +131,28 @@ Neither loop may compute its expectation with the same transformation it checks.
 arranges, such as inserting 51 rows to cross a page limit, holds no assertion and stays legal.
 Prefer `await Promise.all(Array.from({ length: 51 }, …))` when the order of the rows does not
 matter.
+
+### Property tests
+
+Use fast-check for generated inputs or operation sequences whose combinations matter. Keep fixed
+decision tables in `test.each`. A property runner may dispatch generated operations, branch on
+expected outcomes, and check invariants after each operation. These permissions apply inside the
+property runner and its operation interpreter; ordinary tests keep their loop, branching, and
+single-act rules. Await an async `fc.assert` so a failed property fails the enclosing test.
+
+- Check relevant transitions, not only the final state. Unexpected errors fail the property; an
+  expected-outcome branch never suppresses them.
+- Derive invariants from an independent contract or a simpler model, never a copy of the production
+  algorithm.
+- Start each generated case from clean state and release its resources before the next case. Use a
+  tested scoped helper for case resources, with cleanup on success and failure. `onTestFinished`
+  runs after the enclosing Bun test, not after each generated case; its fallback cleanup alone does
+  not isolate cases.
+- Preserve the seed, reduced counterexample, and applicable replay information. Add an explicit
+  regression test for a discovered sequence when it represents a behavior the suite must keep.
+- Keep separate assertions for independent results and tests for behavioral stand-ins. Do not reduce
+  generated coverage to conceal slow tests. The interpreter needs no rewrite into command classes
+  solely for alignment.
 
 ## Setup and cleanup
 
@@ -403,7 +432,8 @@ asserts the hidden result, such as `toBeNull()`.
 
 ### Narrowing and branching
 
-A test body never branches. Each path through the unit gets its own test.
+An ordinary test body never branches. Each path through the unit gets its own test. Generated
+operation dispatch follows [Property tests](#property-tests).
 
 Narrow a value that may be missing with `invariant(value)` or an explicit `throw` on the line before
 the assertion. Optional chaining inside `expect` is safe when the matcher fails on `undefined`,
@@ -423,8 +453,9 @@ expect(result.data.error).toBeUndefined();
 
 When you are unsure which kind a matcher is, narrow.
 
-An assertion inside a callback passes when the callback never runs. Copy the value out of the
-callback into a variable, then assert on it once the call returns.
+An assertion inside an ordinary callback passes when the callback never runs. Copy the value out of
+the callback into a variable, then assert on it once the call returns. Property-runner assertions
+follow [Property tests](#property-tests).
 
 ## Time and waiting
 
