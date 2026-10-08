@@ -30,7 +30,10 @@ test('it denies a test file edit until the session loads both testing skills', a
 
   await writeFile(
     join(ctx.dir, 'transcript.jsonl'),
-    '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Skill","input":{"skill":"testing"}}]}}\n',
+    [
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"testing"}}]}}',
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Launching skill: testing"}]}}',
+    ].join('\n'),
   );
 
   const result = spawnSync('bun', [ctx.hookPath], {
@@ -70,8 +73,10 @@ test('it allows a test file edit once the session loads both testing skills', as
   await writeFile(
     join(ctx.dir, 'transcript.jsonl'),
     [
-      '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Skill","input":{"skill":"testing"}}]}}',
-      '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Skill","input":{"skill":"project-testing"}}]}}',
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"testing"}}]}}',
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Launching skill: testing"}]}}',
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_2","name":"Skill","input":{"skill":"project-testing"}}]}}',
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_2","content":"Launching skill: project-testing"}]}}',
     ].join('\n'),
   );
 
