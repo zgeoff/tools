@@ -64,8 +64,16 @@
         "target": ".claude/skills/testing/references/frontend.md"
       },
       {
+        "source": "sync/skills/testing/references/go.md",
+        "target": ".claude/skills/testing/references/go.md"
+      },
+      {
         "source": "sync/skills/testing/references/http.md",
         "target": ".claude/skills/testing/references/http.md"
+      },
+      {
+        "source": "sync/skills/testing/references/nixos.md",
+        "target": ".claude/skills/testing/references/nixos.md"
       },
       {
         "source": "sync/skills/testing/references/observability.md",
