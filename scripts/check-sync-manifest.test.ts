@@ -42,6 +42,43 @@ test('it fails when a skill folder holds a file its entry omits', async () => {
   );
 });
 
+test('it fails when two entries split one skill folder between them', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, 'sync/skills/demo/references'), { recursive: true });
+  await writeFile(join(ctx.dir, 'sync/skills/demo/SKILL.md'), '# Demo\n');
+  await writeFile(join(ctx.dir, 'sync/skills/demo/references/go.md'), '# Go\n');
+
+  await writeFile(
+    join(ctx.dir, 'sync/manifest.json'),
+    JSON.stringify([
+      {
+        name: 'skill-demo',
+        description: 'The demo skill',
+        files: [{ source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' }],
+      },
+      {
+        name: 'skill-demo-go',
+        description: 'The demo skill Go reference',
+        files: [
+          {
+            source: 'sync/skills/demo/references/go.md',
+            target: '.claude/skills/demo/references/go.md',
+          },
+        ],
+      },
+    ]),
+  );
+
+  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.dir, encoding: 'utf8' });
+
+  expect(result.status).toBe(1);
+
+  expect(result.stderr).toBe(
+    "check-sync-manifest: entry 'skill-demo-go' ships sync/skills/demo/, but omits sync/skills/demo/SKILL.md\ncheck-sync-manifest: entry 'skill-demo' ships sync/skills/demo/, but omits sync/skills/demo/references/go.md\n",
+  );
+});
+
 test('it fails when no entry lists a file from a skill folder', async () => {
   const ctx = await setupTest();
 

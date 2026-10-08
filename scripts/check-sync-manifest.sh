@@ -37,24 +37,25 @@ while IFS=$'\t' read -r name source target; do
 done < <(jq -r '.[] | .name as $n | .files[] | [$n, .source, .target] | @tsv' "$manifest")
 
 # A skill links its references by relative path, so a file the entry omits
-# arrives downstream as a dead link.
+# arrives downstream as a dead link. Each entry that ships a file from a skill
+# folder must ship the whole folder, since a caller can select it alone.
 if [ -d sync/skills ]; then
   while IFS= read -r file; do
     skill=${file#sync/skills/}
     prefix="sync/skills/${skill%%/*}/"
     owners=$(jq -r --arg prefix "$prefix" \
-      '[.[] | select(any(.files[]; .source | startswith($prefix))) | .name] | join(", ")' "$manifest")
+      '.[] | select(any(.files[]; .source | startswith($prefix))) | .name' "$manifest")
 
     if [ -z "$owners" ]; then
       report "skill folder $prefix holds $file, but no entry lists a file from that folder"
       continue
     fi
 
-    if ! jq -e --arg prefix "$prefix" --arg file "$file" \
-      'any(.[] | select(any(.files[]; .source | startswith($prefix))) | .files[]; .source == $file)' \
-      "$manifest" > /dev/null; then
-      report "entry '$owners' ships $prefix, but omits $file"
-    fi
+    while IFS= read -r name; do
+      report "entry '$name' ships $prefix, but omits $file"
+    done < <(jq -r --arg prefix "$prefix" --arg file "$file" \
+      '.[] | select(any(.files[]; .source | startswith($prefix)))
+        | select(any(.files[]; .source == $file) | not) | .name' "$manifest")
   done < <(find sync/skills -type f | sort)
 fi
 
