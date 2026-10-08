@@ -43,7 +43,9 @@ repo-sync never touches:
 
 1. Add `hook-skill-gate` to `include` in `.github/workflows/repo-sync.yml`.
 2. Write `.claude/skill-gate.json`. `match` is a glob over the path from the repo root, and a path
-   that holds an `ignore` segment is never gated. A repo without this file has no gate.
+   that holds an `ignore` segment is never gated. A repo without this file has no gate. `Bun.Glob`
+   misses deep paths for a `**` inside a brace group, such as `{e2e/**,test/**}`, so write one gate
+   per pattern.
 
    ```json
    {
