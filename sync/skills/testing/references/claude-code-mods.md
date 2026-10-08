@@ -84,7 +84,9 @@ the stand-in throws.
 
 A mod reads the wall clock, `Date.now()`, for deadlines and record timestamps. Its checks assert a
 two-sided range around the act: capture `Date.now()` before and after the act, then check that the
-value falls between them.
+value falls between them. `Date.now()` is not monotonic, so a clock adjustment can end a deadline
+early or late; a mod uses it anyway because the deadline crosses into another process, which a
+monotonic clock cannot do.
 
 A mod never reads `$.clock.now()`, even though `mock.clock` would make its values exact. `clock.now`
 is a host event that any installed plugin can hook, so reading it lets another plugin move a
