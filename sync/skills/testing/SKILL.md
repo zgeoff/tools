@@ -322,9 +322,13 @@ Reordering the tests or choosing unique keys hides the gap and leaves it for the
   instance passes. A factory with nested fields deep-merges each override into fresh defaults.
 - A row factory returns the table's insert shape, and a contract factory returns the API type. They
   are separate factories, kept in the packages that own each shape.
-- Each factory has a test file with two tests: `it builds a default <type>`, which asserts the whole
-  shape with `toStrictEqual` and asymmetric matchers, and
-  `it applies overrides on top of the defaults`.
+- Each factory has a test file with at least two tests: `it builds a default <type>`, which asserts
+  the whole shape with `toStrictEqual` and asymmetric matchers, and
+  `it applies overrides on top of the defaults`. Add a test only for a factory branch that those two
+  cannot reach, such as an override that leaves out an optional field (`undefined` meaning absent),
+  a field derived from another field, or a keyed or nested override that builds each child from its
+  own factory. Each added test fails when that branch is deleted. Never add one that checks faker's
+  output or the plain merge of overrides again.
 - The test that uses a factory's value calls the factory itself. A helper that presets overrides is
   a second set of defaults that the reader cannot see.
 - A runtime stand-in that implements behaviour or assumptions about a dependency lives in the shared
