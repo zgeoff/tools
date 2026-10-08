@@ -30,7 +30,7 @@ it, such as `// claimJob commits the claim before it runs the job`.
 ## SQLite isolation
 
 A fresh SQLite database per test costs little, so SQLite needs no isolation levels. `setupTest()`
-opens the database and its dispose closes it.
+opens the database and registers its cleanup with `onTestFinished`.
 
 - Open a file inside the test's `mkdtemp` tree when the code opens its own connection by path, or
   when the test depends on file behaviour such as a read-only connection or write-ahead logging.
