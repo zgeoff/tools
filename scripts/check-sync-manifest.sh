@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Checks sync/manifest.json against the rules the repo-sync workflow assumes:
 # unique entry names, a source file for every item, the repo-sync marker on
-# every source whose target is a workflow, and a string `build` when present.
+# every source whose target is a workflow, a string `build` when present, and
+# every file under sync/skills/<name>/ listed by the entry that ships that skill.
 # Usage: check-sync-manifest.sh [manifest]
 set -euo pipefail
 
@@ -34,5 +35,27 @@ while IFS=$'\t' read -r name source target; do
     report "entry '$name' targets $target, but $source lacks the line '$marker'"
   fi
 done < <(jq -r '.[] | .name as $n | .files[] | [$n, .source, .target] | @tsv' "$manifest")
+
+# A skill links its references by relative path, so a file the entry omits
+# arrives downstream as a dead link.
+if [ -d sync/skills ]; then
+  while IFS= read -r file; do
+    skill=${file#sync/skills/}
+    prefix="sync/skills/${skill%%/*}/"
+    owners=$(jq -r --arg prefix "$prefix" \
+      '[.[] | select(any(.files[]; .source | startswith($prefix))) | .name] | join(", ")' "$manifest")
+
+    if [ -z "$owners" ]; then
+      report "skill folder $prefix holds $file, but no entry lists a file from that folder"
+      continue
+    fi
+
+    if ! jq -e --arg prefix "$prefix" --arg file "$file" \
+      'any(.[] | select(any(.files[]; .source | startswith($prefix))) | .files[]; .source == $file)' \
+      "$manifest" > /dev/null; then
+      report "entry '$owners' ships $prefix, but omits $file"
+    fi
+  done < <(find sync/skills -type f | sort)
+fi
 
 exit "$errors"

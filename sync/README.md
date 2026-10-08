@@ -31,7 +31,9 @@ names, since the copy itself is verbatim. `workflow-bun-pr` runs
 Files under [`skills/`](./skills/) are the shared base of a Claude skill, delivered by the opt-in
 `skill-testing` and `skill-docs-writing` entries to `.claude/skills/<name>/`. A repo keeps its own
 rules for the same area in a `project-<name>` skill beside it, which repo-sync never touches, and
-the shared skill tells the reader to load both.
+the shared skill tells the reader to load both. The entry lists every file in its skill folder,
+since the skill links its references by relative path; `scripts/check-sync-manifest.sh` fails on a
+file the entry omits.
 
 A sync branch is force-pushed on every run, so a commit a person adds to it is lost on the next run.
 Edit the source here instead.

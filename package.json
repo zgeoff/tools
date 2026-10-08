@@ -32,7 +32,7 @@
   "scripts": {
     "prepare": "lefthook install --force || true",
     "build:agents": "bash scripts/build-agents-md.sh agents/shared.md agents/project.md AGENTS.md",
-    "typecheck": "bun run --filter '*' typecheck",
+    "typecheck": "bun run --filter '*' typecheck && tsc -p scripts",
     "test": "bun test",
     "build": "bun run --filter '*' build",
     "lint": "oxlint --report-unused-disable-directives-severity error",
