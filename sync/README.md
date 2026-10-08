@@ -80,6 +80,18 @@ repo-sync never touches:
 A rule that names a skill missing from `.claude/skills/`, or a rules file that does not parse, never
 denies an edit. The hook warns the user and the agent on every edit until the rule is fixed.
 
+The gate counts the loads of the session that makes the edit. A subagent's tool call carries
+`agent_id` beside the main session's `transcript_path`, and the gate reads that subagent's own
+transcript, `<session>/subagents/agent-<agent_id>.jsonl` beside the main one. A subagent therefore
+loads the skills itself, and the main session's loads never count for it. A compaction writes a
+`compact_boundary` entry, and the loads before it no longer count: after a compaction, the gate
+denies a gated edit until the session loads the skills again, and its denial says so.
+
+The gate sees Edit, Write and MultiEdit only. A Bash command that writes a gated path, such as a
+redirect, `tee`, `sed -i`, or a script, is not checked: a reliable check needs a full shell parser,
+and a partial one refuses ordinary commands. This gap is accepted. Change a gated path only with
+Edit, Write or MultiEdit; the denial says the same.
+
 A sync branch is force-pushed on every run, so a commit a person adds to it is lost on the next run.
 Edit the source here instead.
 

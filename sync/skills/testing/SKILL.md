@@ -24,6 +24,13 @@ downstream copy. When the repo has a `project-testing` skill, load it as well. T
 repo's harnesses, regimes, and stricter rules. A project skill never relaxes a rule here; a repo
 that needs an exception changes this skill.
 
+A repo that runs the skill gate refuses an edit to a test file until the session that makes it has
+loaded the skills the path needs. A subagent loads them itself, because the main session's loads do
+not count for it. A compaction clears every load, so load the skills again after one. The gate sees
+only Edit, Write and MultiEdit: change a gated file with those tools, never with a Bash redirect,
+`tee`, `sed -i`, or a script. The gate does not check Bash, and that gap is accepted, not a way
+around the rule.
+
 ## Languages and runners
 
 Apply the behavioral principles across languages. The syntax, matchers, hooks, and file conventions
