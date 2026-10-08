@@ -12,9 +12,32 @@ test('it denies the edit and names each missing skill and how to load it', () =>
       hookEventName: 'PreToolUse',
       permissionDecision: 'deny',
       permissionDecisionReason:
-        'Load the `testing` and `project-testing` skills with the Skill tool before editing /repo/src/a.test.ts, then retry the edit. .claude/skill-gate.json lists the skills each path needs.',
+        'Load the `testing` and `project-testing` skills with the Skill tool before editing /repo/src/a.test.ts, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.',
     },
   });
+});
+
+test('it tells the session to load the skills again after a compaction', () => {
+  expect(
+    buildSkillGateOutput(
+      '/repo/src/a.test.ts',
+      { missing: ['testing', 'project-testing'], unknown: [] },
+      { compacted: true },
+    ),
+  ).toStrictEqual({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason:
+        'Load the `testing` and `project-testing` skills again with the Skill tool before editing /repo/src/a.test.ts, then retry the edit. This session was compacted, and a skill loaded before the compaction no longer counts. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.',
+    },
+  });
+});
+
+test('it stays silent after a compaction when no skill is missing', () => {
+  expect(
+    buildSkillGateOutput('/repo/src/a.ts', { missing: [], unknown: [] }, { compacted: true }),
+  ).toBeNull();
 });
 
 test('it names a single missing skill in the singular', () => {
@@ -25,7 +48,7 @@ test('it names a single missing skill in the singular', () => {
       hookEventName: 'PreToolUse',
       permissionDecision: 'deny',
       permissionDecisionReason:
-        'Load the `docs-writing` skill with the Skill tool before editing /repo/README.md, then retry the edit. .claude/skill-gate.json lists the skills each path needs.',
+        'Load the `docs-writing` skill with the Skill tool before editing /repo/README.md, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.',
     },
   });
 });
@@ -67,7 +90,7 @@ test('it warns without a denial when the rules file is broken', () => {
     buildSkillGateOutput(
       '/repo/src/a.ts',
       { missing: [], unknown: [] },
-      '`gates` must be an array',
+      { rulesError: '`gates` must be an array' },
     ),
   ).toStrictEqual({
     systemMessage: warning,
@@ -89,7 +112,7 @@ test('it carries the rule warning on a denial for another skill', () => {
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
       permissionDecision: 'deny',
-      permissionDecisionReason: `Load the \`testing\` skill with the Skill tool before editing /repo/src/a.test.ts, then retry the edit. .claude/skill-gate.json lists the skills each path needs.\n${warning}`,
+      permissionDecisionReason: `Load the \`testing\` skill with the Skill tool before editing /repo/src/a.test.ts, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n${warning}`,
     },
   });
 });

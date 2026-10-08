@@ -52,7 +52,7 @@ test('it denies a test file edit until the session loads both testing skills', a
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
       permissionDecision: 'deny',
-      permissionDecisionReason: `Load the \`project-testing\` skill with the Skill tool before editing ${join(ctx.dir, 'src/a.test.ts')}, then retry the edit. .claude/skill-gate.json lists the skills each path needs.`,
+      permissionDecisionReason: `Load the \`project-testing\` skill with the Skill tool before editing ${join(ctx.dir, 'src/a.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
     },
   });
 });
@@ -92,6 +92,229 @@ test('it allows a test file edit once the session loads both testing skills', as
 
   expect(result.status).toBe(0);
   expect(result.stdout).toBe('');
+});
+
+test('it allows a subagent edit once the subagent loads both testing skills', async () => {
+  const ctx = await setupTest();
+
+  await Promise.all([
+    mkdir(join(ctx.dir, '.claude/skills/testing'), { recursive: true }),
+    mkdir(join(ctx.dir, '.claude/skills/project-testing'), { recursive: true }),
+    mkdir(join(ctx.dir, 'transcripts/session-1/subagents'), { recursive: true }),
+  ]);
+
+  await writeFile(join(ctx.dir, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+  await writeFile(join(ctx.dir, '.claude/skills/project-testing/SKILL.md'), '# Project testing\n');
+
+  await writeFile(
+    join(ctx.dir, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing', 'project-testing'] }] }),
+  );
+
+  await writeFile(
+    join(ctx.dir, 'transcripts/session-1/subagents/agent-a1b2c3.jsonl'),
+    [
+      '{"type":"assistant","isSidechain":true,"message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"testing"}}]}}',
+      '{"type":"user","isSidechain":true,"message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Launching skill: testing"}]}}',
+      '{"type":"assistant","isSidechain":true,"message":{"content":[{"type":"tool_use","id":"toolu_2","name":"Skill","input":{"skill":"project-testing"}}]}}',
+      '{"type":"user","isSidechain":true,"message":{"content":[{"type":"tool_result","tool_use_id":"toolu_2","content":"Launching skill: project-testing"}]}}',
+    ].join('\n'),
+  );
+
+  const result = spawnSync('bun', [ctx.hookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.dir },
+    input: JSON.stringify({
+      cwd: ctx.dir,
+      session_id: 'session-1',
+      transcript_path: join(ctx.dir, 'transcripts/session-1.jsonl'),
+      agent_id: 'a1b2c3',
+      agent_type: 'general-purpose',
+      tool_input: { file_path: join(ctx.dir, 'src/a.test.ts') },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});
+
+test('it denies a subagent edit when only the main session loaded the skills', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, '.claude/skills/testing'), { recursive: true });
+  await mkdir(join(ctx.dir, 'transcripts/session-1/subagents'), { recursive: true });
+  await writeFile(join(ctx.dir, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(ctx.dir, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+  );
+
+  await writeFile(
+    join(ctx.dir, 'transcripts/session-1.jsonl'),
+    [
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"testing"}}]}}',
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Launching skill: testing"}]}}',
+    ].join('\n'),
+  );
+
+  await writeFile(
+    join(ctx.dir, 'transcripts/session-1/subagents/agent-a1b2c3.jsonl'),
+    '{"type":"user","isSidechain":true,"message":{"content":"Write src/a.test.ts"}}',
+  );
+
+  const result = spawnSync('bun', [ctx.hookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.dir },
+    input: JSON.stringify({
+      cwd: ctx.dir,
+      session_id: 'session-1',
+      transcript_path: join(ctx.dir, 'transcripts/session-1.jsonl'),
+      agent_id: 'a1b2c3',
+      agent_type: 'general-purpose',
+      tool_input: { file_path: join(ctx.dir, 'src/a.test.ts') },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: `Load the \`testing\` skill with the Skill tool before editing ${join(ctx.dir, 'src/a.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
+    },
+  });
+});
+
+test('it denies a subagent edit when the subagent has no transcript', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, '.claude/skills/testing'), { recursive: true });
+  await mkdir(join(ctx.dir, 'transcripts'), { recursive: true });
+  await writeFile(join(ctx.dir, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(ctx.dir, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+  );
+
+  await writeFile(
+    join(ctx.dir, 'transcripts/session-1.jsonl'),
+    [
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"testing"}}]}}',
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Launching skill: testing"}]}}',
+    ].join('\n'),
+  );
+
+  const result = spawnSync('bun', [ctx.hookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.dir },
+    input: JSON.stringify({
+      cwd: ctx.dir,
+      session_id: 'session-1',
+      transcript_path: join(ctx.dir, 'transcripts/session-1.jsonl'),
+      agent_id: 'a1b2c3',
+      agent_type: 'general-purpose',
+      tool_input: { file_path: join(ctx.dir, 'src/a.test.ts') },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: `Load the \`testing\` skill with the Skill tool before editing ${join(ctx.dir, 'src/a.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
+    },
+  });
+});
+
+test('it denies a subagent edit whose agent id climbs out of the subagents folder', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, '.claude/skills/testing'), { recursive: true });
+  await mkdir(join(ctx.dir, 'transcripts'), { recursive: true });
+  await writeFile(join(ctx.dir, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(ctx.dir, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+  );
+
+  await writeFile(
+    join(ctx.dir, 'transcripts/session-1.jsonl'),
+    [
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"testing"}}]}}',
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Launching skill: testing"}]}}',
+    ].join('\n'),
+  );
+
+  const result = spawnSync('bun', [ctx.hookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.dir },
+    input: JSON.stringify({
+      cwd: ctx.dir,
+      session_id: 'session-1',
+      transcript_path: join(ctx.dir, 'transcripts/session-1.jsonl'),
+      agent_id: 'x/../../../session-1',
+      agent_type: 'general-purpose',
+      tool_input: { file_path: join(ctx.dir, 'src/a.test.ts') },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: `Load the \`testing\` skill with the Skill tool before editing ${join(ctx.dir, 'src/a.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
+    },
+  });
+});
+
+test('it denies an edit after a compaction and says to load the skills again', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, '.claude/skills/testing'), { recursive: true });
+  await writeFile(join(ctx.dir, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(ctx.dir, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+  );
+
+  await writeFile(
+    join(ctx.dir, 'transcript.jsonl'),
+    [
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"testing"}}]}}',
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Launching skill: testing"}]}}',
+      '{"type":"system","subtype":"compact_boundary","content":"Conversation compacted","compactMetadata":{"trigger":"manual"}}',
+      '{"type":"attachment","attachment":{"type":"invoked_skills","skills":[{"name":"testing","path":"projectSettings:testing","content":"# Testing"}]}}',
+    ].join('\n'),
+  );
+
+  const result = spawnSync('bun', [ctx.hookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.dir },
+    input: JSON.stringify({
+      cwd: ctx.dir,
+      transcript_path: join(ctx.dir, 'transcript.jsonl'),
+      tool_input: { file_path: join(ctx.dir, 'src/a.test.ts') },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: `Load the \`testing\` skill again with the Skill tool before editing ${join(ctx.dir, 'src/a.test.ts')}, then retry the edit. This session was compacted, and a skill loaded before the compaction no longer counts. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
+    },
+  });
 });
 
 test('it stays silent in a repo without a rules file', async () => {
@@ -221,7 +444,7 @@ test('it reads the project root from the payload cwd when CLAUDE_PROJECT_DIR is 
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
       permissionDecision: 'deny',
-      permissionDecisionReason: `Load the \`testing\` skill with the Skill tool before editing ${join(ctx.dir, 'a.test.ts')}, then retry the edit. .claude/skill-gate.json lists the skills each path needs.`,
+      permissionDecisionReason: `Load the \`testing\` skill with the Skill tool before editing ${join(ctx.dir, 'a.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
     },
   });
 });
@@ -273,7 +496,7 @@ test('it gates a project file whose name starts with two dots', async () => {
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
       permissionDecision: 'deny',
-      permissionDecisionReason: `Load the \`testing\` skill with the Skill tool before editing ${join(ctx.dir, '..dots.test.ts')}, then retry the edit. .claude/skill-gate.json lists the skills each path needs.`,
+      permissionDecisionReason: `Load the \`testing\` skill with the Skill tool before editing ${join(ctx.dir, '..dots.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
     },
   });
 });
