@@ -35,6 +35,51 @@ the shared skill tells the reader to load both. The entry lists every file in it
 since the skill links its references by relative path; `scripts/check-sync-manifest.sh` fails on a
 file the entry omits.
 
+Files under [`hooks/`](./hooks/) are Claude Code hooks, delivered as opt-in entries to
+`.claude/hooks/<name>/`. Their tests stay here. `hook-skill-gate` delivers the skill gate: a
+`PreToolUse` hook that denies an edit until the session has loaded every skill the path needs, and
+names the missing skills. The gate holds no rules. A repo opts in with three changes, which
+repo-sync never touches:
+
+1. Add `hook-skill-gate` to `include` in `.github/workflows/repo-sync.yml`.
+2. Write `.claude/skill-gate.json`. `match` is a glob over the path from the repo root, and a path
+   that holds an `ignore` segment is never gated. A repo without this file has no gate. `Bun.Glob`
+   misses deep paths for a `**` inside a brace group, such as `{e2e/**,test/**}`, so write one gate
+   per pattern.
+
+   ```json
+   {
+     "ignore": ["node_modules/", "dist/"],
+     "gates": [
+       { "match": "**/*.test.ts", "skills": ["testing", "project-testing"] },
+       { "match": "**/*.md", "skills": ["docs-writing"] }
+     ]
+   }
+   ```
+
+3. Register the hook in `.claude/settings.json`:
+
+   ```json
+   {
+     "hooks": {
+       "PreToolUse": [
+         {
+           "matcher": "Edit|Write|MultiEdit",
+           "hooks": [
+             {
+               "type": "command",
+               "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate/skill-gate.ts\""
+             }
+           ]
+         }
+       ]
+     }
+   }
+   ```
+
+A rule that names a skill missing from `.claude/skills/`, or a rules file that does not parse, never
+denies an edit. The hook warns the user and the agent on every edit until the rule is fixed.
+
 A sync branch is force-pushed on every run, so a commit a person adds to it is lost on the next run.
 Edit the source here instead.
 

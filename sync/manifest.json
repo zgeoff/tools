@@ -96,5 +96,36 @@
         "mode": "0755"
       }
     ]
+  },
+  {
+    "name": "hook-skill-gate",
+    "description": "The skill-gate PreToolUse hook, which denies an edit until the session loads the skills the path needs; the repo keeps its rules in .claude/skill-gate.json and registers the hook in .claude/settings.json",
+    "optIn": true,
+    "files": [
+      {
+        "source": "sync/hooks/skill-gate/skill-gate.ts",
+        "target": ".claude/hooks/skill-gate/skill-gate.ts"
+      },
+      {
+        "source": "sync/hooks/skill-gate/build-skill-gate-output.ts",
+        "target": ".claude/hooks/skill-gate/build-skill-gate-output.ts"
+      },
+      {
+        "source": "sync/hooks/skill-gate/collect-loaded-skills.ts",
+        "target": ".claude/hooks/skill-gate/collect-loaded-skills.ts"
+      },
+      {
+        "source": "sync/hooks/skill-gate/parse-skill-gate-rules.ts",
+        "target": ".claude/hooks/skill-gate/parse-skill-gate-rules.ts"
+      },
+      {
+        "source": "sync/hooks/skill-gate/plan-skill-gate.ts",
+        "target": ".claude/hooks/skill-gate/plan-skill-gate.ts"
+      },
+      {
+        "source": "sync/hooks/skill-gate/types.ts",
+        "target": ".claude/hooks/skill-gate/types.ts"
+      }
+    ]
   }
 ]
