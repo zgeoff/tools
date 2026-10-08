@@ -65,14 +65,16 @@ These decide a case that the rules below leave open.
 - When one file tests several units, such as the procedures of one router, a `#<unit>` prefix takes
   the place of "it": `#archiveNote rejects a note that is already archived`. A file that tests one
   unit uses no prefix.
-- A test body arranges, acts, then asserts, and a blank line separates each phase. Phase comments
-  such as `// act` never appear. A test acts once: it has one act phase, which may hold several
-  calls whose combined result the assertions check, such as the two runs that a determinism test
-  compares. A body with two independent act-and-assert pairs holds two tests, so split it. When a
-  second act depends on the first, the first act becomes arrangement, as `setupTest` describes. A
-  pure function's test may collapse the three phases into one `expect` line.
+- A test body arranges, acts, then asserts. The formatter owns spacing, including gaps between
+  phases; keep its layout when it joins statements from different phases. Phase comments such as
+  `// act` never appear. A test acts once: it has one act phase, which may hold several calls whose
+  combined result the assertions check, such as the two runs that a determinism test compares. A
+  body with two independent act-and-assert pairs holds two tests, so split it. When a second act
+  depends on the first, the first act becomes arrangement, as `setupTest` describes. A pure
+  function's test may collapse the three phases into one `expect` line.
 - `test.each` serves a closed decision table only: rows of plain data, and a title template that
-  starts with "it" and interpolates the input that varies. Any other set of cases gets a separate
+  starts with "it" and interpolates the input that varies or an accurate descriptive label for that
+  input. The row supplies the actual values to the test. Any other set of cases gets a separate
   `test()` for each case.
 - Tests sit beside the module they test (`parse-entry.ts` and `parse-entry.test.ts`), and a test of
   a program's entry module, such as `cli.ts`, sits beside that module too. The one exception is
@@ -95,6 +97,9 @@ An end-to-end suite splits by user journey, one file per journey: `e2e/tui-spawn
 `e2e/tui-attach.test.ts`. A journey test may chain dependent act-and-assert phases, because each
 step of the journey needs the state that the step before it left. This holds only in `e2e/`: every
 other test acts once.
+
+Keep command construction importable. Test argument and flag-position cases through the real parser
+in module tests; keep binary journeys that check the assembled program.
 
 ### Loops
 
@@ -135,12 +140,15 @@ never appear in a test file.
   all. Two questions sort a value. Does any test in the file assert on it, or need a different value
   of it? Does `setupTest()` return it, or take a config field for it? A yes to either question makes
   the value scenario data, and it moves into the test body. Boot data carries a one-line comment
-  that names what needs it.
+  that names what needs it. A value that an assertion depends on stays in the test body even when
+  every test uses the same value.
 - An earlier act that the test's one act depends on, such as starting the session that the test
   attaches to, is arrangement. No assertion checks it, because a separate test covers that act.
   `setupTest()` runs it and returns the handles it produced. An earlier act that carries scenario
   data, such as saving the note that the test then archives, stays in the arrange phase of the test
-  body instead, because `setupTest()` never carries scenario data.
+  body instead, because `setupTest()` never carries scenario data. An earlier action that only some
+  tests need stays visible in those tests' arrange phase without assertions; do not hide it behind a
+  conditional setup flag.
 - A test file declares one function, `setupTest()`, and nothing else. A helper the tests want goes
   one of three ways: inline it where it is used, swap it for a registered matcher, or move it to the
   shared test utils with tests of its own. A file with nothing to wire has no `setupTest()`.
@@ -289,10 +297,13 @@ Reordering the tests or choosing unique keys hides the gap and leaves it for the
   stand-in that starts something long-running, such as a stub server, is `start-stub-<thing>.ts`. A
   stand-in that creates a resource, such as a stub repository on disk, is `create-stub-<thing>.ts`.
   Every other stand-in is `build-stub-<thing>.ts`. It has its own tests, which pin the assumptions
-  it makes about the real thing.
+  it makes about the real thing. An executable stand-in script uses `run-stub-<thing>.ts`; an
+  imported helper that starts it keeps `start-stub-<thing>.ts`.
 - Keep bare call recorders (`mock()` with no implementation) and no-op callbacks (`() => {}`)
   inline, including a recorder inside an object such as `{ sendEvent: mock() }`. Never extract a
-  wrapper or add a test whose only purpose is to check that the mocking library records calls.
+  wrapper or add a test whose only purpose is to check that the mocking library records calls. A
+  no-op executable placeholder stays inline through the shared file helper when the test needs only
+  an executable. Extract a dedicated stand-in when the script models arguments, output, or failures.
 
 ### Composites
 
@@ -335,6 +346,17 @@ pass, and it returns data, never clients, apps, or servers.
   defaults, timestamps, or generated ids, use asymmetric matchers inside `toStrictEqual`, or
   `toMatchObject`. Choosing a partial match because the full literal is long is a defect. `toEqual`
   never appears.
+- Assert each result on its own. Never assemble unrelated results or observations into an object
+  only to put them under one `toStrictEqual`. A normalized projection of one result, such as a
+  command's exit code, stdout, and stderr, stays together. A later request's status is a separate
+  assertion. Independently meaningful scalar checks use separate `toBe` calls.
+- Derive an expected value from the contract, independently of the unit's own calculation. For a
+  filesystem path, use a known package or fixture root plus the explicit expected location, rather
+  than repeating the unit's relative path expression. Keep a behaviour check where it proves the
+  derived value works.
+- A recovery test checks that the injected fault occurred and that recovery succeeded. Capture the
+  earlier state during arrangement, then assert it at the end alongside the final state; use
+  separate scalar assertions for each state.
 - After a mutation, one `toBe` on the field that changed is enough.
 - Snapshots are inline only. `toMatchInlineSnapshot` pins a golden value: deterministic machine
   output that no person derives by reading the code, such as a generated SQL string or a rendered
