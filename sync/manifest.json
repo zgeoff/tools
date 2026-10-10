@@ -150,6 +150,6 @@
         "target": "scripts/run-related-tests.ts"
       }
     ],
-    "build": "add='{\"files:branch\":\"bun scripts/collect-branch-files.ts\",\"lint:files\":\"oxlint\",\"test:related\":\"bun scripts/run-related-tests.ts\"}'; missing=$(jq -c --argjson add \"$add\" '(.scripts // {}) as $s | $add | with_entries(select(.key as $k | $s | has($k) | not))' package.json); if [ \"$missing\" != '{}' ]; then jq --argjson missing \"$missing\" '.scripts = (.scripts // {}) + $missing' package.json > package.json.tmp; mv package.json.tmp package.json; fi"
+    "build": "add='{\"files:branch\":\"bun scripts/collect-branch-files.ts\",\"lint:files\":\"oxlint --no-error-on-unmatched-pattern\",\"test:related\":\"bun scripts/run-related-tests.ts\"}'; missing=$(jq -c --argjson add \"$add\" '(.scripts // {}) as $s | $add | with_entries(select(.key as $k | $s | has($k) | not))' package.json); if [ \"$missing\" != '{}' ]; then jq --argjson missing \"$missing\" '.scripts = (.scripts // {}) + $missing' package.json > package.json.tmp; mv package.json.tmp package.json; fi"
   }
 ]

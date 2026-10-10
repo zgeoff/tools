@@ -37,7 +37,7 @@
     "test:related": "bun sync/pre-push/run-related-tests.ts",
     "build": "bun run --filter '*' build",
     "lint": "oxlint --report-unused-disable-directives-severity error",
-    "lint:files": "oxlint",
+    "lint:files": "oxlint --no-error-on-unmatched-pattern",
     "lint:fix": "oxlint --fix",
     "lint:type-aware": "oxlint --type-aware --type-check --report-unused-disable-directives-severity error",
     "format": "oxfmt . && bun packages/format-codemod/src/cli.ts --quiet .",
