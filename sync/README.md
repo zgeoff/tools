@@ -92,6 +92,33 @@ redirect, `tee`, `sed -i`, or a script, is not checked: a reliable check needs a
 and a partial one refuses ordinary commands. This gap is accepted. Change a gated path only with
 Edit, Write or MultiEdit; the denial says the same.
 
+Files under [`pre-push/`](./pre-push/) are the pre-push baseline, delivered by the opt-in
+`pre-push-baseline` entry. The baseline runs its jobs one at a time, so a push fits a 2 GiB host or
+a machine shared by parallel agents. It runs `format:check` and `typecheck` over the whole tree, and
+plain `oxlint` and the sibling tests over the files the branch changes. CI keeps every whole-tree
+check required. The entry delivers three files, and its tests stay here:
+
+- `.lefthook/pre-push-baseline.yml` — the lefthook jobs.
+- `scripts/collect-branch-files.ts` — lists the files changed since the merge base with origin's
+  default branch. lefthook's `{push_files}` lists every file in history for a branch with no
+  upstream, so the baseline does not use it.
+- `scripts/run-related-tests.ts` — runs each changed file's sibling test through the repo's `test`
+  script.
+
+Its build adds the package scripts `files:branch`, `lint:files` and `test:related` when the repo
+lacks them, and never changes a script the repo already has. A repo opts in with three changes:
+
+1. Add `pre-push-baseline` to `include` in `.github/workflows/repo-sync.yml`.
+2. In `lefthook.yml`, add `extends: [.lefthook/pre-push-baseline.yml]` and delete the baseline's
+   jobs from `pre-push`. A job the repo keeps under `pre-push.jobs` runs before the baseline's, so
+   keep only cheap repo-specific gates there.
+3. Move every whole-tree check the baseline drops, such as type-aware lint, dead code and the full
+   suite, into CI as a required check, if CI does not run it already.
+
+A repo changes what a baseline job runs through the package script that the job calls, such as
+`typecheck`. A job of the same name in `lefthook.yml` does not override it, because lefthook merges
+the extended file over the repo's own.
+
 A sync branch is force-pushed on every run, so a commit a person adds to it is lost on the next run.
 Edit the source here instead.
 

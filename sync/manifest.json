@@ -131,5 +131,25 @@
         "target": ".claude/hooks/skill-gate/types.ts"
       }
     ]
+  },
+  {
+    "name": "pre-push-baseline",
+    "description": "The light pre-push baseline: lefthook jobs that lint and test only the files the branch changes and run one at a time, the two scripts they call, and the package scripts files:branch, lint:files and test:related where the repo lacks them",
+    "optIn": true,
+    "files": [
+      {
+        "source": "sync/pre-push/lefthook-pre-push.yml",
+        "target": ".lefthook/pre-push-baseline.yml"
+      },
+      {
+        "source": "sync/pre-push/collect-branch-files.ts",
+        "target": "scripts/collect-branch-files.ts"
+      },
+      {
+        "source": "sync/pre-push/run-related-tests.ts",
+        "target": "scripts/run-related-tests.ts"
+      }
+    ],
+    "build": "add='{\"files:branch\":\"bun scripts/collect-branch-files.ts\",\"lint:files\":\"oxlint\",\"test:related\":\"bun scripts/run-related-tests.ts\"}'; missing=$(jq -c --argjson add \"$add\" '(.scripts // {}) as $s | $add | with_entries(select(.key as $k | $s | has($k) | not))' package.json); if [ \"$missing\" != '{}' ]; then jq --argjson missing \"$missing\" '.scripts = (.scripts // {}) + $missing' package.json > package.json.tmp; mv package.json.tmp package.json; fi"
   }
 ]

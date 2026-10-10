@@ -1,0 +1,31 @@
+# repo-sync delivers this file from zgeoff/tools; edit it there.
+#
+# The pre-push baseline every zgeoff repo extends from its lefthook.yml:
+#
+#   extends:
+#     - .lefthook/pre-push-baseline.yml
+#
+# It checks what the branch changes, plus the whole-tree gates that fit a
+# small host: format:check and typecheck. CI runs every whole-tree check:
+# type-aware lint, dead code, and the full test suite. A repo adds its own
+# pre-push jobs under pre-push.jobs in lefthook.yml; they run before these.
+# A repo changes what a job runs through the package script it calls.
+
+pre-push:
+  # Sequential, to bound memory on a small host or with parallel agents.
+  piped: true
+  jobs:
+    - name: format:check
+      run: bun run format:check
+    # Plain oxlint, without the unused-directive check: a directive for a
+    # type-aware rule reads as unused in plain mode.
+    - name: lint
+      files: bun run --silent files:branch
+      glob: '*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}'
+      run: bun run lint:files {files}
+    - name: typecheck
+      run: bun run typecheck
+    - name: test
+      files: bun run --silent files:branch
+      glob: '*.{ts,tsx}'
+      run: bun run test:related {files}
