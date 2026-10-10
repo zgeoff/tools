@@ -1,5 +1,12 @@
-# Git hooks. pre-commit fixes staged files only (fast); pre-push gates the whole
-# tree so config drift affecting unstaged files is caught before CI.
+# Git hooks. pre-commit fixes staged files only (fast); pre-push runs the shared
+# baseline, which checks what the branch changes plus the cheap whole-tree
+# gates. CI runs every whole-tree check, type-aware lint and the full suite
+# among them.
+
+# The source of the baseline that repo-sync delivers to the other repos as
+# .lefthook/pre-push-baseline.yml.
+extends:
+  - sync/pre-push/lefthook-pre-push.yml
 
 pre-commit:
   piped: true
@@ -18,15 +25,3 @@ pre-commit:
       glob: '*.{ts,tsx}'
       run: bun packages/format-codemod/src/cli.ts --quiet {staged_files}
       stage_fixed: true
-
-pre-push:
-  parallel: true
-  jobs:
-    - name: format:check
-      run: bun run format:check
-    - name: lint:type-aware
-      run: bun run lint:type-aware
-    - name: typecheck
-      run: bun run typecheck
-    - name: test
-      run: bun run test
