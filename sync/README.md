@@ -137,14 +137,6 @@ Edit the source here instead.
    op read 'op://zgeoff/repo-sync-github-app/private-key' | gh secret set REPO_SYNC_APP_PRIVATE_KEY -R zgeoff/<repo>
    ```
 
-2. Add `agents/project.md` with the repo's own rules, and add `agents/shared.md` and `AGENTS.md` to
-   the repo's formatter ignore list, since both arrive formatted by this repo's settings.
-3. Copy [`repo-sync.yml`](./repo-sync.yml) to `.github/workflows/repo-sync.yml`.
-4. Dispatch it once: `gh workflow run repo-sync.yml -R zgeoff/<repo>`. Expect one pull request per
+2. Copy [`repo-sync.yml`](./repo-sync.yml) to `.github/workflows/repo-sync.yml`.
+3. Dispatch it once: `gh workflow run repo-sync.yml -R zgeoff/<repo>`. Expect one pull request per
    entry the repo is behind on.
-5. Add a drift check to the repo's CI, so a hand edit to `AGENTS.md` fails the build:
-
-   ```yaml
-   - run: bash scripts/build-agents-md.sh agents/shared.md agents/project.md AGENTS.md
-   - run: git diff --exit-code AGENTS.md
-   ```
