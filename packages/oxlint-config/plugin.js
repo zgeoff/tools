@@ -1,6 +1,7 @@
 import functionVerb from './function-verb.js';
 import maxConsecutiveLineComments from './max-consecutive-line-comments.js';
 import noJSDoc from './no-jsdoc.js';
+import testBesideModule from './test-beside-module.js';
 
 // custom rules loaded through oxlint's jsPlugins (ESLint v9 rule API): each
 // bans a shape no native oxlint rule can express, as an esquery selector or a
@@ -95,6 +96,7 @@ const plugin = {
     'no-jsdoc': noJSDoc,
     'max-consecutive-line-comments': maxConsecutiveLineComments,
     'function-verb': functionVerb,
+    'test-beside-module': testBesideModule,
   },
 };
 

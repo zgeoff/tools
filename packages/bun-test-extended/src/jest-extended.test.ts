@@ -1,3 +1,4 @@
+// oxlint-disable zgeoff/test-beside-module -- tests the jest-extended matchers this package registers, not a module of its own
 import { expect, mock, test } from 'bun:test';
 
 test('it matches empty strings, arrays, and objects with toBeEmpty', () => {

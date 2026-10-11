@@ -6,7 +6,8 @@ restriction-rule cherry-picks, comment-style enforcement via `@stylistic`, and a
 function declarations, bare named exports, destructured and inline-typed parameters, ternary and
 await arguments, awaits hidden inside a control-flow condition or a `&&`/`||`/`??` chain, every
 JSDoc block, and any run of more than three line comments. `zgeoff/function-verb` enforces the
-function-naming taxonomy from the shared agent guidelines.
+function-naming taxonomy from the shared agent guidelines, and `zgeoff/test-beside-module` keeps
+each test file beside the module it tests.
 
 ## Usage
 
@@ -70,6 +71,22 @@ whitespace change.
   },
 }
 ```
+
+## `zgeoff/test-beside-module`
+
+A `<name>.test.ts` or `<name>.test.tsx` file needs a non-test file `<name>.<ext>` in the same
+directory — `.ts`, `.tsx`, `.sh`, `.json`, or any other single extension, so `install.test.ts` may
+test `install.sh`. Files under an `e2e/` or `evals/` directory at the repo root (the nearest
+ancestor holding `.git`, else oxlint's working directory) are exempt; no other directory is. Exempt
+any other test with a file-level disable comment that states the reason. The rule reports at the
+first statement, so put the comment above it:
+
+```ts
+// oxlint-disable zgeoff/test-beside-module -- tests base.json and react.json together
+```
+
+A second test file for a module (`<name>.host.test.ts`) needs its own `<name>.host.<ext>`, so the
+rule reports it beside only `<name>.ts`.
 
 ## Notes
 
