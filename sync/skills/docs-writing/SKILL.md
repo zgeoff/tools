@@ -59,9 +59,8 @@ they still know everything it says and act the same way? If yes, delete the whol
 points, not single sentences. Keep or cut a sentence that orients the reader, names something, or
 summarizes on how it reads, not on whether it carries a fact.
 
-The test is one source file, not the whole repo. A fact that only shows up when you read several
-files together, such as how three modules cooperate to survive a crash, is exactly what the code
-can't tell a reader, and it stays.
+The test is one source file, not the whole repo: a fact that shows only across several files stays
+("Describe the mechanism where the mechanism is the architecture" covers which).
 
 Paragraphs that defend a decision are the most common source of padding: lists of edge cases that
 only happen if someone tampers with the system, "in case someone…", restatements of what is out of
@@ -133,13 +132,10 @@ database factory".
 - Bad: "`runBoundedAttempts` (`apps/web/src/lib/rpc/`) retries a GET up to three times."
 - Good: "The bounded-attempt policy resends a GET when an attempt hits its bound."
 
-This rule covers the repo's own internals, not what the system is built from. A library, product,
-service, protocol, or algorithm the system depends on keeps its real name: pg-boss, Neon, PgBouncer,
-postgres.js, SQLite's WAL mode, Ed25519, xoroshiro128+. Replacing one is an architecture change, so
-the name is a fact the doc owns, and a refactor never breaks it. Writing "the queue engine" where
-you mean pg-boss hides the one fact the reader needed. A workspace package's name may appear once,
-in passing, where the reader needs to find the code, but never in place of the concept it
-implements.
+A library, product, protocol, or algorithm the system is built from keeps its real name: pg-boss,
+Neon, SQLite's WAL mode, Ed25519. Replacing one is an architecture change, so a refactor never
+breaks the name. A workspace package's name may appear once, in passing, where the reader needs to
+find the code.
 
 Three kinds of identifier are fine too: an error code or wire field a client switches on, a domain
 term the doc defines that also happens to be an identifier (the `Started` checkpoint, `userSeed`),
@@ -157,10 +153,8 @@ A reader opens an architecture doc before they change a subsystem, and should le
 model of it: what it is for, what its parts are, how they fit together, which part owns each piece
 of state, what must stay true whatever a caller does, and why the system has this shape. The test of
 a good one: after reading it, the reader can predict what the system does in a case the doc never
-names, such as what happens when a process dies halfway through a write. A list of correct rules can
-still fail that test, because the reader gets the rules without the model that connects them.
-
-Everything else in this section serves that model.
+names, such as what happens when a process dies halfway through a write. Everything else in this
+section serves that model.
 
 ### Open with the concept, not the package
 
@@ -172,9 +166,6 @@ implements it comes later and in passing, if at all.
   seed chain. The chain is a single sequence of positions running forward. An activity draws the
   position at the front, plays out from it, and leaves the next position for the activity that
   follows."
-
-The good version teaches the idea before it names anything, so every later fact has somewhere to
-attach.
 
 ### Describe the mechanism where the mechanism is the architecture
 
@@ -235,9 +226,8 @@ paragraph about the part that keeps it, with its reason beside it.
   docs cover the facts next to its own: "[Replay verification](./replay-verification.md) covers the
   verifier that proves a stream and settles it." A link inside the opening paragraph does the same
   job, when its sentence says what the linked doc covers.
-- **Diagrams carry the shapes.** The overview's request path and topology, and every section about a
-  pipeline, a state machine, or a topology, open with a diagram ("Diagrams for pipelines, state
-  machines, and topologies" gives the rules).
+- **Diagrams carry the shapes.** The overview's request path and topology get diagrams, under the
+  rules in "Diagrams for pipelines, state machines, and topologies".
 
 ### What stays out of an architecture doc
 
@@ -246,7 +236,7 @@ paragraph about the part that keeps it, with its reason beside it.
   being built, the overview describes the connections that exist, and one sentence links the design
   for the rest.
 - What a user sees and does. A guide covers that.
-- A defense of a decision, and the alternatives it rejected. A decision record covers those.
+- The alternatives a decision rejected. A decision record covers those.
 - Reference for internals: one entry per protocol method, config key, or module.
 
 ## The docs/ tree
@@ -536,8 +526,7 @@ story, make it a paragraph. A list whose items are parallel, each with its own c
 inside it, such as three ways a queue gets drained, stays a list. Every list item should carry a
 fact beyond its own name; an item with nothing to add goes inline.
 
-Most of an architecture doc is cause and effect, so most of it is paragraphs. A doc that is mostly
-bullets and tables is usually a rule list that lost its model.
+Most of an architecture doc is cause and effect, so most of it is paragraphs.
 
 ### Tables for variants with several attributes
 
