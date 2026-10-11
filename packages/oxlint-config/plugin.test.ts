@@ -907,3 +907,62 @@ test('it rejects an edge with neither to nor allow', async () => {
   expect(result.exitCode).not.toBe(0);
   expect(result.stdout).toInclude("Options validation failed for rule 'zgeoff/import-zones'");
 });
+
+test('it resolves # imports and export patterns through the package manifest', async () => {
+  const manifest = {
+    name: 'demo',
+    imports: { '#tools/*': './scripts/*.ts', '#parser': 'oxc-parser' },
+    exports: { '.': './src/index.ts', './*': ['./scripts/*.ts'] },
+  };
+
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { core: ['src/**'], tooling: ['scripts/**'] },
+        edges: [{ name: 'core-no-tooling', from: ['core'], to: ['tooling'] }],
+        modules: [{ name: 'parser', modules: ['oxc-parser'], from: ['core'], allow: [] }],
+      },
+    ],
+  };
+
+  const source = [
+    "import { run } from '#tools/run';",
+    "import { build } from 'demo/build';",
+    "import { parse } from '#parser';",
+    '',
+    'run(build(parse));',
+    '',
+  ].join('\n');
+
+  const files = {
+    'package.json': JSON.stringify(manifest),
+    'src/index.ts': source,
+    'scripts/run.ts': 'export function run(): void {}\n',
+    'scripts/build.ts': 'export function build(): void {}\n',
+  };
+
+  const result = await runLintTree(files, 'src/index.ts', rules);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('core-no-tooling: core must not import scripts/run.ts');
+  expect(result.stdout).toInclude('core-no-tooling: core must not import scripts/build.ts');
+  expect(result.stdout).toInclude('parser: oxc-parser is allowed only in no zone');
+});
+
+test('it accepts a call of a local binding named like a restricted global', async () => {
+  const source = [
+    "import { fetch } from 'undici';",
+    '',
+    "await fetch('https://x.test');",
+    '',
+    'export function send(self: { fetch: (url: string) => void }): void {',
+    "  self.fetch('https://x.test');",
+    '}',
+    '',
+  ].join('\n');
+
+  const result = await runLintTree({ 'src/state/send.ts': source }, 'src/state/send.ts', layered);
+
+  expect(result.exitCode).toBe(0);
+});

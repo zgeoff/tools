@@ -4,23 +4,50 @@ import { dirname, join, resolve } from 'node:path';
 // a `.js` specifier in TypeScript source names the `.ts` file beside it
 const sourceExtensions = { '.js': ['.ts', '.tsx'], '.mjs': ['.mts'], '.cjs': ['.cts'] };
 
-// `module` for a bare specifier that is not the package's own name, `file`
-// with the absolute path when the import resolves, `missing` otherwise
+// `module` with the specifier for a package or builtin, `file` with the
+// absolute path when the import resolves, `missing` otherwise. The package's
+// own name resolves through its `exports`, and `#` names through its `imports`.
 export default function resolveImportTarget(filename, specifier, settings) {
-  const manifest = findPackageManifest(dirname(filename), settings.root);
-  const name = manifest?.name;
-  const isSelfReference =
-    typeof name === 'string' && (specifier === name || specifier.startsWith(`${name}/`));
-
-  if (!isSelfReference && !isPathSpecifier(specifier)) {
-    return { kind: 'module' };
+  if (isPathSpecifier(specifier)) {
+    return toTarget(findImportedFile(filename, specifier, settings.extensions));
   }
 
-  const path = isSelfReference
-    ? findExportedFile(manifest, `.${specifier.slice(name.length)}`, settings.conditions)
-    : findImportedFile(filename, specifier, settings.extensions);
+  const manifest = findPackageManifest(dirname(filename), settings.root);
 
+  return resolveManifestTarget(manifest, specifier, settings.conditions);
+}
+
+function resolveManifestTarget(manifest, specifier, conditions) {
+  const name = manifest?.name;
+
+  if (specifier.startsWith('#')) {
+    const mapped = findMappedTarget(manifest?.imports, specifier, conditions);
+
+    return mapped !== null && !isPathSpecifier(mapped)
+      ? { kind: 'module', specifier: mapped }
+      : toMappedTarget(manifest, mapped);
+  }
+
+  if (typeof name === 'string' && (specifier === name || specifier.startsWith(`${name}/`))) {
+    const subpath = `.${specifier.slice(name.length)}`;
+
+    return toMappedTarget(
+      manifest,
+      findMappedTarget(toSubpathMap(manifest.exports), subpath, conditions),
+    );
+  }
+
+  return { kind: 'module', specifier };
+}
+
+function toTarget(path) {
   return path === null ? { kind: 'missing' } : { kind: 'file', path };
+}
+
+function toMappedTarget(manifest, mapped) {
+  return mapped === null
+    ? { kind: 'missing' }
+    : { kind: 'file', path: resolve(manifest.dir, mapped) };
 }
 
 function isPathSpecifier(specifier) {
@@ -49,44 +76,78 @@ function findPackageManifest(dir, root) {
   return manifest;
 }
 
-function findExportedFile(manifest, subpath, conditions) {
-  const exports = manifest.exports;
+// `exports` without `.` keys is the target of the package's own name alone
+function toSubpathMap(exports) {
   const isSubpathMap =
     typeof exports === 'object' &&
     exports !== null &&
+    !Array.isArray(exports) &&
     Object.keys(exports).some((key) => key.startsWith('.'));
-  let value = null;
 
-  if (isSubpathMap) {
-    value = exports[subpath] ?? null;
-  } else if (subpath === '.') {
-    value = exports ?? null;
-  }
-
-  const target = findExportTarget(value, conditions);
-
-  return target === null ? null : resolve(manifest.dir, target);
+  return isSubpathMap || exports === undefined ? exports : { '.': exports };
 }
 
-// node's rule: the first key, in object order, that names an active condition
-function findExportTarget(value, conditions) {
+// an exact key wins; otherwise the `*` pattern with the longest prefix, its
+// match substituted into the target
+function findMappedTarget(map, key, conditions) {
+  if (typeof map !== 'object' || map === null) {
+    return null;
+  }
+
+  if (Object.hasOwn(map, key)) {
+    return findConditionTarget(map[key], conditions);
+  }
+
+  const [pattern] = Object.keys(map)
+    .filter((candidate) => isPatternMatch(candidate, key))
+    .toSorted((left, right) => right.indexOf('*') - left.indexOf('*'));
+
+  return pattern === undefined ? null : findPatternTarget(map, pattern, { key, conditions });
+}
+
+function findPatternTarget(map, pattern, lookup) {
+  const star = pattern.indexOf('*');
+  const match = lookup.key.slice(star, lookup.key.length - (pattern.length - star - 1));
+  const target = findConditionTarget(map[pattern], lookup.conditions);
+
+  return target === null ? null : target.replaceAll('*', match);
+}
+
+function isPatternMatch(pattern, key) {
+  const star = pattern.indexOf('*');
+
+  if (star === -1 || pattern.includes('*', star + 1)) {
+    return false;
+  }
+
+  const prefix = pattern.slice(0, star);
+  const suffix = pattern.slice(star + 1);
+
+  return key.length >= pattern.length && key.startsWith(prefix) && key.endsWith(suffix);
+}
+
+// node's rule: the first key, in object order, that names an active
+// condition; in an array, the first entry that yields a target
+function findConditionTarget(value, conditions) {
   if (typeof value === 'string') {
     return value;
   }
 
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+  if (typeof value !== 'object' || value === null) {
     return null;
   }
 
-  for (const [condition, nested] of Object.entries(value)) {
-    const target = conditions.has(condition) ? findExportTarget(nested, conditions) : null;
+  const candidates = Array.isArray(value)
+    ? value
+    : Object.entries(value)
+        .filter((entry) => conditions.has(entry[0]))
+        .map((entry) => entry[1]);
 
-    if (target !== null) {
-      return target;
-    }
-  }
-
-  return null;
+  return (
+    candidates
+      .map((candidate) => findConditionTarget(candidate, conditions))
+      .find((target) => target !== null) ?? null
+  );
 }
 
 function findImportedFile(filename, specifier, extensions) {

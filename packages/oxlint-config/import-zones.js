@@ -68,7 +68,7 @@ function checkImport(file, imported) {
   });
 
   if (target.kind === 'module') {
-    checkModule(file, imported, specifier);
+    checkModule(file, imported, target.specifier);
   } else if (target.kind === 'missing') {
     emitUnresolved(file, imported.node, { messageId: 'unresolved', data: { specifier } });
   } else {
@@ -169,7 +169,7 @@ function checkUnzoned(file, program) {
 
 function checkGlobalCall(file, node) {
   for (const entry of collectEntries(file, file.options.globals)) {
-    const global = findGlobalCallName(node.callee, entry.globals);
+    const global = findGlobalCallName(file, node, entry.globals);
 
     if (global !== null && !isInAny(file.zones, entry.allow)) {
       emitReport(file, entry, {
@@ -183,20 +183,42 @@ function checkGlobalCall(file, node) {
 
 const globalObjects = new Set(['globalThis', 'self', 'window']);
 
-function findGlobalCallName(callee, names) {
-  if (callee.type === 'Identifier' && names.includes(callee.name)) {
-    return callee.name;
-  }
+// a call of the global itself, so a local binding of the same name passes
+function findGlobalCallName(file, node, names) {
+  const callee = node.callee;
+  let name = null;
+  let binding = null;
 
-  const isGlobalMember =
+  if (callee.type === 'Identifier' && names.includes(callee.name)) {
+    name = callee.name;
+    binding = callee.name;
+  } else if (
     callee.type === 'MemberExpression' &&
     !callee.computed &&
     callee.object.type === 'Identifier' &&
     globalObjects.has(callee.object.name) &&
     callee.property.type === 'Identifier' &&
-    names.includes(callee.property.name);
+    names.includes(callee.property.name)
+  ) {
+    name = callee.property.name;
+    binding = callee.object.name;
+  }
 
-  return isGlobalMember ? callee.property.name : null;
+  return name === null || isLocalBinding(file, node, binding) ? null : name;
+}
+
+function isLocalBinding(file, node, name) {
+  let scope = file.context.sourceCode.getScope(node);
+
+  while (scope !== null) {
+    if ((scope.set.get(name)?.defs.length ?? 0) > 0) {
+      return true;
+    }
+
+    scope = scope.upper;
+  }
+
+  return false;
 }
 
 function isTypeOnlyImport(node) {
