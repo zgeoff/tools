@@ -85,7 +85,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Check AGENTS.md drift
-        if: hashFiles('scripts/build-agents-md.sh') != ''
+        if: hashFiles('scripts/build-agents-md.sh') != '' && hashFiles('agents/project.md') != ''
         run: |
           bash scripts/build-agents-md.sh agents/shared.md agents/project.md AGENTS.md
           git diff --exit-code AGENTS.md

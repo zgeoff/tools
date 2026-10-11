@@ -1,12 +1,18 @@
-<!-- Generated file — do not edit. Edit agents/project.md here, or agents/shared.md in zgeoff/tools. -->
-
 # Agent Guidelines
+
+## Required reading
+
+The rules a task needs are not repeated here. Load the skill for the work before starting it.
+
+| Skill        | Load before                                                                             |
+| ------------ | --------------------------------------------------------------------------------------- |
+| `code-style` | writing, reviewing, or renaming any TypeScript — the function-verb taxonomy lives there |
+
+The shared `testing` and `docs-writing` skills ship from `sync/skills/` to the other repos; read the
+source there before test or prose work in this repo.
 
 ## Operations
 
-- AGENTS.md is generated from `agents/shared.md` and `agents/project.md` — edit the partials, never
-  AGENTS.md itself. The shared partial is synced from
-  [zgeoff/tools](https://github.com/zgeoff/tools); cross-project rule changes belong there.
 - Perform all work on a branch in a git worktree under `.worktrees/` (e.g.
   `git worktree add .worktrees/<branch> -b <branch>`) — never commit directly on `main`.
 - Use [Conventional Commits](https://www.conventionalcommits.org/) for all commit messages.
@@ -20,128 +26,11 @@
 - After pushing, link the PR URL in your response.
 - A PR is ready only when its checks are green: watch CI (`gh pr checks <n> --watch`) after opening
   or updating, and report a failure with what you're doing about it.
-
-## Code style
-
-Mechanically enforced rules (oxfmt, oxlint, format-codemod) aren't repeated here — this file covers
-what tooling can't check.
-
-- One primary export per file, and the file name kebab-cases that export (`with-jest-context.ts`
-  exports `withJestContext`). Exceptions: `index.ts` entrypoints, `types.ts` for a package's shared
-  types, and side-effect-only modules, which are named for what they do (`augment-bun-test.ts`).
-- Module order: imports, the primary export, then private helpers in composition order (depth-first)
-  — never helpers first. Supporting declarations (consts, interfaces, type aliases) sit directly
-  above their first use, never below it and never leading the file; types for the primary export's
-  signature may sit just above it.
-- Acronyms stay uppercase in identifiers (`runCLI`, `parseCLIArgs`, `ASTNode`, `pkgURL`,
-  `isPackageJSON`) — except when one starts a camelCase name, where it lowercases whole (`cliPath`,
-  `astNode`). ID counts as an acronym: `userID`, `sessionID` — never `userId` — and `idToken` when
-  it starts a name. File names are unaffected: kebab-case lowercases everything (`parse-cli-args.ts`
-  exports `parseCLIArgs`).
-
-### Function naming
-
-Every function name starts with a prefix from the closed list below: pick from it, or extend this
-file in the same PR that introduces the new verb. The prefix is a contract — a reader should know
-the function's shape without opening it.
-
-**Predicates** — return boolean, no side effects:
-
-| Prefix   | Contract                | Example          |
-| -------- | ----------------------- | ---------------- |
-| `is`     | type or state test      | `isVarDecl`      |
-| `has`    | containment, possession | `hasBlankLine`   |
-| `can`    | capability              | `canResize`      |
-| `should` | policy decision         | `shouldSkipFile` |
-| `needs`  | requirement             | `needsBlankLine` |
-
-**Pure producers** — result comes from arguments alone, no side effects:
-
-| Prefix                        | Contract                                                                  | Example             |
-| ----------------------------- | ------------------------------------------------------------------------- | ------------------- |
-| `build<Result>[From<Source>]` | default constructor for values; drop `From<Source>` when no single source | `buildEditsFromAST` |
-| `define<X>`                   | identity; its only job is compile-time constraint of its literal argument | `defineErrors`      |
-| `parse`                       | unstructured input → structure, invalid input reported                    | `parseSource`       |
-| `encode`                      | structure → its defined compact or wire form, reversed by `decode`        | `encodeState`       |
-| `decode`                      | `encode`'s output → the original structure, malformed input reported      | `decodeState`       |
-| `derive`                      | one-way cryptographic derivation from secret material                     | `deriveAvatarKey`   |
-| `plan`                        | compute an action without performing it                                   | `planGapEdit`       |
-| `pick`                        | select among known alternatives                                           | `pickMode`          |
-| `find`                        | search that can miss — null/undefined on miss                             | `findPrevious`      |
-| `get`                         | cheap access that cannot miss (throwing on a broken invariant is fine)    | `getNodeEnd`        |
-| `collect`                     | gather from a traversal or scan                                           | `collectChildNodes` |
-| `count`                       | how many                                                                  | `countNewlines`     |
-| `split`                       | one value → parts                                                         | `splitLines`        |
-| `merge`                       | parts → one value                                                         | `mergeWindows`      |
-| `sort`                        | reorder                                                                   | `sortEdits`         |
-| `format`                      | value → human-readable string                                             | `formatRange`       |
-| `render`                      | structure → output text or markup                                         | `renderHunk`        |
-| `normalize`                   | variant forms → the canonical form                                        | `normalizePath`     |
-| `resolve`                     | follow indirection to a concrete value                                    | `resolveBinPath`    |
-| `expand`                      | compact form → full form                                                  | `expandInputs`      |
-| `compress`                    | value → its reversible compact encoding                                   | `compressGraph`     |
-| `decompress`                  | reverse a `compress` encoding (non-encoded shorthand is `expand`)         | `decompressGraph`   |
-| `to<Result>`                  | cheap representation change                                               | `toPosixPath`       |
-| `transform`                   | a package's own source→source operation                                   | `transform`         |
-
-**Effectful** — touches the world (filesystem, streams, processes, registries):
-
-| Prefix         | Contract                                                                                                                                | Example            |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| `apply`        | perform previously planned changes                                                                                                      | `applyEdits`       |
-| `create`       | bring a resource into existence (file, directory, process)                                                                              | `createWorkDir`    |
-| `claim`        | atomically take exclusive ownership of a work item or resource; ownership ends at commit or an explicit release                         | `claimNextChain`   |
-| `read`         | pull raw content from filesystem or network into memory                                                                                 | `readSource`       |
-| `load`         | read **and** parse into a ready structure                                                                                               | `loadConfig`       |
-| `write`        | persist to the filesystem                                                                                                               | `writeOutput`      |
-| `remove`       | delete a resource                                                                                                                       | `removeStaleDist`  |
-| `update`       | mutate existing state or resource in place                                                                                              | `updateIndex`      |
-| `upsert`       | single-statement insert-or-update keyed by a natural or composite key, refreshing the conflicting row's columns in place                | `upsertUser`       |
-| `set`          | assign a store's named state slice wholesale — the store-setter idiom; partial mutation is `update`                                     | `setSelectedNode`  |
-| `toggle<Flag>` | invert a boolean state slice                                                                                                            | `toggleDevCamera`  |
-| `reset`        | return state to its initial value                                                                                                       | `resetCombatState` |
-| `print`        | write to stdout/stderr                                                                                                                  | `printHelp`        |
-| `run`          | execute a subprocess, task, or whole pipeline                                                                                           | `runCLI`           |
-| `check`        | evaluate and report findings; effects allowed per mode                                                                                  | `checkFile`        |
-| `try<X>`       | X with failures captured as a value instead of a throw                                                                                  | `tryCheckFile`     |
-| `register`     | add to a registry the caller doesn't own                                                                                                | `registerMatcher`  |
-| `subscribe`    | attach a listener to an event source, returning or enabling detachment                                                                  | `subscribeToTicks` |
-| `unsubscribe`  | detach what `subscribe` attached                                                                                                        | `unsubscribe`      |
-| `assert`       | throw when an invariant doesn't hold                                                                                                    | `assertSpan`       |
-| `require`      | throw unless a runtime condition holds — a guard real input can trip (`assert` covers invariants)                                       | `requireAuth`      |
-| `verify`       | test a claim or credential against evidence, rejecting on mismatch                                                                      | `verifySession`    |
-| `emit`         | dispatch an event or notification                                                                                                       | `emitProgress`     |
-| `send`         | transmit a payload to a remote receiver (fire-and-forget or RPC — no resource semantics; REST mutations are `create`/`update`/`remove`) | `sendWebhook`      |
-| `wait`         | block until an event or condition resolves; may return the awaited value                                                                | `waitForMessage`   |
-| `setup`        | prepare the environment or fixture the following code assumes; `teardown` reverses it                                                   | `setupTest`        |
-| `teardown`     | release what `setup` prepared                                                                                                           | `teardownTest`     |
-| `start`        | put a long-running resource into service (server, worker, poll loop); `stop` reverses it                                                | `startQueues`      |
-| `stop`         | take a long-running resource out of service, releasing what `start` acquired                                                            | `stopWorker`       |
-| `drain`        | consume a pending backlog until empty                                                                                                   | `drainJobs`        |
-
-**Wrappers and factories** — the result is behaviour, not data:
-
-| Prefix    | Contract                                  | Example           |
-| --------- | ----------------------------------------- | ----------------- |
-| `with<X>` | HOF that runs a callback inside a context | `withJestContext` |
-| `make<X>` | factory whose result is itself a function | `makeExcluder`    |
-
-**Framework conventions** — where the ecosystem's prefix is load-bearing, it wins:
-
-| Prefix                   | Contract                                                                                                                | Example          |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| `use<X>`                 | React hook — the prefix drives rules-of-hooks linting; helpers inside a hook follow the normal taxonomy                 | `useDebounce`    |
-| `on<Event>`              | event-callback prop or parameter                                                                                        | `onRowClick`     |
-| `handle<Event>`          | local implementation passed to an `on<Event>` prop — the idiomatic React pair; the `handle` ban applies everywhere else | `handleRowClick` |
-| `handle<LifecycleEvent>` | implementation of an engine lifecycle callback, keyed by the engine's lifecycle-event enum                              | `handleTick`     |
-
-**Banned** — each is a vaguer or synonymous form of a listed verb; use that one instead: `handle`
-(except the `handle<Event>` framework conventions), `process`, `manage`, `do`, `perform` (say what
-it does), `execute` (→ `run`), `compute` (→ `build`), `fetch` (→ `read`), `save`/`store` (→
-`write`), `delete` (→ `remove`), `search`/`lookup` (→ `find`/`get`).
-
-Algorithm-native vocabulary (`walk`, `backtrack`, `slideDiagonal`) is allowed inside the module
-implementing that algorithm — forcing list verbs onto textbook terms hides the algorithm.
+- Light linting, formatting, and other checks run via lefthook's pre-commit and pre-push hooks.
+  Defer to CI for larger checks, as the environment you're operating in may have conservative memory
+  constraints.
+- `bun run lint` is plain oxlint. `bun run lint:full` adds the type-aware pass and the type check,
+  and is CI-only: never run it locally.
 
 ## Dependencies
 
@@ -152,8 +41,8 @@ implementing that algorithm — forcing list verbs onto textbook terms hides the
 
 CodeRabbit reviews every PR. Its shared config lives in the zgeoff/coderabbit repo, and a repo-root
 `.coderabbit.yaml` with `inheritance: true` layers repo-specific settings on top. CodeRabbit reads
-this file as its guidelines. A repo that runs another review bot names it and its config in
-`agents/project.md`, and these rules cover that bot too.
+this file as its guidelines. A review bot added later is named here with its config, and these rules
+cover it too.
 
 - A PR is ready only after every bot review is read and every finding is answered: a fixed finding's
   reply cites the commit that fixed it; a declined finding's reply states the reason — when a
@@ -172,9 +61,9 @@ this file as its guidelines. A repo that runs another review bot names it and it
 
 ## Type checking
 
-Type errors are checked by two engines on purpose: `lint:type-aware` includes tsgolint's
-experimental `--type-check` (fast, run it locally), while `typecheck` runs real `tsc` per package
-(ground truth). CI runs both until tsgolint earns trust; if they ever disagree, believe `tsc`.
+Type errors are checked by two engines on purpose: `lint:full` includes tsgolint's experimental
+`--type-check` (fast, but CI-only), while `typecheck` runs real `tsc` per package (ground truth). CI
+runs both until tsgolint earns trust; if they ever disagree, believe `tsc`.
 
 ## Workspace dependencies
 

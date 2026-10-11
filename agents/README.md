@@ -1,13 +1,11 @@
-# AGENTS.md partials
+# AGENTS.md partial
 
-The repo-root `AGENTS.md` is generated — never edit it directly.
+`shared.md` holds the cross-project guidelines that repo-sync's `agents` entry delivers, with
+`scripts/build-agents-md.sh`, to a downstream repo that builds its `AGENTS.md` from `shared.md` and
+its own `agents/project.md`. A downstream repo keeps its vendored copy as delivered and never edits
+it locally.
 
-- `shared.md` — cross-project guidelines. This repo is the canonical source; downstream repos
-  receive a vendored copy via the repo-sync workflow and must not edit it locally.
-- `project.md` — guidelines specific to the containing repo, appended after the shared partial.
-
-Rebuild with `bash scripts/build-agents-md.sh agents/shared.md agents/project.md AGENTS.md`
-(`bun run build:agents` here). CI fails the PR when `AGENTS.md` doesn't match the partials.
+This repo's own `AGENTS.md` is hand-kept: edit it directly. It does not build from `shared.md`.
 
 ## Wiring up a downstream repo
 

@@ -15,4 +15,4 @@ jobs:
       pull-requests: write
     uses: ./.github/workflows/bun-checks.yml
     with:
-      scripts: check:sync format:check lint:type-aware typecheck test
+      scripts: check:sync format:check lint:full typecheck test
