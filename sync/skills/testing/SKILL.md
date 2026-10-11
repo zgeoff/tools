@@ -532,10 +532,10 @@ does not prove expiry. Keep default configuration coverage separate. Wait out th
 when the runtime cannot expose a shorter faithful deadline, and run that case through an explicit
 script.
 
-A timer that a third-party library owns gets the same treatment when the library runs the timer
-internally and takes only a duration in its config. Pass the shortest duration the library accepts
-and wait on the observable event, never with a sleep. Add a control: the same duration with a live
-peer does not fire. Fake timers stay for libraries whose timers do not interleave with real I/O.
+When a third-party library owns a timer, runs it internally, and takes only a duration in its
+config, pass the shortest duration the library accepts and wait on the observable event, never with
+a sleep. Add a control: the same duration with a live peer does not fire. Fake timers stay for
+libraries whose timers do not interleave with real I/O.
 
 A real delay may define an end-to-end workload rate or a seeded fault-injection offset. State the
 rate or fault purpose and preserve replay information. A claim that a fault lands mid-operation
