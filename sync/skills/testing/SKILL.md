@@ -336,8 +336,8 @@ Reordering the tests or choosing unique keys hides the gap and leaves it for the
   a constant that only names a literal (`const EMPTY = ''`) never appears in a test file.
 - A domain type that crosses a module boundary gets a factory, `build-mock-<type>.ts` exporting
   `buildMock<Type>`, in the shared test utils as soon as a test needs one. A factory returns a value
-  and brings no resource into existence, so it takes the `build` prefix from the `code-style`
-  skill's naming table. A composite that writes rows creates a resource and keeps `create`. A type
+  and brings no resource into existence, so it takes the `build` prefix from the repo's
+  function-naming table. A composite that writes rows creates a resource and keeps `create`. A type
   that another package owns, such as an SDK result, is in the same position on first use. A type
   private to the module under test stays an inline literal.
 - A factory returns a complete plain object. Fields whose value is arbitrary default to
@@ -361,8 +361,8 @@ Reordering the tests or choosing unique keys hides the gap and leaves it for the
 - The test that uses a factory's value calls the factory itself. A helper that presets overrides is
   a second set of defaults that the reader cannot see.
 - A runtime stand-in that implements behaviour or assumptions about a dependency lives in the shared
-  test utils under a name for what it impersonates. Its prefix follows the `code-style` skill's
-  naming table. A stand-in that starts something long-running, such as a stub server, is
+  test utils under a name for what it impersonates. Its prefix follows the repo's function-naming
+  table. A stand-in that starts something long-running, such as a stub server, is
   `start-stub-<thing>.ts`. A stand-in that creates a resource, such as a stub repository on disk, is
   `create-stub-<thing>.ts`. Every other stand-in is `build-stub-<thing>.ts`. It has its own tests,
   which pin the assumptions it makes about the real thing. An executable stand-in script uses

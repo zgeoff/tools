@@ -69,10 +69,10 @@ report 'Process residue (date stamps, investigation framing, memory citations, Â
 # The words every zgeoff repo bans; a repo's AGENTS.md lists them with their legal senses.
 # Judgment-only bans (bites, floor, anchor) are not grepped. CAS stays case-sensitive so "CAs"
 # passes.
-# AGENTS.md holds the banned-words registry itself, and "code fence" is the legal markdown sense of
-# the word.
+# AGENTS.md and the agents/ partials hold the banned-words registry itself, and "code fence" is the
+# legal markdown sense of the word.
 report 'Banned words:' \
-  "$(grep_docs -nPi '\bsurfaces?\b|load-bearing|\bseams?\b|\bceilings?\b|(?<!code )\bfenc(e|es|ed|ing)\b|(?-i:\bCAS\b)|significantly|near-instant' -- "$@" ':(exclude)AGENTS.md')"
+  "$(grep_docs -nPi '\bsurfaces?\b|load-bearing|\bseams?\b|\bceilings?\b|(?<!code )\bfenc(e|es|ed|ing)\b|(?-i:\bCAS\b)|significantly|near-instant' -- "$@" ':(exclude)AGENTS.md' ':(exclude)agents')"
 
 report 'Filler with no term-of-art use:' \
   "$(grep_docs -nPi 'organically|earns its complexity|cheap insurance|lays (the )?foundation|the right level' -- "$@")"
