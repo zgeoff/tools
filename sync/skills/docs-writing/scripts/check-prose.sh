@@ -16,9 +16,10 @@ fi
 set -- "$@" ':(exclude).claude/skills/docs-writing' ':(exclude).claude/skills/project-docs-writing' \
   ':(exclude)sync/skills/docs-writing'
 
-# Every grep reads untracked files too, so a new doc is checked before it is staged.
+# Every grep reads untracked files too, so a new doc is checked before it is staged, and skips
+# binary files.
 grep_docs() {
-  git grep --untracked "$@"
+  git grep --untracked -I "$@"
 }
 
 list_markdown() {
@@ -97,6 +98,24 @@ report 'Number joined to its unit ("64KB"; write "64 KB"; code blocks are exempt
         next
       }
       if (open == "" && $0 ~ /(^|[^[:alnum:]_])[0-9]+(KB|MB|GB|TB|KiB|MiB|GiB|ms)([^[:alnum:]_]|$)/) print FILENAME":"FNR":"$0
+    }')"
+
+# Architecture docs state rules, never the values the code decides. A protocol-fixed period, a
+# design cap, or a measurement with its source is legal; rephrase it around the rule, or move the
+# measurement to the doc that owns it.
+report 'Values with units under docs/architecture (the code owns its values; code blocks are exempt):' \
+  "$(list_markdown "$@" | grep '^docs/architecture/' | xargs -r awk "$fence_awk"'
+    {
+      m = fence_marker($0)
+      if (m != "") {
+        rest = fence_rest($0, m)
+        if (open == "") open = m
+        else if (closes(m, rest)) open = ""
+        next
+      }
+      if (open != "") next
+      if ($0 ~ /(^|[^[:alnum:]_.])[0-9]+(\.[0-9]+)? ?(ms|s|min|h|d|KB|MB|GB|TB|KiB|MiB|GiB)([^[:alnum:]_]|$)/ ||
+        $0 ~ /(^|[^[:alnum:]_.])[0-9]+[ -](second|minute|hour|day|week)s?([^[:alnum:]_]|$)/) print FILENAME":"FNR":"$0
     }')"
 
 report 'Horizontal rules outside YAML frontmatter:' \

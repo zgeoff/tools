@@ -2,7 +2,8 @@
 # Checks sync/manifest.json against the rules the repo-sync workflow assumes:
 # unique entry names, a source file for every item, the repo-sync marker on
 # every source whose target is a workflow, a string `build` when present, and
-# every file under sync/skills/<name>/ listed by the entry that ships that skill.
+# every file under sync/skills/<name>/ listed by the entry that ships that skill, except the
+# tests, which stay here.
 # Usage: check-sync-manifest.sh [manifest]
 set -euo pipefail
 
@@ -56,7 +57,7 @@ if [ -d sync/skills ]; then
     done < <(jq -r --arg prefix "$prefix" --arg file "$file" \
       '.[] | select(any(.files[]; .source | startswith($prefix)))
         | select(any(.files[]; .source == $file) | not) | .name' "$manifest")
-  done < <(find sync/skills -type f | sort)
+  done < <(find sync/skills -type f -not -name '*.test.ts' | sort)
 fi
 
 exit "$errors"

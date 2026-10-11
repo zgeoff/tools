@@ -124,3 +124,34 @@ test('it passes when the entry lists every file in its skill folder', async () =
   expect(result.status).toBe(0);
   expect(result.stderr).toBe('');
 });
+
+test('it passes when the entry omits only a test beside a skill script', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, 'sync/skills/demo/scripts'), { recursive: true });
+  await writeFile(join(ctx.dir, 'sync/skills/demo/SKILL.md'), '# Demo\n');
+  await writeFile(join(ctx.dir, 'sync/skills/demo/scripts/check.sh'), 'exit 0\n');
+  await writeFile(join(ctx.dir, 'sync/skills/demo/scripts/check.test.ts'), '');
+
+  await writeFile(
+    join(ctx.dir, 'sync/manifest.json'),
+    JSON.stringify([
+      {
+        name: 'skill-demo',
+        description: 'The demo skill',
+        files: [
+          { source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' },
+          {
+            source: 'sync/skills/demo/scripts/check.sh',
+            target: '.claude/skills/demo/scripts/check.sh',
+          },
+        ],
+      },
+    ]),
+  );
+
+  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.dir, encoding: 'utf8' });
+
+  expect(result.status).toBe(0);
+  expect(result.stderr).toBe('');
+});

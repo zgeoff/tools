@@ -33,7 +33,7 @@ Files under [`skills/`](./skills/) are the shared base of a Claude skill, delive
 rules for the same area in a `project-<name>` skill beside it, which repo-sync never touches, and
 the shared skill tells the reader to load both. The entry lists every file in its skill folder,
 since the skill links its references by relative path; `scripts/check-sync-manifest.sh` fails on a
-file the entry omits.
+file the entry omits. A skill's tests sit beside its scripts and stay here.
 
 Files under [`hooks/`](./hooks/) are Claude Code hooks, delivered as opt-in entries to
 `.claude/hooks/<name>/`. Their tests stay here. `hook-skill-gate` delivers the skill gate: a
