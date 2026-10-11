@@ -23,7 +23,7 @@
     },
     "packages/bun-test-extended": {
       "name": "@zgeoff/bun-test-extended",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "jest-extended": "catalog:",
         "jest-matcher-utils": "catalog:",
@@ -35,7 +35,7 @@
     },
     "packages/bun-test-react": {
       "name": "@zgeoff/bun-test-react",
-      "version": "0.0.0",
+      "version": "0.2.0",
       "dependencies": {
         "@happy-dom/global-registrator": "catalog:",
         "@testing-library/jest-dom": "catalog:",
@@ -100,7 +100,7 @@
     },
     "packages/oxlint-config": {
       "name": "@zgeoff/oxlint-config",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@stylistic/eslint-plugin": "catalog:",
       },
@@ -114,7 +114,7 @@
     },
     "packages/tsconfig": {
       "name": "@zgeoff/tsconfig",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "dependencies": {
         "@tsconfig/strictest": "catalog:",
       },
