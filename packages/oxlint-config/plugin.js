@@ -1,4 +1,5 @@
 import functionVerb from './function-verb.js';
+import importZones from './import-zones.js';
 import maxConsecutiveLineComments from './max-consecutive-line-comments.js';
 import noJSDoc from './no-jsdoc.js';
 import testBesideModule from './test-beside-module.js';
@@ -97,6 +98,7 @@ const plugin = {
     'max-consecutive-line-comments': maxConsecutiveLineComments,
     'function-verb': functionVerb,
     'test-beside-module': testBesideModule,
+    'import-zones': importZones,
   },
 };
 

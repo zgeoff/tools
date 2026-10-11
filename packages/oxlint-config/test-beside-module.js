@@ -1,33 +1,18 @@
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, sep } from 'node:path';
+import findRepoRoot from './find-repo-root.js';
 
 const testFilePattern = /^(?<base>.+)\.test\.tsx?$/u;
 
 // suites that run the whole program have no single module to sit beside
 const exemptRootDirs = new Set(['e2e', 'evals']);
 
+// the repo root, not oxlint's working directory, so a per-package lint
+// script neither exempts a package's own e2e/ nor flags the root one
 function isUnderExemptRoot(cwd, filename) {
   const [first] = relative(findRepoRoot(filename) ?? cwd, filename).split(sep);
 
   return exemptRootDirs.has(first);
-}
-
-// the repo root, not oxlint's working directory, so a per-package lint
-// script neither exempts a package's own e2e/ nor flags the root one
-function findRepoRoot(filename) {
-  let dir = dirname(filename);
-
-  while (!existsSync(join(dir, '.git'))) {
-    const parent = dirname(dir);
-
-    if (parent === dir) {
-      return null;
-    }
-
-    dir = parent;
-  }
-
-  return dir;
 }
 
 // a module is `<name>.<ext>` with a single-segment extension, so a
