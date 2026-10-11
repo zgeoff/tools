@@ -76,9 +76,10 @@ whitespace change.
 
 A `<name>.test.ts` or `<name>.test.tsx` file needs a non-test file `<name>.<ext>` in the same
 directory — `.ts`, `.tsx`, `.sh`, `.json`, or any other single extension, so `install.test.ts` may
-test `install.sh`. Files under a root `e2e/` or `evals/` directory (relative to oxlint's working
-directory) are exempt; no other directory is. Exempt any other test with a file-level disable
-comment that states the reason:
+test `install.sh`. Files under an `e2e/` or `evals/` directory at the repo root (the nearest
+ancestor holding `.git`, else oxlint's working directory) are exempt; no other directory is. Exempt
+any other test with a file-level disable comment that states the reason. The rule reports at the
+first statement, so put the comment above it:
 
 ```ts
 // oxlint-disable zgeoff/test-beside-module -- tests base.json and react.json together

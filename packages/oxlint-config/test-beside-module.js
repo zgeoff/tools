@@ -1,5 +1,5 @@
-import { readdirSync } from 'node:fs';
-import { basename, dirname, relative, sep } from 'node:path';
+import { existsSync, readdirSync, statSync } from 'node:fs';
+import { basename, dirname, join, relative, sep } from 'node:path';
 
 const testFilePattern = /^(?<base>.+)\.test\.tsx?$/u;
 
@@ -7,23 +7,48 @@ const testFilePattern = /^(?<base>.+)\.test\.tsx?$/u;
 const exemptRootDirs = new Set(['e2e', 'evals']);
 
 function isUnderExemptRoot(cwd, filename) {
-  const [first] = relative(cwd, filename).split(sep);
+  const [first] = relative(findRepoRoot(filename) ?? cwd, filename).split(sep);
 
   return exemptRootDirs.has(first);
 }
 
-// a module is `<name>.<ext>` with a single-segment extension, so another
-// test (`<name>.test.ts`) or a declaration file never stands in for one
-function hasModuleSibling(dir, name) {
-  return readdirSync(dir, { withFileTypes: true }).some((entry) => {
-    if (!entry.isFile()) {
-      return false;
+// the repo root, not oxlint's working directory, so a per-package lint
+// script neither exempts a package's own e2e/ nor flags the root one
+function findRepoRoot(filename) {
+  let dir = dirname(filename);
+
+  while (!existsSync(join(dir, '.git'))) {
+    const parent = dirname(dir);
+
+    if (parent === dir) {
+      return null;
     }
 
-    const dot = entry.name.lastIndexOf('.');
+    dir = parent;
+  }
 
-    return dot > 0 && entry.name.slice(0, dot) === name;
+  return dir;
+}
+
+// a module is `<name>.<ext>` with a single-segment extension, so a
+// declaration file never stands in for one, and neither does another test
+// (`foo.test.ts` beside `foo.test.test.ts`)
+function hasModuleSibling(dir, name) {
+  return readdirSync(dir).some((entry) => {
+    const dot = entry.lastIndexOf('.');
+
+    return (
+      dot > 0 &&
+      entry.slice(0, dot) === name &&
+      !testFilePattern.test(entry) &&
+      isFile(join(dir, entry))
+    );
   });
+}
+
+// follows a symlink, so a linked module counts as the file it points at
+function isFile(path) {
+  return statSync(path, { throwIfNoEntry: false })?.isFile() ?? false;
 }
 
 const testBesideModule = {

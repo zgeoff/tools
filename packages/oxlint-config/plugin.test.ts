@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -51,28 +51,33 @@ async function runLint(source: string, fix: boolean, rules: RuleSettings): Promi
   return { exitCode, stdout, output };
 }
 
+type TreeLintResult = Omit<LintResult, 'output'>;
+
 async function runLintTree(
   files: FileTree,
   target: string,
   rules: RuleSettings,
-): Promise<LintResult> {
+): Promise<TreeLintResult> {
   const dir = await createLintTree(files, rules);
 
+  return runLintIn(dir, dir, target);
+}
+
+async function runLintIn(dir: string, cwd: string, target: string): Promise<TreeLintResult> {
   const args = [
     oxlintBin,
     '-c',
-    '.oxlintrc.json',
+    join(dir, '.oxlintrc.json'),
     '--report-unused-disable-directives-severity',
     'error',
     target,
   ];
 
-  const proc = Bun.spawn(args, { cwd: dir, stdout: 'pipe', stderr: 'pipe' });
+  const proc = Bun.spawn(args, { cwd, stdout: 'pipe', stderr: 'pipe' });
 
   const [exitCode, stdout] = await Promise.all([proc.exited, new Response(proc.stdout).text()]);
-  const output = await readFile(join(dir, target), 'utf8');
 
-  return { exitCode, stdout, output };
+  return { exitCode, stdout };
 }
 
 function collectTaxonomyVerbs(markdown: string): string[] {
@@ -439,6 +444,7 @@ test('it flags a .test.tsx file with no module beside it', async () => {
   );
 
   expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('view.<ext>');
 });
 
 test('it accepts a test beside a .ts, .tsx, .sh, or .json module', async () => {
@@ -450,7 +456,7 @@ test('it accepts a test beside a .ts, .tsx, .sh, or .json module', async () => {
     }),
   );
 
-  expect(results.map((result: Readonly<LintResult>) => result.exitCode)).toStrictEqual([
+  expect(results.map((result: Readonly<TreeLintResult>) => result.exitCode)).toStrictEqual([
     0, 0, 0, 0,
   ]);
 });
@@ -466,13 +472,32 @@ test('it accepts a .test.tsx file beside its module', async () => {
 });
 
 test('it counts neither another test nor a declaration file as the module', async () => {
-  const result = await runLintTree(
-    { 'egress.test.ts': testSource, 'egress.unit.test.ts': testSource, 'egress.d.ts': '' },
+  const declaration = await runLintTree(
+    { 'egress.test.ts': testSource, 'egress.d.ts': '' },
     'egress.test.ts',
     besideModule,
   );
 
-  expect(result.exitCode).toBe(1);
+  const otherTest = await runLintTree(
+    { 'egress.test.ts': testSource, 'egress.test.test.ts': testSource },
+    'egress.test.test.ts',
+    besideModule,
+  );
+
+  expect(declaration.exitCode).toBe(1);
+  expect(declaration.stdout).toInclude('egress.<ext>');
+  expect(otherTest.exitCode).toBe(1);
+  expect(otherTest.stdout).toInclude('egress.test.<ext>');
+});
+
+test('it counts a symlinked module', async () => {
+  const dir = await createLintTree({ 'real.ts': '', 'link.test.ts': testSource }, besideModule);
+
+  await symlink(join(dir, 'real.ts'), join(dir, 'link.ts'));
+
+  const result = await runLintIn(dir, dir, 'link.test.ts');
+
+  expect(result.exitCode).toBe(0);
 });
 
 test('it flags a test-kind suffix test beside only the base module', async () => {
@@ -513,7 +538,29 @@ test('it flags tests under test-utils/ or a nested e2e/ directory', async () => 
   );
 
   expect(testUtils.exitCode).toBe(1);
+  expect(testUtils.stdout).toInclude('fixtures.<ext>');
   expect(nestedE2E.exitCode).toBe(1);
+  expect(nestedE2E.stdout).toInclude('run.<ext>');
+});
+
+test('it anchors the e2e/ exemption on the repo root, not the working directory', async () => {
+  const dir = await createLintTree(
+    {
+      '.git/HEAD': '',
+      'e2e/root.test.ts': testSource,
+      'packages/cli/e2e/run.test.ts': testSource,
+    },
+    besideModule,
+  );
+
+  const packageCWD = join(dir, 'packages', 'cli');
+
+  const nested = await runLintIn(dir, packageCWD, 'e2e/run.test.ts');
+  const root = await runLintIn(dir, packageCWD, join(dir, 'e2e', 'root.test.ts'));
+
+  expect(nested.exitCode).toBe(1);
+  expect(nested.stdout).toInclude('run.<ext>');
+  expect(root.exitCode).toBe(0);
 });
 
 test('it honours a file-level disable comment with a reason', async () => {
