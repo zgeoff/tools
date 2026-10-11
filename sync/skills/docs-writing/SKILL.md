@@ -1,9 +1,9 @@
 ---
 name: docs-writing
 description:
-  How to write prose that gets committed to the repo — docs/, READMEs, AGENTS.md and agents/
-  partials, skills, and doc comments — plus the README and docs/ contracts and the scripts that
-  check them. Load it before writing, editing, or reviewing any of them.
+  How to write prose that gets committed to the repo — docs/, READMEs, AGENTS.md, skills, and doc
+  comments — plus the README and docs/ contracts and the scripts that check them. Load it before
+  writing, editing, or reviewing any of them.
 ---
 
 # Writing docs

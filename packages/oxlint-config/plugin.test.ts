@@ -5,7 +5,16 @@ import { dirname, join } from 'node:path';
 
 const oxlintBin = join(import.meta.dir, '..', '..', 'node_modules', '.bin', 'oxlint');
 const pluginPath = join(import.meta.dir, 'plugin.js');
-const sharedTaxonomyPath = join(import.meta.dir, '..', '..', 'agents', 'shared.md');
+
+const sharedTaxonomyPath = join(
+  import.meta.dir,
+  '..',
+  '..',
+  '.claude',
+  'skills',
+  'code-style',
+  'SKILL.md',
+);
 
 interface LintResult {
   exitCode: number;
@@ -81,7 +90,7 @@ async function runLintIn(dir: string, cwd: string, target: string): Promise<Tree
 }
 
 function collectTaxonomyVerbs(markdown: string): string[] {
-  const start = markdown.indexOf('### Function naming');
+  const start = markdown.indexOf('## Function naming');
   const end = markdown.indexOf('**Banned**');
   const section = markdown.slice(start, end);
   const verbs = section.match(/(?<=^\| `)[a-z]+/gmu) ?? [];

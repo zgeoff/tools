@@ -1,7 +1,6 @@
 # Reusable workflow: the pull-request checks every zgeoff Bun repo runs. A
 # gitleaks job scans the commits, and a checks job installs with the frozen
-# lockfile, fails on a hand-edited AGENTS.md when the repo builds one through
-# repo-sync, then runs each package script in `scripts` in order.
+# lockfile, then runs each package script in `scripts` in order.
 #
 # `scripts` is a space-separated list of package.json script names. Empty means
 # the standard list: audit deadcode format:check lint typecheck test. A name
@@ -83,12 +82,6 @@ jobs:
 
       - name: Install
         run: bun install --frozen-lockfile
-
-      - name: Check AGENTS.md drift
-        if: hashFiles('scripts/build-agents-md.sh') != '' && hashFiles('agents/project.md') != ''
-        run: |
-          bash scripts/build-agents-md.sh agents/shared.md agents/project.md AGENTS.md
-          git diff --exit-code AGENTS.md
 
       - name: Run the check scripts
         env:
