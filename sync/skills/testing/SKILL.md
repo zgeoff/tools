@@ -265,9 +265,10 @@ Each kind of state has one cleanup tool.
 `try`/`finally` never appears in a test. `onTestFinished` runs on failure as well, keeps teardown
 beside the acquisition, and needs no `?.` guard for a resource the test never reached. A shared test
 util may register `onTestFinished` for its callers. These helpers must run inside a test. A test of
-such a helper proves its cleanup ran by asserting in an `onTestFinished` hook. The hooks run
-first-in, first-out, so register that check after the helper's call, and register the removal of any
-directory the check reads after the check. This is the only place an assertion leaves the test body.
+such a helper proves its cleanup ran by asserting in an `onTestFinished` hook. `onTestFinished`
+hooks run first-in, first-out, so register that check after the helper's call, and register the
+removal of any directory the check reads after the check, not immediately after creating it. This is
+the only place an assertion leaves the test body.
 
 When resources have cleanup dependencies, register one callback that closes them in the required
 order. Every cleanup must run even if another cleanup throws. Use a disposable stack when reverse
@@ -439,8 +440,8 @@ pass, and it returns data, never clients, apps, or servers.
   literal input and pins the full output inline. A determinism test asserts that the same input
   gives equal outputs: `expect(run(input)).toStrictEqual(run(input))`. The golden input is never a
   factory call, because regenerating snapshots must never change the input. Beside those two tests,
-  a large seeded regression input may pin its output by length and SHA-256 when the output is too
-  large to inline.
+  a test may pin the output of a large seeded regression input by its length and SHA-256 when that
+  output is too large to inline.
 - A stand-in's derived values, such as a fake hash or a fake signature, are not contract. Assert
   their properties: their shape, that the same input gives the same output, and that different
   inputs give different outputs.
@@ -552,9 +553,9 @@ matter to the contract to justify a dwell.
 
 Stand-ins replace a boundary, never the code inside it. A test never stubs `fetch`, an HTTP client,
 or a method of the unit's own services: the path from the call to the boundary runs for real,
-including serialisation and error handling. One exception: a recorder may stand in for an own
-package at its boundary, when that package's kernel edge has its own tests and the test asserts only
-whether and how the call was made.
+including serialisation and error handling. One exception: a recorder may stand in for one of the
+unit's own packages at that package's boundary, when the package's kernel edge has its own tests and
+the test asserts only whether and how the call was made.
 
 | Boundary                                       | The test uses                                                                         |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------- |
@@ -589,10 +590,10 @@ behavior keeps MSW where it applies.
 A real temp tree costs about 1 to 2 ms per test for a handful of small files, and more as the tree
 grows. A test pays that for real behaviour: `fs.watch`, permissions, symlinks, `Bun.file`, and
 `Bun.write`, which an in-memory filesystem fakes or misses. Take every path from the temp root and
-pass it into the module. When a test needs a disk feature that a tmpfs temp root lacks, such as
-FIEMAP, make `/var/tmp`, the disk-backed temp root, the parent of the fresh per-test directory.
-Never steer a module through `process.cwd()` or through a `HOME` value set after startup, because
-Bun reads some of those once at startup.
+pass it into the module. Never steer a module through `process.cwd()` or through a `HOME` value set
+after startup, because Bun reads some of those once at startup. When a test needs a disk feature
+that a tmpfs temp root lacks, such as the FIEMAP extent-mapping ioctl, make `/var/tmp`, the
+disk-backed temp root, the parent of the fresh per-test directory.
 
 ### Program-fixed paths and global resources
 
