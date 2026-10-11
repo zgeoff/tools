@@ -217,7 +217,10 @@ never appear in a test file.
   conditional setup flag.
 - A test file declares one function, `setupTest()`, and nothing else. A helper the tests want goes
   one of three ways: inline it where it is used, swap it for a registered matcher, or move it to the
-  shared test utils with tests of its own. A file with nothing to wire has no `setupTest()`.
+  shared test utils with tests of its own. A file with nothing to wire has no `setupTest()`. One
+  exception: a collection-time skip gate may keep its awaited probe, and named gates derived from
+  it, at module level. Only `skipIf` reads them, each repeated condition is named once, and a
+  comment gives the reason: Bun 1.4.2's `skipIf` takes a boolean and has no in-body skip.
 - Each test file keeps its own `setupTest()`. A shared one gathers a flag for every suite that uses
   it.
 
@@ -262,9 +265,9 @@ Each kind of state has one cleanup tool.
 `try`/`finally` never appears in a test. `onTestFinished` runs on failure as well, keeps teardown
 beside the acquisition, and needs no `?.` guard for a resource the test never reached. A shared test
 util may register `onTestFinished` for its callers. These helpers must run inside a test. A test of
-such a helper proves its cleanup ran by registering an `onTestFinished` hook after the helper's
-call, so the hook runs after the helper's release, and asserting in that hook. This is the only
-place an assertion leaves the test body.
+such a helper proves its cleanup ran by asserting in an `onTestFinished` hook. The hooks run
+first-in, first-out, so register that check after the helper's call, and register the removal of any
+directory the check reads after the check. This is the only place an assertion leaves the test body.
 
 When resources have cleanup dependencies, register one callback that closes them in the required
 order. Every cleanup must run even if another cleanup throws. Use a disposable stack when reverse
@@ -435,7 +438,9 @@ pass, and it returns data, never clients, apps, or servers.
 - A deterministic pipeline's suite opens with two tests. A frozen-golden test feeds one hand-written
   literal input and pins the full output inline. A determinism test asserts that the same input
   gives equal outputs: `expect(run(input)).toStrictEqual(run(input))`. The golden input is never a
-  factory call, because regenerating snapshots must never change the input.
+  factory call, because regenerating snapshots must never change the input. Beside those two tests,
+  a large seeded regression input may pin its output by length and SHA-256 when the output is too
+  large to inline.
 - A stand-in's derived values, such as a fake hash or a fake signature, are not contract. Assert
   their properties: their shape, that the same input gives the same output, and that different
   inputs give different outputs.
@@ -547,7 +552,9 @@ matter to the contract to justify a dwell.
 
 Stand-ins replace a boundary, never the code inside it. A test never stubs `fetch`, an HTTP client,
 or a method of the unit's own services: the path from the call to the boundary runs for real,
-including serialisation and error handling.
+including serialisation and error handling. One exception: a recorder may stand in for an own
+package at its boundary, when that package's kernel edge has its own tests and the test asserts only
+whether and how the call was made.
 
 | Boundary                                       | The test uses                                                                         |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------- |
@@ -582,8 +589,10 @@ behavior keeps MSW where it applies.
 A real temp tree costs about 1 to 2 ms per test for a handful of small files, and more as the tree
 grows. A test pays that for real behaviour: `fs.watch`, permissions, symlinks, `Bun.file`, and
 `Bun.write`, which an in-memory filesystem fakes or misses. Take every path from the temp root and
-pass it into the module. Never steer a module through `process.cwd()` or through a `HOME` value set
-after startup, because Bun reads some of those once at startup.
+pass it into the module. When a test needs a disk feature that a tmpfs temp root lacks, such as
+FIEMAP, make `/var/tmp`, the disk-backed temp root, the parent of the fresh per-test directory.
+Never steer a module through `process.cwd()` or through a `HOME` value set after startup, because
+Bun reads some of those once at startup.
 
 ### Program-fixed paths and global resources
 

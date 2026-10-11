@@ -13,7 +13,9 @@ preloads, matcher types, and file layout do not apply.
   `lib.debug.runTests`; select nix-unit when cases need independent reporting of evaluation errors.
   Pin the runner and check compatibility with the project's Nix implementation.
 - Reuse immutable VM/module definitions and infrastructure defaults. Sharing a pure definition does
-  not share mutable test state. Keep the options that select a case in that case.
+  not share mutable test state. Keep the options that select a case in that case. Shared test hosts
+  may stay in a `let` that several cases read, when each case that asserts one of their values has a
+  one-line comment that names the option it depends on.
 - Build generated files before checks that must read their contents. Preserve these checks when
   adopting an evaluation runner; an evaluator does not replace build-time behavior.
 
