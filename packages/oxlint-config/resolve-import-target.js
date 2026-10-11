@@ -87,8 +87,8 @@ function toSubpathMap(exports) {
   return isSubpathMap || exports === undefined ? exports : { '.': exports };
 }
 
-// an exact key wins; otherwise the `*` pattern with the longest prefix, its
-// match substituted into the target
+// an exact key wins; otherwise the `*` pattern with the longest prefix, then
+// the longest key, as node picks it, its match substituted into the target
 function findMappedTarget(map, key, conditions) {
   if (typeof map !== 'object' || map === null) {
     return null;
@@ -100,7 +100,11 @@ function findMappedTarget(map, key, conditions) {
 
   const [pattern] = Object.keys(map)
     .filter((candidate) => isPatternMatch(candidate, key))
-    .toSorted((left, right) => right.indexOf('*') - left.indexOf('*'));
+    .toSorted((left, right) => {
+      const byPrefix = right.indexOf('*') - left.indexOf('*');
+
+      return byPrefix === 0 ? right.length - left.length : byPrefix;
+    });
 
   return pattern === undefined ? null : findPatternTarget(map, pattern, { key, conditions });
 }

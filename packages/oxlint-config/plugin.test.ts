@@ -966,3 +966,28 @@ test('it accepts a call of a local binding named like a restricted global', asyn
 
   expect(result.exitCode).toBe(0);
 });
+
+test('it picks the longer export pattern when two share a prefix', async () => {
+  const manifest = { name: 'demo', exports: { './*': './src/*.ts', './*.js': './scripts/*.ts' } };
+
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { core: ['src/**'], tooling: ['scripts/**'] },
+        edges: [{ name: 'core-no-tooling', from: ['core'], to: ['tooling'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'package.json': JSON.stringify(manifest),
+    'src/index.ts': "import { run } from 'demo/run.js';\n\nrun();\n",
+    'scripts/run.ts': 'export function run(): void {}\n',
+  };
+
+  const result = await runLintTree(files, 'src/index.ts', rules);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('core-no-tooling: core must not import scripts/run.ts');
+});
