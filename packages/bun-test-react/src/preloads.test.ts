@@ -1,3 +1,4 @@
+// oxlint-disable zgeoff/test-beside-module -- tests the zustand.ts and index.ts preloads together in a child bun test
 import { expect, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';

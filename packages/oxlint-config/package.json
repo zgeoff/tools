@@ -14,6 +14,7 @@
     "function-verb.js",
     "max-consecutive-line-comments.js",
     "no-jsdoc.js",
+    "test-beside-module.js",
     "index.js"
   ],
   "type": "module",

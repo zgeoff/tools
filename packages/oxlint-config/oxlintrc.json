@@ -28,6 +28,7 @@
     "zgeoff/no-jsdoc": "error",
     "zgeoff/max-consecutive-line-comments": ["error", { "max": 3 }],
     "zgeoff/function-verb": "error",
+    "zgeoff/test-beside-module": "error",
 
     // enforced comment style — line comments unless JSDoc or exclamation
     "@stylistic/multiline-comment-style": [

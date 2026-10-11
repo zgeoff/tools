@@ -1,3 +1,4 @@
+// oxlint-disable zgeoff/test-beside-module -- tests the base.json and react.json configs together, which share no file name
 import { expect, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
