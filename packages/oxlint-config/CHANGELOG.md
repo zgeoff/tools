@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.0...@zgeoff/oxlint-config@0.2.1) (2026-10-11)
+
+### Features
+
+- **oxlint-config:** add zgeoff/import-zones for module boundaries
+  ([#116](https://github.com/zgeoff/tools/issues/116))
+  ([4d1dac8](https://github.com/zgeoff/tools/commit/4d1dac8718f0083534207e5059826ab1590d1021))
+
 ## [0.2.0](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.1.0...@zgeoff/oxlint-config@0.2.0) (2026-10-11)
 
 ### ⚠ BREAKING CHANGES
