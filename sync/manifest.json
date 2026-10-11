@@ -87,7 +87,7 @@
   },
   {
     "name": "skill-docs-writing",
-    "description": "The shared docs-writing skill and its prose check script; a repo keeps its own rules in a project-docs-writing skill",
+    "description": "The shared docs-writing skill and its prose, length and link check scripts; a repo keeps its own rules in a project-docs-writing skill",
     "optIn": true,
     "files": [
       {
@@ -97,6 +97,16 @@
       {
         "source": "sync/skills/docs-writing/scripts/check-prose.sh",
         "target": ".claude/skills/docs-writing/scripts/check-prose.sh",
+        "mode": "0755"
+      },
+      {
+        "source": "sync/skills/docs-writing/scripts/check-length.sh",
+        "target": ".claude/skills/docs-writing/scripts/check-length.sh",
+        "mode": "0755"
+      },
+      {
+        "source": "sync/skills/docs-writing/scripts/check-links.sh",
+        "target": ".claude/skills/docs-writing/scripts/check-links.sh",
         "mode": "0755"
       }
     ]
