@@ -155,7 +155,8 @@ A README reader wants three things, in order: the pitch, the install, and the ca
 their configuration. Everything else lives in a guide in `docs/`, in `--help`, or in the config
 schema.
 
-A package README (one for a published package) has six sections, in this order:
+A package README (one for a published package, classified as the table below states) has six
+sections, in this order:
 
 1. Hero: the logo or title, badges, and at most 3 links.
 2. Pitch: 1 to 2 short paragraphs and the demo, when one exists. The pitch names the 2 or 3 actions
@@ -169,7 +170,8 @@ A package README (one for a published package) has six sections, in this order:
 A plain repo README (a repo that publishes no package) has one paragraph, then Quick start, Checks,
 Layout, and Documentation. A sub-package or folder README documents its own folder.
 
-`check-length.sh` classifies each README and fails the run above its limit:
+`check-length.sh` classifies each README outside `docs/` and `.claude/`, and fails the run above its
+limit:
 
 | README      | Classified by                                                | Target | Limit |
 | ----------- | ------------------------------------------------------------ | ------ | ----- |
@@ -417,8 +419,8 @@ passes with this skill as its only reference.
    runs `check-prose.sh` over the READMEs and the Markdown under `docs/`. It fails on a README over
    its limit or on a prose violation. Pass `--package <readme>` for a package README whose
    package.json is private. `check-links.sh` checks every relative link and anchor in the READMEs
-   and `docs/`, and fails on a broken one. To check other prose, such as a skill or AGENTS.md, run
-   `check-prose.sh <path>...` on it.
+   and `docs/` (outside `.claude/`), and fails on a broken one. Pass paths to check other Markdown.
+   To check other prose, such as a skill or AGENTS.md, run `check-prose.sh <path>...` on it.
 
    `check-prose.sh` fails on process residue, greppable banned words, values with units under
    `docs/architecture/`, formatting violations, and untagged code fences. It then prints candidate
