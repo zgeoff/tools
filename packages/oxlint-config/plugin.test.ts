@@ -579,3 +579,424 @@ test('it honours a file-level disable comment with a reason', async () => {
 
   expect(result.exitCode).toBe(0);
 });
+
+const layered = {
+  'zgeoff/import-zones': [
+    'error',
+    {
+      zones: {
+        core: ['src/**'],
+        support: ['src/{config,state}/**'],
+        stage: ['src/{judge,rules}/**'],
+        network: ['src/model/**'],
+        tooling: ['scripts/**'],
+      },
+      edges: [
+        { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
+        {
+          name: 'support',
+          from: ['support'],
+          allow: ['support'],
+          allowTypeOnly: ['**/types.ts'],
+          reason: 'support modules sit below the stages',
+        },
+        { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
+      ],
+      modules: [
+        {
+          name: 'network',
+          modules: ['node:https', 'node:http'],
+          from: ['core'],
+          allow: ['network'],
+          allowTypeOnly: true,
+        },
+      ],
+      globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
+      unzoned: [
+        {
+          name: 'zone-assignment',
+          from: ['core'],
+          zones: ['support', 'stage', 'network'],
+          ignore: ['**/*.test.ts'],
+        },
+      ],
+      unresolved: [{ name: 'unresolved', from: ['core'] }],
+    },
+  ],
+};
+
+test('it flags an import across a forbidden edge', async () => {
+  const result = await runLintTree(
+    {
+      'src/config/read-config.ts': "import { run } from '../../scripts/run';\n\nrun();\n",
+      'scripts/run.ts': 'export function run(): void {}\n',
+    },
+    'src/config/read-config.ts',
+    layered,
+  );
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('import-zones');
+  expect(result.stdout).toInclude('core-no-tooling: core must not import scripts/run.ts (tooling)');
+});
+
+test('it accepts an import the zones allow', async () => {
+  const result = await runLintTree(
+    {
+      'src/judge/run-judge.ts':
+        "import { readState } from '../state/read-state';\nimport { split } from './split';\n\nreadState(split());\n",
+      'src/state/read-state.ts': 'export function readState(): void {}\n',
+      'src/judge/split.ts': 'export function split(): void {}\n',
+    },
+    'src/judge/run-judge.ts',
+    layered,
+  );
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it flags an import into a zone outside the allow list, with the reason', async () => {
+  const result = await runLintTree(
+    {
+      'src/config/read-config.ts': "import { judge } from '../judge/judge.ts';\n\njudge();\n",
+      'src/judge/judge.ts': 'export function judge(): void {}\n',
+    },
+    'src/config/read-config.ts',
+    layered,
+  );
+
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout).toInclude(
+    'support: support must not import src/judge/judge.ts (core, stage) — support modules sit below the stages',
+  );
+});
+
+test('it flags a stage that imports another stage but not its own folder', async () => {
+  const files = {
+    'src/judge/run-judge.ts': "import { split } from '../rules/split';\n\nsplit();\n",
+    'src/rules/split.ts': 'export function split(): void {}\n',
+  };
+
+  const result = await runLintTree(files, 'src/judge/run-judge.ts', layered);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('stages: stage must not import src/rules/split.ts (core, stage)');
+});
+
+test('it accepts a type-only import where the edge allows one', async () => {
+  const files = {
+    'src/config/read-config.ts':
+      "import type { Verdict } from '../judge/types';\n\nexport const verdict: Verdict = 'allow';\n",
+    'src/judge/types.ts': "export type Verdict = 'allow' | 'deny';\n",
+  };
+
+  const result = await runLintTree(files, 'src/config/read-config.ts', layered);
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it flags a type-only import of a file the edge does not exempt', async () => {
+  const files = {
+    'src/config/read-config.ts':
+      "import { type Verdict } from '../judge/judge';\n\nexport const verdict: Verdict = 'allow';\n",
+    'src/judge/judge.ts': "export type Verdict = 'allow' | 'deny';\n",
+  };
+
+  const result = await runLintTree(files, 'src/config/read-config.ts', layered);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('support: support must not import src/judge/judge.ts');
+});
+
+test('it judges re-exports, dynamic imports, require calls and import types', async () => {
+  const source = [
+    "export { run } from '../../scripts/run';",
+    "export * from '../../scripts/run';",
+    "await import('../../scripts/run');",
+    'require(`../../scripts/run`);',
+    "export type Run = import('../../scripts/run').Run;",
+    '',
+  ].join('\n');
+
+  const files = {
+    'src/model/send.ts': source,
+    'scripts/run.ts': 'export type Run = () => void;\nexport function run(): void {}\n',
+  };
+
+  const result = await runLintTree(files, 'src/model/send.ts', layered);
+
+  const reports = result.stdout.match(/core-no-tooling: /gu) ?? [];
+
+  expect(result.exitCode).toBe(1);
+  expect(reports).toHaveLength(5);
+});
+
+test('it flags a restricted module outside its zones', async () => {
+  const files = {
+    'src/state/send.ts': "import { request } from 'node:https';\n\nrequest('https://x.test');\n",
+  };
+
+  const result = await runLintTree(files, 'src/state/send.ts', layered);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('network: node:https is allowed only in network');
+});
+
+test('it accepts a restricted module inside its zone, out of scope, or imported for types', async () => {
+  const files = {
+    'src/model/send.ts': "import { request } from 'https';\n\nrequest('https://x.test');\n",
+    'src/state/agent.ts':
+      "import type { Agent } from 'node:https';\n\nexport const agents: Agent[] = [];\n",
+    'scripts/send.ts': "import { request } from 'node:https';\n\nrequest('https://x.test');\n",
+  };
+
+  const dir = await createLintTree(files, layered);
+
+  const results = await Promise.all(
+    ['src/model/send.ts', 'src/state/agent.ts', 'scripts/send.ts'].map((target: string) =>
+      runLintIn(dir, dir, target),
+    ),
+  );
+
+  expect(results.map((result: TreeLintResult) => result.exitCode)).toStrictEqual([0, 0, 0]);
+});
+
+test('it flags a restricted global call outside its zones', async () => {
+  const files = {
+    'src/state/send.ts':
+      "await fetch('https://x.test');\nawait globalThis.fetch('https://x.test');\n",
+    'src/model/send.ts': "await fetch('https://x.test');\n",
+  };
+
+  const dir = await createLintTree(files, layered);
+  const outside = await runLintIn(dir, dir, 'src/state/send.ts');
+  const inside = await runLintIn(dir, dir, 'src/model/send.ts');
+
+  expect(outside.exitCode).toBe(1);
+  expect(outside.stdout.match(/network: fetch\(\) is allowed only in network/gu)).toHaveLength(2);
+  expect(inside.exitCode).toBe(0);
+});
+
+test('it flags a file that belongs to none of the required zones, unless ignored', async () => {
+  const files = {
+    'src/stray/run.ts': 'export const answer = 42;\n',
+    'src/stray/run.test.ts': 'export const answer = 42;\n',
+  };
+
+  const dir = await createLintTree(files, layered);
+  const stray = await runLintIn(dir, dir, 'src/stray/run.ts');
+  const ignored = await runLintIn(dir, dir, 'src/stray/run.test.ts');
+
+  expect(stray.exitCode).toBe(1);
+
+  expect(stray.stdout).toInclude(
+    'zone-assignment: this file belongs to none of support, stage, network',
+  );
+
+  expect(ignored.exitCode).toBe(0);
+});
+
+test('it flags an unresolved relative import and a computed specifier', async () => {
+  const files = {
+    'src/state/read.ts': "import { gone } from './gone';\n\nawait import(gone);\n",
+  };
+
+  const result = await runLintTree(files, 'src/state/read.ts', layered);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('unresolved: cannot resolve ./gone');
+  expect(result.stdout).toInclude('unresolved: cannot check a computed import specifier');
+});
+
+test('it resolves the package’s own name through its exports and conditions', async () => {
+  const manifest = {
+    name: 'demo',
+    exports: {
+      '.': { types: './dist/index.d.ts', default: './dist/index.js' },
+      './internal': { 'demo-source': './scripts/run.ts', default: './dist/run.js' },
+    },
+  };
+
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { core: ['src/**'], tooling: ['scripts/**'] },
+        conditions: ['demo-source'],
+        edges: [{ name: 'core-no-tooling', from: ['core'], to: ['tooling'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'package.json': JSON.stringify(manifest),
+    'src/index.ts': "import { run } from 'demo/internal';\n\nrun();\n",
+    'scripts/run.ts': 'export function run(): void {}\n',
+  };
+
+  const result = await runLintTree(files, 'src/index.ts', rules);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('core-no-tooling: core must not import scripts/run.ts');
+});
+
+test('it resolves a .js specifier to the .ts source beside it', async () => {
+  const files = {
+    'src/config/read-config.ts': "import { run } from '../../scripts/run.js';\n\nrun();\n",
+    'scripts/run.ts': 'export function run(): void {}\n',
+  };
+
+  const result = await runLintTree(files, 'src/config/read-config.ts', layered);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('core-no-tooling: core must not import scripts/run.ts');
+});
+
+test('it honours a next-line disable comment with a reason on a forbidden edge', async () => {
+  const source = [
+    '// oxlint-disable-next-line zgeoff/import-zones -- GEO-1 moves run into src/',
+    "import { run } from '../../scripts/run';",
+    '',
+    'run();',
+    '',
+  ].join('\n');
+
+  const files = {
+    'src/config/read-config.ts': source,
+    'scripts/run.ts': 'export function run(): void {}\n',
+  };
+
+  const result = await runLintTree(files, 'src/config/read-config.ts', layered);
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it exempts an allow zone inside a to zone', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { core: ['src/**'], mods: ['mods/**'], contract: ['mods/app/contract/**'] },
+        edges: [{ name: 'apart', from: ['core'], to: ['mods'], allow: ['contract'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'src/read.ts': "import { shape } from '../mods/app/contract/shape';\n\nshape();\n",
+    'src/hook.ts': "import { hook } from '../mods/app/hook';\n\nhook();\n",
+    'mods/app/contract/shape.ts': 'export function shape(): void {}\n',
+    'mods/app/hook.ts': 'export function hook(): void {}\n',
+  };
+
+  const dir = await createLintTree(files, rules);
+  const contract = await runLintIn(dir, dir, 'src/read.ts');
+  const hook = await runLintIn(dir, dir, 'src/hook.ts');
+
+  expect(contract.exitCode).toBe(0);
+  expect(hook.exitCode).toBe(1);
+  expect(hook.stdout).toInclude('apart: core must not import mods/app/hook.ts (mods)');
+});
+
+test('it rejects an edge with neither to nor allow', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      { zones: { core: ['src/**'] }, edges: [{ name: 'empty', from: ['core'] }] },
+    ],
+  };
+
+  const result = await runLintTree(
+    { 'src/read.ts': 'export const a = 1;\n' },
+    'src/read.ts',
+    rules,
+  );
+
+  expect(result.exitCode).not.toBe(0);
+  expect(result.stdout).toInclude("Options validation failed for rule 'zgeoff/import-zones'");
+});
+
+test('it resolves # imports and export patterns through the package manifest', async () => {
+  const manifest = {
+    name: 'demo',
+    imports: { '#tools/*': './scripts/*.ts', '#parser': 'oxc-parser' },
+    exports: { '.': './src/index.ts', './*': ['./scripts/*.ts'] },
+  };
+
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { core: ['src/**'], tooling: ['scripts/**'] },
+        edges: [{ name: 'core-no-tooling', from: ['core'], to: ['tooling'] }],
+        modules: [{ name: 'parser', modules: ['oxc-parser'], from: ['core'], allow: [] }],
+      },
+    ],
+  };
+
+  const source = [
+    "import { run } from '#tools/run';",
+    "import { build } from 'demo/build';",
+    "import { parse } from '#parser';",
+    '',
+    'run(build(parse));',
+    '',
+  ].join('\n');
+
+  const files = {
+    'package.json': JSON.stringify(manifest),
+    'src/index.ts': source,
+    'scripts/run.ts': 'export function run(): void {}\n',
+    'scripts/build.ts': 'export function build(): void {}\n',
+  };
+
+  const result = await runLintTree(files, 'src/index.ts', rules);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('core-no-tooling: core must not import scripts/run.ts');
+  expect(result.stdout).toInclude('core-no-tooling: core must not import scripts/build.ts');
+  expect(result.stdout).toInclude('parser: oxc-parser is allowed only in no zone');
+});
+
+test('it accepts a call of a local binding named like a restricted global', async () => {
+  const source = [
+    "import { fetch } from 'undici';",
+    '',
+    "await fetch('https://x.test');",
+    '',
+    'export function send(self: { fetch: (url: string) => void }): void {',
+    "  self.fetch('https://x.test');",
+    '}',
+    '',
+  ].join('\n');
+
+  const result = await runLintTree({ 'src/state/send.ts': source }, 'src/state/send.ts', layered);
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it picks the longer export pattern when two share a prefix', async () => {
+  const manifest = { name: 'demo', exports: { './*': './src/*.ts', './*.js': './scripts/*.ts' } };
+
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { core: ['src/**'], tooling: ['scripts/**'] },
+        edges: [{ name: 'core-no-tooling', from: ['core'], to: ['tooling'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'package.json': JSON.stringify(manifest),
+    'src/index.ts': "import { run } from 'demo/run.js';\n\nrun();\n",
+    'scripts/run.ts': 'export function run(): void {}\n',
+  };
+
+  const result = await runLintTree(files, 'src/index.ts', rules);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('core-no-tooling: core must not import scripts/run.ts');
+});

@@ -15,6 +15,12 @@
     "max-consecutive-line-comments.js",
     "no-jsdoc.js",
     "test-beside-module.js",
+    "import-zones.js",
+    "import-zones-schema.js",
+    "find-repo-root.js",
+    "load-zone-options.js",
+    "make-glob-matcher.js",
+    "resolve-import-target.js",
     "index.js"
   ],
   "type": "module",

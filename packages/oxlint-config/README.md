@@ -6,8 +6,9 @@ restriction-rule cherry-picks, comment-style enforcement via `@stylistic`, and a
 function declarations, bare named exports, destructured and inline-typed parameters, ternary and
 await arguments, awaits hidden inside a control-flow condition or a `&&`/`||`/`??` chain, every
 JSDoc block, and any run of more than three line comments. `zgeoff/function-verb` enforces the
-function-naming taxonomy from the shared agent guidelines, and `zgeoff/test-beside-module` keeps
-each test file beside the module it tests.
+function-naming taxonomy from the shared agent guidelines, `zgeoff/test-beside-module` keeps each
+test file beside the module it tests, and `zgeoff/import-zones` fails an import that crosses a
+module boundary the repo declares.
 
 ## Usage
 
@@ -87,6 +88,67 @@ first statement, so put the comment above it:
 
 A second test file for a module (`<name>.host.test.ts`) needs its own `<name>.host.<ext>`, so the
 rule reports it beside only `<name>.ts`.
+
+## `zgeoff/import-zones`
+
+Off unless a repo configures it. The options name zones (path globs, relative to the repo root) and
+the boundaries between them. A file belongs to every zone its path matches, so zones may overlap.
+Each entry has a `name`, which starts its report, an optional `reason`, which ends it, and optional
+`from` zones and `ignore` globs that limit which importing files it judges.
+
+- `edges` judge an import that resolves to a file: relative, or the package's own name resolved
+  through its `exports` under `conditions` plus `default`. A target in a `to` zone fails unless it
+  is also in an `allow` zone; with `allow` alone, a target in none of the `allow` zones fails, a
+  target in no zone included. `allowTypeOnly` exempts type-only imports (`true`, or globs the target
+  must match), and `allowWithin: "src/*"` exempts an import inside the importer's own `src/<name>/`.
+- `modules` restrict a package or builtin (`node:` prefix optional, subpaths included) to the
+  `allow` zones; `allowTypeOnly: true` exempts type-only imports.
+- `globals` restrict a call to a global, bare or through `globalThis`, `self` or `window`.
+- `unzoned` reports a file in a `from` zone that belongs to none of `zones`.
+- `unresolved` reports a relative or self-referencing import that resolves to no file, and a dynamic
+  `import()` or `require()` whose specifier is computed.
+
+```jsonc
+{
+  "rules": {
+    "zgeoff/import-zones": [
+      "error",
+      {
+        "zones": {
+          "core": ["src/**"],
+          "support": ["src/{config,state}/**"],
+          "process": ["src/process/**"],
+          "tooling": ["scripts/**"],
+        },
+        "edges": [
+          { "name": "core-no-tooling", "from": ["core"], "to": ["tooling"] },
+          {
+            "name": "support",
+            "from": ["support"],
+            "allow": ["support"],
+            "allowTypeOnly": ["**/types.ts"],
+            "reason": "support modules sit below the stages",
+          },
+        ],
+        "modules": [
+          {
+            "name": "child-process",
+            "modules": ["node:child_process"],
+            "from": ["core"],
+            "allow": ["process"],
+            "allowTypeOnly": true,
+          },
+        ],
+        "unresolved": [{ "name": "unresolved", "from": ["core"] }],
+      },
+    ],
+  },
+}
+```
+
+Exempt a known violation with a next-line disable comment that names the ticket that removes it. An
+unzoned report sits on the first statement, so its comment goes above that. Run lint with
+`--report-unused-disable-directives-severity error` so a comment outlives no import.
 
 ## Notes
 

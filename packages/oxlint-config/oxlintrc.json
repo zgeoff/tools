@@ -38,10 +38,12 @@
     ],
 
     // own-line comments get a blank line above so they don't crowd the
-    // previous statement; comments opening a block/object/class/etc are exempt
+    // previous statement; comments opening a block/object/class/etc are exempt,
+    // and so are oxlint directives, which oxfmt's import sort packs tight
     "@stylistic/lines-around-comment": [
       "error",
       {
+        "ignorePattern": "^\\s*oxlint-",
         "beforeLineComment": true,
         "beforeBlockComment": true,
         "allowBlockStart": true,
