@@ -23,7 +23,7 @@ grep_docs() {
 }
 
 list_markdown() {
-  git ls-files --cached --others --exclude-standard -- "$@" | grep '\.md$'
+  git -c core.quotePath=false ls-files --cached --others --exclude-standard -- "$@" | grep '\.md$'
 }
 
 # Tracks fenced code blocks (backtick or tilde, any indent, closed by the same marker at least as
@@ -100,9 +100,9 @@ report 'Number joined to its unit ("64KB"; write "64 KB"; code blocks are exempt
       if (open == "" && $0 ~ /(^|[^[:alnum:]_])[0-9]+(KB|MB|GB|TB|KiB|MiB|GiB|ms)([^[:alnum:]_]|$)/) print FILENAME":"FNR":"$0
     }')"
 
-# Architecture docs state rules, never the values the code decides. A protocol-fixed period, a
-# design cap, or a measurement with its source is legal; rephrase it around the rule, or move the
-# measurement to the doc that owns it.
+# Architecture docs state rules, never values. Code spans are dropped first, since a command the
+# reader types may hold a value. A bare s, d or h joined to its number is no unit here ("1990s",
+# "2d"); its spaced form is.
 report 'Values with units under docs/architecture (the code owns its values; code blocks are exempt):' \
   "$(list_markdown "$@" | grep '^docs/architecture/' | xargs -r awk "$fence_awk"'
     {
@@ -114,8 +114,11 @@ report 'Values with units under docs/architecture (the code owns its values; cod
         next
       }
       if (open != "") next
-      if ($0 ~ /(^|[^[:alnum:]_.])[0-9]+(\.[0-9]+)? ?(ms|s|min|h|d|KB|MB|GB|TB|KiB|MiB|GiB)([^[:alnum:]_]|$)/ ||
-        $0 ~ /(^|[^[:alnum:]_.])[0-9]+[ -](second|minute|hour|day|week)s?([^[:alnum:]_]|$)/) print FILENAME":"FNR":"$0
+      text = $0
+      gsub(/`[^`]*`/, "", text)
+      if (text ~ /(^|[^[:alnum:]_.])[0-9]+(\.[0-9]+)? ?(ms|min|KB|MB|GB|TB|KiB|MiB|GiB)([^[:alnum:]_]|$)/ ||
+        text ~ /(^|[^[:alnum:]_.])[0-9]+(\.[0-9]+)? (s|h|d)([^[:alnum:]_]|$)/ ||
+        text ~ /(^|[^[:alnum:]_.])[0-9]+[ -](second|minute|hour|day|week)s?([^[:alnum:]_]|$)/) print FILENAME":"FNR":"$0
     }')"
 
 report 'Horizontal rules outside YAML frontmatter:' \

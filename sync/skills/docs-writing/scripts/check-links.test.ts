@@ -130,3 +130,61 @@ test('it reads the paths it is given', async () => {
   expect(result.status).toBe(1);
   expect(result.stderr).toBe('notes/todo.md:1: (missing.md) notes/missing.md does not exist\n');
 });
+
+test('it matches the anchors GitHub builds from code spans, emphasis and entities', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('README.md', [
+    '[a](#the-div-element) [b](#using-optiont) [c](#fast-path) [d](#a--b) [e](#snake_case-keys)',
+    '',
+    '## The `<div>` element',
+    '',
+    '## Using `Option<T>`',
+    '',
+    '## _Fast_ path',
+    '',
+    '## A &amp; B',
+    '',
+    '## snake_case keys',
+  ]);
+
+  const result = ctx.run();
+
+  expect(result.stderr).toBe('');
+  expect(result.status).toBe(0);
+});
+
+test('it skips footnotes and links inside HTML comments, and keeps parentheses in a target', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('docs/notes_(draft).md', ['# Notes']);
+
+  await ctx.writePage('docs/README.md', [
+    'See [the notes](notes_(draft).md).[^1]',
+    '',
+    '<!-- [old](missing.md) -->',
+    '<!--',
+    '[older](missing.md)',
+    '-->',
+    '',
+    '[^1]: Some footnote text.',
+  ]);
+
+  const result = ctx.run();
+
+  expect(result.stderr).toBe('');
+  expect(result.status).toBe(0);
+});
+
+test('it skips READMEs under .claude/ by default', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/README.md', [
+    'See [the source](../../../src/missing.md).',
+  ]);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('check-links: 0 files, every relative link resolves\n');
+});

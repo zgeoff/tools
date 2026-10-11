@@ -34,7 +34,7 @@ done
 # Lists tracked and untracked files, so a new doc is checked before it is staged. A file deleted
 # from the working tree stays in the index until the deletion is staged, so it is dropped here.
 list_files() {
-  git ls-files --cached --others --exclude-standard -- "$@" | sort -u | while IFS= read -r file; do
+  git -c core.quotePath=false ls-files --cached --others --exclude-standard -- "$@" | sort -u | while IFS= read -r file; do
     [ -f "$file" ] && printf '%s\n' "$file"
   done
 }

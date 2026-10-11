@@ -7,7 +7,7 @@
 set -uo pipefail
 
 if [ "$#" -eq 0 ]; then
-  set -- ':(glob)**/README.md' ':(glob)docs/**/*.md'
+  set -- ':(glob)**/README.md' ':(glob)docs/**/*.md' ':(exclude,glob).claude/**'
 fi
 
 # The skill's own files, and the repo's project skill beside them, link to placeholder targets
@@ -33,8 +33,12 @@ my (%anchor_cache, $broken);
 for my $file (sort @files) {
   my $line_number = 0;
   my $open = "";
+  my $in_comment = 0;
   for my $line (read_lines($file)) {
     $line_number++;
+    if ($open eq "") {
+      ($line, $in_comment) = strip_comments($line, $in_comment);
+    }
     if ($line =~ /^\s*(`{3,}|~{3,})(.*)$/) {
       my ($marker, $rest) = ($1, $2);
       if ($open eq "") { $open = $marker }
@@ -64,6 +68,28 @@ sub to_bytes {
   return $text;
 }
 
+# GitHub never renders an HTML comment, so a link inside one is dropped. Returns the line without
+# its comments and whether a comment is still open at its end.
+sub strip_comments {
+  my ($line, $in_comment) = @_;
+  my $kept = "";
+  while (length $line) {
+    if ($in_comment) {
+      my $end = index $line, "-->";
+      return ($kept, 1) if $end < 0;
+      $line = substr $line, $end + 3;
+      $in_comment = 0;
+    } else {
+      my $start = index $line, "<!--";
+      return ($kept . $line, 0) if $start < 0;
+      $kept .= substr $line, 0, $start;
+      $line = substr $line, $start + 4;
+      $in_comment = 1;
+    }
+  }
+  return ($kept, $in_comment);
+}
+
 sub read_lines {
   my ($path) = @_;
   local $/ = "\n";
@@ -75,13 +101,14 @@ sub read_lines {
 }
 
 # Inline links and images, reference definitions, and HTML href and src attributes. Code spans
-# are dropped first, since a link inside one is literal text.
+# are dropped first, since a link inside one is literal text. A target may hold one level of
+# balanced parentheses, and a footnote definition is no link.
 sub collect_targets {
   my ($line) = @_;
   $line =~ s/(`+).*?\1//g;
   my @targets;
-  push @targets, $1 while $line =~ /\]\(\s*(<[^>]*>|[^)\s]+)/g;
-  push @targets, $1 if $line =~ /^\s{0,3}\[[^\]]+\]:\s*(<[^>]*>|\S+)/;
+  push @targets, $1 while $line =~ /\]\(\s*(<[^>]*>|(?:[^()\s]|\([^()\s]*\))+)/g;
+  push @targets, $1 if $line =~ /^\s{0,3}\[(?!\^)[^\]]+\]:\s*(<[^>]*>|\S+)/;
   push @targets, $1 while $line =~ /\b(?:href|src)\s*=\s*"([^"]*)"/g;
   return map { s/^<(.*)>$/$1/r } @targets;
 }
@@ -168,14 +195,26 @@ sub collect_anchors {
   return \%anchors;
 }
 
-# Link and code syntax and HTML tags dropped, lowercased, every character but a letter, mark,
-# digit, "_", "-" or space dropped, and each space a "-".
+# GitHub slugs the rendered heading text. Outside code spans, link syntax, HTML tags and emphasis
+# markers drop and entities decode; a code span keeps its text. Then the text is lowercased,
+# every character but a letter, mark, digit, "_", "-" or space dropped, and each space a "-".
 sub build_slug {
   my ($title) = @_;
-  $title =~ s/!?\[([^\]]*)\]\([^)]*\)/$1/g;
-  $title =~ s/<[^>]+>//g;
-  $title =~ s/`//g;
-  $title = lc $title;
+  my @parts = split /(`+[^`]*`+)/, $title;
+  for my $part (@parts) {
+    if ($part =~ /^`+([^`]*)`+$/) {
+      $part = $1;
+      next;
+    }
+    $part =~ s/!?\[([^\]]*)\]\([^)]*\)/$1/g;
+    $part =~ s/<[^>]+>//g;
+    $part =~ s/(?<![\p{L}\p{N}])[_*]+|[_*]+(?![\p{L}\p{N}])//g;
+    $part =~ s/&#(\d+);/chr $1/ge;
+    $part =~ s/&#x([0-9a-f]+);/chr hex $1/gie;
+    my %entities = (amp => "&", lt => "<", gt => ">", quot => q("), nbsp => " ");
+    $part =~ s/&(amp|lt|gt|quot|nbsp);/$entities{$1}/g;
+  }
+  $title = lc join "", @parts;
   $title =~ s/^\s+|\s+$//g;
   $title =~ s/[^\p{L}\p{M}\p{N}_\- ]//g;
   $title =~ s/ /-/g;

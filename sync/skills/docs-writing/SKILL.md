@@ -78,8 +78,10 @@ knife.
   - Good: "An idle pooled connection closes before Neon's suspend closes it from the server side."
 
   A number belongs in a doc only when the code doesn't decide it: a period a protocol fixes, a cap a
-  design defines, a count that is the point ("three classes"), or a measurement with its source.
-  `check-prose.sh` fails on a value with a unit under `docs/architecture/`.
+  design defines, a count that is the point ("three classes"), or a measurement with its source. An
+  architecture doc states even those as the rule they serve ("the keepalive period the protocol
+  fixes"), and the guide or runbook that needs the number states it. `check-prose.sh` fails on a
+  value with a unit under `docs/architecture/` outside code.
 
 - **The code owns its names.** A function, option, column, env var, package name, or file path in
   prose breaks silently on a rename. Name the role instead: "the admission handler", "the database

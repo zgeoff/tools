@@ -164,3 +164,45 @@ test('it rejects --package naming a missing README', async () => {
   expect(result.status).toBe(2);
   expect(result.stderr).toBe('check-length: --package names README.md, which does not exist\n');
 });
+
+test('it checks a README whose path is not ASCII', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeLines('README.md', 10);
+  await ctx.writeLines('café/README.md', 71);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(1);
+
+  expect(result.stdout).toInclude(
+    'café/README.md: 71 lines, over the sub-package README limit of 70',
+  );
+});
+
+test('it fails a value with a unit under docs/architecture but not one in code or a year', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeLines('README.md', 10);
+
+  await mkdir(join(ctx.dir, 'docs/architecture'), { recursive: true });
+
+  await writeFile(
+    join(ctx.dir, 'docs/architecture/overview.md'),
+    [
+      'The design dates from the 1990s.',
+      'The grid is 2d.',
+      'Run `sleep 5s` to wait.',
+      'The reaper waits 30 s.',
+      '',
+    ].join('\n'),
+  );
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('docs/architecture/overview.md:4:The reaper waits 30 s.');
+  expect(result.stdout).not.toInclude('overview.md:1:');
+  expect(result.stdout).not.toInclude('overview.md:2:');
+  expect(result.stdout).not.toInclude('overview.md:3:');
+});
