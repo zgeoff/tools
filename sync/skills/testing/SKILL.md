@@ -439,9 +439,7 @@ pass, and it returns data, never clients, apps, or servers.
 - A deterministic pipeline's suite opens with two tests. A frozen-golden test feeds one hand-written
   literal input and pins the full output inline. A determinism test asserts that the same input
   gives equal outputs: `expect(run(input)).toStrictEqual(run(input))`. The golden input is never a
-  factory call, because regenerating snapshots must never change the input. Beside those two tests,
-  a test may pin the output of a large seeded regression input by its length and SHA-256 when that
-  output is too large to inline.
+  factory call, because regenerating snapshots must never change the input.
 - A stand-in's derived values, such as a fake hash or a fake signature, are not contract. Assert
   their properties: their shape, that the same input gives the same output, and that different
   inputs give different outputs.
@@ -553,9 +551,7 @@ matter to the contract to justify a dwell.
 
 Stand-ins replace a boundary, never the code inside it. A test never stubs `fetch`, an HTTP client,
 or a method of the unit's own services: the path from the call to the boundary runs for real,
-including serialisation and error handling. One exception: a recorder may stand in for one of the
-unit's own packages at that package's boundary, when the package's kernel edge has its own tests and
-the test asserts only whether and how the call was made.
+including serialisation and error handling.
 
 | Boundary                                       | The test uses                                                                         |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------- |
@@ -591,9 +587,7 @@ A real temp tree costs about 1 to 2 ms per test for a handful of small files, an
 grows. A test pays that for real behaviour: `fs.watch`, permissions, symlinks, `Bun.file`, and
 `Bun.write`, which an in-memory filesystem fakes or misses. Take every path from the temp root and
 pass it into the module. Never steer a module through `process.cwd()` or through a `HOME` value set
-after startup, because Bun reads some of those once at startup. When a test needs a disk feature
-that a tmpfs temp root lacks, such as the FIEMAP extent-mapping ioctl, make `/var/tmp`, the
-disk-backed temp root, the parent of the fresh per-test directory.
+after startup, because Bun reads some of those once at startup.
 
 ### Program-fixed paths and global resources
 
