@@ -25,7 +25,7 @@ function collectZones(zones, path) {
 }
 
 function isInAny(fileZones, names) {
-  return names.some((name) => fileZones.includes(name));
+  return names.some((name) => fileZones.includes(name)) === true;
 }
 
 // an entry without `from` applies to every file
@@ -252,19 +252,26 @@ const importZones = {
     const file = buildFileState(context);
 
     return {
-      Program: (node) => checkUnzoned(file, node),
-      ImportDeclaration: (node) =>
-        checkImport(file, { node, source: node.source, typeOnly: isTypeOnlyImport(node) }),
+      Program(node) {
+        checkUnzoned(file, node);
+      },
+      ImportDeclaration(node) {
+        checkImport(file, { node, source: node.source, typeOnly: isTypeOnlyImport(node) });
+      },
       ExportNamedDeclaration(node) {
         if (node.source !== null) {
           checkImport(file, { node, source: node.source, typeOnly: isTypeOnlyExport(node) });
         }
       },
-      ExportAllDeclaration: (node) =>
-        checkImport(file, { node, source: node.source, typeOnly: node.exportKind === 'type' }),
-      ImportExpression: (node) => checkImport(file, { node, source: node.source, typeOnly: false }),
-      TSImportType: (node) =>
-        checkImport(file, { node, source: node.source ?? node.argument?.literal, typeOnly: true }),
+      ExportAllDeclaration(node) {
+        checkImport(file, { node, source: node.source, typeOnly: node.exportKind === 'type' });
+      },
+      ImportExpression(node) {
+        checkImport(file, { node, source: node.source, typeOnly: false });
+      },
+      TSImportType(node) {
+        checkImport(file, { node, source: node.source ?? node.argument?.literal, typeOnly: true });
+      },
       TSImportEqualsDeclaration(node) {
         const reference = node.moduleReference;
 

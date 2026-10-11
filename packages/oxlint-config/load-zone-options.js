@@ -20,9 +20,10 @@ export default function loadZoneOptions(options) {
 }
 
 function buildZoneOptions(options) {
-  const zones = Object.entries(options.zones ?? {}).map(([name, globs]) => ({
+  const globsByZone = options.zones ?? {};
+  const zones = Object.keys(globsByZone).map((name) => ({
     name,
-    match: makeGlobMatcher(globs),
+    match: makeGlobMatcher(globsByZone[name]),
   }));
 
   const buildEntries = (entries) => (entries ?? []).map((entry) => buildEntry(entry));

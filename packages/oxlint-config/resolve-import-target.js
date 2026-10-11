@@ -51,7 +51,7 @@ function toMappedTarget(manifest, mapped) {
 }
 
 function isPathSpecifier(specifier) {
-  return specifier.startsWith('.') || specifier.startsWith('/');
+  return /^[./]/u.test(specifier);
 }
 
 const manifests = new Map();
@@ -139,9 +139,9 @@ function findConditionTarget(value, conditions) {
 
   const candidates = Array.isArray(value)
     ? value
-    : Object.entries(value)
-        .filter((entry) => conditions.has(entry[0]))
-        .map((entry) => entry[1]);
+    : Object.keys(value)
+        .filter((condition) => conditions.has(condition))
+        .map((condition) => value[condition]);
 
   return (
     candidates
@@ -152,8 +152,10 @@ function findConditionTarget(value, conditions) {
 
 function findImportedFile(filename, specifier, extensions) {
   const base = resolve(dirname(filename), specifier);
-  const swapped = Object.entries(sourceExtensions).flatMap(([ext, replacements]) =>
-    base.endsWith(ext) ? replacements.map((other) => `${base.slice(0, -ext.length)}${other}`) : [],
+  const swapped = Object.keys(sourceExtensions).flatMap((ext) =>
+    base.endsWith(ext)
+      ? sourceExtensions[ext].map((other) => `${base.slice(0, -ext.length)}${other}`)
+      : [],
   );
 
   const candidates = [
