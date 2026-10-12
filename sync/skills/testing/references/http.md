@@ -48,6 +48,11 @@ operations, and relationships use `@msw/data` collections.
 - Each collection takes its shape from a zod schema (`new Collection({ schema })`). Every field in
   the schema has a `.default()`, using faker where the value is arbitrary. The one exception is a
   discriminator whose value gives a record its meaning. A `.create()` call never restates a default.
+- **Nested fields take defaults too.** "Every field" reaches into nested object schemas.
+  - Test: does each field inside a nested object schema carry its own `.default()`?
+  - Example: `toolCall: z.object({ callID: z.string().default(() => faker.string.uuid()) })`.
+  - Counter-example: a nested `callID: z.string()` with no `.default()`, which every `.create()`
+    must then restate.
 - `@msw/data`'s `factory()` model dictionary never appears.
 - A handler takes its response type from the production contract, so a change to the real API breaks
   the mock at typecheck.
@@ -57,10 +62,20 @@ operations, and relationships use `@msw/data` collections.
 `server.use(...)` in a test adds a handler for one of two reasons:
 
 - **A deviation** that the store cannot express: an error status, a transport failure, a malformed
-  payload, or a scripted sequence such as a failure followed by a success. An `if` inside such a
-  handler scripts the remote side, and it is not branching in the test.
+  payload, or a scripted sequence such as a failure followed by a success.
 - **Capturing input.** The handler feeds an inline `mock()`, and the test asserts it with the mock
   matchers.
+
+A per-test handler follows the stand-in split in the [testing skill](../SKILL.md#test-data): it
+holds data, never logic.
+
+- Test: does the handler compute its response from more than one key lookup in a literal?
+- Example: a handler that returns one fixed `HttpResponse.json({ error: 'busy' }, { status: 503 })`,
+  or one that answers `answers.next()` from the repo's tested answer-queue util, built from an
+  inline list such as a 503 and then a 200.
+- Counter-example: a handler that counts its calls, or branches on the request body, to pick a
+  response. A response that depends on the request is the service's behaviour, so it belongs in the
+  default handlers; a sequence goes through the answer-queue util.
 
 ```ts
 const received = mock<(input: unknown) => void>();
@@ -103,12 +118,21 @@ list and runs the lifecycle in its own preload.
 
 ## RPC contracts
 
-A contract module's suite has three parts:
+A contract module's suite has up to three parts:
 
 1. Each procedure's error map holds the codes it declares, asserted with `toContainAllKeys`.
 2. Each custom error code has an explicit assertion of its HTTP status.
 3. A closing test generates the OpenAPI document from the contract, which proves the contract and
    its schema converters produce one.
+
+**The OpenAPI test applies only to a repo that generates or publishes an OpenAPI document.**
+
+- Test: does the repo commit, serve, or publish an OpenAPI document built from the contract?
+- Example: a repo that serves `/openapi.json` or commits `openapi.json` has the closing test. A
+  committed document is its own golden, as the [testing skill's assertions](../SKILL.md#assertions)
+  describe.
+- Counter-example: a contract that only the repo's own typed RPC clients consume has parts 1 and 2,
+  and no OpenAPI test.
 
 ## Queues and other stateful services
 
