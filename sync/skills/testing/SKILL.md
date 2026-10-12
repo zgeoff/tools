@@ -347,8 +347,10 @@ fallback cleanup registered and make it safe after shutdown. Fixture callers nee
 - **A probe listener stopped on the next line needs no fallback cleanup.** A listener that a test
   opens only to learn a free port, and stops on the statement after it reads the port, cannot
   outlive the test.
-  - Test: is the stop the very next statement after the port read, with no `await` between?
-  - Example: `const probe = Bun.listen(…); const port = probe.port; probe.stop(true);`
+  - Test: is the stop the very next statement after the port read? An `await` on the stop itself is
+    part of that statement.
+  - Example: `const probe = Bun.serve(…); const port = probe.port; await probe.stop(true);`, and the
+    same shape with `Bun.listen`.
   - Counter-example: a listener that serves requests and is stopped later in the body. It registers
     a fallback `onTestFinished` stop beside its start.
 
@@ -548,7 +550,9 @@ pass, and it returns data, never clients, apps, or servers.
     answer 500, so this is a declared error, and a test reaches it with a real error response.
 - **A branch that its dependency never takes is deleted.** When the dependency's contract rules a
   value out, the branch that handles that value is dead code, not a guard.
-  - Test: does the dependency's documented contract ever produce the value the branch checks?
+  - Test: does one dependency's documented contract, on its own, rule out the value the branch
+    checks? When only several calls together rule it out, the branch is an unreachable guard and
+    becomes an `invariant()`.
   - Example: delete `if (!result.success)` after `Bun.build()`, which throws on a failed build by
     default.
   - Counter-example: `if (!response.ok)` after `fetch()`, which resolves for an error status.
@@ -643,8 +647,9 @@ libraries whose timers do not interleave with real I/O.
 - **A real deadline across processes.** A deadline that runs on real time in another process, such
   as a crash harness's settle window, satisfies the controlled-time rule when three things hold.
   - Test: does the deadline have a name, as a constant in the code or an option the test sets by
-    name; can the test not inject a clock into the process that owns it; and does the wait poll a
-    condition rather than sleep a fixed time? All three must hold.
+    name; does the deadline run on real time that no clock the test injects controls, even when the
+    other process takes an injected clock for its other timers; and does the wait poll a condition
+    rather than sleep a fixed time? All three must hold.
   - Example: `harness.advance(1000, { settle: true, settleTimeoutMs: 200 })`, where the child
     process polls until each runner it woke sleeps again, or fails at the deadline.
   - Counter-example: a real 100 ms idle deadline inside the process under test. That code takes an
