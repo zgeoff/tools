@@ -83,6 +83,9 @@ await request.catch(() => {});
 expect(request).rejects.toMatchObject({ code: 'NOT_FOUND' });
 ```
 
+A recovery test captures the rejection as a value instead, as the
+[testing skill's assertions](../SKILL.md#assertions) describe.
+
 ## Timestamps and order
 
 Under `transaction` isolation, Postgres pins `now()` to the start of the transaction, so every

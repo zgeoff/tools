@@ -197,14 +197,15 @@ never appear in a test file.
 
 ### `setupTest`
 
-- `setupTest()` holds only wiring that no assertion depends on: temp directories, the database, the
-  clock, servers, clients, and bare recorders. It takes a typed config object that chooses which
-  dependencies to wire, returns named properties, and has no `if`.
-- `setupTest()` creates no record and runs no earlier act. Every record that a test asserts on, or
-  whose values its outcome depends on, is created in that test's body with those values written
+- `setupTest()` holds only wiring: temp directories, the database, the clock, servers, clients, bare
+  recorders, and the unit built through its factory. It takes a typed config object that selects
+  which dependencies to wire and carries no value that a test's outcome depends on. It returns named
+  properties and has no `if`.
+- `setupTest()` creates no record and calls no operation of the code under test. A record is any
+  row, file, store entry, or other value that the unit reads. Each test creates every record it
+  asserts on, or whose values its outcome depends on, in its own body with those values written
   there, even when every test in the file needs the same record. A factory with explicit arguments
-  may create it, such as `createStep({ leaseMs: 30_000 })`. A value that the unit generates, such as
-  an ID, comes from the test's own create call, never from `setupTest()`'s result.
+  may create it, such as `createStep({ leaseMs: 30_000 })`.
 - A shared helper whose arguments carry the scenario, such as `startTestSite(pages)`, is called in
   the test body with those arguments written there. `setupTest()` wraps only a helper that takes no
   scenario.
@@ -373,10 +374,11 @@ Reordering the tests or choosing unique keys hides the gap and leaves it for the
 - The test that uses a factory's value calls the factory itself. A helper that presets overrides is
   a second set of defaults that the reader cannot see.
 - A stand-in's data stays inline in the test: a fixed answer, a recorder (`mock()`), a no-op
-  (`() => {}`), an answer table read by one key, or a list of scripted answers. A stand-in's logic
-  moves to a tested util in the shared test utils: code that consumes answers in order, counts
-  calls, keeps state, branches, or waits, including a gate, delay, or counter wrapped around a
-  tested stand-in. The test passes its answers to that util inline.
+  (`() => {}`), an answer table read by one key, or a list of scripted answers. Any other code in a
+  stand-in is logic, such as consuming answers in order, counting calls, keeping state, branching,
+  waiting, or deriving a value from an argument. It moves to a tested util in the shared test utils,
+  and so does a gate, delay, or counter wrapped around a tested stand-in. The test passes its
+  answers to that util inline.
 - A stand-in util lives in the shared test utils under a name for what it impersonates. Its prefix
   follows the repo's function-naming table. A stand-in that starts something long-running, such as a
   stub server, is `start-stub-<thing>.ts`. A stand-in that creates a resource, such as a stub
@@ -384,10 +386,9 @@ Reordering the tests or choosing unique keys hides the gap and leaves it for the
   It has its own tests, which pin the assumptions it makes about the real thing. An executable
   stand-in script uses `run-stub-<thing>.ts`; an imported helper that starts it keeps
   `start-stub-<thing>.ts`.
-- Never extract a recorder or add a test whose only purpose is to check that the mocking library
-  records calls. A no-op executable placeholder stays inline through the shared file helper when the
-  test needs only an executable. Extract a dedicated stand-in when the script models arguments,
-  output, or failures.
+- Never add a test whose only purpose is to check that the mocking library records calls. A no-op
+  executable placeholder stays inline through the shared file helper when the test needs only an
+  executable. Extract a dedicated stand-in when the script models arguments, output, or failures.
 - A chain of `mockReturnValueOnce` or `mockResolvedValueOnce` calls never appears: a call past the
   last answer returns the default without failing. A scripted answer list goes through the tested
   answer-queue util, which throws on a call past the last answer.
@@ -443,11 +444,9 @@ pass, and it returns data, never clients, apps, or servers.
   than repeating the unit's relative path expression. Keep a behaviour check where it proves the
   derived value works.
 - A recovery test checks that the injected fault occurred and that recovery succeeded. Capture the
-  earlier state during arrangement, then assert it at the end alongside the final state; use
-  separate scalar assertions for each state.
-- A test that recovers from an injected fault captures the rejection as a value,
-  `.then(() => null, (error: unknown) => error)`, and asserts it at the end beside the final state,
-  never between the fault and the recovery.
+  earlier state and the rejection as values during arrangement, the rejection with
+  `.then(() => null, (error: unknown) => error)`, and assert both at the end beside the final state;
+  use separate scalar assertions for each state.
 - After a mutation, one `toBe` on the field that changed is enough.
 - Snapshots are inline only. `toMatchInlineSnapshot` pins a golden value: deterministic machine
   output that no person derives by reading the code, such as a generated SQL string or a rendered
@@ -459,7 +458,8 @@ pass, and it returns data, never clients, apps, or servers.
   gives equal outputs: `expect(run(input)).toStrictEqual(run(input))`. The golden input is never a
   factory call, because regenerating snapshots must never change the input.
 - When the repo commits a file that it generates, such as an OpenAPI document, the frozen-golden
-  test compares the regenerated output with that committed file instead of an inline snapshot.
+  test compares the regenerated output with that committed file instead of an inline snapshot. That
+  file is a product of the repo, not a file snapshot.
 - A stand-in's derived values, such as a fake hash or a fake signature, are not contract. Assert
   their properties: their shape, that the same input gives the same output, and that different
   inputs give different outputs.
@@ -474,10 +474,11 @@ pass, and it returns data, never clients, apps, or servers.
   golden value.
 - Each error that a unit declares has its own test. A declared error is one that real input or a
   real failure can raise.
-- A throw that no input, real state, or dead transport can reach declares no error and has no test.
-  When one dependency's own contract rules the state out, delete the branch, such as
-  `if (!result.success)` after `Bun.build()`, which throws on failure. Otherwise the code before it
-  rules the state out: write `invariant()` from `tiny-invariant`.
+- A throw that cannot occur in production declares no error and has no test. When one dependency's
+  own contract rules the state out, delete the branch, such as `if (!result.success)` after
+  `Bun.build()`, which throws on failure. Otherwise the code before it rules the state out: write
+  `invariant()` from `tiny-invariant`. A failure that can occur in production but that a test cannot
+  cause follows [Infrastructure failures](#infrastructure-failures).
 - A `try`/`catch` never asserts an error: when the call does not throw, the assertion never runs.
 - `bun-types` declares `.rejects` and `.resolves` as synchronous matchers, and Bun settles the
   promise inside the matcher. Write these chains without `await`. `toResolve()` and `toReject()`
@@ -566,10 +567,11 @@ config, pass the shortest duration the library accepts and wait on the observabl
 a sleep. Add a control: the same duration with a live peer does not fire. Fake timers stay for
 libraries whose timers do not interleave with real I/O.
 
-A deadline that runs on real time where no clock the test injects reaches it, such as a crash
-harness's settle window in its child process, meets this section when it has a name, as a constant
-or an option the test sets by name, and the wait polls a condition. A deadline inside the process
-under test takes an injected clock instead.
+A deadline that runs on real time in a process that the test spawns, where no clock the test injects
+reaches it, such as a crash harness's settle window, needs only two things: a name, from an option
+of the code that owns the deadline or a constant exported outside the test file, and a wait that
+polls a condition. The native-timer rules above do not apply to it. A deadline in the test's own
+process takes an injected clock.
 
 A real delay may define an end-to-end workload rate or a seeded fault-injection offset. State the
 rate or fault purpose and preserve replay information. A claim that a fault lands mid-operation

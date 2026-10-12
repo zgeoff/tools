@@ -47,9 +47,8 @@ operations, and relationships use `@msw/data` collections.
   them.
 - Each collection takes its shape from a zod schema (`new Collection({ schema })`). Every field in
   the schema has a `.default()`, using faker where the value is arbitrary. The one exception is a
-  discriminator whose value gives a record its meaning. A `.create()` call never restates a default.
-- "Every field" includes each field of a nested object schema, and each carries its own
-  `.default()`.
+  discriminator whose value gives a record its meaning. Nested fields count as fields. A `.create()`
+  call never restates a default.
 - `@msw/data`'s `factory()` model dictionary never appears.
 - A handler takes its response type from the production contract, so a change to the real API breaks
   the mock at typecheck.
@@ -64,8 +63,9 @@ operations, and relationships use `@msw/data` collections.
   matchers.
 
 A per-test handler holds data, as the stand-in rule in the [testing skill](../SKILL.md#test-data)
-defines it: a fixed response, an input it captures, or the next answer from the tested answer-queue
-util. A response that depends on the request belongs in the default handlers.
+defines it: a fixed response, a response read from an answer table by one request parameter, an
+input it captures, or the next answer from the tested answer-queue util. Any other response that
+depends on the request belongs in the default handlers.
 
 ```ts
 const received = mock<(input: unknown) => void>();
@@ -116,8 +116,9 @@ A contract module's suite has up to three parts:
    its schema converters produce one.
 
 Part 3 applies only when the repo commits, serves, or publishes an OpenAPI document built from the
-contract. A committed document is its own golden, as the
-[testing skill's assertions](../SKILL.md#assertions) describe.
+contract. When the repo commits the document, the closing test compares the regenerated document
+with the committed file, as the [testing skill's assertions](../SKILL.md#assertions) describe.
+Otherwise it asserts that generation resolves.
 
 ## Queues and other stateful services
 
