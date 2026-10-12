@@ -201,11 +201,13 @@ never appear in a test file.
   recorders, and the unit built through its factory. It takes a typed config object that selects
   which dependencies to wire and carries no value that a test's outcome depends on. It returns named
   properties and has no `if`.
-- `setupTest()` creates no record and calls no operation of the code under test. A record is any
-  row, file, store entry, or other value that the unit reads. Each test creates every record it
-  asserts on, or whose values its outcome depends on, in its own body with those values written
-  there, even when every test in the file needs the same record. A factory with explicit arguments
-  may create it, such as `createStep({ leaseMs: 30_000 })`.
+- `setupTest()` creates no record and calls no operation of the code under test; building the unit
+  through its factory is not an operation. A record is a row, a file, a store entry, or the starting
+  value of the clock or another wired dependency, that the unit reads. A temp directory, a schema,
+  and a handle are wiring. Each test creates every record it asserts on, or whose values its outcome
+  depends on, in its own body with those values written there, even when every test in the file
+  needs the same record. A factory with explicit arguments may create it, such as
+  `createStep({ leaseMs: 30_000 })`.
 - A shared helper whose arguments carry the scenario, such as `startTestSite(pages)`, is called in
   the test body with those arguments written there. `setupTest()` wraps only a helper that takes no
   scenario.
@@ -214,7 +216,8 @@ never appear in a test file.
   wiring when a test compares them.
 - An earlier act that the test's one act depends on, such as starting the session that the test
   attaches to or saving the note that it archives, stays in the arrange phase of the test body, with
-  no assertion, because a separate test covers that act.
+  no assertion, because a separate test covers that act. A recovery test is the exception: it
+  asserts the fault it injected, as [Assertions](#assertions) describes.
 - A test file declares one function, `setupTest()`, and nothing else. A helper the tests want goes
   one of three ways: inline it where it is used, swap it for a registered matcher, or move it to the
   shared test utils with tests of its own. A file with nothing to wire has no `setupTest()`. One

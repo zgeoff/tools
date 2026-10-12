@@ -64,8 +64,8 @@ operations, and relationships use `@msw/data` collections.
 
 A per-test handler holds data, as the stand-in rule in the [testing skill](../SKILL.md#test-data)
 defines it: a fixed response, a response read from an answer table by one request parameter, an
-input it captures, or the next answer from the tested answer-queue util. Any other response that
-depends on the request belongs in the default handlers.
+input it captures, parsed or not, or the next answer from the tested answer-queue util. Any other
+response that depends on the request belongs in the default handlers.
 
 ```ts
 const received = mock<(input: unknown) => void>();
