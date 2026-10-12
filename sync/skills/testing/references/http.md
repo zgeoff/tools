@@ -48,11 +48,8 @@ operations, and relationships use `@msw/data` collections.
 - Each collection takes its shape from a zod schema (`new Collection({ schema })`). Every field in
   the schema has a `.default()`, using faker where the value is arbitrary. The one exception is a
   discriminator whose value gives a record its meaning. A `.create()` call never restates a default.
-- **Nested fields take defaults too.** "Every field" reaches into nested object schemas.
-  - Test: does each field inside a nested object schema carry its own `.default()`?
-  - Example: `toolCall: z.object({ callID: z.string().default(() => faker.string.uuid()) })`.
-  - Counter-example: a nested `callID: z.string()` with no `.default()`, which every `.create()`
-    must then restate.
+- "Every field" includes each field of a nested object schema, and each carries its own
+  `.default()`.
 - `@msw/data`'s `factory()` model dictionary never appears.
 - A handler takes its response type from the production contract, so a change to the real API breaks
   the mock at typecheck.
@@ -66,16 +63,9 @@ operations, and relationships use `@msw/data` collections.
 - **Capturing input.** The handler feeds an inline `mock()`, and the test asserts it with the mock
   matchers.
 
-A per-test handler follows the stand-in split in the [testing skill](../SKILL.md#test-data): it
-holds data, never logic.
-
-- Test: does the handler compute its response from more than one key lookup in a literal?
-- Example: a handler that returns one fixed `HttpResponse.json({ error: 'busy' }, { status: 503 })`,
-  or one that answers `answers.next()` from the repo's tested answer-queue util, built from an
-  inline list such as a 503 and then a 200.
-- Counter-example: a handler that counts its calls, or branches on the request body, to pick a
-  response. A response that depends on the request is the service's behaviour, so it belongs in the
-  default handlers; a sequence goes through the answer-queue util.
+A per-test handler holds data, as the stand-in rule in the [testing skill](../SKILL.md#test-data)
+defines it: a fixed response, an input it captures, or the next answer from the tested answer-queue
+util. A response that depends on the request belongs in the default handlers.
 
 ```ts
 const received = mock<(input: unknown) => void>();
@@ -125,14 +115,9 @@ A contract module's suite has up to three parts:
 3. A closing test generates the OpenAPI document from the contract, which proves the contract and
    its schema converters produce one.
 
-**The OpenAPI test applies only to a repo that generates or publishes an OpenAPI document.**
-
-- Test: does the repo commit, serve, or publish an OpenAPI document built from the contract?
-- Example: a repo that serves `/openapi.json` or commits `openapi.json` has the closing test. A
-  committed document is its own golden, as the [testing skill's assertions](../SKILL.md#assertions)
-  describe.
-- Counter-example: a contract that only the repo's own typed RPC clients consume has parts 1 and 2,
-  and no OpenAPI test.
+Part 3 applies only when the repo commits, serves, or publishes an OpenAPI document built from the
+contract. A committed document is its own golden, as the
+[testing skill's assertions](../SKILL.md#assertions) describe.
 
 ## Queues and other stateful services
 

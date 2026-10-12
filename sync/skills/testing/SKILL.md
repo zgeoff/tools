@@ -200,27 +200,14 @@ never appear in a test file.
 - `setupTest()` holds only wiring that no assertion depends on: temp directories, the database, the
   clock, servers, clients, and bare recorders. It takes a typed config object that chooses which
   dependencies to wire, returns named properties, and has no `if`.
-- **Tests create their own data.** `setupTest()` creates no record and runs no earlier act. Each
-  test creates every record that it asserts on or that its outcome depends on, in its own body, with
-  the values that matter written there. This holds even when every test in the file needs the same
-  record, such as a parent step or a boot image. A small factory with explicit arguments is fine:
-  `createStep({ leaseMs: 30_000 })`. A value the unit generates, such as an ID, comes from the
-  test's own create call.
-  - Test: would a different value from `setupTest()` change any test's outcome, or does any
-    assertion read `ctx.<record>`? Either one is a violation.
-  - Example: the lease test creates and claims its step with `leaseMs: 30_000`, sets the clock, and
-    asserts `toBe(now + 30_000)`.
-  - Counter-example: `setupTest()` creates and claims the parent step, presets the denied host
-    ranges, or builds a stand-in's scripted reply; or a test asserts
-    `toBe(ctx.step.leaseExpiresAt)`.
-- **A shared helper that takes the scenario.** A shared `start*` or `create*` helper whose arguments
-  carry the scenario, such as `startTestSite(pages)`, is called from the test body and needs no
-  `setupTest()` wrapper. `setupTest()` wraps only a helper that takes no scenario.
-  - Test: is every value that the outcome depends on an argument written in the test?
-  - Example: `const site = await startTestSite({ '/': '<h1>Notes</h1>' });` in the test body, which
-    then asserts the title it fetched.
-  - Counter-example: `setupTest({ pages })` that forwards the pages to `startTestSite`, or a bare
-    `startTestSite()` whose default pages the test asserts on.
+- `setupTest()` creates no record and runs no earlier act. Every record that a test asserts on, or
+  whose values its outcome depends on, is created in that test's body with those values written
+  there, even when every test in the file needs the same record. A factory with explicit arguments
+  may create it, such as `createStep({ leaseMs: 30_000 })`. A value that the unit generates, such as
+  an ID, comes from the test's own create call, never from `setupTest()`'s result.
+- A shared helper whose arguments carry the scenario, such as `startTestSite(pages)`, is called in
+  the test body with those arguments written there. `setupTest()` wraps only a helper that takes no
+  scenario.
 - Return runtime handles and generated infrastructure paths from `setupTest()` as named properties,
   such as a database handle, a temporary directory, or a VM's system path. They remain runtime
   wiring when a test compares them.
@@ -233,12 +220,9 @@ never appear in a test file.
   exception: a collection-time skip gate may keep its awaited probe, and named gates derived from
   it, at module level. Only `skipIf` reads them, each repeated condition is named once, and a
   comment gives the reason: Bun 1.4.2's `skipIf` takes a boolean and has no in-body skip.
-- **A closure that `setupTest()` returns.** `setupTest()` may return a closure that only composes
-  production helpers and the runtime it built, so it has nothing that can fail on its own. A closure
-  with logic is a helper, and it moves to the shared test utils with tests of its own.
-  - Test: does the closure hold a branch, a loop, a counter, state, or a value of its own?
-  - Example: `createImpDir: (name) => mkdirSync(buildImpDir(root, name))`.
-  - Counter-example: a returned `nextPort()` that counts up from a base port.
+- `setupTest()` may return a closure that only calls production helpers on the runtime it built,
+  such as `createImpDir(name)`. A closure with a branch, a loop, or state of its own is a helper,
+  and it moves to the shared test utils.
 - Each test file keeps its own `setupTest()`. A shared one gathers a flag for every suite that uses
   it.
 
@@ -288,13 +272,8 @@ hooks run first-in, first-out, so register that check after the helper's call, a
 removal of any directory the check reads after the check, not immediately after creating it. This is
 the only place an assertion leaves the test body.
 
-- **A cleanup that acts only after a failed test needs no proof.** When a helper's cleanup stops
-  work that a passing test always finishes first, its tests leave that cleanup unproved, because a
-  proof would have to abandon the real work partway.
-  - Test: after a passing test, does the cleanup still change anything?
-  - Example: a `buildWebOnce()` cleanup that kills the build only while it is still running.
-  - Counter-example: a `startFakeImp()` cleanup that kills the exec groups and closes the listeners
-    that every passing test leaves open. Its tests prove that cleanup.
+A helper whose cleanup only stops work that a passing test always finishes first, such as killing a
+build that is still running, needs no test that proves that cleanup.
 
 When resources have cleanup dependencies, register one callback that closes them in the required
 order. Every cleanup must run even if another cleanup throws. Use a disposable stack when reverse
@@ -324,15 +303,8 @@ If the scenario needs an explicit shutdown before the next action, call it in th
 fallback cleanup registered and make it safe after shutdown. Fixture callers need no `using` or
 `await using` declaration.
 
-- **A probe listener stopped on the next line needs no fallback cleanup.** A listener that a test
-  opens only to learn a free port, and stops on the statement after it reads the port, cannot
-  outlive the test.
-  - Test: is the stop the very next statement after the port read? An `await` on the stop itself is
-    part of that statement.
-  - Example: `const probe = Bun.serve(…); const port = probe.port; await probe.stop(true);`, and the
-    same shape with `Bun.listen`.
-  - Counter-example: a listener that serves requests and is stopped later in the body. It registers
-    a fallback `onTestFinished` stop beside its start.
+A listener that a test opens only to read a free port needs no fallback cleanup when the statement
+after the port read stops it.
 
 `onTestFinished` runs after all `afterEach` hooks, including the preload's resets. Cleanup uses
 captured paths and handles, rather than environment overrides that those resets remove. Tests that
@@ -400,19 +372,11 @@ Reordering the tests or choosing unique keys hides the gap and leaves it for the
   output or the plain merge of overrides again.
 - The test that uses a factory's value calls the factory itself. A helper that presets overrides is
   a second set of defaults that the reader cannot see.
-- **Stand-ins: data stays inline, logic is extracted.** Data is a fixed answer, a recorder, a no-op,
-  an answer table, or a scripted answer list. Logic is code that decides an answer: it consumes
-  answers in sequence, counts calls, keeps state, branches, or waits. Data stays in the test. Logic
-  goes into a tested util in the shared test utils, with no exception. A gate, delay, or counter
-  wrapped around a tested stand-in is logic too.
-  - Test: does the stand-in, or anything wrapped around it, compute its answer from more than one
-    key lookup in a literal?
-  - Example: `mock(() => new Response('start'))`, `{ sendEvent: mock() }`, `() => {}`, an answer
-    table read as `(host) => answersByHost[host]`, and an inline answer list passed to the repo's
-    tested answer-queue util, such as `buildStubAnswerQueue([refused, accepted])`.
-  - Counter-example: a fetcher that counts its calls, a stand-in that rejects on the first call and
-    resolves after it, an inline wrapper that holds `addSecret` at a gate, or a handler that sleeps
-    before it answers. Each moves to a tested util, and the test keeps its answers inline.
+- A stand-in's data stays inline in the test: a fixed answer, a recorder (`mock()`), a no-op
+  (`() => {}`), an answer table read by one key, or a list of scripted answers. A stand-in's logic
+  moves to a tested util in the shared test utils: code that consumes answers in order, counts
+  calls, keeps state, branches, or waits, including a gate, delay, or counter wrapped around a
+  tested stand-in. The test passes its answers to that util inline.
 - A stand-in util lives in the shared test utils under a name for what it impersonates. Its prefix
   follows the repo's function-naming table. A stand-in that starts something long-running, such as a
   stub server, is `start-stub-<thing>.ts`. A stand-in that creates a resource, such as a stub
@@ -481,14 +445,9 @@ pass, and it returns data, never clients, apps, or servers.
 - A recovery test checks that the injected fault occurred and that recovery succeeded. Capture the
   earlier state during arrangement, then assert it at the end alongside the final state; use
   separate scalar assertions for each state.
-- **Capture an injected fault as a value.** A rejection that arranges a recovery is captured, not
-  asserted where it happens, and the test asserts it at the end beside the final state.
-  - Test: does an assertion sit between the fault and the act that recovers from it?
-  - Example:
-    `const fault = await createImp(ctx.api, spec).then(() => null, (error: unknown) => error);` and,
-    after the recovery, `expect(fault).toMatchObject({ code: 'DISK_FULL' })`.
-  - Counter-example: `expect(createImp(ctx.api, spec)).rejects.toThrow()` mid-body, then the
-    recovery and its assertions.
+- A test that recovers from an injected fault captures the rejection as a value,
+  `.then(() => null, (error: unknown) => error)`, and asserts it at the end beside the final state,
+  never between the fault and the recovery.
 - After a mutation, one `toBe` on the field that changed is enough.
 - Snapshots are inline only. `toMatchInlineSnapshot` pins a golden value: deterministic machine
   output that no person derives by reading the code, such as a generated SQL string or a rendered
@@ -499,13 +458,8 @@ pass, and it returns data, never clients, apps, or servers.
   literal input and pins the full output inline. A determinism test asserts that the same input
   gives equal outputs: `expect(run(input)).toStrictEqual(run(input))`. The golden input is never a
   factory call, because regenerating snapshots must never change the input.
-- **A committed generated file is its own golden.** When the repo commits a file that it generates,
-  such as an OpenAPI document, the test regenerates it and compares the result with the committed
-  file. That file takes the place of the inline snapshot in the frozen-golden test.
-  - Test: is the file committed, and does the test compare against that committed copy?
-  - Example:
-    `expect(renderOpenApiDocument()).toBe(await Bun.file(join(import.meta.dir, '../openapi.json')).text())`.
-  - Counter-example: a generated SQL string that no file holds. It keeps an inline snapshot.
+- When the repo commits a file that it generates, such as an OpenAPI document, the frozen-golden
+  test compares the regenerated output with that committed file instead of an inline snapshot.
 - A stand-in's derived values, such as a fake hash or a fake signature, are not contract. Assert
   their properties: their shape, that the same input gives the same output, and that different
   inputs give different outputs.
@@ -520,22 +474,10 @@ pass, and it returns data, never clients, apps, or servers.
   golden value.
 - Each error that a unit declares has its own test. A declared error is one that real input or a
   real failure can raise.
-- **An unreachable guard is an `invariant()` and has no test.** A guard on a state that the code
-  before it makes impossible is an `invariant()` call from `tiny-invariant`. It declares no error,
-  so no test forces it.
-  - Test: can any input, real state, or dead transport reach the throw?
-  - Example: `invariant(row)` after an `UPDATE … RETURNING` on a row that the same transaction just
-    read.
-  - Counter-example: `if (!response.ok) throw new EnrolmentError(response.status)`. A server can
-    answer 500, so this is a declared error, and a test reaches it with a real error response.
-- **A branch that its dependency never takes is deleted.** When the dependency's contract rules a
-  value out, the branch that handles that value is dead code, not a guard.
-  - Test: does one dependency's documented contract, on its own, rule out the value the branch
-    checks? When only several calls together rule it out, the branch is an unreachable guard and
-    becomes an `invariant()`.
-  - Example: delete `if (!result.success)` after `Bun.build()`, which throws on a failed build by
-    default.
-  - Counter-example: `if (!response.ok)` after `fetch()`, which resolves for an error status.
+- A throw that no input, real state, or dead transport can reach declares no error and has no test.
+  When one dependency's own contract rules the state out, delete the branch, such as
+  `if (!result.success)` after `Bun.build()`, which throws on failure. Otherwise the code before it
+  rules the state out: write `invariant()` from `tiny-invariant`.
 - A `try`/`catch` never asserts an error: when the call does not throw, the assertion never runs.
 - `bun-types` declares `.rejects` and `.resolves` as synchronous matchers, and Bun settles the
   promise inside the matcher. Write these chains without `await`. `toResolve()` and `toReject()`
@@ -624,17 +566,10 @@ config, pass the shortest duration the library accepts and wait on the observabl
 a sleep. Add a control: the same duration with a live peer does not fire. Fake timers stay for
 libraries whose timers do not interleave with real I/O.
 
-- **A real deadline across processes.** A deadline that runs on real time in another process, such
-  as a crash harness's settle window, satisfies the controlled-time rule when three things hold.
-  - Test: does the deadline have a name, as a constant in the code or an option the test sets by
-    name; does the deadline run on real time that no clock the test injects controls, even when the
-    other process takes an injected clock for its other timers; and does the wait poll a condition
-    rather than sleep a fixed time? All three must hold.
-  - Example: `harness.advance(1000, { settle: true, settleTimeoutMs: 200 })`, where the child
-    process polls until each runner it woke sleeps again, or fails at the deadline.
-  - Counter-example: a real 100 ms idle deadline inside the process under test. That code takes an
-    injected clock or timer, and the test steps it. A `Bun.sleep(200)` before an assertion fails the
-    rule in any process.
+A deadline that runs on real time where no clock the test injects reaches it, such as a crash
+harness's settle window in its child process, meets this section when it has a name, as a constant
+or an option the test sets by name, and the wait polls a condition. A deadline inside the process
+under test takes an injected clock instead.
 
 A real delay may define an end-to-end workload rate or a seeded fault-injection offset. State the
 rate or fault purpose and preserve replay information. A claim that a fault lands mid-operation
@@ -648,14 +583,9 @@ Stand-ins replace a boundary, never the code inside it. A test never stubs `fetc
 or a method of the unit's own services: the path from the call to the boundary runs for real,
 including serialisation and error handling.
 
-- **A parameter the unit takes is a boundary.** When the unit receives a service as an injected
-  parameter, a stand-in passed there replaces a boundary, and the stand-in split in
-  [Test data](#test-data) decides where it lives.
-  - Test: does the stand-in arrive through the unit's own parameters, rather than replacing a method
-    on a real object that the unit builds or imports?
-  - Example: `runRecovery({ leases: { release: mock() }, timers })`, with the recorder asserted.
-  - Counter-example: `spyOn(taskService, 'release').mockRejectedValue(fault)` on the real service
-    that the unit calls.
+A stand-in passed through the unit's own parameters replaces a boundary, and the stand-in rules in
+[Test data](#test-data) decide where it lives. Replacing a method of a real object that the unit
+builds or imports is a spy, which [Infrastructure failures](#infrastructure-failures) bans.
 
 | Boundary                                       | The test uses                                                                         |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------- |
