@@ -217,7 +217,7 @@ never appear in a test file.
 - An earlier act that the test's one act depends on, such as starting the session that the test
   attaches to or saving the note that it archives, stays in the arrange phase of the test body, with
   no assertion, because a separate test covers that act. A recovery test is the exception: it
-  asserts the fault it injected, as [Assertions](#assertions) describes.
+  asserts each fault it injected, as [Assertions](#assertions) describes.
 - A test file declares one function, `setupTest()`, and nothing else. A helper the tests want goes
   one of three ways: inline it where it is used, swap it for a registered matcher, or move it to the
   shared test utils with tests of its own. A file with nothing to wire has no `setupTest()`. One
@@ -446,11 +446,11 @@ pass, and it returns data, never clients, apps, or servers.
   filesystem path, use a known package or fixture root plus the explicit expected location, rather
   than repeating the unit's relative path expression. Keep a behaviour check where it proves the
   derived value works.
-- A recovery test injects a fault and then acts to recover from it. The recovery is its one act, and
-  the faults are arrangement. It checks that the fault occurred and that recovery succeeded. Capture
-  the earlier state and the rejection as values during arrangement, the rejection with
-  `.then(() => null, (error: unknown) => error)`, and assert both at the end beside the final state;
-  use separate scalar assertions for each state.
+- A recovery test injects one or more faults and then acts to recover. The recovery is its one act,
+  and each faulted call is arrangement. During arrangement, capture the earlier state and each
+  faulted call's rejection as values, the rejection with
+  `.then(() => null, (error: unknown) => error)`. Assert every captured value at the end beside the
+  final state, with a separate assertion for each.
 - After a mutation, one `toBe` on the field that changed is enough.
 - Snapshots are inline only. `toMatchInlineSnapshot` pins a golden value: deterministic machine
   output that no person derives by reading the code, such as a generated SQL string or a rendered
