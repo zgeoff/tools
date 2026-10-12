@@ -378,10 +378,11 @@ Reordering the tests or choosing unique keys hides the gap and leaves it for the
   a second set of defaults that the reader cannot see.
 - A stand-in's data stays inline in the test: a fixed answer, a recorder (`mock()`), including one
   that parses the input it records, a no-op (`() => {}`), an answer table read by one key, or a list
-  of scripted answers. Any other code in a stand-in is logic, such as consuming answers in order,
-  counting calls, keeping state, branching, waiting, or deriving a value from an argument. It moves
-  to a tested util in the shared test utils, and so does a gate, delay, or counter wrapped around a
-  tested stand-in. The test passes its answers to that util inline.
+  of scripted answers that the test passes to the tested answer-queue util. Any other code in a
+  stand-in is logic, such as consuming answers in order, counting calls, keeping state, branching,
+  waiting, or deriving a value from an argument. It moves to a tested util in the shared test utils,
+  and so does a gate, delay, or counter wrapped around a tested stand-in. The test passes its
+  answers to that util inline.
 - A stand-in util lives in the shared test utils under a name for what it impersonates. Its prefix
   follows the repo's function-naming table. A stand-in that starts something long-running, such as a
   stub server, is `start-stub-<thing>.ts`. A stand-in that creates a resource, such as a stub
@@ -446,10 +447,10 @@ pass, and it returns data, never clients, apps, or servers.
   filesystem path, use a known package or fixture root plus the explicit expected location, rather
   than repeating the unit's relative path expression. Keep a behaviour check where it proves the
   derived value works.
-- A recovery test checks that the injected fault occurred and that recovery succeeded. Capture the
-  earlier state and the rejection as values during arrangement, the rejection with
-  `.then(() => null, (error: unknown) => error)`, and assert both at the end beside the final state;
-  use separate scalar assertions for each state.
+- A recovery test injects a fault and then acts to recover from it. It checks that the fault
+  occurred and that recovery succeeded. Capture the earlier state and the rejection as values during
+  arrangement, the rejection with `.then(() => null, (error: unknown) => error)`, and assert both at
+  the end beside the final state; use separate scalar assertions for each state.
 - After a mutation, one `toBe` on the field that changed is enough.
 - Snapshots are inline only. `toMatchInlineSnapshot` pins a golden value: deterministic machine
   output that no person derives by reading the code, such as a generated SQL string or a rendered
@@ -479,9 +480,9 @@ pass, and it returns data, never clients, apps, or servers.
   real failure can raise.
 - A throw that cannot occur in production declares no error and has no test. When one dependency's
   own contract rules the state out, delete the branch, such as `if (!result.success)` after
-  `Bun.build()`, which throws on failure. Otherwise the code before it rules the state out: write
-  `invariant()` from `tiny-invariant`. A failure that can occur in production but that a test cannot
-  cause follows [Infrastructure failures](#infrastructure-failures).
+  `Bun.build()`, which throws on failure. In every other case, write `invariant()` from
+  `tiny-invariant`. A failure that can occur in production but that a test cannot cause follows
+  [Infrastructure failures](#infrastructure-failures).
 - A `try`/`catch` never asserts an error: when the call does not throw, the assertion never runs.
 - `bun-types` declares `.rejects` and `.resolves` as synchronous matchers, and Bun settles the
   promise inside the matcher. Write these chains without `await`. `toResolve()` and `toReject()`
@@ -573,8 +574,9 @@ libraries whose timers do not interleave with real I/O.
 A deadline that runs on real time in a process that the test spawns, where no clock the test injects
 reaches it, such as a crash harness's settle window, needs only two things: a name, from an option
 of the code that owns the deadline or a constant exported outside the test file, and a wait that
-polls a condition. The native-timer rules above do not apply to it. A deadline in the test's own
-process takes an injected clock.
+ends on a condition, checked by the test or reported by the process that owns the deadline, never on
+a fixed sleep. The native-timer rules above do not apply to it. A deadline in the test's own process
+takes an injected clock.
 
 A real delay may define an end-to-end workload rate or a seeded fault-injection offset. State the
 rate or fault purpose and preserve replay information. A claim that a fault lands mid-operation
