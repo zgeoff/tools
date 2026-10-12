@@ -394,8 +394,7 @@ Reordering the tests or choosing unique keys hides the gap and leaves it for the
   executable placeholder stays inline through the shared file helper when the test needs only an
   executable. Extract a dedicated stand-in when the script models arguments, output, or failures.
 - A chain of `mockReturnValueOnce` or `mockResolvedValueOnce` calls never appears: a call past the
-  last answer returns the default without failing. A scripted answer list goes through the tested
-  answer-queue util, which throws on a call past the last answer.
+  last answer returns the default without failing, where the answer-queue util throws.
 
 ### Composites
 
