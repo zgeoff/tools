@@ -202,12 +202,12 @@ never appear in a test file.
   which dependencies to wire and carries no value that a test's outcome depends on. It returns named
   properties and has no `if`.
 - `setupTest()` creates no record and calls no operation of the code under test; building the unit
-  through its factory is not an operation. A record is a row, a file, a store entry, or the starting
-  value of the clock or another wired dependency, that the unit reads. A temp directory, a schema,
-  and a handle are wiring. Each test creates every record it asserts on, or whose values its outcome
-  depends on, in its own body with those values written there, even when every test in the file
-  needs the same record. A factory with explicit arguments may create it, such as
-  `createStep({ leaseMs: 30_000 })`.
+  through its factory is not an operation. A record is a row, a file, or a store entry that the unit
+  reads, or the starting value of the clock or another wired dependency when a test's outcome
+  depends on it. A temp directory, a schema, and a handle are wiring. Each test creates every record
+  it asserts on, or whose values its outcome depends on, in its own body with those values written
+  there, even when every test in the file needs the same record. A factory with explicit arguments
+  may create it, such as `createStep({ leaseMs: 30_000 })`.
 - A shared helper whose arguments carry the scenario, such as `startTestSite(pages)`, is called in
   the test body with those arguments written there. `setupTest()` wraps only a helper that takes no
   scenario.
@@ -376,12 +376,12 @@ Reordering the tests or choosing unique keys hides the gap and leaves it for the
   output or the plain merge of overrides again.
 - The test that uses a factory's value calls the factory itself. A helper that presets overrides is
   a second set of defaults that the reader cannot see.
-- A stand-in's data stays inline in the test: a fixed answer, a recorder (`mock()`), a no-op
-  (`() => {}`), an answer table read by one key, or a list of scripted answers. Any other code in a
-  stand-in is logic, such as consuming answers in order, counting calls, keeping state, branching,
-  waiting, or deriving a value from an argument. It moves to a tested util in the shared test utils,
-  and so does a gate, delay, or counter wrapped around a tested stand-in. The test passes its
-  answers to that util inline.
+- A stand-in's data stays inline in the test: a fixed answer, a recorder (`mock()`), including one
+  that parses the input it records, a no-op (`() => {}`), an answer table read by one key, or a list
+  of scripted answers. Any other code in a stand-in is logic, such as consuming answers in order,
+  counting calls, keeping state, branching, waiting, or deriving a value from an argument. It moves
+  to a tested util in the shared test utils, and so does a gate, delay, or counter wrapped around a
+  tested stand-in. The test passes its answers to that util inline.
 - A stand-in util lives in the shared test utils under a name for what it impersonates. Its prefix
   follows the repo's function-naming table. A stand-in that starts something long-running, such as a
   stub server, is `start-stub-<thing>.ts`. A stand-in that creates a resource, such as a stub
