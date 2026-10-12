@@ -642,12 +642,14 @@ libraries whose timers do not interleave with real I/O.
 
 - **A real deadline across processes.** A deadline that runs on real time in another process, such
   as a crash harness's settle window, satisfies the controlled-time rule when three things hold.
-  - Test: is the deadline a named constant, can the test not inject a clock into the process that
-    owns it, and does the wait poll a condition rather than sleep a fixed time? All three must hold.
-  - Example: the harness waits up to `SETTLE_TIMEOUT_MS` for the child process to report that it
-    sleeps, through `waitFor(() => child.isSettled())`.
+  - Test: does the deadline have a name, as a constant in the code or an option the test sets by
+    name; can the test not inject a clock into the process that owns it; and does the wait poll a
+    condition rather than sleep a fixed time? All three must hold.
+  - Example: `harness.advance(1000, { settle: true, settleTimeoutMs: 200 })`, where the child
+    process polls until each runner it woke sleeps again, or fails at the deadline.
   - Counter-example: a real 100 ms idle deadline inside the process under test. That code takes an
-    injected clock or timer, and the test steps it.
+    injected clock or timer, and the test steps it. A `Bun.sleep(200)` before an assertion fails the
+    rule in any process.
 
 A real delay may define an end-to-end workload rate or a seeded fault-injection offset. State the
 rate or fault purpose and preserve replay information. A claim that a fault lands mid-operation
