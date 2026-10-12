@@ -446,10 +446,11 @@ pass, and it returns data, never clients, apps, or servers.
   filesystem path, use a known package or fixture root plus the explicit expected location, rather
   than repeating the unit's relative path expression. Keep a behaviour check where it proves the
   derived value works.
-- A recovery test injects a fault and then acts to recover from it. It checks that the fault
-  occurred and that recovery succeeded. Capture the earlier state and the rejection as values during
-  arrangement, the rejection with `.then(() => null, (error: unknown) => error)`, and assert both at
-  the end beside the final state; use separate scalar assertions for each state.
+- A recovery test injects a fault and then acts to recover from it. The recovery is its one act, and
+  the faults are arrangement. It checks that the fault occurred and that recovery succeeded. Capture
+  the earlier state and the rejection as values during arrangement, the rejection with
+  `.then(() => null, (error: unknown) => error)`, and assert both at the end beside the final state;
+  use separate scalar assertions for each state.
 - After a mutation, one `toBe` on the field that changed is enough.
 - Snapshots are inline only. `toMatchInlineSnapshot` pins a golden value: deterministic machine
   output that no person derives by reading the code, such as a generated SQL string or a rendered
