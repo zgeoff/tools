@@ -197,37 +197,22 @@ never appear in a test file.
 
 ### `setupTest`
 
-- `setupTest()` builds the runtime the test needs: temp directories, servers, clients, database
-  handles, recorders. It takes a typed config object, returns named properties, and has no `if`. Its
-  config chooses which dependencies to wire, and it never carries scenario data.
-- The scenario belongs to the test body: every row, override, and value that selects the case, such
-  as agent entries or authentication tokens. A scenario value stays there even when every test uses
-  the same value. `setupTest()` may write boot data without which the unit cannot run; each value
-  carries a one-line comment that states why boot needs it.
-- **Boot record or scenario.** `setupTest()` may create a record that no test in the file varies,
-  such as the parent task an action runs under or the image every create boots. A value of that
-  record that a test's outcome depends on stays visible in the test: the test reads it from the
-  handle `setupTest()` returns, or writes it in its body.
-  - Test: does any test in the file need a different value for this record? Yes makes the record
-    scenario, so it moves to the test body. No keeps it in `setupTest()`, and each test whose
-    outcome depends on one of its values reads that value from the returned handle.
-  - Example: `setupTest()` creates and claims the parent step and returns `ctx.step`; the lease test
-    asserts `toBe(ctx.step.leaseExpiresAt)`.
-  - Counter-example: the same test asserts `toBe(now + 30_000)`, a lease length that only
-    `setupTest()` shows.
-- **A setup default that picks a branch is scenario.** A value in `setupTest()` that decides which
-  path the unit takes moves to the test body.
-  - Test: would a different value send the unit down another path?
-  - Example: `setupTest()` opens the temp root that every test writes into.
-  - Counter-example: `setupTest()` presets the allowed and denied host ranges that decide which
-    egress case each test reaches.
-- **Stand-ins and factory values in setup.** `setupTest()` may build a bare recorder and return it.
-  A stand-in that carries answers, and a factory value that a test's outcome depends on, are
-  scenario and are built in the test body.
-  - Test: does the test's outcome change when this stand-in's answer or this factory value changes?
-  - Example: `setupTest()` returns `{ send: mock() }`, and the test asserts the calls it recorded.
-  - Counter-example: `setupTest()` builds the scripted reply and calls `buildMockTurnFrame()` for
-    the frame that the test then asserts on.
+- `setupTest()` holds only wiring that no assertion depends on: temp directories, the database, the
+  clock, servers, clients, and bare recorders. It takes a typed config object that chooses which
+  dependencies to wire, returns named properties, and has no `if`.
+- **Tests create their own data.** `setupTest()` creates no record and runs no earlier act. Each
+  test creates every record that it asserts on or that its outcome depends on, in its own body, with
+  the values that matter written there. This holds even when every test in the file needs the same
+  record, such as a parent step or a boot image. A small factory with explicit arguments is fine:
+  `createStep({ leaseMs: 30_000 })`. A value the unit generates, such as an ID, comes from the
+  test's own create call.
+  - Test: would a different value from `setupTest()` change any test's outcome, or does any
+    assertion read `ctx.<record>`? Either one is a violation.
+  - Example: the lease test creates and claims its step with `leaseMs: 30_000`, sets the clock, and
+    asserts `toBe(now + 30_000)`.
+  - Counter-example: `setupTest()` creates and claims the parent step, presets the denied host
+    ranges, or builds a stand-in's scripted reply; or a test asserts
+    `toBe(ctx.step.leaseExpiresAt)`.
 - **A shared helper that takes the scenario.** A shared `start*` or `create*` helper whose arguments
   carry the scenario, such as `startTestSite(pages)`, is called from the test body and needs no
   `setupTest()` wrapper. `setupTest()` wraps only a helper that takes no scenario.
@@ -238,15 +223,10 @@ never appear in a test file.
     `startTestSite()` whose default pages the test asserts on.
 - Return runtime handles and generated infrastructure paths from `setupTest()` as named properties,
   such as a database handle, a temporary directory, or a VM's system path. They remain runtime
-  wiring when a test compares them. Keep the scenario's choice of resource or generation visible in
-  the test body.
+  wiring when a test compares them.
 - An earlier act that the test's one act depends on, such as starting the session that the test
-  attaches to, is arrangement. No assertion checks it, because a separate test covers that act.
-  `setupTest()` runs it and returns the handles it produced. An earlier act that carries scenario
-  data, such as saving the note that the test then archives, stays in the arrange phase of the test
-  body instead, because `setupTest()` never carries scenario data. An earlier action that only some
-  tests need stays visible in those tests' arrange phase without assertions; do not hide it behind a
-  conditional setup flag.
+  attaches to or saving the note that it archives, stays in the arrange phase of the test body, with
+  no assertion, because a separate test covers that act.
 - A test file declares one function, `setupTest()`, and nothing else. A helper the tests want goes
   one of three ways: inline it where it is used, swap it for a registered matcher, or move it to the
   shared test utils with tests of its own. A file with nothing to wire has no `setupTest()`. One
