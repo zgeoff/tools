@@ -83,7 +83,7 @@ await request.catch(() => {});
 expect(request).rejects.toMatchObject({ code: 'NOT_FOUND' });
 ```
 
-A recovery test captures the rejection as a value instead, as the
+A recovery test captures each rejection as a value instead, as the
 [testing skill's assertions](../SKILL.md#assertions) describe.
 
 ## Timestamps and order
