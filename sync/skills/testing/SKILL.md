@@ -542,7 +542,7 @@ Control time in the most explicit form the code allows:
    parameter: `scheduler.advance(30_000)`.
 2. **An injected clock.** Code with its own loop or timers takes a `now` function or a clock object,
    and the test steps it.
-3. **Fake timers.** Code with no injection point, such as a third-party library, gets
+3. **Fake timers.** Code the repo does not own, such as a third-party library, gets
    `setSystemTime()` and fake timers. The test restores them in `onTestFinished`.
 
 A Claude Code mod reads the wall clock and never the host's clock, for the reason in
