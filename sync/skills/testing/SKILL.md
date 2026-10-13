@@ -405,8 +405,9 @@ pass, and it returns data, never clients, apps, or servers.
   expect(result.error?.issues).toPartiallyContain({ path: ['title'] });
   ```
 
-  Pass the expected partial object directly. Never read `issues[0]`, which ties the test to issue
-  order.
+  Pass the expected partial object directly, never wrapped in `expect.objectContaining`, which
+  `toPartiallyContain` does not check (see [Matchers](#matchers)). Never read `issues[0]`, which
+  ties the test to issue order.
 
 - An acceptance test asserts `result.data`. For a schema that passes values through, assert
   `toStrictEqual(payload)`. For one that transforms, assert the transformed value. A bare
@@ -650,3 +651,12 @@ not exist. Prefer a matcher to a hand-written check:
 Each matcher also works asymmetrically inside `toStrictEqual` and `toMatchObject`, as in
 `status: expect.toBeOneOf(['open', 'held'])`. Upstream leaves `expect.pass` and `expect.fail`
 unimplemented, so the types leave them out.
+
+`toPartiallyContain` and `toIncludeAllPartialMembers` take plain objects, such as
+`toPartiallyContain({ path: ['title'] })`, and never a bare asymmetric matcher as an element. They
+compare the expected element's own fields with each received element, and a Bun matcher such as
+`expect.toStartWith('zzz')` or `expect.objectContaining({ id: 2 })` has no own fields, so any
+non-empty array passes. A matcher inside a field is checked, as in
+`toPartiallyContain({ name: expect.toStartWith('a') })`. To find an element by a matcher, use
+`toContainEqual`, which applies the matcher to each element:
+`expect(names).toContainEqual(expect.toStartWith('a'))`.
