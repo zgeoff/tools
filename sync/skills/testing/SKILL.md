@@ -576,8 +576,11 @@ clock the test injects reaches it, such as a crash harness's settle window, need
 name, from an option of the code that owns the deadline or a constant exported outside the test
 file, and a wait that ends on a condition, checked by the test or reported by the process that owns
 the deadline, never on a fixed sleep. The rules above for native and library timers do not apply to
-it. A deadline that the repo's own code runs in the test's own process takes an injected clock. A
-native runtime or kernel timer, and a library-owned timer, follow the rules above in any process.
+it. A deadline that the repo's own code runs in the test's own process takes a time argument or an
+injected clock, in the order [Time and waiting](#time-and-waiting) ranks them. A deadline that the
+repo's code schedules, even with `setTimeout`, is its own. A native runtime or kernel timer is one
+that the runtime configures and runs, such as a server's idle timeout; it and a library-owned timer
+follow the rules above in any process.
 
 A real delay may define an end-to-end workload rate or a seeded fault-injection offset. State the
 rate or fault purpose and preserve replay information. A claim that a fault lands mid-operation
