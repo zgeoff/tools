@@ -198,9 +198,9 @@ never appear in a test file.
 ### `setupTest`
 
 - `setupTest()` holds only wiring: temp directories, the database, the clock, servers, clients, bare
-  recorders, and the unit built through its factory. It takes a typed config object that selects
-  which dependencies to wire and carries no value that a test's outcome depends on. It returns named
-  properties and has no `if`.
+  recorders, and the unit built through its factory. It takes no argument, or a typed config object
+  that selects which dependencies to wire and carries no value that a test's outcome depends on. It
+  returns named properties and has no `if`.
 - `setupTest()` creates no record and calls no operation of the code under test; building the unit
   through its factory is not an operation. A record is a row, a file, or a store entry that the unit
   reads, or the starting value of the clock or another wired dependency when a test's outcome
@@ -571,12 +571,13 @@ config, pass the shortest duration the library accepts and wait on the observabl
 a sleep. Add a control: the same duration with a live peer does not fire. Fake timers stay for
 libraries whose timers do not interleave with real I/O.
 
-A deadline that runs on real time in a process that the test spawns, where no clock the test injects
-reaches it, such as a crash harness's settle window, needs only two things: a name, from an option
-of the code that owns the deadline or a constant exported outside the test file, and a wait that
-ends on a condition, checked by the test or reported by the process that owns the deadline, never on
-a fixed sleep. The native-timer rules above do not apply to it. A deadline in the test's own process
-takes an injected clock.
+A deadline that the repo's own code runs on real time in a process that the test spawns, where no
+clock the test injects reaches it, such as a crash harness's settle window, needs only two things: a
+name, from an option of the code that owns the deadline or a constant exported outside the test
+file, and a wait that ends on a condition, checked by the test or reported by the process that owns
+the deadline, never on a fixed sleep. The rules above for native and library timers do not apply to
+it. A deadline that the repo's own code runs in the test's own process takes an injected clock. A
+native runtime or kernel timer, and a library-owned timer, follow the rules above in any process.
 
 A real delay may define an end-to-end workload rate or a seeded fault-injection offset. State the
 rate or fault purpose and preserve replay information. A claim that a fault lands mid-operation
