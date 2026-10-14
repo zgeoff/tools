@@ -42,9 +42,9 @@ A service exposes one factory, such as `createNotesService({ db })`, that the pr
 and every test both call. Tests inject only the database. A test never copies the service's
 configuration into its own setup, because a copy drifts from production.
 
-`setupTest()` builds the database handle and boots the service through that factory. It may write
-the boot data the service refuses to start without, under the boot-data rule in the
-[testing skill](../SKILL.md#setuptest).
+`setupTest()` builds the database handle and boots the service through that factory. It creates no
+record, as the [testing skill](../SKILL.md#setuptest) states. A service that refuses to start until
+such a record exists boots in the test body, after the test creates the record.
 
 ## Persisted test data
 
@@ -82,6 +82,9 @@ await request.catch(() => {});
 
 expect(request).rejects.toMatchObject({ code: 'NOT_FOUND' });
 ```
+
+A recovery test captures each rejection as a value instead, as the
+[testing skill's assertions](../SKILL.md#assertions) describe.
 
 ## Timestamps and order
 
