@@ -139,6 +139,7 @@ The tags count up from `sync-v1`, and each one marks a commit on `main`. To rele
 1. Tag the merged `main` with the next number, and push the tag:
 
    ```sh
+   git fetch origin main
    git tag sync-v2 origin/main
    git push origin sync-v2
    ```
