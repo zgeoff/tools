@@ -46,6 +46,26 @@ test('it pins every call to a zgeoff/tools workflow to the ref', async () => {
   );
 });
 
+test.each([
+  ['a double-quoted', '"'],
+  ['a single-quoted', "'"],
+])('it keeps the closing quote of %s call', async (_label, quote) => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.dir, '.github/workflows/pr.yml'),
+    `jobs:\n  pr:\n    uses: ${quote}zgeoff/tools/.github/workflows/bun-checks.yml@main${quote}\n`,
+  );
+
+  spawnSync('bash', [ctx.scriptPath, 'sync-v2', ctx.dir], { encoding: 'utf8' });
+
+  const pr = await readFile(join(ctx.dir, '.github/workflows/pr.yml'), 'utf8');
+
+  expect(pr).toBe(
+    `jobs:\n  pr:\n    uses: ${quote}zgeoff/tools/.github/workflows/bun-checks.yml@sync-v2${quote}\n`,
+  );
+});
+
 test('it prints only the files it changed', async () => {
   const ctx = await setupTest();
 
