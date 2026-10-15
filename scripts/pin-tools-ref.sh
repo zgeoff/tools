@@ -22,7 +22,8 @@ if [ ! -d "$dir/.github/workflows" ]; then
   exit 1
 fi
 
-pattern='(zgeoff/tools/\.github/workflows/[^@[:space:]"'"'"']+)@[^[:space:]"'"'"']+'
+# A ref ends at whitespace, a quote, or a YAML flow delimiter.
+pattern='(zgeoff/tools/\.github/workflows/[^]@[:space:]"'"'"'{},]+)@[^]{},[:space:]"'"'"']+'
 
 while IFS= read -r -d '' file; do
   if grep -qE "$pattern" "$file"; then

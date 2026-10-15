@@ -66,6 +66,23 @@ test.each([
   );
 });
 
+test('it keeps the closing brace of a flow-style call', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.dir, '.github/workflows/repo-sync.yml'),
+    'jobs:\n  sync: {uses: zgeoff/tools/.github/workflows/repo-sync.yml@sync-v1}\n',
+  );
+
+  spawnSync('bash', [ctx.scriptPath, 'sync-v2', ctx.dir], { encoding: 'utf8' });
+
+  const repoSync = await readFile(join(ctx.dir, '.github/workflows/repo-sync.yml'), 'utf8');
+
+  expect(repoSync).toBe(
+    'jobs:\n  sync: {uses: zgeoff/tools/.github/workflows/repo-sync.yml@sync-v2}\n',
+  );
+});
+
 test('it prints only the files it changed', async () => {
   const ctx = await setupTest();
 

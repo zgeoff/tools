@@ -176,7 +176,7 @@ jobs:
             mkdir -p "$(dirname "$target")"
             install -m "$mode" ".repo-sync/$source" "$target"
             if [[ "$target" == .github/workflows/* ]]; then
-              sed -i -E "s#(zgeoff/tools/\.github/workflows/[^@[:space:]\"']+)@main([[:space:]\"']|\$)#\1@$pin\2#g" "$target"
+              sed -i -E "s#(zgeoff/tools/\.github/workflows/[^]@[:space:]\"'{},]+)@main([]{},[:space:]\"']|\$)#\1@$pin\2#g" "$target"
             fi
           done <<< "$rows"
           exit "$conflicts"
