@@ -12,7 +12,8 @@ An entry holds:
 - `name` — the branch suffix and the name that `skip` and `include` take.
 - `description` — one line, which the workflow writes into the pull request body.
 - `files` — `source` (a path in this repo), `target` (a path in the downstream repo), and an
-  optional `mode` such as `0755`. The workflow copies each file verbatim.
+  optional `mode` such as `0755`. The workflow copies each file verbatim, except that a workflow
+  target's calls to `zgeoff/tools` workflows at `@main` move to the ref the run syncs from.
 - `optIn` (optional) — `true` delivers the entry only to a repo whose stub lists it in `include`.
 - `build` (optional) — a bash command the workflow runs in the downstream checkout after the copy,
   for a file that is generated from a copied one. The runner has bash, git and jq, and nothing from
@@ -25,7 +26,7 @@ in its source. Without it, the workflow never overwrites a workflow file the rep
 Files under [`workflow-callers/`](./workflow-callers/) are opt-in entries: each is a short workflow
 that calls a reusable workflow in this repo, and a repo lists the ones it runs in the stub's
 `include` input. A caller reads repo-specific values from repo variables, which its header comment
-names, since the copy itself is verbatim. `workflow-bun-pr` runs
+names, since the copy is otherwise verbatim. `workflow-bun-pr` runs
 [`bun-checks.yml`](../.github/workflows/bun-checks.yml), the standard Bun pull-request checks.
 
 Files under [`skills/`](./skills/) are the shared base of a Claude skill, delivered by the opt-in
@@ -126,6 +127,33 @@ the extended file over the repo's own.
 A sync branch is force-pushed on every run, so a commit a person adds to it is lost on the next run.
 Edit the source here instead.
 
+## Sync tags
+
+A downstream repo calls the repo-sync workflow at a sync tag, never at `main`, and each run syncs
+the files that tag holds. A change merged here reaches a repo only when the repo moves to a newer
+tag, so a sweep of test or doc audits never sees the shared files change under it. A delivered
+workflow that calls a workflow here, such as `workflow-bun-pr`, runs at the same tag.
+
+The tags count up from `sync-v1`, and each one marks a commit on `main`. To release the sync files:
+
+1. Tag the merged `main` with the next number, and push the tag:
+
+   ```sh
+   git fetch origin main
+   git tag sync-v2 origin/main
+   git push origin sync-v2
+   ```
+
+2. Between sweeps, move each downstream repo to the tag in a pull request.
+   [`scripts/pin-tools-ref.sh`](../scripts/pin-tools-ref.sh) rewrites every call to a workflow here
+   in the repo's `.github/workflows/`, and prints each file it changed:
+
+   ```sh
+   bash scripts/pin-tools-ref.sh sync-v2 ../<repo>
+   ```
+
+A tag is never moved or deleted, because the repos that pin it read it on every run.
+
 ## Wiring up a downstream repo
 
 1. Install the repo-sync GitHub App on the repo, and set the `REPO_SYNC_APP_CLIENT_ID` and
@@ -137,6 +165,7 @@ Edit the source here instead.
    op read 'op://zgeoff/repo-sync-github-app/private-key' | gh secret set REPO_SYNC_APP_PRIVATE_KEY -R zgeoff/<repo>
    ```
 
-2. Copy [`repo-sync.yml`](./repo-sync.yml) to `.github/workflows/repo-sync.yml`.
+2. Copy [`repo-sync.yml`](./repo-sync.yml) to `.github/workflows/repo-sync.yml`, and pin it to the
+   newest sync tag with `scripts/pin-tools-ref.sh`.
 3. Dispatch it once: `gh workflow run repo-sync.yml -R zgeoff/<repo>`. Expect one pull request per
    entry the repo is behind on.

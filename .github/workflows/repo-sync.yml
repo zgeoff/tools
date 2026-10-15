@@ -6,6 +6,11 @@
 # per entry, and a new shared file is a manifest entry here with no change
 # downstream.
 #
+# Callers pin this workflow to a sync tag, such as `@sync-v1`, and the run syncs
+# the files that tag holds: both checkouts of this repository read the commit of
+# the called workflow, unless `tools-ref` names another ref. A delivered caller
+# of another workflow here is pinned to the same ref on the way out.
+#
 # Callers install sync/repo-sync.yml as .github/workflows/repo-sync.yml and set
 # the REPO_SYNC_APP_CLIENT_ID and REPO_SYNC_APP_PRIVATE_KEY secrets. The job
 # mints a GitHub App token from them to push the branch and open the pull
@@ -23,10 +28,10 @@ on:
   workflow_call:
     inputs:
       tools-ref:
-        description: Ref of zgeoff/tools to sync from
+        description: Ref of zgeoff/tools to sync from; empty reads the commit of this workflow
         type: string
         required: false
-        default: main
+        default: ''
       skip:
         description: Comma-separated manifest entry names to leave alone
         type: string
@@ -56,7 +61,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: zgeoff/tools
-          ref: ${{ inputs.tools-ref }}
+          ref: ${{ inputs.tools-ref || job.workflow_sha }}
           sparse-checkout: sync/manifest.json
           sparse-checkout-cone-mode: false
 
@@ -129,7 +134,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: zgeoff/tools
-          ref: ${{ inputs.tools-ref }}
+          ref: ${{ inputs.tools-ref || job.workflow_sha }}
           path: .repo-sync
           persist-credentials: false
 
@@ -143,9 +148,20 @@ jobs:
           NAME: ${{ matrix.entry.name }}
           FILES: ${{ toJSON(matrix.entry.files) }}
           MARKER: repo-sync delivers this file from zgeoff/tools
+          TOOLS_REF: ${{ inputs.tools-ref }}
+          WORKFLOW_REF: ${{ job.workflow_ref }}
         run: |
           set -euo pipefail
           trap 'rm -rf .repo-sync' EXIT
+          # A delivered workflow calls this repository at the ref this run syncs
+          # from, so a caller pinned to a tag never runs the shared jobs of main.
+          pin="${TOOLS_REF:-${WORKFLOW_REF##*@}}"
+          pin="${pin#refs/tags/}"
+          pin="${pin#refs/heads/}"
+          if [[ ! "$pin" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "::error::cannot pin delivered workflows to the ref '${pin//:/ }'"
+            exit 1
+          fi
           rows=$(printf '%s' "$FILES" | jq -r '.[] | [.source, .target, (.mode // "0644")] | @tsv')
           conflicts=0
           while IFS=$'\t' read -r source target mode; do
@@ -159,6 +175,9 @@ jobs:
             fi
             mkdir -p "$(dirname "$target")"
             install -m "$mode" ".repo-sync/$source" "$target"
+            if [[ "$target" == .github/workflows/* ]]; then
+              sed -i -E "s#(zgeoff/tools/\.github/workflows/[^]@[:space:]\"'{},]+)@main([]{},[:space:]\"']|\$)#\1@$pin\2#g" "$target"
+            fi
           done <<< "$rows"
           exit "$conflicts"
 
