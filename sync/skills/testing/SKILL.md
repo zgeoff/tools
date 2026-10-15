@@ -19,6 +19,9 @@ exercises real behaviour through real code, and it reaches for a stand-in only a
 test cannot cross. When existing tests break these rules, you align them while you work on the code
 they cover.
 
+Never write a test only to satisfy a lint or layout rule. Change the rule's config instead, with a
+one-line reason. Never cut a test that checks behaviour.
+
 This skill is the shared base that repo-sync delivers from zgeoff/tools: edit it there, never in a
 downstream copy. When the repo has a `project-testing` skill, load it as well. That skill adds this
 repo's harnesses, regimes, and stricter rules. A project skill never relaxes a rule here; a repo
