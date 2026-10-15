@@ -5,6 +5,9 @@ Releases are fully automated off `main` via
 publish step in `.github/workflows/main.yml`. No npm tokens live in CI. Decision record:
 [#8](https://github.com/zgeoff/tools/issues/8).
 
+The shared files under `sync/` ship by hand-pushed `sync-vN` tags instead, which
+[sync tags](./sync/README.md#sync-tags) describes.
+
 ## Flow
 
 1. A `feat:`/`fix:` PR touching `packages/<pkg>` merges to `main`.
