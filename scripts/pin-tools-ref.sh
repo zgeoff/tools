@@ -22,13 +22,15 @@ if [ ! -d "$dir/.github/workflows" ]; then
   exit 1
 fi
 
-# A ref ends at whitespace, a quote, or a YAML flow delimiter.
-pattern='(zgeoff/tools/\.github/workflows/[^]@[:space:]"'"'"'{},]+)@[^]{},[:space:]"'"'"']+'
+# The owner starts at the line start or after a character that no owner name
+# holds, so other-zgeoff/tools never matches. A ref ends at whitespace, a
+# quote, or a YAML flow delimiter.
+pattern='(^|[^A-Za-z0-9._/-])(zgeoff/tools/\.github/workflows/[^]@[:space:]"'"'"'{},]+)@[^]{},[:space:]"'"'"']+'
 
 while IFS= read -r -d '' file; do
   if grep -qE "$pattern" "$file"; then
     before=$(cat "$file")
-    sed -i -E "s#$pattern#\\1@$ref#g" "$file"
+    sed -i -E "s#$pattern#\\1\\2@$ref#g" "$file"
     if [ "$before" != "$(cat "$file")" ]; then
       echo "$file"
     fi

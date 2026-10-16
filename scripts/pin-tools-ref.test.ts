@@ -116,6 +116,22 @@ test('it leaves calls to other repositories alone', async () => {
   expect(ci).toBe('jobs:\n  ci:\n    uses: other-org/tools/.github/workflows/ci.yml@main\n');
 });
 
+test('it leaves a call to an owner whose name ends in zgeoff alone', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.dir, '.github/workflows/ci.yml'),
+    'jobs:\n  ci:\n    uses: other-zgeoff/tools/.github/workflows/ci.yml@main\n',
+  );
+
+  const result = spawnSync('bash', [ctx.scriptPath, 'sync-v2', ctx.dir], { encoding: 'utf8' });
+
+  const ci = await readFile(join(ctx.dir, '.github/workflows/ci.yml'), 'utf8');
+
+  expect(result.stdout).toBe('');
+  expect(ci).toBe('jobs:\n  ci:\n    uses: other-zgeoff/tools/.github/workflows/ci.yml@main\n');
+});
+
 test('it rejects a ref that holds a character outside a plain git ref', async () => {
   const ctx = await setupTest();
 
