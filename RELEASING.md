@@ -60,6 +60,9 @@ Once that's saved, CI publishes all future versions with no tokens.
   run.
 - `npm publish` 404/403 on a package's first CI release: trusted publisher not configured for that
   package, or the first manual publish never happened.
+- Publish fails with `the release tagged <x> but <path>/package.json holds <y>`: the publish step
+  checked out a commit other than the one release-please tagged. Republish as below, then find out
+  why the checkout differed.
 - Tagged and GitHub-released but the npm publish failed: re-run just the publish via
 
   ```sh
