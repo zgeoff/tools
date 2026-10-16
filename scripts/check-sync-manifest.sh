@@ -47,9 +47,9 @@ done < <(jq -r '.[] | .name as $n | .files[] | select(has("except"))
 
 # A repo that an `except` names gets each Markdown file of the entry without
 # the blocks that need the files it does not receive. A link to such a file
-# outside its block would arrive as a dead link, so each Markdown source is
-# stripped as the sync strips it for each such repo, and must then link none of
-# that repo's excepted files.
+# outside its block would arrive as a dead link, so each Markdown source the
+# repo receives is stripped as the sync strips it for that repo, and must then
+# link none of that repo's excepted files.
 scripts_dir=$(dirname "$0")
 staging=$(mktemp -d)
 trap 'rm -rf "$staging"' EXIT
@@ -82,8 +82,11 @@ while IFS=$'\t' read -r name repo; do
         fi
       done
     done < <(grep -oE '\]\([^)#[:space:]]+' "$copy" | sed 's/^](//' | sort -u)
-  done < <(jq -r --arg name "$name" \
-    '.[] | select(.name == $name) | .files[] | select(.target | endswith(".md")) | [.source, .target] | @tsv' "$manifest")
+  done < <(jq -r --arg name "$name" --arg repo "$repo" \
+    '.[] | select(.name == $name) | .files[]
+      | select(.target | endswith(".md"))
+      | select((.except // []) | map(ascii_downcase) | index($repo) | not)
+      | [.source, .target] | @tsv' "$manifest")
 done < <(jq -r '.[] | .name as $n
   | [.files[] | .except // [] | select(type == "array") | .[] | strings | ascii_downcase] | unique | .[]
   | [$n, .] | @tsv' "$manifest")
