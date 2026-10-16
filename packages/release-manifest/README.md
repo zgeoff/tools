@@ -2,11 +2,12 @@
 
 A release manifest is a small JSON file, `release.json`, that a repo attaches to each of its GitHub
 releases to list what the release ships: its container images pinned by digest, the database
-migrations it adds, and the config schema it expects. Every repo that cloud deploys, such as nixie,
-impz and atc, publishes one with each release. Cloud, the deployment repo, reads it, because cloud
-deploys only released artifacts and takes those facts from the manifest in place of each repo's
-source tree. This package holds the JSON Schema for the manifest, so each publishing repo validates
-its manifest before upload and cloud validates it again after download, against the same shape.
+migrations it adds, and the config schema it expects. A repo that wants cloud to deploy it, such as
+nixie, impz or atc, must publish one with each release. Cloud, the deployment repo, reads it,
+because cloud deploys only released artifacts and takes those facts from the manifest in place of
+each repo's source tree. This package holds the JSON Schema for the manifest, so each publishing
+repo validates its manifest before upload and cloud validates it again after download, against the
+same shape.
 
 ## Example
 
