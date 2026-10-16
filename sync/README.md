@@ -11,9 +11,11 @@ An entry holds:
 
 - `name` — the branch suffix and the name that `skip` and `include` take.
 - `description` — one line, which the workflow writes into the pull request body.
-- `files` — `source` (a path in this repo), `target` (a path in the downstream repo), and an
-  optional `mode` such as `0755`. The workflow copies each file verbatim, except that a workflow
-  target's calls to `zgeoff/tools` workflows at `@main` move to the ref the run syncs from.
+- `files` — `source` (a path in this repo), `target` (a path in the downstream repo), an optional
+  `mode` such as `0755`, and an optional `except`, the `owner/repo` names of the repos that never
+  receive the file. The workflow copies each file verbatim, except that a workflow target's calls to
+  `zgeoff/tools` workflows at `@main` move to the ref the run syncs from, and a Markdown target
+  loses the blocks that need a file the repo does not receive.
 - `optIn` (optional) — `true` delivers the entry only to a repo whose stub lists it in `include`.
 - `build` (optional) — a bash command the workflow runs in the downstream checkout after the copy,
   for a file that is generated from a copied one. The runner has bash, git and jq, and nothing from
@@ -35,6 +37,23 @@ rules for the same area in a `project-<name>` skill beside it, which repo-sync n
 the shared skill tells the reader to load both. The entry lists every file in its skill folder,
 since the skill links its references by relative path; `scripts/check-sync-manifest.sh` fails on a
 file the entry omits. A skill's tests sit beside its scripts and stay here.
+
+A reference that fits only some repos, such as one for a language a repo never uses, names the other
+repos in its `except`, so they never load it. Every link to it in the entry's Markdown files sits in
+a block, which the workflow removes for an excepted repo, and the text outside the block reads whole
+without it:
+
+```markdown
+<!-- repo-sync needs ./references/rust.md -->
+
+For Rust, read [Rust testing](./references/rust.md).
+
+<!-- repo-sync end -->
+```
+
+The path is relative to the Markdown file. `scripts/check-sync-manifest.sh` fails on a link to an
+excepted file outside its block. The workflow never deletes a file, so a repo that holds a copy from
+before its `except` removes that copy itself.
 
 Files under [`hooks/`](./hooks/) are Claude Code hooks, delivered as opt-in entries to
 `.claude/hooks/<name>/`. Their tests stay here. `hook-skill-gate` delivers the skill gate: a

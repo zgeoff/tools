@@ -49,11 +49,13 @@
       },
       {
         "source": "sync/skills/testing/references/frontend.md",
-        "target": ".claude/skills/testing/references/frontend.md"
+        "target": ".claude/skills/testing/references/frontend.md",
+        "except": ["zgeoff/atc"]
       },
       {
         "source": "sync/skills/testing/references/go.md",
-        "target": ".claude/skills/testing/references/go.md"
+        "target": ".claude/skills/testing/references/go.md",
+        "except": ["zgeoff/atc"]
       },
       {
         "source": "sync/skills/testing/references/http.md",
@@ -61,7 +63,8 @@
       },
       {
         "source": "sync/skills/testing/references/nixos.md",
-        "target": ".claude/skills/testing/references/nixos.md"
+        "target": ".claude/skills/testing/references/nixos.md",
+        "except": ["zgeoff/atc"]
       },
       {
         "source": "sync/skills/testing/references/observability.md",
