@@ -30,6 +30,10 @@
     "packages/oxlint-config": {
       "component": "@zgeoff/oxlint-config"
     },
+    "packages/release-manifest": {
+      "component": "@zgeoff/release-manifest",
+      "initial-version": "0.1.0"
+    },
     "packages/tsconfig": {
       "component": "@zgeoff/tsconfig"
     }

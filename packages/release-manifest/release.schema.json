@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/zgeoff/tools/main/packages/release-manifest/release.schema.json",
+  "title": "release.json",
+  "description": "The manifest that a release publishes as a release asset, so a deployment reads what the release contains without the repo's source tree. format rises only on a change that a reader of the format before would misread.",
+  "type": "object",
+  "required": ["format", "version", "tag", "commit"],
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "description": "The version of this manifest shape.",
+      "const": 1
+    },
+    "version": {
+      "description": "The release version, as semver without a leading v.",
+      "type": "string",
+      "pattern": "^(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)(?:-(?:(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+[0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*)?$"
+    },
+    "tag": {
+      "description": "The git tag of the release, in the repo's own tag form, such as v1.2.0 or @scope/name@1.2.0.",
+      "type": "string",
+      "pattern": "^\\S+$"
+    },
+    "commit": {
+      "description": "The full SHA-1 of the commit that the release builds.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "images": {
+      "description": "The container images that a deployment runs, by name.",
+      "$ref": "#/$defs/imageMap"
+    },
+    "sandboxImages": {
+      "description": "The images that the release's own services pull at run time, which a host must have before a rollout.",
+      "$ref": "#/$defs/imageMap"
+    },
+    "migrations": {
+      "description": "The database migrations that the release adds since the release before.",
+      "type": "object",
+      "required": ["since", "added", "readableByReleaseBefore"],
+      "additionalProperties": false,
+      "properties": {
+        "since": {
+          "description": "The tag of the release before, or null for the first release.",
+          "type": ["string", "null"],
+          "pattern": "^\\S+$"
+        },
+        "added": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["version", "name"],
+            "additionalProperties": false,
+            "properties": {
+              "version": { "type": "integer", "minimum": 0 },
+              "name": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "readableByReleaseBefore": {
+          "description": "Whether the release before can read the schema that this release leaves; null for the first release.",
+          "type": ["boolean", "null"]
+        }
+      }
+    },
+    "configSchema": {
+      "description": "The JSON Schema for the release's config, published as a separate release asset.",
+      "type": "object",
+      "required": ["asset", "since", "breaking"],
+      "additionalProperties": false,
+      "properties": {
+        "asset": {
+          "description": "The file name of the schema among the release's assets.",
+          "type": "string",
+          "pattern": "^[^/\\\\\\s]+$"
+        },
+        "since": {
+          "description": "The tag of the release before, or null for the first release that publishes the schema.",
+          "type": ["string", "null"],
+          "pattern": "^\\S+$"
+        },
+        "breaking": {
+          "description": "Each config change since that release that a config valid before can fail.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "imageMap": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z][a-zA-Z0-9-]*$" },
+      "additionalProperties": { "$ref": "#/$defs/imageRef" }
+    },
+    "imageRef": {
+      "description": "An image pinned by digest, as <registry>/<repository>[:<tag>]@sha256:<digest>.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*(?::[0-9]+)?(?:/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)+(?::[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})?@sha256:[0-9a-f]{64}$"
+    }
+  }
+}

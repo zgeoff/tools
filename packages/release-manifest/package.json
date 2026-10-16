@@ -1,0 +1,30 @@
+{
+  "name": "@zgeoff/release-manifest",
+  "version": "0.1.0",
+  "description": "JSON Schema for the release.json that a release publishes, so a deployment reads every release manifest in one known shape",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zgeoff/tools.git",
+    "directory": "packages/release-manifest"
+  },
+  "files": [
+    "release.schema.json"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./release.schema.json",
+    "./release.schema.json": "./release.schema.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "typecheck": "tsc"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "ajv": "catalog:",
+    "typescript": "catalog:"
+  }
+}
