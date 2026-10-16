@@ -191,7 +191,7 @@ test('it fails when a Markdown file links an excepted file outside a block', asy
   expect(result.status).toBe(1);
 
   expect(result.stderr).toBe(
-    "check-sync-manifest: entry 'skill-demo' links ./references/rust.md from sync/skills/demo/SKILL.md outside a 'repo-sync needs ./references/rust.md' block\n",
+    "check-sync-manifest: entry 'skill-demo' links ./references/rust.md from sync/skills/demo/SKILL.md outside a 'repo-sync needs ./references/rust.md' block, so acme/ledger gets a dead link\n",
   );
 });
 
@@ -257,5 +257,53 @@ test('it fails when an except holds a value that is not an owner/repo name', asy
 
   expect(result.stderr).toBe(
     "check-sync-manifest: entry 'demo' gives demo.md an except that is not a list of owner/repo names\n",
+  );
+});
+
+test('it fails on a link that only one excepted repo loses its block for', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, 'sync/skills/demo/references'), { recursive: true });
+
+  await writeFile(
+    join(ctx.dir, 'sync/skills/demo/SKILL.md'),
+    '# Demo\n\n' +
+      '<!-- repo-sync needs ./references/kotlin.md -->\n\n' +
+      'Read [Kotlin](./references/kotlin.md) beside [Rust](./references/rust.md).\n\n' +
+      '<!-- repo-sync end -->\n',
+  );
+
+  await writeFile(join(ctx.dir, 'sync/skills/demo/references/kotlin.md'), '# Kotlin\n');
+  await writeFile(join(ctx.dir, 'sync/skills/demo/references/rust.md'), '# Rust\n');
+
+  await writeFile(
+    join(ctx.dir, 'sync/manifest.json'),
+    JSON.stringify([
+      {
+        name: 'skill-demo',
+        description: 'The demo skill',
+        files: [
+          { source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' },
+          {
+            source: 'sync/skills/demo/references/kotlin.md',
+            target: '.claude/skills/demo/references/kotlin.md',
+            except: ['acme/storefront'],
+          },
+          {
+            source: 'sync/skills/demo/references/rust.md',
+            target: '.claude/skills/demo/references/rust.md',
+            except: ['acme/ledger'],
+          },
+        ],
+      },
+    ]),
+  );
+
+  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.dir, encoding: 'utf8' });
+
+  expect(result.status).toBe(1);
+
+  expect(result.stderr).toBe(
+    "check-sync-manifest: entry 'skill-demo' links ./references/rust.md from sync/skills/demo/SKILL.md outside a 'repo-sync needs ./references/rust.md' block, so acme/ledger gets a dead link\n",
   );
 });

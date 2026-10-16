@@ -46,23 +46,26 @@ done < <(jq -r '.[] | .name as $n | .files[] | select(has("except"))
   | [$n, .source] | @tsv' "$manifest")
 
 # A repo that an `except` names gets each Markdown file of the entry without
-# the blocks that need the excepted files. A link to such a file outside its
-# block would arrive as a dead link, so each Markdown source is stripped as
-# the sync strips it and must link no excepted file after that.
+# the blocks that need the files it does not receive. A link to such a file
+# outside its block would arrive as a dead link, so each Markdown source is
+# stripped as the sync strips it for each such repo, and must then link none of
+# that repo's excepted files.
 scripts_dir=$(dirname "$0")
 staging=$(mktemp -d)
 trap 'rm -rf "$staging"' EXIT
 
-while IFS= read -r name; do
+while IFS=$'\t' read -r name repo; do
+  root="$staging/$name/$repo"
   excluded=()
   while IFS= read -r target; do
-    excluded+=("$staging/$name/$target")
-  done < <(jq -r --arg name "$name" \
-    '.[] | select(.name == $name) | .files[] | select((.except // []) | length > 0) | .target' "$manifest")
+    excluded+=("$root/$target")
+  done < <(jq -r --arg name "$name" --arg repo "$repo" \
+    '.[] | select(.name == $name) | .files[]
+      | select((.except // []) | map(ascii_downcase) | index($repo)) | .target' "$manifest")
 
   while IFS=$'\t' read -r source target; do
     [ -f "$source" ] || continue
-    copy="$staging/$name/$target"
+    copy="$root/$target"
     mkdir -p "$(dirname "$copy")"
     cp "$source" "$copy"
 
@@ -75,13 +78,15 @@ while IFS= read -r name; do
       resolved=$(realpath -m "$(dirname "$copy")/$link")
       for path in "${excluded[@]}"; do
         if [ "$resolved" = "$(realpath -m "$path")" ]; then
-          report "entry '$name' links $link from $source outside a 'repo-sync needs $link' block"
+          report "entry '$name' links $link from $source outside a 'repo-sync needs $link' block, so $repo gets a dead link"
         fi
       done
     done < <(grep -oE '\]\([^)#[:space:]]+' "$copy" | sed 's/^](//' | sort -u)
   done < <(jq -r --arg name "$name" \
     '.[] | select(.name == $name) | .files[] | select(.target | endswith(".md")) | [.source, .target] | @tsv' "$manifest")
-done < <(jq -r '.[] | select(any(.files[]; (.except // []) | type == "array" and length > 0)) | .name' "$manifest")
+done < <(jq -r '.[] | .name as $n
+  | [.files[] | .except // [] | select(type == "array") | .[] | strings | ascii_downcase] | unique | .[]
+  | [$n, .] | @tsv' "$manifest")
 
 # A skill links its references by relative path, so a file the entry omits
 # arrives downstream as a dead link. Each entry that ships a file from a skill
