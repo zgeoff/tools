@@ -138,6 +138,10 @@ jobs:
           path: .repo-sync
           persist-credentials: false
 
+      # A file whose `except` list names the caller is not copied, and each
+      # Markdown file the entry delivers loses the blocks that need it, so the
+      # copy never links a file the caller lacks.
+      #
       # A workflow the repo wrote itself can share a target's path. Overwriting
       # it would drop the repo's own jobs in a pull request that reads as a
       # routine sync, so the entry fails instead. The job overwrites an existing
@@ -150,6 +154,7 @@ jobs:
           MARKER: repo-sync delivers this file from zgeoff/tools
           TOOLS_REF: ${{ inputs.tools-ref }}
           WORKFLOW_REF: ${{ job.workflow_ref }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           trap 'rm -rf .repo-sync' EXIT
@@ -162,9 +167,15 @@ jobs:
             echo "::error::cannot pin delivered workflows to the ref '${pin//:/ }'"
             exit 1
           fi
-          rows=$(printf '%s' "$FILES" | jq -r '.[] | [.source, .target, (.mode // "0644")] | @tsv')
+          rows=$(printf '%s' "$FILES" | bash .repo-sync/scripts/select-sync-files.sh "$REPO")
           conflicts=0
-          while IFS=$'\t' read -r source target mode; do
+          excluded=()
+          copied=()
+          while IFS=$'\t' read -r action source target mode; do
+            if [ "$action" = skip ]; then
+              excluded+=("$target")
+              continue
+            fi
             if [[ "$target" == .github/workflows/* && -f "$target" ]] && ! grep -qF "$MARKER" "$target"; then
               calls=$(grep -oE 'zgeoff/tools/\.github/workflows/[^@[:space:]]+' ".repo-sync/$source" | sort -u || true)
               if [ -z "$calls" ] || ! grep -qFf <(printf '%s\n' "$calls") "$target"; then
@@ -178,7 +189,15 @@ jobs:
             if [[ "$target" == .github/workflows/* ]]; then
               sed -i -E "s#(zgeoff/tools/\.github/workflows/[^]@[:space:]\"'{},]+)@main([]{},[:space:]\"']|\$)#\1@$pin\2#g" "$target"
             fi
+            copied+=("$target")
           done <<< "$rows"
+          if [ "${#excluded[@]}" -gt 0 ]; then
+            for target in "${copied[@]}"; do
+              if [[ "$target" == *.md ]]; then
+                bash .repo-sync/scripts/remove-excluded-blocks.sh "$target" "${excluded[@]}"
+              fi
+            done
+          fi
           exit "$conflicts"
 
       # The build runs in the caller's checkout with the runner's stock tools

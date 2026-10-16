@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Checks sync/manifest.json against the rules the repo-sync workflow assumes:
 # unique entry names, a source file for every item, the repo-sync marker on
-# every source whose target is a workflow, a string `build` when present, and
-# every file under sync/skills/<name>/ listed by the entry that ships that skill, except the
-# tests, which stay here.
+# every source whose target is a workflow, a string `build` when present, an
+# `except` that lists owner/repo names, no link to an excepted file outside a
+# block that needs it, and every file under sync/skills/<name>/ listed by the
+# entry that ships that skill, except the tests, which stay here.
 # Usage: check-sync-manifest.sh [manifest]
 set -euo pipefail
 
@@ -36,6 +37,59 @@ while IFS=$'\t' read -r name source target; do
     report "entry '$name' targets $target, but $source lacks the line '$marker'"
   fi
 done < <(jq -r '.[] | .name as $n | .files[] | [$n, .source, .target] | @tsv' "$manifest")
+
+while IFS=$'\t' read -r name source; do
+  report "entry '$name' gives $source an except that is not a list of owner/repo names"
+done < <(jq -r '.[] | .name as $n | .files[] | select(has("except"))
+  | select((.except | type) != "array"
+    or any(.except[]; type != "string" or (test("^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$") | not)))
+  | [$n, .source] | @tsv' "$manifest")
+
+# A repo that an `except` names gets each Markdown file of the entry without
+# the blocks that need the files it does not receive. A link to such a file
+# outside its block would arrive as a dead link, so each Markdown source the
+# repo receives is stripped as the sync strips it for that repo, and must then
+# link none of that repo's excepted files.
+scripts_dir=$(dirname "$0")
+staging=$(mktemp -d)
+trap 'rm -rf "$staging"' EXIT
+
+while IFS=$'\t' read -r name repo; do
+  root="$staging/$name/$repo"
+  excluded=()
+  while IFS= read -r target; do
+    excluded+=("$root/$target")
+  done < <(jq -r --arg name "$name" --arg repo "$repo" \
+    '.[] | select(.name == $name) | .files[]
+      | select((.except // []) | map(ascii_downcase) | index($repo)) | .target' "$manifest")
+
+  while IFS=$'\t' read -r source target; do
+    [ -f "$source" ] || continue
+    copy="$root/$target"
+    mkdir -p "$(dirname "$copy")"
+    cp "$source" "$copy"
+
+    if ! problem=$(bash "$scripts_dir/remove-excluded-blocks.sh" "$copy" "${excluded[@]}" 2>&1); then
+      report "entry '$name' cannot strip $source: ${problem#remove-excluded-blocks: }"
+      continue
+    fi
+
+    while IFS= read -r link; do
+      resolved=$(realpath -m "$(dirname "$copy")/$link")
+      for path in "${excluded[@]}"; do
+        if [ "$resolved" = "$(realpath -m "$path")" ]; then
+          report "entry '$name' links $link from $source outside a 'repo-sync needs $link' block, so $repo gets a dead link"
+        fi
+      done
+    done < <(grep -oE '\]\([^)#[:space:]]+' "$copy" | sed 's/^](//' | sort -u)
+  done < <(jq -r --arg name "$name" --arg repo "$repo" \
+    '.[] | select(.name == $name) | .files[]
+      | select(.target | endswith(".md"))
+      | select((.except // []) | map(ascii_downcase) | index($repo) | not)
+      | [.source, .target] | @tsv' "$manifest")
+done < <(jq -r '.[] | .name as $n
+  | [.files[] | .except // [] | select(type == "array") | .[] | strings | ascii_downcase] | unique | .[]
+  | [$n, .] | @tsv' "$manifest")
 
 # A skill links its references by relative path, so a file the entry omits
 # arrives downstream as a dead link. Each entry that ships a file from a skill
