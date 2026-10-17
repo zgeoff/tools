@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.6](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.5...@zgeoff/oxlint-config@0.2.6) (2026-10-17)
+
+
+### Bug Fixes
+
+* **geo-1241:** settle one-var, sort-vars and switch in the shared oxlint config ([#162](https://github.com/zgeoff/tools/issues/162)) ([a90759f](https://github.com/zgeoff/tools/commit/a90759f0c5cb258c1c41a2da70a2cfcee187aff3))
+
 ## [0.2.5](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.4...@zgeoff/oxlint-config@0.2.5) (2026-10-17)
 
 ### Bug Fixes
