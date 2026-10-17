@@ -5,10 +5,10 @@ restriction-rule cherry-picks, comment-style enforcement via `@stylistic`, and a
 (`zgeoff/*` rules) banning shapes no native oxlint rule can express — top-level arrows, nested
 function declarations, bare named exports, destructured and inline-typed parameters, ternary and
 await arguments, awaits hidden inside a control-flow condition or a `&&`/`||`/`??` chain, every
-JSDoc block, any run of more than three line comments, and a repo config that loosens either comment
-rule. `zgeoff/function-verb` enforces the function-naming taxonomy from the shared agent guidelines,
-`zgeoff/test-beside-module` keeps each test file beside the module it tests, and
-`zgeoff/import-zones` fails an import that crosses a module boundary the repo declares.
+`switch` statement, every JSDoc block, any run of more than three line comments, and a repo config
+that loosens either comment rule. `zgeoff/function-verb` enforces the function-naming taxonomy from
+the shared agent guidelines, `zgeoff/test-beside-module` keeps each test file beside the module it
+tests, and `zgeoff/import-zones` fails an import that crosses a module boundary the repo declares.
 
 ## Usage
 
