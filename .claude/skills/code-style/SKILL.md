@@ -2,9 +2,9 @@
 name: code-style
 description:
   Code style for zgeoff TypeScript repos — module layout and file naming, acronyms, state
-  lifecycles, and the closed function-verb taxonomy that the function-verb lint rule enforces. Load
-  before writing, reviewing, or renaming any TypeScript, with the repo's project-code-style skill
-  beside it.
+  lifecycles, branching on a union with ts-pattern, and the closed function-verb taxonomy that the
+  function-verb lint rule enforces. Load before writing, reviewing, or renaming any TypeScript, with
+  the repo's project-code-style skill beside it.
 ---
 
 # Code style
