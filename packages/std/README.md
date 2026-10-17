@@ -1,21 +1,27 @@
-# @zgeoff/exact-optional
+# @zgeoff/std
 
 Private until its first publish to npm.
 
-`toExactOptional` returns a copy of an object without the keys whose value is `undefined`, typed so
-the copy fits a type with optional properties under `exactOptionalPropertyTypes`. It replaces the
-conditional spread, `...(x === undefined ? {} : { x })`, that such code otherwise writes per key.
+Small, dependency-free TypeScript helpers that more than one zgeoff repo needs. Each helper is one
+file with its test beside it, exported from the package root, and named by the shared function-verb
+rules.
 
 ## Install
 
 ```sh
-bun add @zgeoff/exact-optional
+bun add @zgeoff/std
 ```
 
-## Usage
+## Helpers
+
+### `toExactOptional`
+
+Returns a copy of an object without the keys whose value is `undefined`, typed so the copy fits a
+type with optional properties under `exactOptionalPropertyTypes`. It replaces the conditional
+spread, `...(x === undefined ? {} : { x })`, that such code otherwise writes per key.
 
 ```ts
-import { toExactOptional } from '@zgeoff/exact-optional';
+import { toExactOptional } from '@zgeoff/std';
 
 interface Options {
   label?: string;
