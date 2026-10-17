@@ -122,7 +122,7 @@ test('it reads a verb from the first cell of a table row', async () => {
   expect(result.status).toBe(0);
 });
 
-test('it passes a repo with no project-code-style skill and no lint config', async () => {
+test('it passes a repo with no lint config', async () => {
   const ctx = await setupTest();
 
   const result = ctx.run();
@@ -130,17 +130,29 @@ test('it passes a repo with no project-code-style skill and no lint config', asy
   expect(result.status).toBe(0);
 
   expect(result.stdout).toBe(
-    'check-project-verbs: no project-code-style skill and no lint config\n',
+    'check-project-verbs: no .oxlintrc.json, so no project verbs to check\n',
   );
 });
 
-test('it fails when the lint config exists but the skill does not', async () => {
+test('it passes a repo with no project-code-style skill whose lint config adds no names', async () => {
   const ctx = await setupTest();
 
   await ctx.writePage('.oxlintrc.json', ['{ "rules": {} }']);
 
   const result = ctx.run();
 
+  expect(result.status).toBe(0);
+});
+
+test('it fails a repo with no project-code-style skill whose lint config adds a verb', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.oxlintrc.json', [
+    '{ "rules": { "zgeoff/function-verb": ["error", { "verbs": ["mint"] }] } }',
+  ]);
+
+  const result = ctx.run();
+
   expect(result.status).toBe(1);
-  expect(result.stderr).toBe(`check-project-verbs: ${skillPath} does not exist\n`);
+  expect(result.stdout).toBe(`${skillPath}: lacks \`mint\`, which .oxlintrc.json lists in verbs\n`);
 });

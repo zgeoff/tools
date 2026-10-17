@@ -3,7 +3,7 @@
 # zgeoff/function-verb rule in .oxlintrc.json; exits non-zero when they differ.
 # Usage (from the repo root): check-project-verbs.sh [<skill> [<lint-config>]]
 # The skill defaults to .claude/skills/project-code-style/SKILL.md and the config to .oxlintrc.json.
-# A repo with neither file passes. The skill lists each verb as a bullet or a table row that starts
+# A repo with no lint config passes, and a missing skill counts as one that lists no names. The skill lists each verb as a bullet or a table row that starts
 # with the backticked verb under its "## Project verbs" heading, and each exempt name the same way
 # under "## Exempt names".
 set -uo pipefail
@@ -11,17 +11,10 @@ set -uo pipefail
 skill=${1:-.claude/skills/project-code-style/SKILL.md}
 config=${2:-.oxlintrc.json}
 
-if [ ! -f "$skill" ] && [ ! -f "$config" ]; then
-  echo 'check-project-verbs: no project-code-style skill and no lint config'
+if [ ! -f "$config" ]; then
+  echo "check-project-verbs: no $config, so no project verbs to check"
   exit 0
 fi
-
-for file in "$skill" "$config"; do
-  if [ ! -f "$file" ]; then
-    echo "check-project-verbs: $file does not exist" >&2
-    exit 1
-  fi
-done
 
 perl -MJSON::PP -e '
 use strict;
@@ -32,8 +25,9 @@ my ($skill, $config) = @ARGV;
 my %listed = (verbs => {}, exemptNames => {});
 my %heading = ("Project verbs" => "verbs", "Exempt names" => "exemptNames");
 my $section;
-open my $md, "<", $skill or die "check-project-verbs: cannot read $skill: $!\n";
-while (my $line = <$md>) {
+my $md;
+open $md, "<", $skill or undef $md if -e $skill;
+while (defined $md and my $line = <$md>) {
   if ($line =~ /^##\s+(.*?)\s*$/) {
     $section = $heading{$1};
     next;
@@ -41,7 +35,7 @@ while (my $line = <$md>) {
   next unless defined $section;
   $listed{$section}{$1} = 1 if $line =~ /^(?:-|\|)\s*`([^`]+)`/;
 }
-close $md;
+close $md if defined $md;
 
 open my $fh, "<", $config or die "check-project-verbs: cannot read $config: $!\n";
 my $text = do { local $/; <$fh> };
