@@ -122,6 +122,27 @@
     // this config targets node/bun tooling — node builtins are the platform
     "import/no-nodejs-modules": "off",
 
+    // a file past 500 non-blank lines holds more than one concept, and a fifth
+    // parameter wants an options object
+    "max-lines": ["error", { "max": 500, "skipBlankLines": true }],
+    "max-params": ["error", { "max": 4 }],
+
+    // counts that fire on code already in its clearest form
+    "max-statements": "off",
+    "max-lines-per-function": "off",
+    "import/max-dependencies": "off",
+
+    // the fix reads worse than the code: tsc checks assignment before use, a
+    // guard `continue` is an early return, awaits in a loop keep order, and
+    // an event or timer needs a bare `new Promise`
+    "init-declarations": "off",
+    "no-continue": "off",
+    "no-await-in-loop": "off",
+    "promise/avoid-new": "off",
+
+    // a library or platform handle has no readonly form
+    "typescript/prefer-readonly-parameter-types": "off",
+
     // preload-style modules (matcher registration, type augmentation) are
     // side-effect imports by design
     "import/no-unassigned-import": [

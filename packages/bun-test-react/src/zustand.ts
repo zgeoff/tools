@@ -10,7 +10,6 @@ const actualVanilla = await import('zustand/vanilla');
 // the wrapper would recurse.
 const actualCreateStore = actualVanilla.createStore;
 
-// oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- StoreApi exposes setState and has no readonly form
 function registerStoreReset<T>(store: StoreApi<T>): void {
   const initialState = store.getInitialState();
 
@@ -33,7 +32,6 @@ function registerStoreReset<T>(store: StoreApi<T>): void {
   storeResets.add(resetStore);
 }
 
-// oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- StateCreator carries mutable marker properties and has no readonly form
 function createTrackedStore<T>(creator: StateCreator<T>) {
   const store = actualCreateStore(creator);
 
@@ -42,7 +40,6 @@ function createTrackedStore<T>(creator: StateCreator<T>) {
   return store;
 }
 
-// oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- StateCreator carries mutable marker properties and has no readonly form
 function createStoreWithReset<T>(creator?: StateCreator<T>) {
   return typeof creator === 'function' ? createTrackedStore(creator) : createTrackedStore;
 }
