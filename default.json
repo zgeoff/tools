@@ -83,6 +83,12 @@
       "automerge": false
     },
     {
+      "description": "An override pins a transitive dependency, usually to a patched release, so a major bump would break the packages that depend on it.",
+      "matchDepTypes": ["overrides"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
       "description": "zgeoff packages bump at any level as soon as they publish, each in its own PR, and merge on green CI. bun install still needs the package in the repo's minimumReleaseAgeExcludes.",
       "matchPackageNames": ["@zgeoff/**"],
       "minimumReleaseAge": null,
