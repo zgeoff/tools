@@ -27,7 +27,10 @@ test('it keeps the writes of a committed transaction', async () => {
   await connection.executeQuery(CompiledQuery.raw("INSERT INTO plants (species) VALUES ('fern')"));
   await ctx.driver.commitTransaction(connection);
 
-  expect(ctx.sqlite.query('SELECT species FROM plants').all()).toStrictEqual([{ species: 'fern' }]);
+  expect({
+    inTransaction: ctx.sqlite.inTransaction,
+    rows: ctx.sqlite.query('SELECT species FROM plants').all(),
+  }).toStrictEqual({ inTransaction: false, rows: [{ species: 'fern' }] });
 });
 
 test('it drops the writes of a rolled-back transaction', async () => {

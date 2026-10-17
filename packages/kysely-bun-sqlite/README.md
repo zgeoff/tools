@@ -27,6 +27,9 @@ interface LibrarySchema {
 }
 
 const sqlite = new Database('library.db', { create: true });
+
+sqlite.run('CREATE TABLE IF NOT EXISTS books (title TEXT NOT NULL)');
+
 const db = new Kysely<LibrarySchema>({ dialect: buildSQLiteDialect(sqlite) });
 
 const titles = await db.selectFrom('books').select('title').execute();
