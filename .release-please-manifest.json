@@ -6,5 +6,6 @@
   "packages/commitlint-config": "0.1.0",
   "packages/oxfmt-config": "0.1.0",
   "packages/bun-test-react": "0.2.1",
-  "packages/release-manifest": "0.1.0"
+  "packages/release-manifest": "0.1.0",
+  "packages/exact-optional": "0.1.0"
 }
