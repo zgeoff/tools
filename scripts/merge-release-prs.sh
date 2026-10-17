@@ -74,20 +74,22 @@ while :; do
   # wait, and the deadline still bounds it.
   if head=$(gh api graphql -f owner="${repo%%/*}" -f name="${repo#*/}" \
     -f ref="refs/heads/$branch" -f query="$query" | jq -r "$filter"); then
-    sha=$(printf '%s\n' "$head" | head -n 1)
-    states=$(printf '%s\n' "$head" | tail -n +2)
+    # Expansions and here-strings, not pipes: under pipefail, a reader that
+    # exits early, like head or grep -q, can fail the pipe with SIGPIPE.
+    sha=${head%%$'\n'*}
+    states=${head#"$sha"}
+    states=${states#$'\n'}
   else
     states=pending
   fi
-  failed=$(printf '%s\n' "$states" | sed -n 's/^fail://p' | awk 'NR > 1 { printf ", " } { printf "%s", $0 }')
+  failed=$(sed -n 's/^fail://p' <<< "$states" | awk 'NR > 1 { printf ", " } { printf "%s", $0 }')
   if [ -n "$failed" ]; then
     echo "release PR #$pr has failing checks on $sha: $failed" >&2
     exit 1
   fi
   # Other apps' checks, such as a review bot's status, can pass before
   # GitHub Actions creates this repo's own checks, so wait for those too.
-  if printf '%s\n' "$states" | grep -qx actions \
-    && ! printf '%s\n' "$states" | grep -qx pending; then
+  if grep -qx actions <<< "$states" && ! grep -qx pending <<< "$states"; then
     break
   fi
   if [ "$SECONDS" -ge "$deadline" ]; then
