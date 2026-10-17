@@ -6,7 +6,7 @@
     },
     {
       "path": "sync/skills/testing/SKILL.md",
-      "skip": ["Key rules", "References", "Loading the skill"]
+      "skip": ["Key rules", "References", "Loading the skill", "Languages and runners"]
     },
     {
       "path": "sync/skills/docs-writing/SKILL.md",
