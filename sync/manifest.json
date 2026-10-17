@@ -20,6 +20,16 @@
     ]
   },
   {
+    "name": "socket",
+    "description": "The Socket config, which limits the Socket GitHub app's pull-request scans to changes in dependency and workflow files",
+    "files": [
+      {
+        "source": "socket.yml",
+        "target": "socket.yml"
+      }
+    ]
+  },
+  {
     "name": "workflow-bun-pr",
     "description": "The pull-request workflow that runs the shared Bun checks",
     "optIn": true,

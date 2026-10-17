@@ -222,6 +222,18 @@ the repo-sync App secrets that [Wiring up a downstream repo](#wiring-up-a-downst
 App token pushes the branch, so the repo's checks run on the pull request; a push with the default
 `GITHUB_TOKEN` starts no workflow run.
 
+### The Socket config
+
+The Socket GitHub app checks each pull request for supply-chain risks in its dependencies, and
+reports two checks, `Socket Security: Pull Request Alerts` and `Socket Security: Project Report`.
+The `socket` entry delivers [`socket.yml`](../socket.yml) to the repo root, the only place Socket
+reads it. Its `triggerPaths` lists the dependency manifests, the lock files and the workflow files,
+so a pull request that changes none of them starts no scan. The account stays on Socket's Free plan,
+whose monthly scan cap is smaller than the number of pull requests these repos open, so a scan of
+every pull request would use up the month's scans. The checks are advisory: no ruleset requires
+them, and the config leaves the app's comments and check runs on. Renovate's pull requests are
+scanned like any other, because they are the pull requests that change dependencies.
+
 ## Sync tags
 
 A downstream repo calls the repo-sync workflow at a sync tag, never at `main`, and each run syncs
