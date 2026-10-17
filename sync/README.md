@@ -149,6 +149,79 @@ the extended file over the repo's own.
 A sync branch is force-pushed on every run, so a commit a person adds to it is lost on the next run.
 Edit the source here instead.
 
+## Dependency updates
+
+Two parts keep a repo's dependencies current with no person filing an issue. Renovate opens the
+update pull requests from the shared preset in [`default.json`](../default.json), which a repo takes
+with `"extends": ["github>zgeoff/tools"]` in its own `renovate.json`, with no sync entry. The
+`workflow-audit-fix` entry turns a red `bun audit` into a pull request. Neither part uses GitHub's
+dependency graph, because the graph does not read `bun.lock`, so Dependabot alerts stay empty for
+these repos.
+
+### The Renovate preset
+
+The preset sorts each update by its kind:
+
+| Update                    | Release-age wait | Pull request                                 | Merge           |
+| ------------------------- | ---------------- | -------------------------------------------- | --------------- |
+| Security fix              | none             | one per package, labelled `security`         | on green checks |
+| Patch                     | 7 days           | the weekly `patch updates` group             | on green checks |
+| Dev-tool minor            | 7 days           | the weekly `dev tools` group                 | after review    |
+| Other minor, or any major | 7 days           | one per package                              | after review    |
+| `@zgeoff/*` package       | none             | one per package, at any level                | on green checks |
+| zgeoff/tools sync tag     | none             | one per tag                                  | on green checks |
+| Lock-file maintenance     | none             | weekly, for the dependencies of dependencies | after review    |
+
+The 7-day wait matches the `minimumReleaseAge = 604800` in each repo's `bunfig.toml`, so Renovate
+proposes no version that `bun install` would refuse. Security fixes come from OSV, through
+`osvVulnerabilityAlerts`, for every package Renovate finds. Their lock refresh runs
+`bun install --minimum-release-age=0`, so a fix younger than the gate installs, and so do the new
+dependencies it brings. A `@zgeoff/*` bump keeps the gate for its dependencies: `bun install`
+accepts the new release only when the repo lists the package in `minimumReleaseAgeExcludes`.
+
+Renovate's bun manager reads no Bun catalog until renovatebot/renovate#42909 ships, so a regex
+manager in the preset finds each `catalog` entry in `package.json`. A regex-manager bump changes
+`package.json` alone, because Renovate runs a manager's lock-file update only for that manager's own
+updates. A `postUpgradeTasks` step therefore runs `bun install` and commits `bun.lock` in the same
+pull request. Renovate runs that command only when the admin's `allowedCommands` allows it. The free
+Mend-hosted app allows no such command, so on that app every catalog bump fails
+`bun install --frozen-lockfile`. The preset needs self-hosted Renovate with `allowedCommands` set to
+`["^bun install --ignore-scripts( --minimum-release-age=0)?$"]`. The step installs the newest Bun,
+not the version in `.bun-version`, as Renovate's own bun manager does. Remove the regex manager once
+the bun manager reads catalogs.
+
+### The audit-fix workflow
+
+The `workflow-audit-fix` caller runs the reusable
+[`audit-fix.yml`](../.github/workflows/audit-fix.yml) every day, by hand, and after a `PR`,
+`Dependency Health` or `Dep Health` run fails. The job audits the default branch, and it opens a
+pull request on the branch `audit-fix` only when the audit needs a change:
+
+- `bun audit fix` updates each vulnerable package to the lowest fixed release that every dependent's
+  range accepts.
+- A fix younger than the release-age gate gets a `minimumReleaseAgeExcludes` entry in `bunfig.toml`,
+  with a comment that dates the release and the day to remove the entry. The first run on or after
+  that day removes the entry and its comment; an entry without the step's comment stays.
+- An advisory that no fix reaches gets an entry in `audit-ignores.json`, which holds the package,
+  the reason, and an expiry 30 days out. The `audit` script in `package.json` gets the matching
+  `--ignore` flag.
+- An expired ignore is audited again: the entry gets a new expiry while no fix reaches it, and goes
+  when the audit no longer reports the advisory. An expiry more than 90 days out counts as expired.
+- A rerun keeps the expiries on the open `audit-fix` branch, so it builds the same tree and leaves
+  the pull request's checks alone.
+
+An `--ignore` flag with no `audit-ignores.json` entry stays as it is. The pull request is labelled
+`dependencies` and `security`. A pull request that adds or renews an ignore is also labelled
+`audit-ignore` and waits for a person's review: the job turns auto-merge off for it. The job asks
+GitHub to merge any other pull request on green checks, which needs auto-merge allowed in the repo
+settings. A run that finds nothing to change deletes the `audit-fix` branch, which closes a stale
+pull request.
+
+The caller needs Bun 1.4.0 or newer in `.bun-version`, since `bun audit fix` arrived in 1.4.0, and
+the repo-sync App secrets that [Wiring up a downstream repo](#wiring-up-a-downstream-repo) sets. The
+App token pushes the branch, so the repo's checks run on the pull request; a push with the default
+`GITHUB_TOKEN` starts no workflow run.
+
 ## Sync tags
 
 A downstream repo calls the repo-sync workflow at a sync tag, never at `main`, and each run syncs
