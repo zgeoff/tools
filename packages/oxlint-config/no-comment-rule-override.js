@@ -13,9 +13,10 @@ const keyPatterns = lockedRules.map((rule) => ({
   pattern: new RegExp(`"${rule}"\\s*:`, 'u'),
 }));
 
-// one report per repo per process, so a repo with an override sees it once
-// rather than on every file
-const reportedRoots = new Set();
+// the one file per repo that carries the report, so a repo with an override
+// sees it once per run rather than on every file, and an editor's language
+// server keeps it on that file across edits
+const anchorFiles = new Map();
 
 function buildCommentFreeText(text) {
   return text.replaceAll(
@@ -48,11 +49,17 @@ const noCommentRuleOverride = {
   create(context) {
     const root = findRepoRoot(context.filename);
 
-    if (root === null || reportedRoots.has(root)) {
+    if (root === null) {
       return {};
     }
 
-    reportedRoots.add(root);
+    if (!anchorFiles.has(root)) {
+      anchorFiles.set(root, context.filename);
+    }
+
+    if (anchorFiles.get(root) !== context.filename) {
+      return {};
+    }
 
     return {
       Program(node) {

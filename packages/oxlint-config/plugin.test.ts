@@ -1046,3 +1046,18 @@ test('it ignores a comment rule named only inside a config comment', async () =>
 
   expect(result.exitCode).toBe(0);
 });
+
+test('it reports an override once when a run lints several files', async () => {
+  const rules = { 'zgeoff/no-comment-rule-override': 'error', 'zgeoff/no-jsdoc': 'off' };
+
+  const files = {
+    '.git': 'gitdir: elsewhere\n',
+    'first.ts': 'export const first = 1;\n',
+    'second.ts': 'export const second = 2;\n',
+  };
+
+  const result = await runLintTree(files, '.', rules);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout.split('sets zgeoff/no-jsdoc')).toHaveLength(2);
+});
