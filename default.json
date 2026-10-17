@@ -22,7 +22,7 @@
   },
   "lockFileMaintenance": {
     "enabled": true,
-    "automerge": false,
+    "automerge": true,
     "schedule": ["* 0-5 * * 1"]
   },
   "customManagers": [
@@ -54,14 +54,18 @@
       }
     },
     {
-      "description": "Patch bumps go in one weekly PR and merge on green CI.",
-      "matchUpdateTypes": ["patch"],
-      "groupName": "patch updates",
-      "schedule": ["* 0-5 * * 1"],
+      "description": "Every update below major merges on green CI. Other minor bumps keep one PR per package.",
+      "matchUpdateTypes": ["minor", "patch", "pin", "pinDigest", "digest"],
       "automerge": true
     },
     {
-      "description": "Dev-tool minor bumps go in one weekly PR, which waits for review. Their patch bumps go in the patch group.",
+      "description": "Patch bumps go in one weekly PR.",
+      "matchUpdateTypes": ["patch"],
+      "groupName": "patch updates",
+      "schedule": ["* 0-5 * * 1"]
+    },
+    {
+      "description": "Dev-tool minor bumps go in one weekly PR. Their patch bumps go in the patch group.",
       "matchPackageNames": [
         "@commitlint/**",
         "@tsconfig/**",
