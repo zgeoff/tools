@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.4...@zgeoff/oxlint-config@0.2.5) (2026-10-17)
+
+
+### Bug Fixes
+
+* **geo-1222:** exempt .claude-check.ts mod checks from max-lines ([#158](https://github.com/zgeoff/tools/issues/158)) ([68253fd](https://github.com/zgeoff/tools/commit/68253fdb548be77faa7ab66053cf4bc536a2a551))
+
 ## [0.2.4](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.3...@zgeoff/oxlint-config@0.2.4) (2026-10-17)
 
 ### Bug Fixes
