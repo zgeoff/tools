@@ -57,3 +57,38 @@ test('it types an optional input key as optional without undefined', () => {
 
   expect(result).toStrictEqual({ b: null });
 });
+
+test('it keeps symbol keys and drops undefined ones', () => {
+  const kept = Symbol('kept');
+  const dropped = Symbol('dropped');
+
+  const input: { [kept]: string; [dropped]: string | undefined } = {
+    [kept]: 'x',
+    [dropped]: undefined,
+  };
+
+  const result: { [kept]: string; [dropped]?: string } = toExactOptional(input);
+
+  expect(result[kept]).toBe('x');
+  expect(Reflect.ownKeys(result)).toStrictEqual([kept]);
+});
+
+test('it skips non-enumerable keys', () => {
+  const input = Object.defineProperty({ a: 1 }, 'hidden', { value: 2, enumerable: false });
+
+  expect(Reflect.ownKeys(toExactOptional(input))).toStrictEqual(['a']);
+});
+
+test('it keeps each member of a union input with its own keys', () => {
+  type Shape = { kind: 'circle'; radius: number | undefined } | { kind: 'square'; side: number };
+
+  const input: Shape[] = [
+    { kind: 'circle', radius: undefined },
+    { kind: 'square', side: 2 },
+  ];
+
+  const result: ({ kind: 'circle'; radius?: number } | { kind: 'square'; side: number })[] =
+    input.map((shape) => toExactOptional(shape));
+
+  expect(result).toStrictEqual([{ kind: 'circle' }, { kind: 'square', side: 2 }]);
+});

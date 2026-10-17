@@ -29,5 +29,6 @@ const label: string | undefined = readLabel();
 const options: Options = toExactOptional({ label, retries: 3 });
 ```
 
-Only own enumerable string keys are copied. `null` values stay, falsy values such as `0` and `''`
-stay, and the input object is left untouched.
+Own enumerable keys are copied, symbols included, as an object spread would. `null` values stay,
+falsy values such as `0` and `''` stay, and the input object is left untouched. A union input maps
+member by member, so each member keeps its own keys.

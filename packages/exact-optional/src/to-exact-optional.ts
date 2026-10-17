@@ -7,17 +7,24 @@ type UndefinedKeys<T> = {
 type Simplify<T> = { [K in keyof T]: T[K] };
 
 // T with each key that admits undefined made optional and its undefined dropped:
-// { a: string | undefined; b: number } becomes { a?: string; b: number }.
-export type ExactOptional<T extends object> = Simplify<
-  Pick<T, Exclude<keyof T, UndefinedKeys<T>>> & {
-    [K in keyof Pick<T, UndefinedKeys<T>>]?: Exclude<T[K], undefined>;
-  }
->;
+// { a: string | undefined; b: number } becomes { a?: string; b: number }. A union
+// maps member by member, so each member keeps its own keys.
+export type ExactOptional<T extends object> = T extends unknown
+  ? Simplify<
+      Pick<T, Exclude<keyof T, UndefinedKeys<T>>> & {
+        [K in keyof Pick<T, UndefinedKeys<T>>]?: Exclude<T[K], undefined>;
+      }
+    >
+  : never;
 
-// Returns a new object with the own enumerable string keys of `value` whose
-// value is not undefined; null values stay, and `value` is left untouched.
+// Returns a new object with the own enumerable keys of `value`, symbols included,
+// whose value is not undefined; null values stay, and `value` is left untouched.
 export function toExactOptional<T extends object>(value: T): ExactOptional<T> {
-  const entries = Object.entries(value).filter(([, entry]) => entry !== undefined);
+  const entries = Reflect.ownKeys(value)
+    .filter((key) => Object.prototype.propertyIsEnumerable.call(value, key))
+    .map((key): [PropertyKey, unknown] => [key, Reflect.get(value, key)])
+    .filter(([, entry]) => entry !== undefined);
 
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the filter above is what makes the keys optional; the type system cannot follow it
   return Object.fromEntries(entries) as ExactOptional<T>;
 }
