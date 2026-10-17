@@ -102,6 +102,37 @@ test('it fails a description that YAML reads as null', async () => {
   expect(result.stdout).toInclude('.claude/skills/demo/SKILL.md: has no description\n');
 });
 
+test('it reads a null followed by a folded line as text', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description: null',
+    '  checks for the demo service. Load it before a demo test.',
+    '---',
+  ]);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(0);
+});
+
+test('it reads a null with a hash and no space before it as text', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description: null#marker',
+    '---',
+  ]);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(0);
+});
+
 test('it fails a line anchor in a single-quoted HTML link', async () => {
   const ctx = await setupTest();
 
@@ -375,4 +406,26 @@ test('it rejects a folder with no SKILL.md', async () => {
 
   expect(result.status).toBe(2);
   expect(result.stderr).toBe('check-skill: notes has no SKILL.md\n');
+});
+
+test('it reads no link inside an HTML comment', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description: Commands for the demo service. Load it before a demo test.',
+    '---',
+    '',
+    '<!-- [an old pointer](../../../src/demo.ts#L12) -->',
+    '<!--',
+    '[another](../../../src/demo.ts#L40)',
+    '-->',
+    'Run the demo.',
+  ]);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).not.toInclude('line anchor');
 });
