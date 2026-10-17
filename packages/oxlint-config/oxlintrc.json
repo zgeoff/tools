@@ -160,9 +160,9 @@
   },
   "overrides": [
     {
-      "files": ["**/*.test.ts", "**/*.test.tsx"],
-      // one co-located suite per module with inline test data: file length
-      // scales with coverage, not complexity
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/*.claude-check.ts"],
+      // one co-located suite per module (a mod's hook checks included) with
+      // inline test data: file length scales with coverage, not complexity
       "rules": {
         "max-lines": "off"
       }
