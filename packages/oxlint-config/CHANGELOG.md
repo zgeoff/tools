@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.2...@zgeoff/oxlint-config@0.2.3) (2026-10-17)
+
+
+### Features
+
+* **oxlint-config:** share common verbs and refuse comment rule overrides ([#138](https://github.com/zgeoff/tools/issues/138)) ([cfee9c0](https://github.com/zgeoff/tools/commit/cfee9c02d39296e6966256bbcf0869ac522612bc))
+
 ## [0.2.2](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.1...@zgeoff/oxlint-config@0.2.2) (2026-10-17)
 
 ### Features
