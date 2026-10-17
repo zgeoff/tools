@@ -85,6 +85,17 @@
     ]
   },
   {
+    "name": "skill-code-style",
+    "description": "The shared code-style skill, whose verb list the function-verb lint rule's test pins; a repo keeps its own verbs and rules in a project-code-style skill",
+    "optIn": true,
+    "files": [
+      {
+        "source": ".claude/skills/code-style/SKILL.md",
+        "target": ".claude/skills/code-style/SKILL.md"
+      }
+    ]
+  },
+  {
     "name": "skill-docs-writing",
     "description": "The shared docs-writing skill and its prose, length and link check scripts; a repo keeps its own rules in a project-docs-writing skill",
     "optIn": true,
