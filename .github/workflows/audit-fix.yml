@@ -1,6 +1,6 @@
-# Reusable workflow: turns a red `bun audit` on the caller's default branch into
-# a pull request. scripts/audit-fix/audit-fix.ts updates each vulnerable package
-# to a fixed release, excludes a fix younger than the minimumReleaseAge gate in
+# Reusable workflow: turns a red `bun audit` on the caller's default branch, or
+# on `base-branch`, into a pull request against that branch.
+# scripts/audit-fix/audit-fix.ts updates each vulnerable package to a fixed release, excludes a fix younger than the minimumReleaseAge gate in
 # bunfig.toml with a dated comment, and records each advisory it cannot fix in
 # audit-ignores.json with a reason and an expiry, mirrored as an --ignore flag in
 # the `audit` script. An expired ignore is audited again on the next run.
@@ -30,6 +30,12 @@ on:
         type: boolean
         required: false
         default: true
+      base-branch:
+        description:
+          Branch to audit and to open the pull request against; empty means the default branch
+        type: string
+        required: false
+        default: ''
     secrets:
       REPO_SYNC_APP_CLIENT_ID:
         required: true
@@ -43,7 +49,7 @@ jobs:
     permissions:
       contents: read
     env:
-      BRANCH: audit-fix
+      BASE: ${{ inputs.base-branch || github.event.repository.default_branch }}
       LEFTHOOK: 0
     steps:
       - name: Mint a write token for the caller
@@ -55,10 +61,10 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
 
-      - name: Check out the caller's default branch
+      - name: Check out the branch to audit
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ github.event.repository.default_branch }}
+          ref: ${{ env.BASE }}
           token: ${{ steps.app-token.outputs.token }}
 
       - name: Check out the audit-fix script
@@ -69,6 +75,18 @@ jobs:
           path: .audit-fix
           sparse-checkout: scripts/audit-fix
           persist-credentials: false
+
+      # The default branch's fix lives on audit-fix; another base gets its own
+      # branch, so a test run never touches the real one.
+      - name: Name the fix branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [ "$BASE" = "$DEFAULT_BRANCH" ]; then
+            echo "BRANCH=audit-fix" >> "$GITHUB_ENV"
+          else
+            echo "BRANCH=audit-fix-${BASE//\//-}" >> "$GITHUB_ENV"
+          fi
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -121,7 +139,6 @@ jobs:
         if: steps.push.outputs.pushed == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          BASE: ${{ github.event.repository.default_branch }}
           AUTOMERGE: ${{ inputs.automerge }}
           RUN_URL:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
