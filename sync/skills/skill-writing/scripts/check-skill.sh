@@ -101,7 +101,8 @@ sub check_skill {
   check_frontmatter($dir, $skill, @lines);
 
   open my $list, "-|", "git", "-c", "core.quotePath=false", "ls-files", "--cached", "--others",
-    "--exclude-standard", "--", $dir or die "check-skill: cannot list $dir: $!\n";
+    "--exclude-standard", "--", $dir, ":(exclude,attr:linguist-vendored)",
+    ":(exclude,attr:linguist-vendored=true)" or die "check-skill: cannot list $dir: $!\n";
   my %files;
   while (my $file = <$list>) {
     chomp $file;
@@ -162,6 +163,7 @@ sub check_frontmatter {
 sub unquote {
   my ($text) = @_;
   return $2 if $text =~ /\A(["\x27])(.*?)\1\s*(?:#.*)?\z/;
+  return "" if $text =~ /\A#/;
   $text =~ s/\s+#.*\z//;
   return $text;
 }
@@ -196,7 +198,7 @@ sub check_markdown {
     my @targets;
     push @targets, $1 while $text =~ /\]\(\s*(<[^>]*>|(?:[^()\s]|\([^()\s]*\))+)/g;
     push @targets, $1 if $text =~ /^\s{0,3}\[(?!\^)[^\]]+\]:\s*(<[^>]*>|\S+)/;
-    push @targets, $1 while $text =~ /\b(?:href|src)\s*=\s*"([^"]*)"/g;
+    push @targets, $2 while $text =~ /\b(?:href|src)\s*=\s*(["\x27])(.*?)\1/g;
 
     for my $target (@targets) {
       $target =~ s/^<(.*)>$/$1/;

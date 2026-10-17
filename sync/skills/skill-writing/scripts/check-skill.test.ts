@@ -70,6 +70,37 @@ test('it reads a name and description past quotes and trailing comments', async 
   expect(result.stdout).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
 });
 
+test('it fails a description that holds only a comment', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description: # TODO',
+    '---',
+  ]);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('.claude/skills/demo/SKILL.md: has no description\n');
+});
+
+test('it fails a line anchor in a single-quoted HTML link', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    ...frontmatter,
+    '',
+    "See <a href='guide.md#L42'>the guide</a>.",
+  ]);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('link guide.md#L42 has a line anchor');
+});
+
 test('it fails a name that differs from the folder', async () => {
   const ctx = await setupTest();
 
@@ -236,6 +267,22 @@ test('it skips a skill that git marks linguist-vendored', async () => {
 
   expect(result.status).toBe(0);
   expect(result.stdout).toBe('check-skill: no skills to check\n');
+});
+
+test('it skips a vendored reference inside a skill it checks', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.gitattributes', [
+    '.claude/skills/demo/references/vendor.md linguist-vendored',
+  ]);
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', frontmatter);
+  await ctx.writePage('.claude/skills/demo/references/vendor.md', ['See [x](y.ts#L1).']);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
 });
 
 test('it checks only the skill folders it is given', async () => {
