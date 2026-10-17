@@ -291,6 +291,25 @@ test('it warns about a code-formatted path to a repo file, but not a linked one'
   );
 });
 
+test('it reads no code-formatted path in a table row as a missing link', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('scripts/test-go.sh', ['echo go']);
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    ...frontmatter,
+    '',
+    '| Run   | Command              |',
+    '| ----- | -------------------- |',
+    '| Go    | `scripts/test-go.sh` |',
+  ]);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
+});
+
 test('it skips a skill that git marks linguist-vendored', async () => {
   const ctx = await setupTest();
 

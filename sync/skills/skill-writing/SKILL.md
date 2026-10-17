@@ -34,7 +34,7 @@ Each line links the section that explains it.
 - [SKILL.md and references](#skillmd-and-references): split by how often a task needs the text, one
   level deep.
 - [Point at the code, never copy it](#point-at-the-code-never-copy-it): a code name is a Markdown
-  link to its file; no inventories and no narrations.
+  link to its file; no inventories, no narrations, and no stale quotes.
 - [Answering a review of a skill](#answering-a-review-of-a-skill): decline a finding that asks for a
   copy of the code.
 - [Keeping a skill true](#keeping-a-skill-true): rules, not incidents, and a script where a check
@@ -164,10 +164,14 @@ defines. Replace it with the rule that defines the list and the search that list
 docs-writing allows a table whose key column is a list when its other columns hold facts the code
 doesn't. In a skill, a table keyed by files, functions, or options is an inventory whatever its
 other columns hold: move those facts into the code as doc comments, so the search returns them. A
-table keyed by something the agent does, such as the commands table above, is no inventory.
+table keyed by something the agent does or passes, such as the commands table above or the arguments
+of a workflow the skill tells the agent to call, is no inventory: the agent needs it on every load,
+at the call.
 
 When agents need to browse a list, generate the reference from the code with a script, and have CI
-fail when the reference drifts.
+fail when the reference drifts. When most loads of the skill need the list itself, such as the verbs
+a repo's function names may start with, keep the list in the skill and add a check that fails when
+it differs from the code, as `check-project-verbs.sh` does for the code-style skill.
 
 ### A narration
 
@@ -179,6 +183,13 @@ sequence.
   endpoint."
 - Good: "Run `deploy.sh <env>`. It pushes before it rolls out, so a failed push leaves the old
   version serving; rerun it. [`deploy.sh`](../../../scripts/deploy.sh) owns the sequence."
+
+### A quoted example
+
+A quote of real code text, such as a tool description, an error message, or a log line, is a copy:
+it drifts when the code changes, and the example then teaches the old text. Quote it only when the
+exact words are the point, and check the quote whenever the code it quotes changes. When the words
+are not the point, write a made-up example and mark it as one.
 
 ### Live lists
 
