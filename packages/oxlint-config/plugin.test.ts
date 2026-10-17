@@ -1000,3 +1000,64 @@ test('it picks the longer export pattern when two share a prefix', async () => {
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('core-no-tooling: core must not import scripts/run.ts');
 });
+
+test('it reports a repo config that sets a comment rule', async () => {
+  const rules = { 'zgeoff/no-comment-rule-override': 'error', 'zgeoff/no-jsdoc': 'off' };
+  const files = { '.git': 'gitdir: elsewhere\n', 'sample.ts': 'export const value = 1;\n' };
+
+  const result = await runLintTree(files, 'sample.ts', rules);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('.oxlintrc.json sets zgeoff/no-jsdoc');
+});
+
+test('it reports a comment rule set in a second repo config', async () => {
+  const extra = '{\n  "rules": {\n    "zgeoff/max-consecutive-line-comments": "off"\n  }\n}\n';
+
+  const files = {
+    '.git': 'gitdir: elsewhere\n',
+    '.oxlintrc.imports.json': extra,
+    'sample.ts': 'export const value = 1;\n',
+  };
+
+  const result = await runLintTree(files, 'sample.ts', {
+    'zgeoff/no-comment-rule-override': 'error',
+  });
+
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout).toInclude(
+    '.oxlintrc.imports.json sets zgeoff/max-consecutive-line-comments',
+  );
+});
+
+test('it ignores a comment rule named only inside a config comment', async () => {
+  const extra = '{\n  // "zgeoff/no-jsdoc": "off",\n  "rules": {}\n}\n';
+
+  const files = {
+    '.git': 'gitdir: elsewhere\n',
+    '.oxlintrc.extra.json': extra,
+    'sample.ts': 'export const value = 1;\n',
+  };
+
+  const result = await runLintTree(files, 'sample.ts', {
+    'zgeoff/no-comment-rule-override': 'error',
+  });
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it reports an override once when a run lints several files', async () => {
+  const rules = { 'zgeoff/no-comment-rule-override': 'error', 'zgeoff/no-jsdoc': 'off' };
+
+  const files = {
+    '.git': 'gitdir: elsewhere\n',
+    'first.ts': 'export const first = 1;\n',
+    'second.ts': 'export const second = 2;\n',
+  };
+
+  const result = await runLintTree(files, '.', rules);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout.split('sets zgeoff/no-jsdoc')).toHaveLength(2);
+});

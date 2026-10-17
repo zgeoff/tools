@@ -27,6 +27,7 @@
     "zgeoff/no-await-in-logical": "error",
     "zgeoff/no-jsdoc": "error",
     "zgeoff/max-consecutive-line-comments": ["error", { "max": 3 }],
+    "zgeoff/no-comment-rule-override": "error",
     "zgeoff/function-verb": "error",
     "zgeoff/test-beside-module": "error",
 

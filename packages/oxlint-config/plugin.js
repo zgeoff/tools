@@ -1,6 +1,7 @@
 import functionVerb from './function-verb.js';
 import importZones from './import-zones.js';
 import maxConsecutiveLineComments from './max-consecutive-line-comments.js';
+import noCommentRuleOverride from './no-comment-rule-override.js';
 import noJSDoc from './no-jsdoc.js';
 import testBesideModule from './test-beside-module.js';
 
@@ -96,6 +97,7 @@ const plugin = {
     ),
     'no-jsdoc': noJSDoc,
     'max-consecutive-line-comments': maxConsecutiveLineComments,
+    'no-comment-rule-override': noCommentRuleOverride,
     'function-verb': functionVerb,
     'test-beside-module': testBesideModule,
     'import-zones': importZones,
