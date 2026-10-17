@@ -7,6 +7,14 @@ Per-test handlers exist only for what the store cannot express. The [testing ski
 rules on setup, data, and assertions apply throughout. Real application and native transport cases
 follow [Real applications and transport](../SKILL.md#real-applications-and-transport).
 
+- [The server and its lifecycle](#the-server-and-its-lifecycle)
+- [Stateful handlers](#stateful-handlers)
+- [Per-test handlers](#per-test-handlers)
+- [A mock API shared across packages](#a-mock-api-shared-across-packages)
+- [RPC contracts](#rpc-contracts)
+- [Queues and other stateful services](#queues-and-other-stateful-services)
+- [Auth tokens](#auth-tokens)
+
 ## The server and its lifecycle
 
 - Each package has one MSW server, `setupServer(...handlers)`, exported from `mocks/node.ts`. The

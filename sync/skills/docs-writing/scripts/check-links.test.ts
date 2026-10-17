@@ -107,16 +107,45 @@ test('it skips links inside code blocks and code spans', async () => {
   expect(result.status).toBe(0);
 });
 
-test('it reads only the READMEs and docs/ when no path is given', async () => {
+test('it reads only the READMEs, docs/ and skills when no path is given', async () => {
   const ctx = await setupTest();
 
   await ctx.writePage('README.md', ['# Demo']);
   await ctx.writePage('notes/todo.md', ['See [the plan](missing.md).']);
+  await ctx.writePage('.claude/skills/demo/SKILL.md', ['See [the README](../../../README.md).']);
 
   const result = ctx.run();
 
   expect(result.status).toBe(0);
-  expect(result.stdout).toBe('check-links: 1 files, every relative link resolves\n');
+  expect(result.stdout).toBe('check-links: 2 files, every relative link resolves\n');
+});
+
+test('it fails on a broken link in a skill by default', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/references/stand-ins.md', [
+    'See [`buildStub`](../../../../src/build-stub.ts).',
+  ]);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(1);
+
+  expect(result.stderr).toBe(
+    '.claude/skills/demo/references/stand-ins.md:1: (../../../../src/build-stub.ts) src/build-stub.ts does not exist\n',
+  );
+});
+
+test('it skips a skill that git marks linguist-vendored', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.gitattributes', ['.claude/skills/vendor-*/** linguist-vendored']);
+  await ctx.writePage('.claude/skills/vendor-db/SKILL.md', ['See [the guide](missing.md).']);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('check-links: 0 files, every relative link resolves\n');
 });
 
 test('it reads the paths it is given', async () => {

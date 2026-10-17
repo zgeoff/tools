@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,10 +18,15 @@ async function setupTest() {
     await writeFile(join(dir, path), 'The tool reads one file.\n'.repeat(count));
   };
 
+  const writeText = async (path: string, text: string) => {
+    await mkdir(dirname(join(dir, path)), { recursive: true });
+    await writeFile(join(dir, path), text);
+  };
+
   const run = (...args: readonly string[]) =>
     spawnSync('bash', [scriptPath, ...args], { cwd: dir, encoding: 'utf8' });
 
-  return { dir, writeLines, run };
+  return { dir, writeLines, writeText, run };
 }
 
 test('it fails when the plain repo README is over its limit', async () => {
@@ -154,6 +159,51 @@ test('it fails when check-prose finds a violation in a doc', async () => {
 
   expect(result.status).toBe(1);
   expect(result.stdout).toInclude('docs/overview.md:1:The cache is load-bearing.');
+});
+
+test('it fails when check-prose finds a violation in a skill', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeLines('README.md', 10);
+  await ctx.writeText('.claude/skills/demo/SKILL.md', 'The cache is load-bearing.\n');
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('.claude/skills/demo/SKILL.md:1:The cache is load-bearing.');
+});
+
+test('it skips a skill that git marks linguist-vendored', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeLines('README.md', 10);
+  await ctx.writeText('.gitattributes', '.claude/skills/vendor-db/** linguist-vendored\n');
+  await ctx.writeText('.claude/skills/vendor-db/SKILL.md', 'The cache is load-bearing.\n');
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).not.toInclude('load-bearing');
+});
+
+test('it fails when the repo has check-skill and a skill fails it', async () => {
+  const ctx = await setupTest();
+
+  const checkSkill = fileURLToPath(
+    new URL('../../skill-writing/scripts/check-skill.sh', import.meta.url),
+  );
+
+  await ctx.writeLines('README.md', 10);
+
+  const source = await readFile(checkSkill, 'utf8');
+
+  await ctx.writeText('.claude/skills/skill-writing/scripts/check-skill.sh', source);
+  await ctx.writeText('.claude/skills/demo/SKILL.md', '---\nname: demo\n---\n');
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('.claude/skills/demo/SKILL.md: has no description');
 });
 
 test('it rejects --package naming a missing README', async () => {
