@@ -169,7 +169,9 @@ of a workflow the skill tells the agent to call, is no inventory: the agent need
 at the call.
 
 When agents need to browse a list, generate the reference from the code with a script, and have CI
-fail when the reference drifts.
+fail when the reference drifts. When most loads of the skill need the list itself, such as the verbs
+a repo's function names may start with, keep the list in the skill and add a check that fails when
+it differs from the code, as `check-project-verbs.sh` does for the code-style skill.
 
 ### A narration
 

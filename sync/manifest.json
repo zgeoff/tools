@@ -92,6 +92,11 @@
       {
         "source": ".claude/skills/code-style/SKILL.md",
         "target": ".claude/skills/code-style/SKILL.md"
+      },
+      {
+        "source": "sync/skills/code-style/scripts/check-project-verbs.sh",
+        "target": ".claude/skills/code-style/scripts/check-project-verbs.sh",
+        "mode": "0755"
       }
     ]
   },

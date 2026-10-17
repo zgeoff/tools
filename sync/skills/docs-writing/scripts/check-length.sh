@@ -2,8 +2,8 @@
 # Checks each README against its line limit and each docs/ file against its cap, then runs
 # check-prose.sh over the same files and every skill's Markdown. A README over its limit fails the
 # run; a README over its target and a docs/ file over its cap print a warning and never fail it.
-# When the repo has the skill-writing skill, it then runs that skill's check-skill.sh, and fails
-# when that fails.
+# When the repo has the skill-writing skill, it then runs that skill's check-skill.sh, and when it
+# has the code-style skill's check-project-verbs.sh, it runs that too; it fails when either fails.
 # Usage (from the repo root): check-length.sh [--package <readme>]...
 # A README is a package README when it sits beside a package.json that is not private, or when
 # --package names it. Any other README is the plain repo README at the root, or a sub-package
@@ -117,6 +117,15 @@ for check_skill in .claude/skills/skill-writing/scripts/check-skill.sh \
   if [ -f "$check_skill" ]; then
     echo
     bash "$check_skill" || fail=1
+    break
+  fi
+done
+
+for check_verbs in .claude/skills/code-style/scripts/check-project-verbs.sh \
+  sync/skills/code-style/scripts/check-project-verbs.sh; do
+  if [ -f "$check_verbs" ]; then
+    echo
+    bash "$check_verbs" || fail=1
     break
   fi
 done
