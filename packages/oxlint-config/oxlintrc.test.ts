@@ -58,13 +58,14 @@ test('it reports a switch and names ts-pattern', async () => {
   expect(stdout).toInclude('ts-pattern');
 });
 
-test('it reports a declaration that lists two variables', async () => {
+test('it reports a declaration that lists two variables, but not their order', async () => {
   const source = 'export const width = 3, height = 4;\n';
 
   const ctx = await setupTest('size.ts', source);
   const stdout = await runLint(ctx.dir, 'size.ts');
 
   expect(stdout).toInclude('eslint(one-var)');
+  expect(stdout).not.toInclude('eslint(sort-vars)');
 });
 
 test('it accepts one declaration per variable', async () => {
