@@ -86,6 +86,22 @@ test('it fails a description that holds only a comment', async () => {
   expect(result.stdout).toInclude('.claude/skills/demo/SKILL.md: has no description\n');
 });
 
+test('it fails a description that YAML reads as null', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description: null',
+    '---',
+  ]);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('.claude/skills/demo/SKILL.md: has no description\n');
+});
+
 test('it fails a line anchor in a single-quoted HTML link', async () => {
   const ctx = await setupTest();
 

@@ -185,8 +185,10 @@ sub check_frontmatter {
 }
 
 # Returns the value of a scalar: the text inside its quotes, or plain text without a trailing comment.
+# A plain null (null, Null, NULL or ~) has no text, as YAML reads it.
 sub unquote {
   my ($text) = @_;
+  return "" if $text =~ /\A(?:null|Null|NULL|~)\s*(?:#.*)?\z/;
   return $2 if $text =~ /\A(["\x27])(.*?)\1\s*(?:#.*)?\z/;
   return "" if $text =~ /\A#/;
   $text =~ s/\s+#.*\z//;
