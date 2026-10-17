@@ -35,6 +35,7 @@ interface Check {
   name: string;
   status: string;
   conclusion: string | null;
+  app?: string;
 }
 
 interface Status {
@@ -46,7 +47,13 @@ interface Status {
 // status rollup, which is null until the first check registers.
 function buildHeadResponse(oid: string, checks: Check[], statuses: Status[] = []) {
   const nodes = [
-    ...checks.map((check) => ({ __typename: 'CheckRun', ...check })),
+    ...checks.map((check) => ({
+      __typename: 'CheckRun',
+      name: check.name,
+      status: check.status,
+      conclusion: check.conclusion,
+      checkSuite: { app: { slug: check.app ?? 'github-actions' } },
+    })),
     ...statuses.map((status) => ({ __typename: 'StatusContext', ...status })),
   ];
 
@@ -136,6 +143,44 @@ test('it waits on the head a push moved the branch to, and merges that head', as
   expect(result.status).toBe(0);
   expect(calls.filter((call) => call === HEAD_QUERY_CALL)).toHaveLength(3);
   expect(calls.at(-1)).toBe(`${MERGE_CALL} new222`);
+});
+
+test('it waits for the GitHub Actions checks when other apps pass first', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeResponses('prs', [[{ number: 145 }]]);
+
+  const socket = {
+    name: 'Socket Security: Project Report',
+    status: 'COMPLETED',
+    conclusion: 'SUCCESS',
+    app: 'socket-security',
+  };
+
+  const coderabbit = { context: 'CodeRabbit', state: 'SUCCESS' };
+
+  await ctx.writeResponses('heads', [
+    buildHeadResponse('abc123', [], [coderabbit]),
+    buildHeadResponse('abc123', [socket], [coderabbit]),
+    buildHeadResponse(
+      'abc123',
+      [socket, { name: 'pr / checks', status: 'IN_PROGRESS', conclusion: null }],
+      [coderabbit],
+    ),
+    buildHeadResponse(
+      'abc123',
+      [socket, { name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' }],
+      [coderabbit],
+    ),
+  ]);
+
+  const result = ctx.runScript();
+
+  const calls = await ctx.readCalls();
+
+  expect(result.status).toBe(0);
+  expect(calls.filter((call) => call === HEAD_QUERY_CALL)).toHaveLength(4);
+  expect(calls.at(-1)).toBe(`${MERGE_CALL} abc123`);
 });
 
 test('it counts skipped checks and passed commit statuses as passed', async () => {

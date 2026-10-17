@@ -42,7 +42,7 @@ query='query($owner: String!, $name: String!, $ref: String!) {
             contexts(first: 100) {
               nodes {
                 __typename
-                ... on CheckRun { name status conclusion }
+                ... on CheckRun { name status conclusion checkSuite { app { slug } } }
                 ... on StatusContext { context state }
               }
             }
@@ -53,11 +53,13 @@ query='query($owner: String!, $name: String!, $ref: String!) {
   }
 }'
 # Prints the head commit, then one line per check: pass, pending, or
-# fail:<name>. A head with no checks yet has a null rollup and prints no lines.
+# fail:<name>, plus an "actions" line per GitHub Actions check. A head with no
+# checks yet has a null rollup and prints no lines.
 filter='.data.repository.ref.target
   | (.oid // error("no release branch")),
     (.statusCheckRollup.contexts.nodes // [] | .[]
       | if .__typename == "CheckRun" then
+          (if .checkSuite.app.slug == "github-actions" then "actions" else empty end),
           if .status != "COMPLETED" then "pending"
           elif (.conclusion | IN("SUCCESS", "NEUTRAL", "SKIPPED")) then "pass"
           else "fail:" + .name end
@@ -82,7 +84,10 @@ while :; do
     echo "release PR #$pr has failing checks on $sha: $failed" >&2
     exit 1
   fi
-  if [ -n "$states" ] && ! printf '%s\n' "$states" | grep -qx pending; then
+  # Other apps' checks, such as a review bot's status, can pass before
+  # GitHub Actions creates this repo's own checks, so wait for those too.
+  if printf '%s\n' "$states" | grep -qx actions \
+    && ! printf '%s\n' "$states" | grep -qx pending; then
     break
   fi
   if [ "$SECONDS" -ge "$deadline" ]; then
