@@ -1,0 +1,103 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "The shared Renovate preset for zgeoff Bun repos, which a repo takes with extends: github>zgeoff/tools. sync/README.md describes each rule.",
+  "extends": ["config:recommended", ":semanticCommits", ":timezone(Etc/UTC)"],
+  "labels": ["dependencies"],
+  "prHourlyLimit": 0,
+  "minimumReleaseAge": "7 days",
+  "internalChecksFilter": "strict",
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "addLabels": ["security"],
+    "automerge": true,
+    "postUpgradeTasks": {
+      "commands": ["bun install --ignore-scripts --minimum-release-age=0"],
+      "fileFilters": ["**/bun.lock"],
+      "executionMode": "branch",
+      "installTools": {
+        "bun": {}
+      }
+    }
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true,
+    "schedule": ["* 0-5 * * 1"]
+  },
+  "customManagers": [
+    {
+      "description": "Bun catalog entries, until renovatebot/renovate#42909 adds catalog support to the bun manager; remove this manager then.",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)package\\.json$/"],
+      "matchStringsStrategy": "recursive",
+      "matchStrings": [
+        "\"catalog\"\\s*:\\s*\\{[^}]*\\}",
+        "\"(?<depName>[^\"]+)\"\\s*:\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "npm"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "A catalog bump changes package.json only, so bun install refreshes bun.lock in the same commit. It needs self-hosted Renovate that allows the command.",
+      "matchManagers": ["custom.regex"],
+      "matchDatasources": ["npm"],
+      "postUpgradeTasks": {
+        "commands": ["bun install --ignore-scripts"],
+        "fileFilters": ["**/bun.lock"],
+        "executionMode": "branch",
+        "installTools": {
+          "bun": {}
+        }
+      }
+    },
+    {
+      "description": "Patch bumps go in one weekly PR and merge on green CI.",
+      "matchUpdateTypes": ["patch"],
+      "groupName": "patch updates",
+      "schedule": ["* 0-5 * * 1"],
+      "automerge": true
+    },
+    {
+      "description": "Dev-tool minor bumps go in one weekly PR, which waits for review. Their patch bumps go in the patch group.",
+      "matchPackageNames": [
+        "@commitlint/**",
+        "@tsconfig/**",
+        "@types/**",
+        "knip",
+        "lefthook",
+        "oxfmt",
+        "oxlint",
+        "oxlint-tsgolint",
+        "typescript"
+      ],
+      "matchUpdateTypes": ["minor"],
+      "groupName": "dev tools",
+      "schedule": ["* 0-5 * * 1"]
+    },
+    {
+      "description": "Each major bump gets its own PR and waits for review.",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    },
+    {
+      "description": "zgeoff packages bump at any level as soon as they publish, each in its own PR, and merge on green CI. bun install still needs the package in the repo's minimumReleaseAgeExcludes.",
+      "matchPackageNames": ["@zgeoff/**"],
+      "minimumReleaseAge": null,
+      "schedule": ["at any time"],
+      "groupName": null,
+      "automerge": true
+    },
+    {
+      "description": "The zgeoff/tools workflow refs move to the newest sync tag as soon as it is cut, and merge on green CI. The tags are sync-v1, sync-v2 and so on, which are not semver.",
+      "matchManagers": ["github-actions"],
+      "matchDepNames": ["zgeoff/tools"],
+      "versioning": "regex:^sync-v(?<major>\\d+)$",
+      "minimumReleaseAge": null,
+      "schedule": ["at any time"],
+      "groupName": null,
+      "automerge": true
+    }
+  ]
+}

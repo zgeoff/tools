@@ -1,0 +1,151 @@
+# Reusable workflow: turns a red `bun audit` on the caller's default branch into
+# a pull request. scripts/audit-fix/audit-fix.ts updates each vulnerable package
+# to a fixed release, excludes a fix younger than the minimumReleaseAge gate in
+# bunfig.toml with a dated comment, and records each advisory it cannot fix in
+# audit-ignores.json with a reason and an expiry, mirrored as an --ignore flag in
+# the `audit` script. An expired ignore is audited again on the next run.
+#
+# The job pushes the result to the branch audit-fix and opens or updates one
+# pull request, labelled dependencies and security, plus audit-ignore when it
+# only records ignores. When nothing needs a change, it deletes the branch, which
+# closes a stale pull request. With `automerge`, it asks GitHub to merge the pull
+# request on green checks, which needs auto-merge allowed in the repo settings.
+#
+# The caller needs Bun 1.4.0 or newer in .bun-version, for `bun audit fix`, and
+# the REPO_SYNC_APP_CLIENT_ID and REPO_SYNC_APP_PRIVATE_KEY secrets that
+# repo-sync uses: a push with the default GITHUB_TOKEN starts no checks on the
+# pull request. sync/workflow-callers/audit-fix.yml is the caller.
+name: Audit fix (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      expiry-days:
+        description: Days an ignore lasts before the step audits its advisory again
+        type: number
+        required: false
+        default: 30
+      automerge:
+        description: Ask GitHub to merge the pull request once its checks pass
+        type: boolean
+        required: false
+        default: true
+    secrets:
+      REPO_SYNC_APP_CLIENT_ID:
+        required: true
+      REPO_SYNC_APP_PRIVATE_KEY:
+        required: true
+
+jobs:
+  audit-fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      BRANCH: audit-fix
+      LEFTHOOK: 0
+    steps:
+      - name: Mint a write token for the caller
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        with:
+          client-id: ${{ secrets.REPO_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.REPO_SYNC_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Check out the caller's default branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Check out the audit-fix script
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: zgeoff/tools
+          ref: ${{ job.workflow_sha }}
+          path: .audit-fix
+          sparse-checkout: scripts/audit-fix
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Fix the advisories
+        env:
+          EXPIRY_DAYS: ${{ inputs.expiry-days }}
+          NO_COLOR: 1
+        run: |
+          set -euo pipefail
+          bun .audit-fix/scripts/audit-fix/audit-fix.ts \
+            --title-file "$RUNNER_TEMP/title.txt" \
+            --body-file "$RUNNER_TEMP/body.md" \
+            --expiry-days "$EXPIRY_DAYS"
+          rm -rf .audit-fix
+
+      - name: Commit and push the fix
+        id: push
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git checkout -B "$BRANCH"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "bun audit passes with nothing to change; nothing to fix."
+            git push origin --delete "$BRANCH" 2>/dev/null || true
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -m "$(cat "$RUNNER_TEMP/title.txt")"
+          # A rerun on an unchanged default branch makes the same tree; pushing
+          # it again would only restart the pull request's checks.
+          if git fetch --quiet origin "$BRANCH" 2>/dev/null \
+            && [ "$(git rev-parse 'HEAD^{tree}')" = "$(git rev-parse 'FETCH_HEAD^{tree}')" ]; then
+            echo "The open fix already holds this change."
+          else
+            git push --force origin "$BRANCH"
+          fi
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the pull request
+        if: steps.push.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BASE: ${{ github.event.repository.default_branch }}
+          AUTOMERGE: ${{ inputs.automerge }}
+          RUN_URL:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title=$(cat "$RUNNER_TEMP/title.txt")
+          { cat "$RUNNER_TEMP/body.md"; echo; echo "[Workflow run]($RUN_URL)"; } > "$RUNNER_TEMP/pr-body.md"
+          labels=(dependencies security)
+          if [[ "$title" == chore* ]]; then
+            labels+=(audit-ignore)
+          fi
+          # A label the repo already has keeps its colour and description.
+          for label in "${labels[@]}"; do
+            gh label create "$label" > /dev/null 2>&1 || true
+          done
+          label_list=$(IFS=,; echo "${labels[*]}")
+          number=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --title "$title" --body-file "$RUNNER_TEMP/pr-body.md" --add-label "$label_list"
+          else
+            gh pr create --base "$BASE" --head "$BRANCH" --title "$title" \
+              --body-file "$RUNNER_TEMP/pr-body.md" --label "$label_list"
+          fi
+          if [ "$AUTOMERGE" = true ]; then
+            gh pr merge "$BRANCH" --auto --squash \
+              || echo "::warning::GitHub refused auto-merge; allow auto-merge in the repo settings, or merge the pull request by hand."
+          fi

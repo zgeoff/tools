@@ -31,6 +31,17 @@
     ]
   },
   {
+    "name": "workflow-audit-fix",
+    "description": "The workflow that turns a red bun audit into a fix pull request, or a pull request that records an ignore with a reason and an expiry",
+    "optIn": true,
+    "files": [
+      {
+        "source": "sync/workflow-callers/audit-fix.yml",
+        "target": ".github/workflows/audit-fix.yml"
+      }
+    ]
+  },
+  {
     "name": "skill-testing",
     "description": "The shared testing skill and its references; a repo keeps its own rules in a project-testing skill",
     "optIn": true,
