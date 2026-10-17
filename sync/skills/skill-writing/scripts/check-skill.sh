@@ -8,7 +8,7 @@
 # format, a description over 1,024 characters, and a link with a line anchor outside code.
 # Warns on: a SKILL.md over 500 lines, a reference that SKILL.md does not list under ## References,
 # a reference over 100 lines with no contents list near its top, a reference that links to another
-# reference, and a code-formatted span that names an existing repo file.
+# reference, and a code-formatted span outside a table that names an existing repo file.
 set -uo pipefail
 
 # Lists tracked and untracked files, so a new skill is checked before it is staged.
@@ -233,6 +233,8 @@ sub check_markdown {
     }
 
     # A span inside link text is already a link, so only the spans left after links drop are read.
+    # A table row holds commands the agent types, such as the commands table of a skill, so it is skipped.
+    next if $line =~ /^\s*\|/;
     my $outside_links = $line =~ s/!?\[[^\]]*\]\([^)]*\)//gr;
     my @bare;
     $outside_links =~ s/(`+)(.+?)\1/push @bare, $2; ""/ge;
