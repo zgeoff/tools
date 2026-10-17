@@ -1,7 +1,6 @@
 {
   "name": "@zgeoff/std",
   "version": "0.1.0",
-  "private": true,
   "description": "Small, dependency-free TypeScript helpers shared across the zgeoff repos",
   "license": "MIT",
   "repository": {
