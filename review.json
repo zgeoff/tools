@@ -1,0 +1,11 @@
+{
+  "rules": ".claude/skills/code-style/SKILL.md",
+  "instructions": [
+    "**/AGENTS.md",
+    "**/CLAUDE.md",
+    "**/SKILL.md",
+    ".claude/**/*.md",
+    ".cursor/rules/**",
+    "sync/skills/**/*.md"
+  ]
+}
