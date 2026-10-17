@@ -1,5 +1,18 @@
 {
-  "rules": ".claude/skills/code-style/SKILL.md",
+  "rules": [
+    {
+      "path": ".claude/skills/code-style/SKILL.md",
+      "skip": ["Key rules", "Loading the skill"]
+    },
+    {
+      "path": "sync/skills/testing/SKILL.md",
+      "skip": ["Key rules", "References", "Loading the skill"]
+    },
+    {
+      "path": "sync/skills/docs-writing/SKILL.md",
+      "skip": ["Key rules", "References", "Loading the skill"]
+    }
+  ],
   "instructions": [
     "**/AGENTS.md",
     "**/CLAUDE.md",
