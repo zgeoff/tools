@@ -1,130 +1,62 @@
 # Agent Guidelines
 
+This repo is tools, the shared tooling for every zgeoff repo. It publishes the `@zgeoff/*` packages
+to npm, and it holds the files that repo-sync copies into each other repo.
+
 ## Required reading
 
 The rules a task needs are not repeated here. Load the skill for the work before starting it.
 
-| Skill        | Load before                                                                             |
-| ------------ | --------------------------------------------------------------------------------------- |
-| `code-style` | writing, reviewing, or renaming any TypeScript — the function-verb taxonomy lives there |
+| Skill           | Source                       | Load before                                                                             |
+| --------------- | ---------------------------- | --------------------------------------------------------------------------------------- |
+| `code-style`    | `.claude/skills/code-style/` | writing, reviewing, or renaming any TypeScript — the function-verb taxonomy lives there |
+| `testing`       | `sync/skills/testing/`       | designing, writing, or reviewing tests                                                  |
+| `docs-writing`  | `sync/skills/docs-writing/`  | writing or editing any committed prose: READMEs, this file, skills                      |
+| `skill-writing` | `sync/skills/skill-writing/` | writing or editing a skill                                                              |
 
-The shared `testing` and `docs-writing` skills ship from `sync/skills/` to the other repos; read the
-source there before test or prose work in this repo.
+Only `code-style` is installed as a skill here. For the others, read the `SKILL.md` in the source
+folder.
 
-## Operations
+## Repo structure
 
-- Perform all work on a branch in a git worktree under `.worktrees/` (e.g.
-  `git worktree add .worktrees/<branch> -b <branch>`) — never commit directly on `main`.
-- Use [Conventional Commits](https://www.conventionalcommits.org/) for all commit messages.
-- A squash merge makes the PR title the commit subject, so a PR title is a Conventional Commit too.
-  `feat(#412): add the retry budget` is a title; `add the retry budget` is not.
-- Commit subjects and PR titles use the imperative mood ("add X", never "added X" or a bare noun
-  phrase).
-- Open PRs against `main` using the PR template (`.github/PULL_REQUEST_TEMPLATE.md`). Descriptions
-  are condensed: lead paragraph ≤2 sentences, one-line bullets, ≤150 words — write the short version
-  first, don't draft long and trim.
-- After pushing, link the PR URL in your response.
-- A PR is ready only when its checks are green: watch CI (`gh pr checks <n> --watch`) after opening
-  or updating, and report a failure with what you're doing about it.
-- Light linting, formatting, and other checks run via lefthook's pre-commit and pre-push hooks.
-  Defer to CI for larger checks, as the environment you're operating in may have conservative memory
-  constraints.
-- `bun run lint` is plain oxlint. `bun run lint:full` adds the type-aware pass and the type check,
-  and is CI-only: never run it locally.
+tools is one Bun workspace.
 
-## Dependencies
+```text
+packages/           the @zgeoff/* packages; release-please versions each one and publishes the
+                    public ones to npm, as RELEASING.md describes
+sync/               the sources that repo-sync delivers, listed in sync/manifest.json; an edit here
+                    reaches every repo that takes the entry, as sync/README.md describes
+  skills/           the shared skill bases, each delivered to .claude/skills/<name>/
+  pre-push/         the lefthook pre-push baseline, which this repo's lefthook.yml extends too
+  workflow-callers/ opt-in workflow stubs that call this repo's reusable workflows
+  hooks/            the skill-gate hook
+scripts/            the shell scripts that repo-sync and CI run, plus the manual ones that pin a
+                    repo to a sync tag and do a package's first npm publish; tests sit beside them
+.github/workflows/  this repo's CI and release, and the reusable bun-checks and repo-sync workflows
+                    that other repos call
+.claude/skills/     the code-style skill, which is both this repo's skill and the shared base
+```
 
-- Pin exact versions — no `^`/`~` ranges. (`bun add` saves exact automatically via `exact = true` in
-  bunfig.toml — the rule applies to hand-written edits.)
+A manifest entry can name a source outside `sync/`. `.github/PULL_REQUEST_TEMPLATE.md`,
+`.editorconfig` and `.claude/skills/code-style/SKILL.md` ship to other repos too, so an edit to one
+of them changes every repo that takes it.
 
-## Review bots
+## Packages
 
-CodeRabbit reviews every PR. Its shared config lives in the zgeoff/coderabbit repo, and a repo-root
-`.coderabbit.yaml` with `inheritance: true` layers repo-specific settings on top. CodeRabbit reads
-this file as its guidelines. A review bot added later is named here with its config, and these rules
-cover it too.
+- Every external version lives once, in the root `workspaces.catalog`. A package writes `"catalog:"`
+  for an external dependency and `"workspace:*"` for an internal one.
+- Pin exact versions, with no `^` or `~` ranges. `bun add` saves exact versions, so the rule covers
+  hand-written edits.
 
-- A PR is ready only after every bot review is read and every finding is answered: a fixed finding's
-  reply cites the commit that fixed it; a declined finding's reply states the reason — when a
-  finding contradicts this file, this file wins and the reply names the rule. Reviews land within a
-  few minutes of opening; read them with `gh pr view <n> --comments` and
-  `gh api repos/<owner>/<repo>/pulls/<n>/comments`. A finding outside the diff arrives in the review
-  body, not as a thread, so its answer is a PR comment.
-- Resolve a thread once its reply is posted, fixed and declined alike (GraphQL
-  `resolveReviewThread`). A finding the agent cannot confidently judge is escalation, not
-  disposition: reply saying so and leave the thread open for a human.
-- Never teach a bot through chat (`@coderabbitai` learnings and the like) — a correction to bot
-  behaviour is an edit to its config, reviewed in a PR.
-- Bots review a PR once, at open; an agent invokes a re-review only when asked. The exception is a
-  PR that got no review at all, such as one opened before the bot was installed: request it once
-  with that bot's documented trigger, such as `@coderabbitai review` for CodeRabbit.
+## Commands
 
-## Type checking
-
-Type errors are checked by two engines on purpose: `lint:full` includes tsgolint's experimental
-`--type-check` (fast, but CI-only), while `typecheck` runs real `tsc` per package (ground truth). CI
-runs both until tsgolint earns trust; if they ever disagree, believe `tsc`.
-
-## Workspace dependencies
-
-- Shared versions live in the root catalog; workspace packages reference them via `catalog:`.
-
-## Testing
-
-- Never use `describe` — write flat `test(…)` blocks with behavioural titles that start with "it"
-  (`test('it pads before a return statement', …)`). A file that tests several units prefixes each
-  title with `#<unit>` in place of "it" (`test('#parseSource rejects an empty file', …)`).
-- Test files are co-located with the module they test (`parse-source.ts` beside
-  `parse-source.test.ts`) — no `test/`, `tests/` or `__tests__` directories, except a root `e2e/`
-  for the end-to-end suites that run the whole program. Declaration emit excludes `*.test.ts`, so
-  they never ship.
-- Run `bun test` from the repo root: the jest-extended preload lives in the root `bunfig.toml`, so
-  package-cwd runs are missing the extra matchers.
-- Tests declare their own data inline — no fixtures shared between tests, even if that means
-  duplication.
-- Tests are mock-free: pure modules assert on return values, file-touching ones use `mkdtemp` trees,
-  and CLI behaviour is asserted end-to-end by spawning the real binary. If a module is hard to test
-  without mocking, move its I/O to the caller.
-- Reach for jest-extended matchers instead of hand-rolling assertions. Frequently useful:
-  - arrays
-    - `toIncludeAllMembers`
-    - `toIncludeSameMembers`
-    - `toPartiallyContain`
-    - `toIncludeAllPartialMembers`
-    - `toSatisfyAll`
-  - objects
-    - `toContainEntry`
-    - `toContainEntries`
-    - `toContainAllKeys`
-    - `toBeFrozen`
-  - strings
-    - `toStartWith`
-    - `toEndWith`
-    - `toInclude`
-    - `toEqualCaseInsensitive`
-    - `toEqualIgnoringWhitespace`
-  - values
-    - `toBeNil`
-    - `toBeOneOf`
-    - `toSatisfy`
-    - `toBeWithin`
-    - `toBeEmpty`
-  - dates
-    - `toBeAfter`
-    - `toBeBefore`
-    - `toBeBetween`
-    - `toBeValidDate`
-  - mocks
-    - `toHaveBeenCalledOnce`
-    - `toHaveBeenCalledExactlyOnceWith`
-    - `toHaveBeenCalledBefore`
-    - `toHaveBeenCalledAfter`
-  - errors/async
-    - `toThrowWithMessage`
-    - `toResolve` (returns a promise — always `await`)
-    - `toReject` (returns a promise — always `await`)
-- Matchers also work asymmetrically inside `toStrictEqual`/`toMatchObject`
-  (`status: expect.toBeOneOf([…])`).
-- Known gaps: `expect.pass`/`expect.fail` are unimplemented upstream and excluded from our types.
-  It's `toEqualCaseInsensitive` — not `…Insensitively` as some docs claim; unknown matcher names
-  fail typecheck here (upstream's own types are looser and would let typos through).
+- Run `bun test` from the repo root. The jest-extended preload lives in the root `bunfig.toml`, so a
+  run from a package folder lacks the extra matchers.
+- `bun run format` fixes formatting. lefthook runs the light checks before a commit and a push, and
+  CI runs the rest.
+- `bun run lint` is plain oxlint. `bun run lint:full` adds the type-aware pass and tsgolint's type
+  check, and is CI-only: never run it locally.
+- `bun run typecheck` runs `tsc` per package and over `scripts/` and `sync/`. CI runs it beside
+  `lint:full`, and when the two type checks disagree, `tsc` is right.
+- `bun run check:sync` checks `sync/manifest.json` against the rules repo-sync assumes. Run it after
+  you change the manifest or a file an entry lists. CI runs it, and the pre-push hook does not.
