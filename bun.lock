@@ -74,14 +74,6 @@
         "@commitlint/cli": ">=21.0.0",
       },
     },
-    "packages/exact-optional": {
-      "name": "@zgeoff/exact-optional",
-      "version": "0.1.0",
-      "devDependencies": {
-        "@types/bun": "catalog:",
-        "typescript": "catalog:",
-      },
-    },
     "packages/format-codemod": {
       "name": "@zgeoff/format-codemod",
       "version": "0.1.0",
@@ -128,6 +120,14 @@
       "devDependencies": {
         "@types/bun": "catalog:",
         "ajv": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
+    "packages/std": {
+      "name": "@zgeoff/std",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/bun": "catalog:",
         "typescript": "catalog:",
       },
     },
@@ -471,8 +471,6 @@
 
     "@zgeoff/commitlint-config": ["@zgeoff/commitlint-config@workspace:packages/commitlint-config"],
 
-    "@zgeoff/exact-optional": ["@zgeoff/exact-optional@workspace:packages/exact-optional"],
-
     "@zgeoff/format-codemod": ["@zgeoff/format-codemod@workspace:packages/format-codemod"],
 
     "@zgeoff/oxfmt-config": ["@zgeoff/oxfmt-config@workspace:packages/oxfmt-config"],
@@ -480,6 +478,8 @@
     "@zgeoff/oxlint-config": ["@zgeoff/oxlint-config@workspace:packages/oxlint-config"],
 
     "@zgeoff/release-manifest": ["@zgeoff/release-manifest@workspace:packages/release-manifest"],
+
+    "@zgeoff/std": ["@zgeoff/std@workspace:packages/std"],
 
     "@zgeoff/tsconfig": ["@zgeoff/tsconfig@workspace:packages/tsconfig"],
 

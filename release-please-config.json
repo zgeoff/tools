@@ -20,8 +20,8 @@
       "component": "@zgeoff/commitlint-config",
       "initial-version": "0.1.0"
     },
-    "packages/exact-optional": {
-      "component": "@zgeoff/exact-optional",
+    "packages/std": {
+      "component": "@zgeoff/std",
       "initial-version": "0.1.0"
     },
     "packages/format-codemod": {

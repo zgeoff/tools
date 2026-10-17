@@ -1,13 +1,13 @@
 {
-  "name": "@zgeoff/exact-optional",
+  "name": "@zgeoff/std",
   "version": "0.1.0",
   "private": true,
-  "description": "Drop the undefined-valued keys of an object, so it fits a type with optional properties under exactOptionalPropertyTypes",
+  "description": "Small, dependency-free TypeScript helpers shared across the zgeoff repos",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zgeoff/tools.git",
-    "directory": "packages/exact-optional"
+    "directory": "packages/std"
   },
   "files": [
     "src",
