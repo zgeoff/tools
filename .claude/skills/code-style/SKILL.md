@@ -31,11 +31,12 @@ This skill is the shared base that repo-sync delivers from zgeoff/tools; edit it
 downstream repo. When the repo has a `project-code-style` skill, load it too. It holds the repo's
 own verbs, exempt names, and rules, and it never relaxes a rule here.
 
-A `project-code-style` skill lists each of the repo's verbs as a bullet that starts with the
-backticked verb under `## Project verbs`, and each exempt name the same way under `## Exempt names`,
-so an agent sees every verb it may use when the skill loads. `check-project-verbs.sh`, beside this
-skill, fails when those lists differ from the `verbs` and `exemptNames` options of
-`zgeoff/function-verb` in `.oxlintrc.json`, and docs-writing's `check-length.sh` runs it.
+A `project-code-style` skill lists each of the repo's verbs as a bullet or a table row that starts
+with the backticked verb under `## Project verbs`, and each exempt name the same way under
+`## Exempt names`, so an agent sees every verb it may use when the skill loads.
+`check-project-verbs.sh`, beside this skill, fails when those lists differ from the `verbs` and
+`exemptNames` options of `zgeoff/function-verb` in `.oxlintrc.json`, and docs-writing's
+`check-length.sh` runs it.
 
 ## Files and modules
 

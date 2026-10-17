@@ -102,6 +102,26 @@ test('it reads only the first backticked name of a bullet under its heading', as
   expect(result.status).toBe(0);
 });
 
+test('it reads a verb from the first cell of a table row', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage(skillPath, [
+    '## Project verbs',
+    '',
+    '| Verb    | Contract                  | As opposed to |',
+    '| ------- | ------------------------- | ------------- |',
+    '| `admit` | verify a record and keep it | `verify`    |',
+  ]);
+
+  await ctx.writePage('.oxlintrc.json', [
+    '{ "rules": { "zgeoff/function-verb": ["error", { "verbs": ["admit"] }] } }',
+  ]);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(0);
+});
+
 test('it passes a repo with no project-code-style skill and no lint config', async () => {
   const ctx = await setupTest();
 

@@ -3,9 +3,9 @@
 # zgeoff/function-verb rule in .oxlintrc.json; exits non-zero when they differ.
 # Usage (from the repo root): check-project-verbs.sh [<skill> [<lint-config>]]
 # The skill defaults to .claude/skills/project-code-style/SKILL.md and the config to .oxlintrc.json.
-# A repo with neither file passes. The skill lists each verb as a bullet that starts with the
-# backticked verb under its "## Project verbs" heading, and each exempt name the same way under
-# "## Exempt names".
+# A repo with neither file passes. The skill lists each verb as a bullet or a table row that starts
+# with the backticked verb under its "## Project verbs" heading, and each exempt name the same way
+# under "## Exempt names".
 set -uo pipefail
 
 skill=${1:-.claude/skills/project-code-style/SKILL.md}
@@ -39,7 +39,7 @@ while (my $line = <$md>) {
     next;
   }
   next unless defined $section;
-  $listed{$section}{$1} = 1 if $line =~ /^- `([^`]+)`/;
+  $listed{$section}{$1} = 1 if $line =~ /^(?:-|\|)\s*`([^`]+)`/;
 }
 close $md;
 
