@@ -74,7 +74,7 @@ async function setupTest() {
   const runScript = (env: Record<string, string> = {}) =>
     spawnSync('bash', [scriptPath, 'zgeoff/tools'], {
       encoding: 'utf8',
-      env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, POLL_INTERVAL: '0', ...env },
+      env: { ...process.env, PATH: `${dir}:${process.env['PATH']}`, POLL_INTERVAL: '0', ...env },
     });
 
   const readCalls = async () => {
