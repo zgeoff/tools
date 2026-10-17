@@ -1,5 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { Database } from 'bun:sqlite';
+import { setImmediate } from 'node:timers/promises';
 import { Kysely } from 'kysely';
 import { buildSQLiteDialect } from './build-sqlite-dialect.ts';
 
@@ -52,9 +53,7 @@ test('it runs concurrent Kysely transactions one at a time', async () => {
 
   // An immediate fires only after every queued promise callback has run, so
   // the second transaction has had every chance to start inside the first.
-  await new Promise((resolve) => {
-    setImmediate(resolve);
-  });
+  await setImmediate();
 
   gate.resolve();
 

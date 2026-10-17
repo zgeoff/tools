@@ -1,5 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { Database } from 'bun:sqlite';
+import { setImmediate } from 'node:timers/promises';
 import { CompiledQuery } from 'kysely';
 import { BunSQLiteDriver } from './bun-sqlite-driver.ts';
 
@@ -87,9 +88,7 @@ test('it waits for the caller that holds the connection before it finishes destr
 
   // An immediate fires only after every queued promise callback has run, so
   // a destroy still pending here waits on the holder and nothing else.
-  await new Promise((resolve) => {
-    setImmediate(resolve);
-  });
+  await setImmediate();
 
   const statusWhileHeld = Bun.peek.status(destroyed);
 
