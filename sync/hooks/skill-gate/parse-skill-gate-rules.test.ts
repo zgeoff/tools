@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import invariant from 'tiny-invariant';
 import { parseSkillGateRules } from './parse-skill-gate-rules.ts';
 
 test('it accepts ignore segments and gates', () => {
@@ -28,9 +29,7 @@ test('it reads a missing ignore list as no ignore segments', () => {
 test('it rejects text that is not JSON', () => {
   const result = parseSkillGateRules('{ "gates": [');
 
-  if (result.ok) {
-    throw new Error('expected the parser to reject the text');
-  }
+  invariant(!result.ok, 'expected the parser to reject the text');
 
   expect(result.error).toStartWith('is not valid JSON: ');
 });
