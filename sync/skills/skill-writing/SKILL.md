@@ -34,7 +34,7 @@ Each line links the section that explains it.
 - [SKILL.md and references](#skillmd-and-references): split by how often a task needs the text, one
   level deep.
 - [Point at the code, never copy it](#point-at-the-code-never-copy-it): a code name is a Markdown
-  link to its file; no inventories and no narrations.
+  link to its file; no inventories, no narrations, and no stale quotes.
 - [Answering a review of a skill](#answering-a-review-of-a-skill): decline a finding that asks for a
   copy of the code.
 - [Keeping a skill true](#keeping-a-skill-true): rules, not incidents, and a script where a check
@@ -179,6 +179,13 @@ sequence.
   endpoint."
 - Good: "Run `deploy.sh <env>`. It pushes before it rolls out, so a failed push leaves the old
   version serving; rerun it. [`deploy.sh`](../../../scripts/deploy.sh) owns the sequence."
+
+### A quoted example
+
+A quote of real code text, such as a tool description, an error message, or a log line, is a copy:
+it drifts when the code changes, and the example then teaches the old text. Quote it only when the
+exact words are the point, and check the quote whenever the code it quotes changes. When the words
+are not the point, write a made-up example and mark it as one.
 
 ### Live lists
 
