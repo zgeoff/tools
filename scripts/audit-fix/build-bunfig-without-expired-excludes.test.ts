@@ -42,3 +42,18 @@ test('it keeps an exclude with no audit-fix comment', () => {
 
   expect(buildBunfigWithoutExpiredExcludes(bunfig, '2026-10-17').removed).toBeEmpty();
 });
+
+test("it keeps a person's entry that shares a row with an aged exclude", () => {
+  const bunfig = `minimumReleaseAge = 604800\n${honoComment}minimumReleaseAgeExcludes = [\n  "hono", "qs",\n  "nanoid",\n]\n`;
+  const result = buildBunfigWithoutExpiredExcludes(bunfig, '2026-10-17');
+
+  expect(result).toStrictEqual({
+    bunfig: 'minimumReleaseAge = 604800\nminimumReleaseAgeExcludes = [\n  "qs",\n  "nanoid",\n]\n',
+    removed: ['hono'],
+  });
+
+  expect(Bun.TOML.parse(result.bunfig)).toStrictEqual({
+    minimumReleaseAge: 604_800,
+    minimumReleaseAgeExcludes: ['qs', 'nanoid'],
+  });
+});

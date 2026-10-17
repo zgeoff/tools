@@ -54,10 +54,14 @@ function removeExcludeNames(bunfig: string, names: readonly string[]): string {
   for (const name of names) {
     const quoted = `"${name}"`;
 
+    // Only the value and its comma go, so another entry on the same row stays.
     list = list.includes('\n')
       ? list
           .split('\n')
-          .filter((line) => !line.trim().startsWith(quoted))
+          .map((line) => line.replace(new RegExp(`${RegExp.escape(quoted)}\\s*,?[ \\t]*`, 'u'), ''))
+          .filter(
+            (line, index, lines) => index === 0 || index === lines.length - 1 || line.trim() !== '',
+          )
           .join('\n')
       : list.replace(new RegExp(`\\s*${RegExp.escape(quoted)}\\s*,?`, 'u'), '');
   }
