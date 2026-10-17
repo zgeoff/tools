@@ -1,7 +1,5 @@
 # @zgeoff/kysely-bun-sqlite
 
-Private until its first publish to npm.
-
 A Kysely driver and dialect over one `bun:sqlite` database handle. Kysely ships no `bun:sqlite`
 dialect, so a repo that pairs the two builds its dialect from this package.
 
