@@ -106,7 +106,8 @@
     "unicorn/number-literal-case": "off",
     "unicorn/filename-case": "off",
 
-    // one declaration per variable; a declaration list has no order to sort
+    // one declaration per variable, so sort-vars never sees a list to order and
+    // stays off rather than fire on code one-var already rejects
     "one-var": ["error", "never"],
     "sort-vars": "off",
 
