@@ -1,4 +1,4 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": ["plugin.test.ts"]
+  "include": ["plugin.test.ts", "oxlintrc.test.ts"]
 }
