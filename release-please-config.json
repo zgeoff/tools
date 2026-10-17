@@ -24,6 +24,10 @@
       "component": "@zgeoff/std",
       "initial-version": "0.1.0"
     },
+    "packages/kysely-bun-sqlite": {
+      "component": "@zgeoff/kysely-bun-sqlite",
+      "initial-version": "0.1.0"
+    },
     "packages/format-codemod": {
       "component": "@zgeoff/format-codemod"
     },
