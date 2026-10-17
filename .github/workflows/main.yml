@@ -106,60 +106,29 @@ jobs:
             git push
           fi
 
+      # The workspace holds the release PR's branch, or nothing when the
+      # sync steps were skipped, so take the script from this run's commit.
+      - name: Check out the merge script
+        if: github.event_name == 'push' && steps.app-token.outputs.token != ''
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          path: .merge-release-prs
+          sparse-checkout: scripts/merge-release-prs.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
       # Reads no release-please outputs on purpose: prs_created is false
       # when the open release PR needed no update (a previous run failed
       # after creating it), and a step's env block is template-evaluated
       # even when its if-condition is false, so fallible expressions like
-      # fromJSON must never appear in env. Mergeability is recomputed
-      # asynchronously after the sync push — poll until it settles — and a
-      # MERGEABLE read can be stale ("Base branch was modified" from the
-      # merge mutation), so the merge attempt itself retries inside the
-      # same loop rather than trusting any single read.
+      # fromJSON must never appear in env. The script waits, with a time
+      # bound, for the checks on the release branch's head, including the
+      # sync commit just pushed, and fails only when one fails or none
+      # finish in time.
       - name: Auto-merge release PRs
         if: github.event_name == 'push' && steps.app-token.outputs.token != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          for pr in $(gh pr list --repo "$GITHUB_REPOSITORY" --head release-please--branches--main --json number --jq '.[].number'); do
-            # No branch protection enforces the release PR's checks, so wait
-            # for them here: first for any to appear, then for all to pass.
-            for _ in $(seq 1 30); do
-              count=$(gh pr checks "$pr" --repo "$GITHUB_REPOSITORY" --json name --jq length 2>/dev/null || echo 0)
-              if [ "$count" -gt 0 ]; then
-                break
-              fi
-              sleep 10
-            done
-            if ! gh pr checks "$pr" --repo "$GITHUB_REPOSITORY" --watch --fail-fast --interval 10; then
-              echo "release PR #$pr has failing checks" >&2
-              exit 1
-            fi
-            # --watch exits 0 when a check was cancelled, so require every
-            # check to have passed or been skipped.
-            unfinished=$(gh pr checks "$pr" --repo "$GITHUB_REPOSITORY" --json name,bucket \
-              --jq '[.[] | select(.bucket != "pass" and .bucket != "skipping") | .name] | join(", ")')
-            if [ -n "$unfinished" ]; then
-              echo "release PR #$pr has checks that did not pass: $unfinished" >&2
-              exit 1
-            fi
-            merged=''
-            for _ in $(seq 1 12); do
-              state=$(gh pr view "$pr" --repo "$GITHUB_REPOSITORY" --json mergeable --jq .mergeable)
-              if [ "$state" = "CONFLICTING" ]; then
-                echo "release PR #$pr has conflicts" >&2
-                exit 1
-              fi
-              if [ "$state" = "MERGEABLE" ] && gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --squash; then
-                merged=1
-                break
-              fi
-              sleep 5
-            done
-            if [ -z "$merged" ]; then
-              echo "release PR #$pr never became mergeable" >&2
-              exit 1
-            fi
-          done
+        run: bash .merge-release-prs/scripts/merge-release-prs.sh "$GITHUB_REPOSITORY"
 
       # release-please reads main through the API, not this run's commit. A
       # run that waits in the release queue can start after an earlier run
