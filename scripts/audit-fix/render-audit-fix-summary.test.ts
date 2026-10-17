@@ -14,6 +14,7 @@ test('it titles a change that updates a package as a fix', () => {
     fixes: [
       { name: 'brace-expansion', from: '5.0.6', to: '5.0.12', newerThanMinimumReleaseAge: true },
     ],
+    expiredExcludes: [],
     excludes: [
       {
         name: 'brace-expansion',
@@ -30,7 +31,7 @@ test('it titles a change that updates a package as a fix', () => {
 
   expect(summary).toStrictEqual({
     title: 'fix(deps): update brace-expansion, ignore 1 unfixed advisory',
-    body: `The audit-fix workflow opened this pull request after it ran \`bun audit\` on the base branch.
+    body: `The audit-fix workflow opened this pull request after it ran \`bun audit\` on the base branch. It ignores advisories that no fix reaches, so it waits for a person to review it and never merges by itself.
 
 ## Updated to a fixed release
 - \`brace-expansion\` 5.0.6 → 5.0.12
@@ -42,7 +43,7 @@ These fixes are younger than \`minimumReleaseAge\`, so \`bunfig.toml\` excludes 
 ## Ignored until a fix can land
 - GHSA-85c8-ppgw-ccpr in \`tinypool\` (Tinypool: Prototype Pollution Gadget to RCE in run() options), until 2026-11-16: The fix is tinypool 2.1.2, but oxfmt@0.56.0 accepts only 2.1.0.
 `,
-    kind: 'fix',
+    needsReview: true,
   });
 });
 
@@ -50,19 +51,21 @@ test('it titles a change that only records ignores as a chore', () => {
   const summary = renderAuditFixSummary({
     fixes: [],
     excludes: [],
+    expiredExcludes: [],
     added: [],
     renewed: [tinypoolIgnore],
     removed: [],
   });
 
   expect(summary.title).toBe('chore(deps): ignore 1 unfixed audit advisory');
-  expect(summary.kind).toBe('ignore');
+  expect(summary.needsReview).toBe(true);
 });
 
 test('it titles a change that only drops ignores', () => {
   const summary = renderAuditFixSummary({
     fixes: [],
     excludes: [],
+    expiredExcludes: [],
     added: [],
     renewed: [],
     removed: ['GHSA-85c8-ppgw-ccpr', 'GHSA-5gmw-xhrv-c9v3'],
@@ -80,6 +83,7 @@ test('it counts the packages when their names would make the title too long', ()
       newerThanMinimumReleaseAge: false,
     })),
     excludes: [],
+    expiredExcludes: [],
     added: [],
     renewed: [],
     removed: [],
@@ -90,10 +94,53 @@ test('it counts the packages when their names would make the title too long', ()
 
 test('it reports nothing when nothing changed', () => {
   expect(
-    renderAuditFixSummary({ fixes: [], excludes: [], added: [], renewed: [], removed: [] }),
+    renderAuditFixSummary({
+      fixes: [],
+      excludes: [],
+      expiredExcludes: [],
+      added: [],
+      renewed: [],
+      removed: [],
+    }),
   ).toStrictEqual({
     title: '',
     body: '',
-    kind: 'none',
+    needsReview: false,
+  });
+});
+
+test('it lets a change that only updates packages merge by itself', () => {
+  const summary = renderAuditFixSummary({
+    fixes: [
+      { name: 'brace-expansion', from: '5.0.6', to: '5.0.12', newerThanMinimumReleaseAge: false },
+    ],
+    excludes: [],
+    expiredExcludes: [],
+    added: [],
+    renewed: [],
+    removed: [],
+  });
+
+  expect(summary.needsReview).toBe(false);
+});
+
+test('it titles a change that only drops aged release-age excludes', () => {
+  const summary = renderAuditFixSummary({
+    fixes: [],
+    excludes: [],
+    expiredExcludes: ['hono'],
+    added: [],
+    renewed: [],
+    removed: [],
+  });
+
+  expect(summary).toStrictEqual({
+    title: 'chore(deps): drop 1 aged release-age exclude',
+    body: `The audit-fix workflow opened this pull request after it ran \`bun audit\` on the base branch.
+
+## Release-age excludes dropped, because each release aged past the gate
+- \`hono\`
+`,
+    needsReview: false,
   });
 });

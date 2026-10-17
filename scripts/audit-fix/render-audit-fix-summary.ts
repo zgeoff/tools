@@ -5,23 +5,29 @@ import type { FixedPackage } from './types.ts';
 interface AuditFixSummaryInput {
   readonly fixes: readonly FixedPackage[];
   readonly excludes: readonly ReleaseAgeExclude[];
+
+  // Packages whose audit-fix exclude the run dropped, because the release aged
+  // past the gate.
+  readonly expiredExcludes: readonly string[];
   readonly added: readonly IgnoreChange[];
   readonly renewed: readonly IgnoreChange[];
   readonly removed: readonly string[];
 }
 
 interface AuditFixSummary {
-  // A Conventional Commit subject, used as the commit message and PR title.
+  // A Conventional Commit subject, used as the commit message and PR title;
+  // empty when nothing changed.
   readonly title: string;
   readonly body: string;
 
-  // `fix` when the change updates a package, `ignore` when it only records
-  // ignores, and `none` when nothing changed.
-  readonly kind: 'fix' | 'ignore' | 'none';
+  // True when the change adds or renews an ignore. The workflow labels such a
+  // pull request audit-ignore and never merges it by itself.
+  readonly needsReview: boolean;
 }
 
 export function renderAuditFixSummary(input: AuditFixSummaryInput): AuditFixSummary {
   const ignores = input.added.length + input.renewed.length;
+  const needsReview = ignores > 0;
 
   const sections = [
     renderFixes(input.fixes),
@@ -29,26 +35,36 @@ export function renderAuditFixSummary(input: AuditFixSummaryInput): AuditFixSumm
     renderIgnores('Ignored until a fix can land', input.added),
     renderIgnores('Ignores renewed, because no fix can land yet', input.renewed),
     renderRemoved(input.removed),
+    renderExpiredExcludes(input.expiredExcludes),
   ].filter((section) => section !== '');
 
-  const body = [
-    'The audit-fix workflow opened this pull request after it ran `bun audit` on the base branch.',
-    ...sections,
-  ].join('\n\n');
+  const lead = needsReview
+    ? 'The audit-fix workflow opened this pull request after it ran `bun audit` on the base branch. It ignores advisories that no fix reaches, so it waits for a person to review it and never merges by itself.'
+    : 'The audit-fix workflow opened this pull request after it ran `bun audit` on the base branch.';
+
+  const body = `${[lead, ...sections].join('\n\n')}\n`;
 
   if (input.fixes.length > 0) {
-    return { title: buildFixTitle(input.fixes, ignores), body: `${body}\n`, kind: 'fix' };
+    return { title: buildFixTitle(input.fixes, ignores), body, needsReview };
   }
 
-  if (ignores > 0 || input.removed.length > 0) {
+  if (ignores > 0) {
     return {
-      title: buildIgnoreTitle(ignores, input.removed.length),
-      body: `${body}\n`,
-      kind: 'ignore',
+      title: `chore(deps): ignore ${ignores} unfixed audit ${formatNoun('advisory', ignores)}`,
+      body,
+      needsReview,
     };
   }
 
-  return { title: '', body: '', kind: 'none' };
+  if (input.removed.length > 0 || input.expiredExcludes.length > 0) {
+    return {
+      title: buildDropTitle(input.removed.length, input.expiredExcludes.length),
+      body,
+      needsReview,
+    };
+  }
+
+  return { title: '', body: '', needsReview: false };
 }
 
 function renderFixes(fixes: readonly FixedPackage[]): string {
@@ -123,12 +139,27 @@ function buildFixTitle(fixes: readonly FixedPackage[], ignores: number): string 
   return `fix(deps): update ${names.length} ${formatNoun('package', names.length)}${suffix}`;
 }
 
-function buildIgnoreTitle(ignores: number, removed: number): string {
-  if (ignores === 0) {
-    return `chore(deps): drop ${removed} stale audit ${formatNoun('ignore', removed)}`;
+function buildDropTitle(ignores: number, excludes: number): string {
+  if (excludes === 0) {
+    return `chore(deps): drop ${ignores} stale audit ${formatNoun('ignore', ignores)}`;
   }
 
-  return `chore(deps): ignore ${ignores} unfixed audit ${formatNoun('advisory', ignores)}`;
+  if (ignores === 0) {
+    return `chore(deps): drop ${excludes} aged release-age ${formatNoun('exclude', excludes)}`;
+  }
+
+  return 'chore(deps): drop stale audit ignores and release-age excludes';
+}
+
+function renderExpiredExcludes(names: readonly string[]): string {
+  if (names.length === 0) {
+    return '';
+  }
+
+  return [
+    '## Release-age excludes dropped, because each release aged past the gate',
+    ...names.map((name) => `- \`${name}\``),
+  ].join('\n');
 }
 
 function formatNoun(noun: string, count: number): string {

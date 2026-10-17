@@ -8,6 +8,6 @@ test('it prints its usage when a file argument is missing', () => {
   expect(result.exitCode).toBe(1);
 
   expect(result.stderr.toString()).toContain(
-    'usage: audit-fix.ts --title-file <path> --body-file <path> [--expiry-days <n>]',
+    'usage: audit-fix.ts --title-file <path> --body-file <path> --review-file <path> [--pending-ignores <path>] [--expiry-days <1-90>]',
   );
 });

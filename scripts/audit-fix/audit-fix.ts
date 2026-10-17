@@ -6,6 +6,7 @@ import { parseArgs } from 'node:util';
 import { buildAuditScript } from './build-audit-script.ts';
 import { buildBunfigWithExcludes } from './build-bunfig-with-excludes.ts';
 import type { ReleaseAgeExclude } from './build-bunfig-with-excludes.ts';
+import { buildBunfigWithoutExpiredExcludes } from './build-bunfig-without-expired-excludes.ts';
 import { buildDateAfter } from './build-date-after.ts';
 import { isRecord } from './is-record.ts';
 import { parseAuditIgnores } from './parse-audit-ignores.ts';
@@ -26,17 +27,28 @@ export async function runAuditFix(argv: readonly string[]): Promise<void> {
     options: {
       'title-file': { type: 'string' },
       'body-file': { type: 'string' },
+      'review-file': { type: 'string' },
+      'pending-ignores': { type: 'string' },
       'expiry-days': { type: 'string', default: '30' },
     },
   });
 
   const titleFile = args.values['title-file'];
   const bodyFile = args.values['body-file'];
+  const reviewFile = args.values['review-file'];
+  const pendingPath = args.values['pending-ignores'];
   const expiryDays = Number(args.values['expiry-days']);
 
-  if (titleFile === undefined || bodyFile === undefined || !Number.isInteger(expiryDays)) {
+  if (
+    titleFile === undefined ||
+    bodyFile === undefined ||
+    reviewFile === undefined ||
+    !Number.isInteger(expiryDays) ||
+    expiryDays < 1 ||
+    expiryDays > 90
+  ) {
     throw new Error(
-      'usage: audit-fix.ts --title-file <path> --body-file <path> [--expiry-days <n>]',
+      'usage: audit-fix.ts --title-file <path> --body-file <path> --review-file <path> [--pending-ignores <path>] [--expiry-days <1-90>]',
     );
   }
 
@@ -49,13 +61,16 @@ export async function runAuditFix(argv: readonly string[]): Promise<void> {
   const script = readAuditScript(packageJSON);
   const parsedScript = parseAuditScript(script);
 
-  const ignores = await loadAuditIgnores();
+  const ignores = await loadAuditIgnores(ignoresPath);
 
+  const pending = pendingPath === undefined ? {} : await loadAuditIgnores(pendingPath);
+  const latest = buildDateAfter(today, 90);
   const unmanagedIDs = parsedScript.ignoreIDs.filter((id) => !(id in ignores));
 
-  // An expired ignore is left out, so the fix tries the advisory again.
+  // An expired ignore, or one set past the 90-day cap, is left out, so the fix
+  // tries the advisory again.
   const activeIDs = Object.entries(ignores)
-    .filter(([, ignore]) => ignore.expires > today)
+    .filter(([, ignore]) => ignore.expires > today && ignore.expires <= latest)
     .map(([id]) => id);
 
   const flags = [...activeIDs, ...unmanagedIDs].map((id) => `--ignore=${id}`);
@@ -69,13 +84,7 @@ export async function runAuditFix(argv: readonly string[]): Promise<void> {
   const plan = parseFixPlan(parseJSONLine(planOutput));
 
   const excludes = await collectReleaseAgeExcludes(plan, before, today);
-
-  if (excludes.length > 0) {
-    const bunfig = await readFile('bunfig.toml', 'utf8');
-
-    await writeFile('bunfig.toml', buildBunfigWithExcludes(bunfig, excludes));
-  }
-
+  const expiredExcludes = await updateReleaseAgeExcludes(excludes, today);
   const reportOutput = await runBun(['audit', '--json']);
 
   const report = parseAuditReport(parseJSONLine(reportOutput));
@@ -88,6 +97,7 @@ export async function runAuditFix(argv: readonly string[]): Promise<void> {
     auditLevel: parsedScript.auditLevel,
     today,
     expiryDays,
+    pending,
   });
 
   const nextIDs = [...Object.keys(ignorePlan.ignores), ...unmanagedIDs];
@@ -109,6 +119,7 @@ export async function runAuditFix(argv: readonly string[]): Promise<void> {
   const summary = renderAuditFixSummary({
     fixes: plan.fixes,
     excludes,
+    expiredExcludes,
     added: ignorePlan.added,
     renewed: ignorePlan.renewed,
     removed: ignorePlan.removed,
@@ -116,6 +127,7 @@ export async function runAuditFix(argv: readonly string[]): Promise<void> {
 
   await writeFile(titleFile, summary.title);
   await writeFile(bodyFile, summary.body);
+  await writeFile(reviewFile, String(summary.needsReview));
 }
 
 function requireAuditFix(): void {
@@ -143,12 +155,12 @@ function hasSameIDs(left: readonly string[], right: readonly string[]): boolean 
   return leftSet.size === rightSet.size && [...leftSet].every((id) => rightSet.has(id));
 }
 
-async function loadAuditIgnores(): Promise<AuditIgnores> {
-  if (!existsSync(ignoresPath)) {
+async function loadAuditIgnores(path: string): Promise<AuditIgnores> {
+  if (!existsSync(path)) {
     return {};
   }
 
-  const content = await readFile(ignoresPath, 'utf8');
+  const content = await readFile(path, 'utf8');
 
   const parsed: unknown = JSON.parse(content);
 
@@ -198,6 +210,31 @@ function collectReleaseAgeExcludes(
       };
     }),
   );
+}
+
+// Drops each audit-fix exclude whose release aged past the gate, then adds the
+// new ones; returns the dropped package names.
+async function updateReleaseAgeExcludes(
+  excludes: readonly ReleaseAgeExclude[],
+  today: string,
+): Promise<readonly string[]> {
+  if (!existsSync('bunfig.toml')) {
+    return [];
+  }
+
+  const bunfig = await readFile('bunfig.toml', 'utf8');
+
+  const pruned = buildBunfigWithoutExpiredExcludes(bunfig, today);
+
+  const next =
+    excludes.length > 0 ? buildBunfigWithExcludes(pruned.bunfig, excludes) : pruned.bunfig;
+
+  if (next !== bunfig) {
+    await writeFile('bunfig.toml', next);
+  }
+
+  // A package dropped and added again in one run keeps its exclude.
+  return pruned.removed.filter((name) => !excludes.some((exclude) => exclude.name === name));
 }
 
 async function readPublishDate(name: string, version: string, today: string): Promise<string> {

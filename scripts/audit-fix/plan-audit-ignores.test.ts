@@ -31,6 +31,7 @@ test('it ignores an advisory the fix could not reach, naming the dependent that 
     auditLevel: null,
     today: '2026-10-17',
     expiryDays: 30,
+    pending: {},
   });
 
   expect(plan).toStrictEqual({
@@ -64,6 +65,7 @@ test('it says no release fixes an advisory the fix marks unfixable', () => {
     auditLevel: null,
     today: '2026-10-17',
     expiryDays: 30,
+    pending: {},
   });
 
   expect(plan.added[0]?.reason).toBe('No published release of tinypool fixes it.');
@@ -80,6 +82,7 @@ test('it keys an advisory with no GHSA ID by its numeric ID', () => {
     auditLevel: null,
     today: '2026-10-17',
     expiryDays: 30,
+    pending: {},
   });
 
   expect(Object.keys(plan.ignores)).toStrictEqual(['1241261']);
@@ -96,6 +99,7 @@ test('it keeps an ignore that has not expired', () => {
     auditLevel: null,
     today: '2026-10-17',
     expiryDays: 30,
+    pending: {},
   });
 
   expect(plan).toStrictEqual({
@@ -121,6 +125,7 @@ test('it renews an expired ignore whose advisory the fix still could not reach',
     auditLevel: null,
     today: '2026-10-17',
     expiryDays: 30,
+    pending: {},
   });
 
   expect(plan.renewed).toStrictEqual([
@@ -149,6 +154,7 @@ test('it drops an ignore whose advisory the audit no longer reports', () => {
     auditLevel: null,
     today: '2026-10-17',
     expiryDays: 30,
+    pending: {},
   });
 
   expect(plan).toStrictEqual({
@@ -168,6 +174,7 @@ test('it leaves an advisory alone that the audit script already ignores without 
     auditLevel: null,
     today: '2026-10-17',
     expiryDays: 30,
+    pending: {},
   });
 
   expect(plan).toStrictEqual({ ignores: {}, added: [], renewed: [], removed: [] });
@@ -182,7 +189,74 @@ test('it adds no ignore for an advisory below the audit level', () => {
     auditLevel: 'high',
     today: '2026-10-17',
     expiryDays: 30,
+    pending: {},
   });
 
   expect(plan.added).toBeEmpty();
+});
+
+test('it renews an ignore set further out than 90 days, so it comes back for review', () => {
+  const plan = planAuditIgnores({
+    report: { tinypool: [tinypoolAdvisory] },
+    ignores: {
+      'GHSA-85c8-ppgw-ccpr': { package: 'tinypool', reason: 'Forever.', expires: '9999-12-31' },
+    },
+    unmanagedIDs: [],
+    plan: blockedPlan,
+    auditLevel: null,
+    today: '2026-10-17',
+    expiryDays: 30,
+    pending: {},
+  });
+
+  expect(plan.renewed.map((change) => change.expires)).toStrictEqual(['2026-11-16']);
+});
+
+test('it caps the expiry of a new ignore at 90 days', () => {
+  const plan = planAuditIgnores({
+    report: { tinypool: [tinypoolAdvisory] },
+    ignores: {},
+    unmanagedIDs: [],
+    plan: blockedPlan,
+    auditLevel: null,
+    today: '2026-10-17',
+    expiryDays: 3650,
+    pending: {},
+  });
+
+  expect(plan.ignores['GHSA-85c8-ppgw-ccpr']?.expires).toBe('2027-01-15');
+});
+
+test('it keeps the expiry the open fix branch already holds for a new ignore', () => {
+  const plan = planAuditIgnores({
+    report: { tinypool: [tinypoolAdvisory] },
+    ignores: {},
+    unmanagedIDs: [],
+    plan: blockedPlan,
+    auditLevel: null,
+    today: '2026-10-18',
+    expiryDays: 30,
+    pending: {
+      'GHSA-85c8-ppgw-ccpr': { package: 'tinypool', reason: 'Earlier run.', expires: '2026-11-16' },
+    },
+  });
+
+  expect(plan.added.map((change) => change.expires)).toStrictEqual(['2026-11-16']);
+});
+
+test('it ignores an open fix branch expiry set further out than 90 days', () => {
+  const plan = planAuditIgnores({
+    report: { tinypool: [tinypoolAdvisory] },
+    ignores: {},
+    unmanagedIDs: [],
+    plan: blockedPlan,
+    auditLevel: null,
+    today: '2026-10-18',
+    expiryDays: 30,
+    pending: {
+      'GHSA-85c8-ppgw-ccpr': { package: 'tinypool', reason: 'Edited.', expires: '9999-12-31' },
+    },
+  });
+
+  expect(plan.added.map((change) => change.expires)).toStrictEqual(['2026-11-17']);
 });

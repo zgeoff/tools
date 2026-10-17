@@ -170,7 +170,7 @@ The preset sorts each update by its kind:
 | Other minor, or any major | 7 days           | one per package                              | after review    |
 | `@zgeoff/*` package       | none             | one per package, at any level                | on green checks |
 | zgeoff/tools sync tag     | none             | one per tag                                  | on green checks |
-| Lock-file maintenance     | none             | weekly, for the dependencies of dependencies | on green checks |
+| Lock-file maintenance     | none             | weekly, for the dependencies of dependencies | after review    |
 
 The 7-day wait matches the `minimumReleaseAge = 604800` in each repo's `bunfig.toml`, so Renovate
 proposes no version that `bun install` would refuse. Security fixes come from OSV, through
@@ -200,17 +200,22 @@ pull request on the branch `audit-fix` only when the audit needs a change:
 - `bun audit fix` updates each vulnerable package to the lowest fixed release that every dependent's
   range accepts.
 - A fix younger than the release-age gate gets a `minimumReleaseAgeExcludes` entry in `bunfig.toml`,
-  with a comment that dates the release and the day to remove the entry.
+  with a comment that dates the release and the day to remove the entry. The first run on or after
+  that day removes the entry and its comment; an entry without the step's comment stays.
 - An advisory that no fix reaches gets an entry in `audit-ignores.json`, which holds the package,
   the reason, and an expiry 30 days out. The `audit` script in `package.json` gets the matching
   `--ignore` flag.
 - An expired ignore is audited again: the entry gets a new expiry while no fix reaches it, and goes
-  when the audit no longer reports the advisory.
+  when the audit no longer reports the advisory. An expiry more than 90 days out counts as expired.
+- A rerun keeps the expiries on the open `audit-fix` branch, so it builds the same tree and leaves
+  the pull request's checks alone.
 
 An `--ignore` flag with no `audit-ignores.json` entry stays as it is. The pull request is labelled
-`dependencies` and `security`, plus `audit-ignore` when it only records ignores. The job asks GitHub
-to merge it on green checks, which needs auto-merge allowed in the repo settings. A run that finds
-nothing to change deletes the `audit-fix` branch, which closes a stale pull request.
+`dependencies` and `security`. A pull request that adds or renews an ignore is also labelled
+`audit-ignore` and waits for a person's review: the job turns auto-merge off for it. The job asks
+GitHub to merge any other pull request on green checks, which needs auto-merge allowed in the repo
+settings. A run that finds nothing to change deletes the `audit-fix` branch, which closes a stale
+pull request.
 
 The caller needs Bun 1.4.0 or newer in `.bun-version`, since `bun audit fix` arrived in 1.4.0, and
 the repo-sync App secrets that [Wiring up a downstream repo](#wiring-up-a-downstream-repo) sets. The

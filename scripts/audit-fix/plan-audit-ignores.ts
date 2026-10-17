@@ -14,7 +14,16 @@ interface PlanAuditIgnoresInput {
   readonly auditLevel: Severity | null;
   readonly today: string;
   readonly expiryDays: number;
+
+  // The ignores on the open fix branch. A new or renewed ignore takes its
+  // expiry from there, so a rerun builds the same tree and leaves the pull
+  // request's checks alone.
+  readonly pending: AuditIgnores;
 }
+
+// The furthest an ignore may reach. An entry set further out, by hand or by a
+// bad edit, counts as expired, so it comes back for review.
+const maxExpiryDays = 90;
 
 export interface IgnoreChange extends AuditIgnore {
   readonly advisory: string;
@@ -31,12 +40,20 @@ interface AuditIgnoresPlan {
   readonly removed: readonly string[];
 }
 
-// Decides the audit-ignores.json entries after a fix: an advisory the fix left
-// gets an ignore with a reason and an expiry, an expired ignore whose advisory
-// remains gets a new expiry, and an ignore whose advisory is gone is dropped.
+// Decides the audit-ignores.json entries after a fix. A new or renewed ignore
+// needs a person's review, so the workflow never merges one by itself.
 export function planAuditIgnores(input: PlanAuditIgnoresInput): AuditIgnoresPlan {
   const remaining = collectRemainingAdvisories(input.report, input.auditLevel);
-  const expires = buildDateAfter(input.today, input.expiryDays);
+  const latest = buildDateAfter(input.today, maxExpiryDays);
+  const fallback = buildDateAfter(input.today, Math.min(input.expiryDays, maxExpiryDays));
+  const isLive = (expires: string): boolean => expires > input.today && expires <= latest;
+
+  const pickExpiry = (advisoryID: string): string => {
+    const pending = input.pending[advisoryID]?.expires;
+
+    return pending !== undefined && isLive(pending) ? pending : fallback;
+  };
+
   const ignores: Record<string, AuditIgnore> = {};
   const added: IgnoreChange[] = [];
   const renewed: IgnoreChange[] = [];
@@ -47,10 +64,10 @@ export function planAuditIgnores(input: PlanAuditIgnoresInput): AuditIgnoresPlan
 
     if (advisory === undefined) {
       removed.push(advisoryID);
-    } else if (ignore.expires > input.today) {
+    } else if (isLive(ignore.expires)) {
       ignores[advisoryID] = ignore;
     } else {
-      const change = buildIgnoreChange(advisoryID, advisory, input.plan, expires);
+      const change = buildIgnoreChange(advisoryID, advisory, input.plan, pickExpiry(advisoryID));
 
       ignores[advisoryID] = toAuditIgnore(change);
 
@@ -60,7 +77,7 @@ export function planAuditIgnores(input: PlanAuditIgnoresInput): AuditIgnoresPlan
 
   for (const [advisoryID, advisory] of remaining) {
     if (!(advisoryID in input.ignores) && !input.unmanagedIDs.includes(advisoryID)) {
-      const change = buildIgnoreChange(advisoryID, advisory, input.plan, expires);
+      const change = buildIgnoreChange(advisoryID, advisory, input.plan, pickExpiry(advisoryID));
 
       ignores[advisoryID] = toAuditIgnore(change);
 
