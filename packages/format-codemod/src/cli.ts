@@ -10,7 +10,7 @@ import { readPackageVersion } from './cli/read-package-version.ts';
 import { tryCheckFile } from './cli/try-check-file.ts';
 import type { FileReport } from './cli/types.ts';
 
-const parsedArgs = parseCLIArgs(process.argv.slice(2));
+const parsedArgs = await parseCLIArgs(process.argv.slice(2));
 
 if (typeof parsedArgs === 'string') {
   console.error(parsedArgs);

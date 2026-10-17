@@ -30,6 +30,7 @@
     "typecheck": "tsc"
   },
   "dependencies": {
+    "gunshi": "catalog:",
     "oxc-parser": "0.137.0"
   },
   "devDependencies": {

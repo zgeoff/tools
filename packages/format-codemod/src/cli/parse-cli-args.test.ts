@@ -1,40 +1,72 @@
 import { expect, test } from 'bun:test';
 import { parseCLIArgs } from './parse-cli-args.ts';
 
-test('it collects positionals as inputs and defaults to write mode', () => {
-  const args = parseCLIArgs(['src/a.ts', 'src/b.tsx']);
+test('it collects positionals as inputs and defaults every flag', async () => {
+  const args = await parseCLIArgs(['src/a.ts', 'src/b.tsx']);
 
-  expect(args).toMatchObject({ mode: 'write', inputs: ['src/a.ts', 'src/b.tsx'] });
+  expect(args).toStrictEqual({
+    mode: 'write',
+    quiet: false,
+    bench: false,
+    help: false,
+    version: false,
+    ignore: [],
+    inputs: ['src/a.ts', 'src/b.tsx'],
+  });
 });
 
-test('it picks check mode for --check', () => {
-  expect(parseCLIArgs(['--check', 'a.ts'])).toContainEntry(['mode', 'check']);
+test('it picks check mode for --check', async () => {
+  const args = await parseCLIArgs(['--check', 'a.ts']);
+
+  expect(args).toContainEntry(['mode', 'check']);
 });
 
-test('it picks dry mode for --dry', () => {
-  expect(parseCLIArgs(['--dry', 'a.ts'])).toContainEntry(['mode', 'dry']);
+test('it picks dry mode for --dry', async () => {
+  const args = await parseCLIArgs(['--dry', 'a.ts']);
+
+  expect(args).toContainEntry(['mode', 'dry']);
 });
 
-test('it lets --check win when both --check and --dry are passed', () => {
-  expect(parseCLIArgs(['--dry', '--check', 'a.ts'])).toContainEntry(['mode', 'check']);
+test('it lets --check win when both --check and --dry are passed', async () => {
+  const args = await parseCLIArgs(['--dry', '--check', 'a.ts']);
+
+  expect(args).toContainEntry(['mode', 'check']);
 });
 
-test('it parses the boolean flags', () => {
-  const args = parseCLIArgs(['--quiet', '--bench', '--help', '--version', 'a.ts']);
+test('it parses the boolean flags', async () => {
+  const args = await parseCLIArgs(['--quiet', '--bench', '--help', '--version', 'a.ts']);
 
-  expect(args).toMatchObject({ quiet: true, bench: true, help: true, version: true });
+  expect(args).toStrictEqual({
+    mode: 'write',
+    quiet: true,
+    bench: true,
+    help: true,
+    version: true,
+    ignore: [],
+    inputs: ['a.ts'],
+  });
 });
 
-test('it returns an error message for an unknown flag', () => {
-  const args = parseCLIArgs(['--chekc', 'a.ts']);
+test('it returns an error message for an unknown flag', async () => {
+  const args = await parseCLIArgs(['--chekc', 'a.ts']);
 
-  expect(args).toBeString();
-  expect(args).toInclude("'--chekc'");
+  expect(args).toBe('Unknown option: --chekc');
 });
 
-test('it collects repeated --ignore patterns and defaults to none', () => {
-  const args = parseCLIArgs(['--ignore', 'dist/**', '--ignore', '**/*.gen.ts', 'a.ts']);
+test('it returns an error message for --ignore without a value', async () => {
+  const args = await parseCLIArgs(['a.ts', '--ignore']);
+
+  expect(args).toInclude("'--ignore' requires a value");
+});
+
+test('it collects repeated --ignore patterns in either form', async () => {
+  const args = await parseCLIArgs(['--ignore', 'dist/**', '--ignore=**/*.gen.ts', 'a.ts']);
 
   expect(args).toMatchObject({ ignore: ['dist/**', '**/*.gen.ts'], inputs: ['a.ts'] });
-  expect(parseCLIArgs(['a.ts'])).toContainEntry(['ignore', []]);
+});
+
+test('it keeps an input after -- that starts with a dash', async () => {
+  const args = await parseCLIArgs(['--check', '--', '-odd.ts']);
+
+  expect(args).toMatchObject({ mode: 'check', inputs: ['-odd.ts'] });
 });
