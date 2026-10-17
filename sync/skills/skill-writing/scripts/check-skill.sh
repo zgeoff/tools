@@ -158,9 +158,11 @@ sub check_frontmatter {
   }
 }
 
+# Returns the value of a scalar: the text inside its quotes, or plain text without a trailing comment.
 sub unquote {
   my ($text) = @_;
-  $text =~ s/\A(["\x27])(.*)\1\z/$2/;
+  return $2 if $text =~ /\A(["\x27])(.*?)\1\s*(?:#.*)?\z/;
+  $text =~ s/\s+#.*\z//;
   return $text;
 }
 

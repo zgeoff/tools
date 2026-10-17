@@ -54,6 +54,22 @@ test('it fails a skill with no description', async () => {
   expect(result.stdout).toInclude('.claude/skills/demo/SKILL.md: has no description\n');
 });
 
+test('it reads a name and description past quotes and trailing comments', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo # the command name',
+    "description: 'Commands for the demo service. Load it before a demo test.' # one line",
+    '---',
+  ]);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
+});
+
 test('it fails a name that differs from the folder', async () => {
   const ctx = await setupTest();
 
