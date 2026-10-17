@@ -13,7 +13,9 @@ The shared files under `sync/` ship by hand-pushed `sync-vN` tags instead, which
 1. A `feat:`/`fix:` PR touching `packages/<pkg>` merges to `main`.
 2. `main.yml` runs release-please, which opens (or updates) a release PR for the affected packages:
    version bump per conventional-commit type, `CHANGELOG.md`, manifest update. The job syncs
-   `bun.lock` on the PR branch (versions are recorded there too) and auto-merges the PR.
+   `bun.lock` on the PR branch (versions are recorded there too) and auto-merges the PR once every
+   check on its head passes. `scripts/merge-release-prs.sh` waits up to 15 minutes for those checks
+   to start and finish, and fails the run when one fails.
 3. The merge triggers `main.yml` again: release-please tags `@zgeoff/<pkg>@X.Y.Z`, creates the
    GitHub release, and the publish step runs `bun pm pack` (resolves `catalog:`/`workspace:` to
    exact versions — never pack with npm) then `npm publish <tarball> --provenance` under OIDC.
