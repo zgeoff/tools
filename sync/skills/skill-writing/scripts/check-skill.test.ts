@@ -429,3 +429,23 @@ test('it reads no link inside an HTML comment', async () => {
   expect(result.status).toBe(0);
   expect(result.stdout).not.toInclude('line anchor');
 });
+
+test('it reads a link after a comment marker inside inline code', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description: Commands for the demo service. Load it before a demo test.',
+    '---',
+    '',
+    'A repo-sync marker opens with `<!--` on its own line.',
+    '',
+    'See [the entry](../../../src/demo.ts#L12).',
+  ]);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('has a line anchor');
+});

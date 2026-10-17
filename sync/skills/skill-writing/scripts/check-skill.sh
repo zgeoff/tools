@@ -220,13 +220,15 @@ sub check_markdown {
     next if $open ne "";
 
     # An HTML comment never renders, so its text holds no link and no path.
-    my $visible = $line;
+    # A comment marker inside inline code renders as text, so the spans hide their markers first.
+    my $visible = $line =~ s{(`+)(.+?)\1}{my $span = $&; $span =~ s/<!--/<\x{1}!--/g; $span =~ s/-->/--\x{1}>/g; $span}ger;
     if ($in_comment) {
       next unless $visible =~ s/\A.*?-->//;
       $in_comment = 0;
     }
     $visible =~ s/<!--.*?-->//g;
     $in_comment = 1 if $visible =~ s/<!--.*\z//;
+    $visible =~ s/\x{1}//g;
 
     my $text = $visible;
     my @spans;
