@@ -160,7 +160,7 @@
   },
   "overrides": [
     {
-      "files": ["**/*.test.ts"],
+      "files": ["**/*.test.ts", "**/*.test.tsx"],
       // one co-located suite per module with inline test data: file length
       // scales with coverage, not complexity
       "rules": {
