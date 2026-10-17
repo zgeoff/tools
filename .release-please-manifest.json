@@ -1,10 +1,10 @@
 {
   "packages/bun-test-extended": "0.2.0",
   "packages/format-codemod": "0.1.0",
-  "packages/oxlint-config": "0.2.1",
+  "packages/oxlint-config": "0.2.2",
   "packages/tsconfig": "2.0.0",
   "packages/commitlint-config": "0.1.0",
   "packages/oxfmt-config": "0.1.0",
-  "packages/bun-test-react": "0.2.0",
+  "packages/bun-test-react": "0.2.1",
   "packages/release-manifest": "0.1.0"
 }
