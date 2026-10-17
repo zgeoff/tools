@@ -30,6 +30,9 @@ This guide is the shared base that repo-sync delivers from zgeoff/tools; edit it
 downstream repo. When the repo has a `project-docs-writing` skill, load it too. It holds the rules
 for this repo's own docs tree, and where the two disagree, the project skill wins.
 
+A skill follows the `skill-writing` skill too. It holds what a skill holds, how a skill points at
+code instead of copying it, and how a skill is checked.
+
 ## Deciding what to include
 
 ### Describe the system as it is now
@@ -617,11 +620,12 @@ passes with this guide as its only reference.
    ```
 
    `check-length.sh` prints each README against its limit and each docs/ file over its cap, then
-   runs `check-prose.sh` over the READMEs and the Markdown under `docs/`. It fails on a README over
-   its limit or on a prose violation. Pass `--package <readme>` for a package README whose
-   package.json is private. `check-links.sh` checks every relative link and anchor in the READMEs
-   and `docs/` (outside `.claude/`), and fails on a broken one. Pass paths to check other Markdown.
-   To check other prose, such as a skill or AGENTS.md, run `check-prose.sh <path>...` on it.
+   runs `check-prose.sh` over the READMEs, the Markdown under `docs/`, and each skill's Markdown. It
+   fails on a README over its limit or on a prose violation. Pass `--package <readme>` for a package
+   README whose package.json is private. `check-links.sh` checks every relative link and anchor in
+   the READMEs, `docs/`, and the skills, and fails on a broken one. Pass paths to check other
+   Markdown. Both skip a file git marks `linguist-vendored`. To check other prose, such as
+   AGENTS.md, run `check-prose.sh <path>...` on it.
 
    `check-prose.sh` fails on traces of the work session, the banned words a grep can catch, values
    with units under `docs/architecture/`, formatting faults, and untagged code blocks. It then

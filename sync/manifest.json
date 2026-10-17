@@ -99,6 +99,22 @@
     ]
   },
   {
+    "name": "skill-skill-writing",
+    "description": "The shared skill-writing skill and its check-skill script, which docs-writing's check-length runs when it is present",
+    "optIn": true,
+    "files": [
+      {
+        "source": "sync/skills/skill-writing/SKILL.md",
+        "target": ".claude/skills/skill-writing/SKILL.md"
+      },
+      {
+        "source": "sync/skills/skill-writing/scripts/check-skill.sh",
+        "target": ".claude/skills/skill-writing/scripts/check-skill.sh",
+        "mode": "0755"
+      }
+    ]
+  },
+  {
     "name": "hook-skill-gate",
     "description": "The skill-gate PreToolUse hook, which denies an edit until the session loads the skills the path needs; the repo keeps its rules in .claude/skill-gate.json and registers the hook in .claude/settings.json",
     "optIn": true,
