@@ -102,7 +102,7 @@ test('it rejects an unknown flag with a usage error and leaves files untouched',
   const stderr = result.stderr;
 
   expect(status).toBe(2);
-  expect(stderr).toInclude("'--chekc'");
+  expect(stderr).toInclude('Unknown option: --chekc');
   expect(fs.readFileSync(file, 'utf8')).toBe(src);
 });
 
