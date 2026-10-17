@@ -20,6 +20,10 @@
       "component": "@zgeoff/commitlint-config",
       "initial-version": "0.1.0"
     },
+    "packages/exact-optional": {
+      "component": "@zgeoff/exact-optional",
+      "initial-version": "0.1.0"
+    },
     "packages/format-codemod": {
       "component": "@zgeoff/format-codemod"
     },

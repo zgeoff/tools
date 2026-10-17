@@ -1,0 +1,39 @@
+{
+  "name": "@zgeoff/exact-optional",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Drop the undefined-valued keys of an object, so it fits a type with optional properties under exactOptionalPropertyTypes",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zgeoff/tools.git",
+    "directory": "packages/exact-optional"
+  },
+  "files": [
+    "src",
+    "!src/*.test.ts",
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepare": "bun run build",
+    "typecheck": "tsc"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  },
+  "engines": {
+    "bun": ">=1.3"
+  }
+}
