@@ -6,9 +6,9 @@
 # third-party skills in .gitattributes.
 # Fails on: a missing name or description, a name that differs from the folder or breaks the name
 # format, a description over 1,024 characters, and a link with a line anchor outside code.
-# Warns on: a SKILL.md over 500 lines, a reference over 100 lines with no contents list near its top,
-# a reference that links to another reference, and a code-formatted span that names an existing repo
-# file.
+# Warns on: a SKILL.md over 500 lines, a reference that SKILL.md does not list under ## References,
+# a reference over 100 lines with no contents list near its top, a reference that links to another
+# reference, and a code-formatted span that names an existing repo file.
 set -uo pipefail
 
 # Lists tracked and untracked files, so a new skill is checked before it is staged.
@@ -97,7 +97,8 @@ sub check_skill {
   my $skill = "$dir/SKILL.md";
   my @lines = read_lines($skill);
 
-  warn_about($skill, scalar(@lines) . " lines, over the limit of 500") if @lines > 500;
+  warn_about($skill, scalar(@lines) . " lines, over 500; check that each section is one most tasks need")
+    if @lines > 500;
   check_frontmatter($dir, $skill, @lines);
 
   open my $list, "-|", "git", "-c", "core.quotePath=false", "ls-files", "--cached", "--others",
@@ -114,6 +115,30 @@ sub check_skill {
   for my $file (sort keys %files) {
     check_markdown($dir, $file, $file eq $skill);
   }
+
+  my %listed = map { $_ => 1 } list_references($skill, @lines);
+  for my $file (sort grep { m{^\Q$dir\E/references/[^/]+\.md\z} } keys %files) {
+    warn_about($file, "SKILL.md does not list it under ## References; add a line naming the task that needs it")
+      unless $listed{$file};
+  }
+}
+
+# Returns the files that the links under the ## References heading of SKILL.md point at.
+sub list_references {
+  my ($skill, @lines) = @_;
+  my ($in_section, @found) = (0);
+  for my $line (@lines) {
+    if ($line =~ /^##\s+(.*?)\s*$/) {
+      $in_section = $1 eq "References";
+      next;
+    }
+    next unless $in_section;
+    while ($line =~ /\]\(\s*([^()\s#]+)/g) {
+      my $resolved = resolve_path($skill, $1);
+      push @found, $resolved if defined $resolved;
+    }
+  }
+  return @found;
 }
 
 # Reads the frontmatter block: a name, and a description that may fold over indented lines.

@@ -12,15 +12,87 @@ description:
 # Testing
 
 `bun test` loads every test file into one process, so state that one file leaves behind is state the
-next file sees. The repo's `bunfig.toml` preload owns that process: it registers the matchers, the
-mock server lifecycle, and every reset that returns shared state to a clean baseline after each
-test. Per-test resources register cleanup with `onTestFinished` where they are acquired. A test
-exercises real behaviour through real code, and it reaches for a stand-in only at a boundary the
-test cannot cross. When existing tests break these rules, you align them while you work on the code
-they cover.
+next file sees. The repo's [`bunfig.toml`](../../../bunfig.toml) preload owns that process: it
+registers the matchers, the mock server lifecycle, and every reset that returns shared state to a
+clean baseline after each test. Per-test resources register cleanup with `onTestFinished` where they
+are acquired. A test exercises real behaviour through real code, and it reaches for a stand-in only
+at a boundary the test cannot cross. When existing tests break these rules, you align them while you
+work on the code they cover.
 
 Never write a test only to satisfy a lint or layout rule. Change the rule's config instead, with a
 one-line reason. Never cut a test that checks behaviour.
+
+## Key rules
+
+Each line links the section that explains it.
+
+- [Regimes](#regimes): the furthest edge a package's code reaches picks its regime and the reference
+  to open.
+- [Principles](#principles): visible beats concise, every test stands alone, and a stand-in sits
+  only at an edge the test cannot cross.
+- [Structure and naming](#structure-and-naming): flat `test()` calls titled "it …", one act per
+  test, and no `describe`.
+- [Loops](#loops): replace a loop of assertions with `test.each` or one collection matcher.
+- [`setupTest`](#setuptest): one local `setupTest()` holds wiring only, and each test creates the
+  records it asserts on.
+- [Cleanup](#cleanup): register `onTestFinished` right after each acquisition, with no hooks and no
+  `try`/`finally`.
+- [Test data](#test-data): literals stay inline, shared domain types get tested factories, and
+  stand-ins hold no logic.
+- [Schemas and parsers](#schemas-and-parsers): feed inline payloads, and assert the issue path or
+  the parsed data.
+- [Assertions](#assertions): `toStrictEqual` on the full contract, each result asserted on its own,
+  and inline snapshots only for golden output.
+- [Errors](#errors): each declared error gets a test, and no error is asserted inside a
+  `try`/`catch`.
+- [Authorisation pairs](#authorisation-pairs): an access rule lands with an allowed test and a
+  refused test.
+- [Narrowing and branching](#narrowing-and-branching): a test never branches, and it narrows before
+  a matcher that passes on `undefined`.
+- [Time and waiting](#time-and-waiting): control time by argument, then injected clock, then fake
+  timers, and wait on a condition, never a sleep.
+- [Boundaries](#boundaries): a stand-in replaces a boundary, never the code inside it, and a failure
+  branch runs on a real failure.
+- [Module mocks](#module-mocks): `mock.module` lives only in a preload, for two narrow cases.
+- [Matchers](#matchers): prefer a jest-extended matcher, and give a partial-match matcher a plain
+  object.
+
+## References
+
+Open a reference when the task touches its area.
+
+- [HTTP mocking](./references/http.md): a package in the HTTP-mocked regime.
+- [Database](./references/database.md): a package that owns a schema.
+- [Observability](./references/observability.md): code that records metrics, spans, error reports,
+  or structured logs.
+- [Claude Code mod checks](./references/claude-code-mods.md): a mod's hooks, which
+  `claude plugin test` runs.
+- [System tests](./references/system-tests.md): end-to-end and evaluation suites, property tests,
+  native timers, real transports, and paths the host fixes.
+- [Factories and composites](./references/factories.md): writing or changing a factory or a
+  composite.
+- [Cleanup](./references/cleanup.md): helpers that register cleanup, ordered cleanup, cleanup after
+  the resets, and a test that fails only in the full run.
+
+<!-- repo-sync needs ./references/frontend.md -->
+
+- [Frontend](./references/frontend.md): React and TanStack clients in a web app.
+
+<!-- repo-sync end -->
+
+<!-- repo-sync needs ./references/go.md -->
+
+- [Go testing](./references/go.md): Go tests.
+
+<!-- repo-sync end -->
+
+<!-- repo-sync needs ./references/nixos.md -->
+
+- [NixOS testing](./references/nixos.md): Nix evaluation and VM tests.
+
+<!-- repo-sync end -->
+
+## Loading the skill
 
 This skill is the shared base that repo-sync delivers from zgeoff/tools: edit it there, never in a
 downstream copy. When the repo has a `project-testing` skill, load it as well. That skill adds this
@@ -39,19 +111,8 @@ around the rule.
 Apply the behavioral principles across languages. The syntax, matchers, hooks, and file conventions
 in this file describe Bun tests. A reference for another runner maps them to that runner's
 mechanisms, and keeps isolation, explicit scenarios, independent expectations, real boundaries, and
-meaningful failures. A repo receives only the references for the runners it uses.
-
-<!-- repo-sync needs ./references/go.md -->
-
-For Go, read [Go testing](./references/go.md).
-
-<!-- repo-sync end -->
-
-<!-- repo-sync needs ./references/nixos.md -->
-
-For Nix evaluation and VM tests, read [NixOS testing](./references/nixos.md).
-
-<!-- repo-sync end -->
+meaningful failures. A repo receives only the references for the runners it uses, and
+[References](#references) lists them.
 
 ## Regimes
 
@@ -120,8 +181,8 @@ These decide a case that the rules below leave open.
   a program's entry module, such as `cli.ts`, sits beside that module too, so `src/` stays a mirror
   with one test file per module. Two root directories are the exceptions: `e2e/` holds the
   end-to-end suites that run the whole program, and `evals/` holds the
-  [evaluation suites](#evaluation-suites). The repo has no other `test/`, `tests/`, or `__tests__`
-  directory.
+  [evaluation suites](./references/system-tests.md#evaluation-suites). The repo has no other
+  `test/`, `tests/`, or `__tests__` directory.
 
 ```ts
 test.each([
@@ -135,35 +196,10 @@ test.each([
 
 ### End-to-end suites
 
-An end-to-end suite splits by user journey, one file per journey: `e2e/tui-spawn.test.ts` beside
-`e2e/tui-attach.test.ts`. A journey test may chain dependent act-and-assert phases, because each
-step of the journey needs the state that the step before it left. Ordinary tests outside `e2e/` act
-once. Generated sequences follow [Property tests](#property-tests).
-
-An outer harness may reuse expensive hosts, services, and immutable fixture inputs across journeys.
-Each journey keeps its own file, setup, scenario, and cleanup. Reset shared infrastructure to a
-clean baseline before each journey; test that the reset removes dirty state, including after failure
-or interruption. Recreate the environment when a reset cannot restore the baseline. The harness owns
-infrastructure startup and shutdown; test files keep the hook rules in
-[Setup and cleanup](#setup-and-cleanup).
-
-Keep command construction importable. Test argument and flag-position cases through the real parser
-in module tests; keep binary journeys that check the assembled program.
-
-### Evaluation suites
-
-An evaluation suite in `evals/` checks production code against a committed corpus or report: it
-replays a corpus of recorded traffic through the production path, or checks a committed evaluation
-report against the code. It tests a corpus, not one module, so it has no module to sit beside.
-
-- The input is the committed corpus or report file, read through one tested loader. The cases are
-  never restated as inline literals.
-- Helpers live in `evals/test-utils/` with tests of their own. A stand-in replaces only what a
-  recording cannot reproduce, such as the disk or the forge, and the suite injects it into the
-  production path.
-- A deliberate mismatch between the report and the code fails the suite. A suite that passes on a
-  stale report checks nothing.
-- Every other rule in this skill applies to an evaluation suite.
+An end-to-end suite splits by user journey, one file per journey, and a journey test may chain
+dependent act-and-assert phases. Its harness, resets, and command checks follow
+[System tests](./references/system-tests.md#end-to-end-suites), and so does an evaluation suite in
+`evals/`.
 
 ### Loops
 
@@ -190,25 +226,9 @@ matter.
 
 ### Property tests
 
-Use fast-check for generated inputs or operation sequences whose combinations matter. Keep fixed
-decision tables in `test.each`. A property runner may dispatch generated operations, branch on
-expected outcomes, and check invariants after each operation. These permissions apply inside the
-property runner and its operation interpreter; ordinary tests keep their loop, branching, and
-single-act rules. Await an async `fc.assert` so a failed property fails the enclosing test.
-
-- Check relevant transitions, not only the final state. Unexpected errors fail the property; an
-  expected-outcome branch never suppresses them.
-- Derive invariants from an independent contract or a simpler model, never a copy of the production
-  algorithm.
-- Start each generated case from clean state and release its resources before the next case. Use a
-  tested scoped helper for case resources, with cleanup on success and failure. `onTestFinished`
-  runs after the enclosing Bun test, not after each generated case; its fallback cleanup alone does
-  not isolate cases.
-- Preserve the seed, reduced counterexample, and applicable replay information. Add an explicit
-  regression test for a discovered sequence when it represents a behavior the suite must keep.
-- Keep separate assertions for independent results and tests for behavioral stand-ins. Do not reduce
-  generated coverage to conceal slow tests. The interpreter needs no rewrite into command classes
-  solely for alignment.
+Use fast-check for generated inputs or operation sequences whose combinations matter, and keep fixed
+decision tables in `test.each`. A property runner may loop, branch, and act more than once; the rest
+of its rules are in [System tests](./references/system-tests.md#property-tests).
 
 ## Setup and cleanup
 
@@ -290,64 +310,9 @@ Each kind of state has one cleanup tool.
 | State that a preload reset covers                       | Nothing                                           |
 
 `try`/`finally` never appears in a test. `onTestFinished` runs on failure as well, keeps teardown
-beside the acquisition, and needs no `?.` guard for a resource the test never reached. A shared test
-util may register `onTestFinished` for its callers. These helpers must run inside a test. A test of
-such a helper proves its cleanup ran by asserting in an `onTestFinished` hook. `onTestFinished`
-hooks run first-in, first-out, so register that check after the helper's call, and register the
-removal of any directory the check reads after the check, not immediately after creating it. This is
-the only place an assertion leaves the test body.
-
-A helper whose cleanup only stops work that a passing test always finishes first, such as killing a
-build that is still running, needs no test that proves that cleanup.
-
-When resources have cleanup dependencies, register one callback that closes them in the required
-order. Every cleanup must run even if another cleanup throws. Use a disposable stack when reverse
-acquisition order matches those dependencies, and register its disposal immediately. Do not hold
-that stack with `using` or `await using`, or transfer it with `move()`.
-
-```ts
-async function setupTest() {
-  const stack = new AsyncDisposableStack();
-
-  onTestFinished(() => stack.disposeAsync());
-
-  const dir = await mkdtemp(join(tmpdir(), 'notes-'));
-
-  stack.defer(() => rm(dir, { recursive: true, force: true }));
-
-  const db = new Database(join(dir, 'notes.db'));
-
-  stack.defer(() => db.close());
-  applyNotesMigrations(db);
-
-  return { dir, db };
-}
-```
-
-If the scenario needs an explicit shutdown before the next action, call it in the test body. Keep
-fallback cleanup registered and make it safe after shutdown. Fixture callers need no `using` or
-`await using` declaration.
-
-A listener that a test opens only to read a free port needs no fallback cleanup when the statement
-after the port read stops it.
-
-`onTestFinished` runs after all `afterEach` hooks, including the preload's resets. Cleanup uses
-captured paths and handles, rather than environment overrides that those resets remove. Tests that
-use this hook run sequentially within each file: do not enable `test.concurrent`, `--concurrent`, or
-`concurrentTestGlob` for them. Separate worker processes and CI jobs can still run in parallel.
-
-```ts
-test('it reads a note written by another connection', async () => {
-  const ctx = await setupTest();
-
-  const writer = new Database(join(ctx.dir, 'notes.db'));
-  onTestFinished(() => writer.close());
-
-  writer.run(`INSERT INTO notes (title) VALUES ('from writer')`);
-
-  expect(listNoteTitles(ctx.db)).toStrictEqual(['from writer']);
-});
-```
+beside the acquisition, and needs no `?.` guard for a resource the test never reached. A helper that
+registers cleanup for its callers, resources that close in order, and cleanup that runs after the
+preload's resets follow [Cleanup](./references/cleanup.md).
 
 A test overrides an environment variable through the repo's env util, and the preload restores every
 override after each test. A test never assigns `process.env` directly. A test never relies on a
@@ -355,16 +320,10 @@ unique key to avoid another test's rows: isolation comes from resets, not from l
 
 ### A test that fails only in the full run
 
-A test that passes alone and fails beside others has found a cleanup gap. Find it this way:
-
-1. Run the failing test alone, and confirm it passes.
-2. Run it with half of the other test files, and keep halving toward the half that still makes it
-   fail.
-3. In the file that remains, find the state it leaves behind: a module cache, a singleton, a store,
-   an unrestored override.
-4. Add that state's reset to the preload.
-
-Reordering the tests or choosing unique keys hides the gap and leaves it for the next test to find.
+A test that passes alone and fails beside others has found a cleanup gap. Bisect the test files to
+find the state it leaves behind and add that state's reset to the preload, as
+[Cleanup](./references/cleanup.md#a-test-that-fails-only-in-the-full-run) describes. Reordering the
+tests or choosing unique keys hides the gap.
 
 ## Test data
 
@@ -372,31 +331,10 @@ Reordering the tests or choosing unique keys hides the gap and leaves it for the
   literal again in the next test. A module-level fixture, a baseline object shared between tests, or
   a constant that only names a literal (`const EMPTY = ''`) never appears in a test file.
 - A domain type that crosses a module boundary gets a factory, `build-mock-<type>.ts` exporting
-  `buildMock<Type>`, in the shared test utils as soon as a test needs one. A factory returns a value
-  and brings no resource into existence, so it takes the `build` prefix from the repo's
-  function-naming table. A composite that writes rows creates a resource and keeps `create`. A type
-  that another package owns, such as an SDK result, is in the same position on first use. A type
-  private to the module under test stays an inline literal.
-- A factory returns a complete plain object. Fields whose value is arbitrary default to
-  `@faker-js/faker` values, which prove the unit does not depend on one particular value.
-  Constrained fields, such as an enum or a discriminator, take a fixed default. A deterministic
-  package, whose outputs are pinned as golden values, takes fixed defaults throughout. The preload
-  seeds faker once, so a failing run reproduces.
-- A factory defaults each foreign key to a fresh id and never requires a parent. Wiring real parents
-  is a composite's job.
-- A factory for a class returns an instance of that class, so `toStrictEqual` against a real
-  instance passes. A factory with nested fields deep-merges each override into fresh defaults.
-- A row factory returns the table's insert shape, and a contract factory returns the API type. They
-  are separate factories, kept in the packages that own each shape.
-- Each factory has a test file with at least two tests: `it builds a default <type>`, which asserts
-  the whole shape with `toStrictEqual` and asymmetric matchers, and
-  `it applies overrides on top of the defaults`. Add a test only for a factory branch that those two
-  cannot reach, such as an override that leaves out an optional field (`undefined` meaning absent),
-  a field derived from another field, or a keyed or nested override that builds each child from its
-  own factory. Each added test fails when that branch is deleted. Never add one that checks faker's
-  output or the plain merge of overrides again.
-- The test that uses a factory's value calls the factory itself. A helper that presets overrides is
-  a second set of defaults that the reader cannot see.
+  `buildMock<Type>`, in the shared test utils as soon as a test needs one, and a domain concept
+  built from several records gets a composite. Both follow
+  [Factories and composites](./references/factories.md). A type private to the module under test
+  stays an inline literal.
 - A stand-in's data stays inline in the test: a fixed answer, a recorder (`mock()`), including one
   that parses the input it records, a no-op (`() => {}`), an answer table read by one key, or a list
   of scripted answers that the test passes to the tested answer-queue util. Any other code in a
@@ -416,20 +354,6 @@ Reordering the tests or choosing unique keys hides the gap and leaves it for the
   executable. Extract a dedicated stand-in when the script models arguments, output, or failures.
 - A chain of `mockReturnValueOnce` or `mockResolvedValueOnce` calls never appears: a call past the
   last answer returns the default without failing, where the answer-queue util throws.
-
-### Composites
-
-A composite assembles one domain concept from factories and persistence helpers: a signed-in user
-with its session, or an order with its customer. It creates each dependency that the caller does not
-pass, and it returns data, never clients, apps, or servers.
-
-- A composite's name is a concept the system already names. Two readers who see just the name
-  describe the same contents. A name that lists its parts, such as
-  `createUserWithTwoNotesAndAShare`, is a convenience grouping: compose the primitives in the test
-  instead.
-- A variant is a separate file and export, such as `createAdminUser` beside `createUser`. It is
-  never a flag inside one composite.
-- A composite has no batch form. Several records are several calls.
 
 ## Schemas and parsers
 
@@ -581,34 +505,9 @@ a state flag, and wait on that.
 
 ### Native timers and scenario delays
 
-A test of a native runtime or kernel timer uses the shortest faithful configurable deadline through
-the real mechanism. Configure startup-only settings in an isolated child process. Include a failure
-control that proves an unprotected operation crosses the deadline; a nominal timeout value alone
-does not prove expiry. Keep default configuration coverage separate. Wait out the real default only
-when the runtime cannot expose a shorter faithful deadline, and run that case through an explicit
-script.
-
-When a third-party library owns a timer, runs it internally, and takes only a duration in its
-config, pass the shortest duration the library accepts and wait on the observable event, never with
-a sleep. Add a control: the same duration with a live peer does not fire. Fake timers stay for
-libraries whose timers do not interleave with real I/O.
-
-A deadline that the repo's own code runs on real time in a process that the test spawns, where no
-clock the test injects reaches it, such as a crash harness's settle window, needs only two things: a
-name, from an option of the code that owns the deadline or a constant exported outside the test
-file, and a wait that ends on a condition, checked by the test or reported by the process that owns
-the deadline, never on a fixed sleep. The rules above for native and library timers do not apply to
-it. A deadline that the repo's own code runs in the test's own process takes a time argument or an
-injected clock, in the order [Time and waiting](#time-and-waiting) ranks them. A deadline that the
-repo's code schedules, even with `setTimeout`, is its own. A native runtime or kernel timer is one
-that the runtime configures and runs, such as a server's idle timeout; it and a library-owned timer
-follow the rules above in any process.
-
-A real delay may define an end-to-end workload rate or a seeded fault-injection offset. State the
-rate or fault purpose and preserve replay information. A claim that a fault lands mid-operation
-needs evidence of overlap and checks of the fault and recovery. Use phase-targeted checks for known
-races. A delay that only guesses when a service settles remains a condition wait; elapsed age must
-matter to the contract to justify a dwell.
+A native runtime or kernel timer, a timer a third-party library owns, a deadline the repo's code
+runs in a spawned process, and a deliberate workload or fault delay each follow
+[System tests](./references/system-tests.md#native-timers-and-scenario-delays).
 
 ## Boundaries
 
@@ -637,8 +536,9 @@ with values, and test the I/O edge against the real boundary.
 ### Real applications and transport
 
 A CLI, SDK, or server-side client of a service in the same repo tests against the real application
-wiring, with isolated data and stand-ins at host boundaries the runtime cannot run. A child process
-reaches that application through a real listener.
+wiring, and a tested real network stand-in replaces interception where interception cannot reach the
+contract. [System tests](./references/system-tests.md#real-applications-and-transport) holds both
+rules.
 
 <!-- repo-sync needs ./references/frontend.md -->
 
@@ -646,13 +546,6 @@ Frontend component tests keep the MSW boundary in [frontend testing](./reference
 the real SDK and RPC serialization.
 
 <!-- repo-sync end -->
-
-Use a tested real network stand-in where interception cannot exercise the contract: certificate
-verification, TLS or tunnel behavior, Unix sockets whose native options interception loses, or
-requests from a child process, container, or VM outside the intercepted process. Confirm a claimed
-interceptor limitation with the installed versions. Keep real routing and serialization,
-schema-backed rich mock state, and visible failures for unexpected calls. Ordinary remote HTTP
-behavior keeps MSW where it applies.
 
 ### Filesystem
 
@@ -664,16 +557,9 @@ after startup, because Bun reads some of those once at startup.
 
 ### Program-fixed paths and global resources
 
-Kernel or program contracts may impose a path inside the test environment, such as a certificate
-trust directory, procfs, or a VM mount point. State which contract fixes it. Use a fresh test-owned
-namespace or resource with checked ownership; choose a disposable environment when ownership cannot
-be guaranteed. Each test creates fresh scenario resources and cleans them up.
-
-Distinct names for machine-global resources allocate a namespace, like `mkdtemp`; they never replace
-row or store isolation. Refuse collisions with resources this run does not own before overwriting,
-truncating, mounting, or deleting them. Register cleanup immediately after successful acquisition,
-and release only what this run acquired. A generated name is not proof of ownership. Cleanup remains
-safe after partial failure, interruption, and explicit shutdown.
+A path that a kernel or program contract fixes, and a machine-global resource, need checked
+ownership and cleanup that releases only what the run acquired, as
+[System tests](./references/system-tests.md#program-fixed-paths-and-global-resources) describes.
 
 ### Infrastructure failures
 

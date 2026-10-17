@@ -21,6 +21,26 @@ wins. Anthropic's guidance is in its
 [best-practices page](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)
 and the [Claude Code skills reference](https://code.claude.com/docs/en/skills).
 
+## Key rules
+
+Each line links the section that explains it.
+
+- [What a skill holds](#what-a-skill-holds): when to load it, the commands, the traps, and where to
+  look; the code owns the rest.
+- [Frontmatter](#frontmatter): `name` matches the folder, and `description` says what the skill does
+  and when to load it.
+- [The top of SKILL.md](#the-top-of-skillmd): open with a linked index of the key rules, then the
+  list of references.
+- [SKILL.md and references](#skillmd-and-references): split by how often a task needs the text, one
+  level deep.
+- [Point at the code, never copy it](#point-at-the-code-never-copy-it): a code name is a Markdown
+  link to its file; no inventories and no narrations.
+- [Answering a review of a skill](#answering-a-review-of-a-skill): decline a finding that asks for a
+  copy of the code.
+- [Keeping a skill true](#keeping-a-skill-true): rules, not incidents, and a script where a check
+  can replace prose.
+- [Checking a skill](#checking-a-skill): `check-length.sh`, `check-links.sh`, and `check-skill.sh`.
+
 ## What a skill holds
 
 Most project skills take the same shape: a sentence on what the skill covers, a table of commands,
@@ -50,9 +70,6 @@ The `testing` skill holds the rules. This skill holds what is particular to the 
 Each trap is a fact the code doesn't show, plus what to do about it. A trap belongs in the skill
 when an agent with the source open would still lose time to it.
 
-Put the key instructions near the top of SKILL.md. After a compaction, only the start of a loaded
-skill stays in context, so a rule at the bottom is the first one lost.
-
 ## Frontmatter
 
 `name` matches the skill's folder: lowercase letters, digits, and hyphens, at most 64 characters.
@@ -65,20 +82,53 @@ words a task would use. It runs to at most 1,024 characters.
 - Good: "Commands, test layers, and traps for the widget service's tests. Load it beside the testing
   skill before writing, running, or reviewing a widget test."
 
+## The top of SKILL.md
+
+SKILL.md opens with everything an agent needs to act: one or two paragraphs on what the skill
+covers, then an index of the key rules, then the list of references, then the sections that explain
+each rule. After a compaction, only the start of a loaded skill stays in context, so a rule that
+appears first only at the bottom is the first one lost.
+
+The index is a table of contents with a takeaway: one line per section, a link to the section, and
+the rule in a phrase.
+
+```markdown
+## Key rules
+
+- [Cleanup](#cleanup): register `onTestFinished` right after each acquisition, with no hooks.
+- [Time and waiting](#time-and-waiting): wait on a condition, never a sleep.
+```
+
+Each line restates its rule in one phrase and owns none of its detail, so the section stays the
+rule's owner, and a change to the rule changes both. A skill short enough to read on one screen
+needs no index.
+
+The reference list follows the index. Each entry links one reference and names the task that needs
+it, so an agent opens only the references its task touches:
+
+```markdown
+## References
+
+- [Database](./references/database.md): a package that owns a schema.
+```
+
 ## SKILL.md and references
 
-SKILL.md stays under 500 lines and is the entry point: the rules that apply on every load, and a
-link to each reference with the task that needs it. Aim well below the limit.
+SKILL.md holds what most loads of the skill need. A reference holds what only some tasks need: one
+runner, one kind of doc, one rare case. Decide each section by how often a task needs it, never by
+the line count, because a rule an agent needs on most tasks is easier to miss behind a second read.
+Anthropic recommends a SKILL.md under 500 lines; past that, check that each section is one most
+tasks need.
 
 References sit one level deep. SKILL.md links each reference, and a reference never sends the reader
-on to another reference, because an agent reads a nested file partially. A reference over 100 lines
-opens with a contents list, a list of links to its own headings, so a partial read still shows what
-the file holds. Name each reference by its domain (`database.md`, not `notes.md`), so an agent opens
-only the ones its task touches.
+on to another reference, because an agent reads a nested file partially. A reference may link back
+to a section of SKILL.md. A reference over 100 lines opens with a contents list, a list of links to
+its own headings, so a partial read still shows what the file holds. Name each reference by its
+domain (`database.md`, not `notes.md`).
 
 Moving text from SKILL.md into references makes SKILL.md shorter and the skill no shorter. When a
 skill is too long, cut points first, under docs-writing's "Cut anything the reader could get from
-the code", and split only what remains. A reference follows every rule in this guide.
+the code", and move only what few tasks need. A reference follows every rule in this guide.
 
 ## Point at the code, never copy it
 
@@ -186,9 +236,10 @@ bash .claude/skills/docs-writing/scripts/check-links.sh
 
 `check-length.sh` runs docs-writing's prose check over each skill's Markdown, then runs
 `check-skill.sh`. `check-links.sh` checks every relative link in each skill. `check-skill.sh` fails
-on a frontmatter field outside its limit and on a line anchor. It warns about a SKILL.md over its
-line limit, a missing contents list, a reference that links to another reference, and a
-code-formatted path that should be a link. To check one skill, pass its folder:
+on a frontmatter field outside its limit and on a line anchor. It warns about a SKILL.md over 500
+lines, a reference that SKILL.md doesn't list under `## References`, a missing contents list, a
+reference that links to another reference, and a code-formatted path that should be a link. To check
+one skill, pass its folder:
 
 ```bash
 bash .claude/skills/skill-writing/scripts/check-skill.sh .claude/skills/<skill>

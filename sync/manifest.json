@@ -44,8 +44,16 @@
         "target": ".claude/skills/testing/references/claude-code-mods.md"
       },
       {
+        "source": "sync/skills/testing/references/cleanup.md",
+        "target": ".claude/skills/testing/references/cleanup.md"
+      },
+      {
         "source": "sync/skills/testing/references/database.md",
         "target": ".claude/skills/testing/references/database.md"
+      },
+      {
+        "source": "sync/skills/testing/references/factories.md",
+        "target": ".claude/skills/testing/references/factories.md"
       },
       {
         "source": "sync/skills/testing/references/frontend.md",
@@ -69,6 +77,10 @@
       {
         "source": "sync/skills/testing/references/observability.md",
         "target": ".claude/skills/testing/references/observability.md"
+      },
+      {
+        "source": "sync/skills/testing/references/system-tests.md",
+        "target": ".claude/skills/testing/references/system-tests.md"
       }
     ]
   },
@@ -80,6 +92,18 @@
       {
         "source": "sync/skills/docs-writing/SKILL.md",
         "target": ".claude/skills/docs-writing/SKILL.md"
+      },
+      {
+        "source": "sync/skills/docs-writing/references/architecture-docs.md",
+        "target": ".claude/skills/docs-writing/references/architecture-docs.md"
+      },
+      {
+        "source": "sync/skills/docs-writing/references/docs-tree.md",
+        "target": ".claude/skills/docs-writing/references/docs-tree.md"
+      },
+      {
+        "source": "sync/skills/docs-writing/references/readmes.md",
+        "target": ".claude/skills/docs-writing/references/readmes.md"
       },
       {
         "source": "sync/skills/docs-writing/scripts/check-prose.sh",

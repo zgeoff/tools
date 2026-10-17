@@ -174,7 +174,35 @@ test('it warns and passes when SKILL.md is over 500 lines', async () => {
   expect(result.status).toBe(0);
 
   expect(result.stdout).toInclude(
-    '.claude/skills/demo/SKILL.md: 505 lines, over the limit of 500 (warning)\n',
+    '.claude/skills/demo/SKILL.md: 505 lines, over 500; check that each section is one most tasks need (warning)\n',
+  );
+});
+
+test('it warns about a reference that SKILL.md does not list under References', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    ...frontmatter,
+    '',
+    '## References',
+    '',
+    '- [HTTP](./references/http.md): a client of a remote service.',
+    '',
+    '## Details',
+    '',
+    'See [the database](./references/database.md).',
+  ]);
+
+  await ctx.writePage('.claude/skills/demo/references/http.md', ['# HTTP']);
+  await ctx.writePage('.claude/skills/demo/references/database.md', ['# Database']);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(0);
+
+  expect(result.stdout).toBe(
+    '.claude/skills/demo/references/database.md: SKILL.md does not list it under ## References; add a line naming the task that needs it (warning)\n' +
+      'check-skill: 1 skills, 0 errors, 1 warnings\n',
   );
 });
 
@@ -200,7 +228,13 @@ test('it warns about a long reference with no contents list', async () => {
 test('it accepts a long reference that opens with a contents list', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePage('.claude/skills/demo/SKILL.md', frontmatter);
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    ...frontmatter,
+    '',
+    '## References',
+    '',
+    '- [The harness](./references/e2e.md): an end-to-end journey.',
+  ]);
 
   await ctx.writePage('.claude/skills/demo/references/e2e.md', [
     '# The harness',

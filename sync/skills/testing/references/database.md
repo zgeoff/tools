@@ -7,6 +7,16 @@ defects these tests exist to catch. An in-memory SQLite database (`:memory:`) is
 not a reimplementation. Each test gets a database that no other test can see, and the
 [testing skill](../SKILL.md) rules on `setupTest`, cleanup, and data apply throughout.
 
+- [Postgres isolation](#postgres-isolation)
+- [SQLite isolation](#sqlite-isolation)
+- [Booting a service](#booting-a-service)
+- [Persisted test data](#persisted-test-data)
+- [Reading results back](#reading-results-back)
+- [Timestamps and order](#timestamps-and-order)
+- [Access rules](#access-rules)
+- [Configuration stored in the database](#configuration-stored-in-the-database)
+- [SQL built from identifiers](#sql-built-from-identifiers)
+
 ## Postgres isolation
 
 Each test acquires a handle from the repo's test-database util, holds it in `setupTest()`, and
