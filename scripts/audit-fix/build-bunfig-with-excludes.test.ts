@@ -45,3 +45,27 @@ test('it rejects a bunfig.toml with no release-age gate', () => {
     'bunfig.toml sets no minimumReleaseAge, so no release needs an exclude',
   );
 });
+
+test('it puts the comma before a comment on the last entry', () => {
+  const bunfig =
+    'minimumReleaseAge = 604800\nminimumReleaseAgeExcludes = [\n  "qs" # patches an advisory\n]\n';
+
+  const result = buildBunfigWithExcludes(bunfig, [honoExclude]);
+
+  expect(result).toBe(
+    'minimumReleaseAge = 604800\n# hono 4.13.0 (published 2026-10-15, patches GHSA-8j4g-w8fx-2239) ages past the gate ~2026-10-22 — remove then (audit-fix)\nminimumReleaseAgeExcludes = [\n  "qs", # patches an advisory\n  "hono",\n]\n',
+  );
+
+  expect(Bun.TOML.parse(result)).toStrictEqual({
+    minimumReleaseAge: 604_800,
+    minimumReleaseAgeExcludes: ['qs', 'hono'],
+  });
+});
+
+test('it fills an empty list on one line', () => {
+  const bunfig = 'minimumReleaseAge = 604800\nminimumReleaseAgeExcludes = []\n';
+
+  expect(buildBunfigWithExcludes(bunfig, [honoExclude])).toBe(
+    'minimumReleaseAge = 604800\n# hono 4.13.0 (published 2026-10-15, patches GHSA-8j4g-w8fx-2239) ages past the gate ~2026-10-22 — remove then (audit-fix)\nminimumReleaseAgeExcludes = ["hono"]\n',
+  );
+});

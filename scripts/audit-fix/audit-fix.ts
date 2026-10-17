@@ -7,7 +7,12 @@ import { buildAuditScript } from './build-audit-script.ts';
 import { buildBunfigWithExcludes } from './build-bunfig-with-excludes.ts';
 import type { ReleaseAgeExclude } from './build-bunfig-with-excludes.ts';
 import { buildDateAfter } from './build-date-after.ts';
+import { isRecord } from './is-record.ts';
+import { parseAuditIgnores } from './parse-audit-ignores.ts';
+import { parseAuditReport } from './parse-audit-report.ts';
 import { parseAuditScript } from './parse-audit-script.ts';
+import { parseFixPlan } from './parse-fix-plan.ts';
+import { parseJSONLine } from './parse-json-line.ts';
 import { planAuditIgnores } from './plan-audit-ignores.ts';
 import { renderAuditFixSummary } from './render-audit-fix-summary.ts';
 import type { AuditIgnores, AuditReport, FixPlan } from './types.ts';
@@ -57,11 +62,11 @@ export async function runAuditFix(argv: readonly string[]): Promise<void> {
 
   const beforeOutput = await runBun(['audit', '--json']);
 
-  const before = parseJSONOutput<AuditReport>(beforeOutput);
+  const before = parseAuditReport(parseJSONLine(beforeOutput));
 
   const planOutput = await runBun(['audit', 'fix', '--json', '--ignore-scripts', ...flags]);
 
-  const plan = parseJSONOutput<FixPlan>(planOutput);
+  const plan = parseFixPlan(parseJSONLine(planOutput));
 
   const excludes = await collectReleaseAgeExcludes(plan, before, today);
 
@@ -73,7 +78,7 @@ export async function runAuditFix(argv: readonly string[]): Promise<void> {
 
   const reportOutput = await runBun(['audit', '--json']);
 
-  const report = parseJSONOutput<AuditReport>(reportOutput);
+  const report = parseAuditReport(parseJSONLine(reportOutput));
 
   const ignorePlan = planAuditIgnores({
     report,
@@ -85,14 +90,16 @@ export async function runAuditFix(argv: readonly string[]): Promise<void> {
     expiryDays,
   });
 
-  const nextScript = buildAuditScript(script, [
-    ...Object.keys(ignorePlan.ignores),
-    ...unmanagedIDs,
-  ]);
+  const nextIDs = [...Object.keys(ignorePlan.ignores), ...unmanagedIDs];
+
+  // The script keeps its spelling while its ignores stay the same, so a run
+  // with nothing to fix leaves package.json alone.
+  const isScriptChanged = !hasSameIDs(parsedScript.ignoreIDs, nextIDs);
+  const nextScript = isScriptChanged ? buildAuditScript(script, nextIDs) : script;
 
   await writeAuditIgnores(ignorePlan.ignores);
 
-  if (nextScript !== script) {
+  if (isScriptChanged) {
     await writeAuditScript(nextScript);
   }
 
@@ -122,9 +129,18 @@ function requireAuditFix(): void {
 }
 
 function readAuditScript(packageJSON: string): string {
-  const scripts = (JSON.parse(packageJSON) as { scripts?: Record<string, string> }).scripts;
+  const parsed: unknown = JSON.parse(packageJSON);
+  const scripts = isRecord(parsed) ? parsed['scripts'] : undefined;
+  const audit = isRecord(scripts) ? scripts['audit'] : undefined;
 
-  return scripts?.['audit'] ?? 'bun audit';
+  return typeof audit === 'string' ? audit : 'bun audit';
+}
+
+function hasSameIDs(left: readonly string[], right: readonly string[]): boolean {
+  const leftSet = new Set(left);
+  const rightSet = new Set(right);
+
+  return leftSet.size === rightSet.size && [...leftSet].every((id) => rightSet.has(id));
 }
 
 async function loadAuditIgnores(): Promise<AuditIgnores> {
@@ -134,7 +150,9 @@ async function loadAuditIgnores(): Promise<AuditIgnores> {
 
   const content = await readFile(ignoresPath, 'utf8');
 
-  return JSON.parse(content) as AuditIgnores;
+  const parsed: unknown = JSON.parse(content);
+
+  return parseAuditIgnores(parsed);
 }
 
 interface RunBunOptions {
@@ -154,21 +172,6 @@ async function runBun(args: readonly string[], options: RunBunOptions = {}): Pro
   }
 
   return stdout;
-}
-
-// The JSON object is the last line that starts with a brace; a lifecycle
-// script or a version banner can print before it.
-function parseJSONOutput<T>(stdout: string): T {
-  const line = stdout
-    .split('\n')
-    .toReversed()
-    .find((candidate) => candidate.startsWith('{'));
-
-  if (line === undefined) {
-    throw new Error(`bun printed no JSON:\n${stdout}`);
-  }
-
-  return JSON.parse(line) as T;
 }
 
 // `before` is the audit from before the fix, which still lists the advisories
@@ -205,9 +208,12 @@ async function readPublishDate(name: string, version: string, today: string): Pr
     return today;
   }
 
-  const manifest = (await response.json()) as { time?: Record<string, string> };
+  const manifest: unknown = await response.json();
 
-  return manifest.time?.[version]?.slice(0, 10) ?? today;
+  const time = isRecord(manifest) ? manifest['time'] : undefined;
+  const published = isRecord(time) ? time[version] : undefined;
+
+  return typeof published === 'string' ? published.slice(0, 10) : today;
 }
 
 async function writeAuditIgnores(ignores: AuditIgnores): Promise<void> {
@@ -233,11 +239,18 @@ async function writeAuditScript(script: string): Promise<void> {
     return;
   }
 
-  const parsed = JSON.parse(packageJSON) as { scripts?: Record<string, string> };
+  const parsed: unknown = JSON.parse(packageJSON);
 
-  parsed.scripts = { ...parsed.scripts, audit: script };
+  if (!isRecord(parsed)) {
+    throw new TypeError('package.json holds no object');
+  }
 
-  await writeFile('package.json', `${JSON.stringify(parsed, null, 2)}\n`);
+  const scripts = isRecord(parsed['scripts']) ? parsed['scripts'] : {};
+
+  await writeFile(
+    'package.json',
+    `${JSON.stringify({ ...parsed, scripts: { ...scripts, audit: script } }, null, 2)}\n`,
+  );
 }
 
 if (import.meta.main) {

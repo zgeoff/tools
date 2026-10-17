@@ -68,15 +68,23 @@ function renderExcludeComment(exclude: ReleaseAgeExclude): string {
 // Adds names before the list's closing bracket, so the entries and comments
 // already in it stay as they are. A list on one line stays on one line.
 function buildListWithNames(listUpToBracket: string, names: readonly string[]): string {
-  const body = listUpToBracket.trimEnd();
-  const isEmpty = body.endsWith('[');
-  const separator = isEmpty || body.endsWith(',') ? '' : ',';
+  // The comma goes straight after the last entry, before any comment on its line.
+  const lastQuote = listUpToBracket.lastIndexOf('"');
+  const isEmpty = lastQuote === -1;
+  const rest = listUpToBracket.slice(lastQuote + 1);
+
+  const separated =
+    isEmpty || /^\s*,/u.test(rest)
+      ? listUpToBracket
+      : `${listUpToBracket.slice(0, lastQuote + 1)},${rest}`;
+
+  const body = separated.trimEnd();
 
   if (listUpToBracket.includes('\n')) {
-    return `${body}${separator}\n${names.map((name) => `  "${name}",\n`).join('')}`;
+    return `${body}\n${names.map((name) => `  "${name}",\n`).join('')}`;
   }
 
   const quoted = names.map((name) => `"${name}"`).join(', ');
 
-  return isEmpty ? `${body}${quoted}` : `${body}${separator} ${quoted}`;
+  return isEmpty ? `${body}${quoted}` : `${body} ${quoted}`;
 }
