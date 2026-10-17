@@ -89,6 +89,18 @@
         "typescript": "catalog:",
       },
     },
+    "packages/kysely-bun-sqlite": {
+      "name": "@zgeoff/kysely-bun-sqlite",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "kysely": "catalog:",
+        "typescript": "catalog:",
+      },
+      "peerDependencies": {
+        "kysely": ">=0.29.5 <0.30.0",
+      },
+    },
     "packages/oxfmt-config": {
       "name": "@zgeoff/oxfmt-config",
       "version": "0.1.0",
@@ -158,6 +170,7 @@
     "happy-dom": "20.14.5",
     "jest-extended": "7.0.0",
     "jest-matcher-utils": "30.4.1",
+    "kysely": "0.29.6",
     "lefthook": "2.1.9",
     "oxfmt": "0.56.0",
     "oxlint": "1.71.0",
@@ -473,6 +486,8 @@
 
     "@zgeoff/format-codemod": ["@zgeoff/format-codemod@workspace:packages/format-codemod"],
 
+    "@zgeoff/kysely-bun-sqlite": ["@zgeoff/kysely-bun-sqlite@workspace:packages/kysely-bun-sqlite"],
+
     "@zgeoff/oxfmt-config": ["@zgeoff/oxfmt-config@workspace:packages/oxfmt-config"],
 
     "@zgeoff/oxlint-config": ["@zgeoff/oxlint-config@workspace:packages/oxlint-config"],
@@ -642,6 +657,8 @@
     "json-stable-stringify-without-jsonify": ["json-stable-stringify-without-jsonify@1.0.1", "", {}, "sha512-Bdboy+l7tA3OGW6FjyFHWkP5LuByj1Tk33Ljyq0axyzdk9//JSi2u3fP1QSmd1KNwq6VOKYGlAu87CisVir6Pw=="],
 
     "keyv": ["keyv@4.5.4", "", { "dependencies": { "json-buffer": "3.0.1" } }, "sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw=="],
+
+    "kysely": ["kysely@0.29.6", "", {}, "sha512-hHaB8C/rfzDDtr/t8YZwxAuPJTT0zHyaPoVzcXwDYhYNAgH/4sIfVhi/XLLIY+bL/FqaIJnjATDbi8ObSELmxg=="],
 
     "lefthook": ["lefthook@2.1.9", "", { "optionalDependencies": { "lefthook-darwin-arm64": "2.1.9", "lefthook-darwin-x64": "2.1.9", "lefthook-freebsd-arm64": "2.1.9", "lefthook-freebsd-x64": "2.1.9", "lefthook-linux-arm64": "2.1.9", "lefthook-linux-x64": "2.1.9", "lefthook-openbsd-arm64": "2.1.9", "lefthook-openbsd-x64": "2.1.9", "lefthook-windows-arm64": "2.1.9", "lefthook-windows-x64": "2.1.9" }, "bin": { "lefthook": "bin/index.js" } }, "sha512-bwDaIOViTktE8kJLf9jP0p+H2/RDTlFFlc43Am2YgUsX22hI6Sq4RbzsrecwzY5y+MHTipOH7WsmWSEniePHWQ=="],
 
