@@ -8,9 +8,10 @@
 # hours lands inside the preset's Monday 00:00-05:59 UTC window, so the weekly
 # groups and lock-file maintenance open on schedule.
 #
-# The job mints an installation token from the RENOVATE_APP_ID and
-# RENOVATE_APP_PRIVATE_KEY secrets. Renovate commits as the App's bot user, so
-# the commits match the token that pushes them.
+# The job mints an installation token from the RENOVATE_APP_ID secret, which
+# holds the App's client ID, and the RENOVATE_APP_PRIVATE_KEY secret. Renovate
+# commits as the App's bot user, so the commits match the token that pushes
+# them.
 name: Renovate
 
 on:

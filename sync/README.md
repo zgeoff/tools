@@ -205,10 +205,10 @@ App needs the repository permissions in Renovate's
 [GitHub App guide](https://docs.renovatebot.com/modules/platform/github/#running-as-a-github-app),
 including Workflows write, so Renovate can bump the actions a workflow pins. tools has its own
 `renovate.json`, so with the App installed here Renovate also bumps the action and the Renovate
-version that `renovate.yml` pins. This repo holds the App's ID in the `RENOVATE_APP_ID` secret and
-its private key in `RENOVATE_APP_PRIVATE_KEY`. Renovate merges an auto-merge pull request itself on
-the first run after its checks pass; allowing auto-merge in a repo's settings lets GitHub merge it
-sooner.
+version that `renovate.yml` pins. This repo holds the App's client ID, which starts with `Iv`, in
+the `RENOVATE_APP_ID` secret and its private key in `RENOVATE_APP_PRIVATE_KEY`. Renovate merges an
+auto-merge pull request itself on the first run after its checks pass; allowing auto-merge in a
+repo's settings lets GitHub merge it sooner.
 
 ### The audit-fix workflow
 
