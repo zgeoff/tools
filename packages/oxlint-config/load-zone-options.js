@@ -26,8 +26,6 @@ function buildZoneOptions(options) {
     match: makeGlobMatcher(globsByZone[name]),
   }));
 
-  const buildEntries = (entries) => (entries ?? []).map((entry) => buildEntry(entry));
-
   return {
     zones,
     extensions: options.extensions ?? defaultExtensions,
@@ -38,6 +36,10 @@ function buildZoneOptions(options) {
     unzoned: buildEntries(options.unzoned),
     unresolved: buildEntries(options.unresolved),
   };
+}
+
+function buildEntries(entries) {
+  return (entries ?? []).map((entry) => buildEntry(entry));
 }
 
 function buildEntry(entry) {

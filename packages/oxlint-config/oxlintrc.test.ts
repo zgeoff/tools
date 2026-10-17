@@ -12,12 +12,12 @@ function createLongSource(lineCount: number): string {
   return `${lines.join('\n')}\n`;
 }
 
-async function setupTest(fileName: string) {
+async function setupTest(fileName: string, source: string) {
   const dir = await mkdtemp(join(tmpdir(), 'oxlintrc-test-'));
 
   onTestFinished(() => rm(dir, { recursive: true, force: true }));
 
-  await writeFile(join(dir, fileName), createLongSource(501));
+  await writeFile(join(dir, fileName), source);
 
   return { dir };
 }
@@ -41,8 +41,37 @@ test.each([
   ['view.test.tsx', false],
   ['hook.claude-check.ts', false],
 ])('it reports max-lines for a 501-line %s: %p', async (fileName, expected) => {
-  const ctx = await setupTest(fileName);
+  const ctx = await setupTest(fileName, createLongSource(501));
   const stdout = await runLint(ctx.dir, fileName);
 
   expect(stdout.includes('eslint(max-lines)')).toBe(expected);
+});
+
+test('it reports a switch and names ts-pattern', async () => {
+  const source =
+    "export function readTone(tone: 'warm' | 'cool'): number {\n  switch (tone) {\n    case 'warm': {\n      return 1;\n    }\n    default: {\n      return 2;\n    }\n  }\n}\n";
+
+  const ctx = await setupTest('tone.ts', source);
+  const stdout = await runLint(ctx.dir, 'tone.ts');
+
+  expect(stdout).toInclude('zgeoff(no-switch)');
+  expect(stdout).toInclude('ts-pattern');
+});
+
+test('it reports a declaration that lists two variables', async () => {
+  const source = 'export const width = 3, height = 4;\n';
+
+  const ctx = await setupTest('size.ts', source);
+  const stdout = await runLint(ctx.dir, 'size.ts');
+
+  expect(stdout).toInclude('eslint(one-var)');
+});
+
+test('it accepts one declaration per variable', async () => {
+  const source = 'export const width = 3;\nexport const height = 4;\n';
+
+  const ctx = await setupTest('size.ts', source);
+  const stdout = await runLint(ctx.dir, 'size.ts');
+
+  expect(stdout).not.toInclude('eslint(one-var)');
 });

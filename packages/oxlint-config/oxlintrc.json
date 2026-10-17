@@ -25,6 +25,7 @@
     "zgeoff/no-await-args": "error",
     "zgeoff/no-await-in-condition": "error",
     "zgeoff/no-await-in-logical": "error",
+    "zgeoff/no-switch": "error",
     "zgeoff/no-jsdoc": "error",
     "zgeoff/max-consecutive-line-comments": ["error", { "max": 3 }],
     "zgeoff/no-comment-rule-override": "error",
@@ -104,6 +105,10 @@
     "unicorn/no-null": "off",
     "unicorn/number-literal-case": "off",
     "unicorn/filename-case": "off",
+
+    // one declaration per variable; a declaration list has no order to sort
+    "one-var": ["error", "never"],
+    "sort-vars": "off",
 
     // category-enabled rules that contradict this config's style: inline named
     // export declarations are the convention (group-exports demands the exact

@@ -95,6 +95,11 @@ const plugin = {
       'Await into a named const instead of chaining it after a && / || / ?? operator.',
       ['LogicalExpression > AwaitExpression'],
     ),
+    'no-switch': buildBanRule(
+      'problem',
+      'Branch with match(...).exhaustive() from ts-pattern, never switch.',
+      ['SwitchStatement'],
+    ),
     'no-jsdoc': noJSDoc,
     'max-consecutive-line-comments': maxConsecutiveLineComments,
     'no-comment-rule-override': noCommentRuleOverride,
