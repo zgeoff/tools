@@ -29,9 +29,8 @@ test('it titles a change that updates a package as a fix', () => {
   });
 
   expect(summary).toStrictEqual({
-    title:
-      'fix(deps): update brace-expansion to fix audit advisories and ignore 1 unfixed advisory',
-    body: `The audit-fix workflow opened this pull request after it ran \`bun audit\` on the default branch.
+    title: 'fix(deps): update brace-expansion, ignore 1 unfixed advisory',
+    body: `The audit-fix workflow opened this pull request after it ran \`bun audit\` on the base branch.
 
 ## Updated to a fixed release
 - \`brace-expansion\` 5.0.6 → 5.0.12
@@ -56,7 +55,7 @@ test('it titles a change that only records ignores as a chore', () => {
     removed: [],
   });
 
-  expect(summary.title).toBe('chore(deps): ignore 1 unfixed audit advisory until a fix can land');
+  expect(summary.title).toBe('chore(deps): ignore 1 unfixed audit advisory');
   expect(summary.kind).toBe('ignore');
 });
 
@@ -69,7 +68,24 @@ test('it titles a change that only drops ignores', () => {
     removed: ['GHSA-85c8-ppgw-ccpr', 'GHSA-5gmw-xhrv-c9v3'],
   });
 
-  expect(summary.title).toBe('chore(deps): drop 2 audit ignores that no longer match');
+  expect(summary.title).toBe('chore(deps): drop 2 stale audit ignores');
+});
+
+test('it counts the packages when their names would make the title too long', () => {
+  const summary = renderAuditFixSummary({
+    fixes: ['@modelcontextprotocol/sdk', 'http-cache-semantics', 'source-map-js'].map((name) => ({
+      name,
+      from: '1.0.0',
+      to: '1.0.1',
+      newerThanMinimumReleaseAge: false,
+    })),
+    excludes: [],
+    added: [],
+    renewed: [],
+    removed: [],
+  });
+
+  expect(summary.title).toBe('fix(deps): update 3 packages to fix advisories');
 });
 
 test('it reports nothing when nothing changed', () => {

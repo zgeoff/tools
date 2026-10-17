@@ -3,6 +3,7 @@
   "description": "The shared Renovate preset for zgeoff Bun repos, which a repo takes with extends: github>zgeoff/tools. sync/README.md describes each rule.",
   "extends": ["config:recommended", ":semanticCommits", ":timezone(Etc/UTC)"],
   "labels": ["dependencies"],
+  "commitMessageTopic": "{{depName}}",
   "prHourlyLimit": 0,
   "minimumReleaseAge": "7 days",
   "internalChecksFilter": "strict",

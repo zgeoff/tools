@@ -32,7 +32,7 @@ export function renderAuditFixSummary(input: AuditFixSummaryInput): AuditFixSumm
   ].filter((section) => section !== '');
 
   const body = [
-    'The audit-fix workflow opened this pull request after it ran `bun audit` on the default branch.',
+    'The audit-fix workflow opened this pull request after it ran `bun audit` on the base branch.',
     ...sections,
   ].join('\n\n');
 
@@ -102,22 +102,33 @@ function renderRemoved(removed: readonly string[]): string {
   ].join('\n');
 }
 
+// commitlint's header-max-length rule allows 72 characters, and a squash merge
+// makes the title the commit subject.
+const maxTitleLength = 72;
+
 function buildFixTitle(fixes: readonly FixedPackage[], ignores: number): string {
-  const names = fixes.map((fix) => fix.name);
-  const subject = names.length <= 3 ? names.join(', ') : `${names.length} packages`;
+  const names = [...new Set(fixes.map((fix) => fix.name))];
 
   const suffix =
-    ignores > 0 ? ` and ignore ${ignores} unfixed ${formatNoun('advisory', ignores)}` : '';
+    ignores > 0
+      ? `, ignore ${ignores} unfixed ${formatNoun('advisory', ignores)}`
+      : ' to fix advisories';
 
-  return `fix(deps): update ${subject} to fix audit advisories${suffix}`;
+  const title = `fix(deps): update ${names.join(', ')}${suffix}`;
+
+  if (title.length <= maxTitleLength) {
+    return title;
+  }
+
+  return `fix(deps): update ${names.length} ${formatNoun('package', names.length)}${suffix}`;
 }
 
 function buildIgnoreTitle(ignores: number, removed: number): string {
   if (ignores === 0) {
-    return `chore(deps): drop ${removed} audit ${formatNoun('ignore', removed)} that no longer match`;
+    return `chore(deps): drop ${removed} stale audit ${formatNoun('ignore', removed)}`;
   }
 
-  return `chore(deps): ignore ${ignores} unfixed audit ${formatNoun('advisory', ignores)} until a fix can land`;
+  return `chore(deps): ignore ${ignores} unfixed audit ${formatNoun('advisory', ignores)}`;
 }
 
 function formatNoun(noun: string, count: number): string {
