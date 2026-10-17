@@ -5,10 +5,10 @@ restriction-rule cherry-picks, comment-style enforcement via `@stylistic`, and a
 (`zgeoff/*` rules) banning shapes no native oxlint rule can express — top-level arrows, nested
 function declarations, bare named exports, destructured and inline-typed parameters, ternary and
 await arguments, awaits hidden inside a control-flow condition or a `&&`/`||`/`??` chain, every
-JSDoc block, and any run of more than three line comments. `zgeoff/function-verb` enforces the
-function-naming taxonomy from the shared agent guidelines, `zgeoff/test-beside-module` keeps each
-test file beside the module it tests, and `zgeoff/import-zones` fails an import that crosses a
-module boundary the repo declares.
+JSDoc block, any run of more than three line comments, and a repo config that loosens either comment
+rule. `zgeoff/function-verb` enforces the function-naming taxonomy from the shared agent guidelines,
+`zgeoff/test-beside-module` keeps each test file beside the module it tests, and
+`zgeoff/import-zones` fails an import that crosses a module boundary the repo declares.
 
 ## Usage
 
@@ -65,13 +65,9 @@ comments longer than `max` (default 3); tool directives (`oxlint-`, `eslint-`, `
 count nor join the prose around them. Neither rule fixes: a deleted comment is a decision, not a
 whitespace change.
 
-```jsonc
-{
-  "rules": {
-    "zgeoff/max-consecutive-line-comments": ["error", { "max": 3 }],
-  },
-}
-```
+Every repo runs both rules as this config ships them. `zgeoff/no-comment-rule-override` reports a
+repo-root `.oxlintrc*.json` that sets either rule, once per lint run, so a repo cannot turn them off
+or loosen `max`.
 
 ## `zgeoff/test-beside-module`
 
