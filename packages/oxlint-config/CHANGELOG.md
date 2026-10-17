@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.3...@zgeoff/oxlint-config@0.2.4) (2026-10-17)
+
+
+### Bug Fixes
+
+* **oxlint-config:** exempt .test.tsx suites from max-lines too ([#144](https://github.com/zgeoff/tools/issues/144)) ([b29ad08](https://github.com/zgeoff/tools/commit/b29ad08ff8a1464ee544e919216206ca6eebaaeb))
+
 ## [0.2.3](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.2...@zgeoff/oxlint-config@0.2.3) (2026-10-17)
 
 ### Features
