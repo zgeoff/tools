@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/zgeoff/tools/compare/@zgeoff/bun-test-react@0.2.0...@zgeoff/bun-test-react@0.2.1) (2026-10-17)
+
+
+### Features
+
+* **oxlint-config:** set the decided size limits and turn off the rules repos switched off by hand ([#136](https://github.com/zgeoff/tools/issues/136)) ([5e2abc8](https://github.com/zgeoff/tools/commit/5e2abc83913cdda3336d82d83fb8ae1b857b8cb3))
+
 ## [0.2.0](https://github.com/zgeoff/tools/compare/@zgeoff/bun-test-react@0.1.0...@zgeoff/bun-test-react@0.2.0) (2026-10-11)
 
 ### ⚠ BREAKING CHANGES
