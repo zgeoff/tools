@@ -164,7 +164,9 @@ defines. Replace it with the rule that defines the list and the search that list
 docs-writing allows a table whose key column is a list when its other columns hold facts the code
 doesn't. In a skill, a table keyed by files, functions, or options is an inventory whatever its
 other columns hold: move those facts into the code as doc comments, so the search returns them. A
-table keyed by something the agent does, such as the commands table above, is no inventory.
+table keyed by something the agent does or passes, such as the commands table above or the arguments
+of a workflow the skill tells the agent to call, is no inventory: the agent needs it on every load,
+at the call.
 
 When agents need to browse a list, generate the reference from the code with a script, and have CI
 fail when the reference drifts.
