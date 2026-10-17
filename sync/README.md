@@ -186,9 +186,29 @@ updates. A `postUpgradeTasks` step therefore runs `bun install` and commits `bun
 pull request. Renovate runs that command only when the admin's `allowedCommands` allows it. The free
 Mend-hosted app allows no such command, so on that app every catalog bump fails
 `bun install --frozen-lockfile`. The preset needs self-hosted Renovate with `allowedCommands` set to
-`["^bun install --ignore-scripts( --minimum-release-age=0)?$"]`. The step installs the newest Bun,
-not the version in `.bun-version`, as Renovate's own bun manager does. Remove the regex manager once
-the bun manager reads catalogs.
+`["^bun install --ignore-scripts( --minimum-release-age=0)?$"]`, which
+[Running Renovate](#running-renovate) sets. The step installs the newest Bun, not the version in
+`.bun-version`, as Renovate's own bun manager does. Remove the regex manager once the bun manager
+reads catalogs.
+
+### Running Renovate
+
+This repo's [`renovate.yml`](../.github/workflows/renovate.yml) runs self-hosted Renovate every two
+hours, and by hand with an optional dry run. Each run covers every repo where the Renovate GitHub
+App is installed. A repo opts in with its own `renovate.json`, and Renovate skips a repo without one
+and opens no onboarding pull request. The two-hour cadence puts a run inside the preset's Monday
+window, so the weekly groups open on schedule, and a new `@zgeoff/*` release reaches each repo
+within two hours.
+
+The job mints an installation token from the App, and Renovate commits as the App's bot user. The
+App needs the repository permissions in Renovate's
+[GitHub App guide](https://docs.renovatebot.com/modules/platform/github/#running-as-a-github-app),
+including Workflows write, so Renovate can bump the actions a workflow pins. tools has its own
+`renovate.json`, so with the App installed here Renovate also bumps the action and the Renovate
+version that `renovate.yml` pins. This repo holds the App's client ID, which starts with `Iv`, in
+the `RENOVATE_APP_ID` secret and its private key in `RENOVATE_APP_PRIVATE_KEY`. Renovate merges an
+auto-merge pull request itself on the first run after its checks pass; allowing auto-merge in a
+repo's settings lets GitHub merge it sooner.
 
 ### The audit-fix workflow
 
