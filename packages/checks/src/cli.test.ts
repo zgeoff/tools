@@ -267,3 +267,67 @@ test.each([['shellcheck'], ['shfmt']])(
     });
   },
 );
+
+test('it lists the whole repo and prints root paths when it runs from a subfolder', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, 'scripts'));
+  await writeFile(join(ctx.dir, 'top.sh'), '#!/usr/bin/env bash\necho $1\n');
+  await writeFile(join(ctx.dir, 'scripts/deep.sh'), '#!/usr/bin/env bash\necho $1\n');
+
+  await $`git add top.sh scripts/deep.sh`.cwd(ctx.dir).env(ctx.env);
+
+  const result = await $`${process.execPath} ${ctx.cli}`
+    .cwd(join(ctx.dir, 'scripts'))
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 1,
+    stdout: [
+      'scripts/deep.sh:2: shell: shellcheck note: Double quote to prevent globbing and word splitting. [SC2086]',
+      'top.sh:2: shell: shellcheck note: Double quote to prevent globbing and word splitting. [SC2086]',
+      '',
+    ].join('\n'),
+  });
+});
+
+test('it reads a file argument from the subfolder it runs in', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, 'scripts'));
+  await writeFile(join(ctx.dir, 'scripts/deep.sh'), '#!/usr/bin/env bash\necho $1\n');
+
+  await $`git add scripts/deep.sh`.cwd(ctx.dir).env(ctx.env);
+
+  const result = await $`${process.execPath} ${ctx.cli} deep.sh`
+    .cwd(join(ctx.dir, 'scripts'))
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect(result.stdout.toString()).toStartWith('scripts/deep.sh:2: shell: ');
+});
+
+test('it reads the root config when it runs from a subfolder', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, 'scripts'));
+  await writeFile(join(ctx.dir, 'scripts/deep.sh'), '#!/usr/bin/env bash\necho $1\n');
+
+  await writeFile(
+    join(ctx.dir, 'zgeoff-check.json'),
+    JSON.stringify({ off: [{ check: 'shell', reason: 'the scripts are vendored' }] }),
+  );
+
+  await $`git add scripts/deep.sh zgeoff-check.json`.cwd(ctx.dir).env(ctx.env);
+
+  const result = await $`${process.execPath} ${ctx.cli}`
+    .cwd(join(ctx.dir, 'scripts'))
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect(result.exitCode).toBe(0);
+});

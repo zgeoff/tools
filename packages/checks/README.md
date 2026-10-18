@@ -4,8 +4,10 @@
 script instead of a lint script of its own. Each check is a module with a name, a file glob, and a
 function that returns findings. The runner prints each finding as `path:line: <check>: <message>`
 and exits 1 when it prints any. With no arguments it checks every file that git tracks, and with a
-list of files it checks only those. It skips a listed file that does not exist, such as one the
-branch deletes, so a misspelled path checks nothing.
+list of files it checks only those. It runs from any folder in the repo: it reads the config at the
+repo root, prints each path from the root, and reads a file argument from the folder it runs in. It
+skips a listed file that does not exist, such as one the branch deletes, so a misspelled path checks
+nothing.
 
 ## Install
 
@@ -43,10 +45,11 @@ already has `shellcheck`.
 
 - `0`: no check found a problem.
 - `1`: a check found at least one problem.
-- `2`: the run failed before it could check. The config file breaks a rule, a check needs a program
-  that the PATH lacks, git or a check's program fails, a listed file cannot be read for a reason
-  other than being absent, or the command line holds an unknown option or `--help` with files. The
-  runner prints the reason.
+- `2`: the run could not finish, so the runner prints the reason and no findings, even when some
+  checks found problems before it stopped. That happens when the config file breaks a rule, a check
+  needs a program that the PATH lacks, git or a check's program fails, a listed file cannot be read
+  for a reason other than being absent, or the command line holds an unknown option or `--help` with
+  files.
 
 ## Turning a check off
 

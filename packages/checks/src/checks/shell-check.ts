@@ -1,5 +1,6 @@
 import { runProgram } from '../run-program.ts';
 import type { Check, CheckContext, Finding } from '../types.ts';
+import { parseShellcheckOutput } from './parse-shellcheck-output.ts';
 import { parseShfmtOutput } from './parse-shfmt-output.ts';
 
 // shellcheck and `shfmt -d` over every shell script. shfmt runs with no style flags, so it reads
@@ -32,32 +33,10 @@ function checkShellFiles(context: CheckContext): Finding[] {
   return findings;
 }
 
-// gcc format: `path:line:column: level: message [SC1234]`.
-const SHELLCHECK_LINE = /^(?<path>.+?):(?<line>\d+):\d+: (?<level>\w+): (?<message>.*)$/u;
-
 function runShellcheck(context: CheckContext, files: readonly string[]): Finding[] {
   const result = runProgram('shell', context, ['shellcheck', '--format=gcc', '--', ...files]);
 
-  // shellcheck exits 1 when it reports a problem, and above 1 when it cannot run.
-  if (result.exitCode > 1) {
-    throw new Error(`shell: shellcheck failed: ${result.stderr.trim()}`);
-  }
-
-  return result.stdout.split('\n').flatMap((line) => {
-    const groups = SHELLCHECK_LINE.exec(line)?.groups;
-
-    if (groups === undefined) {
-      return [];
-    }
-
-    return [
-      {
-        path: groups['path'] ?? '',
-        line: Number(groups['line']),
-        message: `shellcheck ${groups['level']}: ${groups['message']}`,
-      },
-    ];
-  });
+  return parseShellcheckOutput(result);
 }
 
 function runShfmt(context: CheckContext, files: readonly string[]): Finding[] {

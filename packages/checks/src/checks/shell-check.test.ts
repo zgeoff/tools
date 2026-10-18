@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { chmod, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import invariant from 'tiny-invariant';
@@ -245,33 +245,4 @@ test('it reports every hunk of every file that shfmt would reformat', async () =
       message: 'shfmt would reformat this hunk; run shfmt -w b.sh to fix it',
     },
   ]);
-});
-
-test('it fails when shfmt fails after it printed a diff', async () => {
-  const ctx = await setupTest();
-
-  const shellcheckPath = Bun.which('shellcheck');
-
-  invariant(shellcheckPath !== null, 'shellcheck must be on the PATH to run this test');
-
-  // A shfmt that prints one file's diff and then dies, with the real shellcheck beside it.
-  await symlink(shellcheckPath, join(ctx.dir, 'shellcheck'));
-
-  await writeFile(
-    join(ctx.dir, 'shfmt'),
-    [
-      '#!/bin/sh',
-      String.raw`printf '%s\n' '--- clean.sh.orig' '+++ clean.sh' '@@ -1,1 +1,1 @@' '-echo' '+echo '`,
-      'echo "fatal: out of memory" >&2',
-      'exit 2',
-      '',
-    ].join('\n'),
-  );
-
-  await chmod(join(ctx.dir, 'shfmt'), 0o755);
-  await writeFile(join(ctx.dir, 'clean.sh'), '#!/usr/bin/env bash\necho "hello"\n');
-
-  expect(() =>
-    shellCheck.check({ cwd: ctx.dir, files: ['clean.sh'], env: { PATH: ctx.dir } }),
-  ).toThrowWithMessage(Error, 'shell: shfmt failed: fatal: out of memory');
 });

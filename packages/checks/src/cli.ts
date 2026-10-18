@@ -1,14 +1,16 @@
 #!/usr/bin/env bun
+import { resolve } from 'node:path';
 import { allChecks } from './all-checks.ts';
 import { loadConfig } from './load-config.ts';
 import { parseCLIArgs } from './parse-cli-args.ts';
+import { resolveRepoRoot } from './resolve-repo-root.ts';
 import { runChecks } from './run-checks.ts';
 
-// Exit codes: 0 with no finding, 1 with any finding, 2 when the run itself fails.
 const USAGE = `usage: zgeoff-check [--] [file ...]
 
 Runs every check over the files that git tracks, or over the files given.
-Each finding prints as path:line: <check>: <message>.
+Each finding prints as path:line: <check>: <message>, with the path from the repo root.
+Exits 0 with no finding, 1 with any finding, and 2 when the run could not finish.
 Checks: ${allChecks.map((check) => check.name).join(', ')}`;
 
 const parsed = await parseCLIArgs(process.argv.slice(2));
@@ -26,19 +28,21 @@ if (parsed.help) {
 const files = parsed.files;
 
 try {
-  const cwd = process.cwd();
+  // A run from a subfolder reads the root config, lists the whole repo, and takes each file argument
+  // relative to the folder it runs in.
+  const root = resolveRepoRoot(process.cwd(), process.env);
 
   const config = loadConfig(
-    cwd,
+    root,
     allChecks.map((check) => check.name),
   );
 
   const findings = await runChecks({
-    cwd,
+    cwd: root,
     checks: allChecks,
     config,
     env: process.env,
-    ...(files.length === 0 ? {} : { files }),
+    ...(files.length === 0 ? {} : { files: files.map((file) => resolve(file)) }),
   });
 
   for (const finding of findings) {
