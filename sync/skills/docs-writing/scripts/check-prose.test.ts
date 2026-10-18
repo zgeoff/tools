@@ -94,6 +94,18 @@ test('it warns and passes on a 151-word paragraph', async () => {
   expect(result.stdout).toInclude('guide.md:3:151 words');
 });
 
+test('it warns and passes on a 250-word paragraph', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', `# Guide\n\n${buildWords(250)}\n`);
+
+  const result = ctx.run('guide.md');
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toInclude('guide.md:3:250 words');
+  expect(result.stdout).not.toInclude('Paragraphs over 250 words');
+});
+
 test('it passes a 150-word paragraph without a warning', async () => {
   const ctx = await setupTest();
 
@@ -221,4 +233,29 @@ test('it fetches the base branch in a pull-request run with no origin history', 
   expect(result.stdout).toInclude('new.md:1:260 words');
   expect(result.stdout).not.toInclude('old.md');
   expect(result.stderr).not.toInclude('no merge base');
+});
+
+test('it passes a long table without outer pipes', async () => {
+  const ctx = await setupTest();
+
+  const row = `${buildWords(150).replaceAll('\n', ' ')} | ${buildWords(150).replaceAll('\n', ' ')}`;
+
+  await ctx.writeText('guide.md', `Name | Description\n--- | ---\n${row}\n`);
+
+  const result = ctx.run('guide.md');
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).not.toInclude('Paragraphs over');
+});
+
+test('it skips an HTML comment across blank lines and counts the prose after it', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', `<!--\n\n${buildWords(300)}\n\n-->\n\n${buildWords(200)}\n`);
+
+  const result = ctx.run('guide.md');
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).not.toInclude('guide.md:3:');
+  expect(result.stdout).toInclude('guide.md:36:200 words');
 });

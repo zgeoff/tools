@@ -168,14 +168,31 @@ list_changed() {
   git -c core.quotePath=false ls-files --others --exclude-standard
 }
 
-# Prints file:line:words for each prose paragraph over the warning limit. A block is prose when its
-# first line is: headings, list items and their lines, tables, block quotes, HTML, link
-# definitions, fenced code, frontmatter and any block whose first line is indented (a list item's
-# later paragraph, or indented code) never count. A line that starts a list,
-# heading, table, quote, HTML or code block ends the prose paragraph above it.
+# Prints file:line:words for each prose paragraph over the warning limit. A paragraph is a run of
+# lines between blank lines. Headings, list items and their lines, tables (with or without outer
+# pipes), block quotes, HTML blocks, link definitions, fenced code, frontmatter and any block whose
+# first line is indented (a list item's later paragraph, or indented code) never count. A line that
+# starts a list, heading, table, quote, HTML or code block ends the prose paragraph above it. An HTML
+# comment, script, pre, style or textarea block runs to its closing marker across blank lines.
 paragraph_awk='
 function starts_other(line) {
   return line ~ /^[ \t]*(#+([ \t]|$)|[-*+]([ \t]|$)|[0-9]+[.)]([ \t]|$)|[|>]|<)/
+}
+function is_table_delimiter(line) {
+  return line ~ /\|/ && line ~ /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/
+}
+# Returns the marker that closes the HTML block this line opens, when the block spans blank lines.
+function html_close(line, tag, rest) {
+  if (match(line, /^[ \t]*<!--/)) {
+    rest = substr(line, RSTART + RLENGTH)
+    return index(rest, "-->") ? "" : "-->"
+  }
+  if (match(line, /^[ \t]*<(script|pre|style|textarea)/)) {
+    tag = substr(line, RSTART, RLENGTH)
+    sub(/^[ \t]*</, "", tag)
+    return index(tolower(line), "</" tag ">") ? "" : "</" tag ">"
+  }
+  return ""
 }
 function flush() {
   if (kind == "prose" && words > warn) print start_file":"start_line":"words
@@ -184,11 +201,16 @@ function flush() {
 }
 FNR == 1 {
   flush()
+  html_end = ""
   front = ($0 == "---")
   if (front) next
 }
 front {
   if ($0 == "---") front = 0
+  next
+}
+html_end != "" {
+  if (index(tolower($0), html_end)) html_end = ""
   next
 }
 {
@@ -205,11 +227,16 @@ front {
     flush()
     next
   }
+  if (kind == "prose" && is_table_delimiter($0)) {
+    kind = "other"
+    words = 0
+  }
   if (kind == "prose" && starts_other($0)) flush()
   if (kind == "") {
     kind = (starts_other($0) || $0 ~ /^[ \t]/ || $0 ~ /^\[.*\]:/) ? "other" : "prose"
     start_file = FILENAME
     start_line = FNR
+    html_end = html_close($0)
   }
   if (kind == "prose") words += NF
 }
