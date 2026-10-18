@@ -1436,6 +1436,94 @@ test('it resolves a workspace package’s name through that package’s exports'
   expect(result.stdout).not.toInclude('store-module');
 });
 
+test('it reads a workspace glob written with a leading ./', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { app: ['packages/app/**'], testing: ['packages/*/src/testing/**'] },
+        workspaces: ['./packages/*'],
+        edges: [{ name: 'no-testing', from: ['app'], to: ['testing'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'packages/store/package.json': JSON.stringify({
+      name: '@demo/store',
+      exports: { './testing': './src/testing/index.ts' },
+    }),
+    'packages/store/src/testing/index.ts': 'export const fake = 1;\n',
+    'packages/app/src/run.ts':
+      "import { fake } from '@demo/store/testing';\n\nexport const all = [fake];\n",
+  };
+
+  const result = await runLintTree(files, 'packages/app/src/run.ts', rules);
+
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout).toInclude(
+    'no-testing: app must not import packages/store/src/testing/index.ts (testing)',
+  );
+});
+
+test('it leaves a package below the workspace glob’s depth a module', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { app: ['packages/app/**'] },
+        workspaces: ['packages/*'],
+        modules: [{ name: 'store-module', modules: ['@demo/store'], allow: [] }],
+      },
+    ],
+  };
+
+  const files = {
+    'packages/group/store/package.json': JSON.stringify({
+      name: '@demo/store',
+      exports: { '.': './src/index.ts' },
+    }),
+    'packages/group/store/src/index.ts': 'export const store = 1;\n',
+    'packages/app/src/run.ts':
+      "import { store } from '@demo/store';\n\nexport const all = [store];\n",
+  };
+
+  const result = await runLintTree(files, 'packages/app/src/run.ts', rules);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('store-module: @demo/store is allowed only in no zone');
+});
+
+test('it resolves a # alias of the file’s own package without a self-import report', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { core: ['src/**'], tooling: ['scripts/**'] },
+        edges: [{ name: 'core-no-tooling', from: ['core'], to: ['tooling'] }],
+        selfImports: [{ name: 'self', from: ['core'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'package.json': JSON.stringify({
+      name: '@demo/store',
+      imports: { '#store': '@demo/store' },
+      exports: { '.': './scripts/run.ts' },
+    }),
+    'src/index.ts': "import { run } from '#store';\n\nrun();\n",
+    'scripts/run.ts': 'export function run(): void {}\n',
+  };
+
+  const result = await runLintTree(files, 'src/index.ts', rules);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('core-no-tooling: core must not import scripts/run.ts');
+  expect(result.stdout).not.toInclude('self:');
+});
+
 test('it resolves a # import that names a workspace package as that name would', async () => {
   const rules = {
     'zgeoff/import-zones': [
