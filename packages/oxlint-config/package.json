@@ -12,6 +12,7 @@
     "oxlintrc.json",
     "plugin.js",
     "function-verb.js",
+    "no-restricted-words.js",
     "max-consecutive-line-comments.js",
     "no-jsdoc.js",
     "no-comment-rule-override.js",
