@@ -101,10 +101,10 @@ that needs an exception changes this skill.
 
 A repo that runs the skill gate refuses an edit to a test file until the session that makes it has
 loaded the skills the path needs. A subagent loads them itself, because the main session's loads do
-not count for it. A compaction clears every load, so load the skills again after one. The gate sees
-only Edit, Write and MultiEdit: change a gated file with those tools, never with a Bash redirect,
-`tee`, `sed -i`, or a script. The gate does not check Bash, and that gap is accepted, not a way
-around the rule.
+not count for it. A compaction clears every load, so load the skills again after one. Change a gated
+file with Edit, Write or MultiEdit, never with a Bash redirect, `tee`, `sed -i`, or a script. The
+gate warns on the common Bash forms of those writes but lets them run, so a Bash write still breaks
+the rule.
 
 ## Languages and runners
 

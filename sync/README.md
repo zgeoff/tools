@@ -61,7 +61,9 @@ before its `except` removes that copy itself.
 Files under [`hooks/`](./hooks/) are Claude Code hooks, delivered as opt-in entries to
 `.claude/hooks/<name>/`. Their tests stay here. `hook-skill-gate` delivers the skill gate: a
 `PreToolUse` hook that denies an edit until the session has loaded every skill the path needs, and
-names the missing skills. The gate holds no rules. A repo opts in with three changes, which
+names the missing skills. It also warns when a Bash command writes a gated path through a redirect,
+`tee`, `sed -i`, `cp`, `mv` or an inline script. The warning names the skills to load and the edit
+tools, and the command still runs. The gate holds no rules. A repo opts in with three changes, which
 repo-sync never touches:
 
 1. Add `hook-skill-gate` to `include` in `.github/workflows/repo-sync.yml`.
@@ -87,7 +89,7 @@ repo-sync never touches:
      "hooks": {
        "PreToolUse": [
          {
-           "matcher": "Edit|Write|MultiEdit",
+           "matcher": "Edit|Write|MultiEdit|Bash",
            "hooks": [
              {
                "type": "command",
@@ -110,10 +112,11 @@ loads the skills itself, and the main session's loads never count for it. A comp
 `compact_boundary` entry, and the loads before it no longer count: after a compaction, the gate
 denies a gated edit until the session loads the skills again, and its denial says so.
 
-The gate sees Edit, Write and MultiEdit only. A Bash command that writes a gated path, such as a
-redirect, `tee`, `sed -i`, or a script, is not checked: a reliable check needs a full shell parser,
-and a partial one refuses ordinary commands. This gap is accepted. Change a gated path only with
-Edit, Write or MultiEdit; the denial says the same.
+The gate blocks only Edit, Write and MultiEdit. For Bash it reads the common forms of a shell write
+and warns, because a hook cannot parse every shell form: a deny built on a partial parser would
+block ordinary commands or let other writes through. A command the parser misses runs with no
+warning. Change a gated path only with Edit, Write or MultiEdit; the denial and the warning both say
+so.
 
 Files under [`pre-push/`](./pre-push/) are the pre-push baseline, delivered by the opt-in
 `pre-push-baseline` entry. The baseline runs its jobs one at a time, so a push fits a 2 GiB host or
