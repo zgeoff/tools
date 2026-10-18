@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.9](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.8...@zgeoff/oxlint-config@0.2.9) (2026-10-18)
+
+### Features
+
+- **geo-1284:** extend zgeoff/import-zones for nixie and impz
+  ([#184](https://github.com/zgeoff/tools/issues/184))
+  ([a6a08e2](https://github.com/zgeoff/tools/commit/a6a08e2a0da4ad050ab168653df348c6f7a4a17e))
+
 ## [0.2.8](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.7...@zgeoff/oxlint-config@0.2.8) (2026-10-18)
 
 ### Features
