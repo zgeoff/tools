@@ -43,6 +43,8 @@
       "error",
       { "min": 2, "exceptions": ["x", "y", "z", "$", "_"], "checkGeneric": false }
     ],
+    // oxlintrc.test.ts holds the same names with their full words, and fails
+    // when an entry changes here without it
     "zgeoff/no-abbreviated-names": [
       "error",
       {

@@ -25,14 +25,18 @@ const noAbbreviatedNames = {
     }
 
     const checkName = (node) => {
-      if (node?.type !== 'Identifier' || !names.has(node.name)) {
+      const isName = node?.type === 'Identifier' || node?.type === 'PrivateIdentifier';
+
+      if (!isName || !names.has(node.name)) {
         return;
       }
+
+      const prefix = node.type === 'PrivateIdentifier' ? '#' : '';
 
       context.report({
         node,
         messageId: 'abbreviated',
-        data: { name: node.name, replacement: names.get(node.name) },
+        data: { name: `${prefix}${node.name}`, replacement: names.get(node.name) },
       });
     };
 
@@ -90,9 +94,11 @@ const noAbbreviatedNames = {
       "TSMethodSignature[kind='set']": checkKey,
 
       // an import's local binding is a value name in this module, whatever the
-      // exporting module calls it
+      // exporting module calls it; a type-only import names a type, not a value
       'ImportSpecifier, ImportDefaultSpecifier, ImportNamespaceSpecifier'(node) {
-        checkName(node.local);
+        if (!isTypeOnlyImport(node)) {
+          checkName(node.local);
+        }
       },
       'AssignmentExpression > MemberExpression.left'(node) {
         if (!node.computed) {
@@ -102,6 +108,10 @@ const noAbbreviatedNames = {
     };
   },
 };
+
+function isTypeOnlyImport(specifier) {
+  return specifier.importKind === 'type' || specifier.parent.importKind === 'type';
+}
 
 // the names a binding pattern declares: a destructured key's alias, not the
 // key, since the key belongs to the object being read

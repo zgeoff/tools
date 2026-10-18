@@ -186,3 +186,38 @@ test.each([
 
   expect(stdout).not.toInclude('eslint(id-length)');
 });
+
+// each abbreviation the shipped config denies, with the full word its report
+// names; an entry added to or removed from the config without this list fails
+const abbreviations = {
+  mgr: 'manager',
+  dir: 'directory',
+  tmp: 'temporary',
+  proc: 'process',
+  src: 'source',
+  dest: 'destination',
+  prev: 'previous',
+  msg: 'message',
+  ms: 'timeoutMs',
+};
+
+interface ShippedConfig {
+  rules: { 'zgeoff/no-abbreviated-names': [string, { names: Record<string, string> }] };
+}
+
+test('it denies exactly the listed abbreviations', async () => {
+  const text = await Bun.file(configPath).text();
+
+  const config = Bun.JSONC.parse(text) as ShippedConfig;
+  const [, options] = config.rules['zgeoff/no-abbreviated-names'];
+
+  expect(Object.keys(options.names).toSorted()).toEqual(Object.keys(abbreviations).toSorted());
+});
+
+test.each(Object.entries(abbreviations))('it reports `%s` and names `%s`', async (name, word) => {
+  const ctx = await setupTest('names.ts', `export const ${name} = 1;\n`);
+  const stdout = await runLint(ctx.dir, 'names.ts');
+
+  expect(stdout).toInclude(`Rename \`${name}\` to`);
+  expect(stdout).toInclude(`\`${word}\``);
+});

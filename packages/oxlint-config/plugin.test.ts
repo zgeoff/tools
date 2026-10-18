@@ -798,6 +798,35 @@ test.each([
   expect(result.stdout).toInclude('Rename `src` to `source`');
 });
 
+test.each([
+  ['a private field', 'export class Paths {\n  #src = 1;\n}\n'],
+  ['a private getter', 'export class Paths {\n  get #src(): number {\n    return 1;\n  }\n}\n'],
+])('it reports an abbreviated name in %s', async (_place, source) => {
+  const result = await runLint(source, false, abbreviated);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('Rename `#src` to `source`');
+});
+
+test.each([
+  [
+    'a type-only import',
+    "import type { Paths as src } from './paths.ts';\n\nexport type Value = src;\n",
+  ],
+  [
+    'a type-only specifier',
+    "import { type Paths as src } from './paths.ts';\n\nexport type Value = src;\n",
+  ],
+  [
+    'a type-only default import',
+    "import type src from './paths.ts';\n\nexport type Value = src;\n",
+  ],
+])('it accepts an abbreviated name in %s', async (_place, source) => {
+  const result = await runLint(source, false, abbreviated);
+
+  expect(result.stdout).not.toInclude('no-abbreviated-names');
+});
+
 test('it accepts an abbreviation inside a longer name', async () => {
   const source = 'export const timeoutMs = 1;\nexport const srcPath = 2;\n';
 
