@@ -9,7 +9,17 @@ async function setupTest() {
   const dir = await mkdtemp(join(tmpdir(), 'check-skill-'));
 
   onTestFinished(() => rm(dir, { recursive: true, force: true }));
-  spawnSync('git', ['init', '-q'], { cwd: dir });
+
+  // A clean environment: a pre-push hook in a linked worktree exports GIT_DIR, which would point
+  // git init and the script's git calls at the real repository.
+  const env = {
+    PATH: process.env['PATH'],
+    HOME: dir,
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_CONFIG_NOSYSTEM: '1',
+  };
+
+  spawnSync('git', ['init', '-q'], { cwd: dir, env });
 
   const scriptPath = fileURLToPath(new URL('check-skill.sh', import.meta.url));
 
@@ -19,7 +29,7 @@ async function setupTest() {
   };
 
   const run = (...args: readonly string[]) =>
-    spawnSync('bash', [scriptPath, ...args], { cwd: dir, encoding: 'utf8' });
+    spawnSync('bash', [scriptPath, ...args], { cwd: dir, env, encoding: 'utf8' });
 
   return { writePage, run };
 }
