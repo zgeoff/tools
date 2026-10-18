@@ -3,9 +3,10 @@
 # lockfile, then runs each package script in `scripts` in order.
 #
 # `scripts` is a space-separated list of package.json script names. Empty means
-# the standard list: audit deadcode format:check lint check typecheck test. A
-# name the repo's package.json does not define fails the run before any script
-# runs, so a renamed script cannot drop a check without notice. The synced
+# the standard list: audit deadcode format:check lint check typecheck test,
+# where check runs only when the repo defines it. Any other name the repo's
+# package.json does not define fails the run before any script runs, so a
+# renamed script cannot drop a check without notice. The synced
 # caller passes the BUN_CHECK_SCRIPTS and NODE_VERSION repo variables, so a
 # repo changes the list or adds Node without editing the caller.
 name: Bun checks (reusable)
@@ -106,7 +107,15 @@ jobs:
           # A value of only whitespace parses to no names and gets the standard list too.
           read -ra list <<< "$SCRIPTS"
           if [ "${#list[@]}" -eq 0 ]; then
-            list=(audit deadcode format:check lint check typecheck test)
+            list=(audit deadcode format:check lint)
+            # The standard list runs check only when the repo defines it, so a
+            # repo turns the check on by adding the script.
+            if jq -e '.scripts.check' package.json > /dev/null; then
+              list+=(check)
+            else
+              echo '::notice::check skipped, because package.json has no check script; add "check": "zgeoff-check" to run it.'
+            fi
+            list+=(typecheck test)
           fi
           missing=""
           for name in "${list[@]}"; do

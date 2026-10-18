@@ -12,7 +12,8 @@ list of files it checks only those.
 bun add -d @zgeoff/checks
 ```
 
-Add the script that the pre-push baseline and the shared pull-request checks call:
+Add the script that the pre-push baseline and the shared pull-request checks call. Both skip the
+check with a notice while a repo lacks the script, so adding it turns the check on:
 
 ```json
 {

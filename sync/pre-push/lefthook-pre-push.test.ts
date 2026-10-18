@@ -87,6 +87,79 @@ test('it leaves the main checkout non-bare when the test job runs in a pre-push 
   expect(existsSync(join(ctx.worktree, 'sandbox/.git'))).toBeTrue();
 });
 
+test('it passes the push with a notice when the repo has no check script', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.worktree, 'fixture.sh'), 'echo $1\n');
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'echo fixture.sh',
+        'test:related': 'true',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m fixture`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  expect(result.exitCode).toBe(0);
+
+  expect(`${result.stdout.toString()}${result.stderr.toString()}`).toInclude(
+    'check: skipped, because package.json has no check script; add "check": "zgeoff-check" to run it',
+  );
+});
+
+test('it fails the push when the check script finds a problem', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.worktree, 'fixture.sh'), 'echo $1\n');
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        check: 'exit 1',
+        typecheck: 'true',
+        'files:branch': 'echo fixture.sh',
+        'test:related': 'true',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m fixture`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  expect(result.exitCode).not.toBe(0);
+});
+
 // Each suite that spawns git must stay safe without the baseline's env -u, so it runs here with
 // the GIT_DIR a pre-push hook in the worktree exports.
 test.each([

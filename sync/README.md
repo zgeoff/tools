@@ -123,8 +123,9 @@ Files under [`pre-push/`](./pre-push/) are the pre-push baseline, delivered by t
 a machine shared by parallel agents. It runs `format:check` and `typecheck` over the whole tree, and
 plain `oxlint`, the repo's `check` script and the sibling tests over the files the branch changes.
 The `check` script is `zgeoff-check` from [`@zgeoff/checks`](../packages/checks/README.md), which
-the repo installs itself. CI keeps every whole-tree check required. The entry delivers three files,
-and its tests stay here:
+the repo installs itself. A repo without the script gets a notice in place of the job until it adds
+one. CI keeps every whole-tree check required. The entry delivers three files, and its tests stay
+here:
 
 - `.lefthook/pre-push-baseline.yml` — the lefthook jobs.
 - `scripts/collect-branch-files.ts` — lists the files changed since the merge base with origin's
