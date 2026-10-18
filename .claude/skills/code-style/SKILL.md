@@ -49,6 +49,9 @@ docs-writing's `check-length.sh` runs it.
   — never helpers first. Supporting declarations (consts, interfaces, type aliases) sit directly
   above their first use, never below it and never leading the file; types for the primary export's
   signature may sit just above it.
+- Build objects with a factory function (`create<X>` or `make<X>`), never a class. The one exception
+  is a custom error, `class <X>Error extends Error`, since `instanceof` checks and stack traces need
+  it.
 
 ## Acronyms
 
