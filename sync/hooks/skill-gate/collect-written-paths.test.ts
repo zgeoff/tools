@@ -36,7 +36,7 @@ test.each([
   [`ruby -e "File.write('src/a.ts', 'x')"`, [{ path: 'src/a.ts' }]],
   [`python3 -c "n = 7 // 2; open('src/a.ts', 'w').write(str(n))"`, [{ path: 'src/a.ts' }]],
   [
-    `node -e "const tag = '#x'; require('fs').writeFileSync('src/a.ts', tag)"`,
+    `node -e "class Draft { #body = 'x'; }; require('fs').writeFileSync('src/a.ts', 'x')"`,
     [{ path: 'src/a.ts' }],
   ],
   ["/usr/bin/sed -i 's/a/b/' /srv/app/a.ts", [{ path: '/srv/app/a.ts' }]],
