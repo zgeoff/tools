@@ -2,10 +2,11 @@
 
 ## [0.2.10](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.9...@zgeoff/oxlint-config@0.2.10) (2026-10-18)
 
-
 ### Features
 
-* **geo-1277:** lint short and abbreviated value names in oxlint-config ([#193](https://github.com/zgeoff/tools/issues/193)) ([5f83011](https://github.com/zgeoff/tools/commit/5f83011754f2c1613a9738fc4273bca4cc0f7d39))
+- **geo-1277:** lint short and abbreviated value names in oxlint-config
+  ([#193](https://github.com/zgeoff/tools/issues/193))
+  ([5f83011](https://github.com/zgeoff/tools/commit/5f83011754f2c1613a9738fc4273bca4cc0f7d39))
 
 ## [0.2.9](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.8...@zgeoff/oxlint-config@0.2.9) (2026-10-18)
 
