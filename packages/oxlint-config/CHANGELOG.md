@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.7](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.6...@zgeoff/oxlint-config@0.2.7) (2026-10-18)
+
+### Features
+
+- **oxlint-config:** ban file snapshots with zgeoff/no-file-snapshot
+  ([#176](https://github.com/zgeoff/tools/issues/176))
+  ([eae5e4f](https://github.com/zgeoff/tools/commit/eae5e4f101232c0fe4e9ea4654330e9c6d5bdffa))
+
 ## [0.2.6](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.5...@zgeoff/oxlint-config@0.2.6) (2026-10-17)
 
 ### Bug Fixes
