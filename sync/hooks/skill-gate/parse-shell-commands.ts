@@ -12,6 +12,7 @@ export function parseShellCommands(text: string): readonly ShellCommand[] | null
 type ShellToken =
   | { readonly kind: 'word'; readonly word: ShellWord }
   | { readonly kind: 'separator' }
+  | { readonly kind: 'subshell'; readonly opens: boolean }
   | { readonly kind: 'redirect'; readonly operator: string }
   | { readonly kind: 'heredoc'; readonly body: string };
 
@@ -75,11 +76,7 @@ function splitShellTokens(text: string): ShellToken[] | null {
         index += operator.length;
         heredocOperator = operator === '<<' || operator === '<<-' ? operator : null;
 
-        const token: ShellToken = SEPARATORS.has(operator)
-          ? { kind: 'separator' }
-          : { kind: 'redirect', operator };
-
-        tokens.push(token);
+        tokens.push(buildOperatorToken(operator));
       }
     }
   }
@@ -134,7 +131,15 @@ const OPERATORS = [
   ')',
 ];
 
-const SEPARATORS = new Set(['&&', '||', '|&', ';;', '|', '&', ';', '(', ')']);
+const SEPARATORS = new Set(['&&', '||', '|&', ';;', '|', '&', ';']);
+
+function buildOperatorToken(operator: string): ShellToken {
+  if (operator === '(' || operator === ')') {
+    return { kind: 'subshell', opens: operator === '(' };
+  }
+
+  return SEPARATORS.has(operator) ? { kind: 'separator' } : { kind: 'redirect', operator };
+}
 
 function findOperator(text: string, index: number): string | null {
   return OPERATORS.find((operator) => text.startsWith(operator, index)) ?? null;
@@ -301,39 +306,66 @@ function isRedirectStart(char: string): boolean {
   return char === '<' || char === '>';
 }
 
+// A subshell's opening counts toward the next command's `enters`, and its closing toward the last
+// command's `leaves`, so a caller can restore the state a subshell changed, such as its directory.
 function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellCommand[] {
   const commands: ShellCommand[] = [];
   let words: ShellWord[] = [];
   let redirects: ShellRedirect[] = [];
   let stdin: string | null = null;
   let operator: string | null = null;
+  let enters = 0;
+
+  const collectPendingCommand = (): void => {
+    if (words.length > 0 || redirects.length > 0) {
+      commands.push({ words, redirects, stdin, enters, leaves: 0 });
+
+      enters = 0;
+    }
+
+    words = [];
+    redirects = [];
+    stdin = null;
+    operator = null;
+  };
 
   for (const token of tokens) {
     if (token.kind === 'separator') {
-      if (words.length > 0 || redirects.length > 0) {
-        commands.push({ words, redirects, stdin });
-      }
+      collectPendingCommand();
+    } else if (token.kind === 'subshell') {
+      collectPendingCommand();
 
-      words = [];
-      redirects = [];
-      stdin = null;
-      operator = null;
+      const last = commands.at(-1);
+
+      if (token.opens) {
+        enters += 1;
+      } else if (last !== undefined) {
+        commands[commands.length - 1] = { ...last, leaves: last.leaves + 1 };
+      }
     } else if (token.kind === 'heredoc') {
       stdin = token.body;
     } else if (token.kind === 'redirect') {
       operator = token.operator;
-    } else if (operator === null) {
-      words.push(token.word);
-    } else {
-      redirects.push({ operator, target: token.word });
+    } else if (token.kind === 'word') {
+      if (operator === null) {
+        words.push(token.word);
+      } else {
+        redirects.push({ operator, target: token.word });
 
-      operator = null;
+        operator = null;
+      }
+    } else {
+      assertNever(token);
     }
   }
 
-  if (words.length > 0 || redirects.length > 0) {
-    commands.push({ words, redirects, stdin });
-  }
+  collectPendingCommand();
 
   return commands;
+}
+
+// The synced hook runs without npm dependencies, so a `never` check stands in for ts-pattern's
+// exhaustive match: a new token kind fails the type check here.
+function assertNever(token: never): never {
+  throw new Error(`skill-gate: unknown shell token ${JSON.stringify(token)}`);
 }

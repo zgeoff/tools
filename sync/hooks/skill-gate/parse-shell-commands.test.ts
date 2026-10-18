@@ -10,8 +10,10 @@ test('it splits a command line into simple commands at each separator', () => {
       ],
       redirects: [],
       stdin: null,
+      enters: 0,
+      leaves: 0,
     },
-    { words: [{ text: 'ls', literal: true }], redirects: [], stdin: null },
+    { words: [{ text: 'ls', literal: true }], redirects: [], stdin: null, enters: 0, leaves: 0 },
     {
       words: [
         { text: 'head', literal: true },
@@ -20,8 +22,10 @@ test('it splits a command line into simple commands at each separator', () => {
       ],
       redirects: [],
       stdin: null,
+      enters: 0,
+      leaves: 0,
     },
-    { words: [{ text: 'pwd', literal: true }], redirects: [], stdin: null },
+    { words: [{ text: 'pwd', literal: true }], redirects: [], stdin: null, enters: 0, leaves: 0 },
   ]);
 });
 
@@ -36,6 +40,8 @@ test('it removes quotes and escapes from a word', () => {
       ],
       redirects: [],
       stdin: null,
+      enters: 0,
+      leaves: 0,
     },
   ]);
 });
@@ -53,6 +59,8 @@ test('it marks a word with a parameter, a substitution or a glob as not literal'
       ],
       redirects: [],
       stdin: null,
+      enters: 0,
+      leaves: 0,
     },
   ]);
 });
@@ -70,6 +78,8 @@ test('it attaches each redirect to its command and drops the file descriptor num
         { operator: '>&', target: { text: '1', literal: true } },
       ],
       stdin: null,
+      enters: 0,
+      leaves: 0,
     },
   ]);
 });
@@ -83,14 +93,33 @@ test('it takes a here document as the stdin of its command and skips its body', 
         { operator: '>', target: { text: 'a.txt', literal: true } },
       ],
       stdin: '\tx > b.txt\n',
+      enters: 0,
+      leaves: 0,
     },
-    { words: [{ text: 'pwd', literal: true }], redirects: [], stdin: null },
+    { words: [{ text: 'pwd', literal: true }], redirects: [], stdin: null, enters: 0, leaves: 0 },
+  ]);
+});
+
+test('it counts the subshells that open before a command and close after it', () => {
+  expect(parseShellCommands('(cd /srv && (pwd)); ls')).toStrictEqual([
+    {
+      words: [
+        { text: 'cd', literal: true },
+        { text: '/srv', literal: true },
+      ],
+      redirects: [],
+      stdin: null,
+      enters: 1,
+      leaves: 0,
+    },
+    { words: [{ text: 'pwd', literal: true }], redirects: [], stdin: null, enters: 1, leaves: 2 },
+    { words: [{ text: 'ls', literal: true }], redirects: [], stdin: null, enters: 0, leaves: 0 },
   ]);
 });
 
 test('it skips a comment to the end of its line', () => {
   expect(parseShellCommands('# echo x > a.txt\npwd')).toStrictEqual([
-    { words: [{ text: 'pwd', literal: true }], redirects: [], stdin: null },
+    { words: [{ text: 'pwd', literal: true }], redirects: [], stdin: null, enters: 0, leaves: 0 },
   ]);
 });
 

@@ -35,6 +35,8 @@ test.each([
   [`bun -e "await Bun.write('src/a.ts', 'x')"`, [{ path: 'src/a.ts' }]],
   [`ruby -e "File.write('src/a.ts', 'x')"`, [{ path: 'src/a.ts' }]],
   ["/usr/bin/sed -i 's/a/b/' /srv/app/a.ts", [{ path: '/srv/app/a.ts' }]],
+  ['(cd /srv); echo x > src/a.ts', [{ path: 'src/a.ts' }]],
+  ['(cd docs; (cd ..); echo x > a.md); echo x > b.md', [{ path: 'docs/a.md' }, { path: 'b.md' }]],
 ])('it finds the paths that %j writes', (command, expected) => {
   expect(collectWrittenPaths(command)).toStrictEqual(expected);
 });
@@ -53,6 +55,8 @@ test.each([
   ['cd "$DIR" && sed -i \'s/a/b/\' a.ts'],
   ["echo 'unclosed > src/a.ts"],
   ['# echo x > src/a.ts'],
+  [`python3 - <<'EOF'\nprint("open('src/a.ts', 'w')")\nEOF`],
+  [`node -e "// writeFileSync('src/a.ts', 'x')"`],
 ])('it finds no written path in %j', (command) => {
   expect(collectWrittenPaths(command)).toStrictEqual([]);
 });

@@ -675,3 +675,64 @@ test('it lets a Bash write to a gated path go ahead in a repo without a rules fi
   expect(result.status).toBe(0);
   expect(result.stdout).toBe('');
 });
+
+test('it lets a Bash write to a gated path go ahead when the rules file is not JSON', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, '.claude'), { recursive: true });
+  await writeFile(join(ctx.dir, '.claude/skill-gate.json'), '{ "gates": [');
+
+  const result = spawnSync('bun', [ctx.hookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.dir },
+    input: JSON.stringify({
+      cwd: ctx.dir,
+      transcript_path: join(ctx.dir, 'transcript.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command: "sed -i 's/oldName/newName/' src/a.test.ts" },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});
+
+test('it denies a Bash command that writes paths under two gates and names every skill', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, '.claude/skills/testing'), { recursive: true });
+  await mkdir(join(ctx.dir, '.claude/skills/docs-writing'), { recursive: true });
+  await writeFile(join(ctx.dir, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+  await writeFile(join(ctx.dir, '.claude/skills/docs-writing/SKILL.md'), '# Docs writing\n');
+
+  await writeFile(
+    join(ctx.dir, '.claude/skill-gate.json'),
+    JSON.stringify({
+      gates: [
+        { match: '**/*.test.ts', skills: ['testing'] },
+        { match: '**/*.md', skills: ['docs-writing'] },
+      ],
+    }),
+  );
+
+  const result = spawnSync('bun', [ctx.hookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.dir },
+    input: JSON.stringify({
+      cwd: ctx.dir,
+      transcript_path: join(ctx.dir, 'transcript.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command: "printf 'draft' | tee src/a.test.ts README.md" },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: `${join(ctx.dir, 'src/a.test.ts')}, ${join(ctx.dir, 'README.md')} are gated paths, so change them with the Edit, Write or MultiEdit tool, never through Bash. Load the \`testing\` and \`docs-writing\` skills with the Skill tool first. .claude/skill-gate.json lists the skills each path needs.`,
+    },
+  });
+});

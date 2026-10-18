@@ -44,10 +44,14 @@ export interface ShellRedirect {
   readonly target: ShellWord;
 }
 
+// `enters` counts the subshells that open just before the command, and `leaves` the ones that
+// close just after it.
 export interface ShellCommand {
   readonly words: readonly ShellWord[];
   readonly redirects: readonly ShellRedirect[];
   readonly stdin: string | null;
+  readonly enters: number;
+  readonly leaves: number;
 }
 
 // A path a Bash command writes, relative to the command's working directory unless absolute. With

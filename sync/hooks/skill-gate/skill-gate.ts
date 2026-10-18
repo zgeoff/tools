@@ -114,7 +114,7 @@ function isOutsideProject(fromProject: string): boolean {
 // in silence. A broken rules file lets every command through, since the next edit reports it.
 async function checkBashCommand(hookInput: HookInput, command: string): Promise<void> {
   const written = collectWrittenPaths(command).map((entry) =>
-    resolveWrittenPath(hookInput.cwd, entry),
+    readWrittenPath(hookInput.cwd, entry),
   );
 
   const candidates = [...new Set(written)].filter(
@@ -166,7 +166,7 @@ async function checkBashCommand(hookInput: HookInput, command: string): Promise<
 }
 
 // A `cp` or `mv` onto an existing directory writes the source's file name inside it.
-function resolveWrittenPath(cwd: string, written: WrittenPath): string {
+function readWrittenPath(cwd: string, written: WrittenPath): string {
   const absolute = path.resolve(cwd, written.path);
 
   if (written.fileName === undefined) {

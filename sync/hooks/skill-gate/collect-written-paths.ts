@@ -14,12 +14,21 @@ export function collectWrittenPaths(command: string): readonly WrittenPath[] {
 function collectTextPaths(text: string, dir: string | null): WrittenPath[] {
   const commands = parseShellCommands(text) ?? [];
   const paths: WrittenPath[] = [];
+  const parentDirs: (string | null)[] = [];
   let current = dir;
 
   for (const command of commands) {
+    const enteredFrom = current;
+
+    parentDirs.push(...Array.from({ length: command.enters }, () => enteredFrom));
     paths.push(...collectCommandPaths(command, current));
 
     current = resolveNextDir(command, current);
+
+    // Leaving a subshell drops its `cd`, so the parent's directory comes back.
+    for (let left = 0; left < command.leaves && parentDirs.length > 0; left += 1) {
+      current = parentDirs.pop() ?? null;
+    }
   }
 
   return paths;
@@ -345,13 +354,64 @@ const SCRIPT_WRITE_PATTERNS = [
 ];
 
 function collectScriptPaths(script: string, dir: string | null): WrittenPath[] {
+  const textRanges = collectScriptTextRanges(script);
+
   return SCRIPT_WRITE_PATTERNS.flatMap((pattern) =>
     [...script.matchAll(pattern)].flatMap((match) => {
       const written = match.groups?.['path'] ?? '';
 
-      return /[$*?{]/u.test(written) ? [] : resolveWordPath({ text: written, literal: true }, dir);
+      const isText = textRanges.some(
+        (range) => match.index > range.start && match.index < range.end,
+      );
+
+      return isText || /[$*?{]/u.test(written)
+        ? []
+        : resolveWordPath({ text: written, literal: true }, dir);
     }),
   );
+}
+
+// Collects the spans of a script's string literals and `#` or `//` comments, so a write call that
+// only appears in text, such as `print("open('a.ts', 'w')")`, is not read as code.
+function collectScriptTextRanges(
+  script: string,
+): readonly { readonly start: number; readonly end: number }[] {
+  const ranges: { start: number; end: number }[] = [];
+  let index = 0;
+
+  while (index < script.length) {
+    const char = script.charAt(index);
+
+    if (char === '#' || script.startsWith('//', index)) {
+      const newline = script.indexOf('\n', index);
+      const end = newline === -1 ? script.length : newline;
+
+      ranges.push({ start: index, end });
+
+      index = end;
+    } else if (char === "'" || char === '"' || char === '`') {
+      const end = findQuoteEnd(script, index);
+
+      ranges.push({ start: index, end });
+
+      index = end;
+    } else {
+      index += 1;
+    }
+  }
+
+  return ranges;
+}
+
+function findQuoteEnd(script: string, start: number): number {
+  const quote = script.charAt(start);
+  let index = start + 1;
+
+  while (index < script.length && script.charAt(index) !== quote) {
+    index += script.charAt(index) === '\\' ? 2 : 1;
+  }
+
+  return Math.min(index + 1, script.length);
 }
 
 function resolveNextDir(command: ShellCommand, dir: string | null): string | null {
