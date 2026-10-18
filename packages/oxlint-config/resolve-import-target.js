@@ -43,9 +43,14 @@ function resolveManifestTarget(manifest, specifier, settings) {
     isPackageSpecifier(candidate.name, specifier),
   );
 
-  return workspace === undefined
-    ? { kind: 'module', specifier }
-    : resolveExportTarget(workspace, specifier, conditions);
+  if (workspace === undefined) {
+    return { kind: 'module', specifier };
+  }
+
+  // a workspace export names a source file, which must exist
+  const target = resolveExportTarget(workspace, specifier, conditions);
+
+  return target.kind === 'file' && !isFile(target.path) ? { kind: 'missing' } : target;
 }
 
 function isPackageSpecifier(name, specifier) {
