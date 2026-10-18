@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
@@ -85,3 +85,32 @@ test('it leaves the main checkout non-bare when the test job runs in a pre-push 
   expect(bare).toBe('false\n');
   expect(existsSync(join(ctx.worktree, 'sandbox/.git'))).toBeTrue();
 });
+
+// Each suite that spawns git must stay safe without the baseline's env -u, so it runs here with
+// the GIT_DIR a pre-push hook in the worktree exports.
+test.each([
+  ['packages/oxfmt-config/index.test.ts'],
+  ['sync/skills/docs-writing/scripts/check-length.test.ts'],
+  ['sync/skills/docs-writing/scripts/check-links.test.ts'],
+  ['sync/skills/skill-writing/scripts/check-skill.test.ts'],
+])(
+  'it leaves the main checkout config and branch unchanged when %s inherits a worktree GIT_DIR',
+  async (suite) => {
+    const ctx = await setupTest();
+    const config = await readFile(join(ctx.main, '.git/config'), 'utf8');
+    const head = await $`git rev-parse feature`.cwd(ctx.main).env(ctx.env).text();
+
+    await $`bun test ./${suite}`
+      .cwd(join(import.meta.dir, '../..'))
+      .env({ ...ctx.env, GIT_DIR: join(ctx.main, '.git/worktrees/worktree') })
+      .quiet()
+      .nothrow();
+
+    const configAfter = await readFile(join(ctx.main, '.git/config'), 'utf8');
+    const headAfter = await $`git rev-parse feature`.cwd(ctx.main).env(ctx.env).text();
+
+    expect(configAfter).toBe(config);
+    expect(headAfter).toBe(head);
+  },
+  30_000,
+);
