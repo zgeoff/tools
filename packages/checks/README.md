@@ -32,12 +32,14 @@ The package runs on Bun.
 
 ## Checks
 
-| Check   | Files     | It runs                     | It needs on the PATH  |
-| ------- | --------- | --------------------------- | --------------------- |
-| `shell` | `**/*.sh` | `shellcheck` and `shfmt -d` | `shellcheck`, `shfmt` |
+| Check   | Files     | It runs                        | It needs on the PATH  |
+| ------- | --------- | ------------------------------ | --------------------- |
+| `shell` | `**/*.sh` | `shellcheck -x` and `shfmt -d` | `shellcheck`, `shfmt` |
 
 The `shell` check runs `shfmt` with no style flags, so `shfmt` reads its style from the repo's
 `.editorconfig`. The `shfmt` finding sits at the first line of each block that `shfmt` would change.
+`shellcheck` follows each `source` line into the file it names, and looks for that file beside the
+script and then from the repo root. A sourced file is followed even when the run does not list it.
 The shared pull-request checks install `shfmt` when their list runs `check`, and the runner image
 already has `shellcheck`.
 

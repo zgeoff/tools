@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import invariant from 'tiny-invariant';
@@ -170,6 +170,44 @@ test.each([
     });
 
     expect(findings).toStrictEqual([{ path: 'z-last.sh', line, message }]);
+  },
+);
+
+test.each([
+  ['the repo root', 'lib/greeting.sh', 'lib/greeting.sh'],
+  ['the script folder', './greeting.sh', 'tools/greeting.sh'],
+])(
+  'it follows a source relative to %s into a file in another batch',
+  async (_label, sourcePath, sourcedFile) => {
+    const ctx = await setupTest();
+
+    // tools/main.sh leads the first batch of 200, and the file it sources comes after every clean
+    // file, so the two never share a batch.
+    const clean = Array.from(
+      { length: 200 },
+      (_, index) => `clean-${String(index).padStart(3, '0')}.sh`,
+    );
+
+    await Promise.all(
+      clean.map((file) => writeFile(join(ctx.dir, file), '#!/usr/bin/env bash\necho "hello"\n')),
+    );
+
+    await Promise.all([mkdir(join(ctx.dir, 'lib')), mkdir(join(ctx.dir, 'tools'))]);
+
+    await writeFile(join(ctx.dir, sourcedFile), '#!/usr/bin/env bash\nexport greeting="hello"\n');
+
+    await writeFile(
+      join(ctx.dir, 'tools/main.sh'),
+      `#!/usr/bin/env bash\nsource ${sourcePath}\necho "$greeting"\n`,
+    );
+
+    const findings = await shellCheck.check({
+      cwd: ctx.dir,
+      files: ['tools/main.sh', ...clean, sourcedFile],
+      env: process.env,
+    });
+
+    expect(findings).toStrictEqual([]);
   },
 );
 

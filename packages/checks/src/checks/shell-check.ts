@@ -33,8 +33,19 @@ function checkShellFiles(context: CheckContext): Finding[] {
   return findings;
 }
 
+// --external-sources lets shellcheck read a sourced file from disk, so a source whose target sits
+// in another batch, or in no batch, still resolves. It looks beside the script, then in the repo
+// root.
 function runShellcheck(context: CheckContext, files: readonly string[]): Finding[] {
-  const result = runProgram('shell', context, ['shellcheck', '--format=gcc', '--', ...files]);
+  const result = runProgram('shell', context, [
+    'shellcheck',
+    '--format=gcc',
+    '--external-sources',
+    '--source-path=SCRIPTDIR',
+    `--source-path=${context.cwd}`,
+    '--',
+    ...files,
+  ]);
 
   return parseShellcheckOutput(result);
 }
