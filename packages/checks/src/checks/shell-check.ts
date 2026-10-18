@@ -10,6 +10,7 @@ export const shellCheck: Check = {
 };
 
 // Each program gets the files in batches, so a large repo stays under the argument-length limit.
+// Every batch runs both programs, so a file past the first batch gets the same checks.
 const BATCH_SIZE = 200;
 
 function checkShellFiles(context: CheckContext): Finding[] {

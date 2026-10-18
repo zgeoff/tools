@@ -133,3 +133,42 @@ test.each([
     `shell: ${missing} is not on the PATH, and the shell check needs it. Install ${missing}, then run zgeoff-check again.`,
   );
 });
+
+test.each([
+  [
+    'a shellcheck problem',
+    '#!/usr/bin/env bash\necho $1\n',
+    2,
+    'shellcheck note: Double quote to prevent globbing and word splitting. [SC2086]',
+  ],
+  [
+    'a shfmt reformat',
+    '#!/usr/bin/env bash\nif true;then echo "yes";fi\n',
+    2,
+    'shfmt would reformat this hunk; run shfmt -w z-last.sh to fix it',
+  ],
+])(
+  'it reports %s in the file after the first batch of 200',
+  async (_label, script, line, message) => {
+    const ctx = await setupTest();
+
+    const clean = Array.from(
+      { length: 200 },
+      (_, index) => `clean-${String(index).padStart(3, '0')}.sh`,
+    );
+
+    await Promise.all(
+      clean.map((file) => writeFile(join(ctx.dir, file), '#!/usr/bin/env bash\necho "hello"\n')),
+    );
+
+    await writeFile(join(ctx.dir, 'z-last.sh'), script);
+
+    const findings = await shellCheck.check({
+      cwd: ctx.dir,
+      files: [...clean, 'z-last.sh'],
+      env: process.env,
+    });
+
+    expect(findings).toStrictEqual([{ path: 'z-last.sh', line, message }]);
+  },
+);

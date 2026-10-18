@@ -12,7 +12,7 @@ async function setupTest() {
   return { dir };
 }
 
-test('it returns the run script of the named step', async () => {
+test('it returns the id, env and run script of the named step', async () => {
   const ctx = await setupTest();
 
   await writeFile(
@@ -23,6 +23,10 @@ test('it returns the run script of the named step', async () => {
       '    steps:',
       '      - uses: actions/checkout@v4',
       '      - name: Greet',
+      '        id: greet',
+      '        env:',
+      `          NAME: \${{ steps.who.outputs.name }}`,
+      '          COUNT: 2',
       '        run: |',
       '          echo "hello"',
       '          echo "bye"',
@@ -30,9 +34,33 @@ test('it returns the run script of the named step', async () => {
     ].join('\n'),
   );
 
-  const run = await readWorkflowStep(join(ctx.dir, 'ci.yml'), 'build', 'Greet');
+  const step = await readWorkflowStep(join(ctx.dir, 'ci.yml'), 'build', 'Greet');
 
-  expect(run).toBe('echo "hello"\necho "bye"\n');
+  expect(step).toStrictEqual({
+    id: 'greet',
+    env: { NAME: `\${{ steps.who.outputs.name }}`, COUNT: '2' },
+    run: 'echo "hello"\necho "bye"\n',
+  });
+});
+
+test('it returns no id and an empty env for a step without them', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.dir, 'ci.yml'),
+    [
+      'jobs:',
+      '  build:',
+      '    steps:',
+      '      - name: Greet',
+      '        run: echo "hello"',
+      '',
+    ].join('\n'),
+  );
+
+  const step = await readWorkflowStep(join(ctx.dir, 'ci.yml'), 'build', 'Greet');
+
+  expect(step).toStrictEqual({ id: null, env: {}, run: 'echo "hello"' });
 });
 
 test('it rejects a step name the job lacks', async () => {

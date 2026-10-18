@@ -25,7 +25,7 @@ export interface CheckFinding extends Finding {
 export async function runChecks(options: Readonly<RunChecksOptions>): Promise<CheckFinding[]> {
   const files = (options.files ?? runGitLsFiles(options))
     .map((file) => toRepoPath(options.cwd, file))
-    .filter((file) => hasFile(options.cwd, file));
+    .filter((file) => checkPathExists(options.cwd, file));
 
   const findings: CheckFinding[] = [];
 
@@ -81,7 +81,7 @@ function runGitLsFiles(options: Readonly<RunChecksOptions>): string[] {
 // A listed path that no longer exists, such as a file the branch deletes, is skipped. Any other
 // error, such as a folder the runner cannot enter, throws, so the run never passes over a file it
 // could not read.
-function hasFile(cwd: string, file: string): boolean {
+function checkPathExists(cwd: string, file: string): boolean {
   try {
     statSync(resolve(cwd, file));
   } catch (error) {
