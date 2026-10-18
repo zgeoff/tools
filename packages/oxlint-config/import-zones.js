@@ -127,7 +127,11 @@ function isRestrictedModule(entry, specifier) {
 
 // `node:*` names every builtin, which a specifier may write without the prefix
 function isPrefixMatch(prefix, specifier) {
-  return specifier.startsWith(prefix) || (prefix === 'node:' && isBuiltin(specifier));
+  if (specifier.startsWith(prefix)) {
+    return true;
+  }
+
+  return prefix === 'node:' && isBuiltin(specifier);
 }
 
 function toModuleName(specifier) {
