@@ -449,7 +449,7 @@ test('it reads the project root from the payload cwd when CLAUDE_PROJECT_DIR is 
   });
 });
 
-test('it stays silent on a payload without a file path', async () => {
+test('it stays silent on a Bash command that writes no file', async () => {
   const ctx = await setupTest();
 
   await mkdir(join(ctx.dir, '.claude'), { recursive: true });
@@ -462,7 +462,12 @@ test('it stays silent on a payload without a file path', async () => {
   const result = spawnSync('bun', [ctx.hookPath], {
     encoding: 'utf8',
     env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.dir },
-    input: JSON.stringify({ cwd: ctx.dir, tool_input: { command: 'ls' } }),
+    input: JSON.stringify({
+      cwd: ctx.dir,
+      transcript_path: join(ctx.dir, 'transcript.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command: 'ls' },
+    }),
   });
 
   expect(result.status).toBe(0);
