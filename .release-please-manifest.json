@@ -8,5 +8,6 @@
   "packages/bun-test-react": "0.2.1",
   "packages/release-manifest": "0.1.0",
   "packages/std": "0.1.0",
-  "packages/kysely-bun-sqlite": "0.1.0"
+  "packages/kysely-bun-sqlite": "0.1.0",
+  "packages/checks": "0.1.0"
 }
