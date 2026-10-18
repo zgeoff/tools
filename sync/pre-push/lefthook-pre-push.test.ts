@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
@@ -34,31 +34,46 @@ async function setupTest() {
   await $`git init --quiet --initial-branch=main ${main}`.cwd(dir).env(env);
   await $`git commit --quiet --allow-empty -m start`.cwd(main).env(env);
   await $`git remote add origin ${join(dir, 'upstream.git')}`.cwd(main).env(env);
+  await $`git push --quiet -u origin main`.cwd(main).env(env);
   await $`git worktree add --quiet -b feature ${worktree}`.cwd(main).env(env);
 
-  return { dir, env, main, worktree };
+  return {
+    env,
+    main,
+    worktree,
+    baseline: join(import.meta.dir, 'lefthook-pre-push.yml'),
+    lefthook: join(import.meta.dir, '../../node_modules/.bin/lefthook'),
+  };
 }
 
 test('it leaves the main checkout non-bare when the test job runs in a pre-push from a worktree', async () => {
   const ctx = await setupTest();
-  const source = await readFile(join(import.meta.dir, 'lefthook-pre-push.yml'), 'utf8');
 
-  const baseline = Bun.YAML.parse(source) as {
-    'pre-push': { jobs: { name: string; run: string }[] };
-  };
+  // lefthook runs the real baseline over a branch that changes one file. The other jobs pass, and
+  // the related tests stand in as a test that runs a plain git init in a fresh folder with the
+  // environment the hook gives it; the trailing true swallows the file name.
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.worktree, 'fixture.ts'), 'export {};\n');
 
-  const testJob = baseline['pre-push'].jobs.find((job) => job.name === 'test');
-
-  // The related tests stand in as one that runs a plain git init in a fresh folder, with the
-  // environment the hook gives it, as a test that spawns git without a clean environment does.
   await writeFile(
     join(ctx.worktree, 'package.json'),
-    JSON.stringify({ scripts: { 'test:related': 'git init --quiet' } }),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'echo fixture.ts',
+        'test:related': 'git init --quiet sandbox && true',
+      },
+    }),
   );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m fixture`.cwd(ctx.worktree).env(ctx.env);
 
   await writeFile(
     join(ctx.main, '.git/hooks/pre-push'),
-    `#!/bin/sh\n${testJob?.run.replace('{files}', join(ctx.dir, 'fixture'))}\n`,
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
   );
 
   await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
@@ -68,5 +83,5 @@ test('it leaves the main checkout non-bare when the test job runs in a pre-push 
   const bare = await $`git config --get core.bare`.cwd(ctx.main).env(ctx.env).text();
 
   expect(bare).toBe('false\n');
-  expect(existsSync(join(ctx.dir, 'fixture/.git'))).toBeTrue();
+  expect(existsSync(join(ctx.worktree, 'sandbox/.git'))).toBeTrue();
 });
