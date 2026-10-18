@@ -909,6 +909,10 @@ test.each([
     'a computed member that reads a variable',
     'export const paths = { path: 1 };\n\npaths[src] = 2;\n',
   ],
+  [
+    'a destructured key in a member assignment',
+    "export const paths = { path: 1 };\n\n({ src: paths.path } = JSON.parse('{}'));\n",
+  ],
   ['a quoted module name', "declare module 'src' {\n  export const root: number;\n}\n"],
   ['a type alias', 'export type src = string;\n'],
   ['a type parameter', 'export type Paths<src> = src[];\n'],
