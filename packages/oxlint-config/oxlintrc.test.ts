@@ -159,7 +159,7 @@ test.each([
   ],
   [
     'a destructured shorthand',
-    'const input = { s: 1 };\nconst { s } = input;\n\nexport const value = s;\n',
+    'const input = Object.fromEntries([["s", 1]]);\nconst { s } = input;\n\nexport const value = s;\n',
   ],
   ['an array element', 'const [s] = [1];\n\nexport const value = s;\n'],
   ['an object key', 'export const value = { s: 1 };\n'],
