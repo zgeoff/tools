@@ -748,6 +748,33 @@ test.each([
   ['an object key', 'export const paths = { src: 1 };\n'],
   ['a class property', 'export class Paths {\n  src = 1;\n}\n'],
   ['an interface property', 'export interface Paths {\n  src: string;\n}\n'],
+  ['an accessor property', 'export class Paths {\n  accessor src = 1;\n}\n'],
+  ['an abstract property', 'export abstract class Paths {\n  abstract src: string;\n}\n'],
+  [
+    'an abstract accessor property',
+    'export abstract class Paths {\n  abstract accessor src: string;\n}\n',
+  ],
+  ['a parameter property', 'export class Reader {\n  constructor(public src: string) {}\n}\n'],
+  ['a function type parameter', 'export type Reader = (src: string) => string;\n'],
+  ['a constructor type parameter', 'export type MakeReader = new (src: string) => object;\n'],
+  [
+    'a method signature parameter',
+    'export interface Reader {\n  readPath(src: string): string;\n}\n',
+  ],
+  ['a call signature parameter', 'export interface Reader {\n  (src: string): string;\n}\n'],
+  [
+    'a construct signature parameter',
+    'export interface MakeReader {\n  new (src: string): object;\n}\n',
+  ],
+  ['a declared function parameter', 'export declare function readPath(src: string): string;\n'],
+  [
+    'an abstract method parameter',
+    'export abstract class Reader {\n  abstract readPath(src: string): string;\n}\n',
+  ],
+  [
+    'an overload parameter',
+    'export class Reader {\n  readPath(src: string): string;\n  readPath(path: string): string {\n    return path;\n  }\n}\n',
+  ],
   ['a member assignment', 'export const paths = { path: 1 };\n\npaths.src = 2;\n'],
 ])('it reports an abbreviated name in %s', async (_place, source) => {
   const result = await runLint(source, false, abbreviated);

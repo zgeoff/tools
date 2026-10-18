@@ -61,12 +61,23 @@ const noAbbreviatedNames = {
       FunctionDeclaration: checkParams,
       FunctionExpression: checkParams,
       ArrowFunctionExpression: checkParams,
+
+      // a signature without a body names its parameters as an implementation does
+      TSDeclareFunction: checkParams,
+      TSEmptyBodyFunctionExpression: checkParams,
+      TSFunctionType: checkParams,
+      TSConstructorType: checkParams,
+      TSMethodSignature: checkParams,
+      TSCallSignatureDeclaration: checkParams,
+      TSConstructSignatureDeclaration: checkParams,
       CatchClause(node) {
         checkPattern(node.param);
       },
       'ObjectExpression > Property': checkKey,
       PropertyDefinition: checkKey,
       AccessorProperty: checkKey,
+      TSAbstractPropertyDefinition: checkKey,
+      TSAbstractAccessorProperty: checkKey,
       TSPropertySignature: checkKey,
       'AssignmentExpression > MemberExpression.left'(node) {
         if (!node.computed) {

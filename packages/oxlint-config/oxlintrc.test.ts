@@ -142,3 +142,12 @@ test.each(['x', 'y', 'z', '$', '_', 'ctx', 'id', 'db', 'timeoutMs'])(
     expect(stdout).not.toInclude('zgeoff(no-abbreviated-names)');
   },
 );
+
+test('it accepts a one-letter type parameter', async () => {
+  const source = 'export function buildValue<T>(value: T): T {\n  return value;\n}\n';
+
+  const ctx = await setupTest('names.ts', source);
+  const stdout = await runLint(ctx.dir, 'names.ts');
+
+  expect(stdout).not.toInclude('eslint(id-length)');
+});
