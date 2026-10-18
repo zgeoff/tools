@@ -861,6 +861,7 @@ test('it judges re-exports, dynamic imports, require calls and import types', as
     "export * from '../../scripts/run';",
     "await import('../../scripts/run');",
     'require(`../../scripts/run`);',
+    "import.meta.require('../../scripts/run');",
     "export type Run = import('../../scripts/run').Run;",
     '',
   ].join('\n');
@@ -875,7 +876,26 @@ test('it judges re-exports, dynamic imports, require calls and import types', as
   const reports = result.stdout.match(/core-no-tooling: /gu) ?? [];
 
   expect(result.exitCode).toBe(1);
-  expect(reports).toHaveLength(5);
+  expect(reports).toHaveLength(6);
+});
+
+test('it flags a computed import.meta.require call and import.meta.require used as a value', async () => {
+  const files = {
+    'src/state/load.ts': [
+      "const name = process.argv[2] ?? 'run';",
+      'import.meta.require(name);',
+      'const load = import.meta.require;',
+      'load(name);',
+      '',
+    ].join('\n'),
+  };
+
+  const result = await runLintTree(files, 'src/state/load.ts', layered);
+
+  const reports = result.stdout.match(/unresolved: cannot check a computed import specifier/gu);
+
+  expect(result.exitCode).toBe(1);
+  expect(reports).toHaveLength(2);
 });
 
 test('it flags a restricted module outside its zones', async () => {

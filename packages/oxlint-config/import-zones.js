@@ -235,6 +235,18 @@ function isTypeOnlyExport(node) {
   );
 }
 
+function isImportMetaRequire(node) {
+  return (
+    node.type === 'MemberExpression' &&
+    !node.computed &&
+    node.object.type === 'MetaProperty' &&
+    node.object.meta.name === 'import' &&
+    node.object.property.name === 'meta' &&
+    node.property.type === 'Identifier' &&
+    node.property.name === 'require'
+  );
+}
+
 const importZones = {
   meta: {
     type: 'problem',
@@ -284,8 +296,19 @@ const importZones = {
       CallExpression(node) {
         checkGlobalCall(file, node);
 
-        if (node.callee.type === 'Identifier' && node.callee.name === 'require') {
+        if (
+          (node.callee.type === 'Identifier' && node.callee.name === 'require') ||
+          isImportMetaRequire(node.callee)
+        ) {
           checkImport(file, { node, source: node.arguments[0], typeOnly: false });
+        }
+      },
+
+      // Bun's import.meta.require used as a value, such as `const load =
+      // import.meta.require`, loads modules no specifier names
+      MemberExpression(node) {
+        if (isImportMetaRequire(node) && node.parent?.callee !== node) {
+          emitUnresolved(file, node, { messageId: 'computed', data: {} });
         }
       },
     };
