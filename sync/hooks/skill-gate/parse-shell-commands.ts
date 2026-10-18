@@ -317,8 +317,8 @@ interface CommandDraft {
 }
 
 // A subshell's opening counts toward the next command's `enters`, and its closing toward the last
-// command's `leaves`. A pipe side or a background command runs in its own subshell too, so a caller
-// can restore the state such a command changed, such as its directory.
+// command's `leaves`. A pipe side and a list sent to the background run in their own subshell too,
+// so a caller can restore the state they changed, such as the directory.
 function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellCommand[] {
   const commands: CommandDraft[] = [];
   const heredocOwners: CommandDraft[] = [];
@@ -326,14 +326,16 @@ function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellComman
   let operator: string | null = null;
   let pipedIn = false;
 
-  // Closes the draft at a separator. A command on either side of a pipe, or one sent to the
-  // background with `&`, enters and leaves one more subshell.
+  // The index of the first command in the current list, one entry for each open subshell.
+  const listStarts = [0];
+
+  // Closes the draft at a separator. A command on either side of a pipe enters and leaves one more
+  // subshell, and so does the whole list before `&`, such as `cd docs && make &`.
   const collectDraft = (separator: string | null): void => {
     const pipedOut = separator === '|' || separator === '|&';
-    const backgrounded = separator === '&';
 
     if (draft.words.length > 0 || draft.redirects.length > 0) {
-      const piped = pipedIn || pipedOut || backgrounded;
+      const piped = pipedIn || pipedOut;
 
       draft.enters += piped ? 1 : 0;
       draft.leaves += piped ? 1 : 0;
@@ -345,6 +347,19 @@ function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellComman
 
     operator = null;
     pipedIn = pipedOut;
+
+    const listStart = listStarts.at(-1) ?? 0;
+    const first = commands[listStart];
+    const last = commands.at(-1);
+
+    if (separator === '&' && first !== undefined && last !== undefined) {
+      first.enters += 1;
+      last.leaves += 1;
+    }
+
+    if (separator !== null && LIST_ENDS.has(separator)) {
+      listStarts[listStarts.length - 1] = commands.length;
+    }
   };
 
   for (const token of tokens) {
@@ -357,8 +372,14 @@ function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellComman
 
       if (token.opens) {
         draft.enters += 1;
-      } else if (last !== undefined) {
-        last.leaves += 1;
+
+        listStarts.push(commands.length);
+      } else {
+        listStarts.pop();
+
+        if (last !== undefined) {
+          last.leaves += 1;
+        }
       }
     } else if (token.kind === 'heredoc') {
       // A here document's body belongs to the command whose `<<` asked for it, which a pipe may
@@ -391,6 +412,8 @@ function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellComman
 
   return commands;
 }
+
+const LIST_ENDS = new Set(['&', ';', ';;', '\n']);
 
 function buildCommandDraft(): CommandDraft {
   return { words: [], redirects: [], stdin: null, enters: 0, leaves: 0 };

@@ -43,6 +43,8 @@ test.each([
   ['(cd /srv); echo x > src/a.ts', [{ path: 'src/a.ts' }]],
   ['cd /srv | cat; echo x > src/a.ts', [{ path: 'src/a.ts' }]],
   ['cd /srv & echo x > src/a.ts', [{ path: 'src/a.ts' }]],
+  ['cd docs && cd .. & echo x > README.md', [{ path: 'README.md' }]],
+  ['(cd docs; cd /srv) & echo x > README.md', [{ path: 'README.md' }]],
   [`node -e "/* a note */ require('fs').writeFileSync('src/a.ts', 'x')"`, [{ path: 'src/a.ts' }]],
   ["sudo -n sed -i 's/a/b/' src/a.ts", [{ path: 'src/a.ts' }]],
   ["python3 - <<'EOF' | cat\nopen('src/a.ts', 'w').write('x')\nEOF", [{ path: 'src/a.ts' }]],
