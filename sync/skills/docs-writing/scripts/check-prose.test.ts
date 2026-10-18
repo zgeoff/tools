@@ -259,3 +259,40 @@ test('it skips an HTML comment across blank lines and counts the prose after it'
   expect(result.stdout).not.toInclude('guide.md:3:');
   expect(result.stdout).toInclude('guide.md:36:200 words');
 });
+
+test('it warns on a paragraph that starts with an inline tag or an autolink', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText(
+    'guide.md',
+    `<https://example.com> ${buildWords(250)}\n\n<em>Read this</em> ${buildWords(249)}\n`,
+  );
+
+  const result = ctx.run('guide.md');
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('guide.md:1:251 words');
+  expect(result.stdout).toInclude('guide.md:27:251 words');
+});
+
+test('it skips a block tag written in upper case across blank lines', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', `<PRE>\n\n${buildWords(300)}\n\n</PRE>\n`);
+
+  const result = ctx.run('guide.md');
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).not.toInclude('Paragraphs over');
+});
+
+test('it counts a paragraph that follows a heading with no blank line', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', `# Guide\n${buildWords(251)}\n`);
+
+  const result = ctx.run('guide.md');
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('guide.md:2:251 words');
+});

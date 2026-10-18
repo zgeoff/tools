@@ -175,22 +175,35 @@ list_changed() {
 # starts a list, heading, table, quote, HTML or code block ends the prose paragraph above it. An HTML
 # comment, script, pre, style or textarea block runs to its closing marker across blank lines.
 paragraph_awk='
+function is_heading(line) {
+  return line ~ /^[ \t]*#+([ \t]|$)/
+}
+# Block-level HTML, as CommonMark starts an HTML block: a comment, a declaration, or a block tag
+# such as div, pre or table, in any case. An inline tag or an autolink starts a prose paragraph.
+function starts_html(line) {
+  return tolower(line) ~ /^[ \t]*<(!|\?|\/?(script|pre|style|textarea|address|article|aside|blockquote|body|caption|center|col|colgroup|dd|details|dialog|div|dl|dt|fieldset|figcaption|figure|footer|form|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|nav|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)([ \t>]|\/>|$))/
+}
+# A line that holds one tag and nothing else starts an HTML block too, but never ends a paragraph.
+function is_lone_tag(line) {
+  return line ~ /^[ \t]*<\/?[A-Za-z][A-Za-z0-9-]*([ \t][^<>]*)?\/?>[ \t]*$/
+}
 function starts_other(line) {
-  return line ~ /^[ \t]*(#+([ \t]|$)|[-*+]([ \t]|$)|[0-9]+[.)]([ \t]|$)|[|>]|<)/
+  return line ~ /^[ \t]*([-*+]([ \t]|$)|[0-9]+[.)]([ \t]|$)|[|>])/ || starts_html(line)
 }
 function is_table_delimiter(line) {
   return line ~ /\|/ && line ~ /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/
 }
 # Returns the marker that closes the HTML block this line opens, when the block spans blank lines.
-function html_close(line, tag, rest) {
-  if (match(line, /^[ \t]*<!--/)) {
-    rest = substr(line, RSTART + RLENGTH)
+function html_close(line, lower, tag, rest) {
+  lower = tolower(line)
+  if (match(lower, /^[ \t]*<!--/)) {
+    rest = substr(lower, RSTART + RLENGTH)
     return index(rest, "-->") ? "" : "-->"
   }
-  if (match(line, /^[ \t]*<(script|pre|style|textarea)/)) {
-    tag = substr(line, RSTART, RLENGTH)
+  if (match(lower, /^[ \t]*<(script|pre|style|textarea)/)) {
+    tag = substr(lower, RSTART, RLENGTH)
     sub(/^[ \t]*</, "", tag)
-    return index(tolower(line), "</" tag ">") ? "" : "</" tag ">"
+    return index(lower, "</" tag ">") ? "" : "</" tag ">"
   }
   return ""
 }
@@ -231,9 +244,14 @@ html_end != "" {
     kind = "other"
     words = 0
   }
+  # A heading is one line, so the line after it starts a new block.
+  if (is_heading($0)) {
+    flush()
+    next
+  }
   if (kind == "prose" && starts_other($0)) flush()
   if (kind == "") {
-    kind = (starts_other($0) || $0 ~ /^[ \t]/ || $0 ~ /^\[.*\]:/) ? "other" : "prose"
+    kind = (starts_other($0) || is_lone_tag($0) || $0 ~ /^[ \t]/ || $0 ~ /^\[.*\]:/) ? "other" : "prose"
     start_file = FILENAME
     start_line = FNR
     html_end = html_close($0)
