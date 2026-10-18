@@ -43,8 +43,8 @@ The schema is draft 2020-12 and uses no `format` keyword, so any validator for t
 same result. With Ajv:
 
 ```ts
-import { Ajv2020 } from 'ajv/dist/2020.js';
 import schema from '@zgeoff/release-manifest' with { type: 'json' };
+import { Ajv2020 } from 'ajv/dist/2020.js';
 
 const validate = new Ajv2020({ allErrors: true }).compile(schema);
 

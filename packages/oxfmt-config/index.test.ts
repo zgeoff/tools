@@ -88,6 +88,10 @@ test('it leaves the files repo-sync delivers unformatted', async () => {
   await writeFile(join(project.dir, 'AGENTS.md'), '*  generated   list item\n');
   await writeFile(join(project.dir, 'agents/shared.md'), '*  shared   list item\n');
 
+  // oxfmt applies the nearest repo's .gitignore, and this repo's ignores the project folder, so the
+  // project needs its own repo for `.` to reach any file.
+  Bun.spawnSync(['git', 'init', '--quiet'], { cwd: project.dir });
+
   const result = Bun.spawnSync([project.oxfmt, '-c', 'oxfmt.config.ts', '.'], { cwd: project.dir });
 
   expect(result.exitCode).toBe(0);
