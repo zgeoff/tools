@@ -25,7 +25,8 @@
     "access": "public"
   },
   "scripts": {
-    "build": "rm -rf dist && bun build src/cli.ts --outdir dist --target bun",
+    "build": "rm -rf dist && bun run build:outdir dist",
+    "build:outdir": "bun build src/cli.ts --target bun --outdir",
     "prepare": "bun run build",
     "typecheck": "tsc"
   },

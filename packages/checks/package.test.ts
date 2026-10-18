@@ -5,13 +5,15 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 
-// The package built, packed, and installed from its tarball into a fresh git repo. A clean git
-// environment keeps a hook's GIT_DIR out, and the real HOME keeps bun install on the shared cache.
+// The package packed and installed from its tarball into a fresh git repo. Every build and pack
+// writes under the test's own folder, never the shared dist, so overlapping runs cannot race.
 async function setupTest() {
   const dir = await mkdtemp(join(tmpdir(), 'checks-package-'));
 
   onTestFinished(() => rm(dir, { recursive: true, force: true }));
 
+  // A clean git environment keeps a hook's GIT_DIR out, and the real HOME keeps bun install on the
+  // shared cache.
   const env = {
     PATH: process.env['PATH'],
     HOME: process.env['HOME'],
@@ -19,25 +21,41 @@ async function setupTest() {
     GIT_CONFIG_NOSYSTEM: '1',
   };
 
+  const unpacked = join(dir, 'unpacked');
+  const packed = join(dir, 'packed');
   const project = join(dir, 'project');
 
-  await mkdir(project);
+  await Promise.all([mkdir(unpacked), mkdir(packed), mkdir(project)]);
 
-  await $`bun run build`
-    .cwd(import.meta.dir)
-    .env(env)
-    .quiet();
-
-  await $`bun pm pack --destination ${dir}`
+  // The source pack runs no build; it gives the published manifest, with catalog versions resolved.
+  await $`bun pm pack --ignore-scripts --destination ${dir}`
     .cwd(import.meta.dir)
     .env(env)
     .quiet();
 
   const entries = await readdir(dir);
 
-  const tarball = entries.find((name) => name.endsWith('.tgz'));
+  const manifest = entries.find((name) => name.endsWith('.tgz'));
 
-  invariant(tarball !== undefined, 'bun pm pack wrote no tarball');
+  invariant(manifest !== undefined, 'bun pm pack wrote no tarball');
+
+  await $`tar -xzf ${join(dir, manifest)} -C ${unpacked}`.env(env).quiet();
+
+  await rm(join(unpacked, 'package/dist'), { recursive: true, force: true });
+
+  await $`bun run build:outdir ${join(unpacked, 'package/dist')}`
+    .cwd(import.meta.dir)
+    .env(env)
+    .quiet();
+
+  await $`bun pm pack --ignore-scripts --destination ${packed}`
+    .cwd(join(unpacked, 'package'))
+    .env(env)
+    .quiet();
+
+  const [tarball, ...extra] = await readdir(packed);
+
+  invariant(tarball !== undefined && extra.length === 0, 'bun pm pack must write one tarball');
 
   await writeFile(
     join(project, 'package.json'),
@@ -45,7 +63,7 @@ async function setupTest() {
       name: 'project',
       private: true,
       scripts: { check: 'zgeoff-check' },
-      devDependencies: { '@zgeoff/checks': `file:${join(dir, tarball)}` },
+      devDependencies: { '@zgeoff/checks': `file:${join(packed, tarball)}` },
     }),
   );
 
