@@ -201,17 +201,20 @@ const abbreviations = {
   ms: 'timeoutMs',
 };
 
-interface ShippedConfig {
-  rules: { 'zgeoff/no-abbreviated-names': [string, { names: Record<string, string> }] };
-}
-
 test('it denies exactly the listed abbreviations', async () => {
   const text = await Bun.file(configPath).text();
 
-  const config = Bun.JSONC.parse(text) as ShippedConfig;
-  const [, options] = config.rules['zgeoff/no-abbreviated-names'];
+  const config: unknown = Bun.JSONC.parse(text);
 
-  expect(Object.keys(options.names).toSorted()).toEqual(Object.keys(abbreviations).toSorted());
+  const entries = Object.entries(abbreviations).map(([name, word]) => [
+    name,
+    expect.stringContaining(`\`${word}\``),
+  ]);
+
+  expect(config).toHaveProperty(
+    ['rules', 'zgeoff/no-abbreviated-names', 1, 'names'],
+    Object.fromEntries(entries),
+  );
 });
 
 test.each(Object.entries(abbreviations))('it reports `%s` and names `%s`', async (name, word) => {
