@@ -6,8 +6,8 @@
       "packages/*"
     ],
     "catalog": {
-      "@commitlint/cli": "21.2.0",
-      "@happy-dom/global-registrator": "20.14.5",
+      "@commitlint/cli": "21.2.3",
+      "@happy-dom/global-registrator": "20.14.6",
       "@stylistic/eslint-plugin": "5.10.0",
       "@testing-library/jest-dom": "7.0.1",
       "@testing-library/react": "16.3.3",
@@ -17,18 +17,18 @@
       "@types/react-dom": "19.3.0",
       "ajv": "8.20.0",
       "gunshi": "1.0.0-rc.1",
-      "happy-dom": "20.14.5",
+      "happy-dom": "20.14.6",
       "jest-extended": "7.0.0",
       "jest-matcher-utils": "30.5.2",
       "kysely": "0.29.6",
       "lefthook": "2.1.9",
       "oxfmt": "0.56.0",
       "oxlint": "1.87.0",
-      "oxlint-tsgolint": "7.0.2003",
+      "oxlint-tsgolint": "7.0.2004",
       "react": "19.3.0",
       "react-dom": "19.3.0",
       "tiny-invariant": "1.3.3",
-      "typescript": "7.0.1-rc",
+      "typescript": "7.0.2",
       "zustand": "5.0.15"
     }
   },
