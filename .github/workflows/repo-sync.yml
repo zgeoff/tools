@@ -58,7 +58,7 @@ jobs:
       entries: ${{ steps.manifest.outputs.entries }}
     steps:
       - name: Check out the manifest
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: zgeoff/tools
           ref: ${{ inputs.tools-ref || job.workflow_sha }}
@@ -126,12 +126,12 @@ jobs:
           permission-workflows: ${{ matrix.entry.workflows && 'write' || '' }}
 
       - name: Check out the caller
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           token: ${{ steps.app-token.outputs.token }}
 
       - name: Check out zgeoff/tools
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: zgeoff/tools
           ref: ${{ inputs.tools-ref || job.workflow_sha }}

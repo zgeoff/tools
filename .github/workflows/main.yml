@@ -18,7 +18,7 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: .bun-version
@@ -85,7 +85,7 @@ jobs:
       # deterministic while separate-pull-requests is off.
       - name: Check out release PR
         if: steps.release.outputs.prs_created == 'true'
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: release-please--branches--main
           token: ${{ steps.app-token.outputs.token || github.token }}
@@ -110,7 +110,7 @@ jobs:
       # sync steps were skipped, so take the script from this run's commit.
       - name: Check out the merge script
         if: github.event_name == 'push' && steps.app-token.outputs.token != ''
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: .merge-release-prs
           sparse-checkout: scripts/merge-release-prs.sh
@@ -171,7 +171,7 @@ jobs:
           gh workflow run main.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f republish_paths="$PATHS_RELEASED"
       - name: Check out merged release
         if: steps.release-commit.outputs.here == 'true' || inputs.republish_paths != ''
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up bun for publish
         if: steps.release-commit.outputs.here == 'true' || inputs.republish_paths != ''
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
