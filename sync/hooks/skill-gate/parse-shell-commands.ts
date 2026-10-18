@@ -38,7 +38,7 @@ function splitShellTokens(text: string): ShellToken[] | null {
       index += 1;
 
       for (const heredoc of heredocs.splice(0)) {
-        const end = findHeredocEnd(text, index, heredoc);
+        const end = getHeredocEndOrTextEnd(text, index, heredoc);
 
         tokens.push({ kind: 'heredoc', body: text.slice(index, end.bodyEnd) });
 
@@ -84,7 +84,7 @@ function splitShellTokens(text: string): ShellToken[] | null {
   return tokens;
 }
 
-function findHeredocEnd(
+function getHeredocEndOrTextEnd(
   text: string,
   start: number,
   heredoc: PendingHeredoc,
@@ -317,8 +317,8 @@ interface CommandDraft {
 }
 
 // A subshell's opening counts toward the next command's `enters`, and its closing toward the last
-// command's `leaves`. Each side of a pipe runs in its own subshell too, so a caller can restore the
-// state such a command changed, such as its directory.
+// command's `leaves`. A pipe side or a background command runs in its own subshell too, so a caller
+// can restore the state such a command changed, such as its directory.
 function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellCommand[] {
   const commands: CommandDraft[] = [];
   const heredocOwners: CommandDraft[] = [];
@@ -326,13 +326,14 @@ function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellComman
   let operator: string | null = null;
   let pipedIn = false;
 
-  // Closes the draft at a separator. A command on either side of a pipe enters and leaves one more
-  // subshell.
+  // Closes the draft at a separator. A command on either side of a pipe, or one sent to the
+  // background with `&`, enters and leaves one more subshell.
   const collectDraft = (separator: string | null): void => {
     const pipedOut = separator === '|' || separator === '|&';
+    const backgrounded = separator === '&';
 
     if (draft.words.length > 0 || draft.redirects.length > 0) {
-      const piped = pipedIn || pipedOut;
+      const piped = pipedIn || pipedOut || backgrounded;
 
       draft.enters += piped ? 1 : 0;
       draft.leaves += piped ? 1 : 0;

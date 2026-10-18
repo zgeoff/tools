@@ -2,10 +2,10 @@ import { statSync } from 'node:fs';
 import path from 'node:path';
 import { buildBashSkillGateOutput } from './build-bash-skill-gate-output.ts';
 import { buildSkillGateOutput } from './build-skill-gate-output.ts';
-import { collectGateSkills } from './collect-gate-skills.ts';
 import { collectLoadedSkills } from './collect-loaded-skills.ts';
 import { collectWrittenPaths } from './collect-written-paths.ts';
 import { parseSkillGateRules } from './parse-skill-gate-rules.ts';
+import { planBashSkillGate } from './plan-bash-skill-gate.ts';
 import { planSkillGate } from './plan-skill-gate.ts';
 import type { WrittenPath } from './types.ts';
 
@@ -133,31 +133,20 @@ async function checkBashCommand(hookInput: HookInput, command: string): Promise<
     process.exit(0);
   }
 
-  const gatedPaths = candidates.filter(
-    (entry) => collectGateSkills(parsedRules.rules, toProjectPath(entry)).length > 0,
-  );
-
-  if (gatedPaths.length === 0) {
-    process.exit(0);
-  }
-
   const skills = await collectAvailableSkills(path.join(projectDir, '.claude', 'skills'));
   const sessionTranscript = await readTranscript(resolveSessionTranscriptPath(hookInput));
 
   const sessionLoads = collectLoadedSkills(sessionTranscript);
 
-  const missing = gatedPaths.flatMap(
-    (entry) =>
-      planSkillGate({
-        rules: parsedRules.rules,
-        relativePath: toProjectPath(entry),
-        loadedSkills: sessionLoads.skills,
-        availableSkills: skills,
-      }).missing,
-  );
+  const bashPlan = planBashSkillGate({
+    rules: parsedRules.rules,
+    paths: candidates.map((entry) => ({ path: entry, relativePath: toProjectPath(entry) })),
+    loadedSkills: sessionLoads.skills,
+    availableSkills: skills,
+  });
 
   printOutput(
-    buildBashSkillGateOutput(gatedPaths, [...new Set(missing)], {
+    buildBashSkillGateOutput(bashPlan.gatedPaths, bashPlan.missing, {
       compacted: sessionLoads.compacted,
     }),
   );

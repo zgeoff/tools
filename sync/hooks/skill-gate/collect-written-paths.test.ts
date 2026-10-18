@@ -42,6 +42,8 @@ test.each([
   ["/usr/bin/sed -i 's/a/b/' /srv/app/a.ts", [{ path: '/srv/app/a.ts' }]],
   ['(cd /srv); echo x > src/a.ts', [{ path: 'src/a.ts' }]],
   ['cd /srv | cat; echo x > src/a.ts', [{ path: 'src/a.ts' }]],
+  ['cd /srv & echo x > src/a.ts', [{ path: 'src/a.ts' }]],
+  [`node -e "/* a note */ require('fs').writeFileSync('src/a.ts', 'x')"`, [{ path: 'src/a.ts' }]],
   ["sudo -n sed -i 's/a/b/' src/a.ts", [{ path: 'src/a.ts' }]],
   ["python3 - <<'EOF' | cat\nopen('src/a.ts', 'w').write('x')\nEOF", [{ path: 'src/a.ts' }]],
   ['(cd docs; (cd ..); echo x > a.md); echo x > b.md', [{ path: 'docs/a.md' }, { path: 'b.md' }]],
@@ -65,6 +67,7 @@ test.each([
   ['# echo x > src/a.ts'],
   [`python3 - <<'EOF'\nprint("open('src/a.ts', 'w')")\nEOF`],
   [`node -e "// writeFileSync('src/a.ts', 'x')"`],
+  [`node -e "/* writeFileSync('src/a.ts', 'x') */ console.log('ok')"`],
 ])('it finds no written path in %j', (command) => {
   expect(collectWrittenPaths(command)).toStrictEqual([]);
 });

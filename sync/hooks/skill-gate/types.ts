@@ -29,6 +29,24 @@ export interface SkillGateInput {
   readonly availableSkills: readonly string[];
 }
 
+// A path a Bash command writes inside the project: absolute, and relative to the project root.
+export interface ProjectPath {
+  readonly path: string;
+  readonly relativePath: string;
+}
+
+export interface BashSkillGateInput {
+  readonly rules: SkillGateRules;
+  readonly paths: readonly ProjectPath[];
+  readonly loadedSkills: readonly string[];
+  readonly availableSkills: readonly string[];
+}
+
+export interface BashSkillGatePlan {
+  readonly gatedPaths: readonly string[];
+  readonly missing: readonly string[];
+}
+
 export interface SkillGatePlan {
   readonly missing: readonly string[];
   readonly unknown: readonly UnknownSkill[];

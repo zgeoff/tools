@@ -391,7 +391,14 @@ function collectScriptTextRanges(
   while (index < script.length) {
     const char = script.charAt(index);
 
-    if (script.startsWith(commentStart, index)) {
+    if (commentStart === '//' && script.startsWith('/*', index)) {
+      const close = script.indexOf('*/', index + 2);
+      const end = close === -1 ? script.length : close + 2;
+
+      ranges.push({ start: index, end });
+
+      index = end;
+    } else if (script.startsWith(commentStart, index)) {
       const newline = script.indexOf('\n', index);
       const end = newline === -1 ? script.length : newline;
 

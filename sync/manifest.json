@@ -217,6 +217,10 @@
         "target": ".claude/hooks/skill-gate/parse-skill-gate-rules.ts"
       },
       {
+        "source": "sync/hooks/skill-gate/plan-bash-skill-gate.ts",
+        "target": ".claude/hooks/skill-gate/plan-bash-skill-gate.ts"
+      },
+      {
         "source": "sync/hooks/skill-gate/plan-skill-gate.ts",
         "target": ".claude/hooks/skill-gate/plan-skill-gate.ts"
       },

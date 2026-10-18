@@ -762,3 +762,45 @@ test('it lets a Bash write to a gated file name outside the project go ahead', a
   expect(result.status).toBe(0);
   expect(result.stdout).toBe('');
 });
+
+test('it denies a Bash write to a gated path after a compaction and says to load the skills again', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, '.claude/skills/testing'), { recursive: true });
+  await writeFile(join(ctx.dir, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(ctx.dir, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+  );
+
+  await writeFile(
+    join(ctx.dir, 'transcript.jsonl'),
+    [
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"testing"}}]}}',
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Launching skill: testing"}]}}',
+      '{"type":"system","subtype":"compact_boundary","content":"Conversation compacted","compactMetadata":{"trigger":"manual"}}',
+    ].join('\n'),
+  );
+
+  const result = spawnSync('bun', [ctx.hookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.dir },
+    input: JSON.stringify({
+      cwd: ctx.dir,
+      transcript_path: join(ctx.dir, 'transcript.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command: "sed -i 's/oldName/newName/' src/a.test.ts" },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: `${join(ctx.dir, 'src/a.test.ts')} is a gated path, so change it with the Edit, Write or MultiEdit tool, never through Bash. Load the \`testing\` skill again with the Skill tool first. This session was compacted, and a skill loaded before the compaction no longer counts. .claude/skill-gate.json lists the skills each path needs.`,
+    },
+  });
+});

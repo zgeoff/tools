@@ -134,6 +134,22 @@ test('it runs each side of a pipe in its own subshell', () => {
   ]);
 });
 
+test('it runs a background command in its own subshell', () => {
+  expect(parseShellCommands('cd src & pwd')).toStrictEqual([
+    {
+      words: [
+        { text: 'cd', literal: true },
+        { text: 'src', literal: true },
+      ],
+      redirects: [],
+      stdin: null,
+      enters: 1,
+      leaves: 1,
+    },
+    { words: [{ text: 'pwd', literal: true }], redirects: [], stdin: null, enters: 0, leaves: 0 },
+  ]);
+});
+
 test('it gives a here document to the command whose redirect asked for it, before a pipe', () => {
   expect(parseShellCommands("python3 - <<'EOF' | cat\nprint('x')\nEOF")).toStrictEqual([
     {
