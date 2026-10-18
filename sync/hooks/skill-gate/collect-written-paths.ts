@@ -118,6 +118,10 @@ function getProgramWords(words: readonly ShellWord[]): readonly ShellWord[] {
 const SHELLS = new Set(['bash', 'sh', 'zsh', 'dash']);
 const INTERPRETERS = new Set(['python', 'python3', 'node', 'bun', 'deno', 'ruby']);
 
+// Python, Ruby and Perl start a comment with `#`, where JavaScript has `//`, and Python's `//` is
+// floor division.
+const JS_RUNTIMES = new Set(['node', 'bun', 'deno']);
+
 function collectProgramPaths(
   name: string,
   args: readonly ShellWord[],
@@ -150,8 +154,9 @@ function collectProgramPaths(
 
   if (INTERPRETERS.has(name)) {
     const script = findInlineScript(args, stdin);
+    const commentStart = JS_RUNTIMES.has(name) ? '//' : '#';
 
-    return script === null ? [] : collectScriptPaths(script, dir);
+    return script === null ? [] : collectScriptPaths(script, commentStart, dir);
   }
 
   return [];
@@ -242,7 +247,7 @@ function collectPerlPaths(
 
   const script = findInlineScript(args, stdin);
 
-  return script === null ? [] : collectScriptPaths(script, dir);
+  return script === null ? [] : collectScriptPaths(script, '#', dir);
 }
 
 function collectOperands(args: readonly ShellWord[]): readonly ShellWord[] {
@@ -353,8 +358,12 @@ const SCRIPT_WRITE_PATTERNS = [
   /\bopen\s*\(?\s*(?:my\s+)?\$?\w+\s*,\s*['"](?:>|>>|\+<)['"]\s*,\s*(?<quote>['"])(?<path>[^'"]+)\k<quote>/gu,
 ];
 
-function collectScriptPaths(script: string, dir: string | null): WrittenPath[] {
-  const textRanges = collectScriptTextRanges(script);
+function collectScriptPaths(
+  script: string,
+  commentStart: string,
+  dir: string | null,
+): WrittenPath[] {
+  const textRanges = collectScriptTextRanges(script, commentStart);
 
   return SCRIPT_WRITE_PATTERNS.flatMap((pattern) =>
     [...script.matchAll(pattern)].flatMap((match) => {
@@ -371,10 +380,11 @@ function collectScriptPaths(script: string, dir: string | null): WrittenPath[] {
   );
 }
 
-// Collects the spans of a script's string literals and `#` or `//` comments, so a write call that
-// only appears in text, such as `print("open('a.ts', 'w')")`, is not read as code.
+// Collects the spans of a script's string literals and comments, so a write call that only appears
+// in text, such as `print("open('a.ts', 'w')")`, is not read as code.
 function collectScriptTextRanges(
   script: string,
+  commentStart: string,
 ): readonly { readonly start: number; readonly end: number }[] {
   const ranges: { start: number; end: number }[] = [];
   let index = 0;
@@ -382,7 +392,7 @@ function collectScriptTextRanges(
   while (index < script.length) {
     const char = script.charAt(index);
 
-    if (char === '#' || script.startsWith('//', index)) {
+    if (script.startsWith(commentStart, index)) {
       const newline = script.indexOf('\n', index);
       const end = newline === -1 ? script.length : newline;
 

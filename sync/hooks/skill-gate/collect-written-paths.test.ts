@@ -34,6 +34,11 @@ test.each([
   [`node -e "require('fs').writeFileSync('src/a.ts', 'x')"`, [{ path: 'src/a.ts' }]],
   [`bun -e "await Bun.write('src/a.ts', 'x')"`, [{ path: 'src/a.ts' }]],
   [`ruby -e "File.write('src/a.ts', 'x')"`, [{ path: 'src/a.ts' }]],
+  [`python3 -c "n = 7 // 2; open('src/a.ts', 'w').write(str(n))"`, [{ path: 'src/a.ts' }]],
+  [
+    `node -e "const tag = '#x'; require('fs').writeFileSync('src/a.ts', tag)"`,
+    [{ path: 'src/a.ts' }],
+  ],
   ["/usr/bin/sed -i 's/a/b/' /srv/app/a.ts", [{ path: '/srv/app/a.ts' }]],
   ['(cd /srv); echo x > src/a.ts', [{ path: 'src/a.ts' }]],
   ['(cd docs; (cd ..); echo x > a.md); echo x > b.md', [{ path: 'docs/a.md' }, { path: 'b.md' }]],
