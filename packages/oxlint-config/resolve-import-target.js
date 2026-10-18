@@ -4,9 +4,9 @@ import { dirname, join, resolve } from 'node:path';
 // a `.js` specifier in TypeScript source names the `.ts` file beside it
 const sourceExtensions = { '.js': ['.ts', '.tsx'], '.mjs': ['.mts'], '.cjs': ['.cts'] };
 
-// `module` with the specifier for a package or builtin, `file` with the
-// absolute path when the import resolves, `missing` otherwise. The package's
-// own name resolves through its `exports`, and `#` names through its `imports`.
+// `module` for a package or builtin, `file` with the absolute path, or
+// `missing`. A workspace package's name and the importer's own, which `self`
+// marks, resolve through `exports`, and `#` names through `imports`.
 export default function resolveImportTarget(filename, specifier, settings) {
   if (isPathSpecifier(specifier)) {
     return toTarget(findImportedFile(filename, toFileSpecifier(specifier), settings.extensions));
@@ -14,10 +14,11 @@ export default function resolveImportTarget(filename, specifier, settings) {
 
   const manifest = findPackageManifest(dirname(filename), settings.root);
 
-  return resolveManifestTarget(manifest, specifier, settings.conditions);
+  return resolveManifestTarget(manifest, specifier, settings);
 }
 
-function resolveManifestTarget(manifest, specifier, conditions) {
+function resolveManifestTarget(manifest, specifier, settings) {
+  const conditions = settings.conditions;
   const name = manifest?.name;
 
   if (specifier.startsWith('#')) {
@@ -28,16 +29,30 @@ function resolveManifestTarget(manifest, specifier, conditions) {
       : toMappedTarget(manifest, mapped);
   }
 
-  if (typeof name === 'string' && (specifier === name || specifier.startsWith(`${name}/`))) {
-    const subpath = `.${specifier.slice(name.length)}`;
-
-    return toMappedTarget(
-      manifest,
-      findMappedTarget(toSubpathMap(manifest.exports), subpath, conditions),
-    );
+  if (isPackageSpecifier(name, specifier)) {
+    return { ...resolveExportTarget(manifest, specifier, conditions), self: true };
   }
 
-  return { kind: 'module', specifier };
+  const workspace = settings.workspaces.find((candidate) =>
+    isPackageSpecifier(candidate.name, specifier),
+  );
+
+  return workspace === undefined
+    ? { kind: 'module', specifier }
+    : resolveExportTarget(workspace, specifier, conditions);
+}
+
+function isPackageSpecifier(name, specifier) {
+  return typeof name === 'string' && (specifier === name || specifier.startsWith(`${name}/`));
+}
+
+function resolveExportTarget(manifest, specifier, conditions) {
+  const subpath = `.${specifier.slice(manifest.name.length)}`;
+
+  return toMappedTarget(
+    manifest,
+    findMappedTarget(toSubpathMap(manifest.exports), subpath, conditions),
+  );
 }
 
 // a bundler query such as Vite's `./styles.css?url` names the file before it

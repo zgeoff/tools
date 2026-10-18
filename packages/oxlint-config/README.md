@@ -141,20 +141,24 @@ Each entry has a `name`, which starts its report, an optional `reason`, which en
 `from` zones and `ignore` globs that limit which importing files it judges.
 
 - `edges` judge an import that resolves to a file: relative, with any bundler query such as `?url`
-  dropped, or the package's own name resolved through its `exports` under `conditions` plus
-  `default`. A target in a `to` zone fails unless it is also in an `allow` zone; with `allow` alone,
-  a target in none of the `allow` zones fails, a target in no zone included. `allowTypeOnly` exempts
-  type-only imports (`true`, or globs the target must match), and `allowWithin: "src/*"` exempts an
-  import inside the importer's own `src/<name>/`.
+  dropped, or a package name resolved through that package's `exports` under `conditions` plus
+  `default`. The package's own name resolves, and so does the name of each package whose directory a
+  `workspaces` glob matches, such as `packages/*`, with one directory level per segment. A target in
+  a `to` zone fails unless it is also in an `allow` zone; with `allow` alone, a target in none of
+  the `allow` zones fails, a target in no zone included. `allowTypeOnly` exempts type-only imports
+  (`true`, or globs the target must match), and `allowWithin: "src/*"` exempts an import inside the
+  importer's own `src/<name>/`.
 - `modules` restrict a package or builtin (`node:` prefix optional, subpaths included) to the
   `allow` zones; `allowTypeOnly: true` exempts type-only imports. A name that ends in `*` restricts
   every specifier that starts with the text before it, such as `@scope/*`, and `node:*` restricts
   every builtin.
 - `globals` restrict a call to a global, bare or through `globalThis`, `self` or `window`.
 - `unzoned` reports a file in a `from` zone that belongs to none of `zones`.
-- `unresolved` reports a relative or self-referencing import that resolves to no file, and a dynamic
-  `import()`, `require()` or `import.meta.require()` whose specifier is computed. Bun's
-  `import.meta.require` used as a value counts as computed too.
+- `unresolved` reports a relative, self-referencing or workspace import that resolves to no file,
+  and a dynamic `import()`, `require()` or `import.meta.require()` whose specifier is computed.
+  Bun's `import.meta.require` used as a value counts as computed too.
+- `selfImports` reports an import of the importer's own package by name, which a relative path
+  reaches without the `exports` map.
 
 ```jsonc
 {

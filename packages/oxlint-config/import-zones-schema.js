@@ -26,6 +26,7 @@ const importZonesSchema = {
     zones: { type: 'object', additionalProperties: stringList },
     extensions: stringList,
     conditions: stringList,
+    workspaces: stringList,
     edges: buildEntrySchema(
       {
         to: stringList,
@@ -43,6 +44,7 @@ const importZonesSchema = {
     globals: buildEntrySchema({ globals: stringList, allow: stringList }, ['globals', 'allow']),
     unzoned: buildEntrySchema({ zones: stringList }, ['from', 'zones']),
     unresolved: buildEntrySchema({}, []),
+    selfImports: buildEntrySchema({}, []),
   },
   additionalProperties: false,
 };

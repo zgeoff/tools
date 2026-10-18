@@ -22,6 +22,7 @@
     "import-zones.js",
     "import-zones-schema.js",
     "find-repo-root.js",
+    "load-workspace-manifests.js",
     "load-zone-options.js",
     "make-glob-matcher.js",
     "resolve-import-target.js",

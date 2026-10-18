@@ -30,11 +30,13 @@ function buildZoneOptions(options) {
     zones,
     extensions: options.extensions ?? defaultExtensions,
     conditions: new Set([...(options.conditions ?? []), 'default']),
+    workspaces: options.workspaces ?? [],
     edges: buildEntries(options.edges),
     modules: buildEntries(options.modules),
     globals: buildEntries(options.globals),
     unzoned: buildEntries(options.unzoned),
     unresolved: buildEntries(options.unresolved),
+    selfImports: buildEntries(options.selfImports),
   };
 }
 
