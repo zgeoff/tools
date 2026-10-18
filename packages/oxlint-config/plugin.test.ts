@@ -786,6 +786,11 @@ test.each([
   ],
   ['a default import', "import src from 'node:fs';\n\nexport const value = src;\n"],
   ['a namespace import', "import * as src from 'node:fs';\n\nexport const value = src;\n"],
+  ['a require import', "import src = require('node:fs');\n\nexport const value = src;\n"],
+  [
+    'a namespace alias import',
+    'namespace Paths {\n  export const root = 1;\n}\n\nimport src = Paths.root;\n\nexport const value = src;\n',
+  ],
   [
     'an overload parameter',
     'export class Reader {\n  readPath(src: string): string;\n  readPath(path: string): string {\n    return path;\n  }\n}\n',
@@ -820,6 +825,10 @@ test.each([
   [
     'a type-only default import',
     "import type src from './paths.ts';\n\nexport type Value = src;\n",
+  ],
+  [
+    'a type-only require import',
+    "import type src = require('./paths.ts');\n\nexport type Value = src;\n",
   ],
 ])('it accepts an abbreviated name in %s', async (_place, source) => {
   const result = await runLint(source, false, abbreviated);

@@ -100,6 +100,11 @@ const noAbbreviatedNames = {
           checkName(node.local);
         }
       },
+      TSImportEqualsDeclaration(node) {
+        if (node.importKind !== 'type') {
+          checkName(node.id);
+        }
+      },
       'AssignmentExpression > MemberExpression.left'(node) {
         if (!node.computed) {
           checkName(node.property);
