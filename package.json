@@ -19,7 +19,7 @@
       "gunshi": "1.0.0-rc.1",
       "happy-dom": "20.14.5",
       "jest-extended": "7.0.0",
-      "jest-matcher-utils": "30.4.1",
+      "jest-matcher-utils": "30.5.2",
       "kysely": "0.29.6",
       "lefthook": "2.1.9",
       "oxfmt": "0.56.0",
