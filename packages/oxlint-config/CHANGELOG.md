@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.11](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.10...@zgeoff/oxlint-config@0.2.11) (2026-10-18)
+
+### Features
+
+- **geo-1373:** check every name-binding form in no-abbreviated-names
+  ([#198](https://github.com/zgeoff/tools/issues/198))
+  ([511050b](https://github.com/zgeoff/tools/commit/511050b3fac0b3bb7d4ef5d895d5ef9ce73e3047))
+
 ## [0.2.10](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.9...@zgeoff/oxlint-config@0.2.10) (2026-10-18)
 
 ### Features
