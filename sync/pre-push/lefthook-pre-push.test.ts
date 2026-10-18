@@ -61,6 +61,7 @@ test('it leaves the main checkout non-bare when the test job runs in a pre-push 
       scripts: {
         'format:check': 'true',
         'lint:files': 'true',
+        check: 'true',
         typecheck: 'true',
         'files:branch': 'echo fixture.ts',
         'test:related': 'git init --quiet sandbox && true',
@@ -89,6 +90,8 @@ test('it leaves the main checkout non-bare when the test job runs in a pre-push 
 // Each suite that spawns git must stay safe without the baseline's env -u, so it runs here with
 // the GIT_DIR a pre-push hook in the worktree exports.
 test.each([
+  ['packages/checks/src/cli.test.ts'],
+  ['packages/checks/src/run-checks.test.ts'],
   ['packages/oxfmt-config/index.test.ts'],
   ['sync/skills/docs-writing/scripts/check-length.test.ts'],
   ['sync/skills/docs-writing/scripts/check-links.test.ts'],

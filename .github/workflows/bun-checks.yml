@@ -3,8 +3,8 @@
 # lockfile, then runs each package script in `scripts` in order.
 #
 # `scripts` is a space-separated list of package.json script names. Empty means
-# the standard list: audit deadcode format:check lint typecheck test. A name
-# the repo's package.json does not define fails the run before any script
+# the standard list: audit deadcode format:check lint check typecheck test. A
+# name the repo's package.json does not define fails the run before any script
 # runs, so a renamed script cannot drop a check without notice. The synced
 # caller passes the BUN_CHECK_SCRIPTS and NODE_VERSION repo variables, so a
 # repo changes the list or adds Node without editing the caller.
@@ -83,6 +83,21 @@ jobs:
       - name: Install
         run: bun install --frozen-lockfile
 
+      # The shell check of zgeoff-check runs shellcheck, which the runner image
+      # carries, and shfmt, which it lacks.
+      - name: Setup shfmt
+        env:
+          SHFMT_VERSION: v3.13.1
+          SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
+        run: |
+          set -euo pipefail
+          if command -v shfmt > /dev/null; then
+            exit 0
+          fi
+          curl -fsSL -o "$RUNNER_TEMP/shfmt" "https://github.com/mvdan/sh/releases/download/$SHFMT_VERSION/shfmt_${SHFMT_VERSION}_linux_amd64"
+          echo "$SHFMT_SHA256  $RUNNER_TEMP/shfmt" | sha256sum -c -
+          install -m 0755 "$RUNNER_TEMP/shfmt" /usr/local/bin/shfmt
+
       - name: Run the check scripts
         env:
           SCRIPTS: ${{ inputs.scripts }}
@@ -91,7 +106,7 @@ jobs:
           # A value of only whitespace parses to no names and gets the standard list too.
           read -ra list <<< "$SCRIPTS"
           if [ "${#list[@]}" -eq 0 ]; then
-            list=(audit deadcode format:check lint typecheck test)
+            list=(audit deadcode format:check lint check typecheck test)
           fi
           missing=""
           for name in "${list[@]}"; do
