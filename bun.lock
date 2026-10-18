@@ -103,7 +103,7 @@
     },
     "packages/oxfmt-config": {
       "name": "@zgeoff/oxfmt-config",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "devDependencies": {
         "@types/bun": "catalog:",
         "typescript": "catalog:",
