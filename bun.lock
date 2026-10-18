@@ -65,7 +65,7 @@
     },
     "packages/checks": {
       "name": "@zgeoff/checks",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "bin": {
         "zgeoff-check": "./dist/cli.js",
       },
@@ -153,7 +153,7 @@
     },
     "packages/std": {
       "name": "@zgeoff/std",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "devDependencies": {
         "@types/bun": "catalog:",
         "typescript": "catalog:",
