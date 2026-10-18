@@ -13,12 +13,18 @@ export const shellCheck: Check = {
 const BATCH_SIZE = 200;
 
 function checkShellFiles(context: CheckContext): Finding[] {
+  // FORCE_COLOR makes shfmt color its diff even into a pipe, and the parsers read plain text only.
+  const plain: CheckContext = {
+    ...context,
+    env: Object.fromEntries(Object.entries(context.env).filter(([name]) => name !== 'FORCE_COLOR')),
+  };
+
   const findings: Finding[] = [];
 
-  for (let start = 0; start < context.files.length; start += BATCH_SIZE) {
-    const batch = context.files.slice(start, start + BATCH_SIZE);
+  for (let start = 0; start < plain.files.length; start += BATCH_SIZE) {
+    const batch = plain.files.slice(start, start + BATCH_SIZE);
 
-    findings.push(...runShellcheck(context, batch), ...runShfmt(context, batch));
+    findings.push(...runShellcheck(plain, batch), ...runShfmt(plain, batch));
   }
 
   return findings;

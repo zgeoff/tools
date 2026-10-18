@@ -43,8 +43,8 @@ already has `shellcheck`.
 - `0`: no check found a problem.
 - `1`: a check found at least one problem.
 - `2`: the run failed before it could check. The config file breaks a rule, a check needs a program
-  that the PATH lacks, git or a check's program fails, or an argument starts with a dash and names
-  no file. The runner prints the reason.
+  that the PATH lacks, git or a check's program fails, a listed file cannot be read, or the command
+  line holds an unknown option or `--help` with files. The runner prints the reason.
 
 ## Turning a check off
 

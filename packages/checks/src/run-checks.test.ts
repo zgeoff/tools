@@ -1,5 +1,5 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
@@ -136,4 +136,43 @@ test('it labels each finding with its check, sorted by path and line', async () 
     { check: 'text', path: 'a.txt', line: 9, message: 'too long' },
     { check: 'text', path: 'b.txt', line: 1, message: 'too short' },
   ]);
+});
+
+test('it skips a listed file that no longer exists', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.dir, 'a.txt'), 'a\n');
+
+  const check = mock((): Finding[] => []);
+
+  await runChecks({
+    cwd: ctx.dir,
+    checks: [{ name: 'text', glob: '**/*.txt', check }],
+    config: { off: new Map() },
+    files: ['a.txt', 'gone.txt', 'a.txt/inner.txt'],
+    env: ctx.env,
+  });
+
+  expect(check).toHaveBeenCalledExactlyOnceWith({ cwd: ctx.dir, files: ['a.txt'], env: ctx.env });
+});
+
+test('it rejects the run when a tracked path cannot be read', async () => {
+  const ctx = await setupTest();
+
+  // A link to itself fails every read with ELOOP, which root's permissions cannot bypass the way
+  // they bypass a folder without search permission.
+  await symlink('loop.txt', join(ctx.dir, 'loop.txt'));
+
+  await $`git add loop.txt`.cwd(ctx.dir).env(ctx.env);
+
+  const check = mock((): Finding[] => []);
+
+  expect(
+    runChecks({
+      cwd: ctx.dir,
+      checks: [{ name: 'text', glob: '**/*.txt', check }],
+      config: { off: new Map() },
+      env: ctx.env,
+    }),
+  ).rejects.toMatchObject({ code: 'ELOOP' });
 });

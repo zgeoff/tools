@@ -1,13 +1,14 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import { createStubBun } from './create-stub-bun.ts';
+import { createStubCurl } from './create-stub-curl.ts';
 import { readWorkflowStep } from './read-workflow-step.ts';
 
-// The steps of the checks job, read from the workflow, and a PATH whose bun records each script
-// name it gets and whose curl writes a fixed body to its -o path, so each step runs for real
-// without the scripts or the network.
+// The steps of the checks job, read from the workflow, and a PATH whose bun and curl are tested
+// stand-ins, so each step runs for real without the scripts or the network.
 async function setupTest() {
   const dir = await mkdtemp(join(tmpdir(), 'bun-checks-'));
 
@@ -17,10 +18,8 @@ async function setupTest() {
   const bin = join(dir, 'bin');
 
   await mkdir(bin);
-  await writeFile(join(bin, 'bun'), `#!/bin/sh\necho "$2" >> "${join(dir, 'ran')}"\n`);
-  await chmod(join(bin, 'bun'), 0o755);
-  await writeFile(join(bin, 'curl'), `#!/bin/sh\nprintf 'fake shfmt\\n' > "$3"\n`);
-  await chmod(join(bin, 'curl'), 0o755);
+  await createStubBun(bin, join(dir, 'ran'));
+  await createStubCurl(bin, 'fake shfmt\n');
 
   const pick = await readWorkflowStep(workflow, 'checks', 'Pick the check scripts');
   const setupShfmt = await readWorkflowStep(workflow, 'checks', 'Setup shfmt');
@@ -125,6 +124,8 @@ test('it installs shfmt into a runner folder on the PATH when the checksum match
     .cwd(ctx.dir)
     .env({
       PATH: ctx.path,
+      SCRIPTS: ' lint check test ',
+      SETUP_SHFMT: 'false',
       RUNNER_TEMP: ctx.dir,
       GITHUB_PATH: join(ctx.dir, 'github-path'),
       SHFMT_VERSION: 'v3.13.1',
@@ -150,6 +151,8 @@ test('it installs nothing when the download fails its checksum', async () => {
     .cwd(ctx.dir)
     .env({
       PATH: ctx.path,
+      SCRIPTS: ' lint check test ',
+      SETUP_SHFMT: 'false',
       RUNNER_TEMP: ctx.dir,
       GITHUB_PATH: join(ctx.dir, 'github-path'),
       SHFMT_VERSION: 'v3.13.1',
@@ -164,4 +167,29 @@ test('it installs nothing when the download fails its checksum', async () => {
   expect(result.exitCode).not.toBe(0);
   expect(installed).toBeFalse();
   expect(wrotePath).toBeFalse();
+});
+
+test.each([
+  ['the scripts run check', ' lint check test ', 'false', true],
+  ['the caller asks for it', ' lint check:sync test ', 'true', true],
+  ['neither holds', ' lint check:sync test ', 'false', false],
+])('it installs shfmt only when %s', async (_label, scripts, setupShfmt, installs) => {
+  const ctx = await setupTest();
+
+  await $`bash -c ${ctx.setupShfmt}`
+    .cwd(ctx.dir)
+    .env({
+      PATH: ctx.path,
+      SCRIPTS: scripts,
+      SETUP_SHFMT: setupShfmt,
+      RUNNER_TEMP: ctx.dir,
+      GITHUB_PATH: join(ctx.dir, 'github-path'),
+      SHFMT_VERSION: 'v3.13.1',
+      SHFMT_SHA256: new Bun.CryptoHasher('sha256').update('fake shfmt\n').digest('hex'),
+    })
+    .quiet();
+
+  const installed = await Bun.file(join(ctx.dir, 'shfmt-bin/shfmt')).exists();
+
+  expect(installed).toBe(installs);
 });

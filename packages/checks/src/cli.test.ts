@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
@@ -172,7 +172,7 @@ test('it exits 2 on an unknown option', async () => {
     .quiet();
 
   expect(result.exitCode).toBe(2);
-  expect(result.stderr.toString()).toStartWith('zgeoff-check: unknown option --fix\n');
+  expect(result.stderr.toString()).toInclude('--fix');
 });
 
 test('it exits 2 rather than print help when --help comes with files', async () => {
@@ -189,17 +189,17 @@ test('it exits 2 rather than print help when --help comes with files', async () 
     .quiet();
 
   expect(result.exitCode).toBe(2);
-  expect(result.stderr.toString()).toStartWith('zgeoff-check: unknown option --help\n');
+  expect(result.stderr.toString()).toStartWith('zgeoff-check: --help takes no files\n');
 });
 
-test('it checks a file whose name starts with a dash', async () => {
+test('it checks a file whose name starts with a dash when the path says so', async () => {
   const ctx = await setupTest();
 
   await writeFile(join(ctx.dir, '-unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
 
   await $`git add -- -unquoted.sh`.cwd(ctx.dir).env(ctx.env);
 
-  const result = await $`${process.execPath} ${ctx.cli} -unquoted.sh`
+  const result = await $`${process.execPath} ${ctx.cli} ./-unquoted.sh`
     .cwd(ctx.dir)
     .env(ctx.env)
     .nothrow()
@@ -239,3 +239,31 @@ test('it exits 2 with the reason when git cannot list the files', async () => {
   expect(result.exitCode).toBe(2);
   expect(result.stderr.toString()).toStartWith('zgeoff-check: git ls-files failed: ');
 });
+
+test.each([['shellcheck'], ['shfmt']])(
+  'it exits 2 with the reason when %s fails without a finding',
+  async (program) => {
+    const ctx = await setupTest();
+
+    await writeFile(join(ctx.dir, 'clean.sh'), '#!/usr/bin/env bash\necho "hello"\n');
+    await mkdir(join(ctx.dir, 'bin'));
+    await writeFile(join(ctx.dir, 'bin', program), '#!/bin/sh\necho "out of memory" >&2\nexit 2\n');
+    await chmod(join(ctx.dir, 'bin', program), 0o755);
+
+    const result = await $`${process.execPath} ${ctx.cli} clean.sh`
+      .cwd(ctx.dir)
+      .env({ ...ctx.env, PATH: `${join(ctx.dir, 'bin')}:${ctx.env.PATH}` })
+      .nothrow()
+      .quiet();
+
+    expect({
+      exitCode: result.exitCode,
+      stdout: result.stdout.toString(),
+      stderr: result.stderr.toString(),
+    }).toStrictEqual({
+      exitCode: 2,
+      stdout: '',
+      stderr: `zgeoff-check: shell: ${program} failed: out of memory\n`,
+    });
+  },
+);

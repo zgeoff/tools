@@ -23,6 +23,9 @@
     "prepare": "bun run build",
     "typecheck": "tsc"
   },
+  "dependencies": {
+    "gunshi": "catalog:"
+  },
   "devDependencies": {
     "@types/bun": "catalog:",
     "typescript": "catalog:"

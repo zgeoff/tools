@@ -1,33 +1,29 @@
 #!/usr/bin/env bun
-import { existsSync } from 'node:fs';
 import { allChecks } from './all-checks.ts';
 import { loadConfig } from './load-config.ts';
+import { parseCLIArgs } from './parse-cli-args.ts';
 import { runChecks } from './run-checks.ts';
 
 // Exit codes: 0 with no finding, 1 with any finding, 2 when the run itself fails.
-const USAGE = `usage: zgeoff-check [file ...]
+const USAGE = `usage: zgeoff-check [--] [file ...]
 
 Runs every check over the files that git tracks, or over the files given.
 Each finding prints as path:line: <check>: <message>.
 Checks: ${allChecks.map((check) => check.name).join(', ')}`;
 
-const args = process.argv.slice(2);
+const parsed = await parseCLIArgs(process.argv.slice(2));
 
-// Bun drops the first -- from the arguments before this module runs, so the runner cannot tell a
-// file after -- from an option. Help therefore prints only for a lone --help, and a dash argument
-// that names no file stops the run instead of passing as an empty list.
-if (args.length === 1 && (args[0] === '--help' || args[0] === '-h')) {
+if (typeof parsed === 'string') {
+  process.stderr.write(`zgeoff-check: ${parsed}\n${USAGE}\n`);
+  process.exit(2);
+}
+
+if (parsed.help) {
   process.stdout.write(`${USAGE}\n`);
   process.exit(0);
 }
 
-const files = args.filter((arg) => arg !== '--');
-const unknownOption = files.find((arg) => arg.startsWith('-') && !existsSync(arg));
-
-if (unknownOption !== undefined) {
-  process.stderr.write(`zgeoff-check: unknown option ${unknownOption}\n${USAGE}\n`);
-  process.exit(2);
-}
+const files = parsed.files;
 
 try {
   const cwd = process.cwd();

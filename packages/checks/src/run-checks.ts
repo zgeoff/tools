@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { statSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import type { CheckConfig } from './load-config.ts';
 import type { Check, Finding } from './types.ts';
@@ -25,7 +25,7 @@ export interface CheckFinding extends Finding {
 export async function runChecks(options: Readonly<RunChecksOptions>): Promise<CheckFinding[]> {
   const files = (options.files ?? runGitLsFiles(options))
     .map((file) => toRepoPath(options.cwd, file))
-    .filter((file) => existsSync(resolve(options.cwd, file)));
+    .filter((file) => hasFile(options.cwd, file));
 
   const findings: CheckFinding[] = [];
 
@@ -76,6 +76,27 @@ function runGitLsFiles(options: Readonly<RunChecksOptions>): string[] {
     .toString()
     .split('\0')
     .filter((file) => file !== '');
+}
+
+// A listed path that no longer exists, such as a file the branch deletes, is skipped. Any other
+// error, such as a folder the runner cannot enter, throws, so the run never passes over a file it
+// could not read.
+function hasFile(cwd: string, file: string): boolean {
+  try {
+    statSync(resolve(cwd, file));
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+    ) {
+      return false;
+    }
+
+    throw error;
+  }
+
+  return true;
 }
 
 // A path the caller gives, such as ./scripts/a.sh, as the repo-relative path a glob matches.

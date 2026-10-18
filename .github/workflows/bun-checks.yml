@@ -123,15 +123,21 @@ jobs:
           echo "scripts= ${list[*]} " >> "$GITHUB_OUTPUT"
 
       # The shell check of zgeoff-check runs shellcheck, which the runner image
-      # carries, and shfmt, which it lacks. The pinned binary goes to a folder
-      # the runner owns, put on the PATH of the later steps.
+      # carries, and shfmt, which it lacks. The step installs the pinned binary
+      # when check runs or the caller asks for it, into a folder the runner
+      # owns, put on the PATH of the later steps.
       - name: Setup shfmt
-        if: inputs.setup-shfmt || contains(steps.pick.outputs.scripts, ' check ')
         env:
+          SCRIPTS: ${{ steps.pick.outputs.scripts }}
+          SETUP_SHFMT: ${{ inputs.setup-shfmt }}
           SHFMT_VERSION: v3.13.1
           SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
         run: |
           set -euo pipefail
+          if [ "$SETUP_SHFMT" != true ] && [[ "$SCRIPTS" != *" check "* ]]; then
+            echo "shfmt: not needed, because the scripts do not run check"
+            exit 0
+          fi
           curl -fsSL -o "$RUNNER_TEMP/shfmt.download" "https://github.com/mvdan/sh/releases/download/$SHFMT_VERSION/shfmt_${SHFMT_VERSION}_linux_amd64"
           echo "$SHFMT_SHA256  $RUNNER_TEMP/shfmt.download" | sha256sum -c -
           mkdir -p "$RUNNER_TEMP/shfmt-bin"

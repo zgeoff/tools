@@ -73,6 +73,29 @@ test('it reports a script that shfmt would reformat at the first changed line', 
   ]);
 });
 
+test('it reports a script that shfmt would reformat when FORCE_COLOR is set', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.dir, 'cramped.sh'),
+    '#!/usr/bin/env bash\necho "start"\nif true;then echo "yes";fi\n',
+  );
+
+  const findings = await shellCheck.check({
+    cwd: ctx.dir,
+    files: ['cramped.sh'],
+    env: { ...process.env, FORCE_COLOR: '1' },
+  });
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'cramped.sh',
+      line: 3,
+      message: 'shfmt would reformat this hunk; run shfmt -w cramped.sh to fix it',
+    },
+  ]);
+});
+
 test('it reports a script that shfmt cannot parse', async () => {
   const ctx = await setupTest();
 
