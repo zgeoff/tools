@@ -692,7 +692,7 @@ test('it flags a restricted word bounded by punctuation', async () => {
 
 test('it accepts a word that holds a restricted word inside it', async () => {
   const source =
-    '// the orbit keeps its own clock\nexport const label = `orbs and sorbet, orb_name, orb2`;\n';
+    '// the orbit keeps its own clock\nexport const label = `orbs, absorb, sorbet, orb_name, orb2`;\n';
 
   const result = await runLint(source, false, restricted);
 
