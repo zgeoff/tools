@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/oxlint-config",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "Shareable oxlint config: strict categories, house-style rules, and a custom JS plugin",
   "license": "MIT",
   "repository": {
