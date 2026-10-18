@@ -861,6 +861,7 @@ test('it judges re-exports, dynamic imports, require calls and import types', as
     "export * from '../../scripts/run';",
     "await import('../../scripts/run');",
     'require(`../../scripts/run`);',
+    "import.meta.require('../../scripts/run');",
     "export type Run = import('../../scripts/run').Run;",
     '',
   ].join('\n');
@@ -875,7 +876,26 @@ test('it judges re-exports, dynamic imports, require calls and import types', as
   const reports = result.stdout.match(/core-no-tooling: /gu) ?? [];
 
   expect(result.exitCode).toBe(1);
-  expect(reports).toHaveLength(5);
+  expect(reports).toHaveLength(6);
+});
+
+test('it flags a computed import.meta.require call and import.meta.require used as a value', async () => {
+  const files = {
+    'src/state/load.ts': [
+      "const name = process.argv[2] ?? 'run';",
+      'import.meta.require(name);',
+      'const load = import.meta.require;',
+      'load(name);',
+      '',
+    ].join('\n'),
+  };
+
+  const result = await runLintTree(files, 'src/state/load.ts', layered);
+
+  const reports = result.stdout.match(/unresolved: cannot check a computed import specifier/gu);
+
+  expect(result.exitCode).toBe(1);
+  expect(reports).toHaveLength(2);
 });
 
 test('it flags a restricted module outside its zones', async () => {
@@ -887,6 +907,39 @@ test('it flags a restricted module outside its zones', async () => {
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('network: node:https is allowed only in network');
+});
+
+test('it restricts every module that a name ending in * prefixes, and node:* every builtin', async () => {
+  const source = [
+    "import { readFile } from 'node:fs';",
+    "import { join } from 'path';",
+    "import { Database } from 'bun:sqlite';",
+    "import { shared } from '@scope/shared';",
+    "import { other } from '@scopes/other';",
+    '',
+  ].join('\n');
+
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { core: ['src/**'] },
+        modules: [{ name: 'neutral', modules: ['node:*', '@scope/*'], allow: [] }],
+      },
+    ],
+  };
+
+  const result = await runLintTree({ 'src/read.ts': source }, 'src/read.ts', rules);
+
+  const reports = result.stdout.match(/neutral: \S+ is allowed only in no zone/gu);
+
+  expect(result.exitCode).toBe(1);
+
+  expect(reports).toStrictEqual([
+    'neutral: node:fs is allowed only in no zone',
+    'neutral: path is allowed only in no zone',
+    'neutral: @scope/shared is allowed only in no zone',
+  ]);
 });
 
 test('it accepts a restricted module inside its zone, out of scope, or imported for types', async () => {
@@ -997,6 +1050,18 @@ test('it resolves a .js specifier to the .ts source beside it', async () => {
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('core-no-tooling: core must not import scripts/run.ts');
+});
+
+test('it resolves a specifier with a bundler query to the file before the query', async () => {
+  const files = {
+    'src/config/theme.ts': "import styles from '../../scripts/styles.css?url';\n\nstyles;\n",
+    'scripts/styles.css': 'body {}\n',
+  };
+
+  const result = await runLintTree(files, 'src/config/theme.ts', layered);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('core-no-tooling: core must not import scripts/styles.css');
 });
 
 test('it honours a next-line disable comment with a reason on a forbidden edge', async () => {
