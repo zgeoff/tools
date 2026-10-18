@@ -236,6 +236,49 @@ test('it passes the push when the branch changes a clean file whose name starts 
   expect(result.exitCode).toBe(0);
 });
 
+test('it forwards every file the branch changes to zgeoff-check when the branch changes several', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+
+  await Promise.all(
+    ['first.sh', 'second.sh', 'third.sh'].map((file) =>
+      writeFile(join(ctx.worktree, file), '#!/usr/bin/env bash\necho "hello"\n'),
+    ),
+  );
+
+  // The check script stands in for zgeoff-check and writes each argument it gets on its own line.
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        check: String.raw`sh -c 'printf "%s\n" "$@" > forwarded.txt' sh`,
+        typecheck: 'true',
+        'files:branch': String.raw`printf '%s\n' first.sh second.sh third.sh`,
+        'test:related': 'true',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m fixture`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  await $`git push --quiet origin feature`.cwd(ctx.worktree).env(ctx.env).quiet();
+
+  const forwarded = await readFile(join(ctx.worktree, 'forwarded.txt'), 'utf8');
+
+  expect(forwarded).toBe('./first.sh\n./second.sh\n./third.sh\n');
+});
+
 // Each suite that spawns git must stay safe without the baseline's env -u, so it runs here with
 // the GIT_DIR a pre-push hook in the worktree exports.
 test.each([
