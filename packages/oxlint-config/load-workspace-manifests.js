@@ -2,8 +2,6 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import makeGlobMatcher from './make-glob-matcher.js';
 
-const loadedManifests = new Map();
-
 // The manifest of every package directory the globs match, relative to the
 // root. Each glob segment matches one directory level, as a workspaces
 // field's globs do.
@@ -23,7 +21,8 @@ export default function loadWorkspaceManifests(root, globs) {
   return manifests;
 }
 
-// `./packages/*` and `packages/*/` name the directories `packages/*` names
+const loadedManifests = new Map();
+
 function splitGlob(glob) {
   return glob.split('/').filter((segment) => segment !== '' && segment !== '.');
 }
