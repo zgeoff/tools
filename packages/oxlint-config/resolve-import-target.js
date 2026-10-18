@@ -24,9 +24,15 @@ function resolveManifestTarget(manifest, specifier, settings) {
   if (specifier.startsWith('#')) {
     const mapped = findMappedTarget(manifest?.imports, specifier, conditions);
 
-    return mapped !== null && !isPathSpecifier(mapped)
-      ? { kind: 'module', specifier: mapped }
-      : toMappedTarget(manifest, mapped);
+    // a package the alias names resolves as that name would; a `#` target is
+    // not a valid mapping, so it stays a module
+    if (mapped !== null && !isPathSpecifier(mapped)) {
+      return mapped.startsWith('#')
+        ? { kind: 'module', specifier: mapped }
+        : { ...resolveManifestTarget(manifest, mapped, settings), self: false };
+    }
+
+    return toMappedTarget(manifest, mapped);
   }
 
   if (isPackageSpecifier(name, specifier)) {

@@ -1436,6 +1436,41 @@ test('it resolves a workspace package’s name through that package’s exports'
   expect(result.stdout).not.toInclude('store-module');
 });
 
+test('it resolves a # import that names a workspace package as that name would', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { app: ['packages/app/**'], testing: ['packages/*/src/testing/**'] },
+        workspaces: ['packages/*'],
+        edges: [{ name: 'no-testing', from: ['app'], to: ['testing'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'packages/store/package.json': JSON.stringify({
+      name: '@demo/store',
+      exports: { './testing': './src/testing/index.ts' },
+    }),
+    'packages/store/src/testing/index.ts': 'export const fake = 1;\n',
+    'packages/app/package.json': JSON.stringify({
+      name: '@demo/app',
+      imports: { '#store-testing': '@demo/store/testing' },
+    }),
+    'packages/app/src/run.ts':
+      "import { fake } from '#store-testing';\n\nexport const all = [fake];\n",
+  };
+
+  const result = await runLintTree(files, 'packages/app/src/run.ts', rules);
+
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout).toInclude(
+    'no-testing: app must not import packages/store/src/testing/index.ts (testing)',
+  );
+});
+
 test('it reports a workspace subpath that the package’s exports omit as unresolved', async () => {
   const rules = {
     'zgeoff/import-zones': [
