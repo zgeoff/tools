@@ -129,7 +129,9 @@ Each entry has a `name`, which starts its report, an optional `reason`, which en
   type-only imports (`true`, or globs the target must match), and `allowWithin: "src/*"` exempts an
   import inside the importer's own `src/<name>/`.
 - `modules` restrict a package or builtin (`node:` prefix optional, subpaths included) to the
-  `allow` zones; `allowTypeOnly: true` exempts type-only imports.
+  `allow` zones; `allowTypeOnly: true` exempts type-only imports. A name that ends in `*` restricts
+  every specifier that starts with the text before it, such as `@scope/*`, and `node:*` restricts
+  every builtin.
 - `globals` restrict a call to a global, bare or through `globalThis`, `self` or `window`.
 - `unzoned` reports a file in a `from` zone that belongs to none of `zones`.
 - `unresolved` reports a relative or self-referencing import that resolves to no file, and a dynamic

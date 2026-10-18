@@ -909,6 +909,39 @@ test('it flags a restricted module outside its zones', async () => {
   expect(result.stdout).toInclude('network: node:https is allowed only in network');
 });
 
+test('it restricts every module that a name ending in * prefixes, and node:* every builtin', async () => {
+  const source = [
+    "import { readFile } from 'node:fs';",
+    "import { join } from 'path';",
+    "import { Database } from 'bun:sqlite';",
+    "import { shared } from '@scope/shared';",
+    "import { other } from '@scopes/other';",
+    '',
+  ].join('\n');
+
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { core: ['src/**'] },
+        modules: [{ name: 'neutral', modules: ['node:*', '@scope/*'], allow: [] }],
+      },
+    ],
+  };
+
+  const result = await runLintTree({ 'src/read.ts': source }, 'src/read.ts', rules);
+
+  const reports = result.stdout.match(/neutral: \S+ is allowed only in no zone/gu);
+
+  expect(result.exitCode).toBe(1);
+
+  expect(reports).toStrictEqual([
+    'neutral: node:fs is allowed only in no zone',
+    'neutral: path is allowed only in no zone',
+    'neutral: @scope/shared is allowed only in no zone',
+  ]);
+});
+
 test('it accepts a restricted module inside its zone, out of scope, or imported for types', async () => {
   const files = {
     'src/model/send.ts': "import { request } from 'https';\n\nrequest('https://x.test');\n",

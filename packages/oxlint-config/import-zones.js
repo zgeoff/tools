@@ -1,3 +1,4 @@
+import { isBuiltin } from 'node:module';
 import { relative, sep } from 'node:path';
 import findRepoRoot from './find-repo-root.js';
 import importZonesSchema from './import-zones-schema.js';
@@ -114,10 +115,19 @@ function isRestrictedModule(entry, specifier) {
   const name = toModuleName(specifier);
 
   return entry.modules.some((module) => {
+    if (module.endsWith('*')) {
+      return isPrefixMatch(module.slice(0, -1), specifier);
+    }
+
     const restricted = toModuleName(module);
 
     return name === restricted || name.startsWith(`${restricted}/`);
   });
+}
+
+// `node:*` names every builtin, which a specifier may write without the prefix
+function isPrefixMatch(prefix, specifier) {
+  return specifier.startsWith(prefix) || (prefix === 'node:' && isBuiltin(specifier));
 }
 
 function toModuleName(specifier) {
