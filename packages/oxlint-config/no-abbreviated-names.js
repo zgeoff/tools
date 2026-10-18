@@ -79,6 +79,21 @@ const noAbbreviatedNames = {
       TSAbstractPropertyDefinition: checkKey,
       TSAbstractAccessorProperty: checkKey,
       TSPropertySignature: checkKey,
+
+      // a getter or setter is read and written as a property, so its key is a
+      // value name
+      "MethodDefinition[kind='get']": checkKey,
+      "MethodDefinition[kind='set']": checkKey,
+      "TSAbstractMethodDefinition[kind='get']": checkKey,
+      "TSAbstractMethodDefinition[kind='set']": checkKey,
+      "TSMethodSignature[kind='get']": checkKey,
+      "TSMethodSignature[kind='set']": checkKey,
+
+      // an import's local binding is a value name in this module, whatever the
+      // exporting module calls it
+      'ImportSpecifier, ImportDefaultSpecifier, ImportNamespaceSpecifier'(node) {
+        checkName(node.local);
+      },
       'AssignmentExpression > MemberExpression.left'(node) {
         if (!node.computed) {
           checkName(node.property);

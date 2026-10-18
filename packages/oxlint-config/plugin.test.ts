@@ -771,6 +771,21 @@ test.each([
     'an abstract method parameter',
     'export abstract class Reader {\n  abstract readPath(src: string): string;\n}\n',
   ],
+  ['a getter', 'export class Paths {\n  get src(): number {\n    return 1;\n  }\n}\n'],
+  [
+    'a setter',
+    'export class Paths {\n  set src(value: number) {\n    globalThis.value = value;\n  }\n}\n',
+  ],
+  ['an abstract getter', 'export abstract class Paths {\n  abstract get src(): number;\n}\n'],
+  ['an abstract setter', 'export abstract class Paths {\n  abstract set src(value: number);\n}\n'],
+  ['an interface getter', 'export interface Paths {\n  get src(): number;\n}\n'],
+  ['an interface setter', 'export interface Paths {\n  set src(value: number);\n}\n'],
+  [
+    'a named import alias',
+    "import { readFile as src } from 'node:fs';\n\nexport const value = src;\n",
+  ],
+  ['a default import', "import src from 'node:fs';\n\nexport const value = src;\n"],
+  ['a namespace import', "import * as src from 'node:fs';\n\nexport const value = src;\n"],
   [
     'an overload parameter',
     'export class Reader {\n  readPath(src: string): string;\n  readPath(path: string): string {\n    return path;\n  }\n}\n',

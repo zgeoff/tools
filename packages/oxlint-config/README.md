@@ -110,11 +110,11 @@ the paths that may name the words:
 ## `zgeoff/no-abbreviated-names`
 
 The `names` option maps each abbreviation to the text that replaces it, and the rule reports a
-variable, parameter, catch parameter, destructured name or property that has one of those names. A
-name matches whole, so `ms` reports `ms` but not `timeoutMs`. A destructured key that an alias
-renames belongs to the object being read, and the rule reports only the alias. The shipped config
-lists the abbreviations that the code-style skill bans and turns on `id-length` beside the rule, so
-a one-letter name fails too, other than `x`, `y`, `z`, `$` and `_`.
+variable, parameter, catch parameter, destructured name, import, property, getter or setter that has
+one of those names. A name matches whole, so `ms` reports `ms` but not `timeoutMs`. A destructured
+key that an alias renames belongs to the object being read, and the rule reports only the alias. The
+shipped config lists the abbreviations that the code-style skill bans and turns on `id-length`
+beside the rule, so a one-letter name fails too, other than `x`, `y`, `z`, `$` and `_`.
 
 ## `zgeoff/no-file-snapshot`
 

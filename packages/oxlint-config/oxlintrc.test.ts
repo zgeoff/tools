@@ -151,3 +151,38 @@ test('it accepts a one-letter type parameter', async () => {
 
   expect(stdout).not.toInclude('eslint(id-length)');
 });
+
+test.each([
+  [
+    'a destructured alias',
+    'const input = { session: 1 };\nconst { session: s } = input;\n\nexport const value = s;\n',
+  ],
+  [
+    'a destructured shorthand',
+    'const input = { s: 1 };\nconst { s } = input;\n\nexport const value = s;\n',
+  ],
+  ['an array element', 'const [s] = [1];\n\nexport const value = s;\n'],
+  ['an object key', 'export const value = { s: 1 };\n'],
+])('it reports a one-letter name in %s', async (_label, source) => {
+  const ctx = await setupTest('names.ts', source);
+  const stdout = await runLint(ctx.dir, 'names.ts');
+
+  expect(stdout).toInclude('eslint(id-length)');
+});
+
+test.each([
+  [
+    'a destructured kept name',
+    'const point = { x: 1 };\nconst { x } = point;\n\nexport const value = x;\n',
+  ],
+  ['an unread array placeholder', 'const [first, _] = [1, 2];\n\nexport const value = first;\n'],
+  [
+    'a one-letter key that an alias renames',
+    'const input = Object.fromEntries([["s", 1]]);\nconst { s: session } = input;\n\nexport const value = session;\n',
+  ],
+])('it accepts %s', async (_label, source) => {
+  const ctx = await setupTest('names.ts', source);
+  const stdout = await runLint(ctx.dir, 'names.ts');
+
+  expect(stdout).not.toInclude('eslint(id-length)');
+});
