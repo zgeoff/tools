@@ -14,7 +14,7 @@ export default function loadWorkspaceManifests(root, globs) {
   if (manifests === undefined) {
     manifests = globs
       .flatMap((glob) => readGlobDirs(root, splitGlob(glob), ''))
-      .map((dir) => loadManifest(join(root, dir)))
+      .map((directory) => loadManifest(join(root, directory)))
       .filter((manifest) => typeof manifest?.name === 'string');
 
     loadedManifests.set(key, manifests);
@@ -47,8 +47,9 @@ function readGlobDirs(root, segments, prefix) {
   return names.flatMap((name) => readGlobDirs(root, rest, join(prefix, name)));
 }
 
-function loadManifest(dir) {
-  const path = join(dir, 'package.json');
+// `dir` is the field the resolver reads from every manifest it loads
+function loadManifest(directory) {
+  const path = join(directory, 'package.json');
 
   if (!existsSync(path)) {
     return null;
@@ -56,7 +57,7 @@ function loadManifest(dir) {
 
   const manifest = JSON.parse(readFileSync(path, 'utf8'));
 
-  manifest.dir = dir;
+  manifest.dir = directory;
 
   return manifest;
 }
