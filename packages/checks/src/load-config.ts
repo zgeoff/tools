@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { isRecord } from '@zgeoff/std';
 import { ConfigError } from './config-error.ts';
 
 const CONFIG_FILE = 'zgeoff-check.json';
@@ -84,8 +85,4 @@ function parseConfig(value: unknown, checkNames: readonly string[]): CheckConfig
   }
 
   return { off };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

@@ -1,4 +1,4 @@
-import { isRecord } from './is-record.ts';
+import { isRecord } from '../../packages/std/src/is-record.ts';
 import type { BlockedPackage, FixPlan, FixedPackage, UnfixablePackage } from './types.ts';
 
 // Checks the shape of `bun audit fix --json` output and keeps the fields the step uses.

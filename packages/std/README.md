@@ -36,3 +36,15 @@ const options: Options = toExactOptional({ label, retries: 3 });
 Own enumerable keys are copied, symbols included, as an object spread would. `null` values stay,
 falsy values such as `0` and `''` stay, and the input object is left untouched. A union input maps
 member by member, so each member keeps its own keys.
+
+### `isRecord`
+
+Tells whether a value is a plain keyed object, and narrows it to `Record<string, unknown>`, so code
+that reads parsed JSON can index it. An array or `null` is not a record.
+
+```ts
+import { isRecord } from '@zgeoff/std';
+
+const parsed: unknown = JSON.parse(text);
+const name = isRecord(parsed) ? parsed['name'] : undefined;
+```

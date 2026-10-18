@@ -1,4 +1,4 @@
-import { isRecord } from './is-record.ts';
+import { isRecord } from '../../packages/std/src/is-record.ts';
 import { severities } from './types.ts';
 import type { Advisory, AuditReport, Severity } from './types.ts';
 
