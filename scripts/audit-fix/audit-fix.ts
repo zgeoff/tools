@@ -3,12 +3,12 @@
 import { existsSync } from 'node:fs';
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
+import { isRecord } from '../../packages/std/src/is-record.ts';
 import { buildAuditScript } from './build-audit-script.ts';
 import { buildBunfigWithExcludes } from './build-bunfig-with-excludes.ts';
 import type { ReleaseAgeExclude } from './build-bunfig-with-excludes.ts';
 import { buildBunfigWithoutExpiredExcludes } from './build-bunfig-without-expired-excludes.ts';
 import { buildDateAfter } from './build-date-after.ts';
-import { isRecord } from './is-record.ts';
 import { parseAuditIgnores } from './parse-audit-ignores.ts';
 import { parseAuditReport } from './parse-audit-report.ts';
 import { parseAuditScript } from './parse-audit-script.ts';

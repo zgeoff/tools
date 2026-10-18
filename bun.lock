@@ -74,6 +74,7 @@
       },
       "devDependencies": {
         "@types/bun": "catalog:",
+        "@zgeoff/std": "workspace:*",
         "typescript": "catalog:",
       },
     },

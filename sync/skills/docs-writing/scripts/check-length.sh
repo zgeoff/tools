@@ -70,7 +70,7 @@ prose_paths=()
 # docs/README.md is the docs index, so the docs cap governs it, not a README limit.
 while IFS= read -r readme; do
   prose_paths+=("$readme")
-  read -r target limit name <<<"$(pick_readme_kind "$readme")"
+  read -r target limit name <<< "$(pick_readme_kind "$readme")"
   lines=$(count_lines "$readme")
 
   if [ "$lines" -gt "$limit" ]; then
@@ -98,7 +98,7 @@ while IFS= read -r doc; do
   if [ "$lines" -gt "$cap" ]; then
     echo "$doc: $lines lines, over the docs cap of $cap (warning: cut points, then split at a code boundary)"
   fi
-done <<<"$docs"
+done <<< "$docs"
 
 skills=$(list_files ':(glob).claude/skills/**/*.md' ':(glob)sync/skills/**/*.md')
 

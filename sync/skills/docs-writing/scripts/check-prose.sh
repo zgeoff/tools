@@ -90,7 +90,8 @@ report '"Should succeed" in a procedure — state the expected outcome instead:'
   "$(grep_docs -nPi 'should (succeed|work|pass)\b' -- "$@")"
 
 report 'Number joined to its unit ("64KB"; write "64 KB"; code blocks are exempt):' \
-  "$(grep_docs -nP '\b[0-9]+(KB|MB|GB|TB|KiB|MiB|GiB|ms)\b' -- "$@" ':(exclude)*.md'
+  "$(
+    grep_docs -nP '\b[0-9]+(KB|MB|GB|TB|KiB|MiB|GiB|ms)\b' -- "$@" ':(exclude)*.md'
     list_markdown "$@" | xargs -r awk "$fence_awk"'
     {
       m = fence_marker($0)
@@ -101,7 +102,8 @@ report 'Number joined to its unit ("64KB"; write "64 KB"; code blocks are exempt
         next
       }
       if (open == "" && $0 ~ /(^|[^[:alnum:]_])[0-9]+(KB|MB|GB|TB|KiB|MiB|GiB|ms)([^[:alnum:]_]|$)/) print FILENAME":"FNR":"$0
-    }')"
+    }'
+  )"
 
 # Architecture docs state rules, never values. Code spans are dropped first, since a command the
 # reader types may hold a value. A bare s, d or h joined to its number is no unit here ("1990s",

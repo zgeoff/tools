@@ -268,6 +268,44 @@ test.each([['shellcheck'], ['shfmt']])(
   },
 );
 
+// Each stand-in fails after a finding is already in: the shellcheck one prints a finding of its own
+// first, and the shfmt one runs after the real shellcheck has reported unquoted.sh.
+test.each([
+  [
+    'shellcheck',
+    String.raw`printf 'unquoted.sh:2:6: note: Double quote to prevent globbing and word splitting. [SC2086]\n'`,
+  ],
+  ['shfmt', 'true'],
+])('it exits 2 and prints no finding when %s fails after a finding', async (program, firstLine) => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.dir, 'unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
+  await mkdir(join(ctx.dir, 'bin'));
+
+  await writeFile(
+    join(ctx.dir, 'bin', program),
+    `#!/bin/sh\n${firstLine}\necho "out of memory" >&2\nexit 2\n`,
+  );
+
+  await chmod(join(ctx.dir, 'bin', program), 0o755);
+
+  const result = await $`${process.execPath} ${ctx.cli} unquoted.sh`
+    .cwd(ctx.dir)
+    .env({ ...ctx.env, PATH: `${join(ctx.dir, 'bin')}:${ctx.env.PATH}` })
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr: `zgeoff-check: shell: ${program} failed: out of memory\n`,
+  });
+});
+
 test('it lists the whole repo and prints root paths when it runs from a subfolder', async () => {
   const ctx = await setupTest();
 
