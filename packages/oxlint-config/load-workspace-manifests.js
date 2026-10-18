@@ -13,7 +13,7 @@ export default function loadWorkspaceManifests(root, globs) {
 
   if (manifests === undefined) {
     manifests = globs
-      .flatMap((glob) => collectGlobDirs(root, glob.split('/'), ''))
+      .flatMap((glob) => readGlobDirs(root, splitGlob(glob), ''))
       .map((dir) => loadManifest(join(root, dir)))
       .filter((manifest) => typeof manifest?.name === 'string');
 
@@ -23,7 +23,12 @@ export default function loadWorkspaceManifests(root, globs) {
   return manifests;
 }
 
-function collectGlobDirs(root, segments, prefix) {
+// `./packages/*` and `packages/*/` name the directories `packages/*` names
+function splitGlob(glob) {
+  return glob.split('/').filter((segment) => segment !== '' && segment !== '.');
+}
+
+function readGlobDirs(root, segments, prefix) {
   const [segment, ...rest] = segments;
 
   if (segment === undefined) {
@@ -39,7 +44,7 @@ function collectGlobDirs(root, segments, prefix) {
         .filter((name) => isMatch(name))
     : [];
 
-  return names.flatMap((name) => collectGlobDirs(root, rest, join(prefix, name)));
+  return names.flatMap((name) => readGlobDirs(root, rest, join(prefix, name)));
 }
 
 function loadManifest(dir) {
