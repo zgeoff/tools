@@ -8,10 +8,6 @@ export interface CLIArgs {
   readonly files: readonly string[];
 }
 
-const CLI_ARGS = {
-  help: { type: 'boolean', short: 'h', default: false },
-} as const;
-
 // Parses the command line, or returns the reason it is refused. Bun drops the first -- before the
 // module runs, so a --help that followed it reads as the option: help with files is refused, so it
 // can never stand in for a run over those files.
@@ -20,7 +16,9 @@ export async function parseCLIArgs(argv: readonly string[]): Promise<CLIArgs | s
 
   const command = define({
     name: 'zgeoff-check',
-    args: CLI_ARGS,
+    args: {
+      help: { type: 'boolean', short: 'h', default: false },
+    },
     run: (ctx) => {
       if (ctx.validationError !== undefined) {
         throw ctx.validationError;

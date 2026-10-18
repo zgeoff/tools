@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import invariant from 'tiny-invariant';
@@ -172,3 +172,106 @@ test.each([
     expect(findings).toStrictEqual([{ path: 'z-last.sh', line, message }]);
   },
 );
+
+test('it formats with the indentation that the repo .editorconfig sets', async () => {
+  const ctx = await setupTest();
+
+  // shfmt indents with tabs by default, so this script passes only when shfmt reads the file.
+  await writeFile(
+    join(ctx.dir, '.editorconfig'),
+    'root = true\n\n[*.sh]\nindent_style = space\nindent_size = 2\n',
+  );
+
+  await writeFile(
+    join(ctx.dir, 'spaced.sh'),
+    '#!/usr/bin/env bash\nif true; then\n  echo "yes"\nfi\n',
+  );
+
+  const findings = await shellCheck.check({
+    cwd: ctx.dir,
+    files: ['spaced.sh'],
+    env: process.env,
+  });
+
+  expect(findings).toStrictEqual([]);
+});
+
+test('it reports every hunk of every file that shfmt would reformat', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.dir, 'a.sh'),
+    [
+      '#!/usr/bin/env bash',
+      'if true;then echo "one";fi',
+      'echo "2"',
+      'echo "3"',
+      'echo "4"',
+      'echo "5"',
+      'echo "6"',
+      'echo "7"',
+      'echo "8"',
+      'echo "9"',
+      'if true;then echo "ten";fi',
+      '',
+    ].join('\n'),
+  );
+
+  await writeFile(
+    join(ctx.dir, 'b.sh'),
+    '#!/usr/bin/env bash\necho "start"\nif true;then echo "yes";fi\n',
+  );
+
+  const findings = await shellCheck.check({
+    cwd: ctx.dir,
+    files: ['a.sh', 'b.sh'],
+    env: process.env,
+  });
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'a.sh',
+      line: 2,
+      message: 'shfmt would reformat this hunk; run shfmt -w a.sh to fix it',
+    },
+    {
+      path: 'a.sh',
+      line: 11,
+      message: 'shfmt would reformat this hunk; run shfmt -w a.sh to fix it',
+    },
+    {
+      path: 'b.sh',
+      line: 3,
+      message: 'shfmt would reformat this hunk; run shfmt -w b.sh to fix it',
+    },
+  ]);
+});
+
+test('it fails when shfmt fails after it printed a diff', async () => {
+  const ctx = await setupTest();
+
+  const shellcheckPath = Bun.which('shellcheck');
+
+  invariant(shellcheckPath !== null, 'shellcheck must be on the PATH to run this test');
+
+  // A shfmt that prints one file's diff and then dies, with the real shellcheck beside it.
+  await symlink(shellcheckPath, join(ctx.dir, 'shellcheck'));
+
+  await writeFile(
+    join(ctx.dir, 'shfmt'),
+    [
+      '#!/bin/sh',
+      String.raw`printf '%s\n' '--- clean.sh.orig' '+++ clean.sh' '@@ -1,1 +1,1 @@' '-echo' '+echo '`,
+      'echo "fatal: out of memory" >&2',
+      'exit 2',
+      '',
+    ].join('\n'),
+  );
+
+  await chmod(join(ctx.dir, 'shfmt'), 0o755);
+  await writeFile(join(ctx.dir, 'clean.sh'), '#!/usr/bin/env bash\necho "hello"\n');
+
+  expect(() =>
+    shellCheck.check({ cwd: ctx.dir, files: ['clean.sh'], env: { PATH: ctx.dir } }),
+  ).toThrowWithMessage(Error, 'shell: shfmt failed: fatal: out of memory');
+});

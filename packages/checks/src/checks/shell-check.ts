@@ -67,7 +67,17 @@ const HUNK_HEADER = /^@@ -(?<start>\d+)(?:,\d+)? \+\d+(?:,\d+)? @@/u;
 function runShfmt(context: CheckContext, files: readonly string[]): Finding[] {
   const result = runProgram('shell', context, ['shfmt', '-d', '--', ...files]);
 
-  const errors = result.stderr.split('\n').flatMap((line) => {
+  // shfmt exits 1 for a diff, a parse error, and an unreadable file alike. Any exit above 1, or any
+  // stderr line that is not a parse error, means a file went unchecked, so the run fails even when
+  // other files gave findings.
+  const stderrLines = result.stderr.split('\n').filter((line) => line.trim() !== '');
+  const failures = stderrLines.filter((line) => !SHFMT_ERROR_LINE.test(line));
+
+  if (result.exitCode > 1 || failures.length > 0) {
+    throw new Error(`shell: shfmt failed: ${result.stderr.trim()}`);
+  }
+
+  const errors = stderrLines.flatMap((line) => {
     const groups = SHFMT_ERROR_LINE.exec(line)?.groups;
 
     if (groups === undefined) {
@@ -85,7 +95,7 @@ function runShfmt(context: CheckContext, files: readonly string[]): Finding[] {
 
   const diffs = collectDiffFindings(result.stdout);
 
-  // shfmt exits 1 for both a diff and a parse error, so a failure with neither is a crash.
+  // An exit of 1 with neither a diff nor a parse error is a crash.
   if (result.exitCode !== 0 && errors.length === 0 && diffs.length === 0) {
     throw new Error(`shell: shfmt failed: ${result.stderr.trim()}`);
   }

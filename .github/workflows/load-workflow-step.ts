@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises';
 
 export interface WorkflowStep {
-  // The step's id, or null when it has none.
   readonly id: string | null;
 
   // The step's env, with each value as the workflow writes it, expressions included.
@@ -10,9 +9,9 @@ export interface WorkflowStep {
   readonly run: string;
 }
 
-// Reads one step of one job from a workflow file, so a test can run the step's shell for real and
-// resolve its env from the workflow's own bindings.
-export async function readWorkflowStep(
+// Reads and parses a workflow file and returns one step of one job, so a test can run the step's
+// shell for real and resolve its env from the workflow's own bindings.
+export async function loadWorkflowStep(
   path: string,
   job: string,
   step: string,

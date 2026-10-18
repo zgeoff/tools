@@ -2,10 +2,10 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readWorkflowStep } from './read-workflow-step.ts';
+import { loadWorkflowStep } from './load-workflow-step.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'read-workflow-step-'));
+  const dir = await mkdtemp(join(tmpdir(), 'load-workflow-step-'));
 
   onTestFinished(() => rm(dir, { recursive: true, force: true }));
 
@@ -34,7 +34,7 @@ test('it returns the id, env and run script of the named step', async () => {
     ].join('\n'),
   );
 
-  const step = await readWorkflowStep(join(ctx.dir, 'ci.yml'), 'build', 'Greet');
+  const step = await loadWorkflowStep(join(ctx.dir, 'ci.yml'), 'build', 'Greet');
 
   expect(step).toStrictEqual({
     id: 'greet',
@@ -58,7 +58,7 @@ test('it returns no id and an empty env for a step without them', async () => {
     ].join('\n'),
   );
 
-  const step = await readWorkflowStep(join(ctx.dir, 'ci.yml'), 'build', 'Greet');
+  const step = await loadWorkflowStep(join(ctx.dir, 'ci.yml'), 'build', 'Greet');
 
   expect(step).toStrictEqual({ id: null, env: {}, run: 'echo "hello"' });
 });
@@ -78,7 +78,7 @@ test('it rejects a step name the job lacks', async () => {
     ].join('\n'),
   );
 
-  expect(readWorkflowStep(join(ctx.dir, 'ci.yml'), 'build', 'Deploy')).rejects.toThrow(
+  expect(loadWorkflowStep(join(ctx.dir, 'ci.yml'), 'build', 'Deploy')).rejects.toThrow(
     `${join(ctx.dir, 'ci.yml')}: the build job has no step named Deploy with a run script`,
   );
 });
@@ -98,7 +98,7 @@ test('it rejects a job the workflow lacks', async () => {
     ].join('\n'),
   );
 
-  expect(readWorkflowStep(join(ctx.dir, 'ci.yml'), 'deploy', 'Greet')).rejects.toThrow(
+  expect(loadWorkflowStep(join(ctx.dir, 'ci.yml'), 'deploy', 'Greet')).rejects.toThrow(
     `${join(ctx.dir, 'ci.yml')}: the deploy job has no steps`,
   );
 });

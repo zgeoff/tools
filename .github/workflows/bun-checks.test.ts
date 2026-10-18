@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 import { createStubBun } from './create-stub-bun.ts';
 import { createStubCurl } from './create-stub-curl.ts';
-import { readWorkflowStep } from './read-workflow-step.ts';
+import { loadWorkflowStep } from './load-workflow-step.ts';
 
 // The steps of the checks job, read from the workflow, and a PATH whose bun is a tested stand-in
 // that records each script, so each step runs for real without the scripts. A test that downloads
@@ -21,9 +21,9 @@ async function setupTest() {
   await mkdir(bin);
   await createStubBun(bin, join(dir, 'ran'));
 
-  const pick = await readWorkflowStep(workflow, 'checks', 'Pick the check scripts');
-  const setupShfmt = await readWorkflowStep(workflow, 'checks', 'Setup shfmt');
-  const run = await readWorkflowStep(workflow, 'checks', 'Run the check scripts');
+  const pick = await loadWorkflowStep(workflow, 'checks', 'Pick the check scripts');
+  const setupShfmt = await loadWorkflowStep(workflow, 'checks', 'Setup shfmt');
+  const run = await loadWorkflowStep(workflow, 'checks', 'Run the check scripts');
 
   return { dir, bin, pick, setupShfmt, run, path: `${bin}:${process.env['PATH']}` };
 }
