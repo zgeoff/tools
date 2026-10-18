@@ -20,7 +20,9 @@ at a boundary the test cannot cross. When existing tests break these rules, you 
 work on the code they cover.
 
 Never write a test only to satisfy a lint or layout rule. Change the rule's config instead, with a
-one-line reason. Never cut a test that checks behaviour.
+one-line reason. A repo that adopts a shared lint rule, such as `zgeoff/import-zones`, never tests
+that the rule or its zones fire: the rule is tested once, in its own package. Never cut a test that
+checks behaviour.
 
 ## Key rules
 
