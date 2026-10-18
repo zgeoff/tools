@@ -73,6 +73,7 @@ made. Single letters and abbreviations are banned.
 A few short names are kept:
 
 - `x` and `y`, for coordinates.
+- `z` for zod, `$` for Bun's shell, and `_` for a placeholder that is never read.
 - `ctx` and `id`.
 - `db`, `args`, `params`, `repo` and `info`, which read as words.
 
@@ -80,7 +81,7 @@ A unit keeps its short form as a suffix, as in `timeoutMs`, but `ms` alone never
 Acronyms follow [Acronyms](#acronyms). A type parameter, such as `T`, is not a value, and this rule
 leaves it alone.
 
-Lint catches the mechanical cases. `id-length` fails a one-letter name other than `x` and `y`, and
+Lint catches the mechanical cases. `id-length` fails a one-letter name other than the kept ones, and
 `zgeoff/no-abbreviated-names` fails each abbreviation its options list, with the full word in its
 message. An abbreviation outside that list, such as `cfg`, breaks this rule all the same.
 
