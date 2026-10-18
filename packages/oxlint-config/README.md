@@ -8,7 +8,8 @@ await arguments, awaits hidden inside a control-flow condition or a `&&`/`||`/`?
 `switch` statement, every JSDoc block, any run of more than three line comments, and a repo config
 that loosens either comment rule. `zgeoff/function-verb` enforces the function-naming taxonomy from
 the shared agent guidelines, `zgeoff/test-beside-module` keeps each test file beside the module it
-tests, and `zgeoff/import-zones` fails an import that crosses a module boundary the repo declares.
+tests, `zgeoff/import-zones` fails an import that crosses a module boundary the repo declares, and
+`zgeoff/no-file-snapshot` bans file snapshots.
 
 ## Usage
 
@@ -84,6 +85,15 @@ first statement, so put the comment above it:
 
 A second test file for a module (`<name>.host.test.ts`) needs its own `<name>.host.<ext>`, so the
 rule reports it beside only `<name>.ts`.
+
+## `zgeoff/no-file-snapshot`
+
+Snapshots are inline only, so the golden value sits in the test that pins it. The rule reports every
+`toMatchSnapshot` and `toThrowErrorMatchingSnapshot`, which write a `.snap` file;
+`toMatchInlineSnapshot` and `toThrowErrorMatchingInlineSnapshot` stay allowed. It also reports a
+linted file that has a `__snapshots__/<file name>.snap` beside it, at the first statement, so a
+file-level disable comment covers it. oxlint never visits a `.snap` file, so a snapshot file whose
+test file is gone is not reported.
 
 ## `zgeoff/import-zones`
 

@@ -16,6 +16,7 @@
     "no-jsdoc.js",
     "no-comment-rule-override.js",
     "test-beside-module.js",
+    "no-file-snapshot.js",
     "import-zones.js",
     "import-zones-schema.js",
     "find-repo-root.js",

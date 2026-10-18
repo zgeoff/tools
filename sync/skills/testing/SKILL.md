@@ -402,7 +402,7 @@ tests or choosing unique keys hides the gap.
   output that no person derives by reading the code, such as a generated SQL string or a rendered
   report. A value a person wrote by hand, such as a spec test vector, keeps an explicit matcher,
   because a snapshot of it would bless whatever the code produced. File snapshots and component
-  snapshots never appear.
+  snapshots never appear, and `zgeoff/no-file-snapshot` reports a file snapshot.
 - A deterministic pipeline's suite opens with two tests. A frozen-golden test feeds one hand-written
   literal input and pins the full output inline. A determinism test asserts that the same input
   gives equal outputs: `expect(run(input)).toStrictEqual(run(input))`. The golden input is never a
