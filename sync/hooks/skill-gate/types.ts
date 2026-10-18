@@ -34,6 +34,30 @@ export interface SkillGatePlan {
   readonly unknown: readonly UnknownSkill[];
 }
 
+export interface ShellWord {
+  readonly text: string;
+  readonly literal: boolean;
+}
+
+export interface ShellRedirect {
+  readonly operator: string;
+  readonly target: ShellWord;
+}
+
+export interface ShellCommand {
+  readonly words: readonly ShellWord[];
+  readonly redirects: readonly ShellRedirect[];
+  readonly stdin: string | null;
+}
+
+// A path a Bash command writes, relative to the command's working directory unless absolute. With
+// a `fileName`, as for `cp a.ts dest`, the write lands at `path/fileName` when `path` is a
+// directory, and at `path` otherwise.
+export interface WrittenPath {
+  readonly path: string;
+  readonly fileName?: string;
+}
+
 export interface SkillGateOutputContext {
   readonly compacted?: boolean;
   readonly rulesError?: string;

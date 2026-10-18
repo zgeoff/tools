@@ -500,3 +500,173 @@ test('it gates a project file whose name starts with two dots', async () => {
     },
   });
 });
+
+test.each([
+  ["sed -i 's/oldName/newName/' src/a.test.ts"],
+  ["echo 'export {};' > src/a.test.ts"],
+  ["echo 'export {};' >> src/a.test.ts"],
+  ["printf 'export {};' | tee src/a.test.ts"],
+  ['cp drafts/a.ts src/a.test.ts'],
+  ['mv drafts/a.ts src/a.test.ts'],
+  ["cd src && sed -i.bak -e 's/oldName/newName/' a.test.ts"],
+  [`python3 -c "open('src/a.test.ts', 'w').write('export {};')"`],
+])('it denies the Bash command %s with the Edit-tool message', async (command) => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, '.claude/skills/testing'), { recursive: true });
+  await mkdir(join(ctx.dir, 'src'), { recursive: true });
+  await writeFile(join(ctx.dir, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(ctx.dir, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+  );
+
+  const result = spawnSync('bun', [ctx.hookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.dir },
+    input: JSON.stringify({
+      cwd: ctx.dir,
+      transcript_path: join(ctx.dir, 'transcript.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: `${join(ctx.dir, 'src/a.test.ts')} is a gated path, so change it with the Edit, Write or MultiEdit tool, never through Bash. Load the \`testing\` skill with the Skill tool first. .claude/skill-gate.json lists the skills each path needs.`,
+    },
+  });
+});
+
+test.each([
+  ["sed -n '1,20p' src/a.test.ts"],
+  ['cat src/a.test.ts'],
+  ['grep -n oldName src/a.test.ts'],
+  ["sed -i 's/oldName/newName/' src/a.ts"],
+  ["echo 'draft' > notes.txt"],
+  ['cp src/a.test.ts drafts/a.test.ts.bak'],
+  ["echo 'unclosed > src/a.test.ts"],
+])('it lets the Bash command %s go ahead in silence', async (command) => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, '.claude/skills/testing'), { recursive: true });
+  await writeFile(join(ctx.dir, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(ctx.dir, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+  );
+
+  const result = spawnSync('bun', [ctx.hookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.dir },
+    input: JSON.stringify({
+      cwd: ctx.dir,
+      transcript_path: join(ctx.dir, 'transcript.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});
+
+test('it denies a Bash write to a gated path after the session loads the skills', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, '.claude/skills/testing'), { recursive: true });
+  await writeFile(join(ctx.dir, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(ctx.dir, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+  );
+
+  await writeFile(
+    join(ctx.dir, 'transcript.jsonl'),
+    [
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"testing"}}]}}',
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Launching skill: testing"}]}}',
+    ].join('\n'),
+  );
+
+  const result = spawnSync('bun', [ctx.hookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.dir },
+    input: JSON.stringify({
+      cwd: ctx.dir,
+      transcript_path: join(ctx.dir, 'transcript.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command: "sed -i 's/oldName/newName/' src/a.test.ts" },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: `${join(ctx.dir, 'src/a.test.ts')} is a gated path, so change it with the Edit, Write or MultiEdit tool, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
+    },
+  });
+});
+
+test('it denies a Bash copy into a directory when the copied file name is gated', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, '.claude/skills/testing'), { recursive: true });
+  await mkdir(join(ctx.dir, 'src'), { recursive: true });
+  await writeFile(join(ctx.dir, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(ctx.dir, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+  );
+
+  const result = spawnSync('bun', [ctx.hookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.dir },
+    input: JSON.stringify({
+      cwd: ctx.dir,
+      transcript_path: join(ctx.dir, 'transcript.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command: 'cp drafts/b.test.ts src' },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: `${join(ctx.dir, 'src/b.test.ts')} is a gated path, so change it with the Edit, Write or MultiEdit tool, never through Bash. Load the \`testing\` skill with the Skill tool first. .claude/skill-gate.json lists the skills each path needs.`,
+    },
+  });
+});
+
+test('it lets a Bash write to a gated path go ahead in a repo without a rules file', async () => {
+  const ctx = await setupTest();
+
+  const result = spawnSync('bun', [ctx.hookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.dir },
+    input: JSON.stringify({
+      cwd: ctx.dir,
+      transcript_path: join(ctx.dir, 'transcript.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command: "sed -i 's/oldName/newName/' src/a.test.ts" },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});

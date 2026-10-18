@@ -61,8 +61,11 @@ before its `except` removes that copy itself.
 Files under [`hooks/`](./hooks/) are Claude Code hooks, delivered as opt-in entries to
 `.claude/hooks/<name>/`. Their tests stay here. `hook-skill-gate` delivers the skill gate: a
 `PreToolUse` hook that denies an edit until the session has loaded every skill the path needs, and
-names the missing skills. The gate holds no rules. A repo opts in with three changes, which
-repo-sync never touches:
+names the missing skills. It also denies a Bash command that writes a gated path through a redirect,
+`tee`, `sed -i`, `cp`, `mv` or an inline script, because a gated path changes only through Edit,
+Write or MultiEdit. The hook lets a Bash command through when it cannot parse the command or a path
+in it, so it guides an agent and does not sandbox the shell. The gate holds no rules. A repo opts in
+with three changes, which repo-sync never touches:
 
 1. Add `hook-skill-gate` to `include` in `.github/workflows/repo-sync.yml`.
 2. Write `.claude/skill-gate.json`. `match` is a glob over the path from the repo root, and a path
@@ -87,7 +90,7 @@ repo-sync never touches:
      "hooks": {
        "PreToolUse": [
          {
-           "matcher": "Edit|Write|MultiEdit",
+           "matcher": "Edit|Write|MultiEdit|Bash",
            "hooks": [
              {
                "type": "command",
