@@ -14,14 +14,15 @@ async function setupTest() {
 
   const text = await readFile(join(import.meta.dir, 'bun-checks.yml'), 'utf8');
 
-  const workflow = Bun.YAML.parse(text) as {
-    jobs: { checks: { steps: { name?: string; run?: string }[] } };
-  };
+  // The step's run block is the last block of the file, indented 10 spaces.
+  const marker = '      - name: Run the check scripts\n';
+  const block = text.slice(text.indexOf('run: |\n', text.indexOf(marker)) + 'run: |\n'.length);
+  const lines = block.split('\n');
 
-  const steps = workflow.jobs.checks.steps;
-  const step = steps.find((candidate) => candidate.name === 'Run the check scripts');
-
-  invariant(step?.run, 'bun-checks.yml has no step named Run the check scripts');
+  invariant(
+    text.includes(marker) && lines.every((line) => line === '' || line.startsWith(' '.repeat(10))),
+    'the Run the check scripts step must end bun-checks.yml',
+  );
 
   const bin = join(dir, 'bin');
 
@@ -29,7 +30,11 @@ async function setupTest() {
   await writeFile(join(bin, 'bun'), `#!/bin/sh\necho "$2" >> "${join(dir, 'ran')}"\n`);
   await chmod(join(bin, 'bun'), 0o755);
 
-  return { dir, script: step.run, path: `${bin}:${process.env['PATH']}` };
+  return {
+    dir,
+    script: lines.map((line) => line.slice(10)).join('\n'),
+    path: `${bin}:${process.env['PATH']}`,
+  };
 }
 
 test('it runs check in the standard list when the repo defines the script', async () => {

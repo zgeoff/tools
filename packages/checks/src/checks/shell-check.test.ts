@@ -96,7 +96,7 @@ test.each([
 
   const presentPath = Bun.which(present);
 
-  invariant(presentPath, `${present} must be on the PATH to run this test`);
+  invariant(presentPath !== null, `${present} must be on the PATH to run this test`);
 
   await symlink(presentPath, join(ctx.dir, present));
   await writeFile(join(ctx.dir, 'clean.sh'), '#!/usr/bin/env bash\necho "hello"\n');
