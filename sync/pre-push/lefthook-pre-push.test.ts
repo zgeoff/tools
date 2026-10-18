@@ -94,15 +94,25 @@ test.each([
   ['sync/skills/docs-writing/scripts/check-links.test.ts'],
   ['sync/skills/skill-writing/scripts/check-skill.test.ts'],
 ])(
-  'it leaves the main checkout config and branch unchanged when %s inherits a worktree GIT_DIR',
+  'it passes %s and leaves the main checkout config and branch unchanged under a worktree GIT_DIR',
   async (suite) => {
     const ctx = await setupTest();
+
+    // A local exclude for every page, so a script whose git reads this repo instead of its own
+    // temp repo lists none of the pages its test writes, and the test fails.
+    await writeFile(join(ctx.main, '.git/info/exclude'), '*.md\n');
+
     const config = await readFile(join(ctx.main, '.git/config'), 'utf8');
     const head = await $`git rev-parse feature`.cwd(ctx.main).env(ctx.env).text();
 
-    await $`bun test ./${suite}`
+    // The real HOME, so a tool on PATH that reads it, such as a version manager's node shim, runs.
+    const result = await $`bun test ./${suite}`
       .cwd(join(import.meta.dir, '../..'))
-      .env({ ...ctx.env, GIT_DIR: join(ctx.main, '.git/worktrees/worktree') })
+      .env({
+        ...ctx.env,
+        HOME: process.env['HOME'],
+        GIT_DIR: join(ctx.main, '.git/worktrees/worktree'),
+      })
       .quiet()
       .nothrow();
 
@@ -111,6 +121,8 @@ test.each([
 
     expect(configAfter).toBe(config);
     expect(headAfter).toBe(head);
+    expect(result.stderr.toString()).toMatch(/^ [1-9]\d* pass\n 0 fail$/mu);
+    expect(result.exitCode).toBe(0);
   },
   30_000,
 );
