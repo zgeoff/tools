@@ -148,24 +148,25 @@ report 'Untagged code fences:' \
 
 # Lists the files the branch changes since its merge base with origin's default branch, then the
 # uncommitted and untracked ones. The paragraph check reads only these, so a doc written before the
-# check fails nobody until a branch edits it.
+# check fails nobody until a branch edits it. Each path ends in a NUL, so a path may hold any
+# character.
 list_changed() {
   local default base
   default=$(git rev-parse -q --abbrev-ref origin/HEAD 2>/dev/null) || default=origin/main
   if git rev-parse -q --verify HEAD >/dev/null; then
     if base=$(git merge-base HEAD "$default" 2>/dev/null); then
-      git -c core.quotePath=false diff --name-only --no-renames --diff-filter=d "$base" HEAD
+      git diff -z --name-only --no-renames --diff-filter=d "$base" HEAD
     # A pull-request run in GitHub Actions checks out the PR's merge commit with no history and no
     # origin branches, so the base tip is fetched and the two trees compared.
     elif [ -n "${GITHUB_BASE_REF:-}" ] &&
       git fetch -q --no-tags --depth=1 origin "$GITHUB_BASE_REF" 2>/dev/null; then
-      git -c core.quotePath=false diff --name-only --no-renames --diff-filter=d FETCH_HEAD HEAD
+      git diff -z --name-only --no-renames --diff-filter=d FETCH_HEAD HEAD
     else
       echo "check-prose: no merge base with $default, so the paragraph check reads only uncommitted files" >&2
     fi
-    git -c core.quotePath=false diff --name-only --no-renames --diff-filter=d HEAD
+    git diff -z --name-only --no-renames --diff-filter=d HEAD
   fi
-  git -c core.quotePath=false ls-files --others --exclude-standard
+  git ls-files -z --others --exclude-standard
 }
 
 # Prints file:line:words for each prose paragraph over the warning limit. A paragraph is a run of
@@ -278,8 +279,23 @@ html_end != "" {
 END { flush() }
 '
 
-paragraphs=$(list_markdown "$@" | grep -Fx -f <(list_changed) | xargs -r awk -v warn="$paragraph_warn" \
-  "$fence_awk$paragraph_awk")
+changed=$'\n'
+while IFS= read -r -d '' file; do
+  changed+=$file$'\n'
+done < <(list_changed)
+
+# The Markdown files the paths name that the branch changes, read NUL-separated like list_changed.
+paragraph_files=()
+while IFS= read -r -d '' file; do
+  if [[ $file == *.md && $changed == *$'\n'"$file"$'\n'* && -f $file ]]; then
+    paragraph_files+=("$file")
+  fi
+done < <(git ls-files -z --cached --others --exclude-standard -- "$@")
+
+paragraphs=
+if [ "${#paragraph_files[@]}" -gt 0 ]; then
+  paragraphs=$(awk -v warn="$paragraph_warn" "$fence_awk$paragraph_awk" "${paragraph_files[@]}")
+fi
 
 report "Paragraphs over $paragraph_fail words in a changed file (split each one; lists, tables and code blocks are exempt):" \
   "$(awk -F: -v limit="$paragraph_fail" '$NF > limit { print $0" words" }' <<<"$paragraphs")"

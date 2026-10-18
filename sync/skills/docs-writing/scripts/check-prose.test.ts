@@ -274,16 +274,20 @@ test('it passes a long table without outer pipes', async () => {
   expect(result.stdout).not.toInclude('Paragraphs over');
 });
 
-test('it skips an HTML comment across blank lines and counts the prose after it', async () => {
+test('it skips HTML comments and upper-case pre blocks across blank lines and counts the prose after them', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('guide.md', `<!--\n\n${buildWords(300)}\n\n-->\n\n${buildWords(200)}\n`);
+  await ctx.writeText(
+    'guide.md',
+    `<!--\n\n${buildWords(300)}\n\n-->\n\n<PRE>\n\n${buildWords(300)}\n\n</PRE>\n\n${buildWords(200)}\n`,
+  );
 
   const result = ctx.run('guide.md');
 
   expect(result.status).toBe(0);
   expect(result.stdout).not.toInclude('guide.md:3:');
-  expect(result.stdout).toInclude('guide.md:36:200 words');
+  expect(result.stdout).not.toInclude('guide.md:38:');
+  expect(result.stdout).toInclude('guide.md:71:200 words');
 });
 
 test('it warns on a paragraph that starts with an inline tag or an autolink', async () => {
@@ -299,18 +303,6 @@ test('it warns on a paragraph that starts with an inline tag or an autolink', as
   expect(result.status).toBe(1);
   expect(result.stdout).toInclude('guide.md:1:251 words');
   expect(result.stdout).toInclude('guide.md:27:251 words');
-});
-
-test('it skips a block tag written in upper case across blank lines', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writeText('guide.md', `<PRE>\n\n${buildWords(300)}\n\n</PRE>\n\n${buildWords(200)}\n`);
-
-  const result = ctx.run('guide.md');
-
-  expect(result.status).toBe(0);
-  expect(result.stdout).not.toInclude('guide.md:3:');
-  expect(result.stdout).toInclude('guide.md:36:200 words');
 });
 
 test('it counts a paragraph that follows a heading with no blank line', async () => {
@@ -381,4 +373,35 @@ test('it counts only the PR documents in a shallow pull-request merge checkout',
   expect(result.status).toBe(1);
   expect(result.stdout).toInclude('pr.md:1:270 words');
   expect(result.stdout).not.toInclude('base.md');
+});
+
+test('it checks a changed file whose name holds a space', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('user guide.md', `${buildWords(251)}\n`);
+
+  const result = ctx.run('user guide.md');
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('user guide.md:1:251 words');
+});
+
+test('it reads the default branch from origin/HEAD', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('old.md', `${buildWords(300)}\n`);
+
+  ctx.runCommit('add the old doc');
+  ctx.runGit('update-ref', 'refs/remotes/origin/trunk', 'HEAD');
+  ctx.runGit('symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/trunk');
+
+  await ctx.writeText('new.md', `${buildWords(251)}\n`);
+
+  ctx.runCommit('add the new doc');
+
+  const result = ctx.run('old.md', 'new.md');
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('new.md:1:251 words');
+  expect(result.stdout).not.toInclude('old.md');
 });
