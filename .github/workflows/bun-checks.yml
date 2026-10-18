@@ -34,6 +34,12 @@ on:
         type: number
         required: false
         default: 10
+      setup-shfmt:
+        description:
+          Install shfmt even when the scripts do not run check, for a suite whose tests run it
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   gitleaks:
@@ -120,7 +126,7 @@ jobs:
       # carries, and shfmt, which it lacks. The pinned binary goes to a folder
       # the runner owns, put on the PATH of the later steps.
       - name: Setup shfmt
-        if: contains(steps.pick.outputs.scripts, ' check ')
+        if: inputs.setup-shfmt || contains(steps.pick.outputs.scripts, ' check ')
         env:
           SHFMT_VERSION: v3.13.1
           SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
