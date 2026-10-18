@@ -9,7 +9,8 @@ await arguments, awaits hidden inside a control-flow condition or a `&&`/`||`/`?
 that loosens either comment rule. `zgeoff/function-verb` enforces the function-naming taxonomy from
 the shared agent guidelines, `zgeoff/test-beside-module` keeps each test file beside the module it
 tests, `zgeoff/import-zones` fails an import that crosses a module boundary the repo declares,
-`zgeoff/no-restricted-words` keeps the words in its `words` option out of a path's text, and
+`zgeoff/no-restricted-words` keeps the words in its `words` option out of a path's text,
+`zgeoff/no-abbreviated-names` reports each abbreviated value name it lists with its full word, and
 `zgeoff/no-file-snapshot` bans file snapshots.
 
 ## Usage
@@ -105,6 +106,15 @@ the paths that may name the words:
   ],
 }
 ```
+
+## `zgeoff/no-abbreviated-names`
+
+The `names` option maps each abbreviation to the text that replaces it, and the rule reports a
+variable, parameter, catch parameter, destructured name, import, property, getter or setter that has
+one of those names. A name matches whole, so `ms` reports `ms` but not `timeoutMs`. A destructured
+key that an alias renames belongs to the object being read, and the rule reports only the alias. The
+shipped config lists the abbreviations that the code-style skill bans and turns on `id-length`
+beside the rule, so a one-letter name fails too, other than `x`, `y`, `z`, `$` and `_`.
 
 ## `zgeoff/no-file-snapshot`
 

@@ -726,6 +726,150 @@ test('it reports nothing when the config names no words', async () => {
   expect(result.exitCode).toBe(0);
 });
 
+const abbreviated = {
+  'zgeoff/no-abbreviated-names': ['error', { names: { src: '`source`', ms: 'a unit suffix' } }],
+};
+
+test.each([
+  ['a variable', 'export const src = 1;\n'],
+  ['a parameter', 'export function readPath(src: string): string {\n  return src;\n}\n'],
+  [
+    'a parameter with a default',
+    "export function readPath(src = ''): string {\n  return src;\n}\n",
+  ],
+  ['an arrow parameter', 'export const paths = [1].map((src) => src);\n'],
+  ['a destructured alias', 'const { path: src } = { path: 1 };\n\nexport const value = src;\n'],
+  ['a destructured rest', 'const { ...src } = { path: 1 };\n\nexport const value = src;\n'],
+  ['an array element', 'const [src] = [1];\n\nexport const value = src;\n'],
+  [
+    'a catch parameter',
+    'export function readPath(): string {\n  try {\n    return String(globalThis);\n  } catch (src) {\n    return String(src);\n  }\n}\n',
+  ],
+  ['an object key', 'export const paths = { src: 1 };\n'],
+  ['a class property', 'export class Paths {\n  src = 1;\n}\n'],
+  ['an interface property', 'export interface Paths {\n  src: string;\n}\n'],
+  ['an accessor property', 'export class Paths {\n  accessor src = 1;\n}\n'],
+  ['an abstract property', 'export abstract class Paths {\n  abstract src: string;\n}\n'],
+  [
+    'an abstract accessor property',
+    'export abstract class Paths {\n  abstract accessor src: string;\n}\n',
+  ],
+  ['a parameter property', 'export class Reader {\n  constructor(public src: string) {}\n}\n'],
+  ['a function type parameter', 'export type Reader = (src: string) => string;\n'],
+  ['a constructor type parameter', 'export type MakeReader = new (src: string) => object;\n'],
+  [
+    'a method signature parameter',
+    'export interface Reader {\n  readPath(src: string): string;\n}\n',
+  ],
+  ['a call signature parameter', 'export interface Reader {\n  (src: string): string;\n}\n'],
+  [
+    'a construct signature parameter',
+    'export interface MakeReader {\n  new (src: string): object;\n}\n',
+  ],
+  ['a declared function parameter', 'export declare function readPath(src: string): string;\n'],
+  [
+    'an abstract method parameter',
+    'export abstract class Reader {\n  abstract readPath(src: string): string;\n}\n',
+  ],
+  ['a getter', 'export class Paths {\n  get src(): number {\n    return 1;\n  }\n}\n'],
+  [
+    'a setter',
+    'export class Paths {\n  set src(value: number) {\n    globalThis.value = value;\n  }\n}\n',
+  ],
+  ['an abstract getter', 'export abstract class Paths {\n  abstract get src(): number;\n}\n'],
+  ['an abstract setter', 'export abstract class Paths {\n  abstract set src(value: number);\n}\n'],
+  ['an interface getter', 'export interface Paths {\n  get src(): number;\n}\n'],
+  ['an interface setter', 'export interface Paths {\n  set src(value: number);\n}\n'],
+  [
+    'a named import alias',
+    "import { readFile as src } from 'node:fs';\n\nexport const value = src;\n",
+  ],
+  ['a default import', "import src from 'node:fs';\n\nexport const value = src;\n"],
+  ['a namespace import', "import * as src from 'node:fs';\n\nexport const value = src;\n"],
+  ['a require import', "import src = require('node:fs');\n\nexport const value = src;\n"],
+  [
+    'a namespace alias import',
+    'namespace Paths {\n  export const root = 1;\n}\n\nimport src = Paths.root;\n\nexport const value = src;\n',
+  ],
+  [
+    'an overload parameter',
+    'export class Reader {\n  readPath(src: string): string;\n  readPath(path: string): string {\n    return path;\n  }\n}\n',
+  ],
+  ['a member assignment', 'export const paths = { path: 1 };\n\npaths.src = 2;\n'],
+])('it reports an abbreviated name in %s', async (_place, source) => {
+  const result = await runLint(source, false, abbreviated);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('Rename `src` to `source`');
+});
+
+test.each([
+  ['a private field', 'export class Paths {\n  #src = 1;\n}\n'],
+  ['a private getter', 'export class Paths {\n  get #src(): number {\n    return 1;\n  }\n}\n'],
+])('it reports an abbreviated name in %s', async (_place, source) => {
+  const result = await runLint(source, false, abbreviated);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('Rename `#src` to `source`');
+});
+
+test.each([
+  [
+    'a type-only import',
+    "import type { Paths as src } from './paths.ts';\n\nexport type Value = src;\n",
+  ],
+  [
+    'a type-only specifier',
+    "import { type Paths as src } from './paths.ts';\n\nexport type Value = src;\n",
+  ],
+  [
+    'a type-only default import',
+    "import type src from './paths.ts';\n\nexport type Value = src;\n",
+  ],
+  [
+    'a type-only require import',
+    "import type src = require('./paths.ts');\n\nexport type Value = src;\n",
+  ],
+])('it accepts an abbreviated name in %s', async (_place, source) => {
+  const result = await runLint(source, false, abbreviated);
+
+  expect(result.stdout).not.toInclude('no-abbreviated-names');
+});
+
+test('it accepts an abbreviation inside a longer name', async () => {
+  const source = 'export const timeoutMs = 1;\nexport const srcPath = 2;\n';
+
+  const result = await runLint(source, false, abbreviated);
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it accepts a destructured key that an alias renames', async () => {
+  const source =
+    'const { src: source } = Object.fromEntries([["src", 1]]);\n\nexport const value = source;\n';
+
+  const result = await runLint(source, false, abbreviated);
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it accepts an abbreviated name read from another object', async () => {
+  const source =
+    'const paths = { source: 1 };\n\nexport const value = Reflect.get(paths, "src") ?? process.src;\n';
+
+  const result = await runLint(source, false, abbreviated);
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it reports nothing when the config names no abbreviations', async () => {
+  const result = await runLint('export const src = 1;\n', false, {
+    'zgeoff/no-abbreviated-names': 'error',
+  });
+
+  expect(result.exitCode).toBe(0);
+});
+
 const layered = {
   'zgeoff/import-zones': [
     'error',
