@@ -41,6 +41,9 @@ test.each([
   ],
   ["/usr/bin/sed -i 's/a/b/' /srv/app/a.ts", [{ path: '/srv/app/a.ts' }]],
   ['(cd /srv); echo x > src/a.ts', [{ path: 'src/a.ts' }]],
+  ['cd /srv | cat; echo x > src/a.ts', [{ path: 'src/a.ts' }]],
+  ["sudo -n sed -i 's/a/b/' src/a.ts", [{ path: 'src/a.ts' }]],
+  ["python3 - <<'EOF' | cat\nopen('src/a.ts', 'w').write('x')\nEOF", [{ path: 'src/a.ts' }]],
   ['(cd docs; (cd ..); echo x > a.md); echo x > b.md', [{ path: 'docs/a.md' }, { path: 'b.md' }]],
 ])('it finds the paths that %j writes', (command, expected) => {
   expect(collectWrittenPaths(command)).toStrictEqual(expected);

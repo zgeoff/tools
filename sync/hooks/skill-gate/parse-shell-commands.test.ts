@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { parseShellCommands } from './parse-shell-commands.ts';
 
 test('it splits a command line into simple commands at each separator', () => {
-  expect(parseShellCommands('cd src && ls | head -n 1; pwd')).toStrictEqual([
+  expect(parseShellCommands('cd src && ls || head -n 1; pwd')).toStrictEqual([
     {
       words: [
         { text: 'cd', literal: true },
@@ -114,6 +114,39 @@ test('it counts the subshells that open before a command and close after it', ()
     },
     { words: [{ text: 'pwd', literal: true }], redirects: [], stdin: null, enters: 1, leaves: 2 },
     { words: [{ text: 'ls', literal: true }], redirects: [], stdin: null, enters: 0, leaves: 0 },
+  ]);
+});
+
+test('it runs each side of a pipe in its own subshell', () => {
+  expect(parseShellCommands('cd src | cat; pwd')).toStrictEqual([
+    {
+      words: [
+        { text: 'cd', literal: true },
+        { text: 'src', literal: true },
+      ],
+      redirects: [],
+      stdin: null,
+      enters: 1,
+      leaves: 1,
+    },
+    { words: [{ text: 'cat', literal: true }], redirects: [], stdin: null, enters: 1, leaves: 1 },
+    { words: [{ text: 'pwd', literal: true }], redirects: [], stdin: null, enters: 0, leaves: 0 },
+  ]);
+});
+
+test('it gives a here document to the command whose redirect asked for it, before a pipe', () => {
+  expect(parseShellCommands("python3 - <<'EOF' | cat\nprint('x')\nEOF")).toStrictEqual([
+    {
+      words: [
+        { text: 'python3', literal: true },
+        { text: '-', literal: true },
+      ],
+      redirects: [{ operator: '<<', target: { text: 'EOF', literal: true } }],
+      stdin: "print('x')\n",
+      enters: 1,
+      leaves: 1,
+    },
+    { words: [{ text: 'cat', literal: true }], redirects: [], stdin: null, enters: 1, leaves: 1 },
   ]);
 });
 

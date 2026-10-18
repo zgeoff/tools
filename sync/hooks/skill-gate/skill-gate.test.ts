@@ -736,3 +736,29 @@ test('it denies a Bash command that writes paths under two gates and names every
     },
   });
 });
+
+test('it lets a Bash write to a gated file name outside the project go ahead', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, 'repo/.claude/skills/testing'), { recursive: true });
+  await writeFile(join(ctx.dir, 'repo/.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(ctx.dir, 'repo/.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+  );
+
+  const result = spawnSync('bun', [ctx.hookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: join(ctx.dir, 'repo') },
+    input: JSON.stringify({
+      cwd: join(ctx.dir, 'repo'),
+      transcript_path: join(ctx.dir, 'transcript.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command: `echo 'draft' > ${join(ctx.dir, 'other/a.test.ts')}` },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});

@@ -11,7 +11,7 @@ export function parseShellCommands(text: string): readonly ShellCommand[] | null
 
 type ShellToken =
   | { readonly kind: 'word'; readonly word: ShellWord }
-  | { readonly kind: 'separator' }
+  | { readonly kind: 'separator'; readonly operator: string }
   | { readonly kind: 'subshell'; readonly opens: boolean }
   | { readonly kind: 'redirect'; readonly operator: string }
   | { readonly kind: 'heredoc'; readonly body: string };
@@ -45,7 +45,7 @@ function splitShellTokens(text: string): ShellToken[] | null {
         index = end.next;
       }
 
-      tokens.push({ kind: 'separator' });
+      tokens.push({ kind: 'separator', operator: '\n' });
     } else if (char === '#') {
       const lineEnd = text.indexOf('\n', index);
 
@@ -138,7 +138,9 @@ function buildOperatorToken(operator: string): ShellToken {
     return { kind: 'subshell', opens: operator === '(' };
   }
 
-  return SEPARATORS.has(operator) ? { kind: 'separator' } : { kind: 'redirect', operator };
+  return SEPARATORS.has(operator)
+    ? { kind: 'separator', operator }
+    : { kind: 'redirect', operator };
 }
 
 function findOperator(text: string, index: number): string | null {
@@ -306,51 +308,76 @@ function isRedirectStart(char: string): boolean {
   return char === '<' || char === '>';
 }
 
+interface CommandDraft {
+  words: ShellWord[];
+  redirects: ShellRedirect[];
+  stdin: string | null;
+  enters: number;
+  leaves: number;
+}
+
 // A subshell's opening counts toward the next command's `enters`, and its closing toward the last
-// command's `leaves`, so a caller can restore the state a subshell changed, such as its directory.
+// command's `leaves`. Each side of a pipe runs in its own subshell too, so a caller can restore the
+// state such a command changed, such as its directory.
 function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellCommand[] {
-  const commands: ShellCommand[] = [];
-  let words: ShellWord[] = [];
-  let redirects: ShellRedirect[] = [];
-  let stdin: string | null = null;
+  const commands: CommandDraft[] = [];
+  const heredocOwners: CommandDraft[] = [];
+  let draft = buildCommandDraft();
   let operator: string | null = null;
-  let enters = 0;
+  let pipedIn = false;
 
-  const collectPendingCommand = (): void => {
-    if (words.length > 0 || redirects.length > 0) {
-      commands.push({ words, redirects, stdin, enters, leaves: 0 });
+  // Closes the draft at a separator. A command on either side of a pipe enters and leaves one more
+  // subshell.
+  const collectDraft = (separator: string | null): void => {
+    const pipedOut = separator === '|' || separator === '|&';
 
-      enters = 0;
+    if (draft.words.length > 0 || draft.redirects.length > 0) {
+      const piped = pipedIn || pipedOut;
+
+      draft.enters += piped ? 1 : 0;
+      draft.leaves += piped ? 1 : 0;
+
+      commands.push(draft);
+
+      draft = buildCommandDraft();
     }
 
-    words = [];
-    redirects = [];
-    stdin = null;
     operator = null;
+    pipedIn = pipedOut;
   };
 
   for (const token of tokens) {
     if (token.kind === 'separator') {
-      collectPendingCommand();
+      collectDraft(token.operator);
     } else if (token.kind === 'subshell') {
-      collectPendingCommand();
+      collectDraft(null);
 
       const last = commands.at(-1);
 
       if (token.opens) {
-        enters += 1;
+        draft.enters += 1;
       } else if (last !== undefined) {
-        commands[commands.length - 1] = { ...last, leaves: last.leaves + 1 };
+        last.leaves += 1;
       }
     } else if (token.kind === 'heredoc') {
-      stdin = token.body;
+      // A here document's body belongs to the command whose `<<` asked for it, which a pipe may
+      // already have closed.
+      const owner = heredocOwners.shift();
+
+      if (owner !== undefined) {
+        owner.stdin = token.body;
+      }
     } else if (token.kind === 'redirect') {
       operator = token.operator;
+
+      if (operator === '<<' || operator === '<<-') {
+        heredocOwners.push(draft);
+      }
     } else if (token.kind === 'word') {
       if (operator === null) {
-        words.push(token.word);
+        draft.words.push(token.word);
       } else {
-        redirects.push({ operator, target: token.word });
+        draft.redirects.push({ operator, target: token.word });
 
         operator = null;
       }
@@ -359,9 +386,13 @@ function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellComman
     }
   }
 
-  collectPendingCommand();
+  collectDraft(null);
 
   return commands;
+}
+
+function buildCommandDraft(): CommandDraft {
+  return { words: [], redirects: [], stdin: null, enters: 0, leaves: 0 };
 }
 
 // The synced hook runs without npm dependencies, so a `never` check stands in for ts-pattern's

@@ -73,19 +73,16 @@ function resolveWordPath(word: ShellWord | undefined, dir: string | null): Writt
 
 const ASSIGNMENT = /^[A-Za-z_]\w*=/u;
 
-const WRAPPERS = new Set(['sudo', 'env', 'command', 'builtin', 'exec', 'nohup', 'time', 'nice']);
-
-const WRAPPER_VALUE_OPTIONS = new Set([
-  '-u',
-  '-g',
-  '-n',
-  '-C',
-  '-S',
-  '-D',
-  '-r',
-  '-t',
-  '-U',
-  '--chdir',
+// Each wrapper names the options that take the next argument as their value, such as `sudo -u`.
+const WRAPPER_VALUE_OPTIONS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+  ['sudo', new Set(['-u', '-g', '-C', '-D', '-p', '-r', '-t', '-T', '-U'])],
+  ['env', new Set(['-u', '-C', '-S', '--unset', '--chdir', '--split-string'])],
+  ['nice', new Set(['-n', '--adjustment'])],
+  ['time', new Set(['-f', '-o', '--format', '--output'])],
+  ['exec', new Set(['-a'])],
+  ['command', new Set<string>()],
+  ['builtin', new Set<string>()],
+  ['nohup', new Set<string>()],
 ]);
 
 // Drops the variable assignments and wrappers such as `sudo` or `env` in front of the program.
@@ -101,11 +98,13 @@ function getProgramWords(words: readonly ShellWord[]): readonly ShellWord[] {
 
     if (ASSIGNMENT.test(word.text)) {
       index += 1;
-    } else if (word.literal && WRAPPERS.has(word.text)) {
+    } else if (word.literal && WRAPPER_VALUE_OPTIONS.has(word.text)) {
+      const valueOptions = WRAPPER_VALUE_OPTIONS.get(word.text) ?? new Set<string>();
+
       index += 1;
 
       while (words[index]?.text.startsWith('-') === true) {
-        index += WRAPPER_VALUE_OPTIONS.has(words[index]?.text ?? '') ? 2 : 1;
+        index += valueOptions.has(words[index]?.text ?? '') ? 2 : 1;
       }
     } else {
       break;
@@ -400,7 +399,7 @@ function collectScriptTextRanges(
 
       index = end;
     } else if (char === "'" || char === '"' || char === '`') {
-      const end = findQuoteEnd(script, index);
+      const end = getQuoteEndOrScriptEnd(script, index);
 
       ranges.push({ start: index, end });
 
@@ -413,7 +412,7 @@ function collectScriptTextRanges(
   return ranges;
 }
 
-function findQuoteEnd(script: string, start: number): number {
+function getQuoteEndOrScriptEnd(script: string, start: number): number {
   const quote = script.charAt(start);
   let index = start + 1;
 

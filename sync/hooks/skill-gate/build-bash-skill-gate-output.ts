@@ -1,6 +1,8 @@
 import { formatSkillList } from './format-skill-list.ts';
 import type { SkillGateHookOutput } from './types.ts';
 
+const RULES_PATH = '.claude/skill-gate.json';
+
 // Builds the PreToolUse hook output for a Bash command, or null when it writes no gated path. A
 // gated path changes only through Edit, Write or MultiEdit, so the command is denied even once the
 // session has loaded the skills, and the reason names the skills it still has to load.
@@ -39,5 +41,3 @@ function buildLoadInstruction(missing: readonly string[], compacted: boolean): s
     ? ` Load the ${formatSkillList(missing)} again with the Skill tool first. This session was compacted, and a skill loaded before the compaction no longer counts.`
     : ` Load the ${formatSkillList(missing)} with the Skill tool first.`;
 }
-
-const RULES_PATH = '.claude/skill-gate.json';
