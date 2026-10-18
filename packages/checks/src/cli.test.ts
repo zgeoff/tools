@@ -3,6 +3,7 @@ import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import invariant from 'tiny-invariant';
 
 // A git repo in a temp folder, and the entry module that zgeoff-check runs. Every process gets a
 // clean environment, so a GIT_DIR that a pre-push hook exports cannot point git at this repo.
@@ -251,6 +252,56 @@ test.each([['shellcheck'], ['shfmt']])(
     await chmod(join(ctx.dir, 'bin', program), 0o755);
 
     const result = await $`${process.execPath} ${ctx.cli} clean.sh`
+      .cwd(ctx.dir)
+      .env({ ...ctx.env, PATH: `${join(ctx.dir, 'bin')}:${ctx.env.PATH}` })
+      .nothrow()
+      .quiet();
+
+    expect({
+      exitCode: result.exitCode,
+      stdout: result.stdout.toString(),
+      stderr: result.stderr.toString(),
+    }).toStrictEqual({
+      exitCode: 2,
+      stdout: '',
+      stderr: `zgeoff-check: shell: ${program} failed: out of memory\n`,
+    });
+  },
+);
+
+test.each([['shellcheck'], ['shfmt']])(
+  'it exits 2 and prints no finding when %s fails after an earlier batch found a problem',
+  async (program) => {
+    const ctx = await setupTest();
+
+    const realPath = Bun.which(program);
+
+    invariant(realPath !== null, `${program} must be on the PATH to run this test`);
+
+    // unquoted.sh gives a shellcheck finding in the first batch of 200. The stand-in runs the real
+    // program until it gets the second batch, which holds only z-last.sh, and fails there.
+    const clean = Array.from(
+      { length: 199 },
+      (_, index) => `clean-${String(index).padStart(3, '0')}.sh`,
+    );
+
+    await Promise.all(
+      [...clean, 'z-last.sh'].map((file) =>
+        writeFile(join(ctx.dir, file), '#!/usr/bin/env bash\necho "hello"\n'),
+      ),
+    );
+
+    await writeFile(join(ctx.dir, 'unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
+    await mkdir(join(ctx.dir, 'bin'));
+
+    await writeFile(
+      join(ctx.dir, 'bin', program),
+      `#!/bin/sh\ncase "$*" in *z-last.sh*) echo "out of memory" >&2; exit 2;; esac\nexec ${realPath} "$@"\n`,
+    );
+
+    await chmod(join(ctx.dir, 'bin', program), 0o755);
+
+    const result = await $`${process.execPath} ${ctx.cli} unquoted.sh ${clean} z-last.sh`
       .cwd(ctx.dir)
       .env({ ...ctx.env, PATH: `${join(ctx.dir, 'bin')}:${ctx.env.PATH}` })
       .nothrow()
