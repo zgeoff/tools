@@ -11,6 +11,10 @@ if [ "$#" -eq 0 ]; then
   exit 2
 fi
 
+# The paragraph limits in words. repo-sync overwrites this file, so a repo cannot loosen them.
+paragraph_warn=150
+paragraph_fail=250
+
 # The skill's own files, the repo's project skill beside them, and the skill-writing skill document
 # the forbidden patterns and contain them as examples. A file git marks linguist-vendored belongs to
 # someone else, so a repo marks its third-party skills in .gitattributes.
@@ -141,6 +145,85 @@ report 'Untagged code fences:' \
         open = ""
       }
     }')"
+
+# Lists the files the branch changes since its merge base with origin's default branch, then the
+# uncommitted and untracked ones. The paragraph check reads only these, so a doc written before the
+# check fails nobody until a branch edits it.
+list_changed() {
+  local default base
+  default=$(git rev-parse -q --abbrev-ref origin/HEAD 2>/dev/null) || default=origin/main
+  if git rev-parse -q --verify HEAD >/dev/null; then
+    if base=$(git merge-base HEAD "$default" 2>/dev/null); then
+      git -c core.quotePath=false diff --name-only --no-renames --diff-filter=d "$base" HEAD
+    # A pull-request run in GitHub Actions checks out the PR's merge commit with no history and no
+    # origin branches, so the base tip is fetched and the two trees compared.
+    elif [ -n "${GITHUB_BASE_REF:-}" ] &&
+      git fetch -q --no-tags --depth=1 origin "$GITHUB_BASE_REF" 2>/dev/null; then
+      git -c core.quotePath=false diff --name-only --no-renames --diff-filter=d FETCH_HEAD HEAD
+    else
+      echo "check-prose: no merge base with $default, so the paragraph check reads only uncommitted files" >&2
+    fi
+    git -c core.quotePath=false diff --name-only --no-renames --diff-filter=d HEAD
+  fi
+  git -c core.quotePath=false ls-files --others --exclude-standard
+}
+
+# Prints file:line:words for each prose paragraph over the warning limit. A block is prose when its
+# first line is: headings, list items and their lines, tables, block quotes, HTML, link
+# definitions, fenced code, frontmatter and any block whose first line is indented (a list item's
+# later paragraph, or indented code) never count. A line that starts a list,
+# heading, table, quote, HTML or code block ends the prose paragraph above it.
+paragraph_awk='
+function starts_other(line) {
+  return line ~ /^[ \t]*(#+([ \t]|$)|[-*+]([ \t]|$)|[0-9]+[.)]([ \t]|$)|[|>]|<)/
+}
+function flush() {
+  if (kind == "prose" && words > warn) print start_file":"start_line":"words
+  kind = ""
+  words = 0
+}
+FNR == 1 {
+  flush()
+  front = ($0 == "---")
+  if (front) next
+}
+front {
+  if ($0 == "---") front = 0
+  next
+}
+{
+  m = fence_marker($0)
+  if (m != "") {
+    flush()
+    rest = fence_rest($0, m)
+    if (open == "") open = m
+    else if (closes(m, rest)) open = ""
+    next
+  }
+  if (open != "") next
+  if ($0 ~ /^[ \t]*$/) {
+    flush()
+    next
+  }
+  if (kind == "prose" && starts_other($0)) flush()
+  if (kind == "") {
+    kind = (starts_other($0) || $0 ~ /^[ \t]/ || $0 ~ /^\[.*\]:/) ? "other" : "prose"
+    start_file = FILENAME
+    start_line = FNR
+  }
+  if (kind == "prose") words += NF
+}
+END { flush() }
+'
+
+paragraphs=$(list_markdown "$@" | grep -Fx -f <(list_changed) | xargs -r awk -v warn="$paragraph_warn" \
+  "$fence_awk$paragraph_awk")
+
+report "Paragraphs over $paragraph_fail words in a changed file (split each one; lists, tables and code blocks are exempt):" \
+  "$(awk -F: -v limit="$paragraph_fail" '$NF > limit { print $0" words" }' <<<"$paragraphs")"
+
+candidate "Paragraphs over $paragraph_warn words in a changed file (warning; reread each one and split it where it defends a decision):" \
+  "$(awk -F: -v limit="$paragraph_fail" '$NF != "" && $NF <= limit { print $0" words" }' <<<"$paragraphs")"
 
 candidate 'Candidates — filler words with term-of-art uses; cull the filler, keep the terms:' \
   "$(grep_docs -nPi '\b(naturally|cleanly|trivially|easy|simple|quick)\b' -- "$@")"
