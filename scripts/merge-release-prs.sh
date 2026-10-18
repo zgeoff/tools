@@ -108,8 +108,8 @@ for _ in $(seq 1 12); do
     echo "release PR #$pr has conflicts" >&2
     exit 1
   fi
-  if [ "$state" = "MERGEABLE" ] \
-    && gh pr merge "$pr" --repo "$repo" --squash --match-head-commit "$sha"; then
+  if [ "$state" = "MERGEABLE" ] &&
+    gh pr merge "$pr" --repo "$repo" --squash --match-head-commit "$sha"; then
     echo "merged release PR #$pr at $sha"
     exit 0
   fi

@@ -7,7 +7,10 @@ set -euo pipefail
 usage="usage: scripts/first-publish.sh <package-dir>   e.g. scripts/first-publish.sh format-codemod"
 pkg_dir="packages/${1:?$usage}"
 manifest="$pkg_dir/package.json"
-[[ -f $manifest ]] || { echo "not a package: $pkg_dir" >&2; exit 1; }
+[[ -f $manifest ]] || {
+  echo "not a package: $pkg_dir" >&2
+  exit 1
+}
 
 name=$(jq -r .name "$manifest")
 version=$(jq -r .version "$manifest")
@@ -17,9 +20,12 @@ version=$(jq -r .version "$manifest")
   exit 1
 }
 
-npm whoami >/dev/null || { echo "not logged in to npm — run: npm login" >&2; exit 1; }
+npm whoami > /dev/null || {
+  echo "not logged in to npm — run: npm login" >&2
+  exit 1
+}
 
-if npm view "$name" version >/dev/null 2>&1; then
+if npm view "$name" version > /dev/null 2>&1; then
   echo "$name already exists on npm — releases go through CI, not this script" >&2
   exit 1
 fi
@@ -30,7 +36,7 @@ if [[ -n $(jq -r '.scripts.build // empty' "$manifest") ]]; then
 fi
 (cd "$pkg_dir" && bun publish --access public)
 
-cat <<EOF
+cat << EOF
 
 published $name@$version
 
