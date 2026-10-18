@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -75,4 +75,30 @@ test('it accepts one declaration per variable', async () => {
   const stdout = await runLint(ctx.dir, 'size.ts');
 
   expect(stdout).not.toInclude('eslint(one-var)');
+});
+
+test('it reports a file snapshot matcher', async () => {
+  const source =
+    "import { expect, test } from 'bun:test';\n\ntest('it renders the banner', () => {\n  expect('ready').toMatchSnapshot();\n});\n";
+
+  const ctx = await setupTest('banner.test.ts', source);
+  const stdout = await runLint(ctx.dir, 'banner.test.ts');
+
+  expect(stdout).toInclude('zgeoff(no-file-snapshot)');
+  expect(stdout).toInclude('toMatchSnapshot');
+});
+
+test('it reports a test file with a snapshot file in __snapshots__/', async () => {
+  const source =
+    "import { expect, test } from 'bun:test';\n\ntest('it renders the banner', () => {\n  expect('ready').toBe('ready');\n});\n";
+
+  const ctx = await setupTest('banner.test.ts', source);
+
+  await mkdir(join(ctx.dir, '__snapshots__'));
+  await writeFile(join(ctx.dir, '__snapshots__', 'banner.test.ts.snap'), '// Bun Snapshot v1\n');
+
+  const stdout = await runLint(ctx.dir, 'banner.test.ts');
+
+  expect(stdout).toInclude('zgeoff(no-file-snapshot)');
+  expect(stdout).toInclude('__snapshots__/banner.test.ts.snap');
 });

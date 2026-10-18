@@ -31,6 +31,7 @@
     "zgeoff/no-comment-rule-override": "error",
     "zgeoff/function-verb": "error",
     "zgeoff/test-beside-module": "error",
+    "zgeoff/no-file-snapshot": "error",
 
     // enforced comment style — line comments unless JSDoc or exclamation
     "@stylistic/multiline-comment-style": [

@@ -580,6 +580,82 @@ test('it honours a file-level disable comment with a reason', async () => {
   expect(result.exitCode).toBe(0);
 });
 
+const noFileSnapshot = { 'zgeoff/no-file-snapshot': 'error' };
+
+test.each(['toMatchSnapshot', 'toThrowErrorMatchingSnapshot'])(
+  'it flags the file-backed %s matcher',
+  async (matcher) => {
+    const source = `import { expect, test } from 'bun:test';\n\ntest('it renders the banner', () => {\n  expect('ready').${matcher}();\n});\n`;
+
+    const result = await runLint(source, false, noFileSnapshot);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toInclude('no-file-snapshot');
+    expect(result.stdout).toInclude(matcher);
+  },
+);
+
+test('it flags a negated and a computed file snapshot matcher', async () => {
+  const source =
+    "import { expect, test } from 'bun:test';\n\ntest('it renders the banner', () => {\n  expect('ready').not.toMatchSnapshot();\n  expect('ready')['toMatchSnapshot']();\n});\n";
+
+  const result = await runLint(source, false, noFileSnapshot);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('sample.ts:4:23');
+  expect(result.stdout).toInclude('sample.ts:5:19');
+});
+
+test('it accepts inline snapshot matchers', async () => {
+  const source =
+    "import { expect, test } from 'bun:test';\n\ntest('it renders the banner', () => {\n  expect('ready').toMatchInlineSnapshot(`\"ready\"`);\n  expect(() => {\n    throw new Error('late');\n  }).toThrowErrorMatchingInlineSnapshot(`\"late\"`);\n});\n";
+
+  const result = await runLint(source, false, noFileSnapshot);
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it flags a test file with a snapshot file beside it in __snapshots__/', async () => {
+  const result = await runLintTree(
+    {
+      'src/banner.ts': '',
+      'src/banner.test.ts': testSource,
+      'src/__snapshots__/banner.test.ts.snap': '// Bun Snapshot v1\n',
+    },
+    'src/banner.test.ts',
+    noFileSnapshot,
+  );
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('no-file-snapshot');
+  expect(result.stdout).toInclude('__snapshots__/banner.test.ts.snap');
+});
+
+test('it accepts a test file whose name no snapshot file in __snapshots__/ matches', async () => {
+  const result = await runLintTree(
+    {
+      'banner.test.ts': testSource,
+      '__snapshots__/footer.test.ts.snap': '// Bun Snapshot v1\n',
+    },
+    'banner.test.ts',
+    noFileSnapshot,
+  );
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it honours a file-level disable comment on a snapshot file', async () => {
+  const source = `// oxlint-disable zgeoff/no-file-snapshot -- migrates the legacy golden files\n${testSource}`;
+
+  const result = await runLintTree(
+    { 'banner.test.ts': source, '__snapshots__/banner.test.ts.snap': '// Bun Snapshot v1\n' },
+    'banner.test.ts',
+    noFileSnapshot,
+  );
+
+  expect(result.exitCode).toBe(0);
+});
+
 const layered = {
   'zgeoff/import-zones': [
     'error',
