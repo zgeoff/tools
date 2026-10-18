@@ -84,22 +84,10 @@ jobs:
       - name: Install
         run: bun install --frozen-lockfile
 
-      # The shell check of zgeoff-check runs shellcheck, which the runner image
-      # carries, and shfmt, which it lacks.
-      - name: Setup shfmt
-        env:
-          SHFMT_VERSION: v3.13.1
-          SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
-        run: |
-          set -euo pipefail
-          if command -v shfmt > /dev/null; then
-            exit 0
-          fi
-          curl -fsSL -o "$RUNNER_TEMP/shfmt" "https://github.com/mvdan/sh/releases/download/$SHFMT_VERSION/shfmt_${SHFMT_VERSION}_linux_amd64"
-          echo "$SHFMT_SHA256  $RUNNER_TEMP/shfmt" | sha256sum -c -
-          install -m 0755 "$RUNNER_TEMP/shfmt" /usr/local/bin/shfmt
-
-      - name: Run the check scripts
+      # Picks the scripts before anything runs, so a missing name fails fast
+      # and the shfmt setup knows whether check runs.
+      - name: Pick the check scripts
+        id: pick
         env:
           SCRIPTS: ${{ inputs.scripts }}
         run: |
@@ -125,6 +113,31 @@ jobs:
             echo "::error::package.json defines no script named:$missing. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list."
             exit 1
           fi
+          # Spaces around the list let a step match one whole name.
+          echo "scripts= ${list[*]} " >> "$GITHUB_OUTPUT"
+
+      # The shell check of zgeoff-check runs shellcheck, which the runner image
+      # carries, and shfmt, which it lacks. The pinned binary goes to a folder
+      # the runner owns, put on the PATH of the later steps.
+      - name: Setup shfmt
+        if: contains(steps.pick.outputs.scripts, ' check ')
+        env:
+          SHFMT_VERSION: v3.13.1
+          SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/shfmt.download" "https://github.com/mvdan/sh/releases/download/$SHFMT_VERSION/shfmt_${SHFMT_VERSION}_linux_amd64"
+          echo "$SHFMT_SHA256  $RUNNER_TEMP/shfmt.download" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/shfmt-bin"
+          install -m 0755 "$RUNNER_TEMP/shfmt.download" "$RUNNER_TEMP/shfmt-bin/shfmt"
+          echo "$RUNNER_TEMP/shfmt-bin" >> "$GITHUB_PATH"
+
+      - name: Run the check scripts
+        env:
+          SCRIPTS: ${{ steps.pick.outputs.scripts }}
+        run: |
+          set -euo pipefail
+          read -ra list <<< "$SCRIPTS"
           for name in "${list[@]}"; do
             echo "::group::bun run $name"
             bun run "$name"

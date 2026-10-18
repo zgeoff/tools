@@ -125,11 +125,11 @@ test('it passes the push with a notice when the repo has no check script', async
   );
 });
 
-test('it fails the push when the check script finds a problem', async () => {
+test('it fails the push when zgeoff-check finds a problem in a file the branch changes', async () => {
   const ctx = await setupTest();
 
   await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
-  await writeFile(join(ctx.worktree, 'fixture.sh'), 'echo $1\n');
+  await writeFile(join(ctx.worktree, 'bad.sh'), '#!/usr/bin/env bash\necho $1\n');
 
   await writeFile(
     join(ctx.worktree, 'package.json'),
@@ -137,9 +137,9 @@ test('it fails the push when the check script finds a problem', async () => {
       scripts: {
         'format:check': 'true',
         'lint:files': 'true',
-        check: 'exit 1',
+        check: `bun ${join(import.meta.dir, '../../packages/checks/src/cli.ts')}`,
         typecheck: 'true',
-        'files:branch': 'echo fixture.sh',
+        'files:branch': 'echo bad.sh',
         'test:related': 'true',
       },
     }),
@@ -158,6 +158,45 @@ test('it fails the push when the check script finds a problem', async () => {
   const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
 
   expect(result.exitCode).not.toBe(0);
+});
+
+test('it passes the push when only a file the branch leaves unchanged fails zgeoff-check', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+
+  // bad.sh fails the shell check, and the branch's file list names only clean.sh, so the job
+  // passes only when it checks the listed files rather than every tracked one.
+  await writeFile(join(ctx.worktree, 'bad.sh'), '#!/usr/bin/env bash\necho $1\n');
+  await writeFile(join(ctx.worktree, 'clean.sh'), '#!/usr/bin/env bash\necho "hello"\n');
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        check: `bun ${join(import.meta.dir, '../../packages/checks/src/cli.ts')}`,
+        typecheck: 'true',
+        'files:branch': 'echo clean.sh',
+        'test:related': 'true',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m fixture`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  expect(result.exitCode).toBe(0);
 });
 
 // Each suite that spawns git must stay safe without the baseline's env -u, so it runs here with

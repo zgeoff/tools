@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
@@ -173,4 +173,69 @@ test('it exits 2 on an unknown option', async () => {
 
   expect(result.exitCode).toBe(2);
   expect(result.stderr.toString()).toStartWith('zgeoff-check: unknown option --fix\n');
+});
+
+test('it exits 2 rather than print help when --help comes with files', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.dir, 'unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
+
+  await $`git add unquoted.sh`.cwd(ctx.dir).env(ctx.env);
+
+  const result = await $`${process.execPath} ${ctx.cli} -- --help unquoted.sh`
+    .cwd(ctx.dir)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect(result.exitCode).toBe(2);
+  expect(result.stderr.toString()).toStartWith('zgeoff-check: unknown option --help\n');
+});
+
+test('it checks a file whose name starts with a dash', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.dir, '-unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
+
+  await $`git add -- -unquoted.sh`.cwd(ctx.dir).env(ctx.env);
+
+  const result = await $`${process.execPath} ${ctx.cli} -unquoted.sh`
+    .cwd(ctx.dir)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout.toString()).toStartWith('-unquoted.sh:2: shell: ');
+});
+
+test('it exits 2 with the reason when the config file cannot be read', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, 'zgeoff-check.json'));
+
+  const result = await $`${process.execPath} ${ctx.cli}`
+    .cwd(ctx.dir)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect(result.exitCode).toBe(2);
+  expect(result.stderr.toString()).toStartWith('zgeoff-check: ');
+  expect(result.stderr.toString()).not.toInclude('    at ');
+});
+
+test('it exits 2 with the reason when git cannot list the files', async () => {
+  const ctx = await setupTest();
+
+  await rm(join(ctx.dir, '.git'), { recursive: true });
+
+  const result = await $`${process.execPath} ${ctx.cli}`
+    .cwd(ctx.dir)
+    .env({ ...ctx.env, GIT_CEILING_DIRECTORIES: ctx.dir })
+    .nothrow()
+    .quiet();
+
+  expect(result.exitCode).toBe(2);
+  expect(result.stderr.toString()).toStartWith('zgeoff-check: git ls-files failed: ');
 });

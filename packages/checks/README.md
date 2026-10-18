@@ -12,8 +12,10 @@ list of files it checks only those.
 bun add -d @zgeoff/checks
 ```
 
-Add the script that the pre-push baseline and the shared pull-request checks call. Both skip the
-check with a notice while a repo lacks the script, so adding it turns the check on:
+Add the script that the pre-push baseline and the standard list of the shared pull-request checks
+call. Both skip the check with a notice while a repo lacks the script, so adding it turns the check
+on. A repo that sets its own list in the `BUN_CHECK_SCRIPTS` variable adds `check` to that list as
+well:
 
 ```json
 {
@@ -33,14 +35,16 @@ The package runs on Bun.
 
 The `shell` check runs `shfmt` with no style flags, so `shfmt` reads its style from the repo's
 `.editorconfig`. The `shfmt` finding sits at the first line of each block that `shfmt` would change.
-The shared pull-request checks install `shfmt`, and the runner image already has `shellcheck`.
+The shared pull-request checks install `shfmt` when their list runs `check`, and the runner image
+already has `shellcheck`.
 
 ## Exit codes
 
 - `0`: no check found a problem.
 - `1`: a check found at least one problem.
 - `2`: the run failed before it could check. The config file breaks a rule, a check needs a program
-  that the PATH lacks, or the command line holds an unknown option. The runner prints the reason.
+  that the PATH lacks, git or a check's program fails, or an argument starts with a dash and names
+  no file. The runner prints the reason.
 
 ## Turning a check off
 

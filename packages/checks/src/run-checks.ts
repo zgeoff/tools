@@ -23,7 +23,7 @@ export interface CheckFinding extends Finding {
 // Runs each check that the config leaves on over the files that match its glob, and returns every
 // finding, sorted by path and line within each check.
 export async function runChecks(options: Readonly<RunChecksOptions>): Promise<CheckFinding[]> {
-  const files = (options.files ?? collectTrackedFiles(options))
+  const files = (options.files ?? runGitLsFiles(options))
     .map((file) => toRepoPath(options.cwd, file))
     .filter((file) => existsSync(resolve(options.cwd, file)));
 
@@ -59,7 +59,7 @@ export async function runChecks(options: Readonly<RunChecksOptions>): Promise<Ch
   return findings;
 }
 
-function collectTrackedFiles(options: Readonly<RunChecksOptions>): string[] {
+function runGitLsFiles(options: Readonly<RunChecksOptions>): string[] {
   const result = Bun.spawnSync(['git', 'ls-files', '-z'], {
     cwd: options.cwd,
     env: { ...options.env },
