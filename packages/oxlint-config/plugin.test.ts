@@ -1019,6 +1019,18 @@ test('it resolves a .js specifier to the .ts source beside it', async () => {
   expect(result.stdout).toInclude('core-no-tooling: core must not import scripts/run.ts');
 });
 
+test('it resolves a specifier with a bundler query to the file before the query', async () => {
+  const files = {
+    'src/config/theme.ts': "import styles from '../../scripts/styles.css?url';\n\nstyles;\n",
+    'scripts/styles.css': 'body {}\n',
+  };
+
+  const result = await runLintTree(files, 'src/config/theme.ts', layered);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('core-no-tooling: core must not import scripts/styles.css');
+});
+
 test('it honours a next-line disable comment with a reason on a forbidden edge', async () => {
   const source = [
     '// oxlint-disable-next-line zgeoff/import-zones -- GEO-1 moves run into src/',

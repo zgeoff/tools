@@ -9,7 +9,7 @@ const sourceExtensions = { '.js': ['.ts', '.tsx'], '.mjs': ['.mts'], '.cjs': ['.
 // own name resolves through its `exports`, and `#` names through its `imports`.
 export default function resolveImportTarget(filename, specifier, settings) {
   if (isPathSpecifier(specifier)) {
-    return toTarget(findImportedFile(filename, specifier, settings.extensions));
+    return toTarget(findImportedFile(filename, toFileSpecifier(specifier), settings.extensions));
   }
 
   const manifest = findPackageManifest(dirname(filename), settings.root);
@@ -38,6 +38,13 @@ function resolveManifestTarget(manifest, specifier, conditions) {
   }
 
   return { kind: 'module', specifier };
+}
+
+// a bundler query such as Vite's `./styles.css?url` names the file before it
+function toFileSpecifier(specifier) {
+  const query = specifier.indexOf('?');
+
+  return query === -1 ? specifier : specifier.slice(0, query);
 }
 
 function toTarget(path) {
