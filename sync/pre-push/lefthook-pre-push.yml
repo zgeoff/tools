@@ -24,7 +24,8 @@ pre-push:
       glob: '*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}'
       run: bun run lint:files {files}
     # zgeoff-check picks each check's files from the list itself, so the job
-    # takes every file the branch changes. A repo turns the job on when it adds
+    # takes every file the branch changes. It checks only that list, so a file
+    # the branch leaves unchanged never fails a push. A repo turns the job on when it adds
     # the check script; until then the job prints a notice and passes.
     - name: check
       files: bun run --silent files:branch

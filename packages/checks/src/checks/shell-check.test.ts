@@ -6,6 +6,8 @@ import invariant from 'tiny-invariant';
 import { MissingProgramError } from '../missing-program-error.ts';
 import { shellCheck } from './shell-check.ts';
 
+// The tests run the real shellcheck and shfmt from the PATH. The runner image lacks shfmt, so
+// main.yml and bun-checks.yml install it before the suite runs.
 async function setupTest() {
   const dir = await mkdtemp(join(tmpdir(), 'shell-check-'));
 
