@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.8](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.7...@zgeoff/oxlint-config@0.2.8) (2026-10-18)
+
+### Features
+
+- **geo-1303:** add zgeoff/no-restricted-words to oxlint-config
+  ([#186](https://github.com/zgeoff/tools/issues/186))
+  ([46675b3](https://github.com/zgeoff/tools/commit/46675b3715b796f16962d993d2ffb7dfc48b12d8))
+
 ## [0.2.7](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.6...@zgeoff/oxlint-config@0.2.7) (2026-10-18)
 
 ### Features
