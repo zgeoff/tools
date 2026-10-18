@@ -8,7 +8,8 @@ await arguments, awaits hidden inside a control-flow condition or a `&&`/`||`/`?
 `switch` statement, every JSDoc block, any run of more than three line comments, and a repo config
 that loosens either comment rule. `zgeoff/function-verb` enforces the function-naming taxonomy from
 the shared agent guidelines, `zgeoff/test-beside-module` keeps each test file beside the module it
-tests, `zgeoff/import-zones` fails an import that crosses a module boundary the repo declares, and
+tests, `zgeoff/import-zones` fails an import that crosses a module boundary the repo declares,
+`zgeoff/no-restricted-words` keeps the words in its `words` option out of a path's text, and
 `zgeoff/no-file-snapshot` bans file snapshots.
 
 ## Usage
@@ -85,6 +86,25 @@ first statement, so put the comment above it:
 
 A second test file for a module (`<name>.host.test.ts`) needs its own `<name>.host.<ext>`, so the
 rule reports it beside only `<name>.ts`.
+
+## `zgeoff/no-restricted-words`
+
+Off unless a repo configures it. The `words` option lists the words to keep out of the text of a
+file: string literals, template text and comments. A word matches whole and without case, so `imp`
+reports `'IMP daemon'` and `'imp-e2e'` but not `'impl'` or `'imp_name'`. Identifiers are code, not
+text, and the rule never reads them. Scope the rule to a path with `overrides`, and turn it off for
+the paths that may name the words:
+
+```jsonc
+{
+  "rules": {
+    "zgeoff/no-restricted-words": ["error", { "words": ["imp", "impd"] }],
+  },
+  "overrides": [
+    { "files": ["packages/execution/**"], "rules": { "zgeoff/no-restricted-words": "off" } },
+  ],
+}
+```
 
 ## `zgeoff/no-file-snapshot`
 

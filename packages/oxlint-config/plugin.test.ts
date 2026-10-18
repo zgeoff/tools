@@ -656,6 +656,76 @@ test('it honours a file-level disable comment on a snapshot file', async () => {
   expect(result.exitCode).toBe(0);
 });
 
+const restricted = { 'zgeoff/no-restricted-words': ['error', { words: ['orb', 'orbd'] }] };
+
+test.each([
+  ['string', "export const label = 'ask the orb daemon';\n"],
+  ['template', 'export const label = `ask the orbd`;\n'],
+  ['comment', '// the orb owns this socket\nexport const label = 1;\n'],
+  ['comment', '/* the orb owns this socket */\nexport const label = 1;\n'],
+])('it flags a restricted word in a %s', async (place, source) => {
+  const result = await runLint(source, false, restricted);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('no-restricted-words');
+  expect(result.stdout).toInclude(`from this ${place}`);
+});
+
+test('it flags a restricted word whatever its case and names it as written', async () => {
+  const source = "export const label = 'the ORB daemon';\n";
+
+  const result = await runLint(source, false, restricted);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('Remove `ORB`');
+});
+
+test('it flags a restricted word bounded by punctuation', async () => {
+  const source = "export const socket = '/run/orbd.sock';\nexport const vault = 'orb-e2e';\n";
+
+  const result = await runLint(source, false, restricted);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('Remove `orbd`');
+  expect(result.stdout).toInclude('Remove `orb`');
+});
+
+test('it accepts a word that holds a restricted word inside it', async () => {
+  const source =
+    '// the orbit keeps its own clock\nexport const label = `orbs and sorbet, orb_name, orb2`;\n';
+
+  const result = await runLint(source, false, restricted);
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it accepts a restricted word as an identifier', async () => {
+  const source = 'const orb = 1;\n\nexport const label = orb;\n';
+
+  const result = await runLint(source, false, restricted);
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it treats a restricted word as text, not as a pattern', async () => {
+  const rules = { 'zgeoff/no-restricted-words': ['error', { words: ['a.b'] }] };
+  const source = "export const label = 'axb';\nexport const other = 'a.b';\n";
+
+  const result = await runLint(source, false, rules);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('sample.ts:2:');
+  expect(result.stdout).not.toInclude('sample.ts:1:');
+});
+
+test('it reports nothing when the config names no words', async () => {
+  const source = "export const label = 'ask the orb daemon';\n";
+
+  const result = await runLint(source, false, { 'zgeoff/no-restricted-words': 'error' });
+
+  expect(result.exitCode).toBe(0);
+});
+
 const layered = {
   'zgeoff/import-zones': [
     'error',
