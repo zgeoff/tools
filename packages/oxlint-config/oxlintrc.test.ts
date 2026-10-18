@@ -132,7 +132,7 @@ test('it names `manager` when it reports `mgr`', async () => {
   expect(stdout).toInclude('Rename `mgr` to `manager`');
 });
 
-test.each(['x', 'y', 'ctx', 'id', 'db', 'timeoutMs'])(
+test.each(['x', 'y', 'z', '$', '_', 'ctx', 'id', 'db', 'timeoutMs'])(
   'it accepts a variable `%s`',
   async (name) => {
     const ctx = await setupTest('names.ts', `export const ${name} = 1;\n`);

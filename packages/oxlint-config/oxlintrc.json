@@ -34,9 +34,13 @@
     "zgeoff/no-file-snapshot": "error",
 
     // name a value for what it holds, in full words: one letter only for a
-    // coordinate, and each listed abbreviation reported with its full word; a
-    // type parameter is not a value, so generics stay unchecked
-    "id-length": ["error", { "min": 2, "exceptions": ["x", "y"], "checkGeneric": false }],
+    // coordinate, zod's `z`, Bun's shell `$` or an unread `_` placeholder, and
+    // each listed abbreviation reported with its full word; a type parameter
+    // is not a value, so generics stay unchecked
+    "id-length": [
+      "error",
+      { "min": 2, "exceptions": ["x", "y", "z", "$", "_"], "checkGeneric": false }
+    ],
     "zgeoff/no-abbreviated-names": [
       "error",
       {
