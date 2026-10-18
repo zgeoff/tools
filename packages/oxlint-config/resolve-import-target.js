@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
+import { isBuiltin } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 
 // a `.js` specifier in TypeScript source names the `.ts` file beside it
@@ -39,9 +40,10 @@ function resolveManifestTarget(manifest, specifier, settings) {
     return { ...resolveExportTarget(manifest, specifier, conditions), self: true };
   }
 
-  const workspace = settings.workspaces.find((candidate) =>
-    isPackageSpecifier(candidate.name, specifier),
-  );
+  // a builtin keeps its name even when a workspace package shares it
+  const workspace = isBuiltin(specifier)
+    ? undefined
+    : settings.workspaces.find((candidate) => isPackageSpecifier(candidate.name, specifier));
 
   if (workspace === undefined) {
     return { kind: 'module', specifier };
