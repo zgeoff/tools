@@ -25,9 +25,9 @@ const noAbbreviatedNames = {
     }
 
     const checkName = (node) => {
-      const isName = node?.type === 'Identifier' || node?.type === 'PrivateIdentifier';
+      const name = findStaticName(node);
 
-      if (!isName || !names.has(node.name)) {
+      if (name === null || !names.has(name)) {
         return;
       }
 
@@ -36,7 +36,7 @@ const noAbbreviatedNames = {
       context.report({
         node,
         messageId: 'abbreviated',
-        data: { name: `${prefix}${node.name}`, replacement: names.get(node.name) },
+        data: { name: `${prefix}${name}`, replacement: names.get(name) },
       });
     };
 
@@ -46,10 +46,17 @@ const noAbbreviatedNames = {
       }
     };
 
-    const checkKey = (node) => {
-      if (!node.computed) {
-        checkName(node.key);
+    // a computed key names its property as a plain key does when it is a
+    // string written in place, as in `{ ['src']: 1 }`; a computed identifier
+    // reads a variable, whose declaration is checked where it is made
+    const checkMemberName = (node, name) => {
+      if (!node.computed || name.type !== 'Identifier') {
+        checkName(name);
       }
+    };
+
+    const checkKey = (node) => {
+      checkMemberName(node, node.key);
     };
 
     const checkParams = (node) => {
@@ -58,20 +65,44 @@ const noAbbreviatedNames = {
       }
     };
 
+    // a write to a member names that property, whether the member stands
+    // alone or sits inside a destructuring target
+    const checkAssignmentTarget = (node) => {
+      for (const member of collectTargetMembers(node)) {
+        checkMemberName(member, member.property);
+      }
+    };
+
+    const checkLoopTarget = (node) => {
+      if (node.left.type !== 'VariableDeclaration') {
+        checkAssignmentTarget(node.left);
+      }
+    };
+
+    // function-verb checks only a plain function or method name, so a quoted
+    // method, a signature or a declared function would pass both rules
+    const checkFunction = (node) => {
+      checkName(node.id);
+      checkParams(node);
+    };
+
     return {
       VariableDeclarator(node) {
         checkPattern(node.id);
       },
-      FunctionDeclaration: checkParams,
-      FunctionExpression: checkParams,
+      FunctionDeclaration: checkFunction,
+      FunctionExpression: checkFunction,
       ArrowFunctionExpression: checkParams,
 
       // a signature without a body names its parameters as an implementation does
-      TSDeclareFunction: checkParams,
+      TSDeclareFunction: checkFunction,
       TSEmptyBodyFunctionExpression: checkParams,
       TSFunctionType: checkParams,
       TSConstructorType: checkParams,
-      TSMethodSignature: checkParams,
+      TSMethodSignature(node) {
+        checkKey(node);
+        checkParams(node);
+      },
       TSCallSignatureDeclaration: checkParams,
       TSConstructSignatureDeclaration: checkParams,
       CatchClause(node) {
@@ -83,15 +114,19 @@ const noAbbreviatedNames = {
       TSAbstractPropertyDefinition: checkKey,
       TSAbstractAccessorProperty: checkKey,
       TSPropertySignature: checkKey,
+      MethodDefinition: checkKey,
+      TSAbstractMethodDefinition: checkKey,
 
-      // a getter or setter is read and written as a property, so its key is a
-      // value name
-      "MethodDefinition[kind='get']": checkKey,
-      "MethodDefinition[kind='set']": checkKey,
-      "TSAbstractMethodDefinition[kind='get']": checkKey,
-      "TSAbstractMethodDefinition[kind='set']": checkKey,
-      "TSMethodSignature[kind='get']": checkKey,
-      "TSMethodSignature[kind='set']": checkKey,
+      // a class, an enum and a namespace are values at run time; a quoted
+      // module name is a path, not a value name
+      'ClassDeclaration, ClassExpression, TSEnumDeclaration'(node) {
+        checkName(node.id);
+      },
+      TSModuleDeclaration(node) {
+        if (node.id.type === 'Identifier') {
+          checkName(node.id);
+        }
+      },
 
       // an import's local binding is a value name in this module, whatever the
       // exporting module calls it; a type-only import names a type, not a value
@@ -105,17 +140,94 @@ const noAbbreviatedNames = {
           checkName(node.id);
         }
       },
-      'AssignmentExpression > MemberExpression.left'(node) {
-        if (!node.computed) {
-          checkName(node.property);
+      TSIndexSignature(node) {
+        for (const parameter of node.parameters) {
+          checkName(parameter);
         }
       },
+      TSEnumMember(node) {
+        checkName(node.id);
+      },
+
+      // an export alias is the name every importing module reads the value by
+      ExportSpecifier(node) {
+        if (!isTypeOnlyExport(node)) {
+          checkName(node.exported);
+        }
+      },
+      ExportAllDeclaration(node) {
+        if (node.exportKind !== 'type') {
+          checkName(node.exported);
+        }
+      },
+      AssignmentExpression(node) {
+        checkAssignmentTarget(node.left);
+      },
+      ForInStatement: checkLoopTarget,
+      ForOfStatement: checkLoopTarget,
     };
   },
 };
 
+// the name a key or binding spells out in the source: an identifier, a
+// string, or a template with no substitutions; a key built at run time has
+// no static name, so the result is null
+function findStaticName(node) {
+  if (node?.type === 'Identifier' || node?.type === 'PrivateIdentifier') {
+    return node.name;
+  }
+
+  if (node?.type === 'Literal' && typeof node.value === 'string') {
+    return node.value;
+  }
+
+  if (node?.type === 'TemplateLiteral' && node.expressions.length === 0) {
+    return node.quasis[0].value.cooked ?? null;
+  }
+
+  return null;
+}
+
 function isTypeOnlyImport(specifier) {
   return specifier.importKind === 'type' || specifier.parent.importKind === 'type';
+}
+
+function isTypeOnlyExport(specifier) {
+  return specifier.exportKind === 'type' || specifier.parent.exportKind === 'type';
+}
+
+// the members an assignment target writes; a bare identifier in the target
+// writes a variable declared elsewhere, and its declaration is checked there
+function collectTargetMembers(node) {
+  if (node === null || node === undefined) {
+    return [];
+  }
+
+  if (node.type === 'MemberExpression') {
+    return [node];
+  }
+
+  if (node.type === 'ObjectPattern') {
+    return node.properties.flatMap((property) => {
+      const target = property.type === 'RestElement' ? property : property.value;
+
+      return collectTargetMembers(target);
+    });
+  }
+
+  if (node.type === 'ArrayPattern') {
+    return node.elements.flatMap((element) => collectTargetMembers(element));
+  }
+
+  if (node.type === 'AssignmentPattern') {
+    return collectTargetMembers(node.left);
+  }
+
+  if (node.type === 'RestElement') {
+    return collectTargetMembers(node.argument);
+  }
+
+  return [];
 }
 
 // the names a binding pattern declares: a destructured key's alias, not the
