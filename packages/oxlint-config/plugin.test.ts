@@ -1436,6 +1436,61 @@ test('it resolves a workspace package’s name through that package’s exports'
   expect(result.stdout).not.toInclude('store-module');
 });
 
+test('it reports a workspace export whose file does not exist as unresolved', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { app: ['packages/app/**'] },
+        workspaces: ['packages/*'],
+        unresolved: [{ name: 'unresolved', from: ['app'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'packages/store/package.json': JSON.stringify({
+      name: '@demo/store',
+      exports: { '.': './src/missing.ts' },
+    }),
+    'packages/app/src/run.ts':
+      "import { store } from '@demo/store';\n\nexport const all = [store];\n",
+  };
+
+  const result = await runLintTree(files, 'packages/app/src/run.ts', rules);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('unresolved: cannot resolve @demo/store');
+});
+
+test('it reports no self-import for another workspace package', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { app: ['packages/app/**'] },
+        workspaces: ['packages/*'],
+        selfImports: [{ name: 'self', from: ['app'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'packages/store/package.json': JSON.stringify({
+      name: '@demo/store',
+      exports: { '.': './src/index.ts' },
+    }),
+    'packages/store/src/index.ts': 'export const store = 1;\n',
+    'packages/app/package.json': JSON.stringify({ name: '@demo/app' }),
+    'packages/app/src/run.ts':
+      "import { store } from '@demo/store';\n\nexport const all = [store];\n",
+  };
+
+  const result = await runLintTree(files, 'packages/app/src/run.ts', rules);
+
+  expect(result.exitCode).toBe(0);
+});
+
 test('it reads a workspace glob written with a leading ./', async () => {
   const rules = {
     'zgeoff/import-zones': [
