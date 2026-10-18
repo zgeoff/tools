@@ -2,8 +2,8 @@
 #
 # Runs the shared Bun pull-request checks. Two optional repo variables change
 # them: BUN_CHECK_SCRIPTS, a space-separated list of package scripts that
-# replaces the standard list (audit deadcode format:check lint typecheck test),
-# and NODE_VERSION, which sets up Node next to Bun.
+# replaces the standard list (audit deadcode format:check lint check typecheck
+# test), and NODE_VERSION, which sets up Node next to Bun.
 name: PR
 
 on:

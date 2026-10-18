@@ -23,11 +23,25 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
+      # The @zgeoff/checks tests run shfmt, which the runner image lacks. The
+      # step and its pin match the Setup shfmt step of bun-checks.yml.
+      - name: Setup shfmt
+        env:
+          SHFMT_VERSION: v3.13.1
+          SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/shfmt.download" "https://github.com/mvdan/sh/releases/download/$SHFMT_VERSION/shfmt_${SHFMT_VERSION}_linux_amd64"
+          echo "$SHFMT_SHA256  $RUNNER_TEMP/shfmt.download" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/shfmt-bin"
+          install -m 0755 "$RUNNER_TEMP/shfmt.download" "$RUNNER_TEMP/shfmt-bin/shfmt"
+          echo "$RUNNER_TEMP/shfmt-bin" >> "$GITHUB_PATH"
       - run: bun run check:sync
       - run: bun run format:check
       - run: bun run lint:full
       - run: bun run typecheck
       - run: bun run test
+      - run: bun run test:workflows
 
   release:
     needs: checks

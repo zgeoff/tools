@@ -23,6 +23,19 @@ pre-push:
       files: bun run --silent files:branch
       glob: '*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}'
       run: bun run lint:files {files}
+    # zgeoff-check picks each check's files from the list itself, so the job
+    # takes every file the branch changes. It checks only that list, so a file
+    # the branch leaves unchanged never fails a push. Each path gets a ./
+    # prefix, so a file whose name starts with a dash reads as a file, not an
+    # option. A repo turns the job on when it adds the check script; until then
+    # the job prints a notice and passes.
+    - name: check
+      files: bun run --silent files:branch
+      run: >-
+        if bun -e 'process.exit(require("./package.json").scripts?.check === undefined ? 1 : 0)';
+        then set -- {files}; for file; do set -- "$@" "./$file"; shift; done; bun run check "$@";
+        else echo 'check: skipped, because package.json has no check script; add "check":
+        "zgeoff-check" to run it'; fi
     - name: typecheck
       run: bun run typecheck
     # A pre-push in a linked worktree exports GIT_DIR, and a test that runs git
