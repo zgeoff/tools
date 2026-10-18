@@ -1436,6 +1436,63 @@ test('it resolves a workspace package’s name through that package’s exports'
   expect(result.stdout).not.toInclude('store-module');
 });
 
+test('it keeps a builtin a module when a workspace package shares its name', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { app: ['packages/app/**'] },
+        workspaces: ['packages/*'],
+        modules: [{ name: 'neutral', modules: ['node:*'], from: ['app'], allow: [] }],
+        unresolved: [{ name: 'unresolved', from: ['app'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'packages/path/package.json': JSON.stringify({
+      name: 'path',
+      exports: { '.': './src/missing.ts' },
+    }),
+    'packages/app/src/run.ts': "import { join } from 'path';\n\nexport const all = [join];\n",
+  };
+
+  const result = await runLintTree(files, 'packages/app/src/run.ts', rules);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('neutral: path is allowed only in no zone');
+  expect(result.stdout).not.toInclude('unresolved:');
+});
+
+test('it reports an own-package subpath the exports omit as a self-import and unresolved', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { core: ['src/**'] },
+        selfImports: [{ name: 'self', from: ['core'] }],
+        unresolved: [{ name: 'unresolved', from: ['core'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'package.json': JSON.stringify({ name: '@demo/store', exports: { '.': './src/index.ts' } }),
+    'src/index.ts': 'export const store = 1;\n',
+    'src/run.ts': "import { hidden } from '@demo/store/private';\n\nexport const all = [hidden];\n",
+  };
+
+  const result = await runLintTree(files, 'src/run.ts', rules);
+
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout).toInclude(
+    'self: @demo/store/private names the package this file belongs to; import it by a relative path',
+  );
+
+  expect(result.stdout).toInclude('unresolved: cannot resolve @demo/store/private');
+});
+
 test('it reports a workspace export whose file does not exist as unresolved', async () => {
   const rules = {
     'zgeoff/import-zones': [
