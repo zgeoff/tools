@@ -109,11 +109,19 @@ the paths that may name the words:
 
 ## `zgeoff/no-abbreviated-names`
 
-The `names` option maps each abbreviation to the text that replaces it, and the rule reports a
-variable, parameter, catch parameter, destructured name, import, property, getter or setter that has
-one of those names. A name matches whole, so `ms` reports `ms` but not `timeoutMs`. A destructured
-key that an alias renames belongs to the object being read, and the rule reports only the alias. The
-shipped config lists the abbreviations that the code-style skill bans and turns on `id-length`
+The `names` option maps each abbreviation to the text that replaces it, and the rule reports every
+value name that has one of those names. A value name is any name that a declaration, an import, an
+export alias, a key or a member write binds, so function, class and method names count beside
+variables and properties. A key counts in each of its spellings, so `src`, `'src'`, `['src']` and
+`#src` all report. A name matches whole, so `ms` reports `ms` but not `timeoutMs`.
+
+The rule leaves alone the names that hold no value of their own. A destructured key that an alias
+renames belongs to the object being read, so the rule reports only the alias. A computed key that
+reads a variable, such as `[src]`, names no property, and the rule checks the variable at its
+declaration. Type names, type-only imports and exports, labels and quoted module names hold no
+value, so the rule skips them.
+
+The shipped config lists the abbreviations that the code-style skill bans and turns on `id-length`
 beside the rule, so a one-letter name fails too, other than `x`, `y`, `z`, `$` and `_`.
 
 ## `zgeoff/no-file-snapshot`

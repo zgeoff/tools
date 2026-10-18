@@ -730,88 +730,153 @@ const abbreviated = {
   'zgeoff/no-abbreviated-names': ['error', { names: { src: '`source`', ms: 'a unit suffix' } }],
 };
 
-test.each([
-  ['a variable', 'export const src = 1;\n'],
-  ['a parameter', 'export function readPath(src: string): string {\n  return src;\n}\n'],
+// every form that binds a name, with NAME where the name goes; each row runs
+// once with `src`, which the rule reports, and once with `source`, which it
+// accepts
+const nameForms = [
+  ['a variable', 'export const NAME = 1;\n'],
+  ['a loop variable', 'for (const NAME of [1]) {\n  globalThis.value = NAME;\n}\n'],
+  ['a parameter', 'export function readPath(NAME: string): string {\n  return NAME;\n}\n'],
   [
     'a parameter with a default',
-    "export function readPath(src = ''): string {\n  return src;\n}\n",
+    "export function readPath(NAME = ''): string {\n  return NAME;\n}\n",
   ],
-  ['an arrow parameter', 'export const paths = [1].map((src) => src);\n'],
-  ['a destructured alias', 'const { path: src } = { path: 1 };\n\nexport const value = src;\n'],
-  ['a destructured rest', 'const { ...src } = { path: 1 };\n\nexport const value = src;\n'],
-  ['an array element', 'const [src] = [1];\n\nexport const value = src;\n'],
+  [
+    'a rest parameter',
+    'export function readPaths(...NAME: string[]): string[] {\n  return NAME;\n}\n',
+  ],
+  ['an arrow parameter', 'export const paths = [1].map((NAME) => NAME);\n'],
+  ['a destructured name', "const { NAME } = JSON.parse('{}');\n\nexport const value = NAME;\n"],
+  ['a destructured alias', 'const { path: NAME } = { path: 1 };\n\nexport const value = NAME;\n'],
+  ['a destructured rest', 'const { ...NAME } = { path: 1 };\n\nexport const value = NAME;\n'],
+  ['an array element', 'const [NAME] = [1];\n\nexport const value = NAME;\n'],
+  [
+    'a destructured parameter',
+    'export function readPath({ path: NAME }: { path: string }): string {\n  return NAME;\n}\n',
+  ],
   [
     'a catch parameter',
-    'export function readPath(): string {\n  try {\n    return String(globalThis);\n  } catch (src) {\n    return String(src);\n  }\n}\n',
+    'export function readPath(): string {\n  try {\n    return String(globalThis);\n  } catch (NAME) {\n    return String(NAME);\n  }\n}\n',
   ],
-  ['an object key', 'export const paths = { src: 1 };\n'],
-  ['a class property', 'export class Paths {\n  src = 1;\n}\n'],
-  ['an interface property', 'export interface Paths {\n  src: string;\n}\n'],
-  ['an accessor property', 'export class Paths {\n  accessor src = 1;\n}\n'],
-  ['an abstract property', 'export abstract class Paths {\n  abstract src: string;\n}\n'],
+  ['a function', 'export function NAME(): number {\n  return 1;\n}\n'],
+  ['a function expression', 'export const readPath = function NAME(): number {\n  return 1;\n};\n'],
+  ['a declared function', 'export declare function NAME(): number;\n'],
+  ['a class', 'export class NAME {}\n'],
+  ['a class expression', 'export const Paths = class NAME {};\n'],
+  ['an enum', 'export enum NAME {\n  Root,\n}\n'],
+  ['a namespace', 'export namespace NAME {\n  export const root = 1;\n}\n'],
+  ['an object key', 'export const paths = { NAME: 1 };\n'],
+  ['a quoted object key', "export const paths = { 'NAME': 1 };\n"],
+  ['a computed string key', "export const paths = { ['NAME']: 1 };\n"],
+  ['a computed template key', 'export const paths = { [`NAME`]: 1 };\n'],
+  ['an object method', 'export const paths = {\n  NAME(): number {\n    return 1;\n  },\n};\n'],
+  ['an object getter', 'export const paths = {\n  get NAME(): number {\n    return 1;\n  },\n};\n'],
+  ['a class property', 'export class Paths {\n  NAME = 1;\n}\n'],
+  ['a quoted class property', "export class Paths {\n  'NAME' = 1;\n}\n"],
+  ['a static class property', 'export class Paths {\n  static NAME = 1;\n}\n'],
+  ['an interface property', 'export interface Paths {\n  NAME: string;\n}\n'],
+  ['a quoted interface property', "export interface Paths {\n  'NAME': string;\n}\n"],
+  ['a type literal property', 'export type Paths = {\n  NAME: string;\n};\n'],
+  ['an index signature parameter', 'export interface Paths {\n  [NAME: string]: number;\n}\n'],
+  ['an accessor property', 'export class Paths {\n  accessor NAME = 1;\n}\n'],
+  ['an abstract property', 'export abstract class Paths {\n  abstract NAME: string;\n}\n'],
   [
     'an abstract accessor property',
-    'export abstract class Paths {\n  abstract accessor src: string;\n}\n',
+    'export abstract class Paths {\n  abstract accessor NAME: string;\n}\n',
   ],
-  ['a parameter property', 'export class Reader {\n  constructor(public src: string) {}\n}\n'],
-  ['a function type parameter', 'export type Reader = (src: string) => string;\n'],
-  ['a constructor type parameter', 'export type MakeReader = new (src: string) => object;\n'],
+  ['a parameter property', 'export class Reader {\n  constructor(public NAME: string) {}\n}\n'],
+  ['a class method', 'export class Paths {\n  NAME(): number {\n    return 1;\n  }\n}\n'],
+  ['a quoted class method', "export class Paths {\n  'NAME'(): number {\n    return 1;\n  }\n}\n"],
+  ['an abstract method', 'export abstract class Paths {\n  abstract NAME(): number;\n}\n'],
+  ['an interface method', 'export interface Paths {\n  NAME(): number;\n}\n'],
+  ['a function type parameter', 'export type Reader = (NAME: string) => string;\n'],
+  ['a constructor type parameter', 'export type MakeReader = new (NAME: string) => object;\n'],
   [
     'a method signature parameter',
-    'export interface Reader {\n  readPath(src: string): string;\n}\n',
+    'export interface Reader {\n  readPath(NAME: string): string;\n}\n',
   ],
-  ['a call signature parameter', 'export interface Reader {\n  (src: string): string;\n}\n'],
+  ['a call signature parameter', 'export interface Reader {\n  (NAME: string): string;\n}\n'],
   [
     'a construct signature parameter',
-    'export interface MakeReader {\n  new (src: string): object;\n}\n',
+    'export interface MakeReader {\n  new (NAME: string): object;\n}\n',
   ],
-  ['a declared function parameter', 'export declare function readPath(src: string): string;\n'],
+  ['a declared function parameter', 'export declare function readPath(NAME: string): string;\n'],
   [
     'an abstract method parameter',
-    'export abstract class Reader {\n  abstract readPath(src: string): string;\n}\n',
-  ],
-  ['a getter', 'export class Paths {\n  get src(): number {\n    return 1;\n  }\n}\n'],
-  [
-    'a setter',
-    'export class Paths {\n  set src(value: number) {\n    globalThis.value = value;\n  }\n}\n',
-  ],
-  ['an abstract getter', 'export abstract class Paths {\n  abstract get src(): number;\n}\n'],
-  ['an abstract setter', 'export abstract class Paths {\n  abstract set src(value: number);\n}\n'],
-  ['an interface getter', 'export interface Paths {\n  get src(): number;\n}\n'],
-  ['an interface setter', 'export interface Paths {\n  set src(value: number);\n}\n'],
-  [
-    'a named import alias',
-    "import { readFile as src } from 'node:fs';\n\nexport const value = src;\n",
-  ],
-  ['a default import', "import src from 'node:fs';\n\nexport const value = src;\n"],
-  ['a namespace import', "import * as src from 'node:fs';\n\nexport const value = src;\n"],
-  ['a require import', "import src = require('node:fs');\n\nexport const value = src;\n"],
-  [
-    'a namespace alias import',
-    'namespace Paths {\n  export const root = 1;\n}\n\nimport src = Paths.root;\n\nexport const value = src;\n',
+    'export abstract class Reader {\n  abstract readPath(NAME: string): string;\n}\n',
   ],
   [
     'an overload parameter',
-    'export class Reader {\n  readPath(src: string): string;\n  readPath(path: string): string {\n    return path;\n  }\n}\n',
+    'export class Reader {\n  readPath(NAME: string): string;\n  readPath(path: string): string {\n    return path;\n  }\n}\n',
   ],
-  ['a member assignment', 'export const paths = { path: 1 };\n\npaths.src = 2;\n'],
-])('it reports an abbreviated name in %s', async (_place, source) => {
-  const result = await runLint(source, false, abbreviated);
+  ['a getter', 'export class Paths {\n  get NAME(): number {\n    return 1;\n  }\n}\n'],
+  ['a quoted getter', "export class Paths {\n  get 'NAME'(): number {\n    return 1;\n  }\n}\n"],
+  [
+    'a setter',
+    'export class Paths {\n  set NAME(value: number) {\n    globalThis.value = value;\n  }\n}\n',
+  ],
+  ['an abstract getter', 'export abstract class Paths {\n  abstract get NAME(): number;\n}\n'],
+  ['an abstract setter', 'export abstract class Paths {\n  abstract set NAME(value: number);\n}\n'],
+  ['an interface getter', 'export interface Paths {\n  get NAME(): number;\n}\n'],
+  ['an interface setter', 'export interface Paths {\n  set NAME(value: number);\n}\n'],
+  ['an enum member', 'export enum Paths {\n  NAME,\n}\n'],
+  ['a quoted enum member', "export enum Paths {\n  'NAME',\n}\n"],
+  [
+    'a named import alias',
+    "import { readFile as NAME } from 'node:fs';\n\nexport const value = NAME;\n",
+  ],
+  ['a default import', "import NAME from 'node:fs';\n\nexport const value = NAME;\n"],
+  ['a namespace import', "import * as NAME from 'node:fs';\n\nexport const value = NAME;\n"],
+  ['a require import', "import NAME = require('node:fs');\n\nexport const value = NAME;\n"],
+  [
+    'a namespace alias import',
+    'namespace Paths {\n  export const root = 1;\n}\n\nimport NAME = Paths.root;\n\nexport const value = NAME;\n',
+  ],
+  ['an export alias', 'const path = 1;\n\nexport { path as NAME };\n'],
+  ['a quoted export alias', "const path = 1;\n\nexport { path as 'NAME' };\n"],
+  ['a namespace re-export', "export * as NAME from 'node:fs';\n"],
+  ['a member assignment', 'export const paths = { path: 1 };\n\npaths.NAME = 2;\n'],
+  ['a computed member assignment', "export const paths = { path: 1 };\n\npaths['NAME'] = 2;\n"],
+  [
+    'a destructuring member assignment',
+    'export const paths = { path: 1 };\n\n({ path: paths.NAME } = { path: 2 });\n',
+  ],
+  ['an array member assignment', 'export const paths = { path: 1 };\n\n[paths.NAME] = [2];\n'],
+  [
+    'a loop member assignment',
+    'export const paths = { path: 1 };\n\nfor (paths.NAME of [2]) {\n  globalThis.value = paths;\n}\n',
+  ],
+] as const;
+
+// a private name reports with its `#`, so these rows take their own message
+const privateNameForms = [
+  ['a private field', 'export class Paths {\n  #NAME = 1;\n}\n'],
+  ['a private getter', 'export class Paths {\n  get #NAME(): number {\n    return 1;\n  }\n}\n'],
+  ['a private method', 'export class Paths {\n  #NAME(): number {\n    return 1;\n  }\n}\n'],
+] as const;
+
+test.each(nameForms)('it reports an abbreviated name in %s', async (_place, template) => {
+  const result = await runLint(template.replaceAll('NAME', 'src'), false, abbreviated);
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('Rename `src` to `source`');
 });
 
-test.each([
-  ['a private field', 'export class Paths {\n  #src = 1;\n}\n'],
-  ['a private getter', 'export class Paths {\n  get #src(): number {\n    return 1;\n  }\n}\n'],
-])('it reports an abbreviated name in %s', async (_place, source) => {
-  const result = await runLint(source, false, abbreviated);
+test.each(privateNameForms)('it reports an abbreviated name in %s', async (_place, template) => {
+  const result = await runLint(template.replaceAll('NAME', 'src'), false, abbreviated);
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('Rename `#src` to `source`');
 });
+
+test.each([...nameForms, ...privateNameForms])(
+  'it accepts a full name in %s',
+  async (_place, template) => {
+    const result = await runLint(template.replaceAll('NAME', 'source'), false, abbreviated);
+
+    expect(result.stdout).not.toInclude('no-abbreviated-names');
+  },
+);
 
 test.each([
   [
@@ -830,6 +895,28 @@ test.each([
     'a type-only require import',
     "import type src = require('./paths.ts');\n\nexport type Value = src;\n",
   ],
+  [
+    'a type-only export',
+    "import type { Paths } from './paths.ts';\n\nexport type { Paths as src };\n",
+  ],
+  [
+    'a type-only export specifier',
+    "import type { Paths } from './paths.ts';\n\nexport { type Paths as src };\n",
+  ],
+  ['a type-only re-export', "export type * as src from './paths.ts';\n"],
+  ['a computed key that reads a variable', 'export const paths = { [src]: 1 };\n'],
+  [
+    'a computed member that reads a variable',
+    'export const paths = { path: 1 };\n\npaths[src] = 2;\n',
+  ],
+  [
+    'a destructured key in a member assignment',
+    "export const paths = { path: 1 };\n\n({ src: paths.path } = JSON.parse('{}'));\n",
+  ],
+  ['a quoted module name', "declare module 'src' {\n  export const root: number;\n}\n"],
+  ['a type alias', 'export type src = string;\n'],
+  ['a type parameter', 'export type Paths<src> = src[];\n'],
+  ['a label', 'src: for (const path of [1]) {\n  globalThis.value = path;\n  break src;\n}\n'],
 ])('it accepts an abbreviated name in %s', async (_place, source) => {
   const result = await runLint(source, false, abbreviated);
 
