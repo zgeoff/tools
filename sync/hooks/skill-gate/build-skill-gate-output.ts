@@ -49,6 +49,6 @@ export function buildSkillGateOutput(
 
 const RULES_PATH = '.claude/skill-gate.json';
 
-// The gate denies a Bash command that writes a gated path, so it names these tools as the only way.
+// A gated path changes only through these tools; the gate warns on a Bash write and blocks an edit.
 const EDIT_TOOLS_NOTE =
   'Change a gated path only with Edit, Write or MultiEdit, never through Bash.';

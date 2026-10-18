@@ -1,5 +1,3 @@
-// Formats skill names for a deny reason: "the `testing` skill", or "the `testing` and
-// `project-testing` skills" without the leading article.
 export function formatSkillList(skills: readonly string[]): string {
   const names = skills.map((skill) => `\`${skill}\``);
   const noun = names.length === 1 ? 'skill' : 'skills';

@@ -103,7 +103,8 @@ A repo that runs the skill gate refuses an edit to a test file until the session
 loaded the skills the path needs. A subagent loads them itself, because the main session's loads do
 not count for it. A compaction clears every load, so load the skills again after one. Change a gated
 file with Edit, Write or MultiEdit, never with a Bash redirect, `tee`, `sed -i`, or a script. The
-gate denies the common Bash forms of those writes, and a form it misses still breaks the rule.
+gate warns on the common Bash forms of those writes but lets them run, so a Bash write still breaks
+the rule.
 
 ## Languages and runners
 

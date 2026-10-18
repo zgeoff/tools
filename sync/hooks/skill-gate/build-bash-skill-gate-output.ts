@@ -3,9 +3,8 @@ import type { SkillGateHookOutput } from './types.ts';
 
 const RULES_PATH = '.claude/skill-gate.json';
 
-// Builds the PreToolUse hook output for a Bash command, or null when it writes no gated path. A
-// gated path changes only through Edit, Write or MultiEdit, so the command is denied even once the
-// session has loaded the skills, and the reason names the skills it still has to load.
+// Builds the PreToolUse hook output for a Bash command, or null when it writes no gated path. The
+// command still runs: the hook only reminds the agent, because a shell parser misses some writes.
 export function buildBashSkillGateOutput(
   gatedPaths: readonly string[],
   missing: readonly string[],
@@ -20,14 +19,13 @@ export function buildBashSkillGateOutput(
       ? `${gatedPaths[0]} is a gated path, so change it`
       : `${gatedPaths.join(', ')} are gated paths, so change them`;
 
-  const rule = `${subject} with the Edit, Write or MultiEdit tool, never through Bash.`;
   const load = buildLoadInstruction(missing, context.compacted === true);
+  const rule = `${subject} with the Edit, Write or MultiEdit tool, never through Bash.`;
 
   return {
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason: `${rule}${load} ${RULES_PATH} lists the skills each path needs.`,
+      additionalContext: `skill-gate: this Bash command writes a gated path and runs anyway.${load} ${rule} ${RULES_PATH} lists the skills each path needs.`,
     },
   };
 }
@@ -38,6 +36,6 @@ function buildLoadInstruction(missing: readonly string[], compacted: boolean): s
   }
 
   return compacted
-    ? ` Load the ${formatSkillList(missing)} again with the Skill tool first. This session was compacted, and a skill loaded before the compaction no longer counts.`
-    : ` Load the ${formatSkillList(missing)} with the Skill tool first.`;
+    ? ` Load the ${formatSkillList(missing)} again with the Skill tool before the next change. This session was compacted, and a skill loaded before the compaction no longer counts.`
+    : ` Load the ${formatSkillList(missing)} with the Skill tool before the next change.`;
 }

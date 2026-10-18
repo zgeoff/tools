@@ -110,8 +110,8 @@ function isOutsideProject(fromProject: string): boolean {
   return fromProject === '..' || fromProject.startsWith('../') || path.isAbsolute(fromProject);
 }
 
-// Denies a command that writes a gated path in the project and exits; any other command goes ahead
-// in silence. A broken rules file lets every command through, since the next edit reports it.
+// Warns on a command that writes a gated path in the project and exits; any other command goes
+// ahead in silence. A broken rules file lets every command through, since the next edit reports it.
 async function checkBashCommand(hookInput: HookInput, command: string): Promise<void> {
   const written = collectWrittenPaths(command).map((entry) =>
     readWrittenPath(hookInput.cwd, entry),

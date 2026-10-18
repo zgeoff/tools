@@ -34,6 +34,7 @@ test.each([
   [`node -e "require('fs').writeFileSync('src/a.ts', 'x')"`, [{ path: 'src/a.ts' }]],
   [`bun -e "await Bun.write('src/a.ts', 'x')"`, [{ path: 'src/a.ts' }]],
   [`ruby -e "File.write('src/a.ts', 'x')"`, [{ path: 'src/a.ts' }]],
+  [`perl -e 'open my $fh, ">", "src/a.ts";'`, [{ path: 'src/a.ts' }]],
   [`python3 -c "n = 7 // 2; open('src/a.ts', 'w').write(str(n))"`, [{ path: 'src/a.ts' }]],
   [
     `node -e "class Draft { #body = 'x'; }; require('fs').writeFileSync('src/a.ts', 'x')"`,

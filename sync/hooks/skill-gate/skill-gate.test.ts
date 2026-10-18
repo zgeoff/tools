@@ -515,7 +515,8 @@ test.each([
   ['mv drafts/a.ts src/a.test.ts'],
   ["cd src && sed -i.bak -e 's/oldName/newName/' a.test.ts"],
   [`python3 -c "open('src/a.test.ts', 'w').write('export {};')"`],
-])('it denies the Bash command %s with the Edit-tool message', async (command) => {
+  [`perl -e 'open my $fh, ">", "src/a.test.ts";'`],
+])('it warns on the Bash command %s with the Edit-tool message', async (command) => {
   const ctx = await setupTest();
 
   await mkdir(join(ctx.dir, '.claude/skills/testing'), { recursive: true });
@@ -543,8 +544,7 @@ test.each([
   expect(JSON.parse(result.stdout)).toStrictEqual({
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason: `${join(ctx.dir, 'src/a.test.ts')} is a gated path, so change it with the Edit, Write or MultiEdit tool, never through Bash. Load the \`testing\` skill with the Skill tool first. .claude/skill-gate.json lists the skills each path needs.`,
+      additionalContext: `skill-gate: this Bash command writes a gated path and runs anyway. Load the \`testing\` skill with the Skill tool before the next change. ${join(ctx.dir, 'src/a.test.ts')} is a gated path, so change it with the Edit, Write or MultiEdit tool, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
     },
   });
 });
@@ -583,7 +583,7 @@ test.each([
   expect(result.stdout).toBe('');
 });
 
-test('it denies a Bash write to a gated path after the session loads the skills', async () => {
+test('it warns on a Bash write to a gated path after the session loads the skills', async () => {
   const ctx = await setupTest();
 
   await mkdir(join(ctx.dir, '.claude/skills/testing'), { recursive: true });
@@ -618,13 +618,12 @@ test('it denies a Bash write to a gated path after the session loads the skills'
   expect(JSON.parse(result.stdout)).toStrictEqual({
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason: `${join(ctx.dir, 'src/a.test.ts')} is a gated path, so change it with the Edit, Write or MultiEdit tool, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
+      additionalContext: `skill-gate: this Bash command writes a gated path and runs anyway. ${join(ctx.dir, 'src/a.test.ts')} is a gated path, so change it with the Edit, Write or MultiEdit tool, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
     },
   });
 });
 
-test('it denies a Bash copy into a directory when the copied file name is gated', async () => {
+test('it warns on a Bash copy into a directory when the copied file name is gated', async () => {
   const ctx = await setupTest();
 
   await mkdir(join(ctx.dir, '.claude/skills/testing'), { recursive: true });
@@ -652,8 +651,7 @@ test('it denies a Bash copy into a directory when the copied file name is gated'
   expect(JSON.parse(result.stdout)).toStrictEqual({
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason: `${join(ctx.dir, 'src/b.test.ts')} is a gated path, so change it with the Edit, Write or MultiEdit tool, never through Bash. Load the \`testing\` skill with the Skill tool first. .claude/skill-gate.json lists the skills each path needs.`,
+      additionalContext: `skill-gate: this Bash command writes a gated path and runs anyway. Load the \`testing\` skill with the Skill tool before the next change. ${join(ctx.dir, 'src/b.test.ts')} is a gated path, so change it with the Edit, Write or MultiEdit tool, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
     },
   });
 });
@@ -697,7 +695,7 @@ test('it lets a Bash write to a gated path go ahead when the rules file is not J
   expect(result.stdout).toBe('');
 });
 
-test('it denies a Bash command that writes paths under two gates and names every skill', async () => {
+test('it warns on a Bash command that writes paths under two gates and names every skill', async () => {
   const ctx = await setupTest();
 
   await mkdir(join(ctx.dir, '.claude/skills/testing'), { recursive: true });
@@ -731,8 +729,7 @@ test('it denies a Bash command that writes paths under two gates and names every
   expect(JSON.parse(result.stdout)).toStrictEqual({
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason: `${join(ctx.dir, 'src/a.test.ts')}, ${join(ctx.dir, 'README.md')} are gated paths, so change them with the Edit, Write or MultiEdit tool, never through Bash. Load the \`testing\` and \`docs-writing\` skills with the Skill tool first. .claude/skill-gate.json lists the skills each path needs.`,
+      additionalContext: `skill-gate: this Bash command writes a gated path and runs anyway. Load the \`testing\` and \`docs-writing\` skills with the Skill tool before the next change. ${join(ctx.dir, 'src/a.test.ts')}, ${join(ctx.dir, 'README.md')} are gated paths, so change them with the Edit, Write or MultiEdit tool, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
     },
   });
 });
@@ -763,7 +760,7 @@ test('it lets a Bash write to a gated file name outside the project go ahead', a
   expect(result.stdout).toBe('');
 });
 
-test('it denies a Bash write to a gated path after a compaction and says to load the skills again', async () => {
+test('it warns on a Bash write to a gated path after a compaction and says to load the skills again', async () => {
   const ctx = await setupTest();
 
   await mkdir(join(ctx.dir, '.claude/skills/testing'), { recursive: true });
@@ -799,8 +796,7 @@ test('it denies a Bash write to a gated path after a compaction and says to load
   expect(JSON.parse(result.stdout)).toStrictEqual({
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason: `${join(ctx.dir, 'src/a.test.ts')} is a gated path, so change it with the Edit, Write or MultiEdit tool, never through Bash. Load the \`testing\` skill again with the Skill tool first. This session was compacted, and a skill loaded before the compaction no longer counts. .claude/skill-gate.json lists the skills each path needs.`,
+      additionalContext: `skill-gate: this Bash command writes a gated path and runs anyway. Load the \`testing\` skill again with the Skill tool before the next change. This session was compacted, and a skill loaded before the compaction no longer counts. ${join(ctx.dir, 'src/a.test.ts')} is a gated path, so change it with the Edit, Write or MultiEdit tool, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
     },
   });
 });

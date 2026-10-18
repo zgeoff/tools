@@ -177,7 +177,7 @@
   },
   {
     "name": "hook-skill-gate",
-    "description": "The skill-gate PreToolUse hook, which denies an edit until the session loads the skills the path needs and denies a Bash command that writes a gated path; the repo keeps its rules in .claude/skill-gate.json and registers the hook in .claude/settings.json",
+    "description": "The skill-gate PreToolUse hook, which denies an edit until the session loads the skills the path needs and warns on a Bash command that writes a gated path; the repo keeps its rules in .claude/skill-gate.json and registers the hook in .claude/settings.json",
     "optIn": true,
     "files": [
       {
