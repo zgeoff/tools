@@ -3,12 +3,12 @@ import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { resolveRepoRoot } from './resolve-repo-root.ts';
+import { runGitShowToplevel } from './run-git-show-toplevel.ts';
 
 // A temp folder, and a clean git environment, so a GIT_DIR that a pre-push hook exports cannot
 // point git at the repo this test runs in.
 async function setupTest() {
-  const created = await mkdtemp(join(tmpdir(), 'resolve-repo-root-'));
+  const created = await mkdtemp(join(tmpdir(), 'run-git-show-toplevel-'));
 
   onTestFinished(() => rm(created, { recursive: true, force: true }));
 
@@ -33,7 +33,7 @@ test('it returns the top of the work tree from a subfolder', async () => {
 
   await mkdir(join(ctx.dir, 'repo/scripts/ci'), { recursive: true });
 
-  expect(resolveRepoRoot(join(ctx.dir, 'repo/scripts/ci'), ctx.env)).toBe(join(ctx.dir, 'repo'));
+  expect(runGitShowToplevel(join(ctx.dir, 'repo/scripts/ci'), ctx.env)).toBe(join(ctx.dir, 'repo'));
 });
 
 test('it returns the folder itself outside a work tree', async () => {
@@ -41,7 +41,7 @@ test('it returns the folder itself outside a work tree', async () => {
 
   await mkdir(join(ctx.dir, 'loose'));
 
-  expect(resolveRepoRoot(join(ctx.dir, 'loose'), ctx.env)).toBe(join(ctx.dir, 'loose'));
+  expect(runGitShowToplevel(join(ctx.dir, 'loose'), ctx.env)).toBe(join(ctx.dir, 'loose'));
 });
 
 test('it returns the folder itself when the PATH lacks git', async () => {
@@ -51,7 +51,7 @@ test('it returns the folder itself when the PATH lacks git', async () => {
 
   await mkdir(join(ctx.dir, 'repo/scripts'));
 
-  expect(resolveRepoRoot(join(ctx.dir, 'repo/scripts'), { PATH: ctx.dir })).toBe(
+  expect(runGitShowToplevel(join(ctx.dir, 'repo/scripts'), { PATH: ctx.dir })).toBe(
     join(ctx.dir, 'repo/scripts'),
   );
 });

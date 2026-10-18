@@ -1,7 +1,7 @@
-// The top of the git work tree that holds `cwd`, so the runner reads the root config and prints
-// root-relative paths from any folder in the repo. Outside a work tree, or without git, it is `cwd`
-// itself, so a file list still runs there.
-export function resolveRepoRoot(
+// Runs git rev-parse --show-toplevel and returns the top of the work tree that holds `cwd`, so the
+// runner reads the root config and prints root-relative paths from any folder in the repo. Outside
+// a work tree, or without git, it returns `cwd`, so a file list still runs there.
+export function runGitShowToplevel(
   cwd: string,
   env: Readonly<Record<string, string | undefined>>,
 ): string {

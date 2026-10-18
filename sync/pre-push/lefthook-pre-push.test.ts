@@ -241,7 +241,7 @@ test('it passes the push when the branch changes a clean file whose name starts 
 test.each([
   ['packages/checks/src/cli.test.ts'],
   ['packages/checks/src/run-checks.test.ts'],
-  ['packages/checks/src/resolve-repo-root.test.ts'],
+  ['packages/checks/src/run-git-show-toplevel.test.ts'],
   ['packages/oxfmt-config/index.test.ts'],
   ['sync/skills/docs-writing/scripts/check-length.test.ts'],
   ['sync/skills/docs-writing/scripts/check-links.test.ts'],

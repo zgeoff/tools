@@ -3,8 +3,8 @@ import { resolve } from 'node:path';
 import { allChecks } from './all-checks.ts';
 import { loadConfig } from './load-config.ts';
 import { parseCLIArgs } from './parse-cli-args.ts';
-import { resolveRepoRoot } from './resolve-repo-root.ts';
 import { runChecks } from './run-checks.ts';
+import { runGitShowToplevel } from './run-git-show-toplevel.ts';
 
 const USAGE = `usage: zgeoff-check [--] [file ...]
 
@@ -30,7 +30,7 @@ const files = parsed.files;
 try {
   // A run from a subfolder reads the root config, lists the whole repo, and takes each file argument
   // relative to the folder it runs in.
-  const root = resolveRepoRoot(process.cwd(), process.env);
+  const root = runGitShowToplevel(process.cwd(), process.env);
 
   const config = loadConfig(
     root,
