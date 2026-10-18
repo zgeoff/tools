@@ -39,10 +39,11 @@ async function setupTest() {
   const run = (...args: readonly string[]) =>
     spawnSync('bash', [scriptPath, ...args], { cwd: dir, env, encoding: 'utf8' });
 
-  // Runs the script as a GitHub Actions pull-request run against a base branch on origin.
-  const runInPullRequest = (baseRef: string, ...args: readonly string[]) =>
+  // Runs the script as a GitHub Actions pull-request run against a base branch on origin, in the
+  // test repository or in a clone of it.
+  const runInPullRequest = (baseRef: string, args: readonly string[], cwd = dir) =>
     spawnSync('bash', [scriptPath, ...args], {
-      cwd: dir,
+      cwd,
       env: { ...env, GITHUB_BASE_REF: baseRef },
       encoding: 'utf8',
     });
@@ -53,9 +54,34 @@ async function setupTest() {
     onTestFinished(() => rm(originDir, { recursive: true, force: true }));
     spawnSync('git', ['init', '-q', '--bare'], { cwd: originDir, env });
     runGit('remote', 'add', 'origin', originDir);
+
+    return originDir;
   };
 
-  return { runGit, writeText, runCommit, run, runInPullRequest, createOrigin };
+  // Clones one branch of origin with no history, as actions/checkout does for a pull request.
+  const createShallowClone = async (originDir: string, branch: string) => {
+    const cloneDir = await mkdtemp(join(tmpdir(), 'check-prose-clone-'));
+
+    onTestFinished(() => rm(cloneDir, { recursive: true, force: true }));
+
+    spawnSync(
+      'git',
+      ['clone', '-q', '--depth', '1', '--branch', branch, `file://${originDir}`, cloneDir],
+      { env },
+    );
+
+    return cloneDir;
+  };
+
+  return {
+    runGit,
+    writeText,
+    runCommit,
+    run,
+    runInPullRequest,
+    createOrigin,
+    createShallowClone,
+  };
 }
 
 // Wraps the words ten to a line, as an editor wraps a paragraph.
@@ -227,7 +253,7 @@ test('it fetches the base branch in a pull-request run with no origin history', 
 
   ctx.runCommit('add the new doc');
 
-  const result = ctx.runInPullRequest('main', 'old.md', 'new.md');
+  const result = ctx.runInPullRequest('main', ['old.md', 'new.md']);
 
   expect(result.status).toBe(1);
   expect(result.stdout).toInclude('new.md:1:260 words');
@@ -278,12 +304,13 @@ test('it warns on a paragraph that starts with an inline tag or an autolink', as
 test('it skips a block tag written in upper case across blank lines', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('guide.md', `<PRE>\n\n${buildWords(300)}\n\n</PRE>\n`);
+  await ctx.writeText('guide.md', `<PRE>\n\n${buildWords(300)}\n\n</PRE>\n\n${buildWords(200)}\n`);
 
   const result = ctx.run('guide.md');
 
   expect(result.status).toBe(0);
-  expect(result.stdout).not.toInclude('Paragraphs over');
+  expect(result.stdout).not.toInclude('guide.md:3:');
+  expect(result.stdout).toInclude('guide.md:36:200 words');
 });
 
 test('it counts a paragraph that follows a heading with no blank line', async () => {
@@ -295,4 +322,63 @@ test('it counts a paragraph that follows a heading with no blank line', async ()
 
   expect(result.status).toBe(1);
   expect(result.stdout).toInclude('guide.md:2:251 words');
+});
+
+test('it skips a long Setext heading', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', `${buildWords(251)}\n===\n\n${buildWords(251)}\n------\n`);
+
+  const result = ctx.run('guide.md');
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).not.toInclude('Paragraphs over');
+});
+
+test('it counts a paragraph that starts on the line after an HTML comment closes', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText(
+    'guide.md',
+    `<!--\nA note for editors.\n-->\n${buildWords(251)}\n\n<!-- A one-line note. -->\n${buildWords(252)}\n`,
+  );
+
+  const result = ctx.run('guide.md');
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('guide.md:4:251 words');
+  expect(result.stdout).toInclude('guide.md:32:252 words');
+});
+
+test('it counts only the PR documents in a shallow pull-request merge checkout', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('readme.md', 'A short doc.\n');
+
+  ctx.runCommit('add the readme');
+  ctx.runGit('branch', '-M', 'main');
+  ctx.runGit('branch', 'feature');
+
+  await ctx.writeText('base.md', `${buildWords(260)}\n`);
+
+  ctx.runCommit('add a doc on the base');
+  ctx.runGit('checkout', '-q', 'feature');
+
+  await ctx.writeText('pr.md', `${buildWords(270)}\n`);
+
+  ctx.runCommit('add a doc on the PR');
+  ctx.runGit('checkout', '-q', '-b', 'pull-merge', 'main');
+  ctx.runGit('merge', '-q', '--no-edit', 'feature');
+
+  const originDir = await ctx.createOrigin();
+
+  ctx.runGit('push', '-q', 'origin', 'main', 'pull-merge');
+
+  const cloneDir = await ctx.createShallowClone(originDir, 'pull-merge');
+
+  const result = ctx.runInPullRequest('main', ['base.md', 'pr.md'], cloneDir);
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('pr.md:1:270 words');
+  expect(result.stdout).not.toInclude('base.md');
 });
