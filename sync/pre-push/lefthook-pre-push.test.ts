@@ -239,6 +239,7 @@ test('it passes the push when the branch changes a clean file whose name starts 
 // Each suite that spawns git must stay safe without the baseline's env -u, so it runs here with
 // the GIT_DIR a pre-push hook in the worktree exports.
 test.each([
+  ['packages/checks/package.test.ts'],
   ['packages/checks/src/cli.test.ts'],
   ['packages/checks/src/run-checks.test.ts'],
   ['packages/checks/src/run-git-show-toplevel.test.ts'],

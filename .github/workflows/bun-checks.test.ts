@@ -220,7 +220,6 @@ test('it hands the picked list to the shfmt setup and the run through the workfl
     }),
   );
 
-  // The caller's inputs: an empty scripts list and no setup-shfmt.
   const inputs: Record<string, string> = {
     [`\${{ inputs.scripts }}`]: '',
     [`\${{ inputs.setup-shfmt }}`]: 'false',
