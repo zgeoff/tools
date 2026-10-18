@@ -89,8 +89,12 @@ test('it leaves the files repo-sync delivers unformatted', async () => {
   await writeFile(join(project.dir, 'agents/shared.md'), '*  shared   list item\n');
 
   // oxfmt applies the nearest repo's .gitignore, and this repo's ignores the project folder, so the
-  // project needs its own repo for `.` to reach any file.
-  Bun.spawnSync(['git', 'init', '--quiet'], { cwd: project.dir });
+  // project needs its own repo for `.` to reach any file. The clean environment keeps a GIT_DIR that
+  // a pre-push hook in a linked worktree exports from pointing git init at the real repository.
+  Bun.spawnSync(['git', 'init', '--quiet'], {
+    cwd: project.dir,
+    env: { PATH: process.env['PATH'], GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+  });
 
   const result = Bun.spawnSync([project.oxfmt, '-c', 'oxfmt.config.ts', '.'], { cwd: project.dir });
 
