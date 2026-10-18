@@ -33,6 +33,27 @@
     "zgeoff/test-beside-module": "error",
     "zgeoff/no-file-snapshot": "error",
 
+    // name a value for what it holds, in full words: one letter only for a
+    // coordinate, and each listed abbreviation reported with its full word; a
+    // type parameter is not a value, so generics stay unchecked
+    "id-length": ["error", { "min": 2, "exceptions": ["x", "y"], "checkGeneric": false }],
+    "zgeoff/no-abbreviated-names": [
+      "error",
+      {
+        "names": {
+          "mgr": "`manager`",
+          "dir": "`directory`",
+          "tmp": "`temporary`",
+          "proc": "`process`",
+          "src": "`source`",
+          "dest": "`destination`",
+          "prev": "`previous`",
+          "msg": "`message`",
+          "ms": "a name for the value with `Ms` as its unit suffix, such as `timeoutMs`"
+        }
+      }
+    ],
+
     // enforced comment style — line comments unless JSDoc or exclamation
     "@stylistic/multiline-comment-style": [
       "error",
@@ -114,14 +135,13 @@
     // category-enabled rules that contradict this config's style: inline named
     // export declarations are the convention (group-exports demands the exact
     // form no-bare-named-exports bans), keys group by meaning not alphabet,
-    // comments stay lowercase, short identifiers and literal numbers are fine
+    // comments stay lowercase, and literal numbers are fine
     "import/prefer-default-export": "off",
     "import/no-named-export": "off",
     "import/exports-last": "off",
     "import/group-exports": "off",
     "sort-keys": "off",
     "capitalized-comments": "off",
-    "id-length": "off",
     "no-magic-numbers": "off",
     // prefer-ternary (only-single-line, above) wants ternaries where they fit
     // on one line; no-ternary would ban the same code

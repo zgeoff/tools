@@ -102,3 +102,43 @@ test('it reports a test file with a snapshot file in __snapshots__/', async () =
   expect(stdout).toInclude('zgeoff(no-file-snapshot)');
   expect(stdout).toInclude('__snapshots__/banner.test.ts.snap');
 });
+
+test.each([
+  ['a variable `s`', 'export const s = 1;\n', 'eslint(id-length)'],
+  [
+    'a parameter `r`',
+    'export function readWidth(r: number): number {\n  return r;\n}\n',
+    'eslint(id-length)',
+  ],
+  ['a variable `e`', 'export const e = 1;\n', 'eslint(id-length)'],
+  [
+    'a catch parameter `e`',
+    'export function readLabel(): string {\n  try {\n    return String(globalThis);\n  } catch (e) {\n    return String(e);\n  }\n}\n',
+    'eslint(id-length)',
+  ],
+  ['a variable `mgr`', 'export const mgr = 1;\n', 'zgeoff(no-abbreviated-names)'],
+  ['a variable `ms`', 'export const ms = 1;\n', 'zgeoff(no-abbreviated-names)'],
+])('it reports %s', async (_label, source, rule) => {
+  const ctx = await setupTest('names.ts', source);
+  const stdout = await runLint(ctx.dir, 'names.ts');
+
+  expect(stdout).toInclude(rule);
+});
+
+test('it names `manager` when it reports `mgr`', async () => {
+  const ctx = await setupTest('names.ts', 'export const mgr = 1;\n');
+  const stdout = await runLint(ctx.dir, 'names.ts');
+
+  expect(stdout).toInclude('Rename `mgr` to `manager`');
+});
+
+test.each(['x', 'y', 'ctx', 'id', 'db', 'timeoutMs'])(
+  'it accepts a variable `%s`',
+  async (name) => {
+    const ctx = await setupTest('names.ts', `export const ${name} = 1;\n`);
+    const stdout = await runLint(ctx.dir, 'names.ts');
+
+    expect(stdout).not.toInclude('eslint(id-length)');
+    expect(stdout).not.toInclude('zgeoff(no-abbreviated-names)');
+  },
+);

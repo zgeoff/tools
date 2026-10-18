@@ -726,6 +726,70 @@ test('it reports nothing when the config names no words', async () => {
   expect(result.exitCode).toBe(0);
 });
 
+const abbreviated = {
+  'zgeoff/no-abbreviated-names': ['error', { names: { src: '`source`', ms: 'a unit suffix' } }],
+};
+
+test.each([
+  ['a variable', 'export const src = 1;\n'],
+  ['a parameter', 'export function readPath(src: string): string {\n  return src;\n}\n'],
+  [
+    'a parameter with a default',
+    "export function readPath(src = ''): string {\n  return src;\n}\n",
+  ],
+  ['an arrow parameter', 'export const paths = [1].map((src) => src);\n'],
+  ['a destructured alias', 'const { path: src } = { path: 1 };\n\nexport const value = src;\n'],
+  ['a destructured rest', 'const { ...src } = { path: 1 };\n\nexport const value = src;\n'],
+  ['an array element', 'const [src] = [1];\n\nexport const value = src;\n'],
+  [
+    'a catch parameter',
+    'export function readPath(): string {\n  try {\n    return String(globalThis);\n  } catch (src) {\n    return String(src);\n  }\n}\n',
+  ],
+  ['an object key', 'export const paths = { src: 1 };\n'],
+  ['a class property', 'export class Paths {\n  src = 1;\n}\n'],
+  ['an interface property', 'export interface Paths {\n  src: string;\n}\n'],
+  ['a member assignment', 'export const paths = { path: 1 };\n\npaths.src = 2;\n'],
+])('it reports an abbreviated name in %s', async (_place, source) => {
+  const result = await runLint(source, false, abbreviated);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('Rename `src` to `source`');
+});
+
+test('it accepts an abbreviation inside a longer name', async () => {
+  const source = 'export const timeoutMs = 1;\nexport const srcPath = 2;\n';
+
+  const result = await runLint(source, false, abbreviated);
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it accepts a destructured key that an alias renames', async () => {
+  const source =
+    'const { src: source } = Object.fromEntries([["src", 1]]);\n\nexport const value = source;\n';
+
+  const result = await runLint(source, false, abbreviated);
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it accepts an abbreviated name read from another object', async () => {
+  const source =
+    'const paths = { source: 1 };\n\nexport const value = Reflect.get(paths, "src") ?? process.src;\n';
+
+  const result = await runLint(source, false, abbreviated);
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it reports nothing when the config names no abbreviations', async () => {
+  const result = await runLint('export const src = 1;\n', false, {
+    'zgeoff/no-abbreviated-names': 'error',
+  });
+
+  expect(result.exitCode).toBe(0);
+});
+
 const layered = {
   'zgeoff/import-zones': [
     'error',

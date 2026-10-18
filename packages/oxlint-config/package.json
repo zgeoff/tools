@@ -13,6 +13,7 @@
     "plugin.js",
     "function-verb.js",
     "no-restricted-words.js",
+    "no-abbreviated-names.js",
     "max-consecutive-line-comments.js",
     "no-jsdoc.js",
     "no-comment-rule-override.js",

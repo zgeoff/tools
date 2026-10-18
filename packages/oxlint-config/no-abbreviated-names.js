@@ -1,0 +1,118 @@
+// each `names` key is a short name and its value the text that replaces it;
+// the rule matches a whole name, so `timeoutMs` passes when `ms` is listed
+const noAbbreviatedNames = {
+  meta: {
+    type: 'suggestion',
+    messages: {
+      abbreviated:
+        'Rename `{{name}}` to {{replacement}}: name a value for what it holds, in full words.',
+    },
+    schema: [
+      {
+        type: 'object',
+        properties: {
+          names: { type: 'object', additionalProperties: { type: 'string', minLength: 1 } },
+        },
+        additionalProperties: false,
+      },
+    ],
+  },
+  create(context) {
+    const names = new Map(Object.entries(context.options[0]?.names ?? {}));
+
+    if (names.size === 0) {
+      return {};
+    }
+
+    const checkName = (node) => {
+      if (node?.type !== 'Identifier' || !names.has(node.name)) {
+        return;
+      }
+
+      context.report({
+        node,
+        messageId: 'abbreviated',
+        data: { name: node.name, replacement: names.get(node.name) },
+      });
+    };
+
+    const checkPattern = (node) => {
+      for (const identifier of collectPatternIdentifiers(node)) {
+        checkName(identifier);
+      }
+    };
+
+    const checkKey = (node) => {
+      if (!node.computed) {
+        checkName(node.key);
+      }
+    };
+
+    const checkParams = (node) => {
+      for (const param of node.params) {
+        checkPattern(param);
+      }
+    };
+
+    return {
+      VariableDeclarator(node) {
+        checkPattern(node.id);
+      },
+      FunctionDeclaration: checkParams,
+      FunctionExpression: checkParams,
+      ArrowFunctionExpression: checkParams,
+      CatchClause(node) {
+        checkPattern(node.param);
+      },
+      'ObjectExpression > Property': checkKey,
+      PropertyDefinition: checkKey,
+      AccessorProperty: checkKey,
+      TSPropertySignature: checkKey,
+      'AssignmentExpression > MemberExpression.left'(node) {
+        if (!node.computed) {
+          checkName(node.property);
+        }
+      },
+    };
+  },
+};
+
+// the names a binding pattern declares: a destructured key's alias, not the
+// key, since the key belongs to the object being read
+function collectPatternIdentifiers(node) {
+  if (node === null || node === undefined) {
+    return [];
+  }
+
+  if (node.type === 'Identifier') {
+    return [node];
+  }
+
+  if (node.type === 'ObjectPattern') {
+    return node.properties.flatMap((property) => {
+      const binding = property.type === 'RestElement' ? property : property.value;
+
+      return collectPatternIdentifiers(binding);
+    });
+  }
+
+  if (node.type === 'ArrayPattern') {
+    return node.elements.flatMap((element) => collectPatternIdentifiers(element));
+  }
+
+  if (node.type === 'AssignmentPattern') {
+    return collectPatternIdentifiers(node.left);
+  }
+
+  if (node.type === 'RestElement') {
+    return collectPatternIdentifiers(node.argument);
+  }
+
+  if (node.type === 'TSParameterProperty') {
+    return collectPatternIdentifiers(node.parameter);
+  }
+
+  return [];
+}
+
+export default noAbbreviatedNames;
