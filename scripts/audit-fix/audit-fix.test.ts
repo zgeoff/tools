@@ -26,14 +26,18 @@ test('it runs from the sparse checkout that audit-fix.yml makes, with no install
   const text = await readFile(join(root, '.github/workflows/audit-fix.yml'), 'utf8');
 
   // The workflow checks out these folders and no others, so a folder it drops fails here.
-  const checkoutStep = expect.objectContaining({
-    name: 'Check out the audit-fix script',
-    with: expect.objectContaining({ 'sparse-checkout': `${folders.join('\n')}\n` }),
+  const checkoutOptions: unknown = expect.objectContaining({
+    'sparse-checkout': `${folders.join('\n')}\n`,
   });
 
-  expect(Bun.YAML.parse(text)).toMatchObject({
-    jobs: { 'audit-fix': { steps: expect.arrayContaining([checkoutStep]) } },
+  const checkoutStep: unknown = expect.objectContaining({
+    name: 'Check out the audit-fix script',
+    with: checkoutOptions,
   });
+
+  const steps: unknown = expect.arrayContaining([checkoutStep]);
+
+  expect(Bun.YAML.parse(text)).toMatchObject({ jobs: { 'audit-fix': { steps } } });
 
   // The same folders, and no node_modules, as in a caller repo whose install lacks the tools
   // packages.
