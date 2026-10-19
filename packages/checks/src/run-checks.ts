@@ -78,6 +78,13 @@ function runGitLsFiles(options: Readonly<RunChecksOptions>): string[] {
     .filter((file) => file !== '');
 }
 
+// A path the caller gives, such as ./scripts/a.sh, as the repo-relative path a glob matches.
+function toRepoPath(cwd: string, file: string): string {
+  const path = relative(cwd, resolve(cwd, file));
+
+  return isAbsolute(path) ? file : path;
+}
+
 // A listed path that no longer exists, such as a file the branch deletes, is skipped. Any other
 // error, such as a folder the runner cannot enter, throws, so the run never passes over a file it
 // could not read.
@@ -97,11 +104,4 @@ function checkPathExists(cwd: string, file: string): boolean {
   }
 
   return true;
-}
-
-// A path the caller gives, such as ./scripts/a.sh, as the repo-relative path a glob matches.
-function toRepoPath(cwd: string, file: string): string {
-  const path = relative(cwd, resolve(cwd, file));
-
-  return isAbsolute(path) ? file : path;
 }
