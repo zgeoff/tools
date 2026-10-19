@@ -7,13 +7,13 @@ import { collectBranchFiles } from './collect-branch-files.ts';
 // A bare upstream and a clone of it whose main holds one pushed commit, so
 // every test starts from a repository whose history predates the branch.
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'collect-branch-files-'));
+  const directory = await mkdtemp(join(tmpdir(), 'collect-branch-files-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const env = readGitEnv(dir);
+  const env = readGitEnv(directory);
 
-  const repo = await createClone(dir, env);
+  const repo = await createClone(directory, env);
 
   await createCommit(repo, env, { 'README.md': '# repo\n' });
   await runGit(repo, env, ['push', '--quiet', '-u', 'origin', 'main']);
@@ -42,14 +42,14 @@ function readGitEnv(home: string) {
 }
 
 async function createClone(
-  dir: string,
+  directory: string,
   env: Readonly<Record<string, string | undefined>>,
 ): Promise<string> {
-  const upstream = join(dir, 'upstream.git');
-  const repo = join(dir, 'work');
+  const upstream = join(directory, 'upstream.git');
+  const repo = join(directory, 'work');
 
-  await runGit(dir, env, ['init', '--quiet', '--bare', '--initial-branch=main', upstream]);
-  await runGit(dir, env, ['clone', '--quiet', upstream, repo]);
+  await runGit(directory, env, ['init', '--quiet', '--bare', '--initial-branch=main', upstream]);
+  await runGit(directory, env, ['clone', '--quiet', upstream, repo]);
   await runGit(repo, env, ['switch', '--quiet', '--create', 'main']);
 
   return repo;
@@ -60,10 +60,12 @@ async function runGit(
   env: Readonly<Record<string, string | undefined>>,
   args: readonly string[],
 ): Promise<void> {
-  const proc = Bun.spawn(['git', ...args], { cwd, env, stdout: 'ignore', stderr: 'pipe' });
+  const subprocess = Bun.spawn(['git', ...args], { cwd, env, stdout: 'ignore', stderr: 'pipe' });
 
-  if ((await proc.exited) !== 0) {
-    throw new Error(`git ${args.join(' ')} failed: ${await new Response(proc.stderr).text()}`);
+  if ((await subprocess.exited) !== 0) {
+    throw new Error(
+      `git ${args.join(' ')} failed: ${await new Response(subprocess.stderr).text()}`,
+    );
   }
 }
 
@@ -83,17 +85,20 @@ async function createCommit(
 }
 
 async function runScript(cwd: string, env: Readonly<Record<string, string | undefined>>) {
-  const proc = Bun.spawn([process.execPath, join(import.meta.dir, 'collect-branch-files.ts')], {
-    cwd,
-    env,
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
+  const subprocess = Bun.spawn(
+    [process.execPath, join(import.meta.dir, 'collect-branch-files.ts')],
+    {
+      cwd,
+      env,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+  );
 
   const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
+    new Response(subprocess.stdout).text(),
+    new Response(subprocess.stderr).text(),
+    subprocess.exited,
   ]);
 
   return { stdout, stderr, exitCode };

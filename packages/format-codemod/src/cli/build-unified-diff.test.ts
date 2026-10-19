@@ -35,7 +35,7 @@ test('it separates distant changes into their own hunks', () => {
 
 test('it finds the minimal diff when lines repeat', () => {
   const diff = buildUnifiedDiff('x\na\nx\n', 'a\nx\n', 'x.ts');
-  const changed = diff.split('\n').filter((l) => l.startsWith('-') || l.startsWith('+'));
+  const changed = diff.split('\n').filter((line) => line.startsWith('-') || line.startsWith('+'));
 
   // headers aside, a single deletion is the whole story
   expect(changed).toEqual(['--- x.ts', '+++ x.ts', '-x']);

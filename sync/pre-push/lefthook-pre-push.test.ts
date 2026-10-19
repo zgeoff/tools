@@ -9,13 +9,13 @@ import { $ } from 'bun';
 // gets a clean environment, so a GIT_DIR this test inherits from a real hook cannot reach the repo
 // it runs in.
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'lefthook-pre-push-'));
+  const directory = await mkdtemp(join(tmpdir(), 'lefthook-pre-push-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   const env = {
     PATH: process.env['PATH'],
-    HOME: dir,
+    HOME: directory,
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_AUTHOR_NAME: 'Test',
@@ -24,16 +24,16 @@ async function setupTest() {
     GIT_COMMITTER_EMAIL: 'test@example.com',
   };
 
-  const main = join(dir, 'main');
-  const worktree = join(dir, 'worktree');
+  const main = join(directory, 'main');
+  const worktree = join(directory, 'worktree');
 
-  await $`git init --quiet --bare --initial-branch=main ${join(dir, 'upstream.git')}`
-    .cwd(dir)
+  await $`git init --quiet --bare --initial-branch=main ${join(directory, 'upstream.git')}`
+    .cwd(directory)
     .env(env);
 
-  await $`git init --quiet --initial-branch=main ${main}`.cwd(dir).env(env);
+  await $`git init --quiet --initial-branch=main ${main}`.cwd(directory).env(env);
   await $`git commit --quiet --allow-empty -m start`.cwd(main).env(env);
-  await $`git remote add origin ${join(dir, 'upstream.git')}`.cwd(main).env(env);
+  await $`git remote add origin ${join(directory, 'upstream.git')}`.cwd(main).env(env);
   await $`git push --quiet -u origin main`.cwd(main).env(env);
   await $`git worktree add --quiet -b feature ${worktree}`.cwd(main).env(env);
 

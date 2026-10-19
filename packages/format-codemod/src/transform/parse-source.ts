@@ -1,8 +1,8 @@
 import { parseSync } from 'oxc-parser';
 import type { ASTNode, ParsedSource } from '../types.ts';
 
-export function parseSource(src: string, filename: string): ParsedSource | string {
-  const parsed = parseSync(filename, src);
+export function parseSource(source: string, filename: string): ParsedSource | string {
+  const parsed = parseSync(filename, source);
   const [firstError] = parsed.errors;
 
   if (firstError !== undefined) {

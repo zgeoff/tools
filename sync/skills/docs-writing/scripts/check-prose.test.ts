@@ -6,15 +6,15 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'check-prose-'));
+  const directory = await mkdtemp(join(tmpdir(), 'check-prose-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   // A clean environment: a pre-push hook in a linked worktree exports GIT_DIR, which would point
   // git init and the script's git calls at the real repository.
   const env = {
     PATH: process.env['PATH'],
-    HOME: dir,
+    HOME: directory,
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_AUTHOR_NAME: 'Test Author',
@@ -24,12 +24,12 @@ async function setupTest() {
   };
 
   const runGit = (...args: readonly string[]) =>
-    spawnSync('git', args, { cwd: dir, env, encoding: 'utf8' });
+    spawnSync('git', args, { cwd: directory, env, encoding: 'utf8' });
 
   runGit('init', '-q');
 
   const scriptPath = fileURLToPath(new URL('check-prose.sh', import.meta.url));
-  const writeText = (path: string, text: string) => writeFile(join(dir, path), text);
+  const writeText = (path: string, text: string) => writeFile(join(directory, path), text);
 
   const runCommit = (message: string) => {
     runGit('add', '-A');
@@ -37,11 +37,11 @@ async function setupTest() {
   };
 
   const run = (...args: readonly string[]) =>
-    spawnSync('bash', [scriptPath, ...args], { cwd: dir, env, encoding: 'utf8' });
+    spawnSync('bash', [scriptPath, ...args], { cwd: directory, env, encoding: 'utf8' });
 
   // Runs the script as a GitHub Actions pull-request run against a base branch on origin, in the
   // test repository or in a clone of it.
-  const runInPullRequest = (baseRef: string, args: readonly string[], cwd = dir) =>
+  const runInPullRequest = (baseRef: string, args: readonly string[], cwd = directory) =>
     spawnSync('bash', [scriptPath, ...args], {
       cwd,
       env: { ...env, GITHUB_BASE_REF: baseRef },

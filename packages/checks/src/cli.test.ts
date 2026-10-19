@@ -7,31 +7,31 @@ import { $ } from 'bun';
 // A git repo in a temp folder, and the entry module that zgeoff-check runs. Every process gets a
 // clean environment, so a GIT_DIR that a pre-push hook exports cannot point git at this repo.
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'zgeoff-check-'));
+  const directory = await mkdtemp(join(tmpdir(), 'zgeoff-check-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   const env = {
     PATH: process.env['PATH'],
-    HOME: dir,
+    HOME: directory,
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
   };
 
-  await $`git init --quiet`.cwd(dir).env(env);
+  await $`git init --quiet`.cwd(directory).env(env);
 
-  return { dir, env, cli: join(import.meta.dir, 'cli.ts') };
+  return { directory, env, cli: join(import.meta.dir, 'cli.ts') };
 }
 
 test('it exits 0 and prints nothing when no check finds a problem', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'clean.sh'), '#!/usr/bin/env bash\necho "hello"\n');
+  await writeFile(join(ctx.directory, 'clean.sh'), '#!/usr/bin/env bash\necho "hello"\n');
 
-  await $`git add clean.sh`.cwd(ctx.dir).env(ctx.env);
+  await $`git add clean.sh`.cwd(ctx.directory).env(ctx.env);
 
   const result = await $`${process.execPath} ${ctx.cli}`
-    .cwd(ctx.dir)
+    .cwd(ctx.directory)
     .env(ctx.env)
     .nothrow()
     .quiet();
@@ -46,12 +46,12 @@ test('it exits 0 and prints nothing when no check finds a problem', async () => 
 test('it exits 1 and prints each finding as path:line: check: message', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
+  await writeFile(join(ctx.directory, 'unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
 
-  await $`git add unquoted.sh`.cwd(ctx.dir).env(ctx.env);
+  await $`git add unquoted.sh`.cwd(ctx.directory).env(ctx.env);
 
   const result = await $`${process.execPath} ${ctx.cli}`
-    .cwd(ctx.dir)
+    .cwd(ctx.directory)
     .env(ctx.env)
     .nothrow()
     .quiet();
@@ -71,13 +71,13 @@ test('it exits 1 and prints each finding as path:line: check: message', async ()
 test('it checks only the files given on the command line', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'clean.sh'), '#!/usr/bin/env bash\necho "hello"\n');
-  await writeFile(join(ctx.dir, 'unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
+  await writeFile(join(ctx.directory, 'clean.sh'), '#!/usr/bin/env bash\necho "hello"\n');
+  await writeFile(join(ctx.directory, 'unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
 
-  await $`git add clean.sh unquoted.sh`.cwd(ctx.dir).env(ctx.env);
+  await $`git add clean.sh unquoted.sh`.cwd(ctx.directory).env(ctx.env);
 
   const result = await $`${process.execPath} ${ctx.cli} clean.sh`
-    .cwd(ctx.dir)
+    .cwd(ctx.directory)
     .env(ctx.env)
     .nothrow()
     .quiet();
@@ -88,17 +88,17 @@ test('it checks only the files given on the command line', async () => {
 test('it exits 0 over a failing file when the config turns its check off with a reason', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
+  await writeFile(join(ctx.directory, 'unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
 
   await writeFile(
-    join(ctx.dir, 'zgeoff-check.json'),
+    join(ctx.directory, 'zgeoff-check.json'),
     JSON.stringify({ off: [{ check: 'shell', reason: 'the scripts are vendored' }] }),
   );
 
-  await $`git add unquoted.sh zgeoff-check.json`.cwd(ctx.dir).env(ctx.env);
+  await $`git add unquoted.sh zgeoff-check.json`.cwd(ctx.directory).env(ctx.env);
 
   const result = await $`${process.execPath} ${ctx.cli}`
-    .cwd(ctx.dir)
+    .cwd(ctx.directory)
     .env(ctx.env)
     .nothrow()
     .quiet();
@@ -109,17 +109,17 @@ test('it exits 0 over a failing file when the config turns its check off with a 
 test('it exits 2 and runs no check when a config entry turns a check off with no reason', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
+  await writeFile(join(ctx.directory, 'unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
 
   await writeFile(
-    join(ctx.dir, 'zgeoff-check.json'),
+    join(ctx.directory, 'zgeoff-check.json'),
     JSON.stringify({ off: [{ check: 'shell' }] }),
   );
 
-  await $`git add unquoted.sh zgeoff-check.json`.cwd(ctx.dir).env(ctx.env);
+  await $`git add unquoted.sh zgeoff-check.json`.cwd(ctx.directory).env(ctx.env);
 
   const result = await $`${process.execPath} ${ctx.cli}`
-    .cwd(ctx.dir)
+    .cwd(ctx.directory)
     .env(ctx.env)
     .nothrow()
     .quiet();
@@ -139,14 +139,14 @@ test('it exits 2 and runs no check when a config entry turns a check off with no
 test('it exits 2 with the install message when the PATH lacks shellcheck', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'clean.sh'), '#!/usr/bin/env bash\necho "hello"\n');
+  await writeFile(join(ctx.directory, 'clean.sh'), '#!/usr/bin/env bash\necho "hello"\n');
 
-  await $`git add clean.sh`.cwd(ctx.dir).env(ctx.env);
+  await $`git add clean.sh`.cwd(ctx.directory).env(ctx.env);
 
   // The file list skips git, so a PATH with no program on it reaches the check.
   const result = await $`${process.execPath} ${ctx.cli} clean.sh`
-    .cwd(ctx.dir)
-    .env({ ...ctx.env, PATH: ctx.dir })
+    .cwd(ctx.directory)
+    .env({ ...ctx.env, PATH: ctx.directory })
     .nothrow()
     .quiet();
 
@@ -166,7 +166,7 @@ test('it exits 2 on an unknown option', async () => {
   const ctx = await setupTest();
 
   const result = await $`${process.execPath} ${ctx.cli} --fix`
-    .cwd(ctx.dir)
+    .cwd(ctx.directory)
     .env(ctx.env)
     .nothrow()
     .quiet();
@@ -178,12 +178,12 @@ test('it exits 2 on an unknown option', async () => {
 test('it exits 2 rather than print help when --help comes with files', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
+  await writeFile(join(ctx.directory, 'unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
 
-  await $`git add unquoted.sh`.cwd(ctx.dir).env(ctx.env);
+  await $`git add unquoted.sh`.cwd(ctx.directory).env(ctx.env);
 
   const result = await $`${process.execPath} ${ctx.cli} -- --help unquoted.sh`
-    .cwd(ctx.dir)
+    .cwd(ctx.directory)
     .env(ctx.env)
     .nothrow()
     .quiet();
@@ -195,12 +195,12 @@ test('it exits 2 rather than print help when --help comes with files', async () 
 test('it checks a file whose name starts with a dash when the path says so', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, '-unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
+  await writeFile(join(ctx.directory, '-unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
 
-  await $`git add -- -unquoted.sh`.cwd(ctx.dir).env(ctx.env);
+  await $`git add -- -unquoted.sh`.cwd(ctx.directory).env(ctx.env);
 
   const result = await $`${process.execPath} ${ctx.cli} ./-unquoted.sh`
-    .cwd(ctx.dir)
+    .cwd(ctx.directory)
     .env(ctx.env)
     .nothrow()
     .quiet();
@@ -212,10 +212,10 @@ test('it checks a file whose name starts with a dash when the path says so', asy
 test('it exits 2 with the reason when the config file cannot be read', async () => {
   const ctx = await setupTest();
 
-  await mkdir(join(ctx.dir, 'zgeoff-check.json'));
+  await mkdir(join(ctx.directory, 'zgeoff-check.json'));
 
   const result = await $`${process.execPath} ${ctx.cli}`
-    .cwd(ctx.dir)
+    .cwd(ctx.directory)
     .env(ctx.env)
     .nothrow()
     .quiet();
@@ -228,11 +228,11 @@ test('it exits 2 with the reason when the config file cannot be read', async () 
 test('it exits 2 with the reason when git cannot list the files', async () => {
   const ctx = await setupTest();
 
-  await rm(join(ctx.dir, '.git'), { recursive: true });
+  await rm(join(ctx.directory, '.git'), { recursive: true });
 
   const result = await $`${process.execPath} ${ctx.cli}`
-    .cwd(ctx.dir)
-    .env({ ...ctx.env, GIT_CEILING_DIRECTORIES: ctx.dir })
+    .cwd(ctx.directory)
+    .env({ ...ctx.env, GIT_CEILING_DIRECTORIES: ctx.directory })
     .nothrow()
     .quiet();
 
@@ -245,14 +245,19 @@ test.each([['shellcheck'], ['shfmt']])(
   async (program) => {
     const ctx = await setupTest();
 
-    await writeFile(join(ctx.dir, 'clean.sh'), '#!/usr/bin/env bash\necho "hello"\n');
-    await mkdir(join(ctx.dir, 'bin'));
-    await writeFile(join(ctx.dir, 'bin', program), '#!/bin/sh\necho "out of memory" >&2\nexit 2\n');
-    await chmod(join(ctx.dir, 'bin', program), 0o755);
+    await writeFile(join(ctx.directory, 'clean.sh'), '#!/usr/bin/env bash\necho "hello"\n');
+    await mkdir(join(ctx.directory, 'bin'));
+
+    await writeFile(
+      join(ctx.directory, 'bin', program),
+      '#!/bin/sh\necho "out of memory" >&2\nexit 2\n',
+    );
+
+    await chmod(join(ctx.directory, 'bin', program), 0o755);
 
     const result = await $`${process.execPath} ${ctx.cli} clean.sh`
-      .cwd(ctx.dir)
-      .env({ ...ctx.env, PATH: `${join(ctx.dir, 'bin')}:${ctx.env.PATH}` })
+      .cwd(ctx.directory)
+      .env({ ...ctx.env, PATH: `${join(ctx.directory, 'bin')}:${ctx.env.PATH}` })
       .nothrow()
       .quiet();
 
@@ -279,19 +284,19 @@ test.each([
 ])('it exits 2 and prints no finding when %s fails after a finding', async (program, firstLine) => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
-  await mkdir(join(ctx.dir, 'bin'));
+  await writeFile(join(ctx.directory, 'unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
+  await mkdir(join(ctx.directory, 'bin'));
 
   await writeFile(
-    join(ctx.dir, 'bin', program),
+    join(ctx.directory, 'bin', program),
     `#!/bin/sh\n${firstLine}\necho "out of memory" >&2\nexit 2\n`,
   );
 
-  await chmod(join(ctx.dir, 'bin', program), 0o755);
+  await chmod(join(ctx.directory, 'bin', program), 0o755);
 
   const result = await $`${process.execPath} ${ctx.cli} unquoted.sh`
-    .cwd(ctx.dir)
-    .env({ ...ctx.env, PATH: `${join(ctx.dir, 'bin')}:${ctx.env.PATH}` })
+    .cwd(ctx.directory)
+    .env({ ...ctx.env, PATH: `${join(ctx.directory, 'bin')}:${ctx.env.PATH}` })
     .nothrow()
     .quiet();
 
@@ -309,14 +314,14 @@ test.each([
 test('it lists the whole repo and prints root paths when it runs from a subfolder', async () => {
   const ctx = await setupTest();
 
-  await mkdir(join(ctx.dir, 'scripts'));
-  await writeFile(join(ctx.dir, 'top.sh'), '#!/usr/bin/env bash\necho $1\n');
-  await writeFile(join(ctx.dir, 'scripts/deep.sh'), '#!/usr/bin/env bash\necho $1\n');
+  await mkdir(join(ctx.directory, 'scripts'));
+  await writeFile(join(ctx.directory, 'top.sh'), '#!/usr/bin/env bash\necho $1\n');
+  await writeFile(join(ctx.directory, 'scripts/deep.sh'), '#!/usr/bin/env bash\necho $1\n');
 
-  await $`git add top.sh scripts/deep.sh`.cwd(ctx.dir).env(ctx.env);
+  await $`git add top.sh scripts/deep.sh`.cwd(ctx.directory).env(ctx.env);
 
   const result = await $`${process.execPath} ${ctx.cli}`
-    .cwd(join(ctx.dir, 'scripts'))
+    .cwd(join(ctx.directory, 'scripts'))
     .env(ctx.env)
     .nothrow()
     .quiet();
@@ -334,13 +339,13 @@ test('it lists the whole repo and prints root paths when it runs from a subfolde
 test('it reads a file argument from the subfolder it runs in', async () => {
   const ctx = await setupTest();
 
-  await mkdir(join(ctx.dir, 'scripts'));
-  await writeFile(join(ctx.dir, 'scripts/deep.sh'), '#!/usr/bin/env bash\necho $1\n');
+  await mkdir(join(ctx.directory, 'scripts'));
+  await writeFile(join(ctx.directory, 'scripts/deep.sh'), '#!/usr/bin/env bash\necho $1\n');
 
-  await $`git add scripts/deep.sh`.cwd(ctx.dir).env(ctx.env);
+  await $`git add scripts/deep.sh`.cwd(ctx.directory).env(ctx.env);
 
   const result = await $`${process.execPath} ${ctx.cli} deep.sh`
-    .cwd(join(ctx.dir, 'scripts'))
+    .cwd(join(ctx.directory, 'scripts'))
     .env(ctx.env)
     .nothrow()
     .quiet();
@@ -351,18 +356,18 @@ test('it reads a file argument from the subfolder it runs in', async () => {
 test('it reads the root config when it runs from a subfolder', async () => {
   const ctx = await setupTest();
 
-  await mkdir(join(ctx.dir, 'scripts'));
-  await writeFile(join(ctx.dir, 'scripts/deep.sh'), '#!/usr/bin/env bash\necho $1\n');
+  await mkdir(join(ctx.directory, 'scripts'));
+  await writeFile(join(ctx.directory, 'scripts/deep.sh'), '#!/usr/bin/env bash\necho $1\n');
 
   await writeFile(
-    join(ctx.dir, 'zgeoff-check.json'),
+    join(ctx.directory, 'zgeoff-check.json'),
     JSON.stringify({ off: [{ check: 'shell', reason: 'the scripts are vendored' }] }),
   );
 
-  await $`git add scripts/deep.sh zgeoff-check.json`.cwd(ctx.dir).env(ctx.env);
+  await $`git add scripts/deep.sh zgeoff-check.json`.cwd(ctx.directory).env(ctx.env);
 
   const result = await $`${process.execPath} ${ctx.cli}`
-    .cwd(join(ctx.dir, 'scripts'))
+    .cwd(join(ctx.directory, 'scripts'))
     .env(ctx.env)
     .nothrow()
     .quiet();

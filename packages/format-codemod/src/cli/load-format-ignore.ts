@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export function loadFormatIgnore(dir: string): readonly string[] {
-  const file = path.join(dir, '.formatignore');
+export function loadFormatIgnore(directory: string): readonly string[] {
+  const file = path.join(directory, '.formatignore');
 
   if (!fs.existsSync(file)) {
     return [];

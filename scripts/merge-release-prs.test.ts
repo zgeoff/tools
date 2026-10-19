@@ -64,28 +64,36 @@ function buildHeadResponse(oid: string, checks: Check[], statuses: Status[] = []
 
 async function setupTest() {
   // Inside the checkout, not the system temp dir: the folder is git-ignored.
-  const dir = await mkdtemp(join(import.meta.dir, '.test-merge-release-prs-'));
+  const directory = await mkdtemp(join(import.meta.dir, '.test-merge-release-prs-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  await writeFile(join(dir, 'gh'), FAKE_GH);
-  await chmod(join(dir, 'gh'), 0o755);
-  await writeFile(join(dir, 'calls.log'), '');
+  await writeFile(join(directory, 'gh'), FAKE_GH);
+  await chmod(join(directory, 'gh'), 0o755);
+  await writeFile(join(directory, 'calls.log'), '');
 
   const scriptPath = fileURLToPath(new URL('merge-release-prs.sh', import.meta.url));
 
   const writeResponses = async (name: string, bodies: unknown[]) => {
-    await writeFile(join(dir, name), bodies.map((body) => `${JSON.stringify(body)}\n`).join(''));
+    await writeFile(
+      join(directory, name),
+      bodies.map((body) => `${JSON.stringify(body)}\n`).join(''),
+    );
   };
 
   const runScript = (env: Record<string, string> = {}) =>
     spawnSync('bash', [scriptPath, 'zgeoff/tools'], {
       encoding: 'utf8',
-      env: { ...process.env, PATH: `${dir}:${process.env['PATH']}`, POLL_INTERVAL: '0', ...env },
+      env: {
+        ...process.env,
+        PATH: `${directory}:${process.env['PATH']}`,
+        POLL_INTERVAL: '0',
+        ...env,
+      },
     });
 
   const readCalls = async () => {
-    const log = await readFile(join(dir, 'calls.log'), 'utf8');
+    const log = await readFile(join(directory, 'calls.log'), 'utf8');
 
     return log.split('\n').filter(Boolean);
   };

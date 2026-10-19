@@ -6,24 +6,24 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'check-sync-manifest-'));
+  const directory = await mkdtemp(join(tmpdir(), 'check-sync-manifest-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   const scriptPath = fileURLToPath(new URL('check-sync-manifest.sh', import.meta.url));
 
-  return { dir, scriptPath };
+  return { directory, scriptPath };
 }
 
 test('it fails when a skill folder holds a file its entry omits', async () => {
   const ctx = await setupTest();
 
-  await mkdir(join(ctx.dir, 'sync/skills/demo/references'), { recursive: true });
-  await writeFile(join(ctx.dir, 'sync/skills/demo/SKILL.md'), '# Demo\n');
-  await writeFile(join(ctx.dir, 'sync/skills/demo/references/go.md'), '# Go\n');
+  await mkdir(join(ctx.directory, 'sync/skills/demo/references'), { recursive: true });
+  await writeFile(join(ctx.directory, 'sync/skills/demo/SKILL.md'), '# Demo\n');
+  await writeFile(join(ctx.directory, 'sync/skills/demo/references/go.md'), '# Go\n');
 
   await writeFile(
-    join(ctx.dir, 'sync/manifest.json'),
+    join(ctx.directory, 'sync/manifest.json'),
     JSON.stringify([
       {
         name: 'skill-demo',
@@ -33,7 +33,7 @@ test('it fails when a skill folder holds a file its entry omits', async () => {
     ]),
   );
 
-  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.dir, encoding: 'utf8' });
+  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.directory, encoding: 'utf8' });
 
   expect(result.status).toBe(1);
 
@@ -45,12 +45,12 @@ test('it fails when a skill folder holds a file its entry omits', async () => {
 test('it fails when two entries split one skill folder between them', async () => {
   const ctx = await setupTest();
 
-  await mkdir(join(ctx.dir, 'sync/skills/demo/references'), { recursive: true });
-  await writeFile(join(ctx.dir, 'sync/skills/demo/SKILL.md'), '# Demo\n');
-  await writeFile(join(ctx.dir, 'sync/skills/demo/references/go.md'), '# Go\n');
+  await mkdir(join(ctx.directory, 'sync/skills/demo/references'), { recursive: true });
+  await writeFile(join(ctx.directory, 'sync/skills/demo/SKILL.md'), '# Demo\n');
+  await writeFile(join(ctx.directory, 'sync/skills/demo/references/go.md'), '# Go\n');
 
   await writeFile(
-    join(ctx.dir, 'sync/manifest.json'),
+    join(ctx.directory, 'sync/manifest.json'),
     JSON.stringify([
       {
         name: 'skill-demo',
@@ -70,7 +70,7 @@ test('it fails when two entries split one skill folder between them', async () =
     ]),
   );
 
-  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.dir, encoding: 'utf8' });
+  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.directory, encoding: 'utf8' });
 
   expect(result.status).toBe(1);
 
@@ -82,11 +82,11 @@ test('it fails when two entries split one skill folder between them', async () =
 test('it fails when no entry lists a file from a skill folder', async () => {
   const ctx = await setupTest();
 
-  await mkdir(join(ctx.dir, 'sync/skills/demo'), { recursive: true });
-  await writeFile(join(ctx.dir, 'sync/skills/demo/SKILL.md'), '# Demo\n');
-  await writeFile(join(ctx.dir, 'sync/manifest.json'), JSON.stringify([]));
+  await mkdir(join(ctx.directory, 'sync/skills/demo'), { recursive: true });
+  await writeFile(join(ctx.directory, 'sync/skills/demo/SKILL.md'), '# Demo\n');
+  await writeFile(join(ctx.directory, 'sync/manifest.json'), JSON.stringify([]));
 
-  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.dir, encoding: 'utf8' });
+  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.directory, encoding: 'utf8' });
 
   expect(result.status).toBe(1);
 
@@ -98,12 +98,12 @@ test('it fails when no entry lists a file from a skill folder', async () => {
 test('it passes when the entry lists every file in its skill folder', async () => {
   const ctx = await setupTest();
 
-  await mkdir(join(ctx.dir, 'sync/skills/demo/references'), { recursive: true });
-  await writeFile(join(ctx.dir, 'sync/skills/demo/SKILL.md'), '# Demo\n');
-  await writeFile(join(ctx.dir, 'sync/skills/demo/references/go.md'), '# Go\n');
+  await mkdir(join(ctx.directory, 'sync/skills/demo/references'), { recursive: true });
+  await writeFile(join(ctx.directory, 'sync/skills/demo/SKILL.md'), '# Demo\n');
+  await writeFile(join(ctx.directory, 'sync/skills/demo/references/go.md'), '# Go\n');
 
   await writeFile(
-    join(ctx.dir, 'sync/manifest.json'),
+    join(ctx.directory, 'sync/manifest.json'),
     JSON.stringify([
       {
         name: 'skill-demo',
@@ -119,7 +119,7 @@ test('it passes when the entry lists every file in its skill folder', async () =
     ]),
   );
 
-  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.dir, encoding: 'utf8' });
+  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.directory, encoding: 'utf8' });
 
   expect(result.status).toBe(0);
   expect(result.stderr).toBe('');
@@ -128,13 +128,13 @@ test('it passes when the entry lists every file in its skill folder', async () =
 test('it passes when the entry omits only a test beside a skill script', async () => {
   const ctx = await setupTest();
 
-  await mkdir(join(ctx.dir, 'sync/skills/demo/scripts'), { recursive: true });
-  await writeFile(join(ctx.dir, 'sync/skills/demo/SKILL.md'), '# Demo\n');
-  await writeFile(join(ctx.dir, 'sync/skills/demo/scripts/check.sh'), 'exit 0\n');
-  await writeFile(join(ctx.dir, 'sync/skills/demo/scripts/check.test.ts'), '');
+  await mkdir(join(ctx.directory, 'sync/skills/demo/scripts'), { recursive: true });
+  await writeFile(join(ctx.directory, 'sync/skills/demo/SKILL.md'), '# Demo\n');
+  await writeFile(join(ctx.directory, 'sync/skills/demo/scripts/check.sh'), 'exit 0\n');
+  await writeFile(join(ctx.directory, 'sync/skills/demo/scripts/check.test.ts'), '');
 
   await writeFile(
-    join(ctx.dir, 'sync/manifest.json'),
+    join(ctx.directory, 'sync/manifest.json'),
     JSON.stringify([
       {
         name: 'skill-demo',
@@ -150,7 +150,7 @@ test('it passes when the entry omits only a test beside a skill script', async (
     ]),
   );
 
-  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.dir, encoding: 'utf8' });
+  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.directory, encoding: 'utf8' });
 
   expect(result.status).toBe(0);
   expect(result.stderr).toBe('');
@@ -159,17 +159,17 @@ test('it passes when the entry omits only a test beside a skill script', async (
 test('it fails when a Markdown file links an excepted file outside a block', async () => {
   const ctx = await setupTest();
 
-  await mkdir(join(ctx.dir, 'sync/skills/demo/references'), { recursive: true });
+  await mkdir(join(ctx.directory, 'sync/skills/demo/references'), { recursive: true });
 
   await writeFile(
-    join(ctx.dir, 'sync/skills/demo/SKILL.md'),
+    join(ctx.directory, 'sync/skills/demo/SKILL.md'),
     '# Demo\n\nFor Rust, read [Rust](./references/rust.md).\n',
   );
 
-  await writeFile(join(ctx.dir, 'sync/skills/demo/references/rust.md'), '# Rust\n');
+  await writeFile(join(ctx.directory, 'sync/skills/demo/references/rust.md'), '# Rust\n');
 
   await writeFile(
-    join(ctx.dir, 'sync/manifest.json'),
+    join(ctx.directory, 'sync/manifest.json'),
     JSON.stringify([
       {
         name: 'skill-demo',
@@ -186,7 +186,7 @@ test('it fails when a Markdown file links an excepted file outside a block', asy
     ]),
   );
 
-  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.dir, encoding: 'utf8' });
+  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.directory, encoding: 'utf8' });
 
   expect(result.status).toBe(1);
 
@@ -198,20 +198,20 @@ test('it fails when a Markdown file links an excepted file outside a block', asy
 test('it passes when every link to an excepted file sits in a block that needs it', async () => {
   const ctx = await setupTest();
 
-  await mkdir(join(ctx.dir, 'sync/skills/demo/references'), { recursive: true });
+  await mkdir(join(ctx.directory, 'sync/skills/demo/references'), { recursive: true });
 
   await writeFile(
-    join(ctx.dir, 'sync/skills/demo/SKILL.md'),
+    join(ctx.directory, 'sync/skills/demo/SKILL.md'),
     '# Demo\n\n' +
       '<!-- repo-sync needs ./references/rust.md -->\n\n' +
       'For Rust, read [Rust](./references/rust.md).\n\n' +
       '<!-- repo-sync end -->\n',
   );
 
-  await writeFile(join(ctx.dir, 'sync/skills/demo/references/rust.md'), '# Rust\n');
+  await writeFile(join(ctx.directory, 'sync/skills/demo/references/rust.md'), '# Rust\n');
 
   await writeFile(
-    join(ctx.dir, 'sync/manifest.json'),
+    join(ctx.directory, 'sync/manifest.json'),
     JSON.stringify([
       {
         name: 'skill-demo',
@@ -228,7 +228,7 @@ test('it passes when every link to an excepted file sits in a block that needs i
     ]),
   );
 
-  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.dir, encoding: 'utf8' });
+  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.directory, encoding: 'utf8' });
 
   expect(result.status).toBe(0);
   expect(result.stderr).toBe('');
@@ -237,11 +237,11 @@ test('it passes when every link to an excepted file sits in a block that needs i
 test('it fails when an except holds a value that is not an owner/repo name', async () => {
   const ctx = await setupTest();
 
-  await mkdir(join(ctx.dir, 'sync'));
-  await writeFile(join(ctx.dir, 'demo.md'), '# Demo\n');
+  await mkdir(join(ctx.directory, 'sync'));
+  await writeFile(join(ctx.directory, 'demo.md'), '# Demo\n');
 
   await writeFile(
-    join(ctx.dir, 'sync/manifest.json'),
+    join(ctx.directory, 'sync/manifest.json'),
     JSON.stringify([
       {
         name: 'demo',
@@ -251,7 +251,7 @@ test('it fails when an except holds a value that is not an owner/repo name', asy
     ]),
   );
 
-  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.dir, encoding: 'utf8' });
+  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.directory, encoding: 'utf8' });
 
   expect(result.status).toBe(1);
 
@@ -263,21 +263,21 @@ test('it fails when an except holds a value that is not an owner/repo name', asy
 test('it fails on a link that only one excepted repo loses its block for', async () => {
   const ctx = await setupTest();
 
-  await mkdir(join(ctx.dir, 'sync/skills/demo/references'), { recursive: true });
+  await mkdir(join(ctx.directory, 'sync/skills/demo/references'), { recursive: true });
 
   await writeFile(
-    join(ctx.dir, 'sync/skills/demo/SKILL.md'),
+    join(ctx.directory, 'sync/skills/demo/SKILL.md'),
     '# Demo\n\n' +
       '<!-- repo-sync needs ./references/kotlin.md -->\n\n' +
       'Read [Kotlin](./references/kotlin.md) beside [Rust](./references/rust.md).\n\n' +
       '<!-- repo-sync end -->\n',
   );
 
-  await writeFile(join(ctx.dir, 'sync/skills/demo/references/kotlin.md'), '# Kotlin\n');
-  await writeFile(join(ctx.dir, 'sync/skills/demo/references/rust.md'), '# Rust\n');
+  await writeFile(join(ctx.directory, 'sync/skills/demo/references/kotlin.md'), '# Kotlin\n');
+  await writeFile(join(ctx.directory, 'sync/skills/demo/references/rust.md'), '# Rust\n');
 
   await writeFile(
-    join(ctx.dir, 'sync/manifest.json'),
+    join(ctx.directory, 'sync/manifest.json'),
     JSON.stringify([
       {
         name: 'skill-demo',
@@ -299,7 +299,7 @@ test('it fails on a link that only one excepted repo loses its block for', async
     ]),
   );
 
-  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.dir, encoding: 'utf8' });
+  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.directory, encoding: 'utf8' });
 
   expect(result.status).toBe(1);
 
@@ -311,18 +311,18 @@ test('it fails on a link that only one excepted repo loses its block for', async
 test('it passes when an excepted Markdown file links another file the same repo skips', async () => {
   const ctx = await setupTest();
 
-  await mkdir(join(ctx.dir, 'sync/skills/demo/references'), { recursive: true });
-  await writeFile(join(ctx.dir, 'sync/skills/demo/SKILL.md'), '# Demo\n');
+  await mkdir(join(ctx.directory, 'sync/skills/demo/references'), { recursive: true });
+  await writeFile(join(ctx.directory, 'sync/skills/demo/SKILL.md'), '# Demo\n');
 
   await writeFile(
-    join(ctx.dir, 'sync/skills/demo/references/kotlin.md'),
+    join(ctx.directory, 'sync/skills/demo/references/kotlin.md'),
     '# Kotlin\n\nCompare [Rust](./rust.md).\n',
   );
 
-  await writeFile(join(ctx.dir, 'sync/skills/demo/references/rust.md'), '# Rust\n');
+  await writeFile(join(ctx.directory, 'sync/skills/demo/references/rust.md'), '# Rust\n');
 
   await writeFile(
-    join(ctx.dir, 'sync/manifest.json'),
+    join(ctx.directory, 'sync/manifest.json'),
     JSON.stringify([
       {
         name: 'skill-demo',
@@ -344,7 +344,7 @@ test('it passes when an excepted Markdown file links another file the same repo 
     ]),
   );
 
-  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.dir, encoding: 'utf8' });
+  const result = spawnSync('bash', [ctx.scriptPath], { cwd: ctx.directory, encoding: 'utf8' });
 
   expect(result.status).toBe(0);
   expect(result.stderr).toBe('');

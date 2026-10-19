@@ -5,8 +5,8 @@ import path from 'node:path';
 import { readPackageVersion } from './read-package-version.ts';
 
 test('it reads the version field from a package manifest', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'read-package-version-'));
-  const manifest = path.join(dir, 'package.json');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'read-package-version-'));
+  const manifest = path.join(directory, 'package.json');
 
   fs.writeFileSync(manifest, '{"name":"x","version":"1.2.3"}');
 
@@ -14,8 +14,8 @@ test('it reads the version field from a package manifest', () => {
 });
 
 test('it throws when the file is not a package manifest', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'read-package-version-'));
-  const manifest = path.join(dir, 'package.json');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'read-package-version-'));
+  const manifest = path.join(directory, 'package.json');
 
   fs.writeFileSync(manifest, '{"name":"x"}');
 

@@ -13,45 +13,49 @@ async function setupTest() {
   onTestFinished(() => rm(created, { recursive: true, force: true }));
 
   // git prints the resolved path, so a symlinked temp folder must resolve too.
-  const dir = await realpath(created);
+  const directory = await realpath(created);
 
   const env = {
     PATH: process.env['PATH'],
-    HOME: dir,
+    HOME: directory,
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
-    GIT_CEILING_DIRECTORIES: dir,
+    GIT_CEILING_DIRECTORIES: directory,
   };
 
-  return { dir, env };
+  return { directory, env };
 }
 
 test('it returns the top of the work tree from a subfolder', async () => {
   const ctx = await setupTest();
 
-  await $`git init --quiet repo`.cwd(ctx.dir).env(ctx.env);
+  await $`git init --quiet repo`.cwd(ctx.directory).env(ctx.env);
 
-  await mkdir(join(ctx.dir, 'repo/scripts/ci'), { recursive: true });
+  await mkdir(join(ctx.directory, 'repo/scripts/ci'), { recursive: true });
 
-  expect(runGitShowToplevel(join(ctx.dir, 'repo/scripts/ci'), ctx.env)).toBe(join(ctx.dir, 'repo'));
+  expect(runGitShowToplevel(join(ctx.directory, 'repo/scripts/ci'), ctx.env)).toBe(
+    join(ctx.directory, 'repo'),
+  );
 });
 
 test('it returns the folder itself outside a work tree', async () => {
   const ctx = await setupTest();
 
-  await mkdir(join(ctx.dir, 'loose'));
+  await mkdir(join(ctx.directory, 'loose'));
 
-  expect(runGitShowToplevel(join(ctx.dir, 'loose'), ctx.env)).toBe(join(ctx.dir, 'loose'));
+  expect(runGitShowToplevel(join(ctx.directory, 'loose'), ctx.env)).toBe(
+    join(ctx.directory, 'loose'),
+  );
 });
 
 test('it returns the folder itself when the PATH lacks git', async () => {
   const ctx = await setupTest();
 
-  await $`git init --quiet repo`.cwd(ctx.dir).env(ctx.env);
+  await $`git init --quiet repo`.cwd(ctx.directory).env(ctx.env);
 
-  await mkdir(join(ctx.dir, 'repo/scripts'));
+  await mkdir(join(ctx.directory, 'repo/scripts'));
 
-  expect(runGitShowToplevel(join(ctx.dir, 'repo/scripts'), { PATH: ctx.dir })).toBe(
-    join(ctx.dir, 'repo/scripts'),
+  expect(runGitShowToplevel(join(ctx.directory, 'repo/scripts'), { PATH: ctx.directory })).toBe(
+    join(ctx.directory, 'repo/scripts'),
   );
 });

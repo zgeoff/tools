@@ -6,21 +6,21 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'remove-excluded-blocks-'));
+  const directory = await mkdtemp(join(tmpdir(), 'remove-excluded-blocks-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  await mkdir(join(dir, 'skill/references'), { recursive: true });
+  await mkdir(join(directory, 'skill/references'), { recursive: true });
 
   const scriptPath = fileURLToPath(new URL('remove-excluded-blocks.sh', import.meta.url));
 
-  return { dir, scriptPath };
+  return { directory, scriptPath };
 }
 
 test('it removes a block that needs an excluded file and the blank line after it', async () => {
   const ctx = await setupTest();
 
-  const markdown = join(ctx.dir, 'skill/SKILL.md');
+  const markdown = join(ctx.directory, 'skill/SKILL.md');
 
   await writeFile(
     markdown,
@@ -33,7 +33,7 @@ test('it removes a block that needs an excluded file and the blank line after it
 
   const result = spawnSync(
     'bash',
-    [ctx.scriptPath, markdown, join(ctx.dir, 'skill/references/rust.md')],
+    [ctx.scriptPath, markdown, join(ctx.directory, 'skill/references/rust.md')],
     { encoding: 'utf8' },
   );
 
@@ -46,7 +46,7 @@ test('it removes a block that needs an excluded file and the blank line after it
 test('it keeps a block whose file the repo receives', async () => {
   const ctx = await setupTest();
 
-  const markdown = join(ctx.dir, 'skill/SKILL.md');
+  const markdown = join(ctx.directory, 'skill/SKILL.md');
 
   const content =
     '# Demo\n\n' +
@@ -58,7 +58,7 @@ test('it keeps a block whose file the repo receives', async () => {
 
   const result = spawnSync(
     'bash',
-    [ctx.scriptPath, markdown, join(ctx.dir, 'skill/references/rust.md')],
+    [ctx.scriptPath, markdown, join(ctx.directory, 'skill/references/rust.md')],
     { encoding: 'utf8' },
   );
 
@@ -71,7 +71,7 @@ test('it keeps a block whose file the repo receives', async () => {
 test('it fails on a block that never closes', async () => {
   const ctx = await setupTest();
 
-  const markdown = join(ctx.dir, 'skill/SKILL.md');
+  const markdown = join(ctx.directory, 'skill/SKILL.md');
 
   await writeFile(markdown, '<!-- repo-sync needs ./references/rust.md -->\n\nRust.\n');
 
@@ -84,7 +84,7 @@ test('it fails on a block that never closes', async () => {
 test('it fails on a block opened inside another block', async () => {
   const ctx = await setupTest();
 
-  const markdown = join(ctx.dir, 'skill/SKILL.md');
+  const markdown = join(ctx.directory, 'skill/SKILL.md');
 
   await writeFile(
     markdown,

@@ -24,8 +24,8 @@ function runCLI(
 }
 
 test('it exits cleanly in check mode when files are already padded', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
-  const file = path.join(dir, 'clean.ts');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const file = path.join(directory, 'clean.ts');
 
   fs.writeFileSync(file, 'const a = 1;\n\nexport function f() {\n  return a;\n}\n');
 
@@ -35,11 +35,11 @@ test('it exits cleanly in check mode when files are already padded', () => {
 });
 
 test('it exits with the diff code in check mode when a file needs padding and leaves it unmodified', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
-  const file = path.join(dir, 'unpadded.ts');
-  const src = 'export function f() {\n  const a = 1;\n  return a;\n}\n';
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const file = path.join(directory, 'unpadded.ts');
+  const source = 'export function f() {\n  const a = 1;\n  return a;\n}\n';
 
-  fs.writeFileSync(file, src);
+  fs.writeFileSync(file, source);
 
   const result = runCLI(['--check', file]);
   const status = result.status;
@@ -47,12 +47,12 @@ test('it exits with the diff code in check mode when a file needs padding and le
 
   expect(status).toBe(1);
   expect(stderr).toInclude('DIFF');
-  expect(fs.readFileSync(file, 'utf8')).toBe(src);
+  expect(fs.readFileSync(file, 'utf8')).toBe(source);
 });
 
 test('it fails the batch in check mode when a file cannot be parsed', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
-  const file = path.join(dir, 'broken.ts');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const file = path.join(directory, 'broken.ts');
 
   fs.writeFileSync(file, 'const = (((\n');
 
@@ -65,8 +65,8 @@ test('it fails the batch in check mode when a file cannot be parsed', () => {
 });
 
 test('it fails the batch when a named file does not exist', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
-  const missing = path.join(dir, 'missing.ts');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const missing = path.join(directory, 'missing.ts');
   const result = runCLI(['--check', missing]);
   const status = result.status;
   const stderr = result.stderr;
@@ -76,9 +76,9 @@ test('it fails the batch when a named file does not exist', () => {
 });
 
 test('it still checks the remaining files after one fails to parse', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
-  const broken = path.join(dir, 'a-broken.ts');
-  const unpadded = path.join(dir, 'b-unpadded.ts');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const broken = path.join(directory, 'a-broken.ts');
+  const unpadded = path.join(directory, 'b-unpadded.ts');
 
   fs.writeFileSync(broken, 'const = (((\n');
   fs.writeFileSync(unpadded, 'export function f() {\n  const a = 1;\n  return a;\n}\n');
@@ -91,11 +91,11 @@ test('it still checks the remaining files after one fails to parse', () => {
 });
 
 test('it rejects an unknown flag with a usage error and leaves files untouched', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
-  const file = path.join(dir, 'unpadded.ts');
-  const src = 'export function f() {\n  const a = 1;\n  return a;\n}\n';
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const file = path.join(directory, 'unpadded.ts');
+  const source = 'export function f() {\n  const a = 1;\n  return a;\n}\n';
 
-  fs.writeFileSync(file, src);
+  fs.writeFileSync(file, source);
 
   const result = runCLI(['--chekc', file]);
   const status = result.status;
@@ -103,12 +103,12 @@ test('it rejects an unknown flag with a usage error and leaves files untouched',
 
   expect(status).toBe(2);
   expect(stderr).toInclude('Unknown option: --chekc');
-  expect(fs.readFileSync(file, 'utf8')).toBe(src);
+  expect(fs.readFileSync(file, 'utf8')).toBe(source);
 });
 
 test('it formats .tsx files containing JSX', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
-  const file = path.join(dir, 'component.tsx');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const file = path.join(directory, 'component.tsx');
 
   fs.writeFileSync(file, 'const el = <div>hi</div>;\nexport function C() {\n  return el;\n}\n');
 
@@ -121,12 +121,12 @@ test('it formats .tsx files containing JSX', () => {
 });
 
 test('it processes a file only once when patterns overlap', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
-  const file = path.join(dir, 'unpadded.ts');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const file = path.join(directory, 'unpadded.ts');
 
   fs.writeFileSync(file, 'export function f() {\n  const a = 1;\n  return a;\n}\n');
 
-  const stderr = runCLI(['--check', dir, file]).stderr;
+  const stderr = runCLI(['--check', directory, file]).stderr;
 
   expect(stderr.match(/DIFF/gu)).toHaveLength(1);
 });
@@ -141,20 +141,20 @@ test('it prints the package version for --version', () => {
 });
 
 test('it only reports files that would change in quiet mode', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
 
-  fs.writeFileSync(path.join(dir, 'clean.ts'), 'const a = 1;\n\nuse(a);\n');
-  fs.writeFileSync(path.join(dir, 'unpadded.ts'), 'const a = 1;\nuse(a);\n');
+  fs.writeFileSync(path.join(directory, 'clean.ts'), 'const a = 1;\n\nuse(a);\n');
+  fs.writeFileSync(path.join(directory, 'unpadded.ts'), 'const a = 1;\nuse(a);\n');
 
-  const stderr = runCLI(['--check', '--quiet', dir]).stderr;
+  const stderr = runCLI(['--check', '--quiet', directory]).stderr;
 
   expect(stderr).toInclude('DIFF');
   expect(stderr).not.toInclude('OK ');
 });
 
 test('it does not descend into node_modules when expanding a directory', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
-  const nested = path.join(dir, 'node_modules', 'dep');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const nested = path.join(directory, 'node_modules', 'dep');
 
   fs.mkdirSync(nested, { recursive: true });
 
@@ -164,11 +164,11 @@ test('it does not descend into node_modules when expanding a directory', () => {
   );
 
   fs.writeFileSync(
-    path.join(dir, 'clean.ts'),
+    path.join(directory, 'clean.ts'),
     'const a = 1;\n\nexport function f() {\n  return a;\n}\n',
   );
 
-  const result = runCLI(['--check', dir]);
+  const result = runCLI(['--check', directory]);
   const status = result.status;
   const stderr = result.stderr;
 
@@ -177,19 +177,19 @@ test('it does not descend into node_modules when expanding a directory', () => {
 });
 
 test('it skips files matching --ignore globs', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
-  const generated = path.join(dir, 'generated');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const generated = path.join(directory, 'generated');
   const unpadded = 'export function f() {\n  const a = 1;\n  return a;\n}\n';
 
   fs.mkdirSync(generated);
   fs.writeFileSync(path.join(generated, 'out.ts'), unpadded);
 
   fs.writeFileSync(
-    path.join(dir, 'clean.ts'),
+    path.join(directory, 'clean.ts'),
     'const a = 1;\n\nexport function f() {\n  return a;\n}\n',
   );
 
-  const result = runCLI(['--check', '--ignore', path.join(dir, 'generated/**'), dir]);
+  const result = runCLI(['--check', '--ignore', path.join(directory, 'generated/**'), directory]);
 
   expect(result.status).toBe(0);
   expect(result.stderr).not.toInclude('generated');
@@ -197,35 +197,35 @@ test('it skips files matching --ignore globs', () => {
 });
 
 test('it skips files matching globs from a .formatignore in the working directory', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
   const unpadded = 'export function f() {\n  const a = 1;\n  return a;\n}\n';
 
-  fs.mkdirSync(path.join(dir, 'generated'));
-  fs.writeFileSync(path.join(dir, 'generated/out.ts'), unpadded);
-  fs.writeFileSync(path.join(dir, '.formatignore'), '# codegen\ngenerated/**\n');
+  fs.mkdirSync(path.join(directory, 'generated'));
+  fs.writeFileSync(path.join(directory, 'generated/out.ts'), unpadded);
+  fs.writeFileSync(path.join(directory, '.formatignore'), '# codegen\ngenerated/**\n');
 
   fs.writeFileSync(
-    path.join(dir, 'clean.ts'),
+    path.join(directory, 'clean.ts'),
     'const a = 1;\n\nexport function f() {\n  return a;\n}\n',
   );
 
-  const result = runCLI(['--check', '.'], dir);
+  const result = runCLI(['--check', '.'], directory);
 
   expect(result.status).toBe(0);
   expect(result.stderr).not.toInclude('generated');
 });
 
 test('it merges .formatignore globs with --ignore flags', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
   const unpadded = 'export function f() {\n  const a = 1;\n  return a;\n}\n';
 
-  fs.mkdirSync(path.join(dir, 'generated'));
-  fs.mkdirSync(path.join(dir, 'vendored'));
-  fs.writeFileSync(path.join(dir, 'generated/out.ts'), unpadded);
-  fs.writeFileSync(path.join(dir, 'vendored/dep.ts'), unpadded);
-  fs.writeFileSync(path.join(dir, '.formatignore'), 'generated/**\n');
+  fs.mkdirSync(path.join(directory, 'generated'));
+  fs.mkdirSync(path.join(directory, 'vendored'));
+  fs.writeFileSync(path.join(directory, 'generated/out.ts'), unpadded);
+  fs.writeFileSync(path.join(directory, 'vendored/dep.ts'), unpadded);
+  fs.writeFileSync(path.join(directory, '.formatignore'), 'generated/**\n');
 
-  const result = runCLI(['--check', '--ignore', 'vendored/**', '.'], dir);
+  const result = runCLI(['--check', '--ignore', 'vendored/**', '.'], directory);
 
   expect(result.status).toBe(2);
   expect(result.stderr).toInclude('no files matched');

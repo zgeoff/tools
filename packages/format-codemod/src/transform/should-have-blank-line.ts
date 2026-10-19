@@ -15,34 +15,34 @@ const CONTROL_FLOW_TYPES = new Set([
   'TryStatement',
 ]);
 
-export function shouldHaveBlankLine(container: ASTNode, prev: ASTNode, next: ASTNode): boolean {
+export function shouldHaveBlankLine(container: ASTNode, previous: ASTNode, next: ASTNode): boolean {
   if (container.type === 'ClassBody') {
     return true;
   }
 
-  if (isRunEnd(prev, next) || next.type === 'ReturnStatement' || isFnOrClassDecl(prev)) {
+  if (isRunEnd(previous, next) || next.type === 'ReturnStatement' || isFnOrClassDecl(previous)) {
     return true;
   }
 
-  if (isTypeDecl(prev) || isTypeDecl(next)) {
+  if (isTypeDecl(previous) || isTypeDecl(next)) {
     return true;
   }
 
   return (
-    isNewHeaded(prev) !== isNewHeaded(next) ||
-    isAwaitHeaded(prev) !== isAwaitHeaded(next) ||
-    isKindBoundary(prev, next) ||
+    isNewHeaded(previous) !== isNewHeaded(next) ||
+    isAwaitHeaded(previous) !== isAwaitHeaded(next) ||
+    isKindBoundary(previous, next) ||
     CONTROL_FLOW_TYPES.has(next.type) ||
-    CONTROL_FLOW_TYPES.has(prev.type)
+    CONTROL_FLOW_TYPES.has(previous.type)
   );
 }
 
-function isRunEnd(prev: ASTNode, next: ASTNode): boolean {
+function isRunEnd(previous: ASTNode, next: ASTNode): boolean {
   return (
-    (isVarDecl(prev) && !isVarDecl(next)) ||
-    (isUsingDecl(prev) && !isUsingDecl(next)) ||
-    (isDirective(prev) && !isDirective(next)) ||
-    (prev.type === 'ImportDeclaration' && next.type !== 'ImportDeclaration')
+    (isVarDecl(previous) && !isVarDecl(next)) ||
+    (isUsingDecl(previous) && !isUsingDecl(next)) ||
+    (isDirective(previous) && !isDirective(next)) ||
+    (previous.type === 'ImportDeclaration' && next.type !== 'ImportDeclaration')
   );
 }
 
@@ -132,8 +132,8 @@ function isAwaitHeaded(node: ASTNode): boolean {
   );
 }
 
-function isKindBoundary(prev: ASTNode, next: ASTNode): boolean {
-  const prevKind = findStatementKind(prev);
+function isKindBoundary(previous: ASTNode, next: ASTNode): boolean {
+  const prevKind = findStatementKind(previous);
   const nextKind = findStatementKind(next);
 
   return prevKind !== null && nextKind !== null && prevKind !== nextKind;

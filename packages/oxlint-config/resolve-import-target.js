@@ -57,22 +57,22 @@ function toFileSpecifier(specifier) {
 
 const manifests = new Map();
 
-function readPackageManifest(dir, root) {
-  if (manifests.has(dir)) {
-    return manifests.get(dir);
+function readPackageManifest(directory, root) {
+  if (manifests.has(directory)) {
+    return manifests.get(directory);
   }
 
-  const path = join(dir, 'package.json');
-  const parent = dirname(dir);
+  const path = join(directory, 'package.json');
+  const parent = dirname(directory);
   let manifest = null;
 
   if (existsSync(path)) {
-    manifest = { dir, ...JSON.parse(readFileSync(path, 'utf8')) };
-  } else if (dir !== root && parent !== dir) {
+    manifest = { directory, ...JSON.parse(readFileSync(path, 'utf8')) };
+  } else if (directory !== root && parent !== directory) {
     manifest = readPackageManifest(parent, root);
   }
 
-  manifests.set(dir, manifest);
+  manifests.set(directory, manifest);
 
   return manifest;
 }
@@ -198,7 +198,7 @@ function toSubpathMap(exports) {
 function toMappedTarget(manifest, mapped) {
   return mapped === null
     ? { kind: 'missing' }
-    : { kind: 'file', path: resolve(manifest.dir, mapped) };
+    : { kind: 'file', path: resolve(manifest.directory, mapped) };
 }
 
 // the edges judge the package folder joined with the subpath, such as
@@ -213,7 +213,7 @@ function resolveWorkspaceTarget(workspaces, specifier) {
   const subpath = `.${specifier.slice(workspace.name.length)}`;
 
   return isExportedSubpath(workspace.exports, subpath)
-    ? { kind: 'file', path: join(workspace.dir, subpath) }
+    ? { kind: 'file', path: join(workspace.directory, subpath) }
     : { kind: 'missing' };
 }
 

@@ -9,13 +9,13 @@ export function collectWrittenPaths(command: string): readonly WrittenPath[] {
   return collectTextPaths(command, '');
 }
 
-// `dir` is the working directory relative to the command's start, or null after a `cd` the parser
-// cannot follow, which leaves only absolute paths.
-function collectTextPaths(text: string, dir: string | null): WrittenPath[] {
+// `directory` is the working directory relative to the command's start, or null after a
+// `cd` the parser cannot follow, which leaves only absolute paths.
+function collectTextPaths(text: string, directory: string | null): WrittenPath[] {
   const commands = parseShellCommands(text) ?? [];
   const paths: WrittenPath[] = [];
   const parentDirs: (string | null)[] = [];
-  let current = dir;
+  let current = directory;
 
   for (const command of commands) {
     const enteredFrom = current;
@@ -34,10 +34,10 @@ function collectTextPaths(text: string, dir: string | null): WrittenPath[] {
   return paths;
 }
 
-function collectCommandPaths(command: ShellCommand, dir: string | null): WrittenPath[] {
+function collectCommandPaths(command: ShellCommand, directory: string | null): WrittenPath[] {
   const redirected = command.redirects
     .filter((redirect) => isWriteRedirect(redirect.operator, redirect.target))
-    .flatMap((redirect) => resolveWordPath(redirect.target, dir));
+    .flatMap((redirect) => resolveWordPath(redirect.target, directory));
 
   const words = getProgramWords(command.words);
   const [program] = words;
@@ -49,7 +49,7 @@ function collectCommandPaths(command: ShellCommand, dir: string | null): Written
   const name = path.basename(program.text);
   const args = words.slice(1);
 
-  return [...redirected, ...collectProgramPaths(name, args, command.stdin, dir)];
+  return [...redirected, ...collectProgramPaths(name, args, command.stdin, directory)];
 }
 
 const WRITE_REDIRECTS = new Set(['>', '>>', '>|', '&>', '&>>', '<>']);
@@ -59,7 +59,7 @@ function isWriteRedirect(operator: string, target: ShellWord): boolean {
   return WRITE_REDIRECTS.has(operator) || (operator === '>&' && !/^(?:\d+|-)$/u.test(target.text));
 }
 
-function resolveWordPath(word: ShellWord | undefined, dir: string | null): WrittenPath[] {
+function resolveWordPath(word: ShellWord | undefined, directory: string | null): WrittenPath[] {
   if (word === undefined || !word.literal || word.text === '' || word.text === '-') {
     return [];
   }
@@ -68,7 +68,7 @@ function resolveWordPath(word: ShellWord | undefined, dir: string | null): Writt
     return [{ path: word.text }];
   }
 
-  return dir === null ? [] : [{ path: path.join(dir, word.text) }];
+  return directory === null ? [] : [{ path: path.join(directory, word.text) }];
 }
 
 const ASSIGNMENT = /^[A-Za-z_]\w*=/u;
@@ -126,37 +126,37 @@ function collectProgramPaths(
   name: string,
   args: readonly ShellWord[],
   stdin: string | null,
-  dir: string | null,
+  directory: string | null,
 ): WrittenPath[] {
   if (name === 'sed' || name === 'gsed') {
     return collectInPlacePaths(args, SED_SCRIPT_FLAGS).flatMap((word) =>
-      resolveWordPath(word, dir),
+      resolveWordPath(word, directory),
     );
   }
 
   if (name === 'perl') {
-    return collectPerlPaths(args, stdin, dir);
+    return collectPerlPaths(args, stdin, directory);
   }
 
   if (name === 'tee') {
-    return collectOperands(args).flatMap((word) => resolveWordPath(word, dir));
+    return collectOperands(args).flatMap((word) => resolveWordPath(word, directory));
   }
 
   if (name === 'cp' || name === 'mv') {
-    return collectCopyPaths(args, dir);
+    return collectCopyPaths(args, directory);
   }
 
   if (SHELLS.has(name)) {
     const script = findShellScript(args, stdin);
 
-    return script === null ? [] : collectTextPaths(script, dir);
+    return script === null ? [] : collectTextPaths(script, directory);
   }
 
   if (INTERPRETERS.has(name)) {
     const script = findInlineScript(args, stdin);
     const commentStart = JS_RUNTIMES.has(name) ? '//' : '#';
 
-    return script === null ? [] : collectScriptPaths(script, commentStart, dir);
+    return script === null ? [] : collectScriptPaths(script, commentStart, directory);
   }
 
   return [];
@@ -235,17 +235,17 @@ const PERL_SCRIPT_FLAGS = new Set(['e', 'E']);
 function collectPerlPaths(
   args: readonly ShellWord[],
   stdin: string | null,
-  dir: string | null,
+  directory: string | null,
 ): WrittenPath[] {
   const inPlace = collectInPlacePaths(args, PERL_SCRIPT_FLAGS);
 
   if (inPlace.length > 0) {
-    return inPlace.flatMap((word) => resolveWordPath(word, dir));
+    return inPlace.flatMap((word) => resolveWordPath(word, directory));
   }
 
   const script = findInlineScript(args, stdin);
 
-  return script === null ? [] : collectScriptPaths(script, '#', dir);
+  return script === null ? [] : collectScriptPaths(script, '#', directory);
 }
 
 const INLINE_FLAGS = new Set(['-c', '-e', '-E', '--eval', '-p', '--print', 'eval']);
@@ -278,7 +278,7 @@ const SCRIPT_WRITE_PATTERNS = [
 function collectScriptPaths(
   script: string,
   commentStart: string,
-  dir: string | null,
+  directory: string | null,
 ): WrittenPath[] {
   const textRanges = collectScriptTextRanges(script, commentStart);
 
@@ -292,7 +292,7 @@ function collectScriptPaths(
 
       return isText || /[$*?{]/u.test(written)
         ? []
-        : resolveWordPath({ text: written, literal: true }, dir);
+        : resolveWordPath({ text: written, literal: true }, directory);
     }),
   );
 }
@@ -355,7 +355,7 @@ function collectOperands(args: readonly ShellWord[]): readonly ShellWord[] {
 // Collects where `cp` or `mv` writes: into the `-t` directory, into the destination when several
 // sources or a trailing slash make it a directory, and otherwise onto the destination, or into it
 // when it turns out to be a directory.
-function collectCopyPaths(args: readonly ShellWord[], dir: string | null): WrittenPath[] {
+function collectCopyPaths(args: readonly ShellWord[], directory: string | null): WrittenPath[] {
   const operands: ShellWord[] = [];
   let targetDir: ShellWord | undefined;
   let optionsEnded = false;
@@ -382,7 +382,7 @@ function collectCopyPaths(args: readonly ShellWord[], dir: string | null): Writt
   }
 
   if (targetDir !== undefined) {
-    return collectIntoDirPaths(targetDir, operands, dir);
+    return collectIntoDirPaths(targetDir, operands, directory);
   }
 
   const destination = operands.at(-1);
@@ -394,12 +394,12 @@ function collectCopyPaths(args: readonly ShellWord[], dir: string | null): Writt
   }
 
   if (sources.length > 1 || destination.text.endsWith('/')) {
-    return collectIntoDirPaths(destination, sources, dir);
+    return collectIntoDirPaths(destination, sources, directory);
   }
 
   const fileName = source.literal ? path.basename(source.text) : undefined;
 
-  return resolveWordPath(destination, dir).map((written) =>
+  return resolveWordPath(destination, directory).map((written) =>
     fileName === undefined ? written : { path: written.path, fileName },
   );
 }
@@ -407,9 +407,9 @@ function collectCopyPaths(args: readonly ShellWord[], dir: string | null): Writt
 function collectIntoDirPaths(
   target: ShellWord,
   sources: readonly ShellWord[],
-  dir: string | null,
+  directory: string | null,
 ): WrittenPath[] {
-  return resolveWordPath(target, dir).flatMap((written) =>
+  return resolveWordPath(target, directory).flatMap((written) =>
     sources
       .filter((source) => source.literal)
       .map((source) => ({ path: path.join(written.path, path.basename(source.text)) })),
@@ -429,11 +429,11 @@ function findShellScript(args: readonly ShellWord[], stdin: string | null): stri
   return script === undefined ? stdin : null;
 }
 
-function resolveNextDir(command: ShellCommand, dir: string | null): string | null {
+function resolveNextDir(command: ShellCommand, directory: string | null): string | null {
   const [program, ...args] = command.words;
 
   if (program?.text !== 'cd') {
-    return dir;
+    return directory;
   }
 
   const [target] = collectOperands(args);
@@ -446,5 +446,5 @@ function resolveNextDir(command: ShellCommand, dir: string | null): string | nul
     return target.text;
   }
 
-  return dir === null ? null : path.join(dir, target.text);
+  return directory === null ? null : path.join(directory, target.text);
 }

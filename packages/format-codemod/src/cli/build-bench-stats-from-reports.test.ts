@@ -10,7 +10,7 @@ test('it sums bytes and counts parsed files across reports', () => {
 
   const stats = buildBenchStatsFromReports(reports, 10);
 
-  expect(stats).toMatchObject({ files: 3, parsed: 2, bytes: 350, ms: 10 });
+  expect(stats).toMatchObject({ files: 3, parsed: 2, bytes: 350, elapsed_ms: 10 });
 });
 
 test('it derives per-file and throughput figures from the elapsed time', () => {

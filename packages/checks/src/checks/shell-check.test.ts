@@ -9,20 +9,20 @@ import { shellCheck } from './shell-check.ts';
 // The tests run the real shellcheck and shfmt from the PATH. The runner image lacks shfmt, so
 // main.yml and bun-checks.yml install it before the suite runs.
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'shell-check-'));
+  const directory = await mkdtemp(join(tmpdir(), 'shell-check-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  return { dir };
+  return { directory };
 }
 
 test('it passes a clean script', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'clean.sh'), '#!/usr/bin/env bash\necho "hello"\n');
+  await writeFile(join(ctx.directory, 'clean.sh'), '#!/usr/bin/env bash\necho "hello"\n');
 
   const findings = await shellCheck.check({
-    cwd: ctx.dir,
+    cwd: ctx.directory,
     files: ['clean.sh'],
     env: process.env,
   });
@@ -33,10 +33,10 @@ test('it passes a clean script', async () => {
 test('it reports a shellcheck problem at its line', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
+  await writeFile(join(ctx.directory, 'unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
 
   const findings = await shellCheck.check({
-    cwd: ctx.dir,
+    cwd: ctx.directory,
     files: ['unquoted.sh'],
     env: process.env,
   });
@@ -54,12 +54,12 @@ test('it reports a script that shfmt would reformat at the first changed line', 
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.dir, 'cramped.sh'),
+    join(ctx.directory, 'cramped.sh'),
     '#!/usr/bin/env bash\necho "start"\nif true;then echo "yes";fi\n',
   );
 
   const findings = await shellCheck.check({
-    cwd: ctx.dir,
+    cwd: ctx.directory,
     files: ['cramped.sh'],
     env: process.env,
   });
@@ -77,12 +77,12 @@ test('it reports a script that shfmt would reformat when FORCE_COLOR is set', as
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.dir, 'cramped.sh'),
+    join(ctx.directory, 'cramped.sh'),
     '#!/usr/bin/env bash\necho "start"\nif true;then echo "yes";fi\n',
   );
 
   const findings = await shellCheck.check({
-    cwd: ctx.dir,
+    cwd: ctx.directory,
     files: ['cramped.sh'],
     env: { ...process.env, FORCE_COLOR: '1' },
   });
@@ -99,10 +99,10 @@ test('it reports a script that shfmt would reformat when FORCE_COLOR is set', as
 test('it reports a script that shfmt cannot parse', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'broken.sh'), '#!/usr/bin/env bash\nif true; then\n');
+  await writeFile(join(ctx.directory, 'broken.sh'), '#!/usr/bin/env bash\nif true; then\n');
 
   const findings = await shellCheck.check({
-    cwd: ctx.dir,
+    cwd: ctx.directory,
     files: ['broken.sh'],
     env: process.env,
   });
@@ -123,11 +123,11 @@ test.each([
 
   invariant(presentPath !== null, `${present} must be on the PATH to run this test`);
 
-  await symlink(presentPath, join(ctx.dir, present));
-  await writeFile(join(ctx.dir, 'clean.sh'), '#!/usr/bin/env bash\necho "hello"\n');
+  await symlink(presentPath, join(ctx.directory, present));
+  await writeFile(join(ctx.directory, 'clean.sh'), '#!/usr/bin/env bash\necho "hello"\n');
 
   expect(() =>
-    shellCheck.check({ cwd: ctx.dir, files: ['clean.sh'], env: { PATH: ctx.dir } }),
+    shellCheck.check({ cwd: ctx.directory, files: ['clean.sh'], env: { PATH: ctx.directory } }),
   ).toThrowWithMessage(
     MissingProgramError,
     `shell: ${missing} is not on the PATH, and the shell check needs it. Install ${missing}, then run zgeoff-check again.`,
@@ -158,13 +158,15 @@ test.each([
     );
 
     await Promise.all(
-      clean.map((file) => writeFile(join(ctx.dir, file), '#!/usr/bin/env bash\necho "hello"\n')),
+      clean.map((file) =>
+        writeFile(join(ctx.directory, file), '#!/usr/bin/env bash\necho "hello"\n'),
+      ),
     );
 
-    await writeFile(join(ctx.dir, 'z-last.sh'), script);
+    await writeFile(join(ctx.directory, 'z-last.sh'), script);
 
     const findings = await shellCheck.check({
-      cwd: ctx.dir,
+      cwd: ctx.directory,
       files: [...clean, 'z-last.sh'],
       env: process.env,
     });
@@ -189,20 +191,25 @@ test.each([
     );
 
     await Promise.all(
-      clean.map((file) => writeFile(join(ctx.dir, file), '#!/usr/bin/env bash\necho "hello"\n')),
+      clean.map((file) =>
+        writeFile(join(ctx.directory, file), '#!/usr/bin/env bash\necho "hello"\n'),
+      ),
     );
 
-    await Promise.all([mkdir(join(ctx.dir, 'lib')), mkdir(join(ctx.dir, 'tools'))]);
-
-    await writeFile(join(ctx.dir, sourcedFile), '#!/usr/bin/env bash\nexport greeting="hello"\n');
+    await Promise.all([mkdir(join(ctx.directory, 'lib')), mkdir(join(ctx.directory, 'tools'))]);
 
     await writeFile(
-      join(ctx.dir, 'tools/main.sh'),
+      join(ctx.directory, sourcedFile),
+      '#!/usr/bin/env bash\nexport greeting="hello"\n',
+    );
+
+    await writeFile(
+      join(ctx.directory, 'tools/main.sh'),
       `#!/usr/bin/env bash\nsource ${sourcePath}\necho "$greeting"\n`,
     );
 
     const findings = await shellCheck.check({
-      cwd: ctx.dir,
+      cwd: ctx.directory,
       files: ['tools/main.sh', ...clean, sourcedFile],
       env: process.env,
     });
@@ -216,17 +223,17 @@ test('it formats with the indentation that the repo .editorconfig sets', async (
 
   // shfmt indents with tabs by default, so this script passes only when shfmt reads the file.
   await writeFile(
-    join(ctx.dir, '.editorconfig'),
+    join(ctx.directory, '.editorconfig'),
     'root = true\n\n[*.sh]\nindent_style = space\nindent_size = 2\n',
   );
 
   await writeFile(
-    join(ctx.dir, 'spaced.sh'),
+    join(ctx.directory, 'spaced.sh'),
     '#!/usr/bin/env bash\nif true; then\n  echo "yes"\nfi\n',
   );
 
   const findings = await shellCheck.check({
-    cwd: ctx.dir,
+    cwd: ctx.directory,
     files: ['spaced.sh'],
     env: process.env,
   });
@@ -238,7 +245,7 @@ test('it reports every hunk of every file that shfmt would reformat', async () =
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.dir, 'a.sh'),
+    join(ctx.directory, 'a.sh'),
     [
       '#!/usr/bin/env bash',
       'if true;then echo "one";fi',
@@ -256,12 +263,12 @@ test('it reports every hunk of every file that shfmt would reformat', async () =
   );
 
   await writeFile(
-    join(ctx.dir, 'b.sh'),
+    join(ctx.directory, 'b.sh'),
     '#!/usr/bin/env bash\necho "start"\nif true;then echo "yes";fi\n',
   );
 
   const findings = await shellCheck.check({
-    cwd: ctx.dir,
+    cwd: ctx.directory,
     files: ['a.sh', 'b.sh'],
     env: process.env,
   });

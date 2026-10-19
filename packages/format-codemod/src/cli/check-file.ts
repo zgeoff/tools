@@ -4,12 +4,12 @@ import { applyDiffMode } from './apply-diff-mode.ts';
 import type { CLIMode, FileReport } from './types.ts';
 
 export function checkFile(file: string, mode: CLIMode): FileReport {
-  const src = fs.readFileSync(file, 'utf8');
+  const source = fs.readFileSync(file, 'utf8');
 
-  // byteLength, not src.length: bench throughput is measured in bytes and the
+  // byteLength, not source.length: bench throughput is measured in bytes and the
   // two diverge on any non-ASCII source.
-  const bytes = Buffer.byteLength(src);
-  const result = transform(src, { filename: file });
+  const bytes = Buffer.byteLength(source);
+  const result = transform(source, { filename: file });
 
   if (result.parseError !== null) {
     return {
@@ -21,9 +21,14 @@ export function checkFile(file: string, mode: CLIMode): FileReport {
     };
   }
 
-  if (result.edits === 0 || result.output === src) {
+  if (result.edits === 0 || result.output === source) {
     return { outcome: 'ok', bytes, parsed: true, message: null, stdout: null };
   }
 
-  return { outcome: 'changed', bytes, parsed: true, ...applyDiffMode({ file, src, result }, mode) };
+  return {
+    outcome: 'changed',
+    bytes,
+    parsed: true,
+    ...applyDiffMode({ file, source, result }, mode),
+  };
 }

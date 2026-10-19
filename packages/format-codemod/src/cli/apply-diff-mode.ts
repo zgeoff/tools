@@ -13,7 +13,7 @@ export function applyDiffMode(edit: FileEdit, mode: CLIMode): DiffOutput {
   }
 
   if (mode === 'dry') {
-    return { message: null, stdout: buildUnifiedDiff(edit.src, edit.result.output, edit.file) };
+    return { message: null, stdout: buildUnifiedDiff(edit.source, edit.result.output, edit.file) };
   }
 
   fs.writeFileSync(edit.file, edit.result.output);

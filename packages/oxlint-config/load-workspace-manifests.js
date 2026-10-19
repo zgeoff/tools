@@ -48,7 +48,7 @@ function splitGlob(glob) {
   return glob.split('/').filter((segment) => segment !== '' && segment !== '.');
 }
 
-// `dir` is the field the resolver reads from every manifest it loads
+// `directory` is the field the resolver reads from every manifest it loads
 function loadManifest(directory) {
   const path = join(directory, 'package.json');
 
@@ -58,7 +58,7 @@ function loadManifest(directory) {
 
   const manifest = JSON.parse(readFileSync(path, 'utf8'));
 
-  manifest.dir = directory;
+  manifest.directory = directory;
 
   return manifest;
 }

@@ -6,39 +6,39 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'check-length-'));
+  const directory = await mkdtemp(join(tmpdir(), 'check-length-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   // A clean environment: a pre-push hook in a linked worktree exports GIT_DIR, which would point
   // git init and the script's git calls at the real repository.
   const env = {
     PATH: process.env['PATH'],
-    HOME: dir,
+    HOME: directory,
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
   };
 
-  spawnSync('git', ['init', '-q'], { cwd: dir, env });
+  spawnSync('git', ['init', '-q'], { cwd: directory, env });
 
   const scriptPath = fileURLToPath(new URL('check-length.sh', import.meta.url));
 
   const writeLines = async (path: string, count: number) => {
-    await mkdir(dirname(join(dir, path)), { recursive: true });
+    await mkdir(dirname(join(directory, path)), { recursive: true });
 
     // Each line is a list item, which the prose check's paragraph limit skips.
-    await writeFile(join(dir, path), '- The tool reads one file.\n'.repeat(count));
+    await writeFile(join(directory, path), '- The tool reads one file.\n'.repeat(count));
   };
 
   const writeText = async (path: string, text: string) => {
-    await mkdir(dirname(join(dir, path)), { recursive: true });
-    await writeFile(join(dir, path), text);
+    await mkdir(dirname(join(directory, path)), { recursive: true });
+    await writeFile(join(directory, path), text);
   };
 
   const run = (...args: readonly string[]) =>
-    spawnSync('bash', [scriptPath, ...args], { cwd: dir, env, encoding: 'utf8' });
+    spawnSync('bash', [scriptPath, ...args], { cwd: directory, env, encoding: 'utf8' });
 
-  return { dir, writeLines, writeText, run };
+  return { directory, writeLines, writeText, run };
 }
 
 test('it fails when the plain repo README is over its limit', async () => {
@@ -66,7 +66,7 @@ test('it warns and passes when a README is over its target but within its limit'
 test('it fails a package README over 130 lines beside a public package.json', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'package.json'), '{ "name": "demo" }\n');
+  await writeFile(join(ctx.directory, 'package.json'), '{ "name": "demo" }\n');
 
   await ctx.writeLines('README.md', 131);
 
@@ -79,7 +79,7 @@ test('it fails a package README over 130 lines beside a public package.json', as
 test('it reads a README beside a private package.json as a package when --package names it', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'package.json'), '{ "name": "demo", "private": true }\n');
+  await writeFile(join(ctx.directory, 'package.json'), '{ "name": "demo", "private": true }\n');
 
   await ctx.writeLines('README.md', 125);
 
@@ -164,8 +164,8 @@ test('it fails when check-prose finds a violation in a doc', async () => {
 
   await ctx.writeLines('README.md', 10);
 
-  await mkdir(join(ctx.dir, 'docs'), { recursive: true });
-  await writeFile(join(ctx.dir, 'docs/overview.md'), 'The cache is load-bearing.\n');
+  await mkdir(join(ctx.directory, 'docs'), { recursive: true });
+  await writeFile(join(ctx.directory, 'docs/overview.md'), 'The cache is load-bearing.\n');
 
   const result = ctx.run();
 
@@ -247,10 +247,10 @@ test('it fails a value with a unit under docs/architecture but not one in code o
 
   await ctx.writeLines('README.md', 10);
 
-  await mkdir(join(ctx.dir, 'docs/architecture'), { recursive: true });
+  await mkdir(join(ctx.directory, 'docs/architecture'), { recursive: true });
 
   await writeFile(
-    join(ctx.dir, 'docs/architecture/overview.md'),
+    join(ctx.directory, 'docs/architecture/overview.md'),
     [
       'The design dates from the 1990s.',
       'The grid is 2d.',

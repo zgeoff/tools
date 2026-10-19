@@ -5,18 +5,18 @@ import { join } from 'node:path';
 // The project sits inside this repo so `extends` resolves @zgeoff/commitlint-config through the
 // workspace link in the root node_modules, the way a consumer's install resolves it.
 async function setupTest() {
-  const dir = await mkdtemp(join(import.meta.dir, '.test-'));
+  const directory = await mkdtemp(join(import.meta.dir, '.test-'));
 
   await writeFile(
-    join(dir, 'commitlint.config.js'),
+    join(directory, 'commitlint.config.js'),
     "export default { extends: ['@zgeoff/commitlint-config'] };\n",
   );
 
   return {
     commitlint: join(import.meta.dir, 'node_modules/.bin/commitlint'),
-    dir,
+    directory,
     async [Symbol.asyncDispose]() {
-      await rm(dir, { recursive: true, force: true });
+      await rm(directory, { recursive: true, force: true });
     },
   };
 }
@@ -24,7 +24,7 @@ async function setupTest() {
 test('it accepts a conventional header with a lower-case scope and subject', async () => {
   await using project = await setupTest();
 
-  const result = Bun.spawnSync([project.commitlint, '--cwd', project.dir], {
+  const result = Bun.spawnSync([project.commitlint, '--cwd', project.directory], {
     stdin: Buffer.from('feat(tsconfig): add the react variant\n'),
   });
 
@@ -34,7 +34,7 @@ test('it accepts a conventional header with a lower-case scope and subject', asy
 test('it rejects a type outside the allowed list', async () => {
   await using project = await setupTest();
 
-  const result = Bun.spawnSync([project.commitlint, '--cwd', project.dir], {
+  const result = Bun.spawnSync([project.commitlint, '--cwd', project.directory], {
     stdin: Buffer.from('wip: add the react variant\n'),
   });
 
@@ -45,7 +45,7 @@ test('it rejects a type outside the allowed list', async () => {
 test('it rejects a subject with an upper-case word', async () => {
   await using project = await setupTest();
 
-  const result = Bun.spawnSync([project.commitlint, '--cwd', project.dir], {
+  const result = Bun.spawnSync([project.commitlint, '--cwd', project.directory], {
     stdin: Buffer.from('chore: inherit the shared CodeRabbit config\n'),
   });
 
@@ -56,7 +56,7 @@ test('it rejects a subject with an upper-case word', async () => {
 test('it rejects a header longer than 72 characters', async () => {
   await using project = await setupTest();
 
-  const result = Bun.spawnSync([project.commitlint, '--cwd', project.dir], {
+  const result = Bun.spawnSync([project.commitlint, '--cwd', project.directory], {
     stdin: Buffer.from(`fix: ${'a'.repeat(68)}\n`),
   });
 
@@ -67,7 +67,7 @@ test('it rejects a header longer than 72 characters', async () => {
 test('it rejects a body that starts on the line after the header', async () => {
   await using project = await setupTest();
 
-  const result = Bun.spawnSync([project.commitlint, '--cwd', project.dir], {
+  const result = Bun.spawnSync([project.commitlint, '--cwd', project.directory], {
     stdin: Buffer.from('fix: keep the lockfile in sync\nthe body starts here\n'),
   });
 
@@ -78,7 +78,7 @@ test('it rejects a body that starts on the line after the header', async () => {
 test('it accepts a breaking-change header', async () => {
   await using project = await setupTest();
 
-  const result = Bun.spawnSync([project.commitlint, '--cwd', project.dir], {
+  const result = Bun.spawnSync([project.commitlint, '--cwd', project.directory], {
     stdin: Buffer.from('feat(core)!: remove the old api\n'),
   });
 
@@ -88,7 +88,7 @@ test('it accepts a breaking-change header', async () => {
 test('it rejects a header with no type', async () => {
   await using project = await setupTest();
 
-  const result = Bun.spawnSync([project.commitlint, '--cwd', project.dir], {
+  const result = Bun.spawnSync([project.commitlint, '--cwd', project.directory], {
     stdin: Buffer.from(': add the react variant\n'),
   });
 

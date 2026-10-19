@@ -5,34 +5,34 @@ import path from 'node:path';
 import { loadFormatIgnore } from './load-format-ignore.ts';
 
 test('it returns an empty list when no ignore file exists', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
 
-  expect(loadFormatIgnore(dir)).toBeEmpty();
+  expect(loadFormatIgnore(directory)).toBeEmpty();
 });
 
 test('it reads one glob per line', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
 
-  fs.writeFileSync(path.join(dir, '.formatignore'), 'dist/**\nsrc/generated/**\n');
+  fs.writeFileSync(path.join(directory, '.formatignore'), 'dist/**\nsrc/generated/**\n');
 
-  expect(loadFormatIgnore(dir)).toStrictEqual(['dist/**', 'src/generated/**']);
+  expect(loadFormatIgnore(directory)).toStrictEqual(['dist/**', 'src/generated/**']);
 });
 
 test('it skips blank lines and comment lines', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
 
   fs.writeFileSync(
-    path.join(dir, '.formatignore'),
+    path.join(directory, '.formatignore'),
     '# build output\ndist/**\n\n  \n# codegen\nsrc/generated/**\n',
   );
 
-  expect(loadFormatIgnore(dir)).toStrictEqual(['dist/**', 'src/generated/**']);
+  expect(loadFormatIgnore(directory)).toStrictEqual(['dist/**', 'src/generated/**']);
 });
 
 test('it trims surrounding whitespace including CRLF line endings', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
 
-  fs.writeFileSync(path.join(dir, '.formatignore'), 'dist/**\r\n  build/**  \r\n');
+  fs.writeFileSync(path.join(directory, '.formatignore'), 'dist/**\r\n  build/**  \r\n');
 
-  expect(loadFormatIgnore(dir)).toStrictEqual(['dist/**', 'build/**']);
+  expect(loadFormatIgnore(directory)).toStrictEqual(['dist/**', 'build/**']);
 });
