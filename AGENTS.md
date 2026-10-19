@@ -38,8 +38,8 @@ scripts/            the shell scripts that repo-sync and CI run, plus the manual
 ```
 
 A manifest entry can name a source outside `sync/`. `.github/PULL_REQUEST_TEMPLATE.md`,
-`.editorconfig` and `.claude/skills/code-style/SKILL.md` ship to other repos too, so an edit to one
-of them changes every repo that takes it.
+`.github/ISSUE_TEMPLATE/`, `.editorconfig` and `.claude/skills/code-style/SKILL.md` ship to other
+repos too, so an edit to one of them changes every repo that takes it.
 
 ## Packages
 
