@@ -174,27 +174,20 @@ list_changed() {
   git ls-files -z --others --exclude-standard
 }
 
-# Prints file:line:words for each prose paragraph over the warning limit. The parser follows the
-# CommonMark leaf block rules (with GFM tables) outside lists and block quotes, and fails open
-# inside them: it never counts text that a renderer would not show as a top-level paragraph.
+# Prints file:line:words for each top-level prose paragraph over the warning limit. The parser runs
+# the CommonMark block algorithm (with GFM tables) on each line: it matches the open block quotes
+# and list items, tries block starts after the last one matched, and takes a lazy line only while a
+# paragraph is the open block. Indentation is in columns, with tabs to the next multiple of 4.
 #
+# - A paragraph inside a list item or a block quote never counts; a paragraph outside them does.
 # - A paragraph runs until a blank line or a line that interrupts it: an ATX heading, a fence, an
 #   HTML block of types 1 to 6, a block quote, a thematic break, a bullet item with content, or an
-#   ordered item numbered 1 with content. Any other line continues it, indented or not.
-# - Link reference definitions at the start of a paragraph are dropped before it is counted, as
-#   CommonMark drops them, so a definition never interrupts a paragraph and may span lines.
-# - A line of = or - under a paragraph makes it a Setext heading. A delimiter row with as many cells
-#   as the paragraph's last line makes that line a table header. Neither counts, but the paragraph
-#   lines above a header do.
-# - Indented code (4 columns or more where no paragraph is open), fenced code, tables, HTML blocks,
-#   frontmatter and ATX headings never count. HTML blocks of types 1 to 5 run to their closing
-#   marker across blank lines; types 6 and 7 run to a blank line, and type 7 (one complete tag alone
-#   on its line) cannot interrupt a paragraph.
-# - A list or a block quote never counts, and neither does any line after it until a blank line is
-#   followed by a line at column 0 that starts no list item or quote. CommonMark ends both
-#   containers there at the latest. Text that it moves out of a container sooner, such as a lazy
-#   line after a quoted heading, is not counted. A fence or an HTML block opened inside a container
-#   is followed to its closing marker.
+#   ordered item numbered 1 with content.
+# - Link reference definitions at the start of a paragraph are dropped before it is counted. A line
+#   of = or - under a paragraph makes it a Setext heading, and a delimiter row with as many cells as
+#   the paragraph's last line makes that line a table header; the lines above a header still count.
+# - Indented code, fenced code, tables, HTML blocks (types 1 to 5 to their closing marker, types 6
+#   and 7 to a blank line), frontmatter and headings never count.
 paragraph_awk='
 BEGIN {
   q = sprintf("%c", 39)
@@ -208,15 +201,26 @@ BEGIN {
   open_tag = "^<[A-Za-z][A-Za-z0-9-]*(" attribute ")*[ \t]*/?>[ \t]*$"
   closing_tag = "^</[A-Za-z][A-Za-z0-9-]*[ \t]*>[ \t]*$"
 }
-function indent_of(line, i, c, col) {
+# Expands each tab to the next column that is a multiple of 4.
+function detab(line, out, i, c, col) {
+  if (index(line, "\t") == 0) return line
+  out = ""
   col = 0
   for (i = 1; i <= length(line); i++) {
     c = substr(line, i, 1)
-    if (c == " ") col++
-    else if (c == "\t") col += 4 - col % 4
-    else break
+    if (c == "\t") {
+      out = out substr("    ", 1, 4 - col % 4)
+      col += 4 - col % 4
+    } else {
+      out = out c
+      col++
+    }
   }
-  return col
+  return out
+}
+function spaces_at(line, p) {
+  match(substr(line, p), /^ */)
+  return RLENGTH
 }
 function is_atx(s) {
   return match(s, /^#+/) && RLENGTH <= 6 && substr(s, RLENGTH + 1) ~ /^([ \t]|$)/
@@ -226,13 +230,6 @@ function is_thematic(s) {
 }
 function is_setext_underline(s) {
   return s ~ /^(=+|-+)[ \t]*$/
-}
-# A bullet, or an ordered marker of 1 to 9 digits, followed by a space, a tab or the line end.
-function is_item(s) {
-  return s ~ /^[-*+]([ \t]|$)/ || (match(s, /^[0-9]+[.)]([ \t]|$)/) && match(s, /^[0-9]+/) && RLENGTH <= 9)
-}
-function starts_container(s) {
-  return s ~ /^>/ || (is_item(s) && !is_thematic(s))
 }
 # Returns the fence marker this line opens, or "" when it opens none. A backtick fence takes no
 # backtick in its info string.
@@ -263,27 +260,25 @@ function is_table_delimiter(s) {
 function html_start(s, lower) {
   lower = tolower(s)
   if (match(lower, /^<(script|pre|style|textarea)([ \t>]|$)/)) return html_marker(lower, "</(script|pre|style|textarea)>")
-  if (match(lower, /^<!--/)) return substr(lower, 5) ~ /^-?>|-->/ ? "closed" : "-->"
+  if (match(lower, /^<!--/)) return html_marker(lower, "-->")
   if (match(lower, /^<\?/)) return html_marker(lower, "[?]>")
   if (match(s, /^<!\[CDATA\[/)) return html_marker(s, "]]>")
   if (match(lower, /^<![a-z]/)) return html_marker(lower, ">")
   if (lower ~ /^<\/?(address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)([ \t>]|\/>|$)/) return "block"
   return ""
 }
+# The end condition holds when the line contains the marker anywhere, so <?> and <!--> close on
+# their own line.
 function html_marker(text, marker) {
-  return substr(text, RSTART + RLENGTH) ~ marker ? "closed" : marker
+  return text ~ marker ? "closed" : marker
 }
 # HTML block type 7: one complete open or closing tag, with valid attributes, alone on its line.
 function is_lone_tag(s) {
   return (s ~ open_tag || s ~ closing_tag) && tolower(s) !~ /^<\/?(script|pre|style|textarea)[^a-z0-9-]/
 }
-function interrupts(s, ind) {
-  return ind < 4 && (fence_open(s) != "" || is_atx(s) || is_thematic(s) || s ~ /^>/ ||
-    html_start(s) != "" || s ~ /^[-*+][ \t]+[^ \t]/ || s ~ /^1[.)][ \t]+[^ \t]/)
-}
 # Returns the length of a bare link destination at the start of s, or 0 when there is none. As in
 # the CommonMark reference parser, it ends at a space, a control character or an unmatched ), and
-# an unclosed ( or an escape-free < at its start makes it invalid.
+# an unclosed ( or a < at its start makes it invalid.
 function bare_destination_length(s, i, c, depth) {
   if (substr(s, 1, 1) == "<") return 0
   depth = 0
@@ -317,86 +312,148 @@ function definition_length(text, n, rest, d) {
   return 0
 }
 # Returns the index of the first paragraph line that no link reference definition holds.
-function first_text_line(text, i, k, n, matched, newlines) {
+function first_text_line(text, i, k, n, matched_text, newlines) {
   text = lines[1]
   for (i = 2; i <= line_count; i++) text = text "\n" lines[i]
   k = 0
   while (text != "" && (n = definition_length(text)) > 0) {
-    matched = substr(text, 1, n)
-    newlines = gsub(/\n/, "\n", matched)
-    k += (substr(matched, n) == "\n") ? newlines : newlines + 1
+    matched_text = substr(text, 1, n)
+    newlines = gsub(/\n/, "\n", matched_text)
+    k += (substr(matched_text, n) == "\n") ? newlines : newlines + 1
     text = substr(text, n + 1)
   }
   return k + 1
 }
+# Closes the open leaf block, and prints a top-level paragraph over the warning limit.
 function flush(i, first, words, parts) {
-  if (block == "para") {
+  if (leaf == "para" && para_depth == 0) {
     first = first_text_line()
     words = 0
     for (i = first; i <= line_count; i++) words += split(lines[i], parts)
     if (words > warn) print start_file":"line_numbers[first]":"words
   }
-  block = ""
+  leaf = ""
   line_count = 0
 }
 function add_line(s) {
   lines[++line_count] = s
   line_numbers[line_count] = FNR
 }
-# Follows a fence or a raw HTML block that opens inside a list or a quote, given the line without
-# its quote markers and indent.
-function read_container(c, h) {
-  if (fence_open(c) != "") {
-    open = fence_open(c)
-    return
-  }
-  h = html_start(c)
-  if (h != "" && h != "closed" && h != "block") html_end = h
+# Starts a block after the last matched container: closes the containers left unmatched and the
+# open leaf, and marks the enclosing list item as holding a block.
+function begin_block() {
+  flush()
+  para_matched = 0
+  depth = matched
+  if (depth > 0) has_child[depth] = 1
 }
-function strip_container(s) {
-  while (s ~ /^[ \t]*>/) {
-    sub(/^[ \t]*>/, "", s)
-    sub(/^[ \t]+/, "", s)
-  }
-  if (is_item(s) && !is_thematic(s)) sub(/^([-*+]|[0-9]+[.)])[ \t]*/, "", s)
-  return s
+function open_container(type, width) {
+  begin_block()
+  depth++
+  matched = depth
+  kind[depth] = type
+  width_of[depth] = width
+  has_child[depth] = 0
 }
-# Starts the block that a line opens. s is the line without its indent and ind its indent in
-# columns.
-function start_block(s, ind, m, h) {
-  if (ind >= 4) {
-    block = "code"
-    return
+# Matches the open containers against the line from position p, as CommonMark does: a quote needs
+# a > after at most 3 spaces, and a list item needs its content indent, or a blank line once it
+# holds a block.
+function match_containers(i, sp) {
+  matched = 0
+  for (i = 1; i <= depth; i++) {
+    sp = spaces_at(L, p)
+    if (kind[i] == "quote") {
+      if (sp > 3 || substr(L, p + sp, 1) != ">") return
+      p += sp + 1
+      if (substr(L, p, 1) == " ") p++
+    } else if (substr(L, p) ~ /^ *$/) {
+      if (!has_child[i]) return
+      p = length(L) + 1
+    } else {
+      if (sp < width_of[i]) return
+      p += width_of[i]
+    }
+    matched++
   }
-  m = fence_open(s)
-  if (m != "") {
-    open = m
-    return
-  }
-  h = html_start(s)
-  if (h == "closed") return
-  if (h == "block" || (h == "" && is_lone_tag(s))) {
-    block = "html"
-    return
-  }
-  if (h != "") {
-    html_end = h
-    return
-  }
-  if (is_atx(s) || is_thematic(s)) return
-  if (starts_container(s)) {
-    block = "container"
-    after_blank = 0
-    read_container(strip_container(s))
-    return
-  }
-  block = "para"
-  start_file = FILENAME
-  add_line(s)
 }
+# Tries the block starts at position p and opens each one found. Returns 1 when the rest of the
+# line belongs to a block it started, and 0 when the line is still to place.
+function start_blocks(sp, t, m, h, mlen, rest, gap, number) {
+  while (1) {
+    sp = spaces_at(L, p)
+    t = substr(L, p + sp)
+    if (t == "") return 0
+    if (sp >= 4) {
+      if (leaf == "para") return 0
+      begin_block()
+      leaf = "code"
+      return 1
+    }
+    if (substr(t, 1, 1) == ">") {
+      open_container("quote", 0)
+      p += sp + 1
+      if (substr(L, p, 1) == " ") p++
+      continue
+    }
+    if (is_atx(t)) {
+      begin_block()
+      return 1
+    }
+    m = fence_open(t)
+    if (m != "") {
+      begin_block()
+      leaf = "fence"
+      fence = m
+      return 1
+    }
+    h = html_start(t)
+    if (h != "" || (leaf != "para" && is_lone_tag(t))) {
+      begin_block()
+      if (h == "" || h == "block") leaf = "htmlblock"
+      else if (h != "closed") {
+        leaf = "html"
+        html_end = h
+      }
+      return 1
+    }
+    if (para_matched && is_setext_underline(t)) {
+      # A paragraph of link definitions alone has no text to underline, so the line is text.
+      if (first_text_line() > line_count) return 0
+      leaf = ""
+      line_count = 0
+      return 1
+    }
+    if (para_matched && is_table_delimiter(t) && cell_count(t) == cell_count(lines[line_count])) {
+      line_count--
+      flush()
+      leaf = "table"
+      return 1
+    }
+    if (is_thematic(t)) {
+      begin_block()
+      return 1
+    }
+    if (match(t, /^([-*+]|[0-9]+[.)])([ \t]|$)/)) {
+      match(t, /^([-*+]|[0-9]+[.)])/)
+      mlen = RLENGTH
+      number = substr(t, 1, mlen - 1)
+      rest = substr(t, mlen + 1)
+      gap = spaces_at(rest, 1)
+      if (mlen > 10 && number ~ /^[0-9]+$/) return 0
+      if (para_matched && (rest ~ /^ *$/ || (number ~ /^[0-9]+$/ && number + 0 != 1))) return 0
+      if (rest ~ /^ *$/ || gap >= 5) gap = 1
+      open_container("item", sp + mlen + gap)
+      p += sp + mlen + gap
+      continue
+    }
+    return 0
+  }
+}
+# A CRLF file ends each line in a carriage return, which is part of the line ending, not the line.
+{ sub(/\r$/, "") }
 FNR == 1 {
   flush()
-  html_end = ""
+  depth = 0
   front = ($0 == "---")
   if (front) next
 }
@@ -405,65 +462,55 @@ front {
   next
 }
 {
-  ind = indent_of($0)
-  s = $0
-  sub(/^[ \t]+/, "", s)
-  blank = (s == "")
-  # Inside a list or a quote, a fence or an HTML block is followed by its content without markers.
-  c = (block == "container") ? strip_container(s) : s
-  if (open != "") {
-    if ((block == "container" || ind < 4) && fence_closes(open, c)) open = ""
+  L = detab($0)
+  p = 1
+  match_containers()
+  all = (matched == depth)
+  t = substr(L, p)
+  if (all && leaf == "fence") {
+    if (spaces_at(L, p) < 4 && fence_closes(fence, substr(t, spaces_at(L, p) + 1))) leaf = ""
     next
   }
-  if (html_end != "") {
-    if (tolower($0) ~ html_end) html_end = ""
+  if (all && leaf == "html") {
+    if (tolower(t) ~ html_end) leaf = ""
     next
   }
-  if (block == "container") {
-    if (blank) {
-      after_blank = 1
-      next
-    }
-    if (!after_blank || ind > 0 || starts_container(s)) {
-      after_blank = 0
-      read_container(c)
-      next
-    }
-    block = ""
+  if (all && leaf == "htmlblock") {
+    if (t ~ /^ *$/) leaf = ""
+    next
   }
-  if (blank) {
+  if (all && leaf == "code") {
+    if (t ~ /^ *$/ || spaces_at(L, p) >= 4) next
+    leaf = ""
+  }
+  para_matched = (all && leaf == "para" && t !~ /^ *$/)
+  if (start_blocks()) next
+  t = substr(L, p)
+  sub(/^ +/, "", t)
+  # A lazy line continues a paragraph left open in a container that this line did not match.
+  if (depth > matched && leaf == "para" && t != "") {
+    add_line(t)
+    next
+  }
+  if (depth > matched) {
+    flush()
+    depth = matched
+  }
+  if (t == "") {
     flush()
     next
   }
-  if (block == "html") next
-  if (block == "code") {
-    if (ind >= 4) next
-    block = ""
+  if (leaf == "para") {
+    add_line(t)
+    next
   }
-  if (block == "para") {
-    if (ind < 4 && is_setext_underline(s)) {
-      # A paragraph of link definitions alone has no text to underline, so the line is text.
-      if (first_text_line() <= line_count) block = ""
-      else add_line(s)
-      next
-    }
-    if (ind < 4 && is_table_delimiter(s) && cell_count(s) == cell_count(lines[line_count])) {
-      line_count--
-      flush()
-      block = "table"
-      next
-    }
-    if (!interrupts(s, ind)) {
-      add_line(s)
-      next
-    }
-    flush()
-  }
-  if (block == "table") {
-    if (!interrupts(s, ind)) next
-    block = ""
-  }
-  start_block(s, ind)
+  if (leaf == "table") next
+  flush()
+  if (depth > 0) has_child[depth] = 1
+  leaf = "para"
+  para_depth = depth
+  start_file = FILENAME
+  add_line(t)
 }
 END { flush() }
 '
