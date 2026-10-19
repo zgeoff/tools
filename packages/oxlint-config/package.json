@@ -30,9 +30,16 @@
     "setup-test-only.js",
     "import-zones.js",
     "import-zones-schema.js",
+    "import-zones-entry.js",
+    "import-zones-entry.d.ts",
+    "collect-refusing-edges.js",
+    "is-edge-refusing.js",
+    "is-entry-applying.js",
+    "is-in-any-zone.js",
+    "collect-zone-names.js",
     "resolve-repo-root.js",
     "load-workspace-manifests.js",
-    "load-zone-options.js",
+    "get-zone-options.js",
     "make-glob-matcher.js",
     "resolve-import-target.js",
     "index.js"
@@ -41,7 +48,11 @@
   "exports": {
     ".": "./index.js",
     "./oxlintrc.json": "./oxlintrc.json",
-    "./plugin": "./plugin.js"
+    "./plugin": "./plugin.js",
+    "./import-zones": {
+      "types": "./import-zones-entry.d.ts",
+      "default": "./import-zones-entry.js"
+    }
   },
   "publishConfig": {
     "access": "public"

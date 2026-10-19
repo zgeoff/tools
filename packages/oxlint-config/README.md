@@ -294,6 +294,15 @@ Exempt a known violation with a next-line disable comment that names the ticket 
 unzoned report sits on the first statement, so its comment goes above that. Run lint with
 `--report-unused-disable-directives-severity error` so a comment outlives no import.
 
+The rule judges only the imports that a file holds. A repo check that judges something else, such as
+a dependency that a manifest declares, imports the rule's own reading from
+`@zgeoff/oxlint-config/import-zones`. That entry exports `importZonesSchema`, the JSON schema of the
+options, with an `ImportZonesOptions` type, and
+`collectRefusingEdges(options, { from, to, typeOnly })`. The function returns each edge in `options`
+that refuses an import of `to` from `from`, both paths relative to the repo root. It skips module
+resolution, so `to` is the path that the rule would resolve the specifier to. The rule judges each
+edge through the same function.
+
 ## Notes
 
 - The config enables the `typescript`, `unicorn`, `oxc`, `import`, and `promise` plugins and loads

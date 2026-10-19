@@ -4,7 +4,7 @@ const loadedOptions = new Map();
 
 // oxlint hands each file its own copy of the options, so the compiled form is
 // keyed by content
-export default function loadZoneOptions(options) {
+export default function getZoneOptions(options) {
   const key = JSON.stringify(options);
   let loaded = loadedOptions.get(key);
 

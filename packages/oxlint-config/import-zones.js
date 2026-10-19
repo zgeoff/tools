@@ -1,8 +1,12 @@
 import { isBuiltin } from 'node:module';
 import { relative, sep } from 'node:path';
+import collectZoneNames from './collect-zone-names.js';
+import getZoneOptions from './get-zone-options.js';
 import importZonesSchema from './import-zones-schema.js';
+import isEdgeRefusing from './is-edge-refusing.js';
+import isEntryApplying from './is-entry-applying.js';
+import isInAnyZone from './is-in-any-zone.js';
 import loadWorkspaceManifests from './load-workspace-manifests.js';
-import loadZoneOptions from './load-zone-options.js';
 import resolveImportTarget from './resolve-import-target.js';
 import resolveRepoRoot from './resolve-repo-root.js';
 
@@ -81,7 +85,7 @@ export default importZones;
 // root, which may overlap. A file belongs to every zone its path matches.
 
 function loadFileState(context) {
-  const options = loadZoneOptions(context.options[0] ?? {});
+  const options = getZoneOptions(context.options[0] ?? {});
   const filename = context.physicalFilename;
   const root = resolveRepoRoot(filename) ?? context.cwd;
   const path = toRootPath(root, filename);
@@ -95,16 +99,12 @@ function loadFileState(context) {
     root,
     path,
     workspaces,
-    zones: collectZones(options.zones, path),
+    zones: collectZoneNames(options.zones, path),
   };
 }
 
 function toRootPath(root, path) {
   return relative(root, path).split(sep).join('/');
-}
-
-function collectZones(zones, path) {
-  return zones.filter((zone) => zone.match(path)).map((zone) => zone.name);
 }
 
 function checkUnzoned(file, program) {
@@ -113,7 +113,7 @@ function checkUnzoned(file, program) {
   const start = program.body[0]?.loc.start ?? { line: 1, column: 0 };
 
   for (const entry of collectEntries(file, file.options.unzoned)) {
-    if (!isInAny(file.zones, entry.zones)) {
+    if (!isInAnyZone(file.zones, entry.zones)) {
       emitReport(file, entry, {
         at: { loc: { start, end: start } },
         messageId: 'unzoned',
@@ -123,16 +123,8 @@ function checkUnzoned(file, program) {
   }
 }
 
-// an entry without `from` applies to every file
 function collectEntries(file, entries) {
-  return entries.filter(
-    (entry) =>
-      (entry.from === undefined || isInAny(file.zones, entry.from)) && !entry.ignore(file.path),
-  );
-}
-
-function isInAny(fileZones, names) {
-  return names.some((name) => fileZones.includes(name)) === true;
+  return entries.filter((entry) => isEntryApplying(entry, file.path, file.zones));
 }
 
 // `at` is `{ node }` or `{ loc }`
@@ -208,7 +200,7 @@ function emitSelfImport(file, node, specifier) {
 function checkModule(file, imported, specifier) {
   for (const entry of collectEntries(file, file.options.modules)) {
     const isAllowed =
-      isInAny(file.zones, entry.allow) || (imported.typeOnly && entry.allowTypeOnly === true);
+      isInAnyZone(file.zones, entry.allow) || (imported.typeOnly && entry.allowTypeOnly === true);
 
     if (!isAllowed && isRestrictedModule(entry, specifier)) {
       emitReport(file, entry, {
@@ -247,27 +239,25 @@ function isPrefixMatch(prefix, specifier) {
   return prefix === 'node:' && isBuiltin(specifier);
 }
 
+// collectRefusingEdges judges an edge the same way, through isEdgeRefusing
 function checkEdge(file, imported, target) {
-  const targetZones = collectZones(file.options.zones, target);
+  const edgeImport = {
+    from: file.path,
+    to: target,
+    fromZones: file.zones,
+    toZones: collectZoneNames(file.options.zones, target),
+    typeOnly: imported.typeOnly,
+  };
 
-  for (const entry of collectEntries(file, file.options.edges)) {
-    // `to` picks the targets judged, every target when absent; `allow`
-    // exempts some of them
-    const isForbidden =
-      (entry.to === undefined || isInAny(targetZones, entry.to)) &&
-      (entry.allow === undefined || !isInAny(targetZones, entry.allow));
-    const isTypeExempt =
-      imported.typeOnly &&
-      (entry.allowTypeOnly === true || entry.typeOnlyTargets?.(target) === true);
-
-    if (isForbidden && !isTypeExempt && entry.within?.(file.path, target) !== true) {
+  for (const entry of file.options.edges) {
+    if (isEdgeRefusing(entry, edgeImport)) {
       emitReport(file, entry, {
         at: { node: imported.node },
         messageId: 'edge',
         data: {
           from: formatZones(entry.from.filter((name) => file.zones.includes(name))),
           target,
-          to: formatZones(targetZones),
+          to: formatZones(edgeImport.toZones),
         },
       });
     }
@@ -292,7 +282,7 @@ function checkGlobalCall(file, node) {
   for (const entry of collectEntries(file, file.options.globals)) {
     const global = findGlobalCallName(file, node, entry.globals);
 
-    if (global !== null && !isInAny(file.zones, entry.allow)) {
+    if (global !== null && !isInAnyZone(file.zones, entry.allow)) {
       emitReport(file, entry, {
         at: { node },
         messageId: 'global',
