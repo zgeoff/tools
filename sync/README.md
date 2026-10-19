@@ -59,64 +59,21 @@ excepted file outside its block. The workflow never deletes a file, so a repo th
 before its `except` removes that copy itself.
 
 Files under [`hooks/`](./hooks/) are Claude Code hooks, delivered as opt-in entries to
-`.claude/hooks/<name>/`. Their tests stay here. `hook-skill-gate` delivers the skill gate: a
-`PreToolUse` hook that denies an edit until the session has loaded every skill the path needs, and
-names the missing skills. It also warns when a Bash command writes a gated path through a redirect,
-`tee`, `sed -i`, `cp`, `mv` or an inline script. The warning names the skills to load and the edit
-tools, and the command still runs. The gate holds no rules. A repo opts in with three changes, which
+`.claude/hooks/<name>/`. Their tests stay here. `hook-skill-gate` delivers the skill gate's entry
+point, a file that runs the gate from [`@zgeoff/skill-gate`](../packages/skill-gate/README.md). The
+gate denies an edit until the session has loaded every skill the path needs, and the package README
+describes what it allows, blocks and warns on. The repo takes a gate fix by bumping the package, and
+the entry point changes only when the package's API does. A repo opts in with four changes, which
 repo-sync never touches:
 
 1. Add `hook-skill-gate` to `include` in `.github/workflows/repo-sync.yml`.
-2. Write `.claude/skill-gate.json`. `match` is a glob over the path from the repo root, and a path
-   that holds an `ignore` segment is never gated. A repo without this file has no gate. `Bun.Glob`
-   misses deep paths for a `**` inside a brace group, such as `{e2e/**,test/**}`, so write one gate
-   per pattern.
-
-   ```json
-   {
-     "ignore": ["node_modules/", "dist/"],
-     "gates": [
-       { "match": "**/*.test.ts", "skills": ["testing", "project-testing"] },
-       { "match": "**/*.md", "skills": ["docs-writing"] }
-     ]
-   }
-   ```
-
-3. Register the hook in `.claude/settings.json`:
-
-   ```json
-   {
-     "hooks": {
-       "PreToolUse": [
-         {
-           "matcher": "Edit|Write|MultiEdit|Bash",
-           "hooks": [
-             {
-               "type": "command",
-               "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate/skill-gate.ts\""
-             }
-           ]
-         }
-       ]
-     }
-   }
-   ```
-
-A rule that names a skill missing from `.claude/skills/`, or a rules file that does not parse, never
-denies an edit. The hook warns the user and the agent on every edit until the rule is fixed.
-
-The gate counts the loads of the session that makes the edit. A subagent's tool call carries
-`agent_id` beside the main session's `transcript_path`, and the gate reads that subagent's own
-transcript, `<session>/subagents/agent-<agent_id>.jsonl` beside the main one. A subagent therefore
-loads the skills itself, and the main session's loads never count for it. A compaction writes a
-`compact_boundary` entry, and the loads before it no longer count: after a compaction, the gate
-denies a gated edit until the session loads the skills again, and its denial says so.
-
-The gate blocks only Edit, Write and MultiEdit. For Bash it reads the common forms of a shell write
-and warns, because a hook cannot parse every shell form: a deny built on a partial parser would
-block ordinary commands or let other writes through. A command the parser misses runs with no
-warning. Change a gated path only with Edit, Write or MultiEdit; the denial and the warning both say
-so.
+2. Run `bun add -d @zgeoff/skill-gate` at the repo root. Without the package, the entry point fails
+   on every edit and gates nothing.
+3. Write the rules in `.claude/skill-gate.json`, as the package README's
+   [Rules](../packages/skill-gate/README.md#rules) section shows. A repo without this file has no
+   gate.
+4. Register the hook in `.claude/settings.json`, as the package README's
+   [Entry point](../packages/skill-gate/README.md#entry-point) section shows.
 
 Files under [`pre-push/`](./pre-push/) are the pre-push baseline, delivered by the opt-in
 `pre-push-baseline` entry. The baseline runs its jobs one at a time, so a push fits a 2 GiB host or

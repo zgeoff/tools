@@ -177,56 +177,12 @@
   },
   {
     "name": "hook-skill-gate",
-    "description": "The skill-gate PreToolUse hook, which denies an edit until the session loads the skills the path needs and warns on a Bash command that writes a gated path; the repo keeps its rules in .claude/skill-gate.json and registers the hook in .claude/settings.json",
+    "description": "The skill-gate PreToolUse hook's entry point, which runs the gate from the @zgeoff/skill-gate package; the repo installs the package, keeps its rules in .claude/skill-gate.json, and registers the hook in .claude/settings.json",
     "optIn": true,
     "files": [
       {
         "source": "sync/hooks/skill-gate/skill-gate.ts",
         "target": ".claude/hooks/skill-gate/skill-gate.ts"
-      },
-      {
-        "source": "sync/hooks/skill-gate/build-bash-skill-gate-output.ts",
-        "target": ".claude/hooks/skill-gate/build-bash-skill-gate-output.ts"
-      },
-      {
-        "source": "sync/hooks/skill-gate/build-skill-gate-output.ts",
-        "target": ".claude/hooks/skill-gate/build-skill-gate-output.ts"
-      },
-      {
-        "source": "sync/hooks/skill-gate/collect-gate-skills.ts",
-        "target": ".claude/hooks/skill-gate/collect-gate-skills.ts"
-      },
-      {
-        "source": "sync/hooks/skill-gate/collect-loaded-skills.ts",
-        "target": ".claude/hooks/skill-gate/collect-loaded-skills.ts"
-      },
-      {
-        "source": "sync/hooks/skill-gate/collect-written-paths.ts",
-        "target": ".claude/hooks/skill-gate/collect-written-paths.ts"
-      },
-      {
-        "source": "sync/hooks/skill-gate/format-skill-list.ts",
-        "target": ".claude/hooks/skill-gate/format-skill-list.ts"
-      },
-      {
-        "source": "sync/hooks/skill-gate/parse-shell-commands.ts",
-        "target": ".claude/hooks/skill-gate/parse-shell-commands.ts"
-      },
-      {
-        "source": "sync/hooks/skill-gate/parse-skill-gate-rules.ts",
-        "target": ".claude/hooks/skill-gate/parse-skill-gate-rules.ts"
-      },
-      {
-        "source": "sync/hooks/skill-gate/plan-bash-skill-gate.ts",
-        "target": ".claude/hooks/skill-gate/plan-bash-skill-gate.ts"
-      },
-      {
-        "source": "sync/hooks/skill-gate/plan-skill-gate.ts",
-        "target": ".claude/hooks/skill-gate/plan-skill-gate.ts"
-      },
-      {
-        "source": "sync/hooks/skill-gate/types.ts",
-        "target": ".claude/hooks/skill-gate/types.ts"
       }
     ]
   },
