@@ -15,10 +15,10 @@ throughout, and each section here names the one it relaxes.
 
 ## End-to-end suites
 
-An end-to-end suite splits by user journey, one file per journey: `e2e/tui-spawn.test.ts` beside
-`e2e/tui-attach.test.ts`. A journey test may chain dependent act-and-assert phases, because each
-step of the journey needs the state that the step before it left. Ordinary tests outside `e2e/` act
-once. Generated sequences follow [Property tests](#property-tests).
+An end-to-end suite splits by user journey, one file per journey: `e2e/checkout.test.ts` beside
+`e2e/refund.test.ts`. A journey test may chain dependent act-and-assert phases, because each step of
+the journey needs the state that the step before it left. Ordinary tests outside `e2e/` act once.
+Generated sequences follow [Property tests](#property-tests).
 
 An outer harness may reuse expensive hosts and services across journeys. Each journey keeps its own
 file, setup, scenario, and cleanup. Reset shared infrastructure to a clean baseline before each
