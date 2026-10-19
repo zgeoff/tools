@@ -26,8 +26,12 @@ export default function resolvePackageTarget(target, patternMatch, lookup) {
 // step 1; a bare `imports` target stays a specifier for the caller to resolve
 function resolveStringTarget(target, patternMatch, isImports) {
   if (!target.startsWith('./')) {
-    const isInvalid =
-      !isImports || target.startsWith('../') || target.startsWith('/') || URL.canParse(target);
+    const isInvalid = [
+      !isImports,
+      target.startsWith('../'),
+      target.startsWith('/'),
+      URL.canParse(target),
+    ].includes(true);
 
     return isInvalid ? invalidTarget : buildPatternTarget(target, patternMatch);
   }
