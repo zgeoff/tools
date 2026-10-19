@@ -93,10 +93,7 @@ const verbContract = {
         }
       },
       TaggedTemplateExpression(node) {
-        const rootName = findRootName(node.tag);
-        const binding = rootName === null ? null : findBinding(context, node, rootName);
-
-        if (isShellTarget(resolveCallTarget(context, { rootName, binding, memberName: null }))) {
+        if (isShellTarget(resolveCallTarget(context, node, node.tag))) {
           markIO('runs a `$` shell command');
         }
       },
@@ -163,8 +160,9 @@ const effectfulVerbs = [
 ];
 
 // a function returning a success flag, such as `removeFile` or `tryLock`,
-// rightly returns a boolean without a predicate verb
-const flagVerbs = [...effectfulVerbs, 'try'];
+// rightly returns a boolean without a predicate verb, and a framework prefix
+// such as a React hook's `use` wins over the predicate verbs
+const flagVerbs = [...effectfulVerbs, 'try', 'use', 'on', 'handle'];
 
 function checkFrame(context, frame) {
   const name = frame.name.name;
@@ -228,12 +226,16 @@ function collectTypeKinds(type, localTypes, resolvePromise = false, seen = new S
     );
   }
 
-  if (type.type !== 'TSTypeReference' || type.typeName.type !== 'Identifier') {
+  if (type.type === 'TSParenthesizedType' || isReadonlyOperator(type)) {
+    return collectTypeKinds(type.typeAnnotation, localTypes, resolvePromise, seen);
+  }
+
+  if (type.type !== 'TSTypeReference') {
     return [pickTypeKind(type)];
   }
 
-  const name = type.typeName.name;
-  const alias = localTypes.aliases.get(name);
+  const name = type.typeName.type === 'Identifier' ? type.typeName.name : null;
+  const alias = name === null ? undefined : localTypes.aliases.get(name);
 
   if (alias !== undefined && !seen.has(name)) {
     return collectTypeKinds(alias, localTypes, resolvePromise, new Set([...seen, name]));
@@ -252,6 +254,28 @@ function collectTypeKinds(type, localTypes, resolvePromise = false, seen = new S
   return [localTypes.interfaces.has(name) ? 'value' : 'open'];
 }
 
+function isReadonlyOperator(type) {
+  return type.type === 'TSTypeOperator' && type.operator === 'readonly';
+}
+
+// a type whose members the rule can see and that never holds null; any other
+// shape, such as an indexed access or a conditional type, is open
+const valueTypes = new Set([
+  'TSStringKeyword',
+  'TSNumberKeyword',
+  'TSBigIntKeyword',
+  'TSSymbolKeyword',
+  'TSObjectKeyword',
+  'TSNeverKeyword',
+  'TSLiteralType',
+  'TSTemplateLiteralType',
+  'TSArrayType',
+  'TSTupleType',
+  'TSTypeLiteral',
+  'TSFunctionType',
+  'TSConstructorType',
+]);
+
 function pickTypeKind(type) {
   if (
     type.type === 'TSBooleanKeyword' ||
@@ -269,7 +293,12 @@ function pickTypeKind(type) {
     return 'void';
   }
 
-  return type.type === 'TSAnyKeyword' || type.type === 'TSUnknownKeyword' ? 'open' : 'value';
+  // `asserts value is T` throws instead of returning a boolean
+  if (type.type === 'TSTypePredicate' || valueTypes.has(type.type)) {
+    return 'value';
+  }
+
+  return 'open';
 }
 
 const localTypesByProgram = new WeakMap();
@@ -319,8 +348,8 @@ function findCallIO(context, node, frameNode) {
   const rootName = findRootName(callee);
   const memberName = callee.type === 'MemberExpression' ? findMemberName(callee) : null;
   const binding = rootName === null ? null : findBinding(context, node, rootName);
-  const source = findImportSource(binding);
-  const target = resolveCallTarget(context, { rootName, binding, memberName });
+  const target = resolveCallTarget(context, node, callee);
+  const targetSource = findImportSource(target.binding);
 
   if (isShellTarget(target)) {
     return 'runs a `$` shell command';
@@ -334,36 +363,51 @@ function findCallIO(context, node, frameNode) {
     return 'runs a database query';
   }
 
-  if (target.rootName === 'Bun' && target.binding === null && bunIOMembers.has(target.memberName)) {
+  if (isBunGlobal(target) && bunIOMembers.has(target.memberName)) {
     return `calls \`Bun.${target.memberName}\``;
   }
-
-  const targetSource = findImportSource(target.binding);
 
   if (targetSource !== null && isIOImport(targetSource, target)) {
     return `calls \`${rootName}\` from \`${targetSource}\``;
   }
 
-  if (!isOwnCallee({ rootName, binding, source, memberName }, frameNode)) {
+  const isOwn =
+    isOwnCallee({ rootName, binding, source: findImportSource(binding), memberName }, frameNode) &&
+    isOwnCallee({ ...target, source: targetSource, memberName: null }, frameNode);
+
+  if (!isOwn) {
     return null;
   }
-
-  const calleeName = callee.type === 'Identifier' ? callee.name : memberName;
-  const verb = calleeName === null ? null : findVerb(calleeName, effectfulVerbs);
 
   // a bare method name such as `map.set` or `fn.apply` is a built-in that a
-  // name cannot tell from I/O
-  if (verb === null || memberName === verb) {
-    return null;
-  }
+  // name cannot tell from I/O, whether the call names it or an alias holds it
+  const names = [
+    {
+      name: callee.type === 'Identifier' ? callee.name : memberName,
+      isMethod: memberName !== null,
+    },
+    { name: target.memberName ?? target.rootName, isMethod: target.memberName !== null },
+  ];
 
-  return `calls '${calleeName}', whose verb may do I/O`;
+  const effectful = names.find((entry) => {
+    const verb = entry.name === null ? null : findVerb(entry.name, effectfulVerbs);
+
+    return verb !== null && !(entry.isMethod && entry.name === verb);
+  });
+
+  return effectful === undefined ? null : `calls '${effectful.name}', whose verb may do I/O`;
 }
 
-// a local alias of an I/O source, such as `const read = fs.readFileSync` or
-// `const { spawn } = Bun`, resolves to that source and the member it names
-function resolveCallTarget(context, target) {
-  let current = target;
+// the source a call reaches: its root binding and the member taken straight
+// off the root, as `spawn` in `Bun.spawn(...)`, followed through each local
+// alias such as `const read = fs.readFileSync` or `const { spawn } = Bun`
+function resolveCallTarget(context, node, callee) {
+  const rootName = findRootName(callee);
+  let current = {
+    rootName,
+    binding: rootName === null ? null : findBinding(context, node, rootName),
+    memberName: findRootMemberName(callee),
+  };
 
   for (let depth = 0; depth < 8; depth++) {
     const declarator = findAliasDeclarator(current.binding);
@@ -373,19 +417,36 @@ function resolveCallTarget(context, target) {
     }
 
     const init = declarator.init;
-    const rootName = findRootName(init);
-    const ownMember = init.type === 'MemberExpression' ? findMemberName(init) : null;
-    const memberName =
-      current.memberName ?? findPatternKey(declarator.id, current.rootName) ?? ownMember;
+    const initRoot = findRootName(init);
 
     current = {
-      rootName,
-      binding: rootName === null ? null : findBinding(context, init, rootName),
-      memberName,
+      rootName: initRoot,
+      binding: initRoot === null ? null : findBinding(context, init, initRoot),
+      memberName:
+        findRootMemberName(init) ??
+        findPatternKey(declarator.id, current.rootName) ??
+        current.memberName,
     };
   }
 
   return current;
+}
+
+// the member read straight off a chain's root: `$` in `bun.$.cwd('a')`
+function findRootMemberName(node) {
+  let current = node;
+  let memberName = null;
+
+  while (current.type === 'MemberExpression' || current.type === 'CallExpression') {
+    if (current.type === 'MemberExpression') {
+      memberName = findMemberName(current);
+      current = current.object;
+    } else {
+      current = current.callee;
+    }
+  }
+
+  return memberName;
 }
 
 function findAliasDeclarator(binding) {
@@ -416,19 +477,26 @@ function findKeyName(property) {
   return !property.computed && property.key.type === 'Identifier' ? property.key.name : null;
 }
 
-// Bun's shell by its usual name, or under any alias of its import from `bun`
+function isBunGlobal(target) {
+  return target.rootName === 'Bun' && target.binding === null;
+}
+
+// Bun's shell: the `$` export of `bun` under any import form or alias, or
+// `Bun.$`; a parameter or local named `$` is some other function
 function isShellTarget(target) {
-  if (target.rootName === '$') {
-    return true;
+  if (isBunGlobal(target)) {
+    return target.memberName === '$';
   }
 
-  const specifier = target.binding?.defs[0].node;
+  if (findImportSource(target.binding) !== 'bun') {
+    return false;
+  }
 
-  return (
-    findImportSource(target.binding) === 'bun' &&
-    specifier.type === 'ImportSpecifier' &&
-    specifier.imported.name === '$'
-  );
+  const specifier = target.binding.defs[0].node;
+
+  return specifier.type === 'ImportSpecifier'
+    ? specifier.imported.name === '$'
+    : target.memberName === '$';
 }
 
 function findMemberName(member) {

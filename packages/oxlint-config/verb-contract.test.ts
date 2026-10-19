@@ -38,420 +38,704 @@ async function setupTest() {
 }
 
 test.each([
-  ['is async', 'export async function buildThing(): Promise<number> {\n  return 1;\n}\n'],
   [
-    'awaits',
-    'export function buildThing(): void {\n  void (async () => {\n    await Promise.resolve();\n  })();\n}\n',
+    'an async no-I/O function',
+    `export async function buildThing(): Promise<number> {
+  return 1;
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it is async",
   ],
   [
-    'calls `existsSync` from `node:fs`',
-    "import { existsSync } from 'node:fs';\n\nexport function buildThing(): boolean {\n  return existsSync('a');\n}\n",
+    'an await inside an unnamed callback',
+    `export function buildThing(): void {
+  void (async () => {
+    await Promise.resolve();
+  })();
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it awaits",
   ],
   [
-    'calls `fs` from `node:fs/promises`',
-    "import fs from 'node:fs/promises';\n\nexport function buildThing(): void {\n  void fs.rm('a');\n}\n",
+    'a named import from node:fs',
+    `import { existsSync } from 'node:fs';
+
+export function buildThing(): boolean {
+  return existsSync('a');
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it calls `existsSync` from `node:fs`",
   ],
   [
-    'calls `execSync` from `node:child_process`',
-    "import { execSync } from 'node:child_process';\n\nexport function buildThing(): void {\n  execSync('ls');\n}\n",
-  ],
-  ['calls `Bun.spawn`', "export function buildThing(): void {\n  Bun.spawn(['ls']);\n}\n"],
-  ['calls `Bun.file`', "export function buildThing(): unknown {\n  return Bun.file('a');\n}\n"],
-  ['calls `Bun.write`', "export function buildThing(): void {\n  void Bun.write('a', 'b');\n}\n"],
-  [
-    'calls `read` from `node:fs`',
-    "import fs from 'node:fs';\n\nexport function buildThing(): string {\n  const read = fs.readFileSync;\n\n  return read('a', 'utf8');\n}\n",
-  ],
-  [
-    'calls `Bun.spawn`',
-    "export function buildThing(): void {\n  const { spawn: launch } = Bun;\n\n  launch(['ls']);\n}\n",
+    'a default import from node:fs/promises',
+    `import fs from 'node:fs/promises';
+
+export function buildThing(): void {
+  void fs.rm('a');
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it calls `fs` from `node:fs/promises`",
   ],
   [
-    'runs a `$` shell command',
-    "import { $ as shell } from 'bun';\n\nexport function buildThing(): unknown {\n  const run = shell;\n\n  return run`ls`;\n}\n",
+    'a namespace import from node:fs',
+    `import * as fs from 'node:fs';
+
+export function buildThing(): string {
+  return fs.readFileSync('a', 'utf8');
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it calls `fs` from `node:fs`",
   ],
   [
-    'calls `spawn` from `bun`',
-    "import { spawn } from 'bun';\n\nexport function buildThing(): void {\n  spawn(['ls']);\n}\n",
+    'a local alias of a node:fs member',
+    `import fs from 'node:fs';
+
+export function buildThing(): string {
+  const read = fs.readFileSync;
+
+  return read('a', 'utf8');
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it calls `read` from `node:fs`",
   ],
   [
-    'runs a `$` shell command',
-    "import { $ } from 'bun';\n\nexport function buildThing(): unknown {\n  return $`ls`;\n}\n",
+    'a named import from node:child_process',
+    `import { execSync } from 'node:child_process';
+
+export function buildThing(): void {
+  execSync('ls');
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it calls `execSync` from `node:child_process`",
   ],
   [
-    'runs a `$` shell command',
-    "import { $ as shell } from 'bun';\n\nexport function buildThing(): unknown {\n  return shell`ls`;\n}\n",
+    'Bun.spawn',
+    `export function buildThing(): void {
+  Bun.spawn(['ls']);
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it calls `Bun.spawn`",
   ],
   [
-    'calls `fetch`',
-    "export function buildThing(): unknown {\n  return fetch('https://a.test');\n}\n",
+    'Bun.file in a concise arrow',
+    `export const buildThing = (): unknown => Bun.file('a');
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it calls `Bun.file`",
   ],
   [
-    'runs a database query',
-    "export function buildThing(db: { selectFrom(table: string): { execute(): unknown } }): unknown {\n  return db.selectFrom('users').execute();\n}\n",
+    'Bun.write',
+    `export function buildThing(): void {
+  void Bun.write('a', 'b');
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it calls `Bun.write`",
   ],
   [
-    'reads the environment',
-    "export function buildThing(): string {\n  return process.env['HOME'] ?? '';\n}\n",
+    'a destructured alias of Bun.spawn',
+    `export function buildThing(): void {
+  const { spawn: launch } = Bun;
+
+  launch(['ls']);
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it calls `Bun.spawn`",
   ],
   [
-    "calls 'readConfig', whose verb may do I/O",
-    "function readConfig(): string {\n  return '';\n}\n\nexport function buildThing(): string {\n  return readConfig();\n}\n",
+    'a named import of spawn from bun',
+    `import { spawn } from 'bun';
+
+export function buildThing(): void {
+  spawn(['ls']);
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it calls `spawn` from `bun`",
   ],
   [
-    "calls 'writeText', whose verb may do I/O",
-    "export function buildThing(ctx: { writeText(text: string): void }): void {\n  ctx.writeText('a');\n}\n",
+    'spawn through a namespace import of bun',
+    `import * as bun from 'bun';
+
+export function buildThing(): void {
+  bun.spawn(['ls']);
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it calls `bun` from `bun`",
   ],
   [
-    "calls 'loadReport', whose verb may do I/O",
-    "import { loadReport } from './load-report.ts';\n\nexport function buildThing(): string {\n  return loadReport();\n}\n",
+    'a named import of the $ shell',
+    `import { $ } from 'bun';
+
+export function buildThing(): unknown {
+  return $\`ls\`;
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it runs a `$` shell command",
   ],
-])('it reports a no-I/O verb on a function that %s', async (reason, source) => {
+  [
+    'a call on the $ shell',
+    `import { $ } from 'bun';
+
+export function buildThing(): unknown {
+  return $.cwd('a');
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it runs a `$` shell command",
+  ],
+  [
+    'an aliased import of the $ shell',
+    `import { $ as shell } from 'bun';
+
+export function buildThing(): unknown {
+  return shell\`ls\`;
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it runs a `$` shell command",
+  ],
+  [
+    'a local alias of the $ shell',
+    `import { $ as shell } from 'bun';
+
+export function buildThing(): unknown {
+  const run = shell;
+
+  return run\`ls\`;
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it runs a `$` shell command",
+  ],
+  [
+    'the $ shell through a namespace import of bun',
+    `import * as bun from 'bun';
+
+export function buildThing(): unknown {
+  return bun.$\`ls\`;
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it runs a `$` shell command",
+  ],
+  [
+    'the $ shell through a default import of bun',
+    `import bun from 'bun';
+
+export function buildThing(): unknown {
+  return bun.$\`ls\`;
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it runs a `$` shell command",
+  ],
+  [
+    'Bun.$',
+    `export function buildThing(): unknown {
+  return Bun.$\`ls\`;
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it runs a `$` shell command",
+  ],
+  [
+    'the global fetch',
+    `export function buildThing(): unknown {
+  return fetch('https://a.test');
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it calls `fetch`",
+  ],
+  [
+    'a Kysely query',
+    `export function buildThing(db: { selectFrom(table: string): { execute(): unknown } }): unknown {
+  return db.selectFrom('users').execute();
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it runs a database query",
+  ],
+  [
+    'a read of process.env',
+    `export function buildThing(): string {
+  return process.env['HOME'] ?? '';
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it reads the environment",
+  ],
+  [
+    'a read of Bun.env',
+    `export function buildThing(): string {
+  return Bun.env['HOME'] ?? '';
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it reads the environment",
+  ],
+  [
+    'a local helper with an effectful verb',
+    `function readConfig(): string {
+  return '';
+}
+
+export function buildThing(): string {
+  return readConfig();
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it calls 'readConfig', whose verb may do I/O",
+  ],
+  [
+    'a local alias of a helper with an effectful verb',
+    `function readConfig(): string {
+  return '';
+}
+
+export function buildThing(): string {
+  const go = readConfig;
+
+  return go();
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it calls 'readConfig', whose verb may do I/O",
+  ],
+  [
+    'a parameter method with an effectful verb',
+    `export function buildThing(ctx: { writeText(text: string): void }): void {
+  ctx.writeText('a');
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it calls 'writeText', whose verb may do I/O",
+  ],
+  [
+    'a method on this with an effectful verb',
+    `export const logger = {
+  writeLine(): void {},
+  buildThing(): void {
+    this.writeLine();
+  },
+};
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it calls 'writeLine', whose verb may do I/O",
+  ],
+  [
+    'a relative import with an effectful verb',
+    `import { loadReport } from './load-report.ts';
+
+export function buildThing(): string {
+  return loadReport();
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it calls 'loadReport', whose verb may do I/O",
+  ],
+  [
+    'a returned named function expression that does I/O',
+    `import { readFileSync } from 'node:fs';
+
+export function makeReader(): () => string {
+  return function buildSource() {
+    return readFileSync('a', 'utf8');
+  };
+}
+`,
+    "'buildSource' starts with 'build', which promises no I/O, but it calls `readFileSync` from `node:fs`",
+  ],
+  [
+    'a predicate that declares a string',
+    `export function isReady(): string {
+  return 'yes';
+}
+`,
+    "'isReady' starts with 'is', which promises a boolean, but it declares another return type.",
+  ],
+  [
+    'a predicate that declares a local interface',
+    `interface State {
+  readonly ready: boolean;
+}
+
+export function isReady(state: State): State {
+  return state;
+}
+`,
+    "'isReady' starts with 'is', which promises a boolean, but it declares another return type.",
+  ],
+  [
+    'a pure boolean function with a free verb',
+    `export function matchesGlob(path: string): boolean {
+  return path.endsWith('.ts');
+}
+`,
+    "'matchesGlob' returns a boolean and does no I/O",
+  ],
+  [
+    'a pure function that declares a local boolean alias',
+    `type Flag = boolean;
+
+export function matchesReady(state: string): Flag {
+  return state === 'ready';
+}
+`,
+    "'matchesReady' returns a boolean and does no I/O",
+  ],
+  [
+    'a pure boolean concise arrow with a free verb',
+    `export const matchesSource = (path: string): boolean => path.endsWith('.ts');
+`,
+    "'matchesSource' returns a boolean and does no I/O",
+  ],
+  [
+    'a find that declares a number',
+    `export function findFirst(items: readonly number[]): number {
+  return items[0] ?? 0;
+}
+`,
+    "'findFirst' starts with 'find', which promises it can miss",
+  ],
+  [
+    'a find that declares a local interface',
+    `interface Entry {
+  readonly name: string;
+}
+
+export function findEntry(entries: readonly Entry[]): Entry {
+  return entries[0] ?? { name: '' };
+}
+`,
+    "'findEntry' starts with 'find', which promises it can miss",
+  ],
+  [
+    'a find that declares a local alias of a readonly array',
+    `interface Entry {
+  readonly name: string;
+}
+
+type Entries = readonly Entry[];
+
+export function findEntries(entries: Entries): Entries {
+  return entries;
+}
+`,
+    "'findEntries' starts with 'find', which promises it can miss",
+  ],
+  [
+    'a get that declares null',
+    `export function getFirst(items: readonly number[]): number | null {
+  return items[0] ?? null;
+}
+`,
+    "'getFirst' starts with 'get', which promises it cannot miss",
+  ],
+  [
+    'a get that declares a local alias holding undefined',
+    `type MaybeNumber = number | undefined;
+
+export function getFirst(items: readonly number[]): MaybeNumber {
+  return items[0];
+}
+`,
+    "'getFirst' starts with 'get', which promises it cannot miss",
+  ],
+  [
+    'an unannotated get that returns null',
+    `export function getEntry() {
+  return null;
+}
+`,
+    "'getEntry' starts with 'get', which promises it cannot miss",
+  ],
+  [
+    'an unannotated get that returns undefined',
+    `export function getFirst(items: readonly number[]) {
+  if (items.length === 0) {
+    return undefined;
+  }
+
+  return items[0];
+}
+`,
+    "'getFirst' starts with 'get', which promises it cannot miss",
+  ],
+  [
+    'an unannotated get with a bare return',
+    `export function getFirst(items: readonly number[]) {
+  if (items.length === 0) {
+    return;
+  }
+
+  return items[0];
+}
+`,
+    "'getFirst' starts with 'get', which promises it cannot miss",
+  ],
+  [
+    'a concise get arrow that returns null',
+    `export const getEntry = () => null;
+`,
+    "'getEntry' starts with 'get', which promises it cannot miss",
+  ],
+  [
+    'a concise get arrow that returns undefined',
+    `export const getEntry = () => undefined;
+`,
+    "'getEntry' starts with 'get', which promises it cannot miss",
+  ],
+])('it reports %s', async (_, source, message) => {
   const ctx = await setupTest();
   const result = await ctx.lint(source);
 
   expect(result.exitCode).toBe(1);
-
-  expect(result.stdout).toInclude(
-    `'buildThing' starts with 'build', which promises no I/O, but it ${reason}`,
-  );
-});
-
-test('it skips a callee imported from a third-party package', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.lint(
-    "import { readPackageUp } from 'read-package-up';\n\nexport function buildThing(): unknown {\n  return readPackageUp();\n}\n",
-  );
-
-  expect(result.exitCode).toBe(0);
-});
-
-test('it skips a bare built-in method on a parameter', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.lint(
-    [
-      'export function buildIndex(index: Map<string, number>, names: readonly string[]): number {',
-      '  for (const name of names) {',
-      '    index.set(name, name.length);',
-      '  }',
-      '',
-      '  return index.size;',
-      '}',
-      '',
-    ].join('\n'),
-  );
-
-  expect(result.exitCode).toBe(0);
-});
-
-test('it skips a bare built-in method name and a method on a value the function makes', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.lint(
-    [
-      'export function buildIndex(names: readonly string[]): Map<string, number> {',
-      '  const index = new Map<string, number>();',
-      '  const date = new Date(0);',
-      '',
-      '  date.setUTCDate(2);',
-      '',
-      '  for (const name of names) {',
-      '    index.set(name, date.getUTCDate());',
-      '  }',
-      '',
-      '  return index;',
-      '}',
-      '',
-    ].join('\n'),
-  );
-
-  expect(result.exitCode).toBe(0);
-});
-
-test('it accepts I/O behind a verb that may do I/O or a free verb', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.lint(
-    [
-      "import { readFileSync } from 'node:fs';",
-      '',
-      'export async function readConfig(): Promise<string> {',
-      "  return readFileSync('a', 'utf8');",
-      '}',
-      '',
-      'export function resolveConfigPath(): string {',
-      "  return process.env['CONFIG'] ?? readFileSync('b', 'utf8');",
-      '}',
-      '',
-    ].join('\n'),
-  );
-
-  expect(result.exitCode).toBe(0);
-});
-
-test('it counts I/O in a returned named function expression against that function', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.lint(
-    [
-      "import { readFileSync } from 'node:fs';",
-      '',
-      'export function buildReader(): () => string {',
-      '  return function readSource() {',
-      "    return readFileSync('a', 'utf8');",
-      '  };',
-      '}',
-      '',
-    ].join('\n'),
-  );
-
-  expect(result.exitCode).toBe(0);
-});
-
-test('it counts I/O against the named function that does it, not the one around it', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.lint(
-    [
-      "import { readFileSync } from 'node:fs';",
-      '',
-      'export function buildReader(): () => string {',
-      "  const readSource = () => readFileSync('a', 'utf8');",
-      '',
-      '  return readSource;',
-      '}',
-      '',
-    ].join('\n'),
-  );
-
-  expect(result.exitCode).toBe(0);
-});
-
-test('it reports a predicate verb that declares a non-boolean return type', async () => {
-  const ctx = await setupTest();
-  const result = await ctx.lint("export function isReady(): string {\n  return 'yes';\n}\n");
-
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stdout).toInclude(
-    "'isReady' starts with 'is', which promises a boolean, but it declares another return type.",
-  );
-});
-
-test('it accepts a boolean, a type predicate, and a probe that resolves to a boolean', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.lint(
-    [
-      'export function isEmpty(text: string): boolean {',
-      "  return text === '';",
-      '}',
-      '',
-      'export function isText(value: unknown): value is string {',
-      "  return typeof value === 'string';",
-      '}',
-      '',
-      'export async function probeFile(path: string): Promise<boolean> {',
-      '  return Bun.file(path).exists();',
-      '}',
-      '',
-    ].join('\n'),
-  );
-
-  expect(result.exitCode).toBe(0);
-});
-
-test('it reads a local boolean alias as a boolean in both predicate checks', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.lint(
-    [
-      'type Flag = boolean;',
-      '',
-      'export function isReady(state: string): Flag {',
-      "  return state === 'ready';",
-      '}',
-      '',
-      'export function matchesReady(state: string): Flag {',
-      "  return state === 'ready';",
-      '}',
-      '',
-    ].join('\n'),
-  );
-
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout).not.toInclude("'isReady'");
-  expect(result.stdout).toInclude("'matchesReady' returns a boolean and does no I/O");
-});
-
-test('it reports a boolean function with no predicate verb that does no I/O', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.lint(
-    "export function matchesGlob(path: string): boolean {\n  return path.endsWith('.ts');\n}\n",
-  );
-
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stdout).toInclude(
-    "'matchesGlob' returns a boolean and does no I/O — start its name with `is`, `has`, `can` or `should`.",
-  );
-});
-
-test('it skips the boolean check for an effectful verb, `try`, and a function that does I/O', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.lint(
-    [
-      "import { existsSync } from 'node:fs';",
-      '',
-      'export function removeEntry(entries: Set<string>, entry: string): boolean {',
-      '  return entries.delete(entry);',
-      '}',
-      '',
-      'export function tryLock(locks: Set<string>, name: string): boolean {',
-      '  return !locks.has(name);',
-      '}',
-      '',
-      'export function checkPath(path: string): boolean {',
-      '  return existsSync(path);',
-      '}',
-      '',
-    ].join('\n'),
-  );
-
-  expect(result.exitCode).toBe(0);
-});
-
-test('it reports a find whose local interface or alias holds no miss', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.lint(
-    [
-      'interface Entry {',
-      '  readonly name: string;',
-      '}',
-      '',
-      'type Entries = readonly Entry[];',
-      '',
-      'export function findEntry(entries: Entries): Entry {',
-      "  return entries[0] ?? { name: '' };",
-      '}',
-      '',
-      'export function findEntries(entries: Entries): Entries {',
-      '  return entries;',
-      '}',
-      '',
-    ].join('\n'),
-  );
-
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout).toInclude("'findEntry' starts with 'find', which promises it can miss");
-  expect(result.stdout).toInclude("'findEntries' starts with 'find', which promises it can miss");
-});
-
-test('it reports a find whose return type holds no miss', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.lint(
-    'export function findFirst(items: readonly number[]): number {\n  return items[0] ?? 0;\n}\n',
-  );
-
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stdout).toInclude(
-    "'findFirst' starts with 'find', which promises it can miss, but its return type holds no null or undefined",
-  );
-});
-
-test('it accepts a find that can return undefined, null, an open type, or an alias that holds a miss', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.lint(
-    [
-      'export function findFirst(items: readonly number[]): number | undefined {',
-      '  return items[0];',
-      '}',
-      '',
-      'export function findLast(items: readonly number[]): number | null {',
-      '  return items.at(-1) ?? null;',
-      '}',
-      '',
-      'export function findAny(items: readonly unknown[]): unknown {',
-      '  return items[0];',
-      '}',
-      '',
-      'type MaybeNumber = number | undefined;',
-      '',
-      'export function findSecond(items: readonly number[]): MaybeNumber {',
-      '  return items[1];',
-      '}',
-      '',
-      "import type { Entry } from './entry.ts';",
-      '',
-      'export function findEntry(entries: readonly Entry[]): Entry {',
-      '  return entries[0] as Entry;',
-      '}',
-      '',
-    ].join('\n'),
-  );
-
-  expect(result.exitCode).toBe(0);
+  expect(result.stdout).toInclude(message);
 });
 
 test.each([
   [
-    'declares null',
-    'export function getFirst(items: readonly number[]): number | null {\n  return items[0] ?? null;\n}\n',
+    'a callee imported from a package',
+    `import { readPackageUp } from 'read-package-up';
+
+export function buildThing(): unknown {
+  return readPackageUp();
+}
+`,
   ],
   [
-    'returns with no value',
-    'export function getFirst(items: readonly number[]) {\n  if (items.length === 0) {\n    return;\n  }\n\n  return items[0];\n}\n',
+    'a local alias of a callee imported from a package',
+    `import { readThing } from 'third-party';
+
+export function buildThing(): unknown {
+  const read = readThing;
+
+  return read();
+}
+`,
   ],
   [
-    'declares a local alias that holds undefined',
-    'type MaybeNumber = number | undefined;\n\nexport function getFirst(items: readonly number[]): MaybeNumber {\n  return items[0];\n}\n',
+    'a bare built-in method and a method on a value the function makes',
+    `export function buildIndex(names: readonly string[]): Map<string, number> {
+  const index = new Map<string, number>();
+  const date = new Date(0);
+
+  date.setUTCDate(2);
+
+  for (const name of names) {
+    index.set(name, date.getUTCDate());
+  }
+
+  return index;
+}
+`,
   ],
   [
-    'returns undefined',
-    'export function getFirst(items: readonly number[]) {\n  if (items.length === 0) {\n    return undefined;\n  }\n\n  return items[0];\n}\n',
+    'a bare built-in method on a parameter',
+    `export function buildIndex(index: Map<string, number>, names: readonly string[]): number {
+  for (const name of names) {
+    index.set(name, name.length);
+  }
+
+  return index.size;
+}
+`,
   ],
-])('it reports a get that %s', async (_, source) => {
+  [
+    'a parameter named $',
+    `export function buildThing($: (text: string) => string): string {
+  return $('a');
+}
+`,
+  ],
+  [
+    'a parameter named fs',
+    `export function buildThing(fs: { existsSync(path: string): boolean }): string {
+  return fs.existsSync('a') ? 'found' : 'missing';
+}
+`,
+  ],
+  [
+    'a parameter named fetch',
+    `export function buildThing(fetch: (url: string) => string): string {
+  return fetch('a');
+}
+`,
+  ],
+  [
+    'a parameter named process',
+    `export function buildThing(process: { env: Record<string, string> }): string {
+  return process.env['HOME'] ?? '';
+}
+`,
+  ],
+  [
+    'a local named Bun',
+    `export function buildThing(): number {
+  const Bun = { file: (path: string) => path.length };
+
+  return Bun.file('a');
+}
+`,
+  ],
+  [
+    'I/O behind a verb that may do I/O and behind a free verb',
+    `import { readFileSync } from 'node:fs';
+
+export async function readConfig(): Promise<string> {
+  return readFileSync('a', 'utf8');
+}
+
+export function resolveConfigPath(): string {
+  return process.env['CONFIG'] ?? readFileSync('b', 'utf8');
+}
+`,
+  ],
+  [
+    'I/O in a named inner function that the outer function only returns',
+    `import { readFileSync } from 'node:fs';
+
+export function buildReader(): () => string {
+  const readSource = () => readFileSync('a', 'utf8');
+
+  return readSource;
+}
+`,
+  ],
+  [
+    'I/O in a returned named function expression with an effectful name',
+    `import { readFileSync } from 'node:fs';
+
+export function buildReader(): () => string {
+  return function readSource() {
+    return readFileSync('a', 'utf8');
+  };
+}
+`,
+  ],
+  [
+    'predicates that declare a boolean, a type predicate, or a probe promise',
+    `export function isEmpty(text: string): boolean {
+  return text === '';
+}
+
+export function isText(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
+export async function probeFile(path: string): Promise<boolean> {
+  return Bun.file(path).exists();
+}
+`,
+  ],
+  [
+    'a predicate that declares a local boolean alias',
+    `type Flag = boolean;
+
+export function isReady(state: string): Flag {
+  return state === 'ready';
+}
+`,
+  ],
+  [
+    'predicates that declare an indexed access, an imported type, or a type parameter',
+    `import type { Ready } from './ready.ts';
+
+interface State {
+  readonly ready: boolean;
+}
+
+export function isReady(state: State): State['ready'] {
+  return state.ready;
+}
+
+export function isSettled(state: State): Ready {
+  return state.ready;
+}
+
+export function isFlag<T extends boolean>(flag: T): T {
+  return flag;
+}
+`,
+  ],
+  [
+    'boolean functions with an effectful verb, try, or I/O',
+    `import { existsSync } from 'node:fs';
+
+export function removeEntry(entries: Set<string>, entry: string): boolean {
+  return entries.delete(entry);
+}
+
+export function tryLock(locks: Set<string>, name: string): boolean {
+  return !locks.has(name);
+}
+
+export function checkPath(path: string): boolean {
+  return existsSync(path);
+}
+`,
+  ],
+  [
+    'boolean functions with a framework prefix',
+    `import { useContext } from 'react';
+import type { Context } from 'react';
+
+export function useReady(context: Context<boolean>): boolean {
+  return useContext(context);
+}
+
+export function onKeyDown(key: string): boolean {
+  return key === 'Enter';
+}
+
+export function handleKeyDown(key: string): boolean {
+  return key === 'Enter';
+}
+`,
+  ],
+  [
+    'finds that can miss or whose type the rule cannot see',
+    `import type { Entry } from './entry.ts';
+
+type MaybeNumber = number | undefined;
+
+export function findFirst(items: readonly number[]): number | undefined {
+  return items[0];
+}
+
+export function findLast(items: readonly number[]): number | null {
+  return items.at(-1) ?? null;
+}
+
+export function findAny(items: readonly unknown[]): unknown {
+  return items[0];
+}
+
+export function findSecond(items: readonly number[]): MaybeNumber {
+  return items[1];
+}
+
+export function findEntry(entries: readonly Entry[]): Entry {
+  return entries[0] as Entry;
+}
+
+export function findItem<T>(items: readonly T[]): T {
+  return items[0] as T;
+}
+
+export function findIndexed(entries: readonly Entry[]): (typeof entries)[number] {
+  return entries[0] as Entry;
+}
+`,
+  ],
+  [
+    'gets that cannot miss or whose type the rule cannot see',
+    `import type { Entry } from './entry.ts';
+
+export function getSlots(count: number): null[] {
+  return Array.from({ length: count }, () => null);
+}
+
+export function getEntry(entries: readonly Entry[]): Entry {
+  return entries[0] as Entry;
+}
+
+export function getItem<T>(items: readonly T[]): T {
+  return items[0] as T;
+}
+
+export const getName = (entry: { name: string }): string => entry.name;
+`,
+  ],
+])('it accepts %s', async (_, source) => {
   const ctx = await setupTest();
   const result = await ctx.lint(source);
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stdout).toInclude(
-    "'getFirst' starts with 'get', which promises it cannot miss, but it can return null or undefined",
-  );
-});
-
-test('it reports an unannotated get that returns null', async () => {
-  const ctx = await setupTest();
-  const result = await ctx.lint('export function getEntry() {\n  return null;\n}\n');
-
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stdout).toInclude(
-    "'getEntry' starts with 'get', which promises it cannot miss, but it can return null or undefined",
-  );
-});
-
-test('it accepts a get whose callback returns null', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.lint(
-    [
-      'export function getSlots(count: number): null[] {',
-      '  return Array.from({ length: count }, () => null);',
-      '}',
-      '',
-    ].join('\n'),
-  );
-
+  expect(result.stdout).toBeEmpty();
   expect(result.exitCode).toBe(0);
 });
 

@@ -146,9 +146,12 @@ no I/O. A pure function stays pure all the way down: a `build` function that cal
 does I/O. verb-contract skips a callee from a package, so a pure function that calls a package's
 I/O, or a local helper whose name hides its I/O, passes lint and still breaks the rule.
 
-A function that returns a boolean and does no I/O starts with `is`, `has`, `can` or `should`. One
-exception: a function with an effectful verb, such as `removeFile` or `tryLock`, may return a
-success flag.
+A function that returns a boolean and does no I/O starts with `is`, `has`, `can` or `should`. Two
+exceptions:
+
+- A function with an effectful verb, such as `removeFile` or `tryLock`, may return a success flag.
+- A framework prefix wins: a React hook that returns a boolean keeps `use`, and a callback keeps
+  `on` or `handle`.
 
 ### Data or resource
 

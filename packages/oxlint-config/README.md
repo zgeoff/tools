@@ -66,24 +66,27 @@ reads declared return types, since it runs without type information. It runs thr
 
 - **No I/O behind a no-I/O verb.** A function named with `is`, `has`, `can`, `should`, `build`,
   `parse`, `format`, `render`, `pick`, `find`, `get`, `collect` or `to` must not be async or await.
-  It must not call `fs`, `child_process`, `Bun.spawn`, `Bun.file`, `Bun.write`, the `$` shell,
-  `fetch` or a Kysely `execute`, and must not read `process.env` or `Bun.env`. It must not call a
-  function whose verb is on the rule's effectful list, such as `readConfig` or `ctx.writeText`. That
-  check skips a callee imported from a package, a global, a bare method name such as `map.set`, and
-  a method on a value the function declares itself. I/O inside an unnamed callback counts against
-  the named function around it. A local alias of an I/O source, such as
-  `const read = fs.readFileSync` or `const { spawn } = Bun`, counts as that source.
+  It must not call `fs`, `child_process`, `Bun.spawn`, `Bun.file`, `Bun.write`, Bun's `$` shell
+  under any import form, `fetch` or a Kysely `execute`, and must not read `process.env` or
+  `Bun.env`. It must not call a function whose verb is on the rule's effectful list, such as
+  `readConfig` or `ctx.writeText`. That check skips a callee imported from a package, a global, a
+  bare method name such as `map.set`, and a method on a value the function declares itself. I/O
+  inside an unnamed callback counts against the named function around it. A local alias of an I/O
+  source, such as `const read = fs.readFileSync` or `const { spawn } = Bun`, counts as that source,
+  and a local alias of a package's callee is skipped as the callee is.
 - **Predicates return a boolean.** A function named with `is`, `has`, `can`, `should` or `probe`
   that declares a return type declares `boolean`, a type predicate, or a promise of one. A function
   that declares `boolean` and does no I/O starts with one of the four no-I/O predicate verbs. That
-  check skips an effectful verb or `try`, whose function may return a success flag.
+  check skips an effectful verb or `try`, whose function may return a success flag, and the
+  framework prefixes `use`, `on` and `handle`.
 - **`find` can miss, and `get` cannot.** A declared `find` return type holds `null`, `undefined`,
   `void`, `unknown` or `any`. A `get` function neither declares `null` or `undefined` nor returns
   either one as a literal or a bare `return`. Every check follows the file's own type aliases, and a
-  type the rule cannot see, such as an import, never fails a check.
+  type the rule cannot see, such as an import, a type parameter or an indexed access, never fails a
+  check.
 
 A test in this package reads the role table in the shared code-style skill and fails when the
-skill's no-I/O verbs differ from the rule's.
+skill's no-I/O verbs and the rule's differ in either direction.
 
 ## `zgeoff/no-jsdoc` and `zgeoff/max-consecutive-line-comments`
 
