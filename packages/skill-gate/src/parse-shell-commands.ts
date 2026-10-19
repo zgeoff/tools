@@ -1,3 +1,4 @@
+import { match } from 'ts-pattern';
 import type { ShellCommand, ShellRedirect, ShellWord } from './types.ts';
 
 // Parses a Bash command line into its simple commands, or null on an unclosed quote. A word with a
@@ -362,50 +363,58 @@ function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellComman
     }
   };
 
-  for (const token of tokens) {
-    if (token.kind === 'separator') {
-      collectDraft(token.operator);
-    } else if (token.kind === 'subshell') {
-      collectDraft(null);
+  const collectToken = (token: ShellToken): void => {
+    match(token)
+      .with({ kind: 'separator' }, (separator) => {
+        collectDraft(separator.operator);
+      })
+      .with({ kind: 'subshell' }, (subshell) => {
+        collectDraft(null);
 
-      const last = commands.at(-1);
+        const last = commands.at(-1);
 
-      if (token.opens) {
-        draft.enters += 1;
+        if (subshell.opens) {
+          draft.enters += 1;
 
-        listStarts.push(commands.length);
-      } else {
-        listStarts.pop();
+          listStarts.push(commands.length);
+        } else {
+          listStarts.pop();
 
-        if (last !== undefined) {
-          last.leaves += 1;
+          if (last !== undefined) {
+            last.leaves += 1;
+          }
         }
-      }
-    } else if (token.kind === 'heredoc') {
-      // A here document's body belongs to the command whose `<<` asked for it, which a pipe may
-      // already have closed.
-      const owner = heredocOwners.shift();
+      })
+      .with({ kind: 'heredoc' }, (heredoc) => {
+        // A here document's body belongs to the command whose `<<` asked for it, which a pipe may
+        // already have closed.
+        const owner = heredocOwners.shift();
 
-      if (owner !== undefined) {
-        owner.stdin = token.body;
-      }
-    } else if (token.kind === 'redirect') {
-      operator = token.operator;
+        if (owner !== undefined) {
+          owner.stdin = heredoc.body;
+        }
+      })
+      .with({ kind: 'redirect' }, (redirect) => {
+        operator = redirect.operator;
 
-      if (operator === '<<' || operator === '<<-') {
-        heredocOwners.push(draft);
-      }
-    } else if (token.kind === 'word') {
-      if (operator === null) {
-        draft.words.push(token.word);
-      } else {
-        draft.redirects.push({ operator, target: token.word });
+        if (operator === '<<' || operator === '<<-') {
+          heredocOwners.push(draft);
+        }
+      })
+      .with({ kind: 'word' }, (word) => {
+        if (operator === null) {
+          draft.words.push(word.word);
+        } else {
+          draft.redirects.push({ operator, target: word.word });
 
-        operator = null;
-      }
-    } else {
-      assertNever(token);
-    }
+          operator = null;
+        }
+      })
+      .exhaustive();
+  };
+
+  for (const token of tokens) {
+    collectToken(token);
   }
 
   collectDraft(null);
@@ -417,10 +426,4 @@ const LIST_ENDS = new Set(['&', ';', ';;', '\n']);
 
 function buildCommandDraft(): CommandDraft {
   return { words: [], redirects: [], stdin: null, enters: 0, leaves: 0 };
-}
-
-// The synced hook runs without npm dependencies, so a `never` check stands in for ts-pattern's
-// exhaustive match: a new token kind fails the type check here.
-function assertNever(token: never): never {
-  throw new Error(`skill-gate: unknown shell token ${JSON.stringify(token)}`);
 }
