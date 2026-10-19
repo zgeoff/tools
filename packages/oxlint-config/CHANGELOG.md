@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.4.0...@zgeoff/oxlint-config@0.5.0) (2026-10-19)
+
+### ⚠ BREAKING CHANGES
+
+- **geo-1434:** the shared config turns zgeoff/module-order on as an error, so a repo that bumps the
+  package fails lint until it runs oxlint --fix and moves the rest by hand.
+
+### Features
+
+- **geo-1434:** enforce the code-style module order with zgeoff/module-order
+  ([#222](https://github.com/zgeoff/tools/issues/222))
+  ([a10caf0](https://github.com/zgeoff/tools/commit/a10caf0879440c16bbc2e6113ef5e8d6f76a53df))
+
 ## [0.4.0](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.3.0...@zgeoff/oxlint-config@0.4.0) (2026-10-19)
 
 ### ⚠ BREAKING CHANGES
