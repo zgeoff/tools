@@ -22,10 +22,10 @@ const noClass = {
 };
 
 function isCustomError(node) {
-  return getSuperName(node.superClass).endsWith('Error');
+  return findSuperclassName(node.superClass)?.endsWith('Error') ?? false;
 }
 
-function getSuperName(superClass) {
+function findSuperclassName(superClass) {
   if (superClass?.type === 'Identifier') {
     return superClass.name;
   }
@@ -34,7 +34,7 @@ function getSuperName(superClass) {
     return superClass.property.name;
   }
 
-  return '';
+  return null;
 }
 
 export default noClass;

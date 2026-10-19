@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { setImmediate } from 'node:timers/promises';
 import { CompiledQuery } from 'kysely';
-import { buildBunSQLiteDriver } from './bun-sqlite-driver.ts';
+import { buildBunSQLiteDriver } from './build-bun-sqlite-driver.ts';
 
 function setupTest() {
   const sqlite = new Database(':memory:');
