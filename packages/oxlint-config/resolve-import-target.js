@@ -19,31 +19,33 @@ export default function resolveImportTarget(filename, specifier, settings) {
 }
 
 function resolveManifestTarget(manifest, specifier, settings) {
-  const name = manifest?.name;
-
-  if (specifier.startsWith('#')) {
-    const mapped = findMappedTarget(manifest?.imports, specifier, settings.conditions);
-
-    return mapped !== null && !isPathSpecifier(mapped)
-      ? resolveBareTarget(settings.workspaces, mapped)
-      : toMappedTarget(manifest, mapped);
+  if (!specifier.startsWith('#')) {
+    return resolveBareTarget(manifest, specifier, settings);
   }
 
-  if (isPackageSpecifier(name, specifier) && !isBuiltin(specifier)) {
+  const mapped = findMappedTarget(manifest?.imports, specifier, settings.conditions);
+
+  return mapped !== null && !isPathSpecifier(mapped)
+    ? resolveBareTarget(manifest, mapped, settings)
+    : toMappedTarget(manifest, mapped);
+}
+
+// a builtin keeps its name even when a package shares it
+function resolveBareTarget(manifest, specifier, settings) {
+  const name = manifest?.name;
+
+  if (isBuiltin(specifier)) {
+    return { kind: 'module', specifier };
+  }
+
+  if (isPackageSpecifier(name, specifier)) {
     const subpath = `.${specifier.slice(name.length)}`;
     const mapped = findMappedTarget(toSubpathMap(manifest.exports), subpath, settings.conditions);
 
     return { ...toMappedTarget(manifest, mapped), self: true };
   }
 
-  return resolveBareTarget(settings.workspaces, specifier);
-}
-
-// a builtin keeps its name even when a package shares it
-function resolveBareTarget(workspaces, specifier) {
-  return isBuiltin(specifier)
-    ? { kind: 'module', specifier }
-    : resolveWorkspaceTarget(workspaces, specifier);
+  return resolveWorkspaceTarget(settings.workspaces, specifier);
 }
 
 function isPackageSpecifier(name, specifier) {
@@ -66,7 +68,6 @@ function resolveWorkspaceTarget(workspaces, specifier) {
     : { kind: 'missing' };
 }
 
-// the exact key, else the pattern key node picks, unless its value is null;
 // with no exports map, every subpath is public, and an empty one exports none
 function isExportedSubpath(exports, subpath) {
   if (exports === undefined) {

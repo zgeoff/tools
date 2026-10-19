@@ -1672,6 +1672,34 @@ test('it flags an import of the file’s own package by name, and accepts a rela
   expect(byPath.exitCode).toBe(0);
 });
 
+test('it flags a # import that maps to the file’s own package name', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { core: ['src/**'] },
+        selfImports: [{ name: 'self', from: ['core'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'package.json': JSON.stringify({
+      name: '@demo/store',
+      exports: { '.': './src/index.ts' },
+      imports: { '#self': '@demo/store' },
+    }),
+    'src/index.ts': 'export const store = 1;\n',
+    'src/run.ts': "import { store } from '#self';\n\nexport const all = [store];\n",
+  };
+
+  const result = await runLintTree(files, 'src/run.ts', rules);
+
+  expect(result.stdout).toInclude(
+    'self: #self names the package this file belongs to; import it by a relative path',
+  );
+});
+
 test('it reports an own-package subpath the exports omit as a self-import and unresolved', async () => {
   const rules = {
     'zgeoff/import-zones': [
