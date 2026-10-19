@@ -20,10 +20,12 @@ async function setupTest() {
   const unpacked = join(dir, 'unpacked');
   const packed = join(dir, 'packed');
   const project = join(dir, 'project');
+  const stdPacked = join(dir, 'std-packed');
 
   await Promise.all([
     mkdir(unpacked),
     mkdir(packed),
+    mkdir(stdPacked),
     mkdir(join(project, '.claude/hooks/skill-gate'), { recursive: true }),
   ]);
 
@@ -58,12 +60,27 @@ async function setupTest() {
 
   invariant(tarball !== undefined && extra.length === 0, 'bun pm pack must write one tarball');
 
+  // A release PR bumps std before npm has the new version, so std installs from its own tarball.
+  // The shipped declarations never import std, so its source pack needs no build.
+  await $`bun pm pack --ignore-scripts --destination ${stdPacked}`
+    .cwd(join(import.meta.dir, '../std'))
+    .env(env)
+    .quiet();
+
+  const [stdTarball, ...stdExtra] = await readdir(stdPacked);
+
+  invariant(
+    stdTarball !== undefined && stdExtra.length === 0,
+    'bun pm pack must write one tarball',
+  );
+
   await writeFile(
     join(project, 'package.json'),
     JSON.stringify({
       name: 'project',
       private: true,
       devDependencies: { '@zgeoff/skill-gate': `file:${join(packed, tarball)}` },
+      overrides: { '@zgeoff/std': `file:${join(stdPacked, stdTarball)}` },
     }),
   );
 
