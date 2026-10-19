@@ -54,7 +54,7 @@ docs-writing's `check-length.sh` runs it.
 - Build objects with a factory function, never a class. The factory takes the verb its result needs:
   `build<X>` for a value, `create<X>` for a resource, and `make<X>` for a function. The one
   exception is a custom error, `class <X>Error extends Error`, since `instanceof` checks and stack
-  traces need it.
+  traces need it. `zgeoff/no-class` fails any other class.
 
 ## Acronyms
 

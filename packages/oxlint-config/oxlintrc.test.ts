@@ -57,6 +57,13 @@ test('it reports a module-level helper in a test file', async () => {
   expect(stdout).toInclude('zgeoff(setup-test-only)');
 });
 
+test.each(['kettle.ts', 'kettle.test.ts'])('it reports a class in %s', async (fileName) => {
+  const ctx = await setupTest(fileName, 'export class Kettle {}\n');
+  const stdout = await runLint(ctx.dir, fileName);
+
+  expect(stdout).toInclude('zgeoff(no-class)');
+});
+
 test('it reports a switch and names ts-pattern', async () => {
   const source =
     "export function readTone(tone: 'warm' | 'cool'): number {\n  switch (tone) {\n    case 'warm': {\n      return 1;\n    }\n    default: {\n      return 2;\n    }\n  }\n}\n";

@@ -11,8 +11,8 @@ the shared agent guidelines, `zgeoff/test-beside-module` keeps each test file be
 tests, `zgeoff/import-zones` fails an import that crosses a module boundary the repo declares,
 `zgeoff/no-restricted-words` keeps the words in its `words` option out of a path's text,
 `zgeoff/no-abbreviated-names` reports each abbreviated value name it lists with its full word,
-`zgeoff/no-file-snapshot` bans file snapshots, and `zgeoff/setup-test-only` keeps a test file's
-module level to `setupTest()` and its tests.
+`zgeoff/no-file-snapshot` bans file snapshots, `zgeoff/setup-test-only` keeps a test file's module
+level to `setupTest()` and its tests, and `zgeoff/no-class` bans every class but a custom error.
 
 ## Usage
 
@@ -156,6 +156,15 @@ Snapshots are inline only, so the golden value sits in the test that pins it. Th
 linted file that has a `__snapshots__/<file name>.snap` beside it, at the first statement, so a
 file-level disable comment covers it. oxlint never visits a `.snap` file, so a snapshot file whose
 test file is gone is not reported.
+
+## `zgeoff/no-class`
+
+Objects come from factory functions, as the code-style skill requires, so the rule reports every
+class declaration and class expression, in test files too. A custom error stays a class, because
+`instanceof` checks and stack traces need one. The rule counts a class as a custom error when its
+`extends` clause holds `Error` or another name that ends in `Error`, bare or as a member such as
+`errors.BrewError`. It does not check the name of the class itself, and it reports a superclass
+reached through a computed member, such as `errors['BrewError']`.
 
 ## `zgeoff/import-zones`
 
