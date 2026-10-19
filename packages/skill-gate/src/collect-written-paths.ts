@@ -120,6 +120,7 @@ const INTERPRETERS = new Set(['python', 'python3', 'node', 'bun', 'deno', 'ruby'
 // Python, Ruby and Perl start a comment with `#`, where JavaScript has `//`, and Python's `//` is
 // floor division.
 const JS_RUNTIMES = new Set(['node', 'bun', 'deno']);
+const SED_SCRIPT_FLAGS = new Set(['e', 'f']);
 
 function collectProgramPaths(
   name: string,
@@ -160,8 +161,6 @@ function collectProgramPaths(
 
   return [];
 }
-
-const SED_SCRIPT_FLAGS = new Set(['e', 'f']);
 
 // Collects the files that `sed -i` or `perl -i` rewrites: every operand after the script, or every
 // operand when an `-e` or `-f` flag gives the script. Without `-i` (or `--in-place`), it writes
@@ -247,87 +246,6 @@ function collectPerlPaths(
   const script = findInlineScript(args, stdin);
 
   return script === null ? [] : collectScriptPaths(script, '#', dir);
-}
-
-function collectOperands(args: readonly ShellWord[]): readonly ShellWord[] {
-  return args.filter((arg) => !arg.text.startsWith('-'));
-}
-
-// Collects where `cp` or `mv` writes: into the `-t` directory, into the destination when several
-// sources or a trailing slash make it a directory, and otherwise onto the destination, or into it
-// when it turns out to be a directory.
-function collectCopyPaths(args: readonly ShellWord[], dir: string | null): WrittenPath[] {
-  const operands: ShellWord[] = [];
-  let targetDir: ShellWord | undefined;
-  let optionsEnded = false;
-
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
-
-    if (arg === undefined) {
-      break;
-    }
-
-    if (optionsEnded || !arg.text.startsWith('-') || arg.text === '-') {
-      operands.push(arg);
-    } else if (arg.text === '--') {
-      optionsEnded = true;
-    } else if (arg.text.startsWith('--target-directory=')) {
-      targetDir = { ...arg, text: arg.text.slice('--target-directory='.length) };
-    } else if (arg.text === '--target-directory' || /^-[^-]*t$/u.test(arg.text)) {
-      targetDir = args[index + 1];
-      index += 1;
-    } else if (arg.text === '-S' || arg.text === '--suffix') {
-      index += 1;
-    }
-  }
-
-  if (targetDir !== undefined) {
-    return collectIntoDirPaths(targetDir, operands, dir);
-  }
-
-  const destination = operands.at(-1);
-  const sources = operands.slice(0, -1);
-  const [source] = sources;
-
-  if (destination === undefined || source === undefined) {
-    return [];
-  }
-
-  if (sources.length > 1 || destination.text.endsWith('/')) {
-    return collectIntoDirPaths(destination, sources, dir);
-  }
-
-  const fileName = source.literal ? path.basename(source.text) : undefined;
-
-  return resolveWordPath(destination, dir).map((written) =>
-    fileName === undefined ? written : { path: written.path, fileName },
-  );
-}
-
-function collectIntoDirPaths(
-  target: ShellWord,
-  sources: readonly ShellWord[],
-  dir: string | null,
-): WrittenPath[] {
-  return resolveWordPath(target, dir).flatMap((written) =>
-    sources
-      .filter((source) => source.literal)
-      .map((source) => ({ path: path.join(written.path, path.basename(source.text)) })),
-  );
-}
-
-// Finds the script a shell runs: the operand after `-c`, or the here document when the shell has
-// no script file.
-function findShellScript(args: readonly ShellWord[], stdin: string | null): string | null {
-  const hasCommandFlag = args.some((arg) => /^-[A-Za-z]*c[A-Za-z]*$/u.test(arg.text));
-  const [script] = collectOperands(args);
-
-  if (hasCommandFlag) {
-    return script?.literal === true ? script.text : null;
-  }
-
-  return script === undefined ? stdin : null;
 }
 
 const INLINE_FLAGS = new Set(['-c', '-e', '-E', '--eval', '-p', '--print', 'eval']);
@@ -428,6 +346,87 @@ function getQuoteEndOrScriptEnd(script: string, start: number): number {
   }
 
   return Math.min(index + 1, script.length);
+}
+
+function collectOperands(args: readonly ShellWord[]): readonly ShellWord[] {
+  return args.filter((arg) => !arg.text.startsWith('-'));
+}
+
+// Collects where `cp` or `mv` writes: into the `-t` directory, into the destination when several
+// sources or a trailing slash make it a directory, and otherwise onto the destination, or into it
+// when it turns out to be a directory.
+function collectCopyPaths(args: readonly ShellWord[], dir: string | null): WrittenPath[] {
+  const operands: ShellWord[] = [];
+  let targetDir: ShellWord | undefined;
+  let optionsEnded = false;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+
+    if (arg === undefined) {
+      break;
+    }
+
+    if (optionsEnded || !arg.text.startsWith('-') || arg.text === '-') {
+      operands.push(arg);
+    } else if (arg.text === '--') {
+      optionsEnded = true;
+    } else if (arg.text.startsWith('--target-directory=')) {
+      targetDir = { ...arg, text: arg.text.slice('--target-directory='.length) };
+    } else if (arg.text === '--target-directory' || /^-[^-]*t$/u.test(arg.text)) {
+      targetDir = args[index + 1];
+      index += 1;
+    } else if (arg.text === '-S' || arg.text === '--suffix') {
+      index += 1;
+    }
+  }
+
+  if (targetDir !== undefined) {
+    return collectIntoDirPaths(targetDir, operands, dir);
+  }
+
+  const destination = operands.at(-1);
+  const sources = operands.slice(0, -1);
+  const [source] = sources;
+
+  if (destination === undefined || source === undefined) {
+    return [];
+  }
+
+  if (sources.length > 1 || destination.text.endsWith('/')) {
+    return collectIntoDirPaths(destination, sources, dir);
+  }
+
+  const fileName = source.literal ? path.basename(source.text) : undefined;
+
+  return resolveWordPath(destination, dir).map((written) =>
+    fileName === undefined ? written : { path: written.path, fileName },
+  );
+}
+
+function collectIntoDirPaths(
+  target: ShellWord,
+  sources: readonly ShellWord[],
+  dir: string | null,
+): WrittenPath[] {
+  return resolveWordPath(target, dir).flatMap((written) =>
+    sources
+      .filter((source) => source.literal)
+      .map((source) => ({ path: path.join(written.path, path.basename(source.text)) })),
+  );
+}
+
+// Finds the script a shell runs: the operand after `-c`, or the here document when the shell has
+// no script file.
+function findShellScript(args: readonly ShellWord[], stdin: string | null): string | null {
+  const hasCommandFlag = args.some((arg) => /^-[A-Za-z]*c[A-Za-z]*$/u.test(arg.text));
+  const [script] = collectOperands(args);
+
+  if (hasCommandFlag) {
+    return script?.literal === true ? script.text : null;
+  }
+
+  return script === undefined ? stdin : null;
 }
 
 function resolveNextDir(command: ShellCommand, dir: string | null): string | null {

@@ -9,24 +9,9 @@ export function buildUnifiedDiff(before: string, after: string, label: string): 
   return [`--- ${label}\n`, `+++ ${label}\n`, ...hunks.map((h) => renderHunk(h))].join('');
 }
 
-function splitLines(s: string): string[] {
-  const lines = s.split('\n');
-
-  if (lines.at(-1) === '') {
-    lines.pop();
-  }
-
-  return lines;
-}
-
 interface DiffOp {
   readonly kind: ' ' | '-' | '+';
   readonly text: string;
-}
-
-interface Position {
-  readonly x: number;
-  readonly y: number;
 }
 
 interface LinePair {
@@ -34,66 +19,18 @@ interface LinePair {
   readonly after: readonly string[];
 }
 
-// Myers' diff: each round of edit depth records, per diagonal, the furthest x
-// it reaches; the trace of rounds then backtracks into the operations
-type FurthestX = Map<number, number>;
-
 function buildDiffOps(lines: LinePair): DiffOp[] {
   return backtrack(lines, buildTrace(lines));
 }
 
-function buildTrace(lines: LinePair): FurthestX[] {
-  const furthestX: FurthestX = new Map([[1, 0]]);
-
-  const trace: FurthestX[] = [];
-
-  for (let depth = 0; depth <= lines.before.length + lines.after.length; depth++) {
-    trace.push(new Map(furthestX));
-
-    if (stepRound(lines, furthestX, depth)) {
-      break;
-    }
-  }
-
-  return trace;
+interface Position {
+  readonly x: number;
+  readonly y: number;
 }
 
-// oxlint-disable-next-line zgeoff/verb-contract -- Myers-native vocabulary; the flag ends the search
-function stepRound(lines: LinePair, furthestX: FurthestX, depth: number): boolean {
-  for (let diagonal = -depth; diagonal <= depth; diagonal += 2) {
-    const x = slideDiagonal(lines, pickX(furthestX, diagonal, depth), diagonal);
-
-    furthestX.set(diagonal, x);
-
-    if (x >= lines.before.length && x - diagonal >= lines.after.length) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-function pickX(furthestX: FurthestX, diagonal: number, depth: number): number {
-  const below = furthestX.get(diagonal - 1) ?? 0;
-  const above = furthestX.get(diagonal + 1) ?? 0;
-  const moveDown = diagonal === -depth || (diagonal !== depth && below < above);
-
-  return moveDown ? above : below + 1;
-}
-
-function slideDiagonal(lines: LinePair, x: number, diagonal: number): number {
-  let endX = x;
-
-  while (
-    endX < lines.before.length &&
-    endX - diagonal < lines.after.length &&
-    lines.before[endX] === lines.after[endX - diagonal]
-  ) {
-    endX++;
-  }
-
-  return endX;
-}
+// Myers' diff: each round of edit depth records, per diagonal, the furthest x
+// it reaches; the trace of rounds then backtracks into the operations
+type FurthestX = Map<number, number>;
 
 function backtrack(lines: LinePair, trace: readonly FurthestX[]): DiffOp[] {
   const operations: DiffOp[] = [];
@@ -171,9 +108,67 @@ function buildEqualOps(lines: LinePair, position: Position, previous: Position):
   return operations;
 }
 
-interface Window {
-  readonly from: number;
-  readonly to: number;
+function buildTrace(lines: LinePair): FurthestX[] {
+  const furthestX: FurthestX = new Map([[1, 0]]);
+
+  const trace: FurthestX[] = [];
+
+  for (let depth = 0; depth <= lines.before.length + lines.after.length; depth++) {
+    trace.push(new Map(furthestX));
+
+    if (stepRound(lines, furthestX, depth)) {
+      break;
+    }
+  }
+
+  return trace;
+}
+
+// oxlint-disable-next-line zgeoff/verb-contract -- Myers-native vocabulary; the flag ends the search
+function stepRound(lines: LinePair, furthestX: FurthestX, depth: number): boolean {
+  for (let diagonal = -depth; diagonal <= depth; diagonal += 2) {
+    const x = slideDiagonal(lines, pickX(furthestX, diagonal, depth), diagonal);
+
+    furthestX.set(diagonal, x);
+
+    if (x >= lines.before.length && x - diagonal >= lines.after.length) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function slideDiagonal(lines: LinePair, x: number, diagonal: number): number {
+  let endX = x;
+
+  while (
+    endX < lines.before.length &&
+    endX - diagonal < lines.after.length &&
+    lines.before[endX] === lines.after[endX - diagonal]
+  ) {
+    endX++;
+  }
+
+  return endX;
+}
+
+function pickX(furthestX: FurthestX, diagonal: number, depth: number): number {
+  const below = furthestX.get(diagonal - 1) ?? 0;
+  const above = furthestX.get(diagonal + 1) ?? 0;
+  const moveDown = diagonal === -depth || (diagonal !== depth && below < above);
+
+  return moveDown ? above : below + 1;
+}
+
+function splitLines(s: string): string[] {
+  const lines = s.split('\n');
+
+  if (lines.at(-1) === '') {
+    lines.pop();
+  }
+
+  return lines;
 }
 
 interface Hunk {
@@ -186,6 +181,11 @@ function buildHunks(ops: readonly DiffOp[]): Hunk[] {
 }
 
 const CONTEXT_LINES = 3;
+
+interface Window {
+  readonly from: number;
+  readonly to: number;
+}
 
 function buildWindows(ops: readonly DiffOp[]): Window[] {
   const windows: Window[] = [];

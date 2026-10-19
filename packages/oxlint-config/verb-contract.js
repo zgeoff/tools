@@ -108,6 +108,13 @@ const verbContract = {
 
 export default verbContract;
 
+function isNullishLiteral(node) {
+  return (
+    (node.type === 'Literal' && node.raw === 'null') ||
+    (node.type === 'Identifier' && node.name === 'undefined')
+  );
+}
+
 // the role table's verbs that promise no I/O
 const pureVerbs = [
   'is',
@@ -212,8 +219,36 @@ function findVerb(name, verbs) {
   return verbs.find((verb) => isVerbMatch(name, verb)) ?? null;
 }
 
-function isBooleanOrOpen(kinds) {
-  return kinds.every((kind) => kind === 'boolean' || kind === 'open');
+const localTypesByProgram = new WeakMap();
+
+function collectLocalTypes(program) {
+  const cached = localTypesByProgram.get(program);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const localTypes = { aliases: new Map(), interfaces: new Set() };
+
+  for (const statement of program.body) {
+    const declaration =
+      statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+
+    if (
+      declaration?.type === 'TSTypeAliasDeclaration' &&
+      (declaration.typeParameters ?? null) === null
+    ) {
+      localTypes.aliases.set(declaration.id.name, declaration.typeAnnotation);
+    }
+
+    if (declaration?.type === 'TSInterfaceDeclaration') {
+      localTypes.interfaces.add(declaration.id.name);
+    }
+  }
+
+  localTypesByProgram.set(program, localTypes);
+
+  return localTypes;
 }
 
 // the kind of each member of a declared type, read without type information:
@@ -301,43 +336,8 @@ function pickTypeKind(type) {
   return 'open';
 }
 
-const localTypesByProgram = new WeakMap();
-
-function collectLocalTypes(program) {
-  const cached = localTypesByProgram.get(program);
-
-  if (cached !== undefined) {
-    return cached;
-  }
-
-  const localTypes = { aliases: new Map(), interfaces: new Set() };
-
-  for (const statement of program.body) {
-    const declaration =
-      statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
-
-    if (
-      declaration?.type === 'TSTypeAliasDeclaration' &&
-      (declaration.typeParameters ?? null) === null
-    ) {
-      localTypes.aliases.set(declaration.id.name, declaration.typeAnnotation);
-    }
-
-    if (declaration?.type === 'TSInterfaceDeclaration') {
-      localTypes.interfaces.add(declaration.id.name);
-    }
-  }
-
-  localTypesByProgram.set(program, localTypes);
-
-  return localTypes;
-}
-
-function isNullishLiteral(node) {
-  return (
-    (node.type === 'Literal' && node.raw === 'null') ||
-    (node.type === 'Identifier' && node.name === 'undefined')
-  );
+function isBooleanOrOpen(kinds) {
+  return kinds.every((kind) => kind === 'boolean' || kind === 'open');
 }
 
 const kyselyRunMethods = new Set(['execute', 'executeTakeFirst', 'executeTakeFirstOrThrow']);
@@ -396,6 +396,40 @@ function findCallIO(context, node, frameNode) {
   });
 
   return effectful === undefined ? null : `calls '${effectful.name}', whose verb may do I/O`;
+}
+
+function findRootName(node) {
+  let current = node;
+
+  while (current.type === 'MemberExpression' || current.type === 'CallExpression') {
+    current = current.type === 'MemberExpression' ? current.object : current.callee;
+  }
+
+  if (current.type === 'ThisExpression') {
+    return 'this';
+  }
+
+  return current.type === 'Identifier' ? current.name : null;
+}
+
+function findMemberName(member) {
+  return !member.computed && member.property.type === 'Identifier' ? member.property.name : null;
+}
+
+function findBinding(context, node, name) {
+  let scope = context.sourceCode.getScope(node);
+
+  while (scope !== null) {
+    const variable = scope.set.get(name);
+
+    if (variable !== undefined && variable.defs.length > 0) {
+      return variable;
+    }
+
+    scope = scope.upper;
+  }
+
+  return null;
 }
 
 // the source a call reaches: its root binding and the member taken straight
@@ -477,8 +511,14 @@ function findKeyName(property) {
   return !property.computed && property.key.type === 'Identifier' ? property.key.name : null;
 }
 
-function isBunGlobal(target) {
-  return target.rootName === 'Bun' && target.binding === null;
+function findImportSource(variable) {
+  if (variable === null) {
+    return null;
+  }
+
+  const [definition] = variable.defs;
+
+  return definition.type === 'ImportBinding' ? definition.parent.source.value : null;
 }
 
 // Bun's shell: the `$` export of `bun` under any import form or alias, or
@@ -499,58 +539,8 @@ function isShellTarget(target) {
     : target.memberName === '$';
 }
 
-function findMemberName(member) {
-  return !member.computed && member.property.type === 'Identifier' ? member.property.name : null;
-}
-
-function findRootName(node) {
-  let current = node;
-
-  while (current.type === 'MemberExpression' || current.type === 'CallExpression') {
-    current = current.type === 'MemberExpression' ? current.object : current.callee;
-  }
-
-  if (current.type === 'ThisExpression') {
-    return 'this';
-  }
-
-  return current.type === 'Identifier' ? current.name : null;
-}
-
-// the global itself, so a local binding of the same name passes
-function isGlobalName(context, node, name) {
-  return (
-    node !== undefined &&
-    node.type === 'Identifier' &&
-    node.name === name &&
-    findBinding(context, node, name) === null
-  );
-}
-
-function findBinding(context, node, name) {
-  let scope = context.sourceCode.getScope(node);
-
-  while (scope !== null) {
-    const variable = scope.set.get(name);
-
-    if (variable !== undefined && variable.defs.length > 0) {
-      return variable;
-    }
-
-    scope = scope.upper;
-  }
-
-  return null;
-}
-
-function findImportSource(variable) {
-  if (variable === null) {
-    return null;
-  }
-
-  const [definition] = variable.defs;
-
-  return definition.type === 'ImportBinding' ? definition.parent.source.value : null;
+function isBunGlobal(target) {
+  return target.rootName === 'Bun' && target.binding === null;
 }
 
 const ioModules = new Set(['fs', 'fs/promises', 'child_process']);
@@ -605,5 +595,15 @@ function isEnvRead(context, node) {
   return (
     findMemberName(node) === 'env' &&
     (isGlobalName(context, node.object, 'process') || isGlobalName(context, node.object, 'Bun'))
+  );
+}
+
+// the global itself, so a local binding of the same name passes
+function isGlobalName(context, node, name) {
+  return (
+    node !== undefined &&
+    node.type === 'Identifier' &&
+    node.name === name &&
+    findBinding(context, node, name) === null
   );
 }

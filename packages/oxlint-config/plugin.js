@@ -12,24 +12,6 @@ import setupTestOnly from './setup-test-only.js';
 import testBesideModule from './test-beside-module.js';
 import verbContract from './verb-contract.js';
 
-// custom rules loaded through oxlint's jsPlugins (ESLint v9 rule API): each
-// bans a shape no native oxlint rule can express, as an esquery selector or a
-// source-comment scan
-
-function buildBanRule(type, message, selectors) {
-  return {
-    meta: { type, messages: { banned: message }, schema: [] },
-    create(context) {
-      const entries = selectors.map((selector) => [
-        selector,
-        (node) => context.report({ node, messageId: 'banned' }),
-      ]);
-
-      return Object.fromEntries(entries);
-    },
-  };
-}
-
 const plugin = {
   meta: { name: 'zgeoff' },
   rules: {
@@ -124,3 +106,21 @@ const plugin = {
 };
 
 export default plugin;
+
+// custom rules loaded through oxlint's jsPlugins (ESLint v9 rule API): each
+// bans a shape no native oxlint rule can express, as an esquery selector or a
+// source-comment scan
+
+function buildBanRule(type, message, selectors) {
+  return {
+    meta: { type, messages: { banned: message }, schema: [] },
+    create(context) {
+      const entries = selectors.map((selector) => [
+        selector,
+        (node) => context.report({ node, messageId: 'banned' }),
+      ]);
+
+      return Object.fromEntries(entries);
+    },
+  };
+}

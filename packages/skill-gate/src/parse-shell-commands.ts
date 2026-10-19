@@ -132,21 +132,11 @@ const OPERATORS = [
   ')',
 ];
 
-const SEPARATORS = new Set(['&&', '||', '|&', ';;', '|', '&', ';']);
-
-function buildOperatorToken(operator: string): ShellToken {
-  if (operator === '(' || operator === ')') {
-    return { kind: 'subshell', opens: operator === '(' };
-  }
-
-  return SEPARATORS.has(operator)
-    ? { kind: 'separator', operator }
-    : { kind: 'redirect', operator };
-}
-
 function findOperator(text: string, index: number): string | null {
   return OPERATORS.find((operator) => text.startsWith(operator, index)) ?? null;
 }
+
+const GLOB_CHARS = '*?[{';
 
 function parseShellWord(
   text: string,
@@ -299,14 +289,24 @@ function getDepthChange(char: string): number {
   return ')}'.includes(char) ? -1 : 0;
 }
 
-const GLOB_CHARS = '*?[{';
-
 function isFileDescriptor(word: ShellWord): boolean {
   return word.literal && /^\d+$/u.test(word.text);
 }
 
 function isRedirectStart(char: string): boolean {
   return char === '<' || char === '>';
+}
+
+const SEPARATORS = new Set(['&&', '||', '|&', ';;', '|', '&', ';']);
+
+function buildOperatorToken(operator: string): ShellToken {
+  if (operator === '(' || operator === ')') {
+    return { kind: 'subshell', opens: operator === '(' };
+  }
+
+  return SEPARATORS.has(operator)
+    ? { kind: 'separator', operator }
+    : { kind: 'redirect', operator };
 }
 
 interface CommandDraft {
@@ -316,6 +316,8 @@ interface CommandDraft {
   enters: number;
   leaves: number;
 }
+
+const LIST_ENDS = new Set(['&', ';', ';;', '\n']);
 
 // A subshell's opening counts toward the next command's `enters`, and its closing toward the last
 // command's `leaves`. A pipe side and a list sent to the background run in their own subshell too,
@@ -421,8 +423,6 @@ function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellComman
 
   return commands;
 }
-
-const LIST_ENDS = new Set(['&', ';', ';;', '\n']);
 
 function buildCommandDraft(): CommandDraft {
   return { words: [], redirects: [], stdin: null, enters: 0, leaves: 0 };

@@ -58,6 +58,10 @@ function collectEntrySkills(entry: unknown, succeeded: readonly string[]): reado
   );
 }
 
+// A slash command opens the user message with its tags, in either order.
+const SLASH_COMMAND_PATTERN =
+  /^\s*(?:<command-message>[^<]*<\/command-message>\s*)?<command-name>\/(?<skill>[^<\s]+)<\/command-name>/u;
+
 function findSlashCommand(entry: unknown): string | undefined {
   if (
     !isRecord(entry) ||
@@ -74,10 +78,6 @@ function findSlashCommand(entry: unknown): string | undefined {
     ? SLASH_COMMAND_PATTERN.exec(content)?.groups?.['skill']
     : undefined;
 }
-
-// A slash command opens the user message with its tags, in either order.
-const SLASH_COMMAND_PATTERN =
-  /^\s*(?:<command-message>[^<]*<\/command-message>\s*)?<command-name>\/(?<skill>[^<\s]+)<\/command-name>/u;
 
 function collectSkillCall(
   block: Readonly<Record<string, unknown>>,

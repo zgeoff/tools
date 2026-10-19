@@ -25,10 +25,6 @@ function withManifestCache(key, load) {
   return loadedManifests.get(key);
 }
 
-function splitGlob(glob) {
-  return glob.split('/').filter((segment) => segment !== '' && segment !== '.');
-}
-
 function readGlobDirectories(root, segments, prefix) {
   const [segment, ...rest] = segments;
 
@@ -46,6 +42,10 @@ function readGlobDirectories(root, segments, prefix) {
     : [];
 
   return names.flatMap((name) => readGlobDirectories(root, rest, join(prefix, name)));
+}
+
+function splitGlob(glob) {
+  return glob.split('/').filter((segment) => segment !== '' && segment !== '.');
 }
 
 // `dir` is the field the resolver reads from every manifest it loads

@@ -188,48 +188,6 @@ function findStaticName(node) {
   return null;
 }
 
-function isTypeOnlyImport(specifier) {
-  return specifier.importKind === 'type' || specifier.parent.importKind === 'type';
-}
-
-function isTypeOnlyExport(specifier) {
-  return specifier.exportKind === 'type' || specifier.parent.exportKind === 'type';
-}
-
-// the members an assignment target writes; a bare identifier in the target
-// writes a variable declared elsewhere, and its declaration is checked there
-function collectTargetMembers(node) {
-  if (node === null || node === undefined) {
-    return [];
-  }
-
-  if (node.type === 'MemberExpression') {
-    return [node];
-  }
-
-  if (node.type === 'ObjectPattern') {
-    return node.properties.flatMap((property) => {
-      const target = property.type === 'RestElement' ? property : property.value;
-
-      return collectTargetMembers(target);
-    });
-  }
-
-  if (node.type === 'ArrayPattern') {
-    return node.elements.flatMap((element) => collectTargetMembers(element));
-  }
-
-  if (node.type === 'AssignmentPattern') {
-    return collectTargetMembers(node.left);
-  }
-
-  if (node.type === 'RestElement') {
-    return collectTargetMembers(node.argument);
-  }
-
-  return [];
-}
-
 // the names a binding pattern declares: a destructured key's alias, not the
 // key, since the key belongs to the object being read
 function collectPatternIdentifiers(node) {
@@ -266,6 +224,48 @@ function collectPatternIdentifiers(node) {
   }
 
   return [];
+}
+
+// the members an assignment target writes; a bare identifier in the target
+// writes a variable declared elsewhere, and its declaration is checked there
+function collectTargetMembers(node) {
+  if (node === null || node === undefined) {
+    return [];
+  }
+
+  if (node.type === 'MemberExpression') {
+    return [node];
+  }
+
+  if (node.type === 'ObjectPattern') {
+    return node.properties.flatMap((property) => {
+      const target = property.type === 'RestElement' ? property : property.value;
+
+      return collectTargetMembers(target);
+    });
+  }
+
+  if (node.type === 'ArrayPattern') {
+    return node.elements.flatMap((element) => collectTargetMembers(element));
+  }
+
+  if (node.type === 'AssignmentPattern') {
+    return collectTargetMembers(node.left);
+  }
+
+  if (node.type === 'RestElement') {
+    return collectTargetMembers(node.argument);
+  }
+
+  return [];
+}
+
+function isTypeOnlyImport(specifier) {
+  return specifier.importKind === 'type' || specifier.parent.importKind === 'type';
+}
+
+function isTypeOnlyExport(specifier) {
+  return specifier.exportKind === 'type' || specifier.parent.exportKind === 'type';
 }
 
 export default noAbbreviatedNames;

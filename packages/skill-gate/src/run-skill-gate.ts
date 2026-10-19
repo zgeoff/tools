@@ -108,10 +108,6 @@ function parseHookInput(value: unknown): HookInput | null {
   };
 }
 
-function isOutsideProject(fromProject: string): boolean {
-  return fromProject === '..' || fromProject.startsWith('../') || path.isAbsolute(fromProject);
-}
-
 interface BashCheck {
   readonly hookInput: HookInput;
   readonly command: string;
@@ -179,6 +175,10 @@ function readWrittenPath(cwd: string, written: WrittenPath): string {
   return isDirectory ? path.join(absolute, written.fileName) : absolute;
 }
 
+function isOutsideProject(fromProject: string): boolean {
+  return fromProject === '..' || fromProject.startsWith('../') || path.isAbsolute(fromProject);
+}
+
 function toProjectPath(projectDir: string, absolute: string): string {
   return path.relative(projectDir, absolute).split(path.sep).join('/');
 }
@@ -199,6 +199,18 @@ async function readAvailableSkills(skillsDir: string): Promise<readonly string[]
   return skills;
 }
 
+async function readTranscript(transcriptPath: string | null): Promise<string> {
+  if (transcriptPath === null) {
+    return '';
+  }
+
+  const transcriptFile = Bun.file(transcriptPath);
+
+  const exists = await transcriptFile.exists();
+
+  return exists ? transcriptFile.text() : '';
+}
+
 // A subagent's call carries the main session's transcript_path plus its own agent_id, and Claude
 // Code keeps its transcript at <session>/subagents/agent-<agent_id>.jsonl. An agent_id that is not
 // a plain name resolves to no transcript, so the edit is denied.
@@ -214,18 +226,6 @@ function resolveSessionTranscriptPath(edit: HookInput): string | null {
   const sessionDir = edit.transcriptPath.replace(/\.jsonl$/u, '');
 
   return path.join(sessionDir, 'subagents', `agent-${edit.agentID}.jsonl`);
-}
-
-async function readTranscript(transcriptPath: string | null): Promise<string> {
-  if (transcriptPath === null) {
-    return '';
-  }
-
-  const transcriptFile = Bun.file(transcriptPath);
-
-  const exists = await transcriptFile.exists();
-
-  return exists ? transcriptFile.text() : '';
 }
 
 function printOutput(output: object | null): void {

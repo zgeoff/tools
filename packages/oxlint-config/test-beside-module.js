@@ -4,38 +4,6 @@ import resolveRepoRoot from './resolve-repo-root.js';
 
 const testFilePattern = /^(?<base>.+)\.test\.tsx?$/u;
 
-// suites that run the whole program have no single module to sit beside
-const exemptRootDirs = new Set(['e2e', 'evals']);
-
-// the repo root, not oxlint's working directory, so a per-package lint
-// script neither exempts a package's own e2e/ nor flags the root one
-function isUnderExemptRoot(cwd, filename) {
-  const [first] = relative(resolveRepoRoot(filename) ?? cwd, filename).split(sep);
-
-  return exemptRootDirs.has(first);
-}
-
-// a module is `<name>.<ext>` with a single-segment extension, so a
-// declaration file never stands in for one, and neither does another test
-// (`foo.test.ts` beside `foo.test.test.ts`)
-function probeModuleSibling(dir, name) {
-  return readdirSync(dir).some((entry) => {
-    const dot = entry.lastIndexOf('.');
-
-    return (
-      dot > 0 &&
-      entry.slice(0, dot) === name &&
-      !testFilePattern.test(entry) &&
-      probeFile(join(dir, entry))
-    );
-  });
-}
-
-// follows a symlink, so a linked module counts as the file it points at
-function probeFile(path) {
-  return statSync(path, { throwIfNoEntry: false })?.isFile() ?? false;
-}
-
 const testBesideModule = {
   meta: {
     type: 'problem',
@@ -76,3 +44,35 @@ const testBesideModule = {
 };
 
 export default testBesideModule;
+
+// suites that run the whole program have no single module to sit beside
+const exemptRootDirs = new Set(['e2e', 'evals']);
+
+// the repo root, not oxlint's working directory, so a per-package lint
+// script neither exempts a package's own e2e/ nor flags the root one
+function isUnderExemptRoot(cwd, filename) {
+  const [first] = relative(resolveRepoRoot(filename) ?? cwd, filename).split(sep);
+
+  return exemptRootDirs.has(first);
+}
+
+// a module is `<name>.<ext>` with a single-segment extension, so a
+// declaration file never stands in for one, and neither does another test
+// (`foo.test.ts` beside `foo.test.test.ts`)
+function probeModuleSibling(dir, name) {
+  return readdirSync(dir).some((entry) => {
+    const dot = entry.lastIndexOf('.');
+
+    return (
+      dot > 0 &&
+      entry.slice(0, dot) === name &&
+      !testFilePattern.test(entry) &&
+      probeFile(join(dir, entry))
+    );
+  });
+}
+
+// follows a symlink, so a linked module counts as the file it points at
+function probeFile(path) {
+  return statSync(path, { throwIfNoEntry: false })?.isFile() ?? false;
+}

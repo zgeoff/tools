@@ -111,6 +111,10 @@ function planLeadingCommentEdit(src: string, restStart: number, commentStart: nu
   };
 }
 
+function countNewlines(s: string): number {
+  return (s.match(/\n/gu) ?? []).length;
+}
+
 function planWhitespaceGap(gap: string, gapStart: number, gapEnd: number): Edit | null {
   if (countNewlines(gap) >= MIN_NEWLINES) {
     return null;
@@ -122,10 +126,6 @@ function planWhitespaceGap(gap: string, gapStart: number, gapEnd: number): Edit 
   const newGap = `${trimmed}${'\n'.repeat(MIN_NEWLINES)}${indent}`;
 
   return { start: gapStart, end: gapEnd, replacement: newGap };
-}
-
-function countNewlines(s: string): number {
-  return (s.match(/\n/gu) ?? []).length;
 }
 
 function planCollapseEdit(gap: Gap): Edit | null {

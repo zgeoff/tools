@@ -46,8 +46,36 @@ function isRunEnd(prev: ASTNode, next: ASTNode): boolean {
   );
 }
 
+const VAR_DECL_KINDS = new Set(['const', 'let', 'var']);
+
+// ESLint's padding-line-between-statements does not look through `export`,
+// so `export const x = 1` is not a `const` for the rule
+function isVarDecl(node: ASTNode): boolean {
+  if (node.type === 'VariableDeclaration') {
+    return node.kind !== undefined && VAR_DECL_KINDS.has(node.kind);
+  }
+
+  return false;
+}
+
+const USING_DECL_KINDS = new Set(['using', 'await using']);
+
+function isUsingDecl(node: ASTNode): boolean {
+  if (node.type === 'VariableDeclaration') {
+    return node.kind !== undefined && USING_DECL_KINDS.has(node.kind);
+  }
+
+  return false;
+}
+
 function isDirective(node: ASTNode): boolean {
   return typeof node['directive'] === 'string';
+}
+
+// ESLint's `prev: ['function', 'class']` does not match `export function` or
+// `export class` (those parse as ExportNamedDeclaration), so neither does this
+function isFnOrClassDecl(node: ASTNode): boolean {
+  return node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration';
 }
 
 const TYPE_DECL_TYPES = new Set(['TSTypeAliasDeclaration', 'TSInterfaceDeclaration']);
@@ -104,15 +132,15 @@ function isAwaitHeaded(node: ASTNode): boolean {
   );
 }
 
-const CALL_TYPES: readonly string[] = ['CallExpression', 'AwaitExpression'];
-const MUTATION_TYPES: readonly string[] = ['AssignmentExpression', 'UpdateExpression'];
-
 function isKindBoundary(prev: ASTNode, next: ASTNode): boolean {
   const prevKind = findStatementKind(prev);
   const nextKind = findStatementKind(next);
 
   return prevKind !== null && nextKind !== null && prevKind !== nextKind;
 }
+
+const CALL_TYPES: readonly string[] = ['CallExpression', 'AwaitExpression'];
+const MUTATION_TYPES: readonly string[] = ['AssignmentExpression', 'UpdateExpression'];
 
 function findStatementKind(node: ASTNode): string | null {
   if (isUsingDecl(node)) {
@@ -130,6 +158,14 @@ function findStatementKind(node: ASTNode): string | null {
   return isExpressionStatementOf(node, MUTATION_TYPES) ? 'mutation' : null;
 }
 
+function isExpressionStatementOf(node: ASTNode, types: readonly string[]): boolean {
+  const expression = node['expression'];
+
+  return (
+    node.type === 'ExpressionStatement' && isASTNode(expression) && types.includes(expression.type)
+  );
+}
+
 function isExpectHeaded(node: ASTNode): boolean {
   const expression = node['expression'];
   const callee = isASTNode(expression) ? findDeepestCallee(expression) : null;
@@ -143,13 +179,6 @@ function isExpectHeaded(node: ASTNode): boolean {
   return head?.type === 'Identifier' && head['name'] === 'expect';
 }
 
-function pickCallKind(node: ASTNode): 'bare-call' | 'method-call' {
-  const expression = node['expression'];
-  const callee = isASTNode(expression) ? findDeepestCallee(expression) : null;
-
-  return callee?.type === 'MemberExpression' ? 'method-call' : 'bare-call';
-}
-
 function findDeepestCallee(expression: ASTNode): ASTNode | null {
   const deepestCall = collectHeadChain(expression).findLast(
     (link) => link.type === 'CallExpression',
@@ -160,38 +189,9 @@ function findDeepestCallee(expression: ASTNode): ASTNode | null {
   return isASTNode(callee) ? callee : null;
 }
 
-function isExpressionStatementOf(node: ASTNode, types: readonly string[]): boolean {
+function pickCallKind(node: ASTNode): 'bare-call' | 'method-call' {
   const expression = node['expression'];
+  const callee = isASTNode(expression) ? findDeepestCallee(expression) : null;
 
-  return (
-    node.type === 'ExpressionStatement' && isASTNode(expression) && types.includes(expression.type)
-  );
-}
-
-const VAR_DECL_KINDS = new Set(['const', 'let', 'var']);
-
-// ESLint's padding-line-between-statements does not look through `export`,
-// so `export const x = 1` is not a `const` for the rule
-function isVarDecl(node: ASTNode): boolean {
-  if (node.type === 'VariableDeclaration') {
-    return node.kind !== undefined && VAR_DECL_KINDS.has(node.kind);
-  }
-
-  return false;
-}
-
-const USING_DECL_KINDS = new Set(['using', 'await using']);
-
-function isUsingDecl(node: ASTNode): boolean {
-  if (node.type === 'VariableDeclaration') {
-    return node.kind !== undefined && USING_DECL_KINDS.has(node.kind);
-  }
-
-  return false;
-}
-
-// ESLint's `prev: ['function', 'class']` does not match `export function` or
-// `export class` (those parse as ExportNamedDeclaration), so neither does this
-function isFnOrClassDecl(node: ASTNode): boolean {
-  return node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration';
+  return callee?.type === 'MemberExpression' ? 'method-call' : 'bare-call';
 }

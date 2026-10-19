@@ -1,25 +1,6 @@
 // the options of zgeoff/import-zones; oxlint rejects a config that breaks it
 const stringList = { type: 'array', items: { type: 'string' } };
 
-function buildEntrySchema(properties, required, anyOf) {
-  return {
-    type: 'array',
-    items: {
-      type: 'object',
-      properties: {
-        name: { type: 'string' },
-        from: stringList,
-        ignore: stringList,
-        reason: { type: 'string' },
-        ...properties,
-      },
-      required: ['name', ...required],
-      additionalProperties: false,
-      ...(anyOf === undefined ? {} : { anyOf }),
-    },
-  };
-}
-
 const importZonesSchema = {
   type: 'object',
   properties: {
@@ -50,3 +31,22 @@ const importZonesSchema = {
 };
 
 export default importZonesSchema;
+
+function buildEntrySchema(properties, required, anyOf) {
+  return {
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        from: stringList,
+        ignore: stringList,
+        reason: { type: 'string' },
+        ...properties,
+      },
+      required: ['name', ...required],
+      additionalProperties: false,
+      ...(anyOf === undefined ? {} : { anyOf }),
+    },
+  };
+}

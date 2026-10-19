@@ -25,11 +25,6 @@ function parseJSON(text: string): unknown {
   }
 }
 
-// An empty string would match every path as an ignore segment, and no session can load it as a skill.
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string' && item !== '');
-}
-
 function parseRulesRecord(value: Readonly<Record<string, unknown>>): SkillGateRulesResult {
   const ignore = value['ignore'] ?? [];
 
@@ -44,6 +39,11 @@ function parseRulesRecord(value: Readonly<Record<string, unknown>>): SkillGateRu
   }
 
   return parseGates(ignore, gates);
+}
+
+// An empty string would match every path as an ignore segment, and no session can load it as a skill.
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string' && item !== '');
 }
 
 function parseGates(ignore: readonly string[], gates: readonly unknown[]): SkillGateRulesResult {

@@ -1,7 +1,5 @@
 import makeGlobMatcher from './make-glob-matcher.js';
 
-const defaultExtensions = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'];
-
 const loadedOptions = new Map();
 
 // oxlint hands each file its own copy of the options, so the compiled form is
@@ -18,6 +16,8 @@ export default function loadZoneOptions(options) {
 
   return loaded;
 }
+
+const defaultExtensions = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'];
 
 function buildZoneOptions(options) {
   const globsByZone = options.zones ?? {};

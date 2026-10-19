@@ -1,13 +1,6 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { Element, Node } from 'happy-dom';
 
-interface InspectableNode {
-  readonly nodeName: string;
-  readonly nodeValue: null | string;
-}
-
-const INSPECT_SYMBOL = Symbol.for('nodejs.util.inspect.custom');
-
 export function registerHappyDOM(): void {
   const nativeFetchStack = {
     AbortController: globalThis.AbortController,
@@ -30,6 +23,13 @@ export function registerHappyDOM(): void {
   // happy-dom's WritableStream, and a happy-dom AbortSignal fails Bun's Request constructor check.
   Object.assign(globalThis, nativeFetchStack);
 }
+
+interface InspectableNode {
+  readonly nodeName: string;
+  readonly nodeValue: null | string;
+}
+
+const INSPECT_SYMBOL = Symbol.for('nodejs.util.inspect.custom');
 
 // A failed matcher prints the received node through Bun.inspect, whose default walk of a
 // happy-dom node's internal graph takes hundreds of milliseconds; the node prints as its opening
