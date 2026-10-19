@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { isBuiltin } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import resolvePackageTarget from './resolve-package-target.js';
 
 // a `.js` specifier in TypeScript source names the `.ts` file beside it
@@ -84,9 +85,19 @@ function toTarget(path) {
 }
 
 function toMappedTarget(manifest, mapped) {
-  return mapped === null
-    ? { kind: 'missing' }
-    : { kind: 'file', path: resolve(manifest.dir, mapped) };
+  const path = mapped === null ? null : findMappedPath(manifest.dir, mapped);
+
+  return path === null ? { kind: 'missing' } : { kind: 'file', path };
+}
+
+// a mapped target is a URL path, as node resolves it against the package
+// URL, so `%20` names a space; a file URL path cannot encode `/`
+function findMappedPath(directory, mapped) {
+  try {
+    return fileURLToPath(new URL(mapped, pathToFileURL(`${directory}/`)));
+  } catch {
+    return null;
+  }
 }
 
 function isPathSpecifier(specifier) {
