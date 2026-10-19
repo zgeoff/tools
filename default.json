@@ -93,8 +93,8 @@
       "enabled": false
     },
     {
-      "description": "zgeoff packages bump at any level as soon as they publish, each in its own PR, and merge on green CI. bun install still needs the package in the repo's minimumReleaseAgeExcludes.",
-      "matchPackageNames": ["@zgeoff/**"],
+      "description": "zgeoff and impz packages bump at any level as soon as they publish, each in its own PR, and merge on green CI. bun install still needs the package in the repo's minimumReleaseAgeExcludes.",
+      "matchPackageNames": ["@zgeoff/**", "@impz/**"],
       "minimumReleaseAge": null,
       "schedule": ["at any time"],
       "groupName": null,
