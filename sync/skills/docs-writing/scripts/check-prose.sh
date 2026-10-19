@@ -154,17 +154,17 @@ report 'Untagged code fences:' \
 # character.
 list_changed() {
   local default base
-  default=$(git rev-parse -q --abbrev-ref origin/HEAD 2>/dev/null) || default=origin/main
+  default=$(git rev-parse -q --abbrev-ref origin/HEAD 2> /dev/null) || default=origin/main
   # Before the first commit, every staged file is new.
-  if ! git rev-parse -q --verify HEAD >/dev/null; then
+  if ! git rev-parse -q --verify HEAD > /dev/null; then
     git ls-files -z --cached
   else
-    if base=$(git merge-base HEAD "$default" 2>/dev/null); then
+    if base=$(git merge-base HEAD "$default" 2> /dev/null); then
       git diff -z --name-only --no-renames --diff-filter=d "$base" HEAD
     # A pull-request run in GitHub Actions checks out the PR's merge commit with no history and no
     # origin branches, so the base tip is fetched and the two trees compared.
     elif [ -n "${GITHUB_BASE_REF:-}" ] &&
-      git fetch -q --no-tags --depth=1 origin "$GITHUB_BASE_REF" 2>/dev/null; then
+      git fetch -q --no-tags --depth=1 origin "$GITHUB_BASE_REF" 2> /dev/null; then
       git diff -z --name-only --no-renames --diff-filter=d FETCH_HEAD HEAD
     else
       echo "check-prose: no merge base with $default, so the paragraph check reads only uncommitted files" >&2
@@ -300,10 +300,10 @@ if [ "${#paragraph_files[@]}" -gt 0 ]; then
 fi
 
 report "Paragraphs over $paragraph_fail words in a changed file (split each one; lists, tables and code blocks are exempt):" \
-  "$(awk -F: -v limit="$paragraph_fail" '$NF > limit { print $0" words" }' <<<"$paragraphs")"
+  "$(awk -F: -v limit="$paragraph_fail" '$NF > limit { print $0" words" }' <<< "$paragraphs")"
 
 candidate "Paragraphs over $paragraph_warn words in a changed file (warning; reread each one and split it where it defends a decision):" \
-  "$(awk -F: -v limit="$paragraph_fail" '$NF != "" && $NF <= limit { print $0" words" }' <<<"$paragraphs")"
+  "$(awk -F: -v limit="$paragraph_fail" '$NF != "" && $NF <= limit { print $0" words" }' <<< "$paragraphs")"
 
 candidate 'Candidates — filler words with term-of-art uses; cull the filler, keep the terms:' \
   "$(grep_docs -nPi '\b(naturally|cleanly|trivially|easy|simple|quick)\b' -- "$@")"
