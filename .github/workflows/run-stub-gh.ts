@@ -1,6 +1,3 @@
-// A stand-in for the gh pull-request commands of one repository, which create-stub-gh.ts installs
-// as gh. The first argument is the state file, a JSON array of pull requests; the rest is the gh
-// command line. A command line outside `pr list`, `pr create` and `pr edit` exits 64.
 import { readFile, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { $ } from 'bun';
