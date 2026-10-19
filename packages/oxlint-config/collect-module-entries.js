@@ -14,8 +14,18 @@ export default function collectModuleEntries(context, program) {
     return { index, statement, declaration, exportKind, ...pickKind(statement, declaration) };
   });
 
+  const listed = new Set(
+    program.body
+      .filter((statement) => statement.type === 'ExportNamedDeclaration' && isExportOnly(statement))
+      .flatMap((statement) => statement.specifiers.map((specifier) => specifier.local.name)),
+  );
+
   for (const entry of entries) {
     entry.isOverloaded = entry.kind === 'function' && overloaded.has(entry.name);
+
+    if (entry.exportKind === null && listed.has(entry.name)) {
+      entry.exportKind = 'named';
+    }
   }
 
   linkReferences(context, program, entries);
@@ -43,6 +53,11 @@ function pickKind(statement, declaration) {
 
   if (declaration.type === 'FunctionDeclaration' && declaration.id === null) {
     return { kind: 'function', name: 'default', nameNode: statement, ...links };
+  }
+
+  // a default export of an expression, such as an object, binds no name
+  if (statement.type === 'ExportDefaultDeclaration' && declaration.type !== 'FunctionDeclaration') {
+    return { kind: 'other', name: 'default', nameNode: statement, ...links };
   }
 
   const name = findDeclarationName(declaration);
@@ -77,6 +92,14 @@ function findDeclarationName(declaration) {
     rest.length === 0 && declarator.id.type === 'Identifier' && declarator.init !== null;
 
   return isPlain ? declarator.id : null;
+}
+
+function isExportOnly(statement) {
+  return (
+    (statement.type === 'ExportDefaultDeclaration' &&
+      statement.declaration.type === 'Identifier') ||
+    (statement.type === 'ExportNamedDeclaration' && statement.declaration === null)
+  );
 }
 
 // fills each entry's `uses` and `users` from the file's top-level scope, and
@@ -117,20 +140,20 @@ function linkReferences(context, program, entries) {
 }
 
 // a reference runs as the module loads unless a function body wraps it; a
-// function passed straight to a call, such as a `.map` callback, may run at
-// once, so it wraps nothing
+// function with a call above it, such as a `.map` callback or the function in
+// `(() => value).call()`, may run at once, so it wraps nothing
 function isLoadTime(identifier) {
-  let node = identifier.parent;
+  const ancestors = [];
 
-  while (node !== null && node !== undefined && node.type !== 'Program') {
-    if (isFunctionNode(node) && !isCallArgument(node)) {
-      return false;
-    }
-
-    node = node.parent;
+  for (let node = identifier.parent; node.type !== 'Program'; node = node.parent) {
+    ancestors.push(node);
   }
 
-  return true;
+  return !ancestors.some(
+    (node, index) =>
+      isFunctionNode(node) &&
+      !ancestors.slice(index + 1).some((ancestor) => isInvocation(ancestor)),
+  );
 }
 
 function isFunctionNode(node) {
@@ -141,11 +164,11 @@ function isFunctionNode(node) {
   );
 }
 
-function isCallArgument(node) {
-  const type = node.parent.type;
-
+function isInvocation(node) {
   return (
-    type === 'CallExpression' || type === 'NewExpression' || type === 'TaggedTemplateExpression'
+    node.type === 'CallExpression' ||
+    node.type === 'NewExpression' ||
+    node.type === 'TaggedTemplateExpression'
   );
 }
 
@@ -185,12 +208,4 @@ function markLiveEntries(entries) {
   for (const entry of entries) {
     entry.isLive = live.has(entry);
   }
-}
-
-function isExportOnly(statement) {
-  return (
-    (statement.type === 'ExportDefaultDeclaration' &&
-      statement.declaration.type === 'Identifier') ||
-    (statement.type === 'ExportNamedDeclaration' && statement.declaration === null)
-  );
 }

@@ -39,7 +39,7 @@ async function setupTest() {
     return runOxlint([]);
   };
 
-  // runs `--fix` once, then lints the fixed file again
+  // oxlint runs one fix pass, so a second lint shows what that pass left
   const fix = async (source: string) => {
     await writeFile(samplePath, source);
     await runOxlint(['--fix']);
@@ -81,6 +81,58 @@ const kettle = {
 export default kettle;
 `,
     "'boil' sits above the primary export 'kettle' — move private helpers below it.",
+  ],
+  [
+    'a helper above a default export of an object',
+    `function boil(): string {
+  return 'boiled';
+}
+
+export default { run: boil };
+`,
+    "'boil' sits above the primary export 'default' — move private helpers below it.",
+  ],
+  [
+    'a helper above a primary export in an export list',
+    `function pourCup(): string {
+  return 'cup';
+}
+
+function brewTea(): string {
+  return pourCup();
+}
+
+export { brewTea };
+`,
+    "'pourCup' sits above the primary export 'brewTea' — move private helpers below it.",
+  ],
+  [
+    'a helper above the export the file is named for',
+    `function pourCup(): string {
+  return 'cup';
+}
+
+export function serveTea(): string {
+  return 'served';
+}
+
+export function brewTea(): string {
+  return pourCup();
+}
+`,
+    "'pourCup' sits above the primary export 'brewTea' — move private helpers below it.",
+  ],
+  [
+    'a helper above the only export, named apart from the file',
+    `function pourCup(): string {
+  return 'cup';
+}
+
+export function serveTea(): string {
+  return pourCup();
+}
+`,
+    "'pourCup' sits above the primary export 'serveTea' — move private helpers below it.",
   ],
   [
     'a nested helper after its parent’s sibling',
@@ -131,6 +183,20 @@ function pickLeaf(leaf: Leaf): Leaf {
 }
 `,
     "'Leaf' sits away from its first use in 'pickLeaf' — move it directly above 'pickLeaf'.",
+  ],
+  [
+    'a type below a helper that runs as the module loads',
+    `export const tea = brewTea();
+
+function brewTea(): Tea {
+  return { cups: 1 };
+}
+
+interface Tea {
+  readonly cups: number;
+}
+`,
+    "'Tea' sits below its first use in 'brewTea' — move it directly above 'brewTea'.",
   ],
   [
     'a const that leads the file for a helper',
@@ -221,6 +287,38 @@ function listTeas(): string[] {
 }
 `,
   ],
+  [
+    'a const that a helper reads through another helper while the module loads',
+    `const defaultTeas = ['green', 'black'];
+
+const menu = { teas: listTeas() };
+
+export default menu;
+
+function listTeas(): string[] {
+  return readTeas();
+}
+
+function readTeas(): string[] {
+  return [...defaultTeas];
+}
+`,
+  ],
+  [
+    'a const that a helper reads in a function called at once through `.call`',
+    `const cupSize = 250;
+
+export function brewTea(): number {
+  return pourCup();
+}
+
+(() => pourCup()).call(null);
+
+function pourCup(): number {
+  return cupSize;
+}
+`,
+  ],
 ])('it accepts %s', async (_, source) => {
   const ctx = await setupTest();
   const result = await ctx.lint(source);
@@ -229,10 +327,10 @@ function listTeas(): string[] {
   expect(result.exitCode).toBe(0);
 });
 
-test('it moves a helper and its comment below the primary export', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.fix(`// pours one cup
+test.each([
+  [
+    'a helper and its comment below the primary export',
+    `// pours one cup
 function pourCup(): string {
   return 'cup';
 }
@@ -240,9 +338,8 @@ function pourCup(): string {
 export function brewTea(): string {
   return pourCup();
 }
-`);
-
-  expect(result.fixed).toBe(`export function brewTea(): string {
+`,
+    `export function brewTea(): string {
   return pourCup();
 }
 
@@ -250,15 +347,11 @@ export function brewTea(): string {
 function pourCup(): string {
   return 'cup';
 }
-`);
-
-  expect(result.stdout).not.toInclude('zgeoff(module-order)');
-});
-
-test('it moves a helper below a default export and its export statement', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.fix(`function boil(): string {
+`,
+  ],
+  [
+    'a helper below a default export and its export statement',
+    `function boil(): string {
   return 'boiled';
 }
 
@@ -269,9 +362,8 @@ const kettle = {
 };
 
 export default kettle;
-`);
-
-  expect(result.fixed).toBe(`const kettle = {
+`,
+    `const kettle = {
   run(): string {
     return boil();
   },
@@ -282,15 +374,30 @@ export default kettle;
 function boil(): string {
   return 'boiled';
 }
-`);
+`,
+  ],
+  [
+    'a helper below the only export, named apart from the file',
+    `function pourCup(): string {
+  return 'cup';
+}
 
-  expect(result.stdout).not.toInclude('zgeoff(module-order)');
-});
+export function serveTea(): string {
+  return pourCup();
+}
+`,
+    `export function serveTea(): string {
+  return pourCup();
+}
 
-test('it moves helpers into depth-first order', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.fix(`export function brewTea(): string {
+function pourCup(): string {
+  return 'cup';
+}
+`,
+  ],
+  [
+    'helpers into depth-first order',
+    `export function brewTea(): string {
   return boilWater() + steepLeaves();
 }
 
@@ -305,9 +412,8 @@ function heatKettle(): string {
 function boilWater(): string {
   return heatKettle();
 }
-`);
-
-  expect(result.fixed).toBe(`export function brewTea(): string {
+`,
+    `export function brewTea(): string {
   return boilWater() + steepLeaves();
 }
 
@@ -322,15 +428,11 @@ function heatKettle(): string {
 function steepLeaves(): string {
   return 'leaves';
 }
-`);
-
-  expect(result.stdout).not.toInclude('zgeoff(module-order)');
-});
-
-test('it moves a helper together with the declarations stacked above it', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.fix(`const cupSize = 250;
+`,
+  ],
+  [
+    'a helper together with the declarations stacked above it',
+    `const cupSize = 250;
 
 function pourCup(): number {
   return cupSize;
@@ -339,9 +441,8 @@ function pourCup(): number {
 export function brewTea(): number {
   return pourCup();
 }
-`);
-
-  expect(result.fixed).toBe(`export function brewTea(): number {
+`,
+    `export function brewTea(): number {
   return pourCup();
 }
 
@@ -350,15 +451,11 @@ const cupSize = 250;
 function pourCup(): number {
   return cupSize;
 }
-`);
-
-  expect(result.stdout).not.toInclude('zgeoff(module-order)');
-});
-
-test('it moves a const and a type directly above their first use', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.fix(`interface Leaf {
+`,
+  ],
+  [
+    'a const and a type directly above their first use',
+    `interface Leaf {
   readonly name: string;
 }
 
@@ -375,9 +472,8 @@ function pickLeaf(leaf: Leaf): Leaf {
 }
 
 const potName = 'clay';
-`);
-
-  expect(result.fixed).toBe(`export function brewTea(): string {
+`,
+    `export function brewTea(): string {
   return warmPot() + pickLeaf({ name: 'oolong' }).name;
 }
 
@@ -394,88 +490,11 @@ interface Leaf {
 function pickLeaf(leaf: Leaf): Leaf {
   return leaf;
 }
-`);
-
-  expect(result.stdout).not.toInclude('zgeoff(module-order)');
-});
-
-test('it leaves reported a const whose value calls a local function', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.fix(`const cupSize = measureCup();
-
-export function brewTea(): number {
-  return pourCup();
-}
-
-function pourCup(): number {
-  return cupSize + lidSize;
-}
-
-function measureCup(): number {
-  return 250;
-}
-
-const lidSize = 10;
-`);
-
-  expect(result.fixed).toBe(`const cupSize = measureCup();
-
-export function brewTea(): number {
-  return pourCup();
-}
-
-const lidSize = 10;
-
-function pourCup(): number {
-  return cupSize + lidSize;
-}
-
-function measureCup(): number {
-  return 250;
-}
-`);
-
-  expect(result.stdout).toInclude(
-    "'cupSize' leads the file, but the primary export does not use it — move it directly above its first use in 'pourCup'.",
-  );
-
-  expect(result.stdout).not.toInclude("'lidSize'");
-});
-
-test('it leaves reported a const that another const reads outside a function body', async () => {
-  const ctx = await setupTest();
-
-  const source = `export function brewTea(): number {
-  return pourCup();
-}
-
-function pourCup(): number {
-  return sizes.cup;
-}
-
-const cupSize = 250;
-
-const sizes = { cup: cupSize };
-`;
-
-  const result = await ctx.fix(source);
-
-  expect(result.fixed).toBe(source);
-
-  expect(result.stdout).toInclude(
-    "'cupSize' sits below its first use in 'pourCup' — move it directly above 'pourCup'.",
-  );
-
-  expect(result.stdout).toInclude(
-    "'sizes' sits below its first use in 'pourCup' — move it directly above 'pourCup'.",
-  );
-});
-
-test('it moves a declaration with its helper past another helper', async () => {
-  const ctx = await setupTest();
-
-  const result = await ctx.fix(`const leafPattern = /^leaf/u;
+`,
+  ],
+  [
+    'a declaration with its helper past another helper',
+    `const leafPattern = /^leaf/u;
 
 function isTea(name: string): boolean {
   return name !== '';
@@ -488,9 +507,8 @@ function isLeaf(name: string): boolean {
 export function brewTea(name: string): boolean {
   return isTea(name) && isLeaf(name);
 }
-`);
-
-  expect(result.fixed).toBe(`export function brewTea(name: string): boolean {
+`,
+    `export function brewTea(name: string): boolean {
   return isTea(name) && isLeaf(name);
 }
 
@@ -503,15 +521,114 @@ const leafPattern = /^leaf/u;
 function isLeaf(name: string): boolean {
   return leafPattern.test(name);
 }
-`);
+`,
+  ],
+  [
+    'the first declaration and leaves the file header in place',
+    `// the tea service
 
+// pours one cup
+function pourCup(): string {
+  return 'cup';
+}
+
+export function brewTea(): string {
+  return pourCup();
+}
+`,
+    `// the tea service
+
+export function brewTea(): string {
+  return pourCup();
+}
+
+// pours one cup
+function pourCup(): string {
+  return 'cup';
+}
+`,
+  ],
+])('it fixes %s', async (_, source, expected) => {
+  const ctx = await setupTest();
+  const result = await ctx.fix(source);
+
+  expect(result.fixed).toBe(expected);
   expect(result.stdout).not.toInclude('zgeoff(module-order)');
 });
 
-test('it moves a helper and leaves reported the consts it cannot move', async () => {
-  const ctx = await setupTest();
+test.each([
+  [
+    'a const whose value calls a local function',
+    `const cupSize = measureCup();
 
-  const result = await ctx.fix(`const sizes = [250, 500];
+export function brewTea(): number {
+  return pourCup();
+}
+
+function pourCup(): number {
+  return cupSize + lidSize;
+}
+
+function measureCup(): number {
+  return 250;
+}
+
+const lidSize = 10;
+`,
+    `const cupSize = measureCup();
+
+export function brewTea(): number {
+  return pourCup();
+}
+
+const lidSize = 10;
+
+function pourCup(): number {
+  return cupSize + lidSize;
+}
+
+function measureCup(): number {
+  return 250;
+}
+`,
+    [
+      "'cupSize' leads the file, but the primary export does not use it — move it directly above its first use in 'pourCup'.",
+    ],
+  ],
+  [
+    'a const that another const reads outside a function body',
+    `export function brewTea(): number {
+  return pourCup();
+}
+
+function pourCup(): number {
+  return sizes.cup;
+}
+
+const cupSize = 250;
+
+const sizes = { cup: cupSize };
+`,
+    `export function brewTea(): number {
+  return pourCup();
+}
+
+function pourCup(): number {
+  return sizes.cup;
+}
+
+const cupSize = 250;
+
+const sizes = { cup: cupSize };
+`,
+    [
+      "'cupSize' sits below its first use in 'pourCup' — move it directly above 'pourCup'.",
+      "'sizes' sits below its first use in 'pourCup' — move it directly above 'pourCup'.",
+    ],
+  ],
+  [
+    'the consts a moved helper cannot take along',
+    `const sizes = [250, 500];
 
 const largest = Math.max(...sizes);
 
@@ -522,9 +639,8 @@ function pourCup(): number {
 export function brewTea(): number {
   return pourCup();
 }
-`);
-
-  expect(result.fixed).toBe(`const sizes = [250, 500];
+`,
+    `const sizes = [250, 500];
 
 const largest = Math.max(...sizes);
 
@@ -535,41 +651,107 @@ export function brewTea(): number {
 function pourCup(): number {
   return largest;
 }
-`);
+`,
+    [
+      "'sizes' leads the file, but the primary export does not use it — move it directly above its first use in 'largest'.",
+      "'largest' leads the file, but the primary export does not use it — move it directly above its first use in 'pourCup'.",
+    ],
+  ],
+  [
+    'a const whose value reads state that load-time code changes',
+    `const savedTea = process.env['TEA'] ?? 'green';
 
-  expect(result.stdout).toInclude(
-    "'sizes' leads the file, but the primary export does not use it — move it directly above its first use in 'largest'.",
-  );
+export function brewTea(): string {
+  return readTea();
+}
 
-  expect(result.stdout).toInclude(
-    "'largest' leads the file, but the primary export does not use it — move it directly above its first use in 'pourCup'.",
-  );
-});
+process.env['TEA'] = 'black';
 
-test('it leaves a file header in place when the first declaration moves', async () => {
+function readTea(): string {
+  return savedTea;
+}
+`,
+    `const savedTea = process.env['TEA'] ?? 'green';
+
+export function brewTea(): string {
+  return readTea();
+}
+
+process.env['TEA'] = 'black';
+
+function readTea(): string {
+  return savedTea;
+}
+`,
+    [
+      "'savedTea' leads the file, but the primary export does not use it — move it directly above its first use in 'readTea'.",
+    ],
+  ],
+  [
+    'a const that a function called at once through `.call` reads',
+    `const savedTea = 'green';
+
+export function brewTea(): string {
+  return readTea();
+}
+
+const menu = { tea: (() => savedTea).call(null) };
+
+function readTea(): string {
+  return savedTea + menu.tea;
+}
+`,
+    `const savedTea = 'green';
+
+export function brewTea(): string {
+  return readTea();
+}
+
+const menu = { tea: (() => savedTea).call(null) };
+
+function readTea(): string {
+  return savedTea + menu.tea;
+}
+`,
+    [
+      "'savedTea' leads the file, but the primary export does not use it — move it directly above its first use in 'menu'.",
+    ],
+  ],
+  [
+    'a helper whose move would join two statements without semicolons',
+    `console.log('start')
+
+function pourCup(): string {
+  return 'cup'
+}
+
+(function warm(): void {})()
+
+export function brewTea(): string {
+  return pourCup()
+}
+`,
+    `console.log('start')
+
+function pourCup(): string {
+  return 'cup'
+}
+
+(function warm(): void {})()
+
+export function brewTea(): string {
+  return pourCup()
+}
+`,
+    ["'pourCup' sits above the primary export 'brewTea' — move private helpers below it."],
+  ],
+])('it fixes what it can and leaves reported %s', async (_, source, expected, messages) => {
   const ctx = await setupTest();
+  const result = await ctx.fix(source);
 
-  const result = await ctx.fix(`// the tea service
+  const reported = messages.filter((message) => result.stdout.includes(message));
 
-// pours one cup
-function pourCup(): string {
-  return 'cup';
-}
-
-export function brewTea(): string {
-  return pourCup();
-}
-`);
-
-  expect(result.fixed).toBe(`// the tea service
-
-export function brewTea(): string {
-  return pourCup();
-}
-
-// pours one cup
-function pourCup(): string {
-  return 'cup';
-}
-`);
+  expect(result.fixed).toBe(expected);
+  expect(reported).toStrictEqual(messages);
+  expect(result.stdout.split('zgeoff(module-order)')).toHaveLength(messages.length + 1);
 });

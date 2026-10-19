@@ -12,8 +12,8 @@
     // tools' own tests declare about 50 module-level helpers and constants,
     // so the rule stays off here until a pass moves them out
     "zgeoff/setup-test-only": "off",
-    // tools' own code breaks the module order in about 100 places, so the
-    // rule stays off here until a `--fix` pass and a pass by hand land
+    // tools' own code breaks the module order in many files, so the rule is
+    // off here
     "zgeoff/module-order": "off"
   }
 }

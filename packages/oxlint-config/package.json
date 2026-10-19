@@ -16,6 +16,7 @@
     "module-order.js",
     "collect-module-entries.js",
     "build-module-order-fix.js",
+    "is-static-value.js",
     "find-function-name.js",
     "is-verb-match.js",
     "no-restricted-words.js",

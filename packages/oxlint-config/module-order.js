@@ -75,7 +75,7 @@ function checkModule(context, program) {
 
 // the default export, else the export the file is named for, else the only
 // value the file exports; `export default name` names the declaration of
-// `name`
+// `name`, and a default export of any other expression is the statement
 function findPrimaryExport(entries, filename) {
   const defaultEntry = entries.find((entry) => entry.exportKind === 'default') ?? null;
   const defaultName =
@@ -88,7 +88,7 @@ function findPrimaryExport(entries, filename) {
   );
 
   if (defaultEntry !== null) {
-    return values.find((entry) => entry === defaultEntry || entry.name === defaultName) ?? null;
+    return values.find((entry) => entry.name === defaultName) ?? defaultEntry;
   }
 
   const [fileBase] = basename(filename).split('.');
@@ -255,7 +255,7 @@ function collectDeclarationReports(layout, helperReports) {
   for (const entry of layout.entries) {
     const home = homes.get(entry) ?? null;
 
-    if (home === null || isReadByLiveFunction(entry)) {
+    if (home === null || (hasValue(entry) && isReadByLiveFunction(entry))) {
       continue;
     }
 
@@ -276,6 +276,13 @@ function collectDeclarationReports(layout, helperReports) {
   }
 
   return reports;
+}
+
+// a type has no value to read unset, so it is always checked
+function hasValue(entry) {
+  const type = entry.declaration.type;
+
+  return type !== 'TSTypeAliasDeclaration' && type !== 'TSInterfaceDeclaration';
 }
 
 function isReadByLiveFunction(entry) {

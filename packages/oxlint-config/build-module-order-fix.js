@@ -1,7 +1,10 @@
+import isStaticValue from './is-static-value.js';
+
 // one fix that moves every safe declaration the reports name, since oxlint
 // fixes a file in one pass; `moved` holds the reported entries it moves, and
 // `fix` is null when nothing can move
 export default function buildModuleOrderFix(context, layout) {
+  const names = collectNames(layout.entries);
   const reported = new Set(layout.reports.map((report) => report.entry));
   const stacks = new Map();
   const helpers = [];
@@ -10,12 +13,12 @@ export default function buildModuleOrderFix(context, layout) {
   for (const report of layout.reports) {
     const entry = report.entry;
 
-    if (entry.kind === 'supporting' && isSafeToMove(entry)) {
+    if (entry.kind === 'supporting' && isSafeToMove(entry, names)) {
       declarations.push(entry);
     }
 
     if (entry.kind === 'function' && layout.ranks.has(entry) && !entry.isOverloaded) {
-      stacks.set(entry, collectStack(entry, layout, reported));
+      stacks.set(entry, collectStack(entry, layout, { reported, names }));
       helpers.push(entry);
     }
   }
@@ -23,7 +26,7 @@ export default function buildModuleOrderFix(context, layout) {
   const order = buildOrder(layout, { helpers, declarations, stacks });
   const isUnchanged = order.every((entry, index) => entry === layout.entries[index]);
 
-  if (isUnchanged) {
+  if (isUnchanged || isJoiningStatements(context.sourceCode.text, order)) {
     return { fix: null, moved: new Set() };
   }
 
@@ -35,10 +38,20 @@ export default function buildModuleOrderFix(context, layout) {
   };
 }
 
+// the names the file binds at its top level, so that a value can tell an
+// import or a global from a local
+function collectNames(entries) {
+  const imports = entries
+    .filter((entry) => entry.kind === 'import')
+    .flatMap((entry) => entry.statement.specifiers.map((specifier) => specifier.local.name));
+  const locals = entries.filter((entry) => entry.kind !== 'import').map((entry) => entry.name);
+
+  return { imports: new Set(imports), locals: new Set(locals) };
+}
+
 // a type always moves safely; a const moves only when every use sits in a
-// function body that runs after the module loads, and its value reads
-// nothing from the file but types
-function isSafeToMove(entry) {
+// function body that runs after the module loads, and its value is static
+function isSafeToMove(entry, names) {
   const type = entry.declaration.type;
 
   if (type === 'TSTypeAliasDeclaration' || type === 'TSInterfaceDeclaration') {
@@ -54,27 +67,20 @@ function isSafeToMove(entry) {
       reference.source === entry ||
       (reference.source !== null && !reference.source.isLive && !reference.isLoadTime),
   );
-  const readsOnlyTypes = entry.uses.every((use) => isTypeEntry(use.target));
 
-  return isUsedAfterLoad && readsOnlyTypes;
-}
-
-function isTypeEntry(entry) {
-  const type = entry.declaration.type;
-
-  return type === 'TSTypeAliasDeclaration' || type === 'TSInterfaceDeclaration';
+  return isUsedAfterLoad && isStaticValue(entry.declaration.declarations[0].init, names);
 }
 
 // the unreported consts and types whose home is the helper, which sit above
 // it and move with it when they move safely; a function declaration is
 // hoisted, so the helper itself always moves
-function collectStack(helper, layout, reported) {
+function collectStack(helper, layout, context) {
   return layout.entries.filter(
     (entry) =>
       entry.kind === 'supporting' &&
       layout.homes.get(entry) === helper &&
-      !reported.has(entry) &&
-      isSafeToMove(entry),
+      !context.reported.has(entry) &&
+      isSafeToMove(entry, context.names),
   );
 }
 
@@ -138,6 +144,32 @@ function findInsertAfter(order, previous) {
     next.declaration.name === previous.name;
 
   return isExportOfPrevious ? at + 1 : at;
+}
+
+// a statement that ends without a semicolon runs on into a next statement
+// that opens with a bracket or an operator, so the fix never puts one there
+function isJoiningStatements(text, order) {
+  return order.some(
+    (entry, index) =>
+      index > 0 &&
+      order[index - 1].index !== entry.index - 1 &&
+      !isTerminated(text, order[index - 1]) &&
+      /^[([`+\-/<]/u.test(text[entry.statement.range[0]]),
+  );
+}
+
+const blockDeclarationTypes = new Set([
+  'FunctionDeclaration',
+  'ClassDeclaration',
+  'TSInterfaceDeclaration',
+  'TSEnumDeclaration',
+  'TSModuleDeclaration',
+]);
+
+function isTerminated(text, entry) {
+  return (
+    text[entry.statement.range[1] - 1] === ';' || blockDeclarationTypes.has(entry.declaration.type)
+  );
 }
 
 // the range from the first entry that moves to the last, and its new text;
