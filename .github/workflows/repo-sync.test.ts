@@ -58,6 +58,7 @@ async function setupTest() {
         "Commit each entry's files",
         'Push the sync branch',
         'Open or update the pull request',
+        'Delete the per-entry sync branches',
         'Fail on the entries left out',
       ],
       {
@@ -350,4 +351,66 @@ test('it leaves a failing entry out, syncs the others, and fails the run', async
       state: 'open',
     },
   ]);
+});
+
+test('it keeps the sync/<name> branch of a failed entry and deletes the others', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeBranch('sync/socket', 'socket.yml', 'version: 1\n');
+  await ctx.writeBranch('sync/editorconfig', '.editorconfig', 'root = false\n');
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+  await ctx.writeSource('sync/socket.yml', 'version: 2\n');
+
+  await ctx.runSync(
+    [
+      {
+        name: 'socket',
+        description: 'The Socket config',
+        files: [{ source: 'sync/socket.yml', target: 'socket.yml' }],
+        build: 'exit 3',
+      },
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+      },
+    ],
+    'sync-v7',
+  );
+
+  const branches = await ctx.readBranchNames();
+
+  expect(branches).toStrictEqual(['main', 'repo-sync/zgeoff-tools', 'sync/socket']);
+});
+
+test('it keeps every sync/<name> branch when no pull request publishes', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeBranch('sync/readme', 'README.md', '# old app\n');
+  await ctx.writeSource('sync/readme.md', '# app\n');
+  await ctx.writeSource('sync/socket.yml', 'version: 2\n');
+
+  const exitCode = await ctx.runSync(
+    [
+      {
+        name: 'socket',
+        description: 'The Socket config',
+        files: [{ source: 'sync/socket.yml', target: 'socket.yml' }],
+        build: 'exit 3',
+      },
+      {
+        name: 'readme',
+        description: 'The readme',
+        files: [{ source: 'sync/readme.md', target: 'README.md' }],
+      },
+    ],
+    'sync-v7',
+  );
+
+  const branches = await ctx.readBranchNames();
+  const pulls = await ctx.readPullRequests();
+
+  expect(exitCode).toBe(1);
+  expect(branches).toStrictEqual(['main', 'sync/readme']);
+  expect(pulls).toStrictEqual([]);
 });

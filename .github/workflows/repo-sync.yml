@@ -253,22 +253,15 @@ jobs:
 
       # The branch is recreated from the base on every run, so it never
       # fast-forwards the remote, and the push forces it. GitHub closes the
-      # pull request of a deleted branch. Each entry's own branch, sync/<name>,
-      # is deleted too, since the one branch carries its files.
+      # pull request of a deleted branch.
       - name: Push the sync branch
         id: push
         env:
-          ENTRIES: ${{ needs.prepare.outputs.entries }}
           BRANCH: repo-sync/zgeoff-tools
           SYNCED: ${{ steps.entries.outputs.synced }}
           FAILED: ${{ steps.entries.outputs.failed }}
         run: |
           set -euo pipefail
-          while IFS= read -r name; do
-            if git ls-remote --exit-code --heads origin "sync/$name" > /dev/null; then
-              git push -q origin --delete "sync/$name"
-            fi
-          done < <(printf '%s' "$ENTRIES" | jq -r '.[].name')
           if [ "$SYNCED" != '[]' ]; then
             git push -q --force origin "$BRANCH"
             echo "pushed=true" >> "$GITHUB_OUTPUT"
@@ -302,6 +295,26 @@ jobs:
             exit 0
           fi
           gh pr create --base "$BASE" --head "$BRANCH" --title "$title" --body "$body"
+
+      # Each entry's own branch, sync/<name>, closes once the one pull request
+      # carries its files: after that pull request publishes, or when every
+      # entry matches the base. A failed entry keeps its branch.
+      - name: Delete the per-entry sync branches
+        env:
+          ENTRIES: ${{ needs.prepare.outputs.entries }}
+          PUSHED: ${{ steps.push.outputs.pushed }}
+          FAILED: ${{ steps.entries.outputs.failed }}
+        run: |
+          set -euo pipefail
+          if [ "$PUSHED" != true ] && [ "$FAILED" != '[]' ]; then
+            echo "No pull request published; the per-entry branches stay."
+            exit 0
+          fi
+          while IFS= read -r name; do
+            if git ls-remote --exit-code --heads origin "sync/$name" > /dev/null; then
+              git push -q origin --delete "sync/$name"
+            fi
+          done < <(printf '%s' "$ENTRIES" | jq -r --argjson failed "$FAILED" '.[].name | select(. as $name | $failed | index($name) | not)')
 
       - name: Fail on the entries left out
         env:
