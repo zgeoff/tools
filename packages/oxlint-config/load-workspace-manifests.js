@@ -6,22 +6,24 @@ import makeGlobMatcher from './make-glob-matcher.js';
 // root. Each glob segment matches one directory level, as a workspaces
 // field's globs do.
 export default function loadWorkspaceManifests(root, globs) {
-  const key = JSON.stringify([root, globs]);
-  let manifests = loadedManifests.get(key);
-
-  if (manifests === undefined) {
-    manifests = globs
+  return withManifestCache(JSON.stringify([root, globs]), () =>
+    globs
       .flatMap((glob) => readGlobDirs(root, splitGlob(glob), ''))
       .map((directory) => loadManifest(join(root, directory)))
-      .filter((manifest) => typeof manifest?.name === 'string');
-
-    loadedManifests.set(key, manifests);
-  }
-
-  return manifests;
+      .filter((manifest) => typeof manifest?.name === 'string'),
+  );
 }
 
 const loadedManifests = new Map();
+
+// each linted file asks again, so the manifests load once per root and globs
+function withManifestCache(key, load) {
+  if (!loadedManifests.has(key)) {
+    loadedManifests.set(key, load());
+  }
+
+  return loadedManifests.get(key);
+}
 
 function splitGlob(glob) {
   return glob.split('/').filter((segment) => segment !== '' && segment !== '.');
