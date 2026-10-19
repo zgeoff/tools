@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.5.0...@zgeoff/oxlint-config@0.5.1) (2026-10-19)
+
+### Features
+
+- **oxlint-config:** pair a browser suite with its module
+  ([#225](https://github.com/zgeoff/tools/issues/225))
+  ([37188ba](https://github.com/zgeoff/tools/commit/37188baab2308c467bbd2c8743dd6dfe118c48ce))
+
 ## [0.5.0](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.4.0...@zgeoff/oxlint-config@0.5.0) (2026-10-19)
 
 ### ⚠ BREAKING CHANGES
