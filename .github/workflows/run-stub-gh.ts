@@ -12,7 +12,7 @@ interface StubPullRequest {
 }
 
 const [statePath = '', ...commandLine] = process.argv.slice(2);
-const parsed = parseCommandLine(commandLine);
+const parsed = parseCommandLine(commandLine) ?? exitWithUsage();
 
 const stateText = await readFile(statePath, 'utf8');
 
@@ -103,7 +103,7 @@ function parseCommandLine(args: string[]) {
       },
     });
   } catch {
-    return exitWithUsage();
+    return null;
   }
 }
 
