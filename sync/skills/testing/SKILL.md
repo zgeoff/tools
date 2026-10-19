@@ -35,8 +35,8 @@ Each line links the section that explains it.
 - [Structure and naming](#structure-and-naming): flat `test()` calls titled "it …", one act per
   test, and no `describe`.
 - [Loops](#loops): replace a loop of assertions with `test.each` or one collection matcher.
-- [`setupTest`](#setuptest): one local `setupTest()` holds wiring only, and each test creates the
-  records it asserts on.
+- [`setupTest`](#setuptest): one local `setupTest()` holds wiring only, and each test creates all of
+  its data.
 - [Cleanup](#cleanup): register `onTestFinished` right after each acquisition, with no hooks and no
   `try`/`finally`.
 - [Test data](#test-data): literals stay inline, shared domain types get tested factories, and
@@ -244,13 +244,11 @@ never appear in a test file.
   recorders, and the unit built through its factory. It takes no argument, or a typed config object
   that selects which dependencies to wire and carries no value that a test's outcome depends on. It
   returns named properties and has no `if`.
-- `setupTest()` creates no record and calls no operation of the code under test; building the unit
-  through its factory is not an operation. A record is a row, a file, or a store entry that the unit
-  reads, or the starting value of the clock or another wired dependency when a test's outcome
-  depends on it. A temp directory, a schema, and a handle are wiring. Each test creates every record
-  it asserts on, or whose values its outcome depends on, in its own body with those values written
-  there, even when every test in the file needs the same record. A factory with explicit arguments
-  may create it, such as `createStep({ leaseMs: 30_000 })`.
+- `setupTest()` wires dependencies and creates no data. Data is any row, file, store entry, or
+  starting value that the code under test reads. Each test creates all of its data in its arrange
+  phase, even when every test in the file needs the same data. A wired clock starts at a fixed
+  default; a test that reads the time sets the clock in its arrange phase. A temp directory, a
+  schema, and a handle are wiring.
 - A shared helper whose arguments carry the scenario, such as `startTestSite(pages)`, is called in
   the test body with those arguments written there. `setupTest()` wraps only a helper that takes no
   scenario.
@@ -273,6 +271,49 @@ never appear in a test file.
   and it moves to the shared test utils.
 - Each test file keeps its own `setupTest()`. A shared one gathers a flag for every suite that uses
   it.
+
+In this made-up example, `setupTest()` returns only the wiring, and the test inserts the user in its
+arrange phase:
+
+```ts
+async function setupTest() {
+  const db = await createTestDatabase();
+  const client = createNotesClient({ db });
+
+  return { db, client };
+}
+
+test('it lists the notes of a user with none as empty', async () => {
+  const ctx = await setupTest();
+  const user = await ctx.db
+    .insertInto('users')
+    .values({ name: 'ada' })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+
+  expect(await ctx.client.listNotes({ userID: user.id })).toStrictEqual([]);
+});
+```
+
+In the made-up counter-example, `setupTest()` inserts the user row and returns it, so it creates
+data:
+
+```ts
+async function setupTest() {
+  const db = await createTestDatabase();
+  const client = createNotesClient({ db });
+  const user = await db
+    .insertInto('users')
+    .values({ name: 'ada' })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+
+  return { db, client, user };
+}
+```
+
+Repeated arrange lines stay inline, or move to a tested shared util that the test calls with its
+arguments, such as `createTestUser(ctx, { name: 'ada' })`.
 
 Register cleanup with `onTestFinished` immediately after each successful resource acquisition, so a
 later setup step or assertion that throws still releases the resource. `setupTest()` returns named
