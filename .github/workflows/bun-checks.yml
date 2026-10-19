@@ -6,9 +6,10 @@
 # the standard list: audit deadcode format:check lint check typecheck test,
 # where check runs only when the repo defines it. Any other name the repo's
 # package.json does not define fails the run before any script runs, so a
-# renamed script cannot drop a check without notice. The synced
-# caller passes the BUN_CHECK_SCRIPTS and NODE_VERSION repo variables, so a
-# repo changes the list or adds Node without editing the caller.
+# renamed script cannot drop a check without notice. The synced caller passes
+# the BUN_CHECK_SCRIPTS, NODE_VERSION and BUN_CHECK_TIMEOUT_MINUTES repo
+# variables, so a repo changes the list, adds Node or sets the checks job's time
+# limit without editing the caller.
 name: Bun checks (reusable)
 
 on:
