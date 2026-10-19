@@ -5,9 +5,11 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 
+const TSC_PATH = join(import.meta.dir, '../../node_modules/.bin/tsc');
+
 // The package packed and installed from its tarball into a fresh project, with the entry point a
-// repo carries at .claude/hooks/skill-gate/skill-gate.ts. The pack writes under the test's own
-// folder, so overlapping runs cannot race.
+// repo carries at .claude/hooks/skill-gate/skill-gate.ts. Every build and pack writes under the
+// test's own folder, never the shared dist, so overlapping runs cannot race.
 async function setupTest() {
   const dir = await mkdtemp(join(tmpdir(), 'skill-gate-package-'));
 
@@ -15,17 +17,40 @@ async function setupTest() {
 
   // The real HOME keeps bun install on the shared cache.
   const env = { PATH: process.env['PATH'], HOME: process.env['HOME'] };
+  const unpacked = join(dir, 'unpacked');
   const packed = join(dir, 'packed');
   const project = join(dir, 'project');
 
   await Promise.all([
+    mkdir(unpacked),
     mkdir(packed),
     mkdir(join(project, '.claude/hooks/skill-gate'), { recursive: true }),
   ]);
 
-  // The runtime loads the shipped source, so the pack needs no build.
-  await $`bun pm pack --ignore-scripts --destination ${packed}`
+  // The source pack runs no build; it gives the published manifest, with workspace versions
+  // resolved. The declarations then build into the unpacked copy, as the publish's prepare does.
+  await $`bun pm pack --ignore-scripts --destination ${dir}`
     .cwd(import.meta.dir)
+    .env(env)
+    .quiet();
+
+  const entries = await readdir(dir);
+
+  const manifest = entries.find((name) => name.endsWith('.tgz'));
+
+  invariant(manifest !== undefined, 'bun pm pack wrote no tarball');
+
+  await $`tar -xzf ${join(dir, manifest)} -C ${unpacked}`.env(env).quiet();
+
+  await rm(join(unpacked, 'package/dist'), { recursive: true, force: true });
+
+  await $`bun run build:outdir ${join(unpacked, 'package/dist')}`
+    .cwd(import.meta.dir)
+    .env(env)
+    .quiet();
+
+  await $`bun pm pack --ignore-scripts --destination ${packed}`
+    .cwd(join(unpacked, 'package'))
     .env(env)
     .quiet();
 
@@ -115,4 +140,56 @@ test('it allows an ungated edit through the entry point with no output', async (
 
   expect(result.exitCode).toBe(0);
   expect(result.stdout.toString()).toBe('');
+});
+
+test('it types runSkillGate from the shipped declarations for a TypeScript consumer', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.project, 'consumer.ts'),
+    [
+      "import { runSkillGate } from '@zgeoff/skill-gate';",
+      '',
+      'type IsEqual<A, B> =',
+      '  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;',
+      '',
+      'export const isRunSkillGateTyped: IsEqual<typeof runSkillGate, () => Promise<never>> = true;',
+      '',
+    ].join('\n'),
+  );
+
+  await writeFile(
+    join(ctx.project, 'tsconfig.json'),
+    JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        noEmit: true,
+        module: 'preserve',
+        moduleResolution: 'bundler',
+        types: [],
+      },
+      files: ['consumer.ts'],
+    }),
+  );
+
+  const result = await $`${TSC_PATH} -p ${ctx.project} --listFilesOnly`
+    .cwd(ctx.project)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  const listed = result.stdout.toString();
+
+  expect(result.exitCode).toBe(0);
+  expect(listed).toContain('node_modules/@zgeoff/skill-gate/dist/index.d.ts');
+  expect(listed).not.toContain('node_modules/@zgeoff/skill-gate/src/');
+
+  const checked = await $`${TSC_PATH} -p ${ctx.project}`
+    .cwd(ctx.project)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect(checked.stdout.toString()).toBe('');
+  expect(checked.exitCode).toBe(0);
 });

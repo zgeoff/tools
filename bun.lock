@@ -155,6 +155,9 @@
     "packages/skill-gate": {
       "name": "@zgeoff/skill-gate",
       "version": "0.1.0",
+      "dependencies": {
+        "@zgeoff/std": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "catalog:",
         "tiny-invariant": "catalog:",

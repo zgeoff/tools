@@ -1,3 +1,4 @@
+import { isRecord } from '@zgeoff/std';
 import type { LoadedSkills } from './types.ts';
 
 // Collects the skills a transcript loaded since its last compaction, which voids earlier loads even
@@ -94,8 +95,4 @@ function collectSkillCall(
   return typeof skill === 'string' && typeof id === 'string' && succeeded.includes(id)
     ? [skill]
     : [];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

@@ -1,3 +1,4 @@
+import { isRecord } from '@zgeoff/std';
 import type { SkillGate, SkillGateRulesResult } from './types.ts';
 
 // Parses a repo's .claude/skill-gate.json: an optional `ignore` list of path segments and a `gates`
@@ -22,10 +23,6 @@ function parseJSON(text: string): unknown {
   } catch (error) {
     return error instanceof Error ? error : new Error(String(error));
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 // An empty string would match every path as an ignore segment, and no session can load it as a skill.

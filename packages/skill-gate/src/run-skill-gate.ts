@@ -1,5 +1,6 @@
 import { statSync } from 'node:fs';
 import path from 'node:path';
+import { isRecord } from '@zgeoff/std';
 import type { BunFile } from 'bun';
 import { buildBashSkillGateOutput } from './build-bash-skill-gate-output.ts';
 import { buildSkillGateOutput } from './build-skill-gate-output.ts';
@@ -105,10 +106,6 @@ function parseHookInput(value: unknown): HookInput | null {
     transcriptPath,
     agentID: value['agent_id'],
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isOutsideProject(fromProject: string): boolean {

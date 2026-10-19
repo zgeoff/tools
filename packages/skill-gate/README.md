@@ -16,8 +16,8 @@ Install it at the repo root, so that Bun resolves it from `.claude/hooks/`. The 
 
 ## Entry point
 
-The hook runs a file in the repo that calls the package. The `hook-skill-gate` repo-sync entry
-delivers it to `.claude/hooks/skill-gate/skill-gate.ts`:
+The hook runs a file in the repo that calls the package, at
+`.claude/hooks/skill-gate/skill-gate.ts`:
 
 ```ts
 import { runSkillGate } from '@zgeoff/skill-gate';
@@ -63,8 +63,9 @@ pattern.
 }
 ```
 
-A rule that names a skill missing from `.claude/skills/`, or a rules file that does not parse, never
-denies an edit. The hook warns the user and the agent on every edit until the rule is fixed.
+The gate skips a skill that a rule names but `.claude/skills/` lacks, and it still requires the
+rule's other skills. A rules file that does not parse denies no edit. In both cases the hook warns
+the user and the agent on every edit until the rules file is fixed.
 
 ## Which loads count
 
