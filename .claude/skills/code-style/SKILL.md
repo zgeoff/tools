@@ -113,12 +113,9 @@ open, such as a string from outside the program.
 
 ## Comments
 
-Two lint rules own comment shape: `zgeoff/no-jsdoc` bans every `/** … */` block, and
-`zgeoff/max-consecutive-line-comments` bans a run of more than three consecutive `//` lines. Every
-repo runs both as `@zgeoff/oxlint-config` ships them, with no exception for authored code. A fact a
-reader needs has a home that stays true: the code, a type, a named constant, a test whose name
-states the rule, the commit body, or the subsystem's architecture doc for an invariant that callers
-obey. A comment holds only the residue none of those can hold.
+A fact a reader needs has a home that stays true: the code, a type, a named constant, a test whose
+name states the rule, the commit body, or the subsystem's architecture doc for an invariant that
+callers obey. A comment holds only the residue none of those can hold.
 
 - Write a `//` comment for one thing: the reason the obvious alternative is wrong, when the cause
   lives outside the file. A library defect, a harness quirk, a runtime or platform behaviour, a
