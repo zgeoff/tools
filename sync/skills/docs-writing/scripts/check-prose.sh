@@ -175,22 +175,40 @@ list_changed() {
 }
 
 # Prints file:line:words for each prose paragraph over the warning limit. The parser is one state
-# machine over CommonMark's block rules, so it counts what a renderer shows as a paragraph:
+# machine over the CommonMark block rules (with GFM tables), so it counts what a renderer shows as a
+# paragraph:
 #
 # - A paragraph runs until a blank line or a line that interrupts it: an ATX heading, a fence, an
 #   HTML block of types 1 to 6, a block quote, a thematic break, a bullet item with content, or an
 #   ordered item numbered 1 with content. Any other line continues it, indented or not.
-# - A line of = or - under a paragraph makes it a Setext heading, and a table delimiter row makes its
-#   last line a table header; neither counts. The paragraph lines above that header still count.
+# - Link reference definitions at the start of a paragraph are dropped before it is counted, as
+#   CommonMark drops them, so a definition never interrupts a paragraph and may span lines.
+# - A line of = or - under a paragraph makes it a Setext heading. A delimiter row with as many cells
+#   as the paragraph's last line makes that line a table header. Neither counts, but the paragraph
+#   lines above a header do.
 # - Indented code (4 columns or more where no paragraph is open), fenced code, block quotes, tables,
-#   link definitions, frontmatter and ATX headings never count.
-# - HTML blocks of types 1 to 5 (script, pre, style or textarea; a comment; a processing
-#   instruction; a declaration; CDATA) run to their closing marker across blank lines. Types 6 (a
-#   block tag) and 7 (a lone tag, which cannot interrupt a paragraph) run to a blank line.
+#   HTML blocks, frontmatter and ATX headings never count. A quote takes a lazy line only while a
+#   paragraph is open inside it.
+# - HTML blocks of types 1 to 5 run to their closing marker across blank lines. Types 6 and 7 run to
+#   a blank line, and type 7 (one complete tag alone on its line) cannot interrupt a paragraph.
 # - Nothing inside a list counts. A list runs while each line is blank, indented to the content of
 #   its outermost item, a new item, or a lazy continuation of a paragraph. A fence or an HTML block
-#   opened in a list ends with it.
+#   opened in a list ends with it, and an empty item followed by a blank line ends it.
 paragraph_awk='
+BEGIN {
+  q = sprintf("%c", 39)
+  esc = "\\\\."
+  label = "\\[[ \t\n]*([^][\\\\ \t\n]|" esc ")([^][\\\\]|" esc ")*\\]:"
+  destination = "(<([^<>\n\\\\]|" esc ")*>|[^ \t\n<][^ \t\n]*)"
+  title = "(\"([^\"\\\\]|" esc ")*\"|" q "([^" q "\\\\]|" esc ")*" q "|\\(([^()\\\\]|" esc ")*\\))"
+  definition = "^" label "[ \t]*\n?[ \t]*" destination
+  titled_definition = definition "([ \t]+|[ \t]*\n[ \t]*)" title "[ \t]*(\n|$)"
+  bare_definition = definition "[ \t]*(\n|$)"
+  value = "([^ \t\"" q "=<>`]+|" q "[^" q "]*" q "|\"[^\"]*\")"
+  attribute = "[ \t]+[A-Za-z_:][A-Za-z0-9_.:-]*([ \t]*=[ \t]*" value ")?"
+  open_tag = "^<[A-Za-z][A-Za-z0-9-]*(" attribute ")*[ \t]*/?>[ \t]*$"
+  closing_tag = "^</[A-Za-z][A-Za-z0-9-]*[ \t]*>[ \t]*$"
+}
 function indent_of(line, i, c, col) {
   col = 0
   for (i = 1; i <= length(line); i++) {
@@ -207,15 +225,35 @@ function is_atx(s) {
 function is_thematic(s) {
   return s ~ /^\*[ \t]*\*[ \t]*\*[ \t*]*$/ || s ~ /^-[ \t]*-[ \t]*-[ \t-]*$/ || s ~ /^_[ \t]*_[ \t]*_[ \t_]*$/
 }
+function is_setext_underline(s) {
+  return s ~ /^(=+|-+)[ \t]*$/
+}
+# A bullet, or an ordered marker of 1 to 9 digits, followed by a space, a tab or the line end.
 function is_item(s) {
-  return s ~ /^([-*+]|[0-9]+[.)])([ \t]|$)/
+  return s ~ /^[-*+]([ \t]|$)/ || (match(s, /^[0-9]+[.)]([ \t]|$)/) && match(s, /^[0-9]+/) && RLENGTH <= 9)
+}
+# Returns the fence marker this line opens, or "" when it opens none. A backtick fence takes no
+# backtick in its info string.
+function fence_open(s, m) {
+  m = fence_marker(s)
+  if (m != "" && substr(m, 1, 1) == "`" && index(fence_rest(s, m), "`")) return ""
+  return m
+}
+function fence_closes(opener, s, m) {
+  m = fence_marker(s)
+  return m != "" && substr(m, 1, 1) == substr(opener, 1, 1) && length(m) >= length(opener) &&
+    fence_rest(s, m) ~ /^[ \t]*$/
+}
+# Counts the cells of a table row: its unescaped pipes, less an outer pipe at either end, plus one.
+function cell_count(s, t) {
+  t = s
+  gsub(/\\\|/, "", t)
+  sub(/^[ \t]*\|/, "", t)
+  sub(/\|[ \t]*$/, "", t)
+  return gsub(/\|/, "|", t) + 1
 }
 function is_table_delimiter(s) {
   return s ~ /\|/ && s ~ /^\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/
-}
-# A link definition holds a label, a destination and an optional title, and nothing else.
-function is_link_definition(s) {
-  return s ~ /^\[[^]]+\]:[ \t]*(<[^>]*>|[^ \t<][^ \t]*)([ \t]+("[^"]*"|\([^)]*\)))?[ \t]*$/
 }
 # Returns the pattern that closes the HTML block this line starts for types 1 to 5, "closed" when
 # the same line closes it, "block" for type 6, or "" for any other line. A tag name needs a boundary
@@ -225,34 +263,115 @@ function html_start(s, lower) {
   if (match(lower, /^<(script|pre|style|textarea)([ \t>]|$)/)) return html_marker(lower, "</(script|pre|style|textarea)>")
   if (match(lower, /^<!--/)) return substr(lower, 5) ~ /^-?>|-->/ ? "closed" : "-->"
   if (match(lower, /^<\?/)) return html_marker(lower, "[?]>")
-  if (match(lower, /^<!\[cdata\[/)) return html_marker(lower, "]]>")
+  if (match(s, /^<!\[CDATA\[/)) return html_marker(s, "]]>")
   if (match(lower, /^<![a-z]/)) return html_marker(lower, ">")
   if (lower ~ /^<\/?(address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)([ \t>]|\/>|$)/) return "block"
   return ""
 }
-function html_marker(lower, marker) {
-  return substr(lower, RSTART + RLENGTH) ~ marker ? "closed" : marker
+function html_marker(text, marker) {
+  return substr(text, RSTART + RLENGTH) ~ marker ? "closed" : marker
 }
+# HTML block type 7: one complete open or closing tag, with valid attributes, alone on its line.
 function is_lone_tag(s) {
-  return s ~ /^<\/?[A-Za-z][A-Za-z0-9-]*([ \t][^<>]*)?\/?>[ \t]*$/
+  return (s ~ open_tag || s ~ closing_tag) && tolower(s) !~ /^<\/?(script|pre|style|textarea)[^a-z0-9-]/
 }
 function interrupts(s, rel) {
-  return rel < 4 && (fence_marker(s) != "" || is_atx(s) || is_thematic(s) || s ~ /^>/ ||
+  return rel < 4 && (fence_open(s) != "" || is_atx(s) || is_thematic(s) || s ~ /^>/ ||
     html_start(s) != "" || s ~ /^[-*+][ \t]+[^ \t]/ || s ~ /^1[.)][ \t]+[^ \t]/)
 }
-function flush() {
-  if (block == "para" && counted && words > warn) print start_file":"start_line":"words
+# Returns the index of the first paragraph line that no link reference definition holds.
+function first_text_line(text, i, k, matched, newlines) {
+  text = lines[1]
+  for (i = 2; i <= line_count; i++) text = text "\n" lines[i]
+  k = 0
+  while (text != "" && (match(text, titled_definition) || match(text, bare_definition))) {
+    matched = substr(text, 1, RLENGTH)
+    newlines = gsub(/\n/, "\n", matched)
+    k += (substr(matched, length(matched)) == "\n") ? newlines : newlines + 1
+    text = substr(text, RLENGTH + 1)
+  }
+  return k + 1
+}
+function flush(i, first, words, parts) {
+  if (block == "para" && counted) {
+    first = first_text_line()
+    words = 0
+    for (i = first; i <= line_count; i++) words += split(lines[i], parts)
+    if (words > warn) print start_file":"line_numbers[first]":"words
+  }
   block = ""
-  words = 0
+  line_count = 0
+}
+function add_line(s) {
+  lines[++line_count] = s
+  line_numbers[line_count] = FNR
+}
+# Reads one line of a block quote, given without its > markers, and records whether a paragraph,
+# a fence or an HTML block is open inside the quote.
+function read_quote(c, ind, t, h) {
+  ind = indent_of(c)
+  t = c
+  sub(/^[ \t]+/, "", t)
+  if (quote_fence != "") {
+    if (ind < 4 && fence_closes(quote_fence, t)) quote_fence = ""
+    return
+  }
+  if (quote_html != "") {
+    if (tolower(c) ~ quote_html) quote_html = ""
+    return
+  }
+  if (t == "") {
+    quote_para = 0
+    quote_block = 0
+    return
+  }
+  if (quote_block) return
+  if (quote_para) {
+    if (ind < 4 && is_setext_underline(t)) {
+      quote_para = 0
+      return
+    }
+    if (!interrupts(t, ind)) return
+    quote_para = 0
+  }
+  if (ind >= 4) return
+  if (fence_open(t) != "") {
+    quote_fence = fence_open(t)
+    return
+  }
+  h = html_start(t)
+  if (h == "closed") return
+  if (h == "block" || (h == "" && is_lone_tag(t))) {
+    quote_block = 1
+    return
+  }
+  if (h != "") {
+    quote_html = h
+    return
+  }
+  if (is_atx(t) || is_thematic(t)) return
+  if (is_item(t)) {
+    sub(/^([-*+]|[0-9]+[.)])[ \t]*/, "", t)
+    quote_para = (t != "")
+    return
+  }
+  quote_para = 1
+}
+function strip_quote_markers(s) {
+  while (s ~ /^[ \t]*>/) {
+    sub(/^[ \t]*>/, "", s)
+    sub(/^ /, "", s)
+  }
+  return s
 }
 # Starts the block that a line opens. s is the line without its indent, rel its indent in columns
 # past the enclosing list item, and ind the column where s starts.
-function start_block(s, rel, ind, m, h, mlen, rest, content, gap, off, parts) {
+function start_block(s, rel, ind, m, h, mlen, rest, content, gap, off) {
   if (rel >= 4) {
     block = "code"
     return
   }
-  m = fence_marker(s)
+  m = fence_open(s)
   if (m != "") {
     open = m
     return
@@ -270,6 +389,9 @@ function start_block(s, rel, ind, m, h, mlen, rest, content, gap, off, parts) {
   if (is_atx(s) || is_thematic(s)) return
   if (s ~ /^>/) {
     block = "quote"
+    quote_para = quote_block = 0
+    quote_fence = quote_html = ""
+    read_quote(strip_quote_markers(s))
     return
   }
   if (is_item(s)) {
@@ -280,21 +402,18 @@ function start_block(s, rel, ind, m, h, mlen, rest, content, gap, off, parts) {
     sub(/^[ \t]+/, "", content)
     gap = length(rest) - length(content)
     off = ind + mlen + ((content == "" || gap >= 5) ? 1 : gap)
-    if (!in_list || ind < list_off) list_off = off
+    if (!in_list || ind < list_off) {
+      list_off = off
+      empty_item = (content == "")
+    }
     in_list = 1
     if (content != "") start_block(content, gap >= 5 ? gap - 1 : 0, off)
     return
   }
-  if (is_link_definition(s)) {
-    block = "linkdef"
-    return
-  }
   block = "para"
   counted = !in_list
-  words = split(s, parts)
-  last_words = words
   start_file = FILENAME
-  start_line = FNR
+  add_line(s)
 }
 FNR == 1 {
   flush()
@@ -312,6 +431,9 @@ front {
   s = $0
   sub(/^[ \t]+/, "", s)
   blank = (s == "")
+  # An empty item followed by a blank line holds nothing more, so the list ends there.
+  if (in_list && blank && empty_item && open == "" && html_end == "") in_list = 0
+  if (in_list && !blank) empty_item = 0
   # A line left of the list content ends the list, unless it starts a new item or lazily continues
   # a paragraph. A fence or an HTML block opened in the list ends with it.
   if (in_list && !blank && ind < list_off) {
@@ -322,7 +444,7 @@ front {
     }
     if (ind < 4 && is_item(s) && !is_thematic(s)) {
       flush()
-    } else if ((block == "para" || block == "quote" || block == "table") && !interrupts(s, ind)) {
+    } else if ((block == "para" || (block == "quote" && quote_para)) && !interrupts(s, ind)) {
       next
     } else {
       flush()
@@ -331,8 +453,7 @@ front {
   }
   rel = (in_list && ind >= list_off) ? ind - list_off : ind
   if (open != "") {
-    m = fence_marker(s)
-    if (m != "" && rel < 4 && closes(m, fence_rest(s, m))) open = ""
+    if (rel < 4 && fence_closes(open, s)) open = ""
     next
   }
   if (html_end != "") {
@@ -343,36 +464,39 @@ front {
     flush()
     next
   }
-  if (block == "linkdef") {
-    block = ""
-    if (rel < 4 && s ~ /^("[^"]*"|\([^)]*\))[ \t]*$/) next
-  }
   if (block == "html") next
   if (block == "code") {
     if (rel >= 4) next
     block = ""
   }
   if (block == "para") {
-    if (rel < 4 && s ~ /^(=+|-+)[ \t]*$/) {
-      block = ""
-      words = 0
+    if (rel < 4 && is_setext_underline(s)) {
+      # A paragraph of link definitions alone has no text to underline, so the line is text.
+      if (first_text_line() <= line_count) block = ""
+      else add_line(s)
       next
     }
-    if (rel < 4 && is_table_delimiter(s)) {
-      words -= last_words
+    if (rel < 4 && is_table_delimiter(s) && cell_count(s) == cell_count(lines[line_count])) {
+      line_count--
       flush()
       block = "table"
       next
     }
     if (!interrupts(s, rel)) {
-      last_words = split(s, parts)
-      words += last_words
+      add_line(s)
       next
     }
     flush()
   }
-  if (block == "quote" || block == "table") {
-    if (block == "quote" && rel < 4 && s ~ /^>/) next
+  if (block == "quote") {
+    if (rel < 4 && s ~ /^>/) {
+      read_quote(strip_quote_markers(s))
+      next
+    }
+    if (quote_para && quote_fence == "" && quote_html == "" && !interrupts(s, rel)) next
+    block = ""
+  }
+  if (block == "table") {
     if (!interrupts(s, rel)) next
     block = ""
   }

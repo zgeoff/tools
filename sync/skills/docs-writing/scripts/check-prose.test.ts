@@ -140,7 +140,8 @@ test('it passes a long list, its wrapped lines and its later paragraphs', async 
 });
 
 // Each row holds a document, the exit status, and the paragraphs over the warning limit that the
-// script reports for it, as CommonMark parses the document's blocks.
+// script reports for it, as CommonMark parses the document's blocks. The rows after the general
+// cases follow the spec sections, one row for each block rule and its edge.
 test.each<[string, string, number, string[]]>([
   ['a 250-word paragraph', `${'word '.repeat(250)}\n`, 0, ['guide.md:1:250 words']],
   ['a 150-word paragraph', `${'word '.repeat(150)}\n`, 0, []],
@@ -328,6 +329,339 @@ test.each<[string, string, number, string[]]>([
     1,
     ['guide.md:4:251 words'],
   ],
+
+  // CommonMark 4.1, thematic breaks.
+  [
+    'a thematic break of spaced hyphens between paragraphs',
+    `${'word '.repeat(200)}\n- - -\n${'word '.repeat(200)}\n`,
+    0,
+    ['guide.md:1:200 words', 'guide.md:3:200 words'],
+  ],
+  [
+    'a thematic break of underscores between paragraphs',
+    `${'word '.repeat(200)}\n___\n${'word '.repeat(200)}\n`,
+    0,
+    ['guide.md:1:200 words', 'guide.md:3:200 words'],
+  ],
+
+  // CommonMark 4.2, ATX headings.
+  [
+    'an ATX heading that interrupts a paragraph',
+    `${'word '.repeat(200)}\n## Heading\n${'word '.repeat(200)}\n`,
+    0,
+    ['guide.md:1:200 words', 'guide.md:3:200 words'],
+  ],
+  [
+    'a hash with no space after it',
+    `#hashtag ${'word '.repeat(250)}\n`,
+    1,
+    ['guide.md:1:251 words'],
+  ],
+  [
+    'an ATX heading indented four columns inside a paragraph',
+    `${'word '.repeat(200)}\n    # Not a heading\n`,
+    0,
+    ['guide.md:1:204 words'],
+  ],
+
+  // CommonMark 4.3, Setext headings.
+  [
+    'a Setext underline with inner spaces',
+    `${'word '.repeat(200)}\n= =\n${'word '.repeat(100)}\n`,
+    1,
+    ['guide.md:1:302 words'],
+  ],
+  [
+    'a Setext underline indented four columns',
+    `${'word '.repeat(250)}\n    ===\n`,
+    1,
+    ['guide.md:1:251 words'],
+  ],
+  [
+    'an underline under a paragraph of link definitions alone',
+    `[ref]: /guide\n===\n${'word '.repeat(250)}\n`,
+    1,
+    ['guide.md:2:251 words'],
+  ],
+
+  // CommonMark 4.4, indented code blocks.
+  [
+    'an HTML comment marker in tab-indented code',
+    `\t<!--\n\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:3:251 words'],
+  ],
+  [
+    'indented code after a paragraph and a blank line',
+    `Intro.\n\n    ${'word '.repeat(300)}\n`,
+    0,
+    [],
+  ],
+  [
+    'a fence marker in indented code',
+    `Intro.\n\n    \`\`\`\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:4:251 words'],
+  ],
+
+  // CommonMark 4.5, fenced code blocks.
+  [
+    'a tilde fence',
+    `~~~\n${'word '.repeat(300)}\n~~~\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:4:251 words'],
+  ],
+  [
+    'a fence that a shorter marker leaves open',
+    `\`\`\`\`\n${'word '.repeat(300)}\n\`\`\`\n${'word '.repeat(300)}\n\`\`\`\`\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:6:251 words'],
+  ],
+  [
+    'a fence that a closer indented four columns leaves open',
+    `\`\`\`\n${'word '.repeat(300)}\n    \`\`\`\n${'word '.repeat(300)}\n\`\`\`\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:6:251 words'],
+  ],
+  [
+    'a tilde fence that backticks leave open',
+    `~~~\n${'word '.repeat(300)}\n\`\`\`\n${'word '.repeat(300)}\n~~~\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:6:251 words'],
+  ],
+  [
+    'a backtick fence whose info string holds a backtick',
+    `\`\`\` a\`b ${'word '.repeat(250)}\n`,
+    1,
+    ['guide.md:1:252 words'],
+  ],
+  ['a fence left open to the end of the file', `\`\`\`text\n${'word '.repeat(300)}\n`, 0, []],
+  [
+    'a fence that interrupts a paragraph',
+    `${'word '.repeat(200)}\n\`\`\`text\n${'word '.repeat(300)}\n\`\`\`\n`,
+    0,
+    ['guide.md:1:200 words'],
+  ],
+
+  // CommonMark 4.6, HTML blocks.
+  [
+    'lower-case cdata, which starts no HTML block',
+    `<![cdata[\n\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:3:251 words'],
+  ],
+  [
+    'a lone open tag with valid attributes',
+    `<a href="/guide" title='Guide' hidden>\n${'word '.repeat(300)}\n\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:4:251 words'],
+  ],
+  [
+    'a lone tag with an invalid attribute',
+    `<span invalid=>\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:1:253 words'],
+  ],
+  [
+    'a lone closing tag',
+    `</span>\n${'word '.repeat(300)}\n\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:4:251 words'],
+  ],
+  [
+    'a lone closing pre tag, which starts no HTML block',
+    `</pre>\n${'word '.repeat(250)}\n`,
+    1,
+    ['guide.md:1:251 words'],
+  ],
+  [
+    'a block tag that interrupts a paragraph',
+    `${'word '.repeat(200)}\n<div>\n${'word '.repeat(300)}\n\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:5:251 words', 'guide.md:1:200 words'],
+  ],
+  [
+    'a pre block that another raw-text closing tag ends',
+    `<pre>\n\n${'word '.repeat(300)}\n</style>\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:5:251 words'],
+  ],
+  [
+    'a declaration closed on its own line',
+    `<!doctype html>\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:2:251 words'],
+  ],
+
+  // CommonMark 4.7, link reference definitions.
+  [
+    'a link definition with a single-quoted title',
+    `[ref]: /guide '${'word '.repeat(251)}'\n`,
+    0,
+    [],
+  ],
+  [
+    'a single-quoted title on the next line',
+    `[ref]: /guide\n'The title'\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:3:251 words'],
+  ],
+  [
+    'a parenthesized title',
+    `[ref]: /guide (The title)\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:2:251 words'],
+  ],
+  [
+    'a title that spans lines',
+    `[ref]: /guide '\nThe title\nruns on\n'\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:5:251 words'],
+  ],
+  [
+    'a title that a blank line breaks',
+    `[ref]: /guide 'The title ${'word '.repeat(250)}\n\nends here.'\n`,
+    1,
+    ['guide.md:1:254 words'],
+  ],
+  [
+    'a destination on the next line',
+    `[ref]:\n/guide\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:3:251 words'],
+  ],
+  [
+    'an angle-bracket destination with a space',
+    `[ref]: <my guide.md> "Title"\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:2:251 words'],
+  ],
+  [
+    'an empty label, which makes no link definition',
+    `[]: /guide\n${'word '.repeat(250)}\n`,
+    1,
+    ['guide.md:1:252 words'],
+  ],
+  [
+    'a link definition inside a paragraph',
+    `${'word '.repeat(200)}\n[ref]: /guide\n${'word '.repeat(100)}\n`,
+    1,
+    ['guide.md:1:302 words'],
+  ],
+  [
+    'an invalid title on the line after a definition',
+    `[ref]: /guide\n"The title" ${'word '.repeat(250)}\n`,
+    1,
+    ['guide.md:2:252 words'],
+  ],
+  [
+    'link definitions in a row',
+    `[a]: /a\n[b]: /b 'B'\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:3:251 words'],
+  ],
+  [
+    'a label that spans lines',
+    `[my\nref]: /guide\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:3:251 words'],
+  ],
+
+  // GFM 4.10, tables.
+  [
+    'a delimiter row with a different cell count',
+    `a | b\n--- | --- | ---\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:1:259 words'],
+  ],
+  [
+    'a table that a heading ends',
+    `a | b\n--- | ---\nrow | row\n# Heading\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:5:251 words'],
+  ],
+  [
+    'a table that a blank line ends',
+    `a | b\n--- | ---\nrow | row\n\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:5:251 words'],
+  ],
+  ['a table row with no pipes', `a | b\n--- | ---\n${'word '.repeat(300)}\n`, 0, []],
+  ['an escaped pipe in a table header', `a \\| b | c\n--- | ---\n${'word '.repeat(300)}\n`, 0, []],
+
+  // CommonMark 5.1, block quotes.
+  [
+    'an unmarked line after a quoted heading',
+    `> # Heading\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:2:251 words'],
+  ],
+  [
+    'an unmarked line after quoted fenced code',
+    `> \`\`\`\n> code\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:3:251 words'],
+  ],
+  [
+    'an unmarked line after quoted indented code',
+    `>     code\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:2:251 words'],
+  ],
+  [
+    'a thematic break after a quote',
+    `> A quote.\n---\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:3:251 words'],
+  ],
+  [
+    'a blank line after a quote',
+    `> A quote.\n\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:3:251 words'],
+  ],
+  ['a lazy line after a nested quote', `> > A quote.\n${'word '.repeat(300)}\n`, 0, []],
+  ['a lazy line after a quoted list item', `> - An item.\n${'word '.repeat(300)}\n`, 0, []],
+  [
+    'a quote that interrupts a paragraph',
+    `${'word '.repeat(200)}\n> A quote.\n`,
+    0,
+    ['guide.md:1:200 words'],
+  ],
+
+  // CommonMark 5.2 and 5.3, list items and lists.
+  [
+    'an empty item, which cannot interrupt a paragraph',
+    `${'word '.repeat(200)}\n*\n${'word '.repeat(100)}\n`,
+    1,
+    ['guide.md:1:301 words'],
+  ],
+  [
+    'an ordered item numbered 1 that interrupts a paragraph',
+    `${'word '.repeat(200)}\n1. ${'word '.repeat(200)}\n`,
+    0,
+    ['guide.md:1:200 words'],
+  ],
+  [
+    'a ten-digit ordered marker',
+    `1234567890. ${'word '.repeat(250)}\n`,
+    1,
+    ['guide.md:1:251 words'],
+  ],
+  [
+    'an item whose content starts as indented code',
+    `-     <!--\n\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:3:251 words'],
+  ],
+  [
+    'an empty item followed by a blank line',
+    `-\n\n  ${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:3:251 words'],
+  ],
+  ['an item whose content starts on the next line', `-\n  ${'word '.repeat(300)}\n`, 0, []],
+  ['an item marker indented four columns', `    - ${'word '.repeat(300)}\n`, 0, []],
 ])('it reports the long paragraphs in %s', async (_label, text, status, reported) => {
   const ctx = await setupTest();
 
@@ -337,7 +671,7 @@ test.each<[string, string, number, string[]]>([
 
   expect(result.status).toBe(status);
 
-  expect(result.stdout.split('\n').filter((line) => line.startsWith('guide.md:'))).toStrictEqual(
+  expect(result.stdout.split('\n').filter((line) => line.endsWith(' words'))).toStrictEqual(
     reported,
   );
 });
