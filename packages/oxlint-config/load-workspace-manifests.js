@@ -8,7 +8,7 @@ import makeGlobMatcher from './make-glob-matcher.js';
 export default function loadWorkspaceManifests(root, globs) {
   return withManifestCache(JSON.stringify([root, globs]), () =>
     globs
-      .flatMap((glob) => readGlobDirs(root, splitGlob(glob), ''))
+      .flatMap((glob) => readGlobDirectories(root, splitGlob(glob), ''))
       .map((directory) => loadManifest(join(root, directory)))
       .filter((manifest) => typeof manifest?.name === 'string'),
   );
@@ -29,7 +29,7 @@ function splitGlob(glob) {
   return glob.split('/').filter((segment) => segment !== '' && segment !== '.');
 }
 
-function readGlobDirs(root, segments, prefix) {
+function readGlobDirectories(root, segments, prefix) {
   const [segment, ...rest] = segments;
 
   if (segment === undefined) {
@@ -45,7 +45,7 @@ function readGlobDirs(root, segments, prefix) {
         .filter((name) => isMatch(name))
     : [];
 
-  return names.flatMap((name) => readGlobDirs(root, rest, join(prefix, name)));
+  return names.flatMap((name) => readGlobDirectories(root, rest, join(prefix, name)));
 }
 
 // `dir` is the field the resolver reads from every manifest it loads

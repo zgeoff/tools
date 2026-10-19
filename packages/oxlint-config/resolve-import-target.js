@@ -1,15 +1,13 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { isBuiltin } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import resolvePackageTarget from './resolve-package-target.js';
 
 // a `.js` specifier in TypeScript source names the `.ts` file beside it
 const sourceExtensions = { '.js': ['.ts', '.tsx'], '.mjs': ['.mts'], '.cjs': ['.cts'] };
 
 // `module` for a package or builtin, `file` with the absolute path, or
-// `missing`. A workspace package's name and the importer's own, which `self`
-// marks, resolve through `exports`, and `#` names through `imports`.
+// `missing`. The own name, which `self` marks, resolves through `exports`, `#`
+// names through `imports`, and a workspace name to a path in its folder.
 export default function resolveImportTarget(filename, specifier, settings) {
   if (isPathSpecifier(specifier)) {
     return toTarget(findImportedFile(filename, toFileSpecifier(specifier), settings.extensions));
@@ -21,56 +19,66 @@ export default function resolveImportTarget(filename, specifier, settings) {
 }
 
 function resolveManifestTarget(manifest, specifier, settings) {
-  const conditions = settings.conditions;
   const name = manifest?.name;
 
   if (specifier.startsWith('#')) {
-    const mapped = findMappedTarget(manifest?.imports, specifier, { conditions, isImports: true });
+    const mapped = findMappedTarget(manifest?.imports, specifier, settings.conditions);
 
-    // a package the alias names resolves as that name would; a `#` target is
-    // not a valid mapping, so it stays a module
-    if (mapped !== null && !isPathSpecifier(mapped)) {
-      return mapped.startsWith('#')
-        ? { kind: 'module', specifier: mapped }
-        : { ...resolveManifestTarget(manifest, mapped, settings), self: false };
-    }
-
-    return toMappedTarget(manifest, mapped);
+    return mapped !== null && !isPathSpecifier(mapped)
+      ? resolveWorkspaceTarget(settings.workspaces, mapped)
+      : toMappedTarget(manifest, mapped);
   }
 
-  // a builtin keeps its name even when the own or a workspace package shares it
+  // a builtin keeps its name even when a package shares it
   if (isBuiltin(specifier)) {
     return { kind: 'module', specifier };
   }
 
   if (isPackageSpecifier(name, specifier)) {
-    return { ...resolveExportTarget(manifest, specifier, conditions), self: true };
+    const subpath = `.${specifier.slice(name.length)}`;
+    const mapped = findMappedTarget(toSubpathMap(manifest.exports), subpath, settings.conditions);
+
+    return { ...toMappedTarget(manifest, mapped), self: true };
   }
 
-  const workspace = settings.workspaces.find((candidate) =>
-    isPackageSpecifier(candidate.name, specifier),
-  );
-
-  if (workspace === undefined) {
-    return { kind: 'module', specifier };
-  }
-
-  const target = resolveExportTarget(workspace, specifier, conditions);
-
-  return target.kind === 'file' && !isFile(target.path) ? { kind: 'missing' } : target;
+  return resolveWorkspaceTarget(settings.workspaces, specifier);
 }
 
 function isPackageSpecifier(name, specifier) {
   return typeof name === 'string' && (specifier === name || specifier.startsWith(`${name}/`));
 }
 
-function resolveExportTarget(manifest, specifier, conditions) {
-  const subpath = `.${specifier.slice(manifest.name.length)}`;
+// the edges judge the package folder joined with the subpath, such as
+// `packages/store/testing`, so the exports map's keys matter and not its targets
+function resolveWorkspaceTarget(workspaces, specifier) {
+  const workspace = workspaces.find((candidate) => isPackageSpecifier(candidate.name, specifier));
 
-  return toMappedTarget(
-    manifest,
-    findMappedTarget(toSubpathMap(manifest.exports), subpath, { conditions, isImports: false }),
-  );
+  if (workspace === undefined) {
+    return { kind: 'module', specifier };
+  }
+
+  const subpath = `.${specifier.slice(workspace.name.length)}`;
+
+  return isExportedSubpath(workspace.exports, subpath)
+    ? { kind: 'file', path: join(workspace.dir, subpath) }
+    : { kind: 'missing' };
+}
+
+// the exact key, else the pattern key node picks, unless its value is null;
+// with no exports map, every subpath is public, and an empty one exports none
+function isExportedSubpath(exports, subpath) {
+  if (exports === undefined) {
+    return true;
+  }
+
+  if (typeof exports === 'object' && exports !== null && Object.keys(exports).length === 0) {
+    return false;
+  }
+
+  const map = toSubpathMap(exports);
+  const key = Object.hasOwn(map, subpath) ? subpath : findPatternKey(map, subpath);
+
+  return key !== undefined && map[key] !== null;
 }
 
 // a bundler query such as Vite's `./styles.css?url` names the file before it
@@ -85,19 +93,9 @@ function toTarget(path) {
 }
 
 function toMappedTarget(manifest, mapped) {
-  const path = mapped === null ? null : findMappedPath(manifest.dir, mapped);
-
-  return path === null ? { kind: 'missing' } : { kind: 'file', path };
-}
-
-// a mapped target is a URL path, as node resolves it against the package
-// URL, so `%20` names a space; a file URL path cannot encode `/`
-function findMappedPath(directory, mapped) {
-  try {
-    return fileURLToPath(new URL(mapped, pathToFileURL(`${directory}/`)));
-  } catch {
-    return null;
-  }
+  return mapped === null
+    ? { kind: 'missing' }
+    : { kind: 'file', path: resolve(manifest.dir, mapped) };
 }
 
 function isPathSpecifier(specifier) {
@@ -139,15 +137,21 @@ function toSubpathMap(exports) {
 
 // an exact key wins; otherwise the `*` pattern with the longest prefix, then
 // the longest key, as node picks it, its match substituted into the target
-function findMappedTarget(map, key, lookup) {
+function findMappedTarget(map, key, conditions) {
   if (typeof map !== 'object' || map === null) {
     return null;
   }
 
   if (Object.hasOwn(map, key)) {
-    return toTargetString(resolvePackageTarget(map[key], null, lookup));
+    return findConditionTarget(map[key], conditions);
   }
 
+  const pattern = findPatternKey(map, key);
+
+  return pattern === undefined ? null : findPatternTarget(map, pattern, { key, conditions });
+}
+
+function findPatternKey(map, key) {
   const [pattern] = Object.keys(map)
     .filter((candidate) => isPatternMatch(candidate, key))
     .toSorted((left, right) => {
@@ -156,19 +160,15 @@ function findMappedTarget(map, key, lookup) {
       return byPrefix === 0 ? right.length - left.length : byPrefix;
     });
 
-  if (pattern === undefined) {
-    return null;
-  }
-
-  const star = pattern.indexOf('*');
-  const match = key.slice(star, key.length - (pattern.length - star - 1));
-
-  return toTargetString(resolvePackageTarget(map[pattern], match, lookup));
+  return pattern;
 }
 
-// a blocked, unmatched or invalid target leaves the import unresolved
-function toTargetString(resolved) {
-  return typeof resolved === 'string' ? resolved : null;
+function findPatternTarget(map, pattern, lookup) {
+  const star = pattern.indexOf('*');
+  const match = lookup.key.slice(star, lookup.key.length - (pattern.length - star - 1));
+  const target = findConditionTarget(map[pattern], lookup.conditions);
+
+  return target === null ? null : target.replaceAll('*', match);
 }
 
 function isPatternMatch(pattern, key) {
@@ -182,6 +182,30 @@ function isPatternMatch(pattern, key) {
   const suffix = pattern.slice(star + 1);
 
   return key.length >= pattern.length && key.startsWith(prefix) && key.endsWith(suffix);
+}
+
+// node's rule: the first key, in object order, that names an active
+// condition; in an array, the first entry that yields a target
+function findConditionTarget(value, conditions) {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const candidates = Array.isArray(value)
+    ? value
+    : Object.keys(value)
+        .filter((condition) => conditions.has(condition))
+        .map((condition) => value[condition]);
+
+  return (
+    candidates
+      .map((candidate) => findConditionTarget(candidate, conditions))
+      .find((target) => target !== null) ?? null
+  );
 }
 
 function findImportedFile(filename, specifier, extensions) {
