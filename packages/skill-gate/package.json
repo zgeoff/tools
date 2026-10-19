@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/skill-gate",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A Claude Code PreToolUse hook that denies an edit until the session loads the skills the path needs, and warns on a Bash command that writes a gated path",
   "keywords": [
     "claude-code",
