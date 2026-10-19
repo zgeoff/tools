@@ -504,3 +504,37 @@ test('it leaves out every file of an entry whose workflow conflicts, syncs the o
   expect(workflow).toBe('name: Own CI\n');
   expect(subjects).toStrictEqual(['chore: sync editorconfig from zgeoff/tools']);
 });
+
+test('it keeps the sync branch and its pull request when every entry of a later release fails', async () => {
+  const ctx = await setupTest();
+
+  const entry = {
+    name: 'editorconfig',
+    description: 'The editor config',
+    files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+  };
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+  await ctx.runSync([entry], 'sync-v7');
+  await ctx.writeSource('sync/editorconfig', 'root = false\n');
+
+  const exitCode = await ctx.runSync([{ ...entry, build: 'exit 3' }], 'sync-v8');
+  const editorconfig = await ctx.readBranch('repo-sync/zgeoff-tools', '.editorconfig');
+  const pulls = await ctx.readPullRequests();
+
+  expect(exitCode).toBe(1);
+  expect(editorconfig).toBe('root = true\n');
+
+  expect(pulls).toStrictEqual([
+    {
+      number: 1,
+      base: 'main',
+      head: 'repo-sync/zgeoff-tools',
+      title: 'chore: sync zgeoff/tools sync-v7',
+      body:
+        'Copied from zgeoff/tools at sync-v7 by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry:\n\n' +
+        '- `editorconfig`: The editor config',
+      state: 'open',
+    },
+  ]);
+});
