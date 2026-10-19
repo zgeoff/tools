@@ -186,6 +186,9 @@ These decide a case that the rules below leave open.
   end-to-end suites that run the whole program, and `evals/` holds the
   [evaluation suites](./references/system-tests.md#evaluation-suites). The repo has no other
   `test/`, `tests/`, or `__tests__` directory.
+- A test that drives a real browser goes in `<module>.browser.test.ts` beside its module, which the
+  repo runs in a serial lane, as [Browser suites](./references/system-tests.md#browser-suites)
+  describes.
 
 ```ts
 test.each([
