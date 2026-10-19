@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.12](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.11...@zgeoff/oxlint-config@0.2.12) (2026-10-19)
+
+
+### Features
+
+* **geo-1282:** resolve workspace package names and flag self imports in zgeoff/import-zones ([#200](https://github.com/zgeoff/tools/issues/200)) ([e90e786](https://github.com/zgeoff/tools/commit/e90e786acc83e2d3a79fbce4d77c9d2b5a332e91))
+
 ## [0.2.11](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.10...@zgeoff/oxlint-config@0.2.11) (2026-10-18)
 
 ### Features
