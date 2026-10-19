@@ -194,9 +194,9 @@ function checkFrame(context, frame) {
     report('findCannotMiss', {});
   }
 
-  const canMiss = frame.returnsNullish || (resultType !== null && canBeNullish(resultType));
+  const declaresMiss = resultType !== null && canBeNullish(resultType);
 
-  if (pureVerb === 'get' && canMiss) {
+  if (pureVerb === 'get' && (frame.returnsNullish === true || declaresMiss)) {
     report('getCanMiss', {});
   }
 }
