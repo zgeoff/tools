@@ -93,7 +93,7 @@
     },
     "packages/format-codemod": {
       "name": "@zgeoff/format-codemod",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "bin": {
         "format-codemod": "./dist/cli.js",
       },
@@ -108,7 +108,7 @@
     },
     "packages/kysely-bun-sqlite": {
       "name": "@zgeoff/kysely-bun-sqlite",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "devDependencies": {
         "@types/bun": "catalog:",
         "kysely": "catalog:",
@@ -131,7 +131,7 @@
     },
     "packages/oxlint-config": {
       "name": "@zgeoff/oxlint-config",
-      "version": "0.2.13",
+      "version": "0.3.0",
       "dependencies": {
         "@stylistic/eslint-plugin": "catalog:",
       },
