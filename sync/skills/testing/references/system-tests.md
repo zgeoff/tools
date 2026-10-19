@@ -1,15 +1,16 @@
 # System tests
 
 These rules cover the tests that run a whole program or reach the host: end-to-end journeys,
-evaluation suites, property tests, native timers, real network stand-ins, and resources the host
-fixes. The [testing skill](../SKILL.md) rules apply throughout, and each section here names the one
-it relaxes.
+evaluation suites, property tests, native timers, real network stand-ins, stateful stand-ins for a
+program the repo drives, and resources the host fixes. The [testing skill](../SKILL.md) rules apply
+throughout, and each section here names the one it relaxes.
 
 - [End-to-end suites](#end-to-end-suites)
 - [Evaluation suites](#evaluation-suites)
 - [Property tests](#property-tests)
 - [Native timers and scenario delays](#native-timers-and-scenario-delays)
 - [Real applications and transport](#real-applications-and-transport)
+- [Stateful stand-ins](#stateful-stand-ins)
 - [Program-fixed paths and global resources](#program-fixed-paths-and-global-resources)
 
 ## End-to-end suites
@@ -108,6 +109,50 @@ requests from a child process, container, or VM outside the intercepted process.
 interceptor limitation with the installed versions. Keep real routing and serialization,
 schema-backed rich mock state, and visible failures for unexpected calls. Ordinary remote HTTP
 behavior keeps MSW where it applies.
+
+## Stateful stand-ins
+
+A program that the repo starts in another process and drives over its own protocol, such as a
+worker, a language server, or a sandboxed guest, gets a stateful stand-in for the host's tests. The
+stand-in speaks the real messages over the real framing, keeps the state the program keeps, and
+answers from that state. A test shapes the state through the stand-in's methods and drives the host
+through its real code. The program's own suite runs the real program, so the host's tests start no
+process.
+
+A scripted stand-in answers each message with whatever the test wrote for it. Each test then
+describes the program's behaviour again, and the stand-in accepts a message the real program
+refuses, so a host bug passes. When test after test scripts the same stand-in, give it state.
+
+In this made-up example, a build host sends jobs to a worker process that keeps a cache of
+checked-out repositories. A host that skips the checkout for a repository the worker evicted gets
+the refusal the real worker sends:
+
+```ts
+test('it checks a repository out again after the worker evicts it', async () => {
+  const ctx = await setupTest(); // the build host on the stub worker
+
+  await ctx.host.build({ repo: 'acme/api', ref: 'main' });
+
+  ctx.worker.evict('acme/api');
+
+  await ctx.host.build({ repo: 'acme/api', ref: 'main' });
+
+  expect(ctx.worker.received.map((message) => message.type)).toStrictEqual([
+    'checkout',
+    'build',
+    'checkout',
+    'build',
+  ]);
+});
+```
+
+A scripted worker answers the second `build` with the answer its script holds, so a host that never
+sends the second `checkout` still passes. The stateful worker holds no checkout for `acme/api` after
+the eviction, refuses the `build`, and fails the test.
+
+The stand-in follows the stand-in rules in [Test data](../SKILL.md#test-data): it lives in the
+shared test utils, takes a stand-in's file name, and has its own tests. Each of those tests pins one
+behaviour the stand-in copies from the real program, such as the refusal for an evicted repository.
 
 ## Program-fixed paths and global resources
 

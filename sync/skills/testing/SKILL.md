@@ -70,7 +70,8 @@ Open a reference when the task touches its area.
 - [Claude Code mod checks](./references/claude-code-mods.md): a mod's hooks, which
   `claude plugin test` runs.
 - [System tests](./references/system-tests.md): end-to-end and evaluation suites, property tests,
-  native timers, real transports, and paths the host fixes.
+  native timers, real transports, stateful stand-ins for a program the repo drives, and paths the
+  host fixes.
 - [Factories and composites](./references/factories.md): writing or changing a factory or a
   composite.
 - [Cleanup](./references/cleanup.md): helpers that register cleanup, ordered cleanup, cleanup after
@@ -563,16 +564,17 @@ A stand-in passed through the unit's own parameters replaces a boundary, and the
 [Test data](#test-data) decide where it lives. Replacing a method of a real object that the unit
 builds or imports is a spy, which [Infrastructure failures](#infrastructure-failures) bans.
 
-| Boundary                                       | The test uses                                                                         |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Pure computation                               | Return values, with no stand-in                                                       |
-| A CLI                                          | The real binary, spawned end to end                                                   |
-| The filesystem                                 | A real `mkdtemp` tree per test                                                        |
-| A database                                     | The real engine, isolated per test, as [database](./references/database.md) describes |
-| A remote HTTP or RPC service                   | MSW handlers, as [HTTP mocking](./references/http.md) describes                       |
-| A service with a cheap container               | The real service in a container                                                       |
-| An SDK with a command layer                    | A stand-in at the command layer                                                       |
-| A queue or pub/sub without a faithful emulator | A wrapper with queryable state, as [HTTP mocking](./references/http.md) describes     |
+| Boundary                                        | The test uses                                                                                     |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Pure computation                                | Return values, with no stand-in                                                                   |
+| A CLI                                           | The real binary, spawned end to end                                                               |
+| The filesystem                                  | A real `mkdtemp` tree per test                                                                    |
+| A database                                      | The real engine, isolated per test, as [database](./references/database.md) describes             |
+| A remote HTTP or RPC service                    | MSW handlers, as [HTTP mocking](./references/http.md) describes                                   |
+| A service with a cheap container                | The real service in a container                                                                   |
+| An SDK with a command layer                     | A stand-in at the command layer                                                                   |
+| A queue or pub/sub without a faithful emulator  | A wrapper with queryable state, as [HTTP mocking](./references/http.md) describes                 |
+| A program the repo drives over its own protocol | A stateful stand-in, as [System tests](./references/system-tests.md#stateful-stand-ins) describes |
 
 A module that is hard to test without a stand-in takes its I/O from its caller: test the pure core
 with values, and test the I/O edge against the real boundary.
