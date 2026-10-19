@@ -4,11 +4,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
 import { createStubGh } from './create-stub-gh.ts';
-import { loadWorkflowStep } from './load-workflow-step.ts';
+import { runWorkflowSteps } from './run-workflow-steps.ts';
 
-// The sync job's own steps, read from the workflow, run for real against a caller cloned from a
-// local bare origin, with a tools checkout that holds the real sync scripts and a gh stand-in that
-// keeps the caller's pull requests. Each run clones the caller again, as each workflow run does.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'repo-sync-'));
 
@@ -47,95 +44,36 @@ async function setupTest() {
     .env(env)
     .quiet();
 
-  const steps = {
-    entries: await loadWorkflowStep(workflow, 'sync', "Commit each entry's files"),
-    push: await loadWorkflowStep(workflow, 'sync', 'Push the sync branch'),
-    open: await loadWorkflowStep(workflow, 'sync', 'Open or update the pull request'),
-    fail: await loadWorkflowStep(workflow, 'sync', 'Fail on the entries left out'),
-  };
-
-  let runs = 0;
-
-  // Runs the four steps in order in a fresh clone of the caller, as the job does, and returns the
-  // exit code of the step that ended the run.
   const runSync = async (entries: unknown[], toolsRef: string) => {
-    runs += 1;
-
-    const caller = join(directory, `caller-${runs}`);
-    const output = join(directory, `output-${runs}`);
+    const caller = await mkdtemp(join(directory, 'caller-'));
 
     await $`git clone -q ${origin} ${caller}`.env(env).quiet();
 
     await cp(tools, join(caller, '.repo-sync'), { recursive: true });
-    await writeFile(output, '');
 
-    const base = {
-      ...env,
-      PATH: `${bin}:${process.env['PATH']}`,
-      GITHUB_OUTPUT: output,
-      ENTRIES: JSON.stringify(entries),
-    };
-
-    const entriesStep = await $`bash -c ${steps.entries.run}`
-      .cwd(caller)
-      .env({
-        ...base,
-        ...steps.entries.env,
-        ENTRIES: base.ENTRIES,
-        TOOLS_REF: toolsRef,
-        WORKFLOW_REF: 'zgeoff/tools/.github/workflows/repo-sync.yml@refs/tags/sync-v1',
-        REPO: 'example/app',
-      })
-      .nothrow()
-      .quiet();
-
-    if (entriesStep.exitCode !== 0) {
-      return entriesStep.exitCode;
-    }
-
-    const outputs = await readOutputs(output);
-
-    const pushStep = await $`bash -c ${steps.push.run}`
-      .cwd(caller)
-      .env({
-        ...base,
-        ...steps.push.env,
-        ENTRIES: base.ENTRIES,
-        SYNCED: outputs.get('synced') ?? '',
-        FAILED: outputs.get('failed') ?? '',
-      })
-      .nothrow()
-      .quiet();
-
-    if (pushStep.exitCode !== 0) {
-      return pushStep.exitCode;
-    }
-
-    const pushOutputs = await readOutputs(output);
-
-    const pushed = pushOutputs.get('pushed');
-
-    if (pushed === 'true') {
-      await $`bash -c ${steps.open.run}`
-        .cwd(caller)
-        .env({
-          ...base,
-          ...steps.open.env,
-          GH_TOKEN: 'token',
-          BASE: 'main',
-          PIN: outputs.get('pin') ?? '',
-          SYNCED: outputs.get('synced') ?? '',
-        })
-        .quiet();
-    }
-
-    const failStep = await $`bash -c ${steps.fail.run}`
-      .cwd(caller)
-      .env({ ...base, FAILED: outputs.get('failed') ?? '' })
-      .nothrow()
-      .quiet();
-
-    return failStep.exitCode;
+    return runWorkflowSteps(
+      workflow,
+      'sync',
+      [
+        "Commit each entry's files",
+        'Push the sync branch',
+        'Open or update the pull request',
+        'Fail on the entries left out',
+      ],
+      {
+        cwd: caller,
+        env: { ...env, PATH: `${bin}:${process.env['PATH']}` },
+        expressions: {
+          'needs.prepare.outputs.entries': JSON.stringify(entries),
+          'inputs.tools-ref': toolsRef,
+          'job.workflow_ref': 'zgeoff/tools/.github/workflows/repo-sync.yml@refs/tags/sync-v1',
+          'github.repository': 'example/app',
+          'github.ref_name': 'main',
+          'steps.app-token.outputs.token': 'token',
+        },
+        outputPath: `${caller}.output`,
+      },
+    );
   };
 
   const writeSource = async (path: string, content: string) => {
@@ -197,17 +135,6 @@ async function setupTest() {
     readPullRequests,
     writeBranch,
   };
-}
-
-async function readOutputs(path: string) {
-  const text = await readFile(path, 'utf8');
-
-  const pairs = text
-    .split('\n')
-    .filter((line) => line.includes('='))
-    .map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)] as const);
-
-  return new Map(pairs);
 }
 
 test('it opens one pull request that carries every changed file of every entry', async () => {
