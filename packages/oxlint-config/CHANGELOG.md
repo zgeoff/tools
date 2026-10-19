@@ -2,14 +2,16 @@
 
 ## [0.3.0](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.13...@zgeoff/oxlint-config@0.3.0) (2026-10-19)
 
-
 ### ⚠ BREAKING CHANGES
 
-* **geo-1275:** @zgeoff/kysely-bun-sqlite exports buildBunSQLiteDriver(sqlite) in place of the BunSQLiteDriver class.
+- **geo-1275:** @zgeoff/kysely-bun-sqlite exports buildBunSQLiteDriver(sqlite) in place of the
+  BunSQLiteDriver class.
 
 ### Features
 
-* **geo-1275:** add zgeoff/no-class and build tools' classes with factories ([#213](https://github.com/zgeoff/tools/issues/213)) ([d186a0f](https://github.com/zgeoff/tools/commit/d186a0fd1d6c0544f36b19d3d87c0f3c8d34fd27))
+- **geo-1275:** add zgeoff/no-class and build tools' classes with factories
+  ([#213](https://github.com/zgeoff/tools/issues/213))
+  ([d186a0f](https://github.com/zgeoff/tools/commit/d186a0fd1d6c0544f36b19d3d87c0f3c8d34fd27))
 
 ## [0.2.13](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.12...@zgeoff/oxlint-config@0.2.13) (2026-10-19)
 
