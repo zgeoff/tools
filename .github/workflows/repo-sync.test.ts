@@ -77,6 +77,24 @@ async function setupTest() {
     );
   };
 
+  const runPrepare = async (manifest: unknown[], include: string) => {
+    const checkout = await mkdtemp(join(directory, 'prepare-'));
+
+    await mkdir(join(checkout, 'sync'));
+    await writeFile(join(checkout, 'sync', 'manifest.json'), JSON.stringify(manifest));
+
+    await runWorkflowSteps(workflow, 'prepare', ['Drop the skipped and the unrequested entries'], {
+      cwd: checkout,
+      env,
+      expressions: { 'inputs.skip': '', 'inputs.include': include },
+      outputPath: `${checkout}.output`,
+    });
+
+    const output = await readFile(`${checkout}.output`, 'utf8');
+
+    return output;
+  };
+
   const writeSource = async (path: string, content: string) => {
     await mkdir(dirname(join(tools, path)), { recursive: true });
     await writeFile(join(tools, path), content);
@@ -127,6 +145,7 @@ async function setupTest() {
   };
 
   return {
+    runPrepare,
     runSync,
     writeSource,
     readBranch,
@@ -413,4 +432,38 @@ test('it keeps every sync/<name> branch when no pull request publishes', async (
   expect(exitCode).toBe(1);
   expect(branches).toStrictEqual(['main', 'sync/readme']);
   expect(pulls).toStrictEqual([]);
+});
+
+test.each([
+  ['true when a selected entry', 'workflow-demo', 'true'],
+  ['false when only a filtered-out entry', '', 'false'],
+])('it outputs workflows %s targets a workflow', async (_label, include, expected) => {
+  const ctx = await setupTest();
+
+  const output = await ctx.runPrepare(
+    [
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+      },
+      {
+        name: 'workflow-demo',
+        description: 'The demo workflow',
+        optIn: true,
+        files: [{ source: 'sync/workflow-demo.yml', target: '.github/workflows/demo.yml' }],
+      },
+    ],
+    include,
+  );
+
+  expect(output).toEndWith(`\nworkflows=${expected}\n`);
+});
+
+test('it asks for workflows write on the token only when the prepare output is true', async () => {
+  const workflow = await readFile(join(import.meta.dir, 'repo-sync.yml'), 'utf8');
+
+  expect(workflow).toInclude(
+    `permission-workflows: \${{ needs.prepare.outputs.workflows == 'true' && 'write' || '' }}`,
+  );
 });
