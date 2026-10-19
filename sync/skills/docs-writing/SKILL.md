@@ -140,7 +140,9 @@ covers which).
 Paragraphs that defend a decision are the most common source of padding: lists of edge cases that
 only happen if someone tampers with the system, "in case someone…", restatements of what is out of
 scope. If a paragraph runs past about eight lines, reread it and ask whether it's defending a
-decision nobody attacked.
+decision nobody attacked. `check-prose.sh` checks paragraph length in each file the branch changes:
+it warns on a long paragraph and fails on a far longer one, at the limits set at the top of the
+script.
 
 ### A bug fix rarely needs a doc change
 
@@ -533,11 +535,12 @@ passes with this guide as its only reference.
    prose, such as AGENTS.md, run `check-prose.sh <path>...` on it.
 
    `check-prose.sh` fails on traces of the work session, the banned words a grep can catch, values
-   with units under `docs/architecture/`, formatting faults, and untagged code blocks. It then
-   prints candidates (filler words that have term-of-art uses, speech verbs on data, delta words,
-   headings written as claims), which need judgment and never fail the run. It skips this skill's
-   own directory, because the examples here contain those patterns on purpose. If you're reviewing
-   this skill, run the greps by hand and judge the hits.
+   with units under `docs/architecture/`, formatting faults, untagged code blocks, and a paragraph
+   over its word limit in a file the branch changes. It then prints candidates (filler words that
+   have term-of-art uses, speech verbs on data, delta words, headings written as claims), which need
+   judgment and never fail the run. It skips this skill's own directory, because the examples here
+   contain those patterns on purpose. If you're reviewing this skill, run the greps by hand and
+   judge the hits.
 
 4. The links. Walk each changed section's links and confirm the link text still matches the heading
    it points to.
