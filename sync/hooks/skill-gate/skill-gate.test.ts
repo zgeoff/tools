@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -49,4 +49,32 @@ test('it denies a gated edit through the delivered entry point', async () => {
       permissionDecisionReason: `Load the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.dir, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
     },
   });
+});
+
+test('it exits 1 with no gate output when the repo lacks @zgeoff/skill-gate', async () => {
+  const ctx = await setupTest();
+
+  const copiedHookPath = join(ctx.dir, '.claude/hooks/skill-gate/skill-gate.ts');
+
+  await mkdir(join(ctx.dir, '.claude/hooks/skill-gate'), { recursive: true });
+  await copyFile(ctx.hookPath, copiedHookPath);
+
+  await writeFile(
+    join(ctx.dir, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
+  );
+
+  const result = spawnSync('bun', [copiedHookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.dir },
+    input: JSON.stringify({
+      cwd: ctx.dir,
+      transcript_path: join(ctx.dir, 'transcript.jsonl'),
+      tool_input: { file_path: join(ctx.dir, 'guide.md') },
+    }),
+  });
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toBe('');
+  expect(result.stderr).toContain("Cannot find module '@zgeoff/skill-gate'");
 });

@@ -25,8 +25,9 @@ import { runSkillGate } from '@zgeoff/skill-gate';
 await runSkillGate();
 ```
 
-`runSkillGate` reads the hook payload from stdin, prints the hook output, and exits the process.
-Register the entry point in `.claude/settings.json`:
+The `hook-skill-gate` entry of repo-sync delivers this file from zgeoff/tools. `runSkillGate` reads
+the hook payload from stdin, prints the hook output, and exits the process. Register the entry point
+in `.claude/settings.json`:
 
 ```json
 {
