@@ -3,11 +3,13 @@
 # lockfile, then runs each package script in `scripts` in order.
 #
 # `scripts` is a space-separated list of package.json script names. Empty means
-# the standard list: audit deadcode format:check lint typecheck test. A name
-# the repo's package.json does not define fails the run before any script
-# runs, so a renamed script cannot drop a check without notice. The synced
-# caller passes the BUN_CHECK_SCRIPTS and NODE_VERSION repo variables, so a
-# repo changes the list or adds Node without editing the caller.
+# the standard list: audit deadcode format:check lint check typecheck test,
+# where check runs only when the repo defines it. Any other name the repo's
+# package.json does not define fails the run before any script runs, so a
+# renamed script cannot drop a check without notice. The synced caller passes
+# the BUN_CHECK_SCRIPTS, NODE_VERSION and BUN_CHECK_TIMEOUT_MINUTES repo
+# variables, so a repo changes the list, adds Node or sets the checks job's time
+# limit without editing the caller.
 name: Bun checks (reusable)
 
 on:
@@ -33,6 +35,12 @@ on:
         type: number
         required: false
         default: 10
+      setup-shfmt:
+        description:
+          Install shfmt even when the scripts do not run check, for a suite whose tests run it
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   gitleaks:
@@ -83,7 +91,10 @@ jobs:
       - name: Install
         run: bun install --frozen-lockfile
 
-      - name: Run the check scripts
+      # Picks the scripts before anything runs, so a missing name fails fast
+      # and the shfmt setup knows whether check runs.
+      - name: Pick the check scripts
+        id: pick
         env:
           SCRIPTS: ${{ inputs.scripts }}
         run: |
@@ -91,7 +102,15 @@ jobs:
           # A value of only whitespace parses to no names and gets the standard list too.
           read -ra list <<< "$SCRIPTS"
           if [ "${#list[@]}" -eq 0 ]; then
-            list=(audit deadcode format:check lint typecheck test)
+            list=(audit deadcode format:check lint)
+            # The standard list runs check only when the repo defines it, so a
+            # repo turns the check on by adding the script.
+            if jq -e '.scripts.check' package.json > /dev/null; then
+              list+=(check)
+            else
+              echo '::notice::check skipped, because package.json has no check script; add "check": "zgeoff-check" to run it.'
+            fi
+            list+=(typecheck test)
           fi
           missing=""
           for name in "${list[@]}"; do
@@ -101,6 +120,37 @@ jobs:
             echo "::error::package.json defines no script named:$missing. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list."
             exit 1
           fi
+          # Spaces around the list let a step match one whole name.
+          echo "scripts= ${list[*]} " >> "$GITHUB_OUTPUT"
+
+      # The shell check of zgeoff-check runs shellcheck, which the runner image
+      # carries, and shfmt, which it lacks. The step installs the pinned binary
+      # when check runs or the caller asks for it, into a folder the runner
+      # owns, put on the PATH of the later steps.
+      - name: Setup shfmt
+        env:
+          SCRIPTS: ${{ steps.pick.outputs.scripts }}
+          SETUP_SHFMT: ${{ inputs.setup-shfmt }}
+          SHFMT_VERSION: v3.13.1
+          SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
+        run: |
+          set -euo pipefail
+          if [ "$SETUP_SHFMT" != true ] && [[ "$SCRIPTS" != *" check "* ]]; then
+            echo "shfmt: not needed, because the scripts do not run check"
+            exit 0
+          fi
+          curl -fsSL -o "$RUNNER_TEMP/shfmt.download" "https://github.com/mvdan/sh/releases/download/$SHFMT_VERSION/shfmt_${SHFMT_VERSION}_linux_amd64"
+          echo "$SHFMT_SHA256  $RUNNER_TEMP/shfmt.download" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/shfmt-bin"
+          install -m 0755 "$RUNNER_TEMP/shfmt.download" "$RUNNER_TEMP/shfmt-bin/shfmt"
+          echo "$RUNNER_TEMP/shfmt-bin" >> "$GITHUB_PATH"
+
+      - name: Run the check scripts
+        env:
+          SCRIPTS: ${{ steps.pick.outputs.scripts }}
+        run: |
+          set -euo pipefail
+          read -ra list <<< "$SCRIPTS"
           for name in "${list[@]}"; do
             echo "::group::bun run $name"
             bun run "$name"

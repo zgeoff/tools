@@ -71,13 +71,17 @@ jobs:
           ref: ${{ env.BASE }}
           token: ${{ steps.app-token.outputs.token }}
 
+      # The script imports @zgeoff/std's source by relative path, because the
+      # caller's install need not hold @zgeoff/std.
       - name: Check out the audit-fix script
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: zgeoff/tools
           ref: ${{ job.workflow_sha }}
           path: .audit-fix
-          sparse-checkout: scripts/audit-fix
+          sparse-checkout: |
+            scripts/audit-fix
+            packages/std/src
           persist-credentials: false
 
       # The default branch's fix lives on audit-fix; another base gets its own

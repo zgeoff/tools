@@ -3,5 +3,14 @@
   "extends": ["./node_modules/@zgeoff/oxlint-config/oxlintrc.json"],
   // ignorePatterns don't propagate through extends — each consumer declares
   // its own
-  "ignorePatterns": ["**/node_modules/**", "**/dist/**", ".worktrees/**", "**/*.json"]
+  "ignorePatterns": ["**/node_modules/**", "**/dist/**", ".worktrees/**", "**/*.json"],
+  // tools' own code breaks the naming rules in about 360 places, so both stay
+  // off here until a rename pass lands, as in each repo before its bump
+  "rules": {
+    "id-length": "off",
+    "zgeoff/no-abbreviated-names": "off",
+    // tools' own tests declare about 50 module-level helpers and constants,
+    // so the rule stays off here until a pass moves them out
+    "zgeoff/setup-test-only": "off"
+  }
 }

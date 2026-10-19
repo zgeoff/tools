@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.2.13](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.12...@zgeoff/oxlint-config@0.2.13) (2026-10-19)
+
+### Features
+
+- **geo-1274:** add zgeoff/setup-test-only to keep test files to setupTest and tests
+  ([#205](https://github.com/zgeoff/tools/issues/205))
+  ([fbb3697](https://github.com/zgeoff/tools/commit/fbb369773bbd8acb8a55f474ec441cc57f20d7dc))
+
+## [0.2.12](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.11...@zgeoff/oxlint-config@0.2.12) (2026-10-19)
+
+### Features
+
+- **geo-1282:** resolve workspace package names and flag self imports in zgeoff/import-zones
+  ([#200](https://github.com/zgeoff/tools/issues/200))
+  ([e90e786](https://github.com/zgeoff/tools/commit/e90e786acc83e2d3a79fbce4d77c9d2b5a332e91))
+
+## [0.2.11](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.10...@zgeoff/oxlint-config@0.2.11) (2026-10-18)
+
+### Features
+
+- **geo-1373:** check every name-binding form in no-abbreviated-names
+  ([#198](https://github.com/zgeoff/tools/issues/198))
+  ([511050b](https://github.com/zgeoff/tools/commit/511050b3fac0b3bb7d4ef5d895d5ef9ce73e3047))
+
+## [0.2.10](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.9...@zgeoff/oxlint-config@0.2.10) (2026-10-18)
+
+### Features
+
+- **geo-1277:** lint short and abbreviated value names in oxlint-config
+  ([#193](https://github.com/zgeoff/tools/issues/193))
+  ([5f83011](https://github.com/zgeoff/tools/commit/5f83011754f2c1613a9738fc4273bca4cc0f7d39))
+
 ## [0.2.9](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.8...@zgeoff/oxlint-config@0.2.9) (2026-10-18)
 
 ### Features

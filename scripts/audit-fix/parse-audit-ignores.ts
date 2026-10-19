@@ -1,4 +1,4 @@
-import { isRecord } from './is-record.ts';
+import { isRecord } from '../../packages/std/src/is-record.ts';
 import type { AuditIgnores } from './types.ts';
 
 // Checks the shape of audit-ignores.json.

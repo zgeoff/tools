@@ -20,6 +20,8 @@ Each line links the section that explains it.
   helpers after it.
 - [Acronyms](#acronyms): acronyms stay uppercase in identifiers, `ID` included, unless one starts a
   name.
+- [Naming values](#naming-values): a variable, parameter or property is named for what it holds, in
+  full words, with no single letters or abbreviations outside a short kept list.
 - [State lifecycles](#state-lifecycles): persisted state moves through one declared transition
   table, and an in-process actor is an xstate machine.
 - [Branching on a union](#branching-on-a-union): branch with `match(...).exhaustive()` from
@@ -56,11 +58,32 @@ docs-writing's `check-length.sh` runs it.
 
 ## Acronyms
 
-Acronyms stay uppercase in identifiers (`runCLI`, `parseCLIArgs`, `ASTNode`, `pkgURL`,
+Acronyms stay uppercase in identifiers (`runCLI`, `parseCLIArgs`, `ASTNode`, `packageURL`,
 `isPackageJSON`) — except when one starts a camelCase name, where it lowercases whole (`cliPath`,
 `astNode`). ID counts as an acronym: `userID`, `sessionID` — never `userId` — and `idToken` when it
 starts a name. File names are unaffected: kebab-case lowercases everything (`parse-cli-args.ts`
 exports `parseCLIArgs`).
+
+## Naming values
+
+Name a variable, parameter or property for what it holds, in full words: `manager`, never `mgr`, and
+`session`, never `s`. A full word tells the reader what the value is without a trip to where it was
+made. Single letters and abbreviations are banned.
+
+A few short names are kept:
+
+- `x` and `y`, for coordinates.
+- `z` for zod, `$` for Bun's shell, and `_` for a placeholder that is never read.
+- `ctx` and `id`.
+- `db`, `args`, `params`, `repo` and `info`, which read as words.
+
+A unit keeps its short form as a suffix, as in `timeoutMs`, but `ms` alone never names a value.
+Acronyms follow [Acronyms](#acronyms). A type parameter, such as `T`, is not a value, and this rule
+leaves it alone.
+
+Lint catches the mechanical cases. `id-length` fails a one-letter name other than the kept ones, and
+`zgeoff/no-abbreviated-names` fails each abbreviation its options list, with the full word in its
+message. An abbreviation outside that list, such as `cfg`, breaks this rule all the same.
 
 ## State lifecycles
 

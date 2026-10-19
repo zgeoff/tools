@@ -1,12 +1,13 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
+import { isBuiltin } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 
 // a `.js` specifier in TypeScript source names the `.ts` file beside it
 const sourceExtensions = { '.js': ['.ts', '.tsx'], '.mjs': ['.mts'], '.cjs': ['.cts'] };
 
-// `module` with the specifier for a package or builtin, `file` with the
-// absolute path when the import resolves, `missing` otherwise. The package's
-// own name resolves through its `exports`, and `#` names through its `imports`.
+// `module` for a package or builtin, `file` with the absolute path, or
+// `missing`. The own name, which `self` marks, resolves through `exports`, `#`
+// names through `imports`, and a workspace name to a path in its folder.
 export default function resolveImportTarget(filename, specifier, settings) {
   if (isPathSpecifier(specifier)) {
     return toTarget(findImportedFile(filename, toFileSpecifier(specifier), settings.extensions));
@@ -14,30 +15,73 @@ export default function resolveImportTarget(filename, specifier, settings) {
 
   const manifest = findPackageManifest(dirname(filename), settings.root);
 
-  return resolveManifestTarget(manifest, specifier, settings.conditions);
+  return resolveManifestTarget(manifest, specifier, settings);
 }
 
-function resolveManifestTarget(manifest, specifier, conditions) {
+function resolveManifestTarget(manifest, specifier, settings) {
+  if (!specifier.startsWith('#')) {
+    return resolveBareTarget(manifest, specifier, settings);
+  }
+
+  const mapped = findMappedTarget(manifest?.imports, specifier, settings.conditions);
+
+  return mapped !== null && !isPathSpecifier(mapped)
+    ? resolveBareTarget(manifest, mapped, settings)
+    : toMappedTarget(manifest, mapped);
+}
+
+// a builtin keeps its name even when a package shares it
+function resolveBareTarget(manifest, specifier, settings) {
   const name = manifest?.name;
 
-  if (specifier.startsWith('#')) {
-    const mapped = findMappedTarget(manifest?.imports, specifier, conditions);
-
-    return mapped !== null && !isPathSpecifier(mapped)
-      ? { kind: 'module', specifier: mapped }
-      : toMappedTarget(manifest, mapped);
+  if (isBuiltin(specifier)) {
+    return { kind: 'module', specifier };
   }
 
-  if (typeof name === 'string' && (specifier === name || specifier.startsWith(`${name}/`))) {
+  if (isPackageSpecifier(name, specifier)) {
     const subpath = `.${specifier.slice(name.length)}`;
+    const mapped = findMappedTarget(toSubpathMap(manifest.exports), subpath, settings.conditions);
 
-    return toMappedTarget(
-      manifest,
-      findMappedTarget(toSubpathMap(manifest.exports), subpath, conditions),
-    );
+    return { ...toMappedTarget(manifest, mapped), self: true };
   }
 
-  return { kind: 'module', specifier };
+  return resolveWorkspaceTarget(settings.workspaces, specifier);
+}
+
+function isPackageSpecifier(name, specifier) {
+  return typeof name === 'string' && (specifier === name || specifier.startsWith(`${name}/`));
+}
+
+// the edges judge the package folder joined with the subpath, such as
+// `packages/store/testing`, so the exports map's keys matter and not its targets
+function resolveWorkspaceTarget(workspaces, specifier) {
+  const workspace = workspaces.find((candidate) => isPackageSpecifier(candidate.name, specifier));
+
+  if (workspace === undefined) {
+    return { kind: 'module', specifier };
+  }
+
+  const subpath = `.${specifier.slice(workspace.name.length)}`;
+
+  return isExportedSubpath(workspace.exports, subpath)
+    ? { kind: 'file', path: join(workspace.dir, subpath) }
+    : { kind: 'missing' };
+}
+
+// with no exports map, every subpath is public, and an empty one exports none
+function isExportedSubpath(exports, subpath) {
+  if (exports === undefined) {
+    return true;
+  }
+
+  if (typeof exports === 'object' && exports !== null && Object.keys(exports).length === 0) {
+    return false;
+  }
+
+  const map = toSubpathMap(exports);
+  const key = Object.hasOwn(map, subpath) ? subpath : findPatternKey(map, subpath);
+
+  return key !== undefined && map[key] !== null;
 }
 
 // a bundler query such as Vite's `./styles.css?url` names the file before it
@@ -105,6 +149,12 @@ function findMappedTarget(map, key, conditions) {
     return findConditionTarget(map[key], conditions);
   }
 
+  const pattern = findPatternKey(map, key);
+
+  return pattern === undefined ? null : findPatternTarget(map, pattern, { key, conditions });
+}
+
+function findPatternKey(map, key) {
   const [pattern] = Object.keys(map)
     .filter((candidate) => isPatternMatch(candidate, key))
     .toSorted((left, right) => {
@@ -113,7 +163,7 @@ function findMappedTarget(map, key, conditions) {
       return byPrefix === 0 ? right.length - left.length : byPrefix;
     });
 
-  return pattern === undefined ? null : findPatternTarget(map, pattern, { key, conditions });
+  return pattern;
 }
 
 function findPatternTarget(map, pattern, lookup) {

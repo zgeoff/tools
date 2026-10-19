@@ -1,0 +1,44 @@
+{
+  "name": "@zgeoff/checks",
+  "version": "0.1.1",
+  "description": "One check runner for every zgeoff repo: zgeoff-check runs each check over the tracked files and prints one line per finding",
+  "keywords": [
+    "check",
+    "lint",
+    "shellcheck",
+    "shfmt"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zgeoff/tools.git",
+    "directory": "packages/checks"
+  },
+  "bin": {
+    "zgeoff-check": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && bun run build:outdir dist",
+    "build:outdir": "bun build src/cli.ts --target bun --outdir",
+    "prepare": "bun run build",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "gunshi": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@zgeoff/std": "workspace:*",
+    "typescript": "catalog:"
+  },
+  "engines": {
+    "bun": ">=1.3"
+  }
+}

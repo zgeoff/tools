@@ -28,6 +28,7 @@
       "react": "19.3.0",
       "react-dom": "19.3.0",
       "tiny-invariant": "1.3.3",
+      "ts-pattern": "5.9.0",
       "typescript": "7.0.2",
       "zustand": "5.0.15"
     }
@@ -35,8 +36,9 @@
   "type": "module",
   "scripts": {
     "prepare": "lefthook install --force || true",
-    "typecheck": "bun run --filter '*' typecheck && tsc -p scripts && tsc -p sync",
+    "typecheck": "bun run --filter '*' typecheck && tsc -p scripts && tsc -p sync && tsc -p .github/workflows",
     "test": "bun test",
+    "test:workflows": "bun test ./.github/workflows",
     "test:related": "bun sync/pre-push/run-related-tests.ts",
     "build": "bun run --filter '*' build",
     "lint": "oxlint",
@@ -46,17 +48,20 @@
     "format": "oxfmt . && bun packages/format-codemod/src/cli.ts --quiet .",
     "format:check": "oxfmt --check . && bun packages/format-codemod/src/cli.ts --check --quiet .",
     "check:sync": "bash scripts/check-sync-manifest.sh",
-    "files:branch": "bun sync/pre-push/collect-branch-files.ts"
+    "files:branch": "bun sync/pre-push/collect-branch-files.ts",
+    "check": "bun packages/checks/src/cli.ts"
   },
   "devDependencies": {
     "@tsconfig/strictest": "catalog:",
     "@types/bun": "catalog:",
     "@zgeoff/bun-test-extended": "workspace:*",
     "@zgeoff/bun-test-react": "workspace:*",
+    "@zgeoff/checks": "workspace:*",
     "@zgeoff/commitlint-config": "workspace:*",
     "@zgeoff/format-codemod": "workspace:*",
     "@zgeoff/oxfmt-config": "workspace:*",
     "@zgeoff/oxlint-config": "workspace:*",
+    "@zgeoff/skill-gate": "workspace:*",
     "@zgeoff/tsconfig": "workspace:*",
     "lefthook": "catalog:",
     "oxfmt": "catalog:",

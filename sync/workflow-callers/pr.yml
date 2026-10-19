@@ -1,9 +1,10 @@
 # repo-sync delivers this file from zgeoff/tools
 #
-# Runs the shared Bun pull-request checks. Two optional repo variables change
+# Runs the shared Bun pull-request checks. Three optional repo variables change
 # them: BUN_CHECK_SCRIPTS, a space-separated list of package scripts that
-# replaces the standard list (audit deadcode format:check lint typecheck test),
-# and NODE_VERSION, which sets up Node next to Bun.
+# replaces the standard list (audit deadcode format:check lint check typecheck
+# test), NODE_VERSION, which sets up Node next to Bun, and
+# BUN_CHECK_TIMEOUT_MINUTES, the checks job's time limit (20 when unset).
 name: PR
 
 on:
@@ -22,3 +23,4 @@ jobs:
     with:
       scripts: ${{ vars.BUN_CHECK_SCRIPTS }}
       node-version: ${{ vars.NODE_VERSION }}
+      timeout-minutes: ${{ fromJSON(vars.BUN_CHECK_TIMEOUT_MINUTES || '20') }}

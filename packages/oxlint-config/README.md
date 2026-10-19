@@ -9,8 +9,10 @@ await arguments, awaits hidden inside a control-flow condition or a `&&`/`||`/`?
 that loosens either comment rule. `zgeoff/function-verb` enforces the function-naming taxonomy from
 the shared agent guidelines, `zgeoff/test-beside-module` keeps each test file beside the module it
 tests, `zgeoff/import-zones` fails an import that crosses a module boundary the repo declares,
-`zgeoff/no-restricted-words` keeps the words in its `words` option out of a path's text, and
-`zgeoff/no-file-snapshot` bans file snapshots.
+`zgeoff/no-restricted-words` keeps the words in its `words` option out of a path's text,
+`zgeoff/no-abbreviated-names` reports each abbreviated value name it lists with its full word,
+`zgeoff/no-file-snapshot` bans file snapshots, and `zgeoff/setup-test-only` keeps a test file's
+module level to `setupTest()` and its tests.
 
 ## Usage
 
@@ -87,6 +89,29 @@ first statement, so put the comment above it:
 A second test file for a module (`<name>.host.test.ts`) needs its own `<name>.host.<ext>`, so the
 rule reports it beside only `<name>.ts`.
 
+## `zgeoff/setup-test-only`
+
+A `<name>.test.ts` or `<name>.test.tsx` file declares one function, `setupTest()`, and nothing else,
+as the testing skill requires. At module level the rule allows imports, `type` and `interface`
+declarations, one `setupTest` function declaration, and statements that call `test`, `test.each`,
+`test.skipIf` or `test.if`, or a chain of them, with `test` under its local alias when the
+`bun:test` import renames it. It reports every other statement: a `let`, a `var`, a class, an enum,
+a second function, an export, and a call such as `beforeEach(...)`. The message holds the three ways
+out of a helper: inline it, swap it for a registered matcher, or move it to the shared test utils
+with tests of its own.
+
+A module-level `const` passes only as a skip gate: a declarator that binds at least one name, each
+binding read, and read only at collection time, inside an argument of the test runner's `skipIf` or
+inside the initializer of another gate. The runner is `test` as `bun:test` exports it, under its
+local alias if the import renames it, or a chain of its modifiers, so `matrix.skipIf(rows)` is not a
+gate read. A file that imports no `test` uses the global one, unless an import or a module-level
+declaration of its own takes the name `test`. A read inside a function never counts, so a `skipIf`
+in `setupTest()` or a test body leaves its `const` reported. A gate derived from an awaited probe
+passes beside the probe, in the same declaration or its own, but consts that only read each other
+never reach a `skipIf` and report. A `const` that nothing reads reports too, and so does a
+declarator that binds nothing, such as `const {} = registerHooks()`. The rule does not check the
+comment that the skill asks a gate to carry.
+
 ## `zgeoff/no-restricted-words`
 
 Off unless a repo configures it. The `words` option lists the words to keep out of the text of a
@@ -106,6 +131,23 @@ the paths that may name the words:
 }
 ```
 
+## `zgeoff/no-abbreviated-names`
+
+The `names` option maps each abbreviation to the text that replaces it, and the rule reports every
+value name that has one of those names. A value name is any name that a declaration, an import, an
+export alias, a key or a member write binds, so function, class and method names count beside
+variables and properties. A key counts in each of its spellings, so `src`, `'src'`, `['src']` and
+`#src` all report. A name matches whole, so `ms` reports `ms` but not `timeoutMs`.
+
+The rule leaves alone the names that hold no value of their own. A destructured key that an alias
+renames belongs to the object being read, so the rule reports only the alias. A computed key that
+reads a variable, such as `[src]`, names no property, and the rule checks the variable at its
+declaration. Type names, type-only imports and exports, labels and quoted module names hold no
+value, so the rule skips them.
+
+The shipped config lists the abbreviations that the code-style skill bans and turns on `id-length`
+beside the rule, so a one-letter name fails too, other than `x`, `y`, `z`, `$` and `_`.
+
 ## `zgeoff/no-file-snapshot`
 
 Snapshots are inline only, so the golden value sits in the test that pins it. The rule reports every
@@ -124,19 +166,26 @@ Each entry has a `name`, which starts its report, an optional `reason`, which en
 
 - `edges` judge an import that resolves to a file: relative, with any bundler query such as `?url`
   dropped, or the package's own name resolved through its `exports` under `conditions` plus
-  `default`. A target in a `to` zone fails unless it is also in an `allow` zone; with `allow` alone,
-  a target in none of the `allow` zones fails, a target in no zone included. `allowTypeOnly` exempts
-  type-only imports (`true`, or globs the target must match), and `allowWithin: "src/*"` exempts an
-  import inside the importer's own `src/<name>/`.
+  `default`. They also judge the name of each package whose directory a `workspaces` glob matches,
+  such as `packages/*`, with one directory level per segment. That name maps to the package folder
+  joined with the subpath, never to an export's target: `@demo/store/testing` is judged as
+  `packages/store/testing`, so a zone names the folder path, such as `packages/store{,/**}`. A
+  target in a `to` zone fails unless it is also in an `allow` zone; with `allow` alone, a target in
+  none of the `allow` zones fails, a target in no zone included. `allowTypeOnly` exempts type-only
+  imports (`true`, or globs the target must match), and `allowWithin: "src/*"` exempts an import
+  inside the importer's own `src/<name>/`.
 - `modules` restrict a package or builtin (`node:` prefix optional, subpaths included) to the
   `allow` zones; `allowTypeOnly: true` exempts type-only imports. A name that ends in `*` restricts
   every specifier that starts with the text before it, such as `@scope/*`, and `node:*` restricts
   every builtin.
 - `globals` restrict a call to a global, bare or through `globalThis`, `self` or `window`.
 - `unzoned` reports a file in a `from` zone that belongs to none of `zones`.
-- `unresolved` reports a relative or self-referencing import that resolves to no file, and a dynamic
+- `unresolved` reports a relative or self-referencing import that resolves to no file, a workspace
+  import whose subpath no `exports` key lists, or one that a `null` key blocks, and a dynamic
   `import()`, `require()` or `import.meta.require()` whose specifier is computed. Bun's
   `import.meta.require` used as a value counts as computed too.
+- `selfImports` reports an import of the importer's own package by name, which a relative path
+  reaches without the `exports` map.
 
 ```jsonc
 {
