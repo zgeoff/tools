@@ -601,6 +601,18 @@ test.each<[string, string, number, string[]]>([
     1,
     ['guide.md:3:251 words'],
   ],
+  [
+    'a label of 999 characters',
+    `[${'a'.repeat(999)}]: /guide\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:2:251 words'],
+  ],
+  [
+    'a label of 1000 characters, which makes no link definition',
+    `[${'a'.repeat(1000)}]: /guide\n${'word '.repeat(250)}\n`,
+    1,
+    ['guide.md:1:252 words'],
+  ],
 
   // GFM 4.10, tables.
   [

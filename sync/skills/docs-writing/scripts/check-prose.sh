@@ -307,9 +307,9 @@ function bare_destination_length(s, i, c, depth) {
   return (depth == 0) ? i - 1 : 0
 }
 # Returns the length of the link reference definition at the start of text, through its line end,
-# or 0 when text starts with none.
+# or 0 when text starts with none. A label holds at most 999 characters between its brackets.
 function definition_length(text, n, rest, d) {
-  if (!match(text, label)) return 0
+  if (!match(text, label) || RLENGTH - 3 > 999) return 0
   n = RLENGTH
   rest = substr(text, n + 1)
   match(rest, /^[ \t]*\n?[ \t]*/)
