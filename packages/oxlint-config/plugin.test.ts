@@ -1606,6 +1606,23 @@ test.each([
   },
 );
 
+test('it decodes a percent-encoded workspace export target as a URL path', async () => {
+  const files = {
+    'packages/store/package.json': JSON.stringify({
+      name: '@demo/store',
+      exports: { '.': './src/my%20file.ts' },
+    }),
+    'packages/store/src/my file.ts': 'export const store = 1;\n',
+    'packages/app/src/run.ts':
+      "import { store } from '@demo/store';\n\nexport const all = [store];\n",
+  };
+
+  const result = await runLintTree(files, 'packages/app/src/run.ts', storeZones);
+
+  expect(result.stdout).toInclude('to-store: app must not import packages/store/src/my file.ts');
+  expect(result.stdout).not.toInclude('unresolved:');
+});
+
 test('it reports an own-package subpath the exports omit as a self-import and unresolved', async () => {
   const rules = {
     'zgeoff/import-zones': [
