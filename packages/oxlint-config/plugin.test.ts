@@ -719,6 +719,22 @@ test.each([
   expect(result.stdout).toInclude('Move this statement into a test or `setupTest()`');
 });
 
+test.each([
+  ['an aliased bun:test import', "import { beforeEach as test } from 'bun:test';\n"],
+  ['a default import', "import test from './runner';\n"],
+  ['a namespace import', "import * as test from './runner';\n"],
+  ['a function declaration', 'function test(callback: () => void) {\n  callback();\n}\n'],
+  ['a const', 'const test = (callback: () => void) => callback();\n'],
+  ['a class', 'class test {}\n'],
+])('it flags a call of a module binding named test that %s defines', async (_, binding) => {
+  const source = `${binding}\ntest(() => {});\n`;
+
+  const result = await runLintTree({ 'hooks.test.ts': source }, 'hooks.test.ts', setupTestOnly);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('Move this statement into a test or `setupTest()`');
+});
+
 test('it accepts a skip gate that only skipIf arguments read', async () => {
   const source =
     "import { test } from 'bun:test';\nimport { probeKettle } from './probe-kettle';\n\n// skipIf takes a boolean and has no in-body skip\nconst hasKettle = await probeKettle();\n\ntest.skipIf(!hasKettle)('it boils', () => {});\n\ntest.skipIf(!hasKettle)('it whistles', () => {});\n";

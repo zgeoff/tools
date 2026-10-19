@@ -104,12 +104,13 @@ A module-level `const` passes only as a skip gate: a declarator that binds at le
 binding read, and read only at collection time, inside an argument of the test runner's `skipIf` or
 inside the initializer of another gate. The runner is `test` as `bun:test` exports it, under its
 local alias if the import renames it, or a chain of its modifiers, so `matrix.skipIf(rows)` is not a
-gate read. A read inside a function never counts, so a `skipIf` in `setupTest()` or a test body
-leaves its `const` reported. A gate derived from an awaited probe passes beside the probe, in the
-same declaration or its own, but consts that only read each other never reach a `skipIf` and report.
-A `const` that nothing reads reports too, and so does a declarator that binds nothing, such as
-`const {} = registerHooks()`. The rule does not check the comment that the skill asks a gate to
-carry.
+gate read. A file that imports no `test` uses the global one, unless an import or a module-level
+declaration of its own takes the name `test`. A read inside a function never counts, so a `skipIf`
+in `setupTest()` or a test body leaves its `const` reported. A gate derived from an awaited probe
+passes beside the probe, in the same declaration or its own, but consts that only read each other
+never reach a `skipIf` and report. A `const` that nothing reads reports too, and so does a
+declarator that binds nothing, such as `const {} = registerHooks()`. The rule does not check the
+comment that the skill asks a gate to carry.
 
 ## `zgeoff/no-restricted-words`
 

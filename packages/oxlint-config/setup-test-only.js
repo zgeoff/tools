@@ -32,7 +32,7 @@ const setupTestOnly = {
           return;
         }
 
-        const testNames = collectTestNames(program);
+        const testNames = collectTestNames(context, program);
         const constants = [];
         let hasSetupTest = false;
 
@@ -77,8 +77,8 @@ const setupTestOnly = {
 
 // the local names that `test` from `bun:test` goes by, so an aliased import
 // such as `import { test as check }` counts; a file that imports no `test`
-// reads the global one
-function collectTestNames(program) {
+// reads the global one, unless a module binding of its own takes the name
+function collectTestNames(context, program) {
   const names = program.body
     .filter(
       (statement) =>
@@ -95,11 +95,20 @@ function collectTestNames(program) {
     )
     .map((specifier) => specifier.local.name);
 
-  if (names.length === 0) {
+  if (names.length === 0 && !hasModuleBinding(context, program, 'test')) {
     return new Set(['test']);
   }
 
   return new Set(names);
+}
+
+// every import form and every module-level declaration defines a binding in
+// the module scope, which ESM nests under the global one
+function hasModuleBinding(context, program, name) {
+  const scope = context.sourceCode.getScope(program);
+  const scopes = [scope, ...scope.childScopes.filter((child) => child.type === 'module')];
+
+  return scopes.some((candidate) => (candidate.set.get(name)?.defs.length ?? 0) > 0);
 }
 
 function getImportedName(specifier) {
