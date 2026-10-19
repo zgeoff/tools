@@ -1,10 +1,11 @@
 # Reusable workflow: keeps the shared files listed in sync/manifest.json current
-# in the caller. One job per manifest entry copies that entry's files from this
-# repository to their target paths, runs the entry's `build` command when it has
-# one, and opens a pull request on the branch sync/<name> when a file changed.
-# A change to a shared file reaches every repo as one reviewable pull request
-# per entry, and a new shared file is a manifest entry here with no change
-# downstream.
+# in the caller. For each manifest entry, the sync job copies the entry's files
+# from this repository to their target paths, runs the entry's `build` command
+# when it has one, and commits the result. The commits go on one branch,
+# repo-sync/zgeoff-tools, and one pull request carries them, so a release of
+# this repository reaches each repo as one pull request. A later run while that
+# pull request is open force-pushes the branch and updates the same pull
+# request. A new shared file is a manifest entry here with no change downstream.
 #
 # Callers pin this workflow to a sync tag, such as `@sync-v1`, and the run syncs
 # the files that tag holds: both checkouts of this repository read the commit of
@@ -56,6 +57,7 @@ jobs:
       contents: read
     outputs:
       entries: ${{ steps.manifest.outputs.entries }}
+      workflows: ${{ steps.manifest.outputs.workflows }}
     steps:
       - name: Check out the manifest
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -100,18 +102,21 @@ jobs:
           fi
           entries=$(printf '%s' "$result" | jq -c '.entries')
           echo "entries=$entries" >> "$GITHUB_OUTPUT"
+          echo "workflows=$(printf '%s' "$entries" | jq 'any(.[]; .workflows)')" >> "$GITHUB_OUTPUT"
 
   sync:
-    name: Sync ${{ matrix.entry.name }}
+    name: Sync the entries
     needs: prepare
     if: ${{ success() && needs.prepare.outputs.entries != '[]' }}
     runs-on: ubuntu-latest
+    # Two runs at once could push one release's files and then write the other
+    # release's title and body. The group names only the caller, so runs from
+    # every ref and every sync tag wait for each other.
+    concurrency:
+      group: repo-sync-${{ github.repository }}
+      cancel-in-progress: false
     permissions:
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        entry: ${{ fromJSON(needs.prepare.outputs.entries) }}
     steps:
       - name: Mint a write token for the caller
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
@@ -122,8 +127,9 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
           # Contents write alone cannot push a file under .github/workflows/.
-          # Only an entry with such a target asks for workflows write.
-          permission-workflows: ${{ matrix.entry.workflows && 'write' || '' }}
+          # The token asks for workflows write only when an entry has such a
+          # target.
+          permission-workflows: ${{ needs.prepare.outputs.workflows == 'true' && 'write' || '' }}
 
       - name: Check out the caller
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -138,6 +144,10 @@ jobs:
           path: .repo-sync
           persist-credentials: false
 
+      # Each entry becomes one commit on the sync branch. An entry that fails,
+      # through a conflict or its build, is reset away and left out, the other
+      # entries still sync, and the last step fails the run.
+      #
       # A file whose `except` list names the caller is not copied, and each
       # Markdown file the entry delivers loses the blocks that need it, so the
       # copy never links a file the caller lacks.
@@ -147,17 +157,20 @@ jobs:
       # routine sync, so the entry fails instead. The job overwrites an existing
       # workflow file only when repo-sync wrote it, which the marker line shows,
       # or when it calls the same shared workflow as the source.
-      - name: Copy the entry's files to their targets
+      #
+      # The build runs in the caller's checkout with the runner's stock tools
+      # (bash, git, jq); the manifest README states that contract.
+      - name: Commit each entry's files
+        id: entries
         env:
-          NAME: ${{ matrix.entry.name }}
-          FILES: ${{ toJSON(matrix.entry.files) }}
+          ENTRIES: ${{ needs.prepare.outputs.entries }}
+          BRANCH: repo-sync/zgeoff-tools
           MARKER: repo-sync delivers this file from zgeoff/tools
           TOOLS_REF: ${{ inputs.tools-ref }}
           WORKFLOW_REF: ${{ job.workflow_ref }}
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          trap 'rm -rf .repo-sync' EXIT
           # A delivered workflow calls this repository at the ref this run syncs
           # from, so a caller pinned to a tag never runs the shared jobs of main.
           pin="${TOOLS_REF:-${WORKFLOW_REF##*@}}"
@@ -167,85 +180,154 @@ jobs:
             echo "::error::cannot pin delivered workflows to the ref '${pin//:/ }'"
             exit 1
           fi
-          rows=$(printf '%s' "$FILES" | bash .repo-sync/scripts/select-sync-files.sh "$REPO")
-          conflicts=0
-          excluded=()
-          copied=()
-          while IFS=$'\t' read -r action source target mode; do
-            if [ "$action" = skip ]; then
-              excluded+=("$target")
-              continue
-            fi
-            if [[ "$target" == .github/workflows/* && -f "$target" ]] && ! grep -qF "$MARKER" "$target"; then
-              calls=$(grep -oE 'zgeoff/tools/\.github/workflows/[^@[:space:]]+' ".repo-sync/$source" | sort -u || true)
-              if [ -z "$calls" ] || ! grep -qFf <(printf '%s\n' "$calls") "$target"; then
-                echo "::error file=$target::$target is the repo's own workflow, so $NAME does not overwrite it. Move its jobs to a file with another name, or add $NAME to skip."
-                conflicts=1
+
+          copy_entry() {
+            local name=$1 files=$2 rows conflicts=0 excluded=() copied=()
+            rows=$(printf '%s' "$files" | bash .repo-sync/scripts/select-sync-files.sh "$REPO")
+            while IFS=$'\t' read -r action source target mode; do
+              if [ "$action" = skip ]; then
+                excluded+=("$target")
                 continue
               fi
-            fi
-            mkdir -p "$(dirname "$target")"
-            install -m "$mode" ".repo-sync/$source" "$target"
-            if [[ "$target" == .github/workflows/* ]]; then
-              sed -i -E "s#(zgeoff/tools/\.github/workflows/[^]@[:space:]\"'{},]+)@main([]{},[:space:]\"']|\$)#\1@$pin\2#g" "$target"
-            fi
-            copied+=("$target")
-          done <<< "$rows"
-          if [ "${#excluded[@]}" -gt 0 ]; then
-            for target in "${copied[@]}"; do
-              if [[ "$target" == *.md ]]; then
-                bash .repo-sync/scripts/remove-excluded-blocks.sh "$target" "${excluded[@]}"
+              if [[ "$target" == .github/workflows/* && -f "$target" ]] && ! grep -qF "$MARKER" "$target"; then
+                calls=$(grep -oE 'zgeoff/tools/\.github/workflows/[^@[:space:]]+' ".repo-sync/$source" | sort -u || true)
+                if [ -z "$calls" ] || ! grep -qFf <(printf '%s\n' "$calls") "$target"; then
+                  echo "::error file=$target::$target is the repo's own workflow, so $name does not overwrite it. Move its jobs to a file with another name, or add $name to skip."
+                  conflicts=1
+                  continue
+                fi
               fi
-            done
-          fi
-          exit "$conflicts"
+              mkdir -p "$(dirname "$target")"
+              install -m "$mode" ".repo-sync/$source" "$target"
+              if [[ "$target" == .github/workflows/* ]]; then
+                sed -i -E "s#(zgeoff/tools/\.github/workflows/[^]@[:space:]\"'{},]+)@main([]{},[:space:]\"']|\$)#\1@$pin\2#g" "$target"
+              fi
+              copied+=("$target")
+            done <<< "$rows"
+            if [ "${#excluded[@]}" -gt 0 ]; then
+              for target in "${copied[@]}"; do
+                if [[ "$target" == *.md ]]; then
+                  bash .repo-sync/scripts/remove-excluded-blocks.sh "$target" "${excluded[@]}"
+                fi
+              done
+            fi
+            return "$conflicts"
+          }
 
-      # The build runs in the caller's checkout with the runner's stock tools
-      # (bash, git, jq); the manifest README states that contract.
-      - name: Run the entry's build
-        if: matrix.entry.build
-        env:
-          BUILD: ${{ matrix.entry.build }}
-        run: bash -euo pipefail -c "$BUILD"
-
-      - name: Commit and push the copy
-        id: push
-        env:
-          NAME: ${{ matrix.entry.name }}
-          BRANCH: sync/${{ matrix.entry.name }}
-        run: |
-          set -euo pipefail
+          # The checkout of this repository stays out of every commit.
+          echo /.repo-sync/ >> .git/info/exclude
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git checkout -B "$BRANCH"
-          git add -A
-          if git diff --cached --quiet; then
-            # Nothing to sync; delete any stale sync branch so its pull request closes.
-            echo "$NAME matches the source; nothing to sync."
-            git push origin --delete "$BRANCH" 2>/dev/null || true
-            echo "pushed=false" >> "$GITHUB_OUTPUT"
+          git checkout -q -B "$BRANCH"
+          synced='[]'
+          failed='[]'
+          while IFS= read -r entry; do
+            name=$(printf '%s' "$entry" | jq -r '.name')
+            # Each entry runs in a subshell with errexit on, outside any
+            # condition, so its first failing command stops it.
+            set +e
+            (
+              set -e
+              copy_entry "$name" "$(printf '%s' "$entry" | jq -c '.files')"
+              build=$(printf '%s' "$entry" | jq -r '.build // empty')
+              if [ -n "$build" ]; then
+                bash -euo pipefail -c "$build"
+              fi
+            )
+            status=$?
+            set -e
+            if [ "$status" -ne 0 ]; then
+              echo "::error::$name failed, so the sync leaves it out."
+              git reset -q --hard
+              git clean -q -f -d
+              failed=$(printf '%s' "$failed" | jq -c --arg name "$name" '. + [$name]')
+              continue
+            fi
+            git add -A
+            if git diff --cached --quiet; then
+              echo "$name matches the source; nothing to sync."
+              continue
+            fi
+            git commit -q -m "chore: sync $name from zgeoff/tools"
+            synced=$(printf '%s' "$synced" | jq -c --argjson entry "$entry" '. + [$entry | {name, description}]')
+          done < <(printf '%s' "$ENTRIES" | jq -c '.[]')
+          {
+            echo "pin=$pin"
+            echo "synced=$synced"
+            echo "failed=$failed"
+          } >> "$GITHUB_OUTPUT"
+
+      # The branch is recreated from the base on every run, so it never
+      # fast-forwards the remote, and the push forces it. GitHub closes the
+      # pull request of a deleted branch.
+      - name: Push the sync branch
+        id: push
+        env:
+          BRANCH: repo-sync/zgeoff-tools
+          SYNCED: ${{ steps.entries.outputs.synced }}
+          FAILED: ${{ steps.entries.outputs.failed }}
+        run: |
+          set -euo pipefail
+          if [ "$SYNCED" != '[]' ]; then
+            git push -q --force origin "$BRANCH"
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit -m "chore: sync $NAME from zgeoff/tools"
-          # The branch was recreated from the base and does not fast-forward the
-          # remote, so force-push.
-          git push --force origin "$BRANCH"
-          echo "pushed=true" >> "$GITHUB_OUTPUT"
+          # A failed entry leaves the branch as the last run pushed it.
+          if [ "$FAILED" = '[]' ] && git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null; then
+            echo "Every entry matches the source; deleting $BRANCH."
+            git push -q origin --delete "$BRANCH"
+          fi
+          echo "pushed=false" >> "$GITHUB_OUTPUT"
 
-      - name: Open the pull request
+      - name: Open or update the pull request
         if: steps.push.outputs.pushed == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          NAME: ${{ matrix.entry.name }}
-          BRANCH: sync/${{ matrix.entry.name }}
+          BRANCH: repo-sync/zgeoff-tools
           BASE: ${{ github.ref_name }}
-          DESCRIPTION: ${{ matrix.entry.description }}
+          PIN: ${{ steps.entries.outputs.pin }}
+          SYNCED: ${{ steps.entries.outputs.synced }}
         run: |
           set -euo pipefail
-          if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')" ]; then
-            echo "A pull request is open for $BRANCH; the push updated it."
+          title="chore: sync zgeoff/tools $PIN"
+          body=$(printf '%s' "$SYNCED" | jq -r --arg pin "$PIN" '
+            "Copied from zgeoff/tools at \($pin) by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry:\n\n"
+            + (map("- `\(.name)`: \(.description)") | join("\n"))')
+          number=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --title "$title" --body "$body"
+            echo "Updated pull request #$number for $BRANCH."
             exit 0
           fi
-          gh pr create --base "$BASE" --head "$BRANCH" \
-            --title "chore: sync $NAME from zgeoff/tools" \
-            --body "$DESCRIPTION. Copied from zgeoff/tools by the repo-sync workflow; edit the source there, not this copy."
+          gh pr create --base "$BASE" --head "$BRANCH" --title "$title" --body "$body"
+
+      # Each entry's own branch, sync/<name>, closes once the one pull request
+      # carries its files: after that pull request publishes, or when every
+      # entry matches the base. A failed entry keeps its branch.
+      - name: Delete the per-entry sync branches
+        env:
+          ENTRIES: ${{ needs.prepare.outputs.entries }}
+          PUSHED: ${{ steps.push.outputs.pushed }}
+          FAILED: ${{ steps.entries.outputs.failed }}
+        run: |
+          set -euo pipefail
+          if [ "$PUSHED" != true ] && [ "$FAILED" != '[]' ]; then
+            echo "No pull request published; the per-entry branches stay."
+            exit 0
+          fi
+          while IFS= read -r name; do
+            if git ls-remote --exit-code --heads origin "sync/$name" > /dev/null; then
+              git push -q origin --delete "sync/$name"
+            fi
+          done < <(printf '%s' "$ENTRIES" | jq -r --argjson failed "$FAILED" '.[].name | select(. as $name | $failed | index($name) | not)')
+
+      - name: Fail on the entries left out
+        env:
+          FAILED: ${{ steps.entries.outputs.failed }}
+        run: |
+          set -euo pipefail
+          if [ "$FAILED" != '[]' ]; then
+            echo "::error::These entries failed and are not in the sync: $(printf '%s' "$FAILED" | jq -r 'join(", ")')"
+            exit 1
+          fi

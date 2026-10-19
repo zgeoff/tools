@@ -3,6 +3,9 @@ import { readFile } from 'node:fs/promises';
 export interface WorkflowStep {
   readonly id: string | null;
 
+  // The step's `if`, as the workflow writes it.
+  readonly condition: string | null;
+
   // The step's env, with each value as the workflow writes it, expressions included.
   readonly env: Readonly<Record<string, string>>;
 
@@ -34,11 +37,13 @@ export async function loadWorkflowStep(
   }
 
   const id = findField(found, 'id');
+  const condition = findField(found, 'if');
   const env = findField(found, 'env');
   const entries = typeof env === 'object' && env !== null ? Object.entries(env) : [];
 
   return {
     id: typeof id === 'string' ? id : null,
+    condition: typeof condition === 'string' ? condition : null,
     env: Object.fromEntries(entries.map(([name, value]) => [name, String(value)])),
     run,
   };
