@@ -28,6 +28,7 @@
       "react": "19.3.0",
       "react-dom": "19.3.0",
       "tiny-invariant": "1.3.3",
+      "ts-pattern": "5.9.0",
       "typescript": "7.0.2",
       "zustand": "5.0.15"
     }
@@ -60,6 +61,7 @@
     "@zgeoff/format-codemod": "workspace:*",
     "@zgeoff/oxfmt-config": "workspace:*",
     "@zgeoff/oxlint-config": "workspace:*",
+    "@zgeoff/skill-gate": "workspace:*",
     "@zgeoff/tsconfig": "workspace:*",
     "lefthook": "catalog:",
     "oxfmt": "catalog:",
