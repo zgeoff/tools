@@ -51,7 +51,7 @@ const setupTestOnly = {
           }
 
           if (statement.type === 'VariableDeclaration' && statement.kind === 'const') {
-            constants.push(statement);
+            constants.push(...statement.declarations);
 
             continue;
           }
@@ -60,10 +60,13 @@ const setupTestOnly = {
         }
 
         const gates = collectSkipGates(context, constants);
+        const declarations = new Set(constants.map((declarator) => declarator.parent));
 
-        for (const declaration of constants) {
-          if (!gates.has(declaration)) {
-            emitReport(context, declaration);
+        for (const declaration of declarations) {
+          const leaks = declaration.declarations.filter((declarator) => !gates.has(declarator));
+
+          if (leaks.length > 0) {
+            emitReport(context, declaration, leaks);
           }
         }
       },
@@ -95,8 +98,8 @@ function isTestCall(statement) {
   return node.name === 'test';
 }
 
-function emitReport(context, statement) {
-  const name = findDeclaredName(context, statement);
+function emitReport(context, statement, declarators) {
+  const name = findDeclaredName(context, statement, declarators);
 
   if (name === undefined) {
     context.report({ node: statement, messageId: 'statement' });
@@ -107,10 +110,10 @@ function emitReport(context, statement) {
   context.report({ node: statement, messageId: 'declaration', data: { name } });
 }
 
-function findDeclaredName(context, statement) {
+function findDeclaredName(context, statement, declarators) {
   if (statement.type === 'VariableDeclaration') {
-    return context.sourceCode
-      .getDeclaredVariables(statement)
+    return (declarators ?? statement.declarations)
+      .flatMap((declarator) => context.sourceCode.getDeclaredVariables(declarator))
       .map((variable) => variable.name)
       .join('`, `');
   }
@@ -118,9 +121,9 @@ function findDeclaredName(context, statement) {
   return statement.id?.name;
 }
 
-// a gate's every binding is read, only in `skipIf(...)` or another gate's
-// initializer; the set grows out from the `skipIf` reads, so consts that only
-// read each other never join it
+// a gate is a declarator whose every binding is read, only in a `skipIf(...)`
+// argument or another gate's initializer; the set grows out from the `skipIf`
+// reads, so consts that only read each other never join it
 function collectSkipGates(context, constants) {
   const gates = new Set();
   let changed = true;
@@ -128,9 +131,9 @@ function collectSkipGates(context, constants) {
   while (changed) {
     changed = false;
 
-    for (const declaration of constants) {
-      if (!gates.has(declaration) && isSkipGate(context, declaration, gates)) {
-        gates.add(declaration);
+    for (const declarator of constants) {
+      if (!gates.has(declarator) && isSkipGate(context, declarator, gates)) {
+        gates.add(declarator);
         changed = true;
       }
     }
@@ -139,8 +142,8 @@ function collectSkipGates(context, constants) {
   return gates;
 }
 
-function isSkipGate(context, declaration, gates) {
-  return context.sourceCode.getDeclaredVariables(declaration).every((variable) => {
+function isSkipGate(context, declarator, gates) {
+  return context.sourceCode.getDeclaredVariables(declarator).every((variable) => {
     const reads = variable.references.filter((reference) => !reference.init && reference.isRead());
 
     return (
@@ -153,10 +156,23 @@ function isSkipGate(context, declaration, gates) {
   });
 }
 
+const functionTypes = new Set([
+  'FunctionDeclaration',
+  'FunctionExpression',
+  'ArrowFunctionExpression',
+]);
+
+// a read counts only at collection time, so no function may enclose it: a
+// `skipIf` inside `setupTest()` or a test runs later
 function isInSkipIfArgument(identifier) {
   let child = identifier;
+  let isSkipIfArgument = false;
 
   for (let node = identifier.parent; node !== null && node !== undefined; node = node.parent) {
+    if (functionTypes.has(node.type)) {
+      return false;
+    }
+
     if (
       node.type === 'CallExpression' &&
       node.arguments.includes(child) &&
@@ -164,7 +180,21 @@ function isInSkipIfArgument(identifier) {
       !node.callee.computed &&
       node.callee.property.name === 'skipIf'
     ) {
-      return true;
+      isSkipIfArgument = true;
+    }
+
+    child = node;
+  }
+
+  return isSkipIfArgument;
+}
+
+function isInGateInit(identifier, gates) {
+  let child = identifier;
+
+  for (let node = identifier.parent; isOutsideFunction(node); node = node.parent) {
+    if (node.type === 'VariableDeclarator') {
+      return node.init === child && gates.has(node);
     }
 
     child = node;
@@ -173,18 +203,8 @@ function isInSkipIfArgument(identifier) {
   return false;
 }
 
-function isInGateInit(identifier, gates) {
-  let child = identifier;
-
-  for (let node = identifier.parent; node !== null && node !== undefined; node = node.parent) {
-    if (node.type === 'VariableDeclarator') {
-      return node.init === child && gates.has(node.parent);
-    }
-
-    child = node;
-  }
-
-  return false;
+function isOutsideFunction(node) {
+  return node !== null && node !== undefined && !functionTypes.has(node.type);
 }
 
 export default setupTestOnly;

@@ -799,6 +799,36 @@ test('it flags a helper that only another helper reads', async () => {
   expect(result.stdout).toInclude('Remove the module-level `doubled`');
 });
 
+test('it flags a gate that only a skipIf inside setupTest reads', async () => {
+  const source =
+    "import { test } from 'bun:test';\n\nconst hasKettle = true;\n\nfunction setupTest() {\n  return test.skipIf(hasKettle);\n}\n\ntest('it boils', () => {\n  setupTest();\n});\n";
+
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('Remove the module-level `hasKettle`');
+});
+
+test('it accepts a probe and its derived gate in one declaration', async () => {
+  const source =
+    "import { test } from 'bun:test';\nimport { probeKettle } from './probe-kettle';\n\n// skipIf takes a boolean and has no in-body skip\nconst hasKettle = await probeKettle(),\n  skipBoil = !hasKettle;\n\ntest.skipIf(skipBoil)('it boils', () => {});\n";
+
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+
+  expect(result.stdout).not.toInclude('setup-test-only');
+});
+
+test('it names only the non-gate binding of a declaration that holds a gate', async () => {
+  const source =
+    "import { expect, test } from 'bun:test';\nimport { probeKettle } from './probe-kettle';\n\nconst hasKettle = await probeKettle(),\n  cups = 2;\n\ntest.skipIf(!hasKettle)('it pours', () => {\n  expect(cups).toBe(2);\n});\n";
+
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('Remove the module-level `cups`');
+  expect(result.stdout).not.toInclude('`hasKettle`');
+});
+
 test('it flags a module-level const that nothing reads', async () => {
   const source =
     "import { test } from 'bun:test';\n\nconst cups = 2;\n\ntest('it pours', () => {});\n";
