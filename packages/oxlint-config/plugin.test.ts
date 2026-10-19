@@ -1564,6 +1564,7 @@ test.each([
     { '.': './src/%2e/index.ts' },
     '@demo/store',
   ],
+  ['1.2, a malformed escape in the target', { '.': './src/%ZZ/index.ts' }, '@demo/store'],
   ['1.6, a ".." segment in the pattern match', { './*': './src/*.ts' }, '@demo/store/x/../index'],
   [
     '2.1, an index property key beside an active default',

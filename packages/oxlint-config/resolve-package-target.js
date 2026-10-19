@@ -53,15 +53,21 @@ function buildPatternTarget(target, patternMatch) {
 
 const invalidSegments = new Set(['', '.', '..', 'node_modules']);
 
+// a malformed escape, such as `%ZZ`, names no file, so the target is invalid
 function hasInvalidSegment(segments) {
-  return segments.some((segment) => invalidSegments.has(decodeSegment(segment).toLowerCase()));
+  return segments.some((segment) => {
+    const decoded = decodeSegment(segment);
+
+    return decoded === null || invalidSegments.has(decoded.toLowerCase());
+  });
 }
 
+// null for a malformed escape
 function decodeSegment(segment) {
   try {
     return decodeURIComponent(segment);
   } catch {
-    return segment;
+    return null;
   }
 }
 
