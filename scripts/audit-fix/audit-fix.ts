@@ -148,13 +148,6 @@ function readAuditScript(packageJSON: string): string {
   return typeof audit === 'string' ? audit : 'bun audit';
 }
 
-function hasSameIDs(left: readonly string[], right: readonly string[]): boolean {
-  const leftSet = new Set(left);
-  const rightSet = new Set(right);
-
-  return leftSet.size === rightSet.size && [...leftSet].every((id) => rightSet.has(id));
-}
-
 async function loadAuditIgnores(path: string): Promise<AuditIgnores> {
   if (!existsSync(path)) {
     return {};
@@ -212,6 +205,22 @@ function readReleaseAgeExcludes(
   );
 }
 
+async function readPublishDate(name: string, version: string, today: string): Promise<string> {
+  const response = await fetch(`https://registry.npmjs.org/${name.replace('/', '%2f')}`);
+
+  if (!response.ok) {
+    // Without the date, today is the latest the release can be from.
+    return today;
+  }
+
+  const manifest: unknown = await response.json();
+
+  const time = isRecord(manifest) ? manifest['time'] : undefined;
+  const published = isRecord(time) ? time[version] : undefined;
+
+  return typeof published === 'string' ? published.slice(0, 10) : today;
+}
+
 // Drops each audit-fix exclude whose release aged past the gate, then adds the
 // new ones; returns the dropped package names.
 async function updateReleaseAgeExcludes(
@@ -237,20 +246,11 @@ async function updateReleaseAgeExcludes(
   return pruned.removed.filter((name) => !excludes.some((exclude) => exclude.name === name));
 }
 
-async function readPublishDate(name: string, version: string, today: string): Promise<string> {
-  const response = await fetch(`https://registry.npmjs.org/${name.replace('/', '%2f')}`);
+function hasSameIDs(left: readonly string[], right: readonly string[]): boolean {
+  const leftSet = new Set(left);
+  const rightSet = new Set(right);
 
-  if (!response.ok) {
-    // Without the date, today is the latest the release can be from.
-    return today;
-  }
-
-  const manifest: unknown = await response.json();
-
-  const time = isRecord(manifest) ? manifest['time'] : undefined;
-  const published = isRecord(time) ? time[version] : undefined;
-
-  return typeof published === 'string' ? published.slice(0, 10) : today;
+  return leftSet.size === rightSet.size && [...leftSet].every((id) => rightSet.has(id));
 }
 
 async function writeAuditIgnores(ignores: AuditIgnores): Promise<void> {

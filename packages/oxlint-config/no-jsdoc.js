@@ -1,18 +1,3 @@
-// mirrors eslint-plugin-jsdoc's default singleLineTags: a block that exists to
-// cast inline (`/** @type {Foo} */ (bar)`) is a type annotation, not prose
-const inlineTagPattern = /^@(?:type|lends)\b/u;
-
-function isJSDoc(comment) {
-  return comment.type === 'Block' && comment.value.startsWith('*');
-}
-
-function isInlineCast(comment) {
-  return (
-    comment.loc.start.line === comment.loc.end.line &&
-    inlineTagPattern.test(comment.value.slice(1).trim())
-  );
-}
-
 const noJSDoc = {
   meta: {
     type: 'suggestion',
@@ -38,3 +23,18 @@ const noJSDoc = {
 };
 
 export default noJSDoc;
+
+function isJSDoc(comment) {
+  return comment.type === 'Block' && comment.value.startsWith('*');
+}
+
+// mirrors eslint-plugin-jsdoc's default singleLineTags: a block that exists to
+// cast inline (`/** @type {Foo} */ (bar)`) is a type annotation, not prose
+const inlineTagPattern = /^@(?:type|lends)\b/u;
+
+function isInlineCast(comment) {
+  return (
+    comment.loc.start.line === comment.loc.end.line &&
+    inlineTagPattern.test(comment.value.slice(1).trim())
+  );
+}

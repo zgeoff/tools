@@ -1,6 +1,12 @@
 import { formatSkillList } from './format-skill-list.ts';
 import type { SkillGateHookOutput, SkillGateOutputContext, SkillGatePlan } from './types.ts';
 
+const RULES_PATH = '.claude/skill-gate.json';
+
+// A gated path changes only through these tools; the gate warns on a Bash write and blocks an edit.
+const EDIT_TOOLS_NOTE =
+  'Change a gated path only with Edit, Write or MultiEdit, never through Bash.';
+
 // Builds the PreToolUse hook output for one edit, or null when the edit goes ahead in silence. A
 // missing skill denies the edit. A broken rules file or a rule that names a skill the repo does
 // not have never denies: it warns the user and the agent, and the edit goes ahead.
@@ -46,9 +52,3 @@ export function buildSkillGateOutput(
     hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: warning },
   };
 }
-
-const RULES_PATH = '.claude/skill-gate.json';
-
-// A gated path changes only through these tools; the gate warns on a Bash write and blocks an edit.
-const EDIT_TOOLS_NOTE =
-  'Change a gated path only with Edit, Write or MultiEdit, never through Bash.';

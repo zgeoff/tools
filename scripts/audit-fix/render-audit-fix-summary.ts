@@ -118,6 +118,17 @@ function renderRemoved(removed: readonly string[]): string {
   ].join('\n');
 }
 
+function renderExpiredExcludes(names: readonly string[]): string {
+  if (names.length === 0) {
+    return '';
+  }
+
+  return [
+    '## Release-age excludes dropped, because each release aged past the gate',
+    ...names.map((name) => `- \`${name}\``),
+  ].join('\n');
+}
+
 // commitlint's header-max-length rule allows 72 characters, and a squash merge
 // makes the title the commit subject.
 const maxTitleLength = 72;
@@ -139,6 +150,14 @@ function buildFixTitle(fixes: readonly FixedPackage[], ignores: number): string 
   return `fix(deps): update ${names.length} ${formatNoun('package', names.length)}${suffix}`;
 }
 
+function formatNoun(noun: string, count: number): string {
+  if (count === 1) {
+    return noun;
+  }
+
+  return noun.endsWith('y') ? `${noun.slice(0, -1)}ies` : `${noun}s`;
+}
+
 function buildDropTitle(ignores: number, excludes: number): string {
   if (excludes === 0) {
     return `chore(deps): drop ${ignores} stale audit ${formatNoun('ignore', ignores)}`;
@@ -149,23 +168,4 @@ function buildDropTitle(ignores: number, excludes: number): string {
   }
 
   return 'chore(deps): drop stale audit ignores and release-age excludes';
-}
-
-function renderExpiredExcludes(names: readonly string[]): string {
-  if (names.length === 0) {
-    return '';
-  }
-
-  return [
-    '## Release-age excludes dropped, because each release aged past the gate',
-    ...names.map((name) => `- \`${name}\``),
-  ].join('\n');
-}
-
-function formatNoun(noun: string, count: number): string {
-  if (count === 1) {
-    return noun;
-  }
-
-  return noun.endsWith('y') ? `${noun.slice(0, -1)}ies` : `${noun}s`;
 }

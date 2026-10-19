@@ -1,62 +1,6 @@
 import findFunctionName from './find-function-name.js';
 import isVerbMatch from './is-verb-match.js';
 
-// banned verb → the role-table verb to use instead; null means the verb is
-// too vague to map and the name should say what the function does
-const bannedVerbs = new Map([
-  ['process', null],
-  ['manage', null],
-  ['do', null],
-  ['perform', null],
-  ['execute', 'run'],
-  ['compute', 'build'],
-  ['fetch', 'read'],
-  ['save', 'write'],
-  ['store', 'write'],
-  ['delete', 'remove'],
-  ['search', 'find'],
-  ['lookup', 'find'],
-]);
-
-// the role table's template prefixes (`with<X>`, `handle<Event>`, …): each is
-// only valid with a suffix, and a bare `handle` is the vague banned verb
-const suffixRequiredVerbs = new Set(['to', 'with', 'make', 'use', 'on']);
-
-function findBannedVerb(name) {
-  for (const [verb, replacement] of bannedVerbs) {
-    if (isVerbMatch(name, verb)) {
-      return { verb, replacement };
-    }
-  }
-
-  return name === 'handle' ? { verb: 'handle', replacement: null } : null;
-}
-
-function planReport(name, exemptNames) {
-  if (exemptNames.has(name) || !/^[a-z]/u.test(name)) {
-    return null;
-  }
-
-  if (suffixRequiredVerbs.has(name)) {
-    return { messageId: 'bareTemplate', data: { name } };
-  }
-
-  const banned = findBannedVerb(name);
-
-  if (banned === null) {
-    return null;
-  }
-
-  if (banned.replacement === null) {
-    return { messageId: 'vagueVerb', data: { name, verb: banned.verb } };
-  }
-
-  return {
-    messageId: 'bannedVerb',
-    data: { name, verb: banned.verb, replacement: banned.replacement },
-  };
-}
-
 const functionVerb = {
   meta: {
     type: 'suggestion',
@@ -96,3 +40,59 @@ const functionVerb = {
 };
 
 export default functionVerb;
+
+// the role table's template prefixes (`with<X>`, `handle<Event>`, …): each is
+// only valid with a suffix, and a bare `handle` is the vague banned verb
+const suffixRequiredVerbs = new Set(['to', 'with', 'make', 'use', 'on']);
+
+function planReport(name, exemptNames) {
+  if (exemptNames.has(name) || !/^[a-z]/u.test(name)) {
+    return null;
+  }
+
+  if (suffixRequiredVerbs.has(name)) {
+    return { messageId: 'bareTemplate', data: { name } };
+  }
+
+  const banned = findBannedVerb(name);
+
+  if (banned === null) {
+    return null;
+  }
+
+  if (banned.replacement === null) {
+    return { messageId: 'vagueVerb', data: { name, verb: banned.verb } };
+  }
+
+  return {
+    messageId: 'bannedVerb',
+    data: { name, verb: banned.verb, replacement: banned.replacement },
+  };
+}
+
+// banned verb → the role-table verb to use instead; null means the verb is
+// too vague to map and the name should say what the function does
+const bannedVerbs = new Map([
+  ['process', null],
+  ['manage', null],
+  ['do', null],
+  ['perform', null],
+  ['execute', 'run'],
+  ['compute', 'build'],
+  ['fetch', 'read'],
+  ['save', 'write'],
+  ['store', 'write'],
+  ['delete', 'remove'],
+  ['search', 'find'],
+  ['lookup', 'find'],
+]);
+
+function findBannedVerb(name) {
+  for (const [verb, replacement] of bannedVerbs) {
+    if (isVerbMatch(name, verb)) {
+      return { verb, replacement };
+    }
+  }
+
+  return name === 'handle' ? { verb: 'handle', replacement: null } : null;
+}

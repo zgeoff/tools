@@ -10,10 +10,6 @@ const allowedStatementTypes = new Set([
   'TSInterfaceDeclaration',
 ]);
 
-// the members a `test` call may chain: `test.each(rows)(…)`,
-// `test.skipIf(gate)(…)`, `test.if(gate)(…)`, and chains of them
-const testModifiers = new Set(['each', 'skipIf', 'if']);
-
 const setupTestOnly = {
   meta: {
     type: 'problem',
@@ -102,6 +98,12 @@ function collectTestNames(context, program) {
   return new Set(names);
 }
 
+function getImportedName(specifier) {
+  return specifier.imported.type === 'Identifier'
+    ? specifier.imported.name
+    : specifier.imported.value;
+}
+
 // every import form and every module-level declaration defines a binding in
 // the module scope, which ESM nests under the global one
 function hasModuleBinding(context, program, name) {
@@ -111,12 +113,6 @@ function hasModuleBinding(context, program, name) {
   return scopes.some((candidate) => (candidate.set.get(name)?.defs.length ?? 0) > 0);
 }
 
-function getImportedName(specifier) {
-  return specifier.imported.type === 'Identifier'
-    ? specifier.imported.name
-    : specifier.imported.value;
-}
-
 function isTestCall(statement, testNames) {
   return (
     statement.type === 'ExpressionStatement' &&
@@ -124,6 +120,10 @@ function isTestCall(statement, testNames) {
     isTestRunner(statement.expression.callee, testNames)
   );
 }
+
+// the members a `test` call may chain: `test.each(rows)(…)`,
+// `test.skipIf(gate)(…)`, `test.if(gate)(…)`, and chains of them
+const testModifiers = new Set(['each', 'skipIf', 'if']);
 
 // `test` itself or a chain of its modifiers, such as `test.skipIf(gate).each(rows)`
 function isTestRunner(node, testNames) {
