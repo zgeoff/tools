@@ -173,9 +173,9 @@ function findConditionTarget(value, conditions) {
   return findConditionValue(value, conditions) ?? null;
 }
 
-// node's rule: in an object, the first active condition, in key order, that
-// yields a target or a null block; in an array, the first entry that yields
-// a target. `undefined` means nothing matched, so an outer object goes on.
+// node's rule: an object takes its first active condition that resolves, a
+// null there blocking the import; an array takes its first target, else a null
+// it holds. `undefined`, where nothing matched, lets an outer object go on.
 function findConditionValue(value, conditions) {
   if (typeof value === 'string' || value === null) {
     return value;
@@ -183,11 +183,11 @@ function findConditionValue(value, conditions) {
 
   if (Array.isArray(value)) {
     const targets = value.map((candidate) => findConditionValue(candidate, conditions));
+    const blocked = targets.includes(null) ? null : undefined;
 
-    return targets.find((target) => typeof target === 'string') ?? null;
+    return targets.find((target) => typeof target === 'string') ?? blocked;
   }
 
-  // a number or boolean target matches nothing
   const branches = typeof value === 'object' ? value : {};
   const targets = Object.keys(branches)
     .filter((condition) => conditions.has(condition))
