@@ -1,15 +1,16 @@
 # System tests
 
 These rules cover the tests that run a whole program or reach the host: end-to-end journeys,
-evaluation suites, property tests, native timers, real network stand-ins, stateful stand-ins for a
-program the repo drives, and resources the host fixes. The [testing skill](../SKILL.md) rules apply
-throughout, and each section here names the one it relaxes.
+evaluation suites, property tests, native timers, real network stand-ins, browser suites, stateful
+stand-ins for a program the repo drives, and resources the host fixes. The
+[testing skill](../SKILL.md) rules apply throughout, and each section here names the one it relaxes.
 
 - [End-to-end suites](#end-to-end-suites)
 - [Evaluation suites](#evaluation-suites)
 - [Property tests](#property-tests)
 - [Native timers and scenario delays](#native-timers-and-scenario-delays)
 - [Real applications and transport](#real-applications-and-transport)
+- [Browser suites](#browser-suites)
 - [Stateful stand-ins](#stateful-stand-ins)
 - [Program-fixed paths and global resources](#program-fixed-paths-and-global-resources)
 
@@ -109,6 +110,18 @@ requests from a child process, container, or VM outside the intercepted process.
 interceptor limitation with the installed versions. Keep real routing and serialization,
 schema-backed rich mock state, and visible failures for unexpected calls. Ordinary remote HTTP
 behavior keeps MSW where it applies.
+
+## Browser suites
+
+A test that drives a real browser, such as Chrome through `Bun.WebView` or Playwright, lives in a
+browser suite named `<module>.browser.test.ts` beside the module it tests. The repo's test script
+runs browser suites in their own serial lane after the parallel run, so the browser starts on an
+idle CPU. A cold browser start on a CPU that the parallel pool saturates can outlast the test
+timeout, and a raised timeout only hides that cost.
+
+- A browser suite keeps the default test timeout. When it needs more, the suite is doing an
+  end-to-end journey's work, and the journey belongs in `e2e/`.
+- Every other test stays out of a browser suite, so the parallel run keeps its speed.
 
 ## Stateful stand-ins
 

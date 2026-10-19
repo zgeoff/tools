@@ -2,7 +2,9 @@ import { readdirSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, sep } from 'node:path';
 import resolveRepoRoot from './resolve-repo-root.js';
 
-const testFilePattern = /^(?<base>.+)\.test\.tsx?$/u;
+// a browser suite (`<name>.browser.test.ts`) tests the same module as
+// `<name>.test.ts`, and the suffix lets a runner put it in its own lane
+const testFilePattern = /^(?<base>.+?)(?:\.browser)?\.test\.tsx?$/u;
 
 // suites that run the whole program have no single module to sit beside
 const exemptRootDirs = new Set(['e2e', 'evals']);

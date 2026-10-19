@@ -519,6 +519,27 @@ test('it counts a symlinked module', async () => {
   expect(result.exitCode).toBe(0);
 });
 
+test('it accepts a browser suite beside its module', async () => {
+  const result = await runLintTree(
+    { 'view.tsx': '', 'view.browser.test.ts': testSource },
+    'view.browser.test.ts',
+    besideModule,
+  );
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it flags a browser suite with no module beside it', async () => {
+  const result = await runLintTree(
+    { 'view.browser.test.ts': testSource, 'other.ts': '' },
+    'view.browser.test.ts',
+    besideModule,
+  );
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('view.<ext>');
+});
+
 test('it flags a test-kind suffix test beside only the base module', async () => {
   const result = await runLintTree(
     { 'egress-ruleset.ts': '', 'egress-ruleset.host.test.ts': testSource },
