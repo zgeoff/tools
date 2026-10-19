@@ -1502,28 +1502,45 @@ const storeZones = {
   ],
 };
 
+// one row per branch of PACKAGE_TARGET_RESOLVE in Node's ESM resolution algorithm
 test.each([
-  ['a string exports field', './src/index.ts'],
-  ['a string root entry', { '.': './src/index.ts' }],
-  ['an active condition', { '.': { development: './src/index.ts', default: './src/dist.ts' } }],
+  ['1.3, a "./" target', './src/index.ts', '@demo/store'],
+  ['1.7, a pattern target', { './*': './src/*.ts' }, '@demo/store/index'],
   [
-    'a nested condition with no match, which falls through to default',
+    '2.2, the first active condition in key order',
+    { '.': { development: './src/index.ts', default: './src/dist.ts' } },
+    '@demo/store',
+  ],
+  [
+    '2.2, default, which is always active',
+    { '.': { worker: './src/dist.ts', default: './src/index.ts' } },
+    '@demo/store',
+  ],
+  [
+    '2.2.1.3, a condition that resolves to undefined, past which the object goes on',
     { '.': { development: { worker: './src/dist.ts' }, default: './src/index.ts' } },
+    '@demo/store',
   ],
   [
-    'an array whose first entry yields nothing',
+    '3.2.1, an invalid entry the array passes over',
+    { '.': ['../outside.ts', './src/index.ts'] },
+    '@demo/store',
+  ],
+  [
+    '3.2.2, an undefined entry the array passes over',
     { '.': [{ worker: './src/dist.ts' }, './src/index.ts'] },
+    '@demo/store',
   ],
   [
-    'an array with no match under an active condition, which falls through to default',
+    '3.3, an array with no match, past which the outer object goes on',
     { '.': { development: [{ worker: './src/dist.ts' }], default: './src/index.ts' } },
+    '@demo/store',
   ],
-])('it resolves a workspace package through %s', async (_shape, exports) => {
+])('it resolves a workspace export through step %s', async (_branch, exports, specifier) => {
   const files = {
     'packages/store/package.json': JSON.stringify({ name: '@demo/store', exports }),
     'packages/store/src/index.ts': 'export const store = 1;\n',
-    'packages/app/src/run.ts':
-      "import { store } from '@demo/store';\n\nexport const all = [store];\n",
+    'packages/app/src/run.ts': `import { store } from '${specifier}';\n\nexport const all = [store];\n`,
   };
 
   const result = await runLintTree(files, 'packages/app/src/run.ts', storeZones);
@@ -1533,27 +1550,53 @@ test.each([
 });
 
 test.each([
+  ['1.1.1, a bare target in exports', { '.': 'src/index.ts' }, '@demo/store'],
+  ['1.1.1, a target that leaves the package', { '.': '../store/src/index.ts' }, '@demo/store'],
+  ['1.2, a ".." segment in the target', { '.': './src/../src/index.ts' }, '@demo/store'],
+  ['1.2, a node_modules segment in the target', { '.': './node_modules/index.ts' }, '@demo/store'],
   [
-    'a null target under an active condition',
-    { '.': { development: null, default: './src/index.ts' } },
+    '1.2, a percent-encoded "." segment in the target',
+    { '.': './src/%2e/index.ts' },
+    '@demo/store',
   ],
-  ['a null root entry', { '.': null }],
-  ['conditions that none of the active ones match', { '.': { worker: './src/index.ts' } }],
-  ['an array that holds a null and no target', { '.': [{ worker: './src/index.ts' }, null] }],
-  ['a target file that does not exist', { '.': './src/missing.ts' }],
-])('it reports a workspace import blocked by %s as unresolved', async (_shape, exports) => {
-  const files = {
-    'packages/store/package.json': JSON.stringify({ name: '@demo/store', exports }),
-    'packages/store/src/index.ts': 'export const store = 1;\n',
-    'packages/app/src/run.ts':
-      "import { store } from '@demo/store';\n\nexport const all = [store];\n",
-  };
+  ['1.6, a ".." segment in the pattern match', { './*': './src/*.ts' }, '@demo/store/x/../index'],
+  ['2.1, an index property key', { '.': { 0: './src/index.ts' } }, '@demo/store'],
+  ['2.3, an object with no active condition', { '.': { worker: './src/index.ts' } }, '@demo/store'],
+  ['3.1, an empty array', { '.': [] }, '@demo/store'],
+  [
+    '3.1, an empty array under an active condition, which blocks default',
+    { '.': { development: [], default: './src/index.ts' } },
+    '@demo/store',
+  ],
+  [
+    '3.2.3, a null entry, which the array returns',
+    { '.': [null, './src/index.ts'] },
+    '@demo/store',
+  ],
+  ['3.3, an array whose entries are all invalid', { '.': ['../a.ts', 'b.ts'] }, '@demo/store'],
+  [
+    '4, a null target under an active condition',
+    { '.': { development: null, default: './src/index.ts' } },
+    '@demo/store',
+  ],
+  ['4, a null root entry', { '.': null }, '@demo/store'],
+  ['5, a target of another type', { '.': 5 }, '@demo/store'],
+  ['1.3, a target file that does not exist', { '.': './src/missing.ts' }, '@demo/store'],
+])(
+  'it reports a workspace export blocked at step %s as unresolved',
+  async (_branch, exports, specifier) => {
+    const files = {
+      'packages/store/package.json': JSON.stringify({ name: '@demo/store', exports }),
+      'packages/store/src/index.ts': 'export const store = 1;\n',
+      'packages/app/src/run.ts': `import { store } from '${specifier}';\n\nexport const all = [store];\n`,
+    };
 
-  const result = await runLintTree(files, 'packages/app/src/run.ts', storeZones);
+    const result = await runLintTree(files, 'packages/app/src/run.ts', storeZones);
 
-  expect(result.stdout).toInclude('unresolved: cannot resolve @demo/store');
-  expect(result.stdout).not.toInclude('to-store:');
-});
+    expect(result.stdout).toInclude(`unresolved: cannot resolve ${specifier}`);
+    expect(result.stdout).not.toInclude('to-store:');
+  },
+);
 
 test('it reports an own-package subpath the exports omit as a self-import and unresolved', async () => {
   const rules = {
