@@ -1532,6 +1532,11 @@ test.each([
     '@demo/store',
   ],
   [
+    '3.2.3, a null entry, past which the array falls back as Node’s resolver does',
+    { '.': [null, './src/index.ts'] },
+    '@demo/store',
+  ],
+  [
     '3.3, an array with no match, past which the outer object goes on',
     { '.': { development: [{ worker: './src/dist.ts' }], default: './src/index.ts' } },
     '@demo/store',
@@ -1560,7 +1565,11 @@ test.each([
     '@demo/store',
   ],
   ['1.6, a ".." segment in the pattern match', { './*': './src/*.ts' }, '@demo/store/x/../index'],
-  ['2.1, an index property key', { '.': { 0: './src/index.ts' } }, '@demo/store'],
+  [
+    '2.1, an index property key beside an active default',
+    { '.': { 0: './src/index.ts', default: './src/index.ts' } },
+    '@demo/store',
+  ],
   ['2.3, an object with no active condition', { '.': { worker: './src/index.ts' } }, '@demo/store'],
   ['3.1, an empty array', { '.': [] }, '@demo/store'],
   [
@@ -1568,11 +1577,7 @@ test.each([
     { '.': { development: [], default: './src/index.ts' } },
     '@demo/store',
   ],
-  [
-    '3.2.3, a null entry, which the array returns',
-    { '.': [null, './src/index.ts'] },
-    '@demo/store',
-  ],
+  ['3.3, an array of null entries', { '.': [null, null] }, '@demo/store'],
   ['3.3, an array whose entries are all invalid', { '.': ['../a.ts', 'b.ts'] }, '@demo/store'],
   [
     '4, a null target under an active condition',
@@ -1585,9 +1590,12 @@ test.each([
 ])(
   'it reports a workspace export blocked at step %s as unresolved',
   async (_branch, exports, specifier) => {
+    // the files an invalid target names exist, so only the step's own check blocks them
     const files = {
       'packages/store/package.json': JSON.stringify({ name: '@demo/store', exports }),
       'packages/store/src/index.ts': 'export const store = 1;\n',
+      'packages/store/node_modules/index.ts': 'export const store = 1;\n',
+      'packages/store/src/%2e/index.ts': 'export const store = 1;\n',
       'packages/app/src/run.ts': `import { store } from '${specifier}';\n\nexport const all = [store];\n`,
     };
 
