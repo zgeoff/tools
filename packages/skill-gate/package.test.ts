@@ -20,11 +20,19 @@ async function setupTest() {
   const unpacked = join(dir, 'unpacked');
   const packed = join(dir, 'packed');
   const project = join(dir, 'project');
+  const stdSource = join(dir, 'std-source');
+  const stdUnpacked = join(dir, 'std-unpacked');
   const stdPacked = join(dir, 'std-packed');
+
+  // A release PR bumps std before npm has the new version. The packed copies take a version npm
+  // lacks, so an install that reaches npm for std fails.
+  const unpublishedStdVersion = '0.0.0-workspace';
 
   await Promise.all([
     mkdir(unpacked),
     mkdir(packed),
+    mkdir(stdSource),
+    mkdir(stdUnpacked),
     mkdir(stdPacked),
     mkdir(join(project, '.claude/hooks/skill-gate'), { recursive: true }),
   ]);
@@ -44,6 +52,11 @@ async function setupTest() {
 
   await $`tar -xzf ${join(dir, manifest)} -C ${unpacked}`.env(env).quiet();
 
+  await $`bun pm pkg set dependencies.@zgeoff/std=${unpublishedStdVersion}`
+    .cwd(join(unpacked, 'package'))
+    .env(env)
+    .quiet();
+
   await rm(join(unpacked, 'package/dist'), { recursive: true, force: true });
 
   await $`bun run build:outdir ${join(unpacked, 'package/dist')}`
@@ -60,10 +73,28 @@ async function setupTest() {
 
   invariant(tarball !== undefined && extra.length === 0, 'bun pm pack must write one tarball');
 
-  // A release PR bumps std before npm has the new version, so std installs from its own tarball.
   // The shipped declarations never import std, so its source pack needs no build.
-  await $`bun pm pack --ignore-scripts --destination ${stdPacked}`
+  await $`bun pm pack --ignore-scripts --destination ${stdSource}`
     .cwd(join(import.meta.dir, '../std'))
+    .env(env)
+    .quiet();
+
+  const [stdSourceTarball, ...stdSourceExtra] = await readdir(stdSource);
+
+  invariant(
+    stdSourceTarball !== undefined && stdSourceExtra.length === 0,
+    'bun pm pack must write one tarball',
+  );
+
+  await $`tar -xzf ${join(stdSource, stdSourceTarball)} -C ${stdUnpacked}`.env(env).quiet();
+
+  await $`bun pm pkg set version=${unpublishedStdVersion}`
+    .cwd(join(stdUnpacked, 'package'))
+    .env(env)
+    .quiet();
+
+  await $`bun pm pack --ignore-scripts --destination ${stdPacked}`
+    .cwd(join(stdUnpacked, 'package'))
     .env(env)
     .quiet();
 
