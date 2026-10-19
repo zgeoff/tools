@@ -35,8 +35,8 @@ Each line links the section that explains it.
 - [Structure and naming](#structure-and-naming): flat `test()` calls titled "it …", one act per
   test, and no `describe`.
 - [Loops](#loops): replace a loop of assertions with `test.each` or one collection matcher.
-- [`setupTest`](#setuptest): one local `setupTest()` holds wiring only, and each test creates the
-  records it asserts on.
+- [`setupTest`](#setuptest): one local `setupTest()` holds wiring only, and each test creates all of
+  its data.
 - [Cleanup](#cleanup): register `onTestFinished` right after each acquisition, with no hooks and no
   `try`/`finally`.
 - [Test data](#test-data): literals stay inline, shared domain types get tested factories, and
@@ -244,13 +244,10 @@ never appear in a test file.
   recorders, and the unit built through its factory. It takes no argument, or a typed config object
   that selects which dependencies to wire and carries no value that a test's outcome depends on. It
   returns named properties and has no `if`.
-- `setupTest()` creates no record and calls no operation of the code under test; building the unit
-  through its factory is not an operation. A record is a row, a file, or a store entry that the unit
-  reads, or the starting value of the clock or another wired dependency when a test's outcome
-  depends on it. A temp directory, a schema, and a handle are wiring. Each test creates every record
-  it asserts on, or whose values its outcome depends on, in its own body with those values written
-  there, even when every test in the file needs the same record. A factory with explicit arguments
-  may create it, such as `createStep({ leaseMs: 30_000 })`.
+- `setupTest()` wires dependencies and creates no data. Data is any row, file, store entry, or
+  starting value that the code under test reads. Each test creates all of its data in its arrange
+  phase, even when every test in the file needs the same data. A wired clock starts at a fixed
+  default; a test that reads the time sets the clock in its arrange phase.
 - A shared helper whose arguments carry the scenario, such as `startTestSite(pages)`, is called in
   the test body with those arguments written there. `setupTest()` wraps only a helper that takes no
   scenario.
@@ -273,6 +270,52 @@ never appear in a test file.
   and it moves to the shared test utils.
 - Each test file keeps its own `setupTest()`. A shared one gathers a flag for every suite that uses
   it.
+
+In impz `e2e/lib/reset-baseline.test.ts:148-157`, `setupTest()` writes the `ubuntu` rootfs and
+creates the image, so it creates data:
+
+```ts
+async function setupTest() {
+  // … wires the database, the stub VMM, impd, and the client
+
+  await Bun.write(join(dataDir, 'images', 'ubuntu', 'rootfs.ext4'), 'rootfs');
+
+  const image = await createImage(
+    db,
+    buildMockNewImage({ name: 'ubuntu', digest: 'sha256:ubuntu', sizeBytes: 6 }),
+  );
+
+  return { client, db, dataDir, vmm, impd, image };
+}
+```
+
+The test at `:160` of the same file follows the rule when `setupTest()` returns only the wiring and
+the test creates the image in its arrange phase:
+
+```ts
+async function setupTest() {
+  // … wires the database, the stub VMM, impd, and the client
+
+  return { client, db, dataDir, vmm, impd };
+}
+
+test('#resetBaseline removes the imps a journey named with its prefix, with their checkpoints and leases', async () => {
+  const ctx = await setupTest();
+
+  await Bun.write(join(ctx.dataDir, 'images', 'ubuntu', 'rootfs.ext4'), 'rootfs');
+  await createImage(
+    ctx.db,
+    buildMockNewImage({ name: 'ubuntu', digest: 'sha256:ubuntu', sizeBytes: 6 }),
+  );
+
+  const imp = await ctx.client.imps.create({ name: 'e2e-x-dev' });
+
+  // … creates a checkpoint and a lease, then calls resetBaseline and asserts
+});
+```
+
+Repeated arrange lines stay inline, or move to a tested shared util that the test calls with its
+arguments, such as `createTestImage(ctx, { name: 'ubuntu' })`.
 
 Register cleanup with `onTestFinished` immediately after each successful resource acquisition, so a
 later setup step or assertion that throws still releases the resource. `setupTest()` returns named
