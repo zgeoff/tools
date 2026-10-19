@@ -1,6 +1,7 @@
 import functionVerb from './function-verb.js';
 import importZones from './import-zones.js';
 import maxConsecutiveLineComments from './max-consecutive-line-comments.js';
+import moduleOrder from './module-order.js';
 import noAbbreviatedNames from './no-abbreviated-names.js';
 import noClass from './no-class.js';
 import noCommentRuleOverride from './no-comment-rule-override.js';
@@ -112,6 +113,7 @@ const plugin = {
     'no-comment-rule-override': noCommentRuleOverride,
     'function-verb': functionVerb,
     'verb-contract': verbContract,
+    'module-order': moduleOrder,
     'no-restricted-words': noRestrictedWords,
     'no-abbreviated-names': noAbbreviatedNames,
     'test-beside-module': testBesideModule,

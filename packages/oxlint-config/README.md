@@ -10,12 +10,13 @@ that loosens either comment rule.
 
 The plugin's other rules each check one convention. `zgeoff/function-verb` bans the vague and
 near-synonym verbs of the shared function-naming rules, `zgeoff/verb-contract` checks the promise
-each role-table verb makes, `zgeoff/test-beside-module` keeps each test file beside the module it
-tests, `zgeoff/import-zones` fails an import that crosses a module boundary the repo declares,
-`zgeoff/no-restricted-words` keeps the words in its `words` option out of a path's text,
-`zgeoff/no-abbreviated-names` reports each abbreviated value name it lists with its full word,
-`zgeoff/no-file-snapshot` bans file snapshots, `zgeoff/setup-test-only` keeps a test file's module
-level to `setupTest()` and its tests, and `zgeoff/no-class` bans every class but a custom error.
+each role-table verb makes, `zgeoff/module-order` keeps a file in the shared module order,
+`zgeoff/test-beside-module` keeps each test file beside the module it tests, `zgeoff/import-zones`
+fails an import that crosses a module boundary the repo declares, `zgeoff/no-restricted-words` keeps
+the words in its `words` option out of a path's text, `zgeoff/no-abbreviated-names` reports each
+abbreviated value name it lists with its full word, `zgeoff/no-file-snapshot` bans file snapshots,
+`zgeoff/setup-test-only` keeps a test file's module level to `setupTest()` and its tests, and
+`zgeoff/no-class` bans every class but a custom error.
 
 ## Usage
 
@@ -87,6 +88,30 @@ reads declared return types, since it runs without type information. It runs thr
 
 A test in this package reads the role table in the shared code-style skill and fails when the
 skill's no-I/O verbs and the rule's differ in either direction.
+
+## `zgeoff/module-order`
+
+The rule checks the module order of the shared code-style skill in each file with a primary export.
+The primary export is the default export, else the export whose name the file name kebab-cases, else
+the file's only exported function or const. A file without one, such as a test file, passes. The
+rule reports three breaks:
+
+- **A helper first.** A private function sits above the primary export.
+- **A helper out of composition order.** The helpers below the primary export follow it depth-first,
+  each in the order its first reference appears.
+- **A declaration away from its first use.** A const, type alias, interface or enum sits below its
+  first use, or a helper sits between it and that use. A declaration the primary export uses may sit
+  just above it.
+
+The config's `import/first` rule reports an import after other code, so this rule leaves imports
+alone. The rule leaves a const unchecked when a helper that runs as the module loads reads it,
+because the const has to sit above the code that calls that helper.
+
+`--fix` moves each declaration it can move without a change in behaviour, with the comments above
+it, in one pass. A function declaration is hoisted and a type has no value, so both always move. A
+const moves only when every use sits in a function body that runs after the module loads, and its
+value reads nothing from the file but types. Any other const stays where it is, and the rule still
+reports it.
 
 ## `zgeoff/no-jsdoc` and `zgeoff/max-consecutive-line-comments`
 
