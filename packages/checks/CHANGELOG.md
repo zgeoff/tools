@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.0](https://github.com/zgeoff/tools/compare/@zgeoff/checks@0.1.1...@zgeoff/checks@0.2.0) (2026-10-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **geo-1437:** zgeoff/function-verb no longer accepts the verbs option, and the shipped config turns on zgeoff/verb-contract.
+
+### Features
+
+* **geo-1437:** name functions by the role table and add zgeoff/verb-contract ([#218](https://github.com/zgeoff/tools/issues/218)) ([8b4e3fb](https://github.com/zgeoff/tools/commit/8b4e3fbd891cb4040f3325ed4734468ceab1d50a))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/std bumped to 0.2.0
+
 ## [0.1.1](https://github.com/zgeoff/tools/compare/@zgeoff/checks@0.1.0...@zgeoff/checks@0.1.1) (2026-10-18)
 
 ### Bug Fixes
