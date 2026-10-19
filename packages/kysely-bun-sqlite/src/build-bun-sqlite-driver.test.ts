@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { setImmediate } from 'node:timers/promises';
 import { CompiledQuery } from 'kysely';
-import { BunSQLiteDriver } from './bun-sqlite-driver.ts';
+import { buildBunSQLiteDriver } from './build-bun-sqlite-driver.ts';
 
 function setupTest() {
   const sqlite = new Database(':memory:');
@@ -11,7 +11,7 @@ function setupTest() {
     sqlite.close();
   });
 
-  const driver = new BunSQLiteDriver(sqlite);
+  const driver = buildBunSQLiteDriver(sqlite);
 
   return { sqlite, driver };
 }
@@ -23,7 +23,7 @@ test('it keeps the writes of a committed transaction', async () => {
 
   const connection = await ctx.driver.acquireConnection();
 
-  await ctx.driver.beginTransaction(connection);
+  await ctx.driver.beginTransaction(connection, {});
   await connection.executeQuery(CompiledQuery.raw("INSERT INTO plants (species) VALUES ('fern')"));
   await ctx.driver.commitTransaction(connection);
 
@@ -40,7 +40,7 @@ test('it drops the writes of a rolled-back transaction', async () => {
 
   const connection = await ctx.driver.acquireConnection();
 
-  await ctx.driver.beginTransaction(connection);
+  await ctx.driver.beginTransaction(connection, {});
   await connection.executeQuery(CompiledQuery.raw("INSERT INTO plants (species) VALUES ('moss')"));
   await ctx.driver.rollbackTransaction(connection);
 
@@ -78,14 +78,14 @@ test('it refuses a streaming query', async () => {
 
   expect(() => connection.streamQuery(CompiledQuery.raw('SELECT 1'), 1)).toThrowWithMessage(
     Error,
-    'BunSQLiteDriver does not support streaming queries',
+    'The bun:sqlite driver does not support streaming queries',
   );
 });
 
 test('it waits for the caller that holds the connection before it finishes destroying', async () => {
   const ctx = setupTest();
 
-  await ctx.driver.acquireConnection();
+  const connection = await ctx.driver.acquireConnection();
 
   const destroyed = ctx.driver.destroy();
 
@@ -95,7 +95,7 @@ test('it waits for the caller that holds the connection before it finishes destr
 
   const statusWhileHeld = Bun.peek.status(destroyed);
 
-  await ctx.driver.releaseConnection();
+  await ctx.driver.releaseConnection(connection);
 
   await destroyed;
 

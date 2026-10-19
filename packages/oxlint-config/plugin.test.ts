@@ -2134,3 +2134,39 @@ test('it reports an override once when a run lints several files', async () => {
   expect(result.exitCode).toBe(1);
   expect(result.stdout.split('sets zgeoff/no-jsdoc')).toHaveLength(2);
 });
+
+const noClass = { 'zgeoff/no-class': 'error' };
+
+test.each([
+  ['a class declaration', 'export class Kettle {}\n'],
+  ['a class expression', 'export const Kettle = class {};\n'],
+  ['a class that extends a class not named for an error', 'export class Kettle extends Map {}\n'],
+  [
+    'a class that extends a computed member',
+    "export class Kettle extends errors['BrewError'] {}\n",
+  ],
+])('it flags %s', async (_label, source) => {
+  const result = await runLint(source, false, noClass);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('zgeoff(no-class)');
+});
+
+test.each([
+  ['a class that extends Error', 'export class KettleError extends Error {}\n'],
+  ['a class that extends another error', 'export class KettleError extends BrewError {}\n'],
+  ['a class that extends a member error', 'export class KettleError extends errors.BrewError {}\n'],
+  ['a class expression that extends Error', 'export const KettleError = class extends Error {};\n'],
+])('it accepts %s', async (_label, source) => {
+  const result = await runLint(source, false, noClass);
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it names the factory and the custom-error exception in its message', async () => {
+  const result = await runLint('export class Kettle {}\n', false, noClass);
+
+  expect(result.stdout).toInclude(
+    'Build this with a factory function (`create<X>` or `make<X>`), not a class. Only a custom error may be a class: `class XError extends Error`.',
+  );
+});

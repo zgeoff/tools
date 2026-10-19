@@ -7,60 +7,54 @@ import type { DatabaseConnection, Driver, QueryResult } from 'kysely';
 // Kysely's RuntimeDriver serializes the connection: SqliteAdapter reports no
 // support for multiple connections, so RuntimeDriver holds a mutex from each
 // acquire to its release.
-export class BunSQLiteDriver implements Driver {
-  private readonly connection: DatabaseConnection;
+export function buildBunSQLiteDriver(sqlite: Database): Driver {
+  const connection = buildConnection(sqlite);
 
   // The driver's own turn chain exists only for the destroy() wait, because
   // Kysely calls destroy() outside RuntimeDriver's mutex.
-  private turn: Promise<void> = Promise.resolve();
+  let turn: Promise<void> = Promise.resolve();
+  let releaseTurn: (() => void) | undefined;
 
-  private releaseTurn: () => void = () => {};
-
-  constructor(sqlite: Database) {
-    this.connection = buildConnection(sqlite);
-  }
-
-  init(): Promise<void> {
-    return Promise.resolve();
-  }
-
-  async acquireConnection(): Promise<DatabaseConnection> {
-    const previous = this.turn;
+  const acquireConnection = async (): Promise<DatabaseConnection> => {
+    const previous = turn;
     const next = Promise.withResolvers<void>();
 
-    this.turn = next.promise;
+    turn = next.promise;
 
     await previous;
 
-    this.releaseTurn = next.resolve;
+    releaseTurn = next.resolve;
 
-    return this.connection;
-  }
+    return connection;
+  };
 
-  async beginTransaction(connection: DatabaseConnection): Promise<void> {
-    await connection.executeQuery(CompiledQuery.raw('begin'));
-  }
-
-  async commitTransaction(connection: DatabaseConnection): Promise<void> {
-    await connection.executeQuery(CompiledQuery.raw('commit'));
-  }
-
-  async rollbackTransaction(connection: DatabaseConnection): Promise<void> {
-    await connection.executeQuery(CompiledQuery.raw('rollback'));
-  }
-
-  releaseConnection(): Promise<void> {
-    this.releaseTurn();
+  const releaseConnection = (): Promise<void> => {
+    releaseTurn?.();
 
     return Promise.resolve();
-  }
+  };
 
-  // The opener owns the handle and closes it, so destroy() leaves the handle
-  // open and only waits for the caller that holds the connection.
-  async destroy(): Promise<void> {
-    await this.acquireConnection();
-    await this.releaseConnection();
-  }
+  return {
+    init: () => Promise.resolve(),
+    acquireConnection,
+    beginTransaction: async (heldConnection) => {
+      await heldConnection.executeQuery(CompiledQuery.raw('begin'));
+    },
+    commitTransaction: async (heldConnection) => {
+      await heldConnection.executeQuery(CompiledQuery.raw('commit'));
+    },
+    rollbackTransaction: async (heldConnection) => {
+      await heldConnection.executeQuery(CompiledQuery.raw('rollback'));
+    },
+    releaseConnection,
+
+    // The opener owns the handle and closes it, so destroy() leaves the handle
+    // open and only waits for the caller that holds the connection.
+    destroy: async () => {
+      await acquireConnection();
+      await releaseConnection();
+    },
+  };
 }
 
 function buildConnection(sqlite: Database): DatabaseConnection {
@@ -85,7 +79,7 @@ function buildConnection(sqlite: Database): DatabaseConnection {
     },
 
     streamQuery<R>(): AsyncIterableIterator<QueryResult<R>> {
-      throw new Error('BunSQLiteDriver does not support streaming queries');
+      throw new Error('The bun:sqlite driver does not support streaming queries');
     },
   };
 }

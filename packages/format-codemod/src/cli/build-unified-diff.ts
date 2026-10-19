@@ -1,7 +1,6 @@
 export function buildUnifiedDiff(before: string, after: string, label: string): string {
-  const ops = new MyersDiff(splitLines(before), splitLines(after)).buildOps();
-
-  const hunks = buildHunks(ops);
+  const operations = buildDiffOps({ before: splitLines(before), after: splitLines(after) });
+  const hunks = buildHunks(operations);
 
   if (hunks.length === 0) {
     return '';
@@ -30,125 +29,149 @@ interface Position {
   readonly y: number;
 }
 
-class MyersDiff {
-  private readonly a: readonly string[];
+interface LinePair {
+  readonly before: readonly string[];
+  readonly after: readonly string[];
+}
 
-  private readonly b: readonly string[];
+// Myers' diff: each round of edit depth records, per diagonal, the furthest x
+// it reaches; the trace of rounds then backtracks into the operations
+type FurthestX = Map<number, number>;
 
-  private readonly v = new Map<number, number>([[1, 0]]);
+function buildDiffOps(lines: LinePair): DiffOp[] {
+  return backtrack(lines, buildTrace(lines));
+}
 
-  private readonly trace: Map<number, number>[] = [];
+function buildTrace(lines: LinePair): FurthestX[] {
+  const furthestX: FurthestX = new Map([[1, 0]]);
 
-  constructor(a: readonly string[], b: readonly string[]) {
-    this.a = a;
-    this.b = b;
-  }
+  const trace: FurthestX[] = [];
 
-  buildOps(): DiffOp[] {
-    this.updateTrace();
+  for (let depth = 0; depth <= lines.before.length + lines.after.length; depth++) {
+    trace.push(new Map(furthestX));
 
-    return this.backtrack();
-  }
-
-  private updateTrace(): void {
-    for (let d = 0; d <= this.a.length + this.b.length; d++) {
-      this.trace.push(new Map(this.v));
-
-      if (this.stepRound(d)) {
-        return;
-      }
+    if (stepRound(lines, furthestX, depth)) {
+      break;
     }
   }
 
-  // oxlint-disable-next-line zgeoff/function-verb -- Myers-native vocabulary
-  private stepRound(d: number): boolean {
-    for (let k = -d; k <= d; k += 2) {
-      const x = this.slideDiagonal(this.pickX(k, d), k);
+  return trace;
+}
 
-      this.v.set(k, x);
+// oxlint-disable-next-line zgeoff/function-verb -- Myers-native vocabulary
+function stepRound(lines: LinePair, furthestX: FurthestX, depth: number): boolean {
+  for (let diagonal = -depth; diagonal <= depth; diagonal += 2) {
+    const x = slideDiagonal(lines, pickX(furthestX, diagonal, depth), diagonal);
 
-      if (x >= this.a.length && x - k >= this.b.length) {
-        return true;
-      }
+    furthestX.set(diagonal, x);
+
+    if (x >= lines.before.length && x - diagonal >= lines.after.length) {
+      return true;
     }
-
-    return false;
   }
 
-  private pickX(k: number, d: number): number {
-    const moveDown = k === -d || (k !== d && (this.v.get(k - 1) ?? 0) < (this.v.get(k + 1) ?? 0));
+  return false;
+}
 
-    return moveDown ? (this.v.get(k + 1) ?? 0) : (this.v.get(k - 1) ?? 0) + 1;
+function pickX(furthestX: FurthestX, diagonal: number, depth: number): number {
+  const below = furthestX.get(diagonal - 1) ?? 0;
+  const above = furthestX.get(diagonal + 1) ?? 0;
+  const moveDown = diagonal === -depth || (diagonal !== depth && below < above);
+
+  return moveDown ? above : below + 1;
+}
+
+// oxlint-disable-next-line zgeoff/function-verb -- Myers-native vocabulary
+function slideDiagonal(lines: LinePair, x: number, diagonal: number): number {
+  let endX = x;
+
+  while (
+    endX < lines.before.length &&
+    endX - diagonal < lines.after.length &&
+    lines.before[endX] === lines.after[endX - diagonal]
+  ) {
+    endX++;
   }
 
-  // oxlint-disable-next-line zgeoff/function-verb -- Myers-native vocabulary
-  private slideDiagonal(x: number, k: number): number {
-    let nx = x;
+  return endX;
+}
 
-    while (nx < this.a.length && nx - k < this.b.length && this.a[nx] === this.b[nx - k]) {
-      nx++;
-    }
+// oxlint-disable-next-line zgeoff/function-verb -- Myers-native vocabulary
+function backtrack(lines: LinePair, trace: readonly FurthestX[]): DiffOp[] {
+  const operations: DiffOp[] = [];
+  let position: Position = { x: lines.before.length, y: lines.after.length };
 
-    return nx;
+  for (let depth = trace.length - 1; depth >= 0; depth--) {
+    const round = unwindRound(lines, trace, position, depth);
+
+    operations.push(...round.operations);
+
+    position = round.position;
   }
 
-  // oxlint-disable-next-line zgeoff/function-verb -- Myers-native vocabulary
-  private backtrack(): DiffOp[] {
-    const ops: DiffOp[] = [];
-    let pos: Position = { x: this.a.length, y: this.b.length };
+  return operations.toReversed();
+}
 
-    for (let d = this.trace.length - 1; d >= 0; d--) {
-      const round = this.unwindRound(pos, d);
+interface Round {
+  readonly operations: DiffOp[];
+  readonly position: Position;
+}
 
-      ops.push(...round.ops);
+// oxlint-disable-next-line zgeoff/function-verb -- Myers-native vocabulary
+function unwindRound(
+  lines: LinePair,
+  trace: readonly FurthestX[],
+  position: Position,
+  depth: number,
+): Round {
+  const step = findPreviousStep(trace, position, depth);
+  const operations = buildEqualOps(lines, position, step.position);
 
-      pos = round.pos;
-    }
+  if (depth > 0) {
+    const changeOp: DiffOp = step.moveDown
+      ? { kind: '+', text: lines.after[step.position.y] ?? '' }
+      : { kind: '-', text: lines.before[step.position.x] ?? '' };
 
-    return ops.toReversed();
+    operations.push(changeOp);
   }
 
-  // oxlint-disable-next-line zgeoff/function-verb -- Myers-native vocabulary
-  private unwindRound(pos: Position, d: number): { ops: DiffOp[]; pos: Position } {
-    const previous = this.findPrevious(pos, d);
-    const prev = previous.prev;
-    const ops = this.buildEqualOps(pos, prev);
+  return { operations, position: step.position };
+}
 
-    if (d > 0) {
-      const changeOp: DiffOp = previous.moveDown
-        ? { kind: '+', text: this.b[prev.y] ?? '' }
-        : { kind: '-', text: this.a[prev.x] ?? '' };
+interface PreviousStep {
+  readonly position: Position;
+  readonly moveDown: boolean;
+}
 
-      ops.push(changeOp);
-    }
+function findPreviousStep(
+  trace: readonly FurthestX[],
+  position: Position,
+  depth: number,
+): PreviousStep {
+  const furthestX = trace[depth] ?? new Map<number, number>();
+  const diagonal = position.x - position.y;
+  const below = furthestX.get(diagonal - 1) ?? 0;
+  const above = furthestX.get(diagonal + 1) ?? 0;
+  const moveDown = diagonal === -depth || (diagonal !== depth && below < above);
+  const previousDiagonal = moveDown ? diagonal + 1 : diagonal - 1;
+  const previousX = furthestX.get(previousDiagonal) ?? 0;
 
-    return { ops, pos: prev };
+  return { position: { x: previousX, y: previousX - previousDiagonal }, moveDown };
+}
+
+function buildEqualOps(lines: LinePair, position: Position, previous: Position): DiffOp[] {
+  const operations: DiffOp[] = [];
+  let x = position.x;
+  let y = position.y;
+
+  while (x > previous.x && y > previous.y) {
+    operations.push({ kind: ' ', text: lines.before[x - 1] ?? '' });
+
+    x--;
+    y--;
   }
 
-  private findPrevious(pos: Position, d: number): { prev: Position; moveDown: boolean } {
-    const v = this.trace[d] ?? new Map<number, number>();
-    const k = pos.x - pos.y;
-    const moveDown = k === -d || (k !== d && (v.get(k - 1) ?? 0) < (v.get(k + 1) ?? 0));
-    const prevK = moveDown ? k + 1 : k - 1;
-    const prevX = v.get(prevK) ?? 0;
-
-    return { prev: { x: prevX, y: prevX - prevK }, moveDown };
-  }
-
-  private buildEqualOps(pos: Position, prev: Position): DiffOp[] {
-    const ops: DiffOp[] = [];
-    let x = pos.x;
-    let y = pos.y;
-
-    while (x > prev.x && y > prev.y) {
-      ops.push({ kind: ' ', text: this.a[x - 1] ?? '' });
-
-      x--;
-      y--;
-    }
-
-    return ops;
-  }
+  return operations;
 }
 
 interface Window {
