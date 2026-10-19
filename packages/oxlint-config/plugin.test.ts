@@ -656,6 +656,123 @@ test('it honours a file-level disable comment on a snapshot file', async () => {
   expect(result.exitCode).toBe(0);
 });
 
+const setupTestOnly = { 'zgeoff/setup-test-only': 'error' };
+
+test('it accepts a test file of imports, types, setupTest and test calls', async () => {
+  const source =
+    "import { expect, test } from 'bun:test';\nimport type { Kettle } from './kettle';\n\ntype Reading = Readonly<{ celsius: number }>;\n\ninterface Brew {\n  kettle: Kettle;\n}\n\nfunction setupTest() {\n  return { reading: { celsius: 90 } satisfies Reading };\n}\n\ntest('it boils', () => {\n  const ctx = setupTest();\n\n  expect(ctx.reading.celsius).toBe(90);\n});\n\ntest.each([[1, 2]])('it adds %d', (left, right) => {\n  expect(left + 1).toBe(right);\n});\n\ntest.skipIf(process.platform === 'win32')('it steeps', () => {});\n\ntest.if(process.platform === 'linux')('it pours', () => {});\n\ntest.skipIf(false).each([[1]])('it chains %d', () => {});\n";
+
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+
+  expect(result.stdout).not.toInclude('setup-test-only');
+});
+
+test.each([
+  ['a module-level const', 'const pot = { cups: 2 };\n', 'pot'],
+  ['a module-level let', 'let pot = 2;\n', 'pot'],
+  ['a module-level var', 'var pot = 2;\n', 'pot'],
+  ['a helper function', 'function buildPot() {\n  return { cups: 2 };\n}\n', 'buildPot'],
+  ['a class', 'class Pot {}\n', 'Pot'],
+  ['an enum', 'enum Pot {\n  Small,\n}\n', 'Pot'],
+  [
+    'a second function beside setupTest',
+    'function setupTest() {\n  return {};\n}\n\nfunction readPot() {\n  return 2;\n}\n',
+    'readPot',
+  ],
+  [
+    'a second setupTest',
+    'function setupTest() {\n  return {};\n}\n\nfunction setupTest() {\n  return {};\n}\n',
+    'setupTest',
+  ],
+])('it flags %s and names it', async (_, declaration, name) => {
+  const source = `import { test } from 'bun:test';\n\n${declaration}\ntest('it pours', () => {});\n`;
+
+  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', setupTestOnly);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('setup-test-only');
+  expect(result.stdout).toInclude(`Remove the module-level \`${name}\``);
+});
+
+test('it names the three ways out of a module-level declaration', async () => {
+  const source =
+    "import { test } from 'bun:test';\n\nconst cups = 2;\n\ntest('it pours', () => {});\n";
+
+  const result = await runLintTree({ 'pot.test.tsx': source }, 'pot.test.tsx', setupTestOnly);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('Inline it where it is used');
+  expect(result.stdout).toInclude('swap it for a registered matcher');
+  expect(result.stdout).toInclude('move it to the shared test utils with tests of its own');
+});
+
+test('it flags a module-level statement that is not a test call', async () => {
+  const source =
+    "import { beforeEach, test } from 'bun:test';\n\nbeforeEach(() => {});\n\ntest('it pours', () => {});\n";
+
+  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', setupTestOnly);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('Move this statement into a test or `setupTest()`');
+});
+
+test('it accepts a skip gate that only skipIf arguments read', async () => {
+  const source =
+    "import { test } from 'bun:test';\nimport { probeKettle } from './probe-kettle';\n\n// skipIf takes a boolean and has no in-body skip\nconst hasKettle = await probeKettle();\n\ntest.skipIf(!hasKettle)('it boils', () => {});\n\ntest.skipIf(!hasKettle)('it whistles', () => {});\n";
+
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+
+  expect(result.stdout).not.toInclude('setup-test-only');
+});
+
+test('it accepts a gate derived from the probe when only skipIf reads the derived gate', async () => {
+  const source =
+    "import { test } from 'bun:test';\nimport { probeKettle } from './probe-kettle';\n\n// skipIf takes a boolean and has no in-body skip\nconst hasKettle = await probeKettle();\nconst skipBoil = !hasKettle || process.platform === 'win32';\n\ntest.skipIf(skipBoil)('it boils', () => {});\n";
+
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+
+  expect(result.stdout).not.toInclude('setup-test-only');
+});
+
+test('it flags a skip gate that a test body reads', async () => {
+  const source =
+    "import { expect, test } from 'bun:test';\nimport { probeKettle } from './probe-kettle';\n\nconst hasKettle = await probeKettle();\n\ntest.skipIf(!hasKettle)('it boils', () => {\n  expect(hasKettle).toBeTrue();\n});\n";
+
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('Remove the module-level `hasKettle`');
+});
+
+test('it flags a gate derived from a probe that a test body reads', async () => {
+  const source =
+    "import { expect, test } from 'bun:test';\nimport { probeKettle } from './probe-kettle';\n\nconst hasKettle = await probeKettle();\nconst skipBoil = !hasKettle;\n\ntest.skipIf(skipBoil)('it boils', () => {\n  expect(hasKettle).toBeTrue();\n});\n";
+
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('Remove the module-level `hasKettle`');
+  expect(result.stdout).not.toInclude('Remove the module-level `skipBoil`');
+});
+
+test('it flags a module-level const that nothing reads', async () => {
+  const source =
+    "import { test } from 'bun:test';\n\nconst cups = 2;\n\ntest('it pours', () => {});\n";
+
+  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', setupTestOnly);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('Remove the module-level `cups`');
+});
+
+test('it accepts module-level declarations in a file that is not a test', async () => {
+  const source = 'const cups = 2;\n\nexport function readCups() {\n  return cups;\n}\n';
+
+  const result = await runLintTree({ 'pot.ts': source }, 'pot.ts', setupTestOnly);
+
+  expect(result.stdout).not.toInclude('setup-test-only');
+});
+
 const restricted = { 'zgeoff/no-restricted-words': ['error', { words: ['orb', 'orbd'] }] };
 
 test.each([
