@@ -6,10 +6,12 @@ restriction-rule cherry-picks, comment-style enforcement via `@stylistic`, and a
 function declarations, bare named exports, destructured and inline-typed parameters, ternary and
 await arguments, awaits hidden inside a control-flow condition or a `&&`/`||`/`??` chain, every
 `switch` statement, every JSDoc block, any run of more than three line comments, and a repo config
-that loosens either comment rule. `zgeoff/function-verb` bans the vague and near-synonym verbs of
-the shared function-naming rules, `zgeoff/verb-contract` checks the promise each role-table verb
-makes, `zgeoff/test-beside-module` keeps each test file beside the module it tests,
-`zgeoff/import-zones` fails an import that crosses a module boundary the repo declares,
+that loosens either comment rule.
+
+The plugin's other rules each check one convention. `zgeoff/function-verb` bans the vague and
+near-synonym verbs of the shared function-naming rules, `zgeoff/verb-contract` checks the promise
+each role-table verb makes, `zgeoff/test-beside-module` keeps each test file beside the module it
+tests, `zgeoff/import-zones` fails an import that crosses a module boundary the repo declares,
 `zgeoff/no-restricted-words` keeps the words in its `words` option out of a path's text,
 `zgeoff/no-abbreviated-names` reports each abbreviated value name it lists with its full word,
 `zgeoff/no-file-snapshot` bans file snapshots, `zgeoff/setup-test-only` keeps a test file's module
