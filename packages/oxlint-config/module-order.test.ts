@@ -212,6 +212,20 @@ function pourCups(): number {
 `,
     "'cupCount' leads the file, but the primary export does not use it — move it directly above its first use in 'pourCups'.",
   ],
+  [
+    'a helper whose name a re-export also lists',
+    `export { boil } from './kettle.js';
+
+function boil(): string {
+  return 'boiled';
+}
+
+export function brewTea(): string {
+  return boil();
+}
+`,
+    "'boil' sits above the primary export 'brewTea' — move private helpers below it.",
+  ],
 ])('it reports %s', async (_, source, message) => {
   const ctx = await setupTest();
   const result = await ctx.lint(source);
@@ -548,6 +562,56 @@ function pourCup(): string {
 }
 `,
   ],
+  [
+    'a const built with a constructor over literals',
+    `const teaKinds = new Set(['green', 'black']);
+
+export function brewTea(name: string): boolean {
+  return isKnownTea(name);
+}
+
+function isKnownTea(name: string): boolean {
+  return teaKinds.has(name);
+}
+`,
+    `export function brewTea(name: string): boolean {
+  return isKnownTea(name);
+}
+
+const teaKinds = new Set(['green', 'black']);
+
+function isKnownTea(name: string): boolean {
+  return teaKinds.has(name);
+}
+`,
+  ],
+  [
+    'a const that copies an import, spreads a literal and uses operators',
+    `import { greenTea } from './teas.js';
+
+const teaSizes = { tea: greenTea, sizes: [...[250, 500], 2 * 125] };
+
+export function brewTea(): number {
+  return pickSize();
+}
+
+function pickSize(): number {
+  return teaSizes.sizes.length;
+}
+`,
+    `import { greenTea } from './teas.js';
+
+export function brewTea(): number {
+  return pickSize();
+}
+
+const teaSizes = { tea: greenTea, sizes: [...[250, 500], 2 * 125] };
+
+function pickSize(): number {
+  return teaSizes.sizes.length;
+}
+`,
+  ],
 ])('it fixes %s', async (_, source, expected) => {
   const ctx = await setupTest();
   const result = await ctx.fix(source);
@@ -744,6 +808,104 @@ export function brewTea(): string {
 }
 `,
     ["'pourCup' sits above the primary export 'brewTea' — move private helpers below it."],
+  ],
+  [
+    'a const that a constructor builds from an import',
+    `import { teaKinds } from './teas.js';
+
+const knownTeas = new Set(teaKinds);
+
+export function brewTea(name: string): boolean {
+  return isKnownTea(name);
+}
+
+function isKnownTea(name: string): boolean {
+  return knownTeas.has(name);
+}
+`,
+    `import { teaKinds } from './teas.js';
+
+const knownTeas = new Set(teaKinds);
+
+export function brewTea(name: string): boolean {
+  return isKnownTea(name);
+}
+
+function isKnownTea(name: string): boolean {
+  return knownTeas.has(name);
+}
+`,
+    [
+      "'knownTeas' leads the file, but the primary export does not use it — move it directly above its first use in 'isKnownTea'.",
+    ],
+  ],
+  [
+    'a const whose operator runs an object’s valueOf',
+    `let phase = 'cold';
+
+const savedLength = +{ valueOf: () => phase.length };
+
+export function brewTea(): number {
+  return readLength();
+}
+
+phase = 'boiling';
+
+function readLength(): number {
+  return savedLength;
+}
+`,
+    `let phase = 'cold';
+
+const savedLength = +{ valueOf: () => phase.length };
+
+export function brewTea(): number {
+  return readLength();
+}
+
+phase = 'boiling';
+
+function readLength(): number {
+  return savedLength;
+}
+`,
+    [
+      "'savedLength' leads the file, but the primary export does not use it — move it directly above its first use in 'readLength'.",
+    ],
+  ],
+  [
+    'a const that reads a global the file shadows',
+    `let NaN = 1;
+
+const savedValue = NaN;
+
+export function brewTea(): number {
+  return readValue();
+}
+
+NaN = 2;
+
+function readValue(): number {
+  return savedValue;
+}
+`,
+    `let NaN = 1;
+
+const savedValue = NaN;
+
+export function brewTea(): number {
+  return readValue();
+}
+
+NaN = 2;
+
+function readValue(): number {
+  return savedValue;
+}
+`,
+    [
+      "'savedValue' leads the file, but the primary export does not use it — move it directly above its first use in 'readValue'.",
+    ],
   ],
 ])('it fixes what it can and leaves reported %s', async (_, source, expected, messages) => {
   const ctx = await setupTest();

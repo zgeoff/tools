@@ -111,10 +111,10 @@ because the const has to sit above the code that calls that helper.
 it, in one pass. A function declaration is hoisted and a type has no value, so both always move. A
 const moves only when every use sits in a function body that runs after the module loads, and its
 value is static. A static value runs no code and reads nothing that load-time code can change: a
-literal, a function, or an array, object, operator, `new Set`, `new Map` or `new RegExp` over static
-values, with an import only as a copied value. Any other const stays where it is, and the rule still
-reports it. The fix makes no change when a move would put a statement that ends without a semicolon
-before one that opens with a bracket or an operator.
+literal, a function, an array, object, `new Set`, `new Map` or `new RegExp` over static values, or
+an operator or template over primitive values, with an import only as a copied value. Any other
+const stays where it is, and the rule still reports it. The fix makes no change when a move would
+put a statement that ends without a semicolon before one that opens with a bracket or an operator.
 
 ## `zgeoff/no-jsdoc` and `zgeoff/max-consecutive-line-comments`
 

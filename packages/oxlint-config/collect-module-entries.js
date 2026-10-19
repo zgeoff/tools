@@ -98,7 +98,9 @@ function isExportOnly(statement) {
   return (
     (statement.type === 'ExportDefaultDeclaration' &&
       statement.declaration.type === 'Identifier') ||
-    (statement.type === 'ExportNamedDeclaration' && statement.declaration === null)
+    (statement.type === 'ExportNamedDeclaration' &&
+      statement.declaration === null &&
+      statement.source === null)
   );
 }
 

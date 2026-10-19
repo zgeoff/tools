@@ -11,15 +11,15 @@ const checks = {
     (valueGlobals.has(value.name) && !names.locals.has(value.name)) ||
     (canCopyImport && names.imports.has(value.name)),
   TemplateLiteral: (value, names) =>
-    value.expressions.every((expression) => isStaticValue(expression, names, false)),
+    value.expressions.every((expression) => isPrimitiveValue(expression, names)),
   ArrayExpression: (value, names) =>
     value.elements.every((element) => element === null || isStaticElement(element, names)),
   ObjectExpression: (value, names) =>
     value.properties.every((property) => isStaticProperty(property, names)),
   UnaryExpression: (value, names) =>
-    value.operator !== 'delete' && isStaticValue(value.argument, names, false),
+    value.operator !== 'delete' && isPrimitiveValue(value.argument, names),
   BinaryExpression: (value, names) =>
-    isStaticValue(value.left, names, false) && isStaticValue(value.right, names, false),
+    isPrimitiveValue(value.left, names) && isPrimitiveValue(value.right, names),
   LogicalExpression: (value, names, canCopyImport) =>
     isStaticValue(value.left, names, canCopyImport) &&
     isStaticValue(value.right, names, canCopyImport),
@@ -61,6 +61,23 @@ function unwrapExpression(node) {
   }
 
   return current;
+}
+
+const primitiveTypes = new Set([
+  'Literal',
+  'Identifier',
+  'TemplateLiteral',
+  'UnaryExpression',
+  'BinaryExpression',
+]);
+
+// an operator or a template turns an object into a primitive through its
+// `valueOf` or `toString`, which can read anything, so it takes only values
+// that are primitive already
+function isPrimitiveValue(node, names) {
+  const value = unwrapExpression(node);
+
+  return primitiveTypes.has(value.type) && isStaticValue(value, names, false);
 }
 
 function isStaticElement(element, names) {

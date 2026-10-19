@@ -4,7 +4,7 @@ import isStaticValue from './is-static-value.js';
 // fixes a file in one pass; `moved` holds the reported entries it moves, and
 // `fix` is null when nothing can move
 export default function buildModuleOrderFix(context, layout) {
-  const names = collectNames(layout.entries);
+  const names = collectNames(context);
   const reported = new Set(layout.reports.map((report) => report.entry));
   const stacks = new Map();
   const helpers = [];
@@ -38,15 +38,21 @@ export default function buildModuleOrderFix(context, layout) {
   };
 }
 
-// the names the file binds at its top level, so that a value can tell an
+// every name the file binds at its top level, so that a value can tell an
 // import or a global from a local
-function collectNames(entries) {
-  const imports = entries
-    .filter((entry) => entry.kind === 'import')
-    .flatMap((entry) => entry.statement.specifiers.map((specifier) => specifier.local.name));
-  const locals = entries.filter((entry) => entry.kind !== 'import').map((entry) => entry.name);
+function collectNames(context) {
+  const programScope = context.sourceCode.getScope(context.sourceCode.ast);
+  const scope = programScope.childScopes.find((child) => child.type === 'module') ?? programScope;
+  const imports = new Set();
+  const locals = new Set();
 
-  return { imports: new Set(imports), locals: new Set(locals) };
+  for (const variable of scope.variables) {
+    const isImport = variable.defs.some((definition) => definition.type === 'ImportBinding');
+
+    (isImport ? imports : locals).add(variable.name);
+  }
+
+  return { imports, locals };
 }
 
 // a type always moves safely; a const moves only when every use sits in a
