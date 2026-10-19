@@ -19,7 +19,14 @@ const parsed = parseCommandLine(commandLine);
 
 const stateText = await readFile(statePath, 'utf8');
 
-const pulls: StubPullRequest[] = JSON.parse(stateText);
+const state: unknown = JSON.parse(stateText);
+
+if (!isStubPullRequestList(state)) {
+  process.stderr.write(`stub gh: ${statePath} holds no list of pull requests\n`);
+  process.exit(1);
+}
+
+const pulls = state;
 const [group, command, ...rest] = parsed.positionals;
 const flags = parsed.values;
 const flagNames = Object.keys(flags).toSorted().join(' ');
@@ -101,6 +108,29 @@ function parseCommandLine(args: string[]) {
   } catch {
     return exitWithUsage();
   }
+}
+
+function isStubPullRequestList(value: unknown): value is StubPullRequest[] {
+  return Array.isArray(value) && value.every((pull) => isStubPullRequest(pull));
+}
+
+function isStubPullRequest(value: unknown): value is StubPullRequest {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'number' in value &&
+    typeof value.number === 'number' &&
+    'base' in value &&
+    typeof value.base === 'string' &&
+    'head' in value &&
+    typeof value.head === 'string' &&
+    'title' in value &&
+    typeof value.title === 'string' &&
+    'body' in value &&
+    typeof value.body === 'string' &&
+    'state' in value &&
+    value.state === 'open'
+  );
 }
 
 function exitWithUsage(): never {

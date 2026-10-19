@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
@@ -37,7 +37,7 @@ test('it opens a pull request and lists it by its branch', async () => {
 
   const state = await readFile(ctx.state, 'utf8');
 
-  const pulls = JSON.parse(state);
+  const pulls: unknown = JSON.parse(state);
 
   expect(created).toBe('https://github.com/example/repo/pull/1\n');
   expect(listed).toBe('1\n');
@@ -65,7 +65,7 @@ test('it refuses a second pull request for a branch with one open', async () => 
 
   const state = await readFile(ctx.state, 'utf8');
 
-  const pulls = JSON.parse(state);
+  const pulls: unknown = JSON.parse(state);
 
   expect(result.exitCode).toBe(1);
 
@@ -84,7 +84,7 @@ test('it replaces the title and body of an open pull request', async () => {
 
   const state = await readFile(ctx.state, 'utf8');
 
-  const pulls = JSON.parse(state);
+  const pulls: unknown = JSON.parse(state);
 
   expect(pulls).toStrictEqual([
     { number: 1, base: 'main', head: 'sync', title: 'two', body: 'Three files.', state: 'open' },
@@ -97,6 +97,17 @@ test('it fails to edit a pull request that does not exist', async () => {
 
   expect(result.exitCode).toBe(1);
   expect(result.stderr.toString()).toBe('no open pull request #4\n');
+});
+
+test('it fails when the state file holds no list of pull requests', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(ctx.state, '{}\n');
+
+  const result = await $`${ctx.gh} pr edit 1 --title two --body two`.nothrow().quiet();
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toBe(`stub gh: ${ctx.state} holds no list of pull requests\n`);
 });
 
 test.each([

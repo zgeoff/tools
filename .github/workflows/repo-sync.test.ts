@@ -171,7 +171,9 @@ async function setupTest() {
   const readPullRequests = async () => {
     const pulls = await readFile(state, 'utf8');
 
-    return JSON.parse(pulls);
+    const parsed: unknown = JSON.parse(pulls);
+
+    return parsed;
   };
 
   const writeBranch = async (branch: string, path: string, content: string) => {
