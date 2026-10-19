@@ -10,8 +10,9 @@ that loosens either comment rule. `zgeoff/function-verb` enforces the function-n
 the shared agent guidelines, `zgeoff/test-beside-module` keeps each test file beside the module it
 tests, `zgeoff/import-zones` fails an import that crosses a module boundary the repo declares,
 `zgeoff/no-restricted-words` keeps the words in its `words` option out of a path's text,
-`zgeoff/no-abbreviated-names` reports each abbreviated value name it lists with its full word, and
-`zgeoff/no-file-snapshot` bans file snapshots.
+`zgeoff/no-abbreviated-names` reports each abbreviated value name it lists with its full word,
+`zgeoff/no-file-snapshot` bans file snapshots, and `zgeoff/setup-test-only` keeps a test file's
+module level to `setupTest()` and its tests.
 
 ## Usage
 
@@ -87,6 +88,29 @@ first statement, so put the comment above it:
 
 A second test file for a module (`<name>.host.test.ts`) needs its own `<name>.host.<ext>`, so the
 rule reports it beside only `<name>.ts`.
+
+## `zgeoff/setup-test-only`
+
+A `<name>.test.ts` or `<name>.test.tsx` file declares one function, `setupTest()`, and nothing else,
+as the testing skill requires. At module level the rule allows imports, `type` and `interface`
+declarations, one `setupTest` function declaration, and statements that call `test`, `test.each`,
+`test.skipIf` or `test.if`, or a chain of them, with `test` under its local alias when the
+`bun:test` import renames it. It reports every other statement: a `let`, a `var`, a class, an enum,
+a second function, an export, and a call such as `beforeEach(...)`. The message holds the three ways
+out of a helper: inline it, swap it for a registered matcher, or move it to the shared test utils
+with tests of its own.
+
+A module-level `const` passes only as a skip gate: a declarator that binds at least one name, each
+binding read, and read only at collection time, inside an argument of the test runner's `skipIf` or
+inside the initializer of another gate. The runner is `test` as `bun:test` exports it, under its
+local alias if the import renames it, or a chain of its modifiers, so `matrix.skipIf(rows)` is not a
+gate read. A file that imports no `test` uses the global one, unless an import or a module-level
+declaration of its own takes the name `test`. A read inside a function never counts, so a `skipIf`
+in `setupTest()` or a test body leaves its `const` reported. A gate derived from an awaited probe
+passes beside the probe, in the same declaration or its own, but consts that only read each other
+never reach a `skipIf` and report. A `const` that nothing reads reports too, and so does a
+declarator that binds nothing, such as `const {} = registerHooks()`. The rule does not check the
+comment that the skill asks a gate to carry.
 
 ## `zgeoff/no-restricted-words`
 

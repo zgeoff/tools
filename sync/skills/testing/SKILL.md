@@ -261,12 +261,13 @@ never appear in a test file.
   attaches to or saving the note that it archives, stays in the arrange phase of the test body, with
   no assertion, because a separate test covers that act. A recovery test is the exception: it
   asserts each fault it injected, as [Assertions](#assertions) describes.
-- A test file declares one function, `setupTest()`, and nothing else. A helper the tests want goes
-  one of three ways: inline it where it is used, swap it for a registered matcher, or move it to the
-  shared test utils with tests of its own. A file with nothing to wire has no `setupTest()`. One
-  exception: a collection-time skip gate may keep its awaited probe, and named gates derived from
-  it, at module level. Only `skipIf` reads them, each repeated condition is named once, and a
-  comment gives the reason: Bun 1.4.2's `skipIf` takes a boolean and has no in-body skip.
+- A test file declares one function, `setupTest()`, and nothing else, and `zgeoff/setup-test-only`
+  fails any other module-level declaration. A helper the tests want goes one of three ways: inline
+  it where it is used, swap it for a registered matcher, or move it to the shared test utils with
+  tests of its own. A file with nothing to wire has no `setupTest()`. One exception: a
+  collection-time skip gate may keep its awaited probe, and named gates derived from it, at module
+  level. Only `skipIf` reads them, each repeated condition is named once, and a comment gives the
+  reason: Bun 1.4.2's `skipIf` takes a boolean and has no in-body skip.
 - `setupTest()` may return a closure that only calls production helpers on the runtime it built,
   such as `createImpDir(name)`. A closure with a branch, a loop, or state of its own is a helper,
   and it moves to the shared test utils.
