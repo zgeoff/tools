@@ -47,6 +47,16 @@ test.each([
   expect(stdout.includes('eslint(max-lines)')).toBe(expected);
 });
 
+test('it reports a module-level helper in a test file', async () => {
+  const source =
+    "import { expect, test } from 'bun:test';\n\nconst cups = 2;\n\ntest('it pours', () => {\n  expect(cups).toBe(2);\n});\n";
+
+  const ctx = await setupTest('pot.test.ts', source);
+  const stdout = await runLint(ctx.dir, 'pot.test.ts');
+
+  expect(stdout).toInclude('zgeoff(setup-test-only)');
+});
+
 test('it reports a switch and names ts-pattern', async () => {
   const source =
     "export function readTone(tone: 'warm' | 'cool'): number {\n  switch (tone) {\n    case 'warm': {\n      return 1;\n    }\n    default: {\n      return 2;\n    }\n  }\n}\n";
