@@ -93,7 +93,10 @@ const verbContract = {
         }
       },
       TaggedTemplateExpression(node) {
-        if (isShellRoot(context, node, findRootName(node.tag))) {
+        const rootName = findRootName(node.tag);
+        const binding = rootName === null ? null : findBinding(context, node, rootName);
+
+        if (isShellTarget(resolveCallTarget(context, { rootName, binding, memberName: null }))) {
           markIO('runs a `$` shell command');
         }
       },
@@ -166,7 +169,6 @@ const flagVerbs = [...effectfulVerbs, 'try'];
 function checkFrame(context, frame) {
   const name = frame.name.name;
   const returnType = frame.node.returnType?.typeAnnotation ?? null;
-  const resultType = returnType === null ? null : unwrapPromise(returnType);
   const pureVerb = findVerb(name, pureVerbs);
   const predicateVerb = findVerb(name, predicateVerbs);
   const report = (messageId, data) =>
@@ -176,28 +178,32 @@ function checkFrame(context, frame) {
     report('pureVerbIO', { verb: pureVerb, reason: frame.ioReason });
   }
 
-  if (predicateVerb !== null && resultType !== null && !isBooleanType(resultType)) {
+  const localTypes = collectLocalTypes(context.sourceCode.ast);
+  const declared = returnType === null ? null : collectTypeKinds(returnType, localTypes);
+  const resolved = returnType === null ? null : collectTypeKinds(returnType, localTypes, true);
+
+  if (predicateVerb !== null && resolved !== null && !isBooleanOrOpen(resolved)) {
     report('predicateNotBoolean', { verb: predicateVerb });
   }
 
   const isUnnamedFlag =
     predicateVerb === null &&
     frame.ioReason === null &&
-    returnType !== null &&
-    isBooleanType(returnType) &&
+    declared !== null &&
+    declared.every((kind) => kind === 'boolean') &&
     findVerb(name, flagVerbs) === null;
 
   if (isUnnamedFlag) {
     report('booleanWithoutPredicate', {});
   }
 
-  const localTypes = collectLocalTypes(context.sourceCode.ast);
+  const missKinds = new Set(['nullish', 'void', 'open']);
 
-  if (pureVerb === 'find' && resultType !== null && !canHoldNullish(resultType, localTypes)) {
+  if (pureVerb === 'find' && resolved !== null && !resolved.some((kind) => missKinds.has(kind))) {
     report('findCannotMiss', {});
   }
 
-  const declaresMiss = resultType !== null && canBeNullish(resultType, localTypes);
+  const declaresMiss = resolved !== null && resolved.includes('nullish');
 
   if (pureVerb === 'get' && (frame.returnsNullish === true || declaresMiss)) {
     report('getCanMiss', {});
@@ -208,81 +214,62 @@ function findVerb(name, verbs) {
   return verbs.find((verb) => isVerbMatch(name, verb)) ?? null;
 }
 
-function unwrapPromise(type) {
-  const typeArguments = type.typeArguments ?? type.typeParameters;
-
-  if (
-    type.type === 'TSTypeReference' &&
-    type.typeName.type === 'Identifier' &&
-    type.typeName.name === 'Promise' &&
-    typeArguments?.params.length === 1
-  ) {
-    const [resolved] = typeArguments.params;
-
-    return resolved;
-  }
-
-  return type;
+function isBooleanOrOpen(kinds) {
+  return kinds.every((kind) => kind === 'boolean' || kind === 'open');
 }
 
-function isBooleanType(type) {
-  return (
-    type.type === 'TSBooleanKeyword' ||
-    (type.type === 'TSTypePredicate' && !type.asserts) ||
-    (type.type === 'TSLiteralType' && typeof type.literal.value === 'boolean')
-  );
-}
-
-// a declared null or undefined is a miss path; an open type such as `unknown`
-// may hold one, so it lets `find` miss but never makes `get` miss
-function canBeNullish(type, localTypes) {
-  return hasMemberType(type, ['TSNullKeyword', 'TSUndefinedKeyword'], localTypes, false);
-}
-
-// a type the file does not declare, such as an import or a type parameter,
-// may hold null, so `find` passes when its nullability is unknown
-function canHoldNullish(type, localTypes) {
-  return hasMemberType(type, openTypes, localTypes, true);
-}
-
-const openTypes = [
-  'TSNullKeyword',
-  'TSUndefinedKeyword',
-  'TSVoidKeyword',
-  'TSAnyKeyword',
-  'TSUnknownKeyword',
-];
-
-// a reference follows the file's own type aliases; an interface never holds
-// null, and any other reference answers `unknownAnswer`
-function hasMemberType(type, types, localTypes, unknownAnswer) {
+// the kind of each member of a declared type, read without type information:
+// a union splits into its members, a reference follows the file's own type
+// aliases, and `resolvePromise` reads a promise as the value it resolves to
+function collectTypeKinds(type, localTypes, resolvePromise = false, seen = new Set()) {
   if (type.type === 'TSUnionType') {
-    return type.types.some((member) => hasMemberType(member, types, localTypes, unknownAnswer));
+    return type.types.flatMap((member) =>
+      collectTypeKinds(member, localTypes, resolvePromise, seen),
+    );
   }
 
   if (type.type !== 'TSTypeReference' || type.typeName.type !== 'Identifier') {
-    return types.includes(type.type);
+    return [pickTypeKind(type)];
   }
 
   const name = type.typeName.name;
-
-  if (localTypes.interfaces.has(name)) {
-    return false;
-  }
-
   const alias = localTypes.aliases.get(name);
 
-  if (alias === undefined || localTypes.visiting.has(name)) {
-    return unknownAnswer;
+  if (alias !== undefined && !seen.has(name)) {
+    return collectTypeKinds(alias, localTypes, resolvePromise, new Set([...seen, name]));
   }
 
-  localTypes.visiting.add(name);
+  const typeArguments = type.typeArguments ?? type.typeParameters;
 
-  const answer = hasMemberType(alias, types, localTypes, unknownAnswer);
+  if (resolvePromise && name === 'Promise' && typeArguments?.params.length === 1) {
+    const [value] = typeArguments.params;
 
-  localTypes.visiting.delete(name);
+    return collectTypeKinds(value, localTypes, resolvePromise, seen);
+  }
 
-  return answer;
+  // an interface never holds null; any other reference, such as an import or
+  // a type parameter, is a type the rule cannot read
+  return [localTypes.interfaces.has(name) ? 'value' : 'open'];
+}
+
+function pickTypeKind(type) {
+  if (
+    type.type === 'TSBooleanKeyword' ||
+    (type.type === 'TSTypePredicate' && !type.asserts) ||
+    (type.type === 'TSLiteralType' && typeof type.literal.value === 'boolean')
+  ) {
+    return 'boolean';
+  }
+
+  if (type.type === 'TSNullKeyword' || type.type === 'TSUndefinedKeyword') {
+    return 'nullish';
+  }
+
+  if (type.type === 'TSVoidKeyword') {
+    return 'void';
+  }
+
+  return type.type === 'TSAnyKeyword' || type.type === 'TSUnknownKeyword' ? 'open' : 'value';
 }
 
 const localTypesByProgram = new WeakMap();
@@ -294,7 +281,7 @@ function collectLocalTypes(program) {
     return cached;
   }
 
-  const localTypes = { aliases: new Map(), interfaces: new Set(), visiting: new Set() };
+  const localTypes = { aliases: new Map(), interfaces: new Set() };
 
   for (const statement of program.body) {
     const declaration =
@@ -331,12 +318,15 @@ function findCallIO(context, node, frameNode) {
   const callee = node.callee;
   const rootName = findRootName(callee);
   const memberName = callee.type === 'MemberExpression' ? findMemberName(callee) : null;
+  const binding = rootName === null ? null : findBinding(context, node, rootName);
+  const source = findImportSource(binding);
+  const target = resolveCallTarget(context, { rootName, binding, memberName });
 
-  if (isShellRoot(context, node, rootName)) {
+  if (isShellTarget(target)) {
     return 'runs a `$` shell command';
   }
 
-  if (isGlobalName(context, callee, 'fetch')) {
+  if (target.rootName === 'fetch' && target.binding === null && target.memberName === null) {
     return 'calls `fetch`';
   }
 
@@ -344,15 +334,14 @@ function findCallIO(context, node, frameNode) {
     return 'runs a database query';
   }
 
-  if (isGlobalName(context, callee.object, 'Bun') && bunIOMembers.has(memberName)) {
-    return `calls \`Bun.${memberName}\``;
+  if (target.rootName === 'Bun' && target.binding === null && bunIOMembers.has(target.memberName)) {
+    return `calls \`Bun.${target.memberName}\``;
   }
 
-  const binding = rootName === null ? null : findBinding(context, node, rootName);
-  const source = binding === null ? null : findImportSource(binding);
+  const targetSource = findImportSource(target.binding);
 
-  if (source !== null && isIOImport(source, binding, memberName)) {
-    return `calls \`${rootName}\` from \`${source}\``;
+  if (targetSource !== null && isIOImport(targetSource, target)) {
+    return `calls \`${rootName}\` from \`${targetSource}\``;
   }
 
   if (!isOwnCallee({ rootName, binding, source, memberName }, frameNode)) {
@@ -371,17 +360,72 @@ function findCallIO(context, node, frameNode) {
   return `calls '${calleeName}', whose verb may do I/O`;
 }
 
+// a local alias of an I/O source, such as `const read = fs.readFileSync` or
+// `const { spawn } = Bun`, resolves to that source and the member it names
+function resolveCallTarget(context, target) {
+  let current = target;
+
+  for (let depth = 0; depth < 8; depth++) {
+    const declarator = findAliasDeclarator(current.binding);
+
+    if (declarator === null) {
+      return current;
+    }
+
+    const init = declarator.init;
+    const rootName = findRootName(init);
+    const ownMember = init.type === 'MemberExpression' ? findMemberName(init) : null;
+    const memberName =
+      current.memberName ?? findPatternKey(declarator.id, current.rootName) ?? ownMember;
+
+    current = {
+      rootName,
+      binding: rootName === null ? null : findBinding(context, init, rootName),
+      memberName,
+    };
+  }
+
+  return current;
+}
+
+function findAliasDeclarator(binding) {
+  const definition = binding?.defs[0];
+  const declarator = definition?.type === 'Variable' ? definition.node : null;
+  const init = declarator?.init ?? null;
+
+  return init !== null && (init.type === 'Identifier' || init.type === 'MemberExpression')
+    ? declarator
+    : null;
+}
+
+// the key a destructured binding takes, as `spawn` in `const { spawn: run } = Bun`
+function findPatternKey(pattern, name) {
+  if (pattern.type !== 'ObjectPattern') {
+    return null;
+  }
+
+  const property = pattern.properties.find(
+    (entry) =>
+      entry.type === 'Property' && entry.value.type === 'Identifier' && entry.value.name === name,
+  );
+
+  return property === undefined ? null : findKeyName(property);
+}
+
+function findKeyName(property) {
+  return !property.computed && property.key.type === 'Identifier' ? property.key.name : null;
+}
+
 // Bun's shell by its usual name, or under any alias of its import from `bun`
-function isShellRoot(context, node, rootName) {
-  if (rootName === '$') {
+function isShellTarget(target) {
+  if (target.rootName === '$') {
     return true;
   }
 
-  const binding = rootName === null ? null : findBinding(context, node, rootName);
-  const specifier = binding?.defs[0].node;
+  const specifier = target.binding?.defs[0].node;
 
   return (
-    findImportSource(binding) === 'bun' &&
+    findImportSource(target.binding) === 'bun' &&
     specifier.type === 'ImportSpecifier' &&
     specifier.imported.name === '$'
   );
@@ -443,7 +487,7 @@ function findImportSource(variable) {
 
 const ioModules = new Set(['fs', 'fs/promises', 'child_process']);
 
-function isIOImport(source, binding, memberName) {
+function isIOImport(source, target) {
   if (ioModules.has(source.replace(/^node:/u, ''))) {
     return true;
   }
@@ -452,8 +496,9 @@ function isIOImport(source, binding, memberName) {
     return false;
   }
 
-  const specifier = binding.defs[0].node;
-  const imported = specifier.type === 'ImportSpecifier' ? specifier.imported.name : memberName;
+  const specifier = target.binding.defs[0].node;
+  const imported =
+    specifier.type === 'ImportSpecifier' ? specifier.imported.name : target.memberName;
 
   return bunIOMembers.has(imported);
 }

@@ -1,6 +1,6 @@
-// a declaration's own name, the variable a function is assigned to, or the
-// key of a class method, an object-literal method or a function-valued
-// property; getters, setters, computed and quoted keys name nothing
+// a declaration's own name, the variable or key a function is assigned to,
+// or else a function expression's own name; getters, setters, computed and
+// quoted keys name nothing
 export default function findFunctionName(node) {
   if (node.type === 'FunctionDeclaration') {
     return node.id;
@@ -20,7 +20,7 @@ export default function findFunctionName(node) {
     return parent.kind === 'init' && parent.value === node ? findKeyName(parent) : null;
   }
 
-  return null;
+  return node.id ?? null;
 }
 
 function findKeyName(member) {

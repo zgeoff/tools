@@ -59,6 +59,18 @@ test.each([
   ['calls `Bun.file`', "export function buildThing(): unknown {\n  return Bun.file('a');\n}\n"],
   ['calls `Bun.write`', "export function buildThing(): void {\n  void Bun.write('a', 'b');\n}\n"],
   [
+    'calls `read` from `node:fs`',
+    "import fs from 'node:fs';\n\nexport function buildThing(): string {\n  const read = fs.readFileSync;\n\n  return read('a', 'utf8');\n}\n",
+  ],
+  [
+    'calls `Bun.spawn`',
+    "export function buildThing(): void {\n  const { spawn: launch } = Bun;\n\n  launch(['ls']);\n}\n",
+  ],
+  [
+    'runs a `$` shell command',
+    "import { $ as shell } from 'bun';\n\nexport function buildThing(): unknown {\n  const run = shell;\n\n  return run`ls`;\n}\n",
+  ],
+  [
     'calls `spawn` from `bun`',
     "import { spawn } from 'bun';\n\nexport function buildThing(): void {\n  spawn(['ls']);\n}\n",
   ],
@@ -115,6 +127,25 @@ test('it skips a callee imported from a third-party package', async () => {
   expect(result.exitCode).toBe(0);
 });
 
+test('it skips a bare built-in method on a parameter', async () => {
+  const ctx = await setupTest();
+
+  const result = await ctx.lint(
+    [
+      'export function buildIndex(index: Map<string, number>, names: readonly string[]): number {',
+      '  for (const name of names) {',
+      '    index.set(name, name.length);',
+      '  }',
+      '',
+      '  return index.size;',
+      '}',
+      '',
+    ].join('\n'),
+  );
+
+  expect(result.exitCode).toBe(0);
+});
+
 test('it skips a bare built-in method name and a method on a value the function makes', async () => {
   const ctx = await setupTest();
 
@@ -152,6 +183,25 @@ test('it accepts I/O behind a verb that may do I/O or a free verb', async () => 
       '',
       'export function resolveConfigPath(): string {',
       "  return process.env['CONFIG'] ?? readFileSync('b', 'utf8');",
+      '}',
+      '',
+    ].join('\n'),
+  );
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it counts I/O in a returned named function expression against that function', async () => {
+  const ctx = await setupTest();
+
+  const result = await ctx.lint(
+    [
+      "import { readFileSync } from 'node:fs';",
+      '',
+      'export function buildReader(): () => string {',
+      '  return function readSource() {',
+      "    return readFileSync('a', 'utf8');",
+      '  };',
       '}',
       '',
     ].join('\n'),
@@ -211,6 +261,29 @@ test('it accepts a boolean, a type predicate, and a probe that resolves to a boo
   );
 
   expect(result.exitCode).toBe(0);
+});
+
+test('it reads a local boolean alias as a boolean in both predicate checks', async () => {
+  const ctx = await setupTest();
+
+  const result = await ctx.lint(
+    [
+      'type Flag = boolean;',
+      '',
+      'export function isReady(state: string): Flag {',
+      "  return state === 'ready';",
+      '}',
+      '',
+      'export function matchesReady(state: string): Flag {',
+      "  return state === 'ready';",
+      '}',
+      '',
+    ].join('\n'),
+  );
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).not.toInclude("'isReady'");
+  expect(result.stdout).toInclude("'matchesReady' returns a boolean and does no I/O");
 });
 
 test('it reports a boolean function with no predicate verb that does no I/O', async () => {
@@ -356,6 +429,17 @@ test.each([
   );
 });
 
+test('it reports an unannotated get that returns null', async () => {
+  const ctx = await setupTest();
+  const result = await ctx.lint('export function getEntry() {\n  return null;\n}\n');
+
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout).toInclude(
+    "'getEntry' starts with 'get', which promises it cannot miss, but it can return null or undefined",
+  );
+});
+
 test('it accepts a get whose callback returns null', async () => {
   const ctx = await setupTest();
 
@@ -379,6 +463,8 @@ test('it holds the same no-I/O verbs as the role table in the shared skill', asy
     'utf8',
   );
 
+  const ruleSource = await readFile(join(import.meta.dir, 'verb-contract.js'), 'utf8');
+
   const rows = [...markdown.matchAll(/^\| [^|]+ \| (?<verbs>[^|]+) \| (?<promise>[^|]+) \|$/gmu)];
 
   const tableVerbs = rows.flatMap((row) =>
@@ -388,8 +474,18 @@ test('it holds the same no-I/O verbs as the role table in the shared skill', asy
     })),
   );
 
-  const source = tableVerbs
-    .map((entry) => `export async function ${entry.verb}Thing() {}\n`)
+  const ruleList =
+    /const pureVerbs = \[(?<list>[^\]]+)\]/u.exec(ruleSource)?.groups?.['list'] ?? '';
+
+  const ruleVerbs = [...ruleList.matchAll(/'(?<verb>[a-z]+)'/gu)].map(
+    (match) => match.groups?.['verb'] ?? '',
+  );
+
+  // every verb either side names, so a verb only the rule holds is linted too
+  const candidates = new Set([...tableVerbs.map((entry) => entry.verb), ...ruleVerbs]);
+
+  const source = [...candidates]
+    .map((verb) => `export async function ${verb}Thing() {}\n`)
     .join('\n');
 
   const result = await ctx.lint(source);
@@ -399,6 +495,7 @@ test('it holds the same no-I/O verbs as the role table in the shared skill', asy
   );
 
   expect(tableVerbs.length).toBeGreaterThan(15);
+  expect(ruleVerbs.length).toBeGreaterThan(10);
 
   expect(reported).toIncludeSameMembers(
     tableVerbs.filter((entry) => entry.promisesNoIO).map((entry) => `${entry.verb}Thing`),

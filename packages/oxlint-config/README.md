@@ -71,15 +71,16 @@ reads declared return types, since it runs without type information. It runs thr
   function whose verb is on the rule's effectful list, such as `readConfig` or `ctx.writeText`. That
   check skips a callee imported from a package, a global, a bare method name such as `map.set`, and
   a method on a value the function declares itself. I/O inside an unnamed callback counts against
-  the named function around it.
+  the named function around it. A local alias of an I/O source, such as
+  `const read = fs.readFileSync` or `const { spawn } = Bun`, counts as that source.
 - **Predicates return a boolean.** A function named with `is`, `has`, `can`, `should` or `probe`
   that declares a return type declares `boolean`, a type predicate, or a promise of one. A function
   that declares `boolean` and does no I/O starts with one of the four no-I/O predicate verbs. That
   check skips an effectful verb or `try`, whose function may return a success flag.
 - **`find` can miss, and `get` cannot.** A declared `find` return type holds `null`, `undefined`,
   `void`, `unknown` or `any`. A `get` function neither declares `null` or `undefined` nor returns
-  either one as a literal or a bare `return`. The rule follows the file's own type aliases, and it
-  lets a `find` pass when its return type is a type it cannot see, such as an import.
+  either one as a literal or a bare `return`. Every check follows the file's own type aliases, and a
+  type the rule cannot see, such as an import, never fails a check.
 
 A test in this package reads the role table in the shared code-style skill and fails when the
 skill's no-I/O verbs differ from the rule's.
