@@ -93,6 +93,24 @@ test.each([
 });
 
 test.each([
+  ['a type-only import', true, []],
+  ['a runtime import', false, ['app-no-scripts']],
+])('it judges %s across an edge whose allowTypeOnly is true', (_, typeOnly, expected) => {
+  const options = {
+    zones: { app: ['src/**'], scripts: ['scripts/**'] },
+    edges: [{ name: 'app-no-scripts', from: ['app'], to: ['scripts'], allowTypeOnly: true }],
+  };
+
+  const refusing = collectRefusingEdges(options, {
+    from: 'src/main.ts',
+    to: 'scripts/seed.ts',
+    typeOnly,
+  });
+
+  expect(refusing.map((edge) => edge.name)).toStrictEqual(expected);
+});
+
+test.each([
   ['inside its own directory', 'src/billing/totals.ts', []],
   ['into a sibling directory', 'src/orders/totals.ts', ['features']],
 ])('it judges an allowWithin edge for an import %s', (_, to, expected) => {
