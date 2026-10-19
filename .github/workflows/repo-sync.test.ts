@@ -467,3 +467,40 @@ test('it asks for workflows write on the token only when the prepare output is t
     `permission-workflows: \${{ needs.prepare.outputs.workflows == 'true' && 'write' || '' }}`,
   );
 });
+
+test('it leaves out every file of an entry whose workflow conflicts, syncs the others, and fails the run', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeBranch('main', '.github/workflows/ci.yml', 'name: Own CI\n');
+  await ctx.writeSource('sync/notes.md', '# Notes\n');
+  await ctx.writeSource('sync/ci.yml', 'name: Shared CI\n');
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const exitCode = await ctx.runSync(
+    [
+      {
+        name: 'workflow-ci',
+        description: 'The CI workflow',
+        files: [
+          { source: 'sync/notes.md', target: 'docs/notes.md' },
+          { source: 'sync/ci.yml', target: '.github/workflows/ci.yml' },
+        ],
+      },
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+      },
+    ],
+    'sync-v7',
+  );
+
+  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
+  const workflow = await ctx.readBranch('repo-sync/zgeoff-tools', '.github/workflows/ci.yml');
+  const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
+
+  expect(exitCode).toBe(1);
+  expect(files).toStrictEqual(['.editorconfig', '.github/workflows/ci.yml', 'README.md']);
+  expect(workflow).toBe('name: Own CI\n');
+  expect(subjects).toStrictEqual(['chore: sync editorconfig from zgeoff/tools']);
+});
