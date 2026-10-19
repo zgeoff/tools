@@ -157,8 +157,10 @@ as a file, a stub binary or a server.
 
 ### Free verbs
 
-A verb outside the table is free: any function may use it, and it makes no promise. `resolve` is
-free because it names both a pure lookup and one that searches the filesystem, so a reader opens a
+A function whose job has no row in the table may start with a verb outside it. That verb is free: it
+makes no promise. A job with a row keeps its row's verb, so a pure yes/no answer starts with `is`,
+`has`, `can` or `should` even when a free verb such as `matches` reads well. `resolve` is free
+because it names both a pure lookup and one that searches the filesystem, so a reader opens a
 `resolve` function to learn which.
 
 ### Banned verbs

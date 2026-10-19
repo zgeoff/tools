@@ -34,10 +34,11 @@ const verbContract = {
       }
     };
 
+    // a bare `return` returns undefined as `return undefined` does
     const markReturn = (argument) => {
       const frame = frames.at(-1);
 
-      if (frame !== undefined && argument !== null && isNullishLiteral(argument)) {
+      if (frame !== undefined && (argument === null || isNullishLiteral(argument))) {
         frame.returnsNullish = true;
       }
     };
@@ -92,7 +93,7 @@ const verbContract = {
         }
       },
       TaggedTemplateExpression(node) {
-        if (findRootName(node.tag) === '$') {
+        if (isShellRoot(context, node, findRootName(node.tag))) {
           markIO('runs a `$` shell command');
         }
       },
@@ -190,11 +191,13 @@ function checkFrame(context, frame) {
     report('booleanWithoutPredicate', {});
   }
 
-  if (pureVerb === 'find' && resultType !== null && !canHoldNullish(resultType)) {
+  const localTypes = collectLocalTypes(context.sourceCode.ast);
+
+  if (pureVerb === 'find' && resultType !== null && !canHoldNullish(resultType, localTypes)) {
     report('findCannotMiss', {});
   }
 
-  const declaresMiss = resultType !== null && canBeNullish(resultType);
+  const declaresMiss = resultType !== null && canBeNullish(resultType, localTypes);
 
   if (pureVerb === 'get' && (frame.returnsNullish === true || declaresMiss)) {
     report('getCanMiss', {});
@@ -202,7 +205,7 @@ function checkFrame(context, frame) {
 }
 
 function findVerb(name, verbs) {
-  return verbs.find((verb) => isVerbMatch(name, verb, true)) ?? null;
+  return verbs.find((verb) => isVerbMatch(name, verb)) ?? null;
 }
 
 function unwrapPromise(type) {
@@ -232,26 +235,86 @@ function isBooleanType(type) {
 
 // a declared null or undefined is a miss path; an open type such as `unknown`
 // may hold one, so it lets `find` miss but never makes `get` miss
-function canBeNullish(type) {
-  return hasMemberType(type, ['TSNullKeyword', 'TSUndefinedKeyword']);
+function canBeNullish(type, localTypes) {
+  return hasMemberType(type, ['TSNullKeyword', 'TSUndefinedKeyword'], localTypes, false);
 }
 
-function canHoldNullish(type) {
-  return hasMemberType(type, [
-    'TSNullKeyword',
-    'TSUndefinedKeyword',
-    'TSVoidKeyword',
-    'TSAnyKeyword',
-    'TSUnknownKeyword',
-  ]);
+// a type the file does not declare, such as an import or a type parameter,
+// may hold null, so `find` passes when its nullability is unknown
+function canHoldNullish(type, localTypes) {
+  return hasMemberType(type, openTypes, localTypes, true);
 }
 
-function hasMemberType(type, types) {
+const openTypes = [
+  'TSNullKeyword',
+  'TSUndefinedKeyword',
+  'TSVoidKeyword',
+  'TSAnyKeyword',
+  'TSUnknownKeyword',
+];
+
+// a reference follows the file's own type aliases; an interface never holds
+// null, and any other reference answers `unknownAnswer`
+function hasMemberType(type, types, localTypes, unknownAnswer) {
   if (type.type === 'TSUnionType') {
-    return type.types.some((member) => hasMemberType(member, types));
+    return type.types.some((member) => hasMemberType(member, types, localTypes, unknownAnswer));
   }
 
-  return types.includes(type.type);
+  if (type.type !== 'TSTypeReference' || type.typeName.type !== 'Identifier') {
+    return types.includes(type.type);
+  }
+
+  const name = type.typeName.name;
+
+  if (localTypes.interfaces.has(name)) {
+    return false;
+  }
+
+  const alias = localTypes.aliases.get(name);
+
+  if (alias === undefined || localTypes.visiting.has(name)) {
+    return unknownAnswer;
+  }
+
+  localTypes.visiting.add(name);
+
+  const answer = hasMemberType(alias, types, localTypes, unknownAnswer);
+
+  localTypes.visiting.delete(name);
+
+  return answer;
+}
+
+const localTypesByProgram = new WeakMap();
+
+function collectLocalTypes(program) {
+  const cached = localTypesByProgram.get(program);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const localTypes = { aliases: new Map(), interfaces: new Set(), visiting: new Set() };
+
+  for (const statement of program.body) {
+    const declaration =
+      statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+
+    if (
+      declaration?.type === 'TSTypeAliasDeclaration' &&
+      (declaration.typeParameters ?? null) === null
+    ) {
+      localTypes.aliases.set(declaration.id.name, declaration.typeAnnotation);
+    }
+
+    if (declaration?.type === 'TSInterfaceDeclaration') {
+      localTypes.interfaces.add(declaration.id.name);
+    }
+  }
+
+  localTypesByProgram.set(program, localTypes);
+
+  return localTypes;
 }
 
 function isNullishLiteral(node) {
@@ -269,7 +332,7 @@ function findCallIO(context, node, frameNode) {
   const rootName = findRootName(callee);
   const memberName = callee.type === 'MemberExpression' ? findMemberName(callee) : null;
 
-  if (rootName === '$') {
+  if (isShellRoot(context, node, rootName)) {
     return 'runs a `$` shell command';
   }
 
@@ -306,6 +369,22 @@ function findCallIO(context, node, frameNode) {
   }
 
   return `calls '${calleeName}', whose verb may do I/O`;
+}
+
+// Bun's shell by its usual name, or under any alias of its import from `bun`
+function isShellRoot(context, node, rootName) {
+  if (rootName === '$') {
+    return true;
+  }
+
+  const binding = rootName === null ? null : findBinding(context, node, rootName);
+  const specifier = binding?.defs[0].node;
+
+  return (
+    findImportSource(binding) === 'bun' &&
+    specifier.type === 'ImportSpecifier' &&
+    specifier.imported.name === '$'
+  );
 }
 
 function findMemberName(member) {
@@ -353,6 +432,10 @@ function findBinding(context, node, name) {
 }
 
 function findImportSource(variable) {
+  if (variable === null) {
+    return null;
+  }
+
   const [definition] = variable.defs;
 
   return definition.type === 'ImportBinding' ? definition.parent.source.value : null;

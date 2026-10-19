@@ -24,7 +24,7 @@ const suffixRequiredVerbs = new Set(['to', 'with', 'make', 'use', 'on']);
 
 function findBannedVerb(name) {
   for (const [verb, replacement] of bannedVerbs) {
-    if (isVerbMatch(name, verb, true)) {
+    if (isVerbMatch(name, verb)) {
       return { verb, replacement };
     }
   }

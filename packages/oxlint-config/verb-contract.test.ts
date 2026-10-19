@@ -67,6 +67,10 @@ test.each([
     "import { $ } from 'bun';\n\nexport function buildThing(): unknown {\n  return $`ls`;\n}\n",
   ],
   [
+    'runs a `$` shell command',
+    "import { $ as shell } from 'bun';\n\nexport function buildThing(): unknown {\n  return shell`ls`;\n}\n",
+  ],
+  [
     'calls `fetch`',
     "export function buildThing(): unknown {\n  return fetch('https://a.test');\n}\n",
   ],
@@ -248,6 +252,33 @@ test('it skips the boolean check for an effectful verb, `try`, and a function th
   expect(result.exitCode).toBe(0);
 });
 
+test('it reports a find whose local interface or alias holds no miss', async () => {
+  const ctx = await setupTest();
+
+  const result = await ctx.lint(
+    [
+      'interface Entry {',
+      '  readonly name: string;',
+      '}',
+      '',
+      'type Entries = readonly Entry[];',
+      '',
+      'export function findEntry(entries: Entries): Entry {',
+      "  return entries[0] ?? { name: '' };",
+      '}',
+      '',
+      'export function findEntries(entries: Entries): Entries {',
+      '  return entries;',
+      '}',
+      '',
+    ].join('\n'),
+  );
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude("'findEntry' starts with 'find', which promises it can miss");
+  expect(result.stdout).toInclude("'findEntries' starts with 'find', which promises it can miss");
+});
+
 test('it reports a find whose return type holds no miss', async () => {
   const ctx = await setupTest();
 
@@ -262,7 +293,7 @@ test('it reports a find whose return type holds no miss', async () => {
   );
 });
 
-test('it accepts a find that can return undefined, null, or an open type', async () => {
+test('it accepts a find that can return undefined, null, an open type, or an alias that holds a miss', async () => {
   const ctx = await setupTest();
 
   const result = await ctx.lint(
@@ -279,6 +310,18 @@ test('it accepts a find that can return undefined, null, or an open type', async
       '  return items[0];',
       '}',
       '',
+      'type MaybeNumber = number | undefined;',
+      '',
+      'export function findSecond(items: readonly number[]): MaybeNumber {',
+      '  return items[1];',
+      '}',
+      '',
+      "import type { Entry } from './entry.ts';",
+      '',
+      'export function findEntry(entries: readonly Entry[]): Entry {',
+      '  return entries[0] as Entry;',
+      '}',
+      '',
     ].join('\n'),
   );
 
@@ -289,6 +332,14 @@ test.each([
   [
     'declares null',
     'export function getFirst(items: readonly number[]): number | null {\n  return items[0] ?? null;\n}\n',
+  ],
+  [
+    'returns with no value',
+    'export function getFirst(items: readonly number[]) {\n  if (items.length === 0) {\n    return;\n  }\n\n  return items[0];\n}\n',
+  ],
+  [
+    'declares a local alias that holds undefined',
+    'type MaybeNumber = number | undefined;\n\nexport function getFirst(items: readonly number[]): MaybeNumber {\n  return items[0];\n}\n',
   ],
   [
     'returns undefined',

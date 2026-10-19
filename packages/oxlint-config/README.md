@@ -78,7 +78,8 @@ reads declared return types, since it runs without type information. It runs thr
   check skips an effectful verb or `try`, whose function may return a success flag.
 - **`find` can miss, and `get` cannot.** A declared `find` return type holds `null`, `undefined`,
   `void`, `unknown` or `any`. A `get` function neither declares `null` or `undefined` nor returns
-  either one as a literal.
+  either one as a literal or a bare `return`. The rule follows the file's own type aliases, and it
+  lets a `find` pass when its return type is a type it cannot see, such as an import.
 
 A test in this package reads the role table in the shared code-style skill and fails when the
 skill's no-I/O verbs differ from the rule's.

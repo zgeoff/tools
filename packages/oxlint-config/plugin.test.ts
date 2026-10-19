@@ -299,15 +299,41 @@ test('it accepts role-table verbs on declarations, const functions, and class me
   expect(result.exitCode).toBe(0);
 });
 
-test('it requires a suffix on template prefixes', async () => {
-  const bare = 'export const handle = (): void => {};\n';
-  const suffixed = 'export function handleRowClick(): void {}\n';
+test.each(['to', 'with', 'make', 'use', 'on'])(
+  'it rejects the bare template prefix %s',
+  async (prefix) => {
+    const source = `export const api = {\n  ${prefix}(): void {},\n};\n`;
 
-  const bareResult = await runLint(bare, false, { 'zgeoff/function-verb': 'error' });
-  const suffixedResult = await runLint(suffixed, false, { 'zgeoff/function-verb': 'error' });
+    const result = await runLint(source, false, { 'zgeoff/function-verb': 'error' });
 
-  expect(bareResult.exitCode).toBe(1);
-  expect(suffixedResult.exitCode).toBe(0);
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toInclude(`'${prefix}' is a bare prefix`);
+  },
+);
+
+test('it accepts each template prefix with a suffix', async () => {
+  const source = [
+    'export const toPosixPath = (): void => {};',
+    'export const withScope = (): void => {};',
+    'export const makeExcluder = (): void => {};',
+    'export const useDebounce = (): void => {};',
+    'export const onRowClick = (): void => {};',
+    'export const handleRowClick = (): void => {};',
+    '',
+  ].join('\n');
+
+  const result = await runLint(source, false, { 'zgeoff/function-verb': 'error' });
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it reports a bare handle as a vague banned verb', async () => {
+  const result = await runLint('export const handle = (): void => {};\n', false, {
+    'zgeoff/function-verb': 'error',
+  });
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude("'handle' starts with the banned verb 'handle'");
 });
 
 test('it matches a banned verb only at a camelCase boundary', async () => {
