@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { collectRelatedTests } from './run-related-tests.ts';
+import { resolveRelatedTests } from './run-related-tests.ts';
 
 // A temp directory standing in for a repo root, with an empty src/.
 async function setupTest() {
@@ -30,59 +30,59 @@ async function runScript(cwd: string, args: readonly string[]) {
   return { stdout, stderr, exitCode };
 }
 
-test('#collectRelatedTests selects a test file that exists', async () => {
+test('#resolveRelatedTests selects a test file that exists', async () => {
   const ctx = await setupTest();
 
   await writeFile(join(ctx.dir, 'src/a.test.ts'), '');
 
-  expect(collectRelatedTests(['src/a.test.ts'], ctx.dir)).toStrictEqual(['src/a.test.ts']);
+  expect(resolveRelatedTests(['src/a.test.ts'], ctx.dir)).toStrictEqual(['src/a.test.ts']);
 });
 
-test('#collectRelatedTests selects the sibling test of a source file', async () => {
+test('#resolveRelatedTests selects the sibling test of a source file', async () => {
   const ctx = await setupTest();
 
   await writeFile(join(ctx.dir, 'src/a.ts'), '');
   await writeFile(join(ctx.dir, 'src/a.test.ts'), '');
 
-  expect(collectRelatedTests(['src/a.ts'], ctx.dir)).toStrictEqual(['src/a.test.ts']);
+  expect(resolveRelatedTests(['src/a.ts'], ctx.dir)).toStrictEqual(['src/a.test.ts']);
 });
 
-test('#collectRelatedTests selects the sibling test of a TSX component', async () => {
+test('#resolveRelatedTests selects the sibling test of a TSX component', async () => {
   const ctx = await setupTest();
 
   await writeFile(join(ctx.dir, 'src/view.tsx'), '');
   await writeFile(join(ctx.dir, 'src/view.test.tsx'), '');
 
-  expect(collectRelatedTests(['src/view.tsx'], ctx.dir)).toStrictEqual(['src/view.test.tsx']);
+  expect(resolveRelatedTests(['src/view.tsx'], ctx.dir)).toStrictEqual(['src/view.test.tsx']);
 });
 
-test('#collectRelatedTests skips a source file with no sibling test and a deleted test file', async () => {
+test('#resolveRelatedTests skips a source file with no sibling test and a deleted test file', async () => {
   const ctx = await setupTest();
 
   await writeFile(join(ctx.dir, 'src/a.ts'), '');
 
-  expect(collectRelatedTests(['src/a.ts', 'src/gone.test.ts'], ctx.dir)).toBeEmpty();
+  expect(resolveRelatedTests(['src/a.ts', 'src/gone.test.ts'], ctx.dir)).toBeEmpty();
 });
 
-test('#collectRelatedTests skips a declaration file even when a test sits beside it', async () => {
+test('#resolveRelatedTests skips a declaration file even when a test sits beside it', async () => {
   const ctx = await setupTest();
 
   await writeFile(join(ctx.dir, 'src/types.d.ts'), '');
   await writeFile(join(ctx.dir, 'src/types.d.test.ts'), '');
 
-  expect(collectRelatedTests(['src/types.d.ts'], ctx.dir)).toBeEmpty();
+  expect(resolveRelatedTests(['src/types.d.ts'], ctx.dir)).toBeEmpty();
 });
 
-test('#collectRelatedTests skips files that are not TypeScript', async () => {
+test('#resolveRelatedTests skips files that are not TypeScript', async () => {
   const ctx = await setupTest();
 
   await writeFile(join(ctx.dir, 'src/a.md'), '');
   await writeFile(join(ctx.dir, 'src/a.test.ts'), '');
 
-  expect(collectRelatedTests(['src/a.md', 'README.md'], ctx.dir)).toBeEmpty();
+  expect(resolveRelatedTests(['src/a.md', 'README.md'], ctx.dir)).toBeEmpty();
 });
 
-test('#collectRelatedTests keeps the order of the paths and drops duplicates', async () => {
+test('#resolveRelatedTests keeps the order of the paths and drops duplicates', async () => {
   const ctx = await setupTest();
 
   await writeFile(join(ctx.dir, 'src/b.ts'), '');
@@ -90,7 +90,7 @@ test('#collectRelatedTests keeps the order of the paths and drops duplicates', a
   await writeFile(join(ctx.dir, 'src/a.test.ts'), '');
 
   expect(
-    collectRelatedTests(['src/b.ts', 'src/a.test.ts', 'src/b.test.ts'], ctx.dir),
+    resolveRelatedTests(['src/b.ts', 'src/a.test.ts', 'src/b.test.ts'], ctx.dir),
   ).toStrictEqual(['src/b.test.ts', 'src/a.test.ts']);
 });
 

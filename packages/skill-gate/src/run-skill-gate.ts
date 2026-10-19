@@ -55,7 +55,7 @@ export async function runSkillGate(): Promise<never> {
     process.exit(0);
   }
 
-  const availableSkills = await collectAvailableSkills(path.join(projectDir, '.claude', 'skills'));
+  const availableSkills = await readAvailableSkills(path.join(projectDir, '.claude', 'skills'));
   const transcript = await readTranscript(resolveSessionTranscriptPath(input));
 
   const loaded = collectLoadedSkills(transcript);
@@ -142,7 +142,7 @@ async function checkBashCommand(check: BashCheck): Promise<void> {
     process.exit(0);
   }
 
-  const skills = await collectAvailableSkills(path.join(check.projectDir, '.claude', 'skills'));
+  const skills = await readAvailableSkills(path.join(check.projectDir, '.claude', 'skills'));
   const sessionTranscript = await readTranscript(resolveSessionTranscriptPath(check.hookInput));
 
   const sessionLoads = collectLoadedSkills(sessionTranscript);
@@ -183,7 +183,7 @@ function toProjectPath(projectDir: string, absolute: string): string {
   return path.relative(projectDir, absolute).split(path.sep).join('/');
 }
 
-async function collectAvailableSkills(skillsDir: string): Promise<readonly string[]> {
+async function readAvailableSkills(skillsDir: string): Promise<readonly string[]> {
   const skills: string[] = [];
 
   const scan = new Bun.Glob('*/SKILL.md').scan({ cwd: skillsDir, followSymlinks: true });

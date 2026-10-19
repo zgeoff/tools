@@ -9,6 +9,7 @@ interface CollectBranchFilesOptions {
   readonly env?: Readonly<Record<string, string | undefined>>;
 }
 
+// oxlint-disable-next-line zgeoff/verb-contract -- repo-sync ships this file by name, and each repo's files:branch script runs it
 export async function collectBranchFiles(
   options: Readonly<CollectBranchFilesOptions>,
 ): Promise<string[]> {

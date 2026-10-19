@@ -7,12 +7,12 @@ to npm, and it holds the files that repo-sync copies into each other repo.
 
 The rules a task needs are not repeated here. Load the skill for the work before starting it.
 
-| Skill           | Source                       | Load before                                                                             |
-| --------------- | ---------------------------- | --------------------------------------------------------------------------------------- |
-| `code-style`    | `.claude/skills/code-style/` | writing, reviewing, or renaming any TypeScript — the function-verb taxonomy lives there |
-| `testing`       | `sync/skills/testing/`       | designing, writing, or reviewing tests                                                  |
-| `docs-writing`  | `sync/skills/docs-writing/`  | writing or editing any committed prose: READMEs, this file, skills                      |
-| `skill-writing` | `sync/skills/skill-writing/` | writing or editing a skill                                                              |
+| Skill           | Source                       | Load before                                                                                 |
+| --------------- | ---------------------------- | ------------------------------------------------------------------------------------------- |
+| `code-style`    | `.claude/skills/code-style/` | writing, reviewing, or renaming any TypeScript — the function-naming role table lives there |
+| `testing`       | `sync/skills/testing/`       | designing, writing, or reviewing tests                                                      |
+| `docs-writing`  | `sync/skills/docs-writing/`  | writing or editing any committed prose: READMEs, this file, skills                          |
+| `skill-writing` | `sync/skills/skill-writing/` | writing or editing a skill                                                                  |
 
 Only `code-style` is installed as a skill here. For the others, read the `SKILL.md` in the source
 folder.

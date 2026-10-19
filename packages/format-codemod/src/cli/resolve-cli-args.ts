@@ -22,7 +22,7 @@ const CLI_ARGS = {
   ignore: { type: 'string', multiple: true },
 } as const;
 
-export async function parseCLIArgs(argv: readonly string[]): Promise<CLIArgs | string> {
+export async function resolveCLIArgs(argv: readonly string[]): Promise<CLIArgs | string> {
   let parsed: CLIArgs | null = null;
 
   const command = define({

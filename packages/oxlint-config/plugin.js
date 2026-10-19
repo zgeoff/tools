@@ -9,6 +9,7 @@ import noJSDoc from './no-jsdoc.js';
 import noRestrictedWords from './no-restricted-words.js';
 import setupTestOnly from './setup-test-only.js';
 import testBesideModule from './test-beside-module.js';
+import verbContract from './verb-contract.js';
 
 // custom rules loaded through oxlint's jsPlugins (ESLint v9 rule API): each
 // bans a shape no native oxlint rule can express, as an esquery selector or a
@@ -110,6 +111,7 @@ const plugin = {
     'max-consecutive-line-comments': maxConsecutiveLineComments,
     'no-comment-rule-override': noCommentRuleOverride,
     'function-verb': functionVerb,
+    'verb-contract': verbContract,
     'no-restricted-words': noRestrictedWords,
     'no-abbreviated-names': noAbbreviatedNames,
     'test-beside-module': testBesideModule,

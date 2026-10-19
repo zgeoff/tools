@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 export function runRelatedTests(paths: readonly string[], cwd: string): Promise<number> {
-  const tests = collectRelatedTests(paths, cwd);
+  const tests = resolveRelatedTests(paths, cwd);
 
   if (tests.length === 0) {
     process.stdout.write('run-related-tests: no related tests\n');
@@ -23,7 +23,7 @@ export function runRelatedTests(paths: readonly string[], cwd: string): Promise<
   return run.exited;
 }
 
-export function collectRelatedTests(paths: readonly string[], cwd: string): string[] {
+export function resolveRelatedTests(paths: readonly string[], cwd: string): string[] {
   const selected = new Set<string>();
 
   for (const path of paths) {

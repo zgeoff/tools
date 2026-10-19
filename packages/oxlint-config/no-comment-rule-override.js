@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import findRepoRoot from './find-repo-root.js';
+import resolveRepoRoot from './resolve-repo-root.js';
 
 // every repo runs the comment rules exactly as this config ships them
 const lockedRules = ['zgeoff/no-jsdoc', 'zgeoff/max-consecutive-line-comments'];
@@ -47,7 +47,7 @@ const noCommentRuleOverride = {
     schema: [],
   },
   create(context) {
-    const root = findRepoRoot(context.filename);
+    const root = resolveRepoRoot(context.filename);
 
     if (root === null) {
       return {};

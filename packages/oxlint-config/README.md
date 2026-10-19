@@ -6,9 +6,10 @@ restriction-rule cherry-picks, comment-style enforcement via `@stylistic`, and a
 function declarations, bare named exports, destructured and inline-typed parameters, ternary and
 await arguments, awaits hidden inside a control-flow condition or a `&&`/`||`/`??` chain, every
 `switch` statement, every JSDoc block, any run of more than three line comments, and a repo config
-that loosens either comment rule. `zgeoff/function-verb` enforces the function-naming taxonomy from
-the shared agent guidelines, `zgeoff/test-beside-module` keeps each test file beside the module it
-tests, `zgeoff/import-zones` fails an import that crosses a module boundary the repo declares,
+that loosens either comment rule. `zgeoff/function-verb` bans the vague and near-synonym verbs of
+the shared function-naming rules, `zgeoff/verb-contract` checks the promise each role-table verb
+makes, `zgeoff/test-beside-module` keeps each test file beside the module it tests,
+`zgeoff/import-zones` fails an import that crosses a module boundary the repo declares,
 `zgeoff/no-restricted-words` keeps the words in its `words` option out of a path's text,
 `zgeoff/no-abbreviated-names` reports each abbreviated value name it lists with its full word,
 `zgeoff/no-file-snapshot` bans file snapshots, `zgeoff/setup-test-only` keeps a test file's module
@@ -43,22 +44,42 @@ The plugin is addressable on its own at `@zgeoff/oxlint-config/plugin` for confi
 
 ## `zgeoff/function-verb`
 
-Every function declaration, function-valued variable, and class method must start with a verb from
-the function-naming taxonomy. Banned verbs report their taxonomy replacement (`fetchUser` → use
-`read`). Object-literal properties are exempt — they overwhelmingly implement externally-defined
-shapes whose names the author doesn't choose — as are names not starting with a lowercase letter.
-Exempt an algorithm-native name (`walk`, `backtrack`) with a disable comment in the module
-implementing that algorithm.
-
-Options extend the shipped set per repo:
+The rule reports a function, method, or function-valued variable or property whose name starts with
+a banned verb, and it names the role-table verb to use instead (`fetchUser` → use `read`). It also
+reports a bare template prefix, such as a function named `on`. A name that does not start with a
+lowercase letter passes. The `exemptNames` option lists names that a library contract fixes:
 
 ```jsonc
 {
   "rules": {
-    "zgeoff/function-verb": ["error", { "verbs": ["walk"], "exemptNames": ["main"] }],
+    "zgeoff/function-verb": ["error", { "exemptNames": ["execute"] }],
   },
 }
 ```
+
+## `zgeoff/verb-contract`
+
+The rule reads each named function's verb and reports a body that breaks the verb's promise. It
+reads declared return types, since it runs without type information. It runs three checks:
+
+- **No I/O behind a no-I/O verb.** A function named with `is`, `has`, `can`, `should`, `build`,
+  `parse`, `format`, `render`, `pick`, `find`, `get`, `collect` or `to` must not be async or await.
+  It must not call `fs`, `child_process`, `Bun.spawn`, `Bun.file`, `Bun.write`, the `$` shell,
+  `fetch` or a Kysely `execute`, and must not read `process.env` or `Bun.env`. It must not call a
+  function whose verb is on the rule's effectful list, such as `readConfig` or `ctx.writeText`. That
+  check skips a callee imported from a package, a global, a bare method name such as `map.set`, and
+  a method on a value the function declares itself. I/O inside an unnamed callback counts against
+  the named function around it.
+- **Predicates return a boolean.** A function named with `is`, `has`, `can`, `should` or `probe`
+  that declares a return type declares `boolean`, a type predicate, or a promise of one. A function
+  that declares `boolean` and does no I/O starts with one of the four no-I/O predicate verbs. That
+  check skips an effectful verb or `try`, whose function may return a success flag.
+- **`find` can miss, and `get` cannot.** A declared `find` return type holds `null`, `undefined`,
+  `void`, `unknown` or `any`. A `get` function neither declares `null` or `undefined` nor returns
+  either one as a literal.
+
+A test in this package reads the role table in the shared code-style skill and fails when the
+skill's no-I/O verbs differ from the rule's.
 
 ## `zgeoff/no-jsdoc` and `zgeoff/max-consecutive-line-comments`
 

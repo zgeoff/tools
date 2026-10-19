@@ -2,8 +2,8 @@ import { expect, test } from 'bun:test';
 import type { ASTNode } from '../types.ts';
 import { collectASTNodes } from './collect-ast-nodes.ts';
 import { isASTNode } from './is-ast-node.ts';
-import { needsBlankLine } from './needs-blank-line.ts';
 import { parseSource } from './parse-source.ts';
+import { shouldHaveBlankLine } from './should-have-blank-line.ts';
 
 function parsePair(body: string): { container: ASTNode; prev: ASTNode; next: ASTNode } {
   const parsed = parseSource(`async function f(x) {\n${body}\n}`, 'file.ts');
@@ -40,227 +40,227 @@ test('it always pads inside a class body', () => {
     throw new TypeError('fixture must parse to a class holding two members');
   }
 
-  expect(needsBlankLine(classBody, a, b)).toBeTrue();
+  expect(shouldHaveBlankLine(classBody, a, b)).toBeTrue();
 });
 
 test('it pads after a var block before a non-var statement', () => {
   const pair = parsePair('const a = 1;\nuse(a);');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
 });
 
 test('it does not pad between two var declarations', () => {
   const pair = parsePair('const a = 1;\nlet b = 2;');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
 
 test('it pads after a using declaration before a statement of another kind', () => {
   const pair = parsePair('using s = open();\nuse(s);');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
 });
 
 test('it does not pad between two plain using declarations', () => {
   const pair = parsePair('using a = openA();\nusing b = openB();');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
 
 test('it does not pad between two await using declarations', () => {
   const pair = parsePair('await using a = await openA();\nawait using b = await openB();');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
 
 test('it pads between an await using and a plain using declaration', () => {
   const pair = parsePair('await using a = await openA();\nusing b = openB();');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
 });
 
 test('it treats an await using without an awaited initializer as awaited', () => {
   const pair = parsePair('await using a = openA();\nusing b = openB();');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
 });
 
 test('it pads before a return statement', () => {
   const pair = parsePair('use(x);\nreturn x;');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
 });
 
 test('it pads after a function declaration', () => {
   const pair = parsePair('function g() {}\nuse(x);');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
 });
 
 test('it pads on both sides of a control-flow statement', () => {
   const before = parsePair('use(x);\nif (x) { use(x); }');
   const after = parsePair('if (x) { use(x); }\nuse(x);');
 
-  expect(needsBlankLine(before.container, before.prev, before.next)).toBeTrue();
-  expect(needsBlankLine(after.container, after.prev, after.next)).toBeTrue();
+  expect(shouldHaveBlankLine(before.container, before.prev, before.next)).toBeTrue();
+  expect(shouldHaveBlankLine(after.container, after.prev, after.next)).toBeTrue();
 });
 
 test('it pads at the boundary between a call and a mutation', () => {
   const pair = parsePair('use(x);\nx = 1;');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
 });
 
 test('it does not pad between two statements of the same kind', () => {
   const pair = parsePair('use(x);\nlog(x);');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
 
 test('it pads at the boundary between a method call and a bare call', () => {
   const pair = parsePair('fs.writeFileSync(file, src);\ncheck(file);');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
 });
 
 test('it does not pad between two method calls', () => {
   const pair = parsePair('fs.writeFileSync(a, x);\nfs.writeFileSync(b, y);');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
 
 test('it treats a member call chained onto a bare call result as a bare call', () => {
   const pair = parsePair('parse(a).check();\nuse(b);');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
 
 test('it keeps the call kind through a wrapping await', () => {
   const pair = parsePair('await db.users.create(a);\nawait expect(p).toReject();');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
 });
 
 test('it does not pad between two awaited method calls', () => {
   const pair = parsePair('await db.users.create(a);\nawait db.sessions.create(b);');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
 
 test('it pads between two adjacent type aliases', () => {
   const pair = parsePair("type A = 'x' | 'y';\ntype B = 'z';");
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
 });
 
 test('it pads between two adjacent exported type aliases', () => {
   const pair = parsePair("export type A = 'x' | 'y';\nexport type B = 'z';");
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
 });
 
 test('it pads on both sides of an interface declaration', () => {
   const before = parsePair('use(x);\ninterface A { x: number }');
   const after = parsePair('interface A { x: number }\nuse(x);');
 
-  expect(needsBlankLine(before.container, before.prev, before.next)).toBeTrue();
-  expect(needsBlankLine(after.container, after.prev, after.next)).toBeTrue();
+  expect(shouldHaveBlankLine(before.container, before.prev, before.next)).toBeTrue();
+  expect(shouldHaveBlankLine(after.container, after.prev, after.next)).toBeTrue();
 });
 
 test('it pads at the boundary between an instantiation and a call-headed declaration', () => {
   const pair = parsePair('const a = new Map();\nconst b = build();');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
 });
 
 test('it does not pad between two instantiation-headed declarations', () => {
   const pair = parsePair('const a = new Map();\nconst b = new Set();');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
 
 test('it pads at the boundary between awaited and non-awaited declarations', () => {
   const pair = parsePair('const a = await load();\nconst b = build();');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
 });
 
 test('it does not pad between two awaited declarations', () => {
   const pair = parsePair('const a = await loadA();\nconst b = await loadB();');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
 
 test('it treats an await inside the head chain as awaited', () => {
   const pair = parsePair('const a = (await load()).prop;\nconst b = await loadB();');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
 
 test('it treats await in argument position as non-awaited', () => {
   const pair = parsePair('const a = build(await load());\nconst b = build();');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
 
 test('it treats an await under a ternary head as non-awaited', () => {
   const pair = parsePair('const a = x ? await load() : build();\nconst b = build();');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
 
 test('it pads at the boundary between awaited and non-awaited call statements', () => {
   const pair = parsePair('await warm();\nreset();');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
 });
 
 test('it pads at the boundary between awaited and non-awaited assignments', () => {
   const pair = parsePair('x = await load();\nx = build();');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
 });
 
 test('it does not pad between kindless statements', () => {
   const pair = parsePair('debugger;\ndebugger;');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
 
 test('it pads at the boundary between a bare call and an expect statement', () => {
   const before = parsePair('advance();\nexpect(x).toBe(1);');
   const after = parsePair('expect(x).toBe(1);\nadvance();');
 
-  expect(needsBlankLine(before.container, before.prev, before.next)).toBeTrue();
-  expect(needsBlankLine(after.container, after.prev, after.next)).toBeTrue();
+  expect(shouldHaveBlankLine(before.container, before.prev, before.next)).toBeTrue();
+  expect(shouldHaveBlankLine(after.container, after.prev, after.next)).toBeTrue();
 });
 
 test('it does not pad between two expect statements', () => {
   const pair = parsePair('expect(x).toBe(1);\nexpect(x).toBeFalse();');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
 
 test('it treats an expect.* helper call as an expect statement', () => {
   const pair = parsePair('expect.assertions(1);\nexpect(x).toBe(1);');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
 
 test('it pads at the boundary between a method call and an expect.* helper call', () => {
   const pair = parsePair('store.reset();\nexpect.assertions(1);');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeTrue();
 });
 
 test('it treats a wrapping await as not changing the expect kind', () => {
   const pair = parsePair('await expect(p).toReject();\nawait expect(q).toReject();');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });
 
 test('it treats expect in argument position as not making an expect statement', () => {
   const pair = parsePair('use(expect(x));\nrun(y);');
 
-  expect(needsBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
+  expect(shouldHaveBlankLine(pair.container, pair.prev, pair.next)).toBeFalse();
 });

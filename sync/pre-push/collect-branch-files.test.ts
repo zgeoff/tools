@@ -11,7 +11,7 @@ async function setupTest() {
 
   onTestFinished(() => rm(dir, { recursive: true, force: true }));
 
-  const env = buildGitEnv(dir);
+  const env = readGitEnv(dir);
 
   const repo = await createClone(dir, env);
 
@@ -28,7 +28,7 @@ async function setupTest() {
 }
 
 // Isolated from the user's git config, with a fixed identity for commits.
-function buildGitEnv(home: string) {
+function readGitEnv(home: string) {
   return {
     PATH: process.env['PATH'],
     HOME: home,

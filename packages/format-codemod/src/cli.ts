@@ -3,14 +3,14 @@ import { fileURLToPath } from 'node:url';
 import { buildBenchStatsFromReports } from './cli/build-bench-stats-from-reports.ts';
 import { expandInputs } from './cli/expand-inputs.ts';
 import { loadFormatIgnore } from './cli/load-format-ignore.ts';
-import { parseCLIArgs } from './cli/parse-cli-args.ts';
 import { printHelp } from './cli/print-help.ts';
 import { printReport } from './cli/print-report.ts';
 import { readPackageVersion } from './cli/read-package-version.ts';
+import { resolveCLIArgs } from './cli/resolve-cli-args.ts';
 import { tryCheckFile } from './cli/try-check-file.ts';
 import type { FileReport } from './cli/types.ts';
 
-const parsedArgs = await parseCLIArgs(process.argv.slice(2));
+const parsedArgs = await resolveCLIArgs(process.argv.slice(2));
 
 if (typeof parsedArgs === 'string') {
   console.error(parsedArgs);

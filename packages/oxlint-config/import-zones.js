@@ -1,18 +1,18 @@
 import { isBuiltin } from 'node:module';
 import { relative, sep } from 'node:path';
-import findRepoRoot from './find-repo-root.js';
 import importZonesSchema from './import-zones-schema.js';
 import loadWorkspaceManifests from './load-workspace-manifests.js';
 import loadZoneOptions from './load-zone-options.js';
 import resolveImportTarget from './resolve-import-target.js';
+import resolveRepoRoot from './resolve-repo-root.js';
 
 // Judges each import against named zones: path globs relative to the repo
 // root, which may overlap. A file belongs to every zone its path matches.
 
-function buildFileState(context) {
+function loadFileState(context) {
   const options = loadZoneOptions(context.options[0] ?? {});
   const filename = context.physicalFilename;
-  const root = findRepoRoot(filename) ?? context.cwd;
+  const root = resolveRepoRoot(filename) ?? context.cwd;
   const path = toRootPath(root, filename);
 
   const workspaces = loadWorkspaceManifests(root, options.workspaces);
@@ -298,7 +298,7 @@ const importZones = {
     schema: [importZonesSchema],
   },
   create(context) {
-    const file = buildFileState(context);
+    const file = loadFileState(context);
 
     return {
       Program(node) {

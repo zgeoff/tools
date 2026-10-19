@@ -1,8 +1,8 @@
 # @zgeoff/std
 
 Small, dependency-free TypeScript helpers that more than one zgeoff repo needs. Each helper is one
-file with its test beside it, exported from the package root, and named by the shared function-verb
-rules.
+file with its test beside it, exported from the package root, and named by the shared
+function-naming rules.
 
 ## Install
 

@@ -58,7 +58,7 @@ function buildTrace(lines: LinePair): FurthestX[] {
   return trace;
 }
 
-// oxlint-disable-next-line zgeoff/function-verb -- Myers-native vocabulary
+// oxlint-disable-next-line zgeoff/verb-contract -- Myers-native vocabulary; the flag ends the search
 function stepRound(lines: LinePair, furthestX: FurthestX, depth: number): boolean {
   for (let diagonal = -depth; diagonal <= depth; diagonal += 2) {
     const x = slideDiagonal(lines, pickX(furthestX, diagonal, depth), diagonal);
@@ -81,7 +81,6 @@ function pickX(furthestX: FurthestX, diagonal: number, depth: number): number {
   return moveDown ? above : below + 1;
 }
 
-// oxlint-disable-next-line zgeoff/function-verb -- Myers-native vocabulary
 function slideDiagonal(lines: LinePair, x: number, diagonal: number): number {
   let endX = x;
 
@@ -96,7 +95,6 @@ function slideDiagonal(lines: LinePair, x: number, diagonal: number): number {
   return endX;
 }
 
-// oxlint-disable-next-line zgeoff/function-verb -- Myers-native vocabulary
 function backtrack(lines: LinePair, trace: readonly FurthestX[]): DiffOp[] {
   const operations: DiffOp[] = [];
   let position: Position = { x: lines.before.length, y: lines.after.length };
@@ -117,14 +115,13 @@ interface Round {
   readonly position: Position;
 }
 
-// oxlint-disable-next-line zgeoff/function-verb -- Myers-native vocabulary
 function unwindRound(
   lines: LinePair,
   trace: readonly FurthestX[],
   position: Position,
   depth: number,
 ): Round {
-  const step = findPreviousStep(trace, position, depth);
+  const step = getPreviousStep(trace, position, depth);
   const operations = buildEqualOps(lines, position, step.position);
 
   if (depth > 0) {
@@ -143,7 +140,7 @@ interface PreviousStep {
   readonly moveDown: boolean;
 }
 
-function findPreviousStep(
+function getPreviousStep(
   trace: readonly FurthestX[],
   position: Position,
   depth: number,

@@ -14,13 +14,13 @@ export function parseAuditScript(script: string): AuditScript {
   let auditLevel: Severity | null = null;
 
   for (const [index, token] of tokens.entries()) {
-    const ignore = readFlagValue(tokens, index, '--ignore');
+    const ignore = findFlagValue(tokens, index, '--ignore');
 
     if (ignore !== null) {
       ignoreIDs.push(ignore);
     }
 
-    const level = readFlagValue(tokens, index, '--audit-level');
+    const level = findFlagValue(tokens, index, '--audit-level');
 
     if (level !== null) {
       if (!isSeverity(level)) {
@@ -38,7 +38,7 @@ export function parseAuditScript(script: string): AuditScript {
   return { ignoreIDs, auditLevel };
 }
 
-function readFlagValue(tokens: readonly string[], index: number, flag: string): string | null {
+function findFlagValue(tokens: readonly string[], index: number, flag: string): string | null {
   const token = tokens[index];
 
   if (token === undefined) {

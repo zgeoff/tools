@@ -8,13 +8,13 @@ export function parseFixPlan(value: unknown): FixPlan {
   }
 
   return {
-    fixes: readList(value, 'fixes').map((entry) => parseFixedPackage(entry)),
-    blocked: readList(value, 'blocked').map((entry) => parseBlockedPackage(entry)),
-    unfixable: readList(value, 'unfixable').map((entry) => parseUnfixablePackage(entry)),
+    fixes: getList(value, 'fixes').map((entry) => parseFixedPackage(entry)),
+    blocked: getList(value, 'blocked').map((entry) => parseBlockedPackage(entry)),
+    unfixable: getList(value, 'unfixable').map((entry) => parseUnfixablePackage(entry)),
   };
 }
 
-function readList(plan: Record<string, unknown>, key: string): unknown[] {
+function getList(plan: Record<string, unknown>, key: string): unknown[] {
   const list = plan[key];
 
   if (!Array.isArray(list)) {

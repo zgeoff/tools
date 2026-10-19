@@ -83,7 +83,7 @@ export async function runAuditFix(argv: readonly string[]): Promise<void> {
 
   const plan = parseFixPlan(parseJSONLine(planOutput));
 
-  const excludes = await collectReleaseAgeExcludes(plan, before, today);
+  const excludes = await readReleaseAgeExcludes(plan, before, today);
   const expiredExcludes = await updateReleaseAgeExcludes(excludes, today);
   const reportOutput = await runBun(['audit', '--json']);
 
@@ -188,7 +188,7 @@ async function runBun(args: readonly string[], options: RunBunOptions = {}): Pro
 
 // `before` is the audit from before the fix, which still lists the advisories
 // each fix patches.
-function collectReleaseAgeExcludes(
+function readReleaseAgeExcludes(
   plan: FixPlan,
   before: AuditReport,
   today: string,

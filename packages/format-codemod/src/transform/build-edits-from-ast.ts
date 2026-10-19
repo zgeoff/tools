@@ -1,7 +1,7 @@
 import type { ASTNode, Edit, ParsedSource, SourceFile } from '../types.ts';
 import { collectChildNodes } from './collect-child-nodes.ts';
-import { needsBlankLine } from './needs-blank-line.ts';
 import { planGapEdit } from './plan-gap-edit.ts';
+import { shouldHaveBlankLine } from './should-have-blank-line.ts';
 
 export function buildEditsFromAST(src: string, parsed: ParsedSource): Edit[] {
   const file: SourceFile = { src, comments: parsed.comments };
@@ -9,7 +9,6 @@ export function buildEditsFromAST(src: string, parsed: ParsedSource): Edit[] {
   return walk(file, parsed.program).toSorted((a, b) => b.start - a.start);
 }
 
-// oxlint-disable-next-line zgeoff/function-verb -- algorithm-native traversal vocabulary
 function walk(file: SourceFile, node: ASTNode): Edit[] {
   const edits: Edit[] = [];
 
@@ -50,7 +49,7 @@ function buildPairEdits(file: SourceFile, container: ASTNode, body: readonly AST
 
     if (prev !== undefined && next !== undefined && !isImportPair(prev, next)) {
       const pad =
-        needsBlankLine(container, prev, next) ||
+        shouldHaveBlankLine(container, prev, next) ||
         isMultiline(file.src, prev) ||
         isMultiline(file.src, next);
 

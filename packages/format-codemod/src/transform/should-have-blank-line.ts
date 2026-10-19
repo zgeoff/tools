@@ -15,7 +15,7 @@ const CONTROL_FLOW_TYPES = new Set([
   'TryStatement',
 ]);
 
-export function needsBlankLine(container: ASTNode, prev: ASTNode, next: ASTNode): boolean {
+export function shouldHaveBlankLine(container: ASTNode, prev: ASTNode, next: ASTNode): boolean {
   if (container.type === 'ClassBody') {
     return true;
   }
@@ -108,13 +108,13 @@ const CALL_TYPES: readonly string[] = ['CallExpression', 'AwaitExpression'];
 const MUTATION_TYPES: readonly string[] = ['AssignmentExpression', 'UpdateExpression'];
 
 function isKindBoundary(prev: ASTNode, next: ASTNode): boolean {
-  const prevKind = getStatementKind(prev);
-  const nextKind = getStatementKind(next);
+  const prevKind = findStatementKind(prev);
+  const nextKind = findStatementKind(next);
 
   return prevKind !== null && nextKind !== null && prevKind !== nextKind;
 }
 
-function getStatementKind(node: ASTNode): string | null {
+function findStatementKind(node: ASTNode): string | null {
   if (isUsingDecl(node)) {
     return 'using';
   }
