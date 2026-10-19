@@ -109,6 +109,12 @@ jobs:
     needs: prepare
     if: ${{ success() && needs.prepare.outputs.entries != '[]' }}
     runs-on: ubuntu-latest
+    # Two runs at once could push one release's files and then write the other
+    # release's title and body. The group names only the caller, so runs from
+    # every ref and every sync tag wait for each other.
+    concurrency:
+      group: repo-sync-${{ github.repository }}
+      cancel-in-progress: false
     permissions:
       contents: read
     steps:
