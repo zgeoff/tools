@@ -9,5 +9,6 @@
   "packages/release-manifest": "0.1.0",
   "packages/std": "0.1.1",
   "packages/kysely-bun-sqlite": "0.1.0",
-  "packages/checks": "0.1.1"
+  "packages/checks": "0.1.1",
+  "packages/skill-gate": "0.1.0"
 }
