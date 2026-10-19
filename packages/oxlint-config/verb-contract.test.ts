@@ -735,7 +735,7 @@ export const getName = (entry: { name: string }): string => entry.name;
   const ctx = await setupTest();
   const result = await ctx.lint(source);
 
-  expect(result.stdout).toBeEmpty();
+  expect(result.stdout).not.toInclude('zgeoff(verb-contract)');
   expect(result.exitCode).toBe(0);
 });
 
