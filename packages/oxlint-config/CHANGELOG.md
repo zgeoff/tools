@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.5.1...@zgeoff/oxlint-config@0.5.2) (2026-10-19)
+
+
+### Features
+
+* **geo-1413:** export the import-zones schema and edge evaluator ([#231](https://github.com/zgeoff/tools/issues/231)) ([d7f3960](https://github.com/zgeoff/tools/commit/d7f3960fab15e09d116442536275a03fa994a19d))
+
 ## [0.5.1](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.5.0...@zgeoff/oxlint-config@0.5.1) (2026-10-19)
 
 ### Features
