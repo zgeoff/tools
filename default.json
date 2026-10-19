@@ -82,9 +82,10 @@
       "schedule": ["* 0-5 * * 1"]
     },
     {
-      "description": "Each major bump gets its own PR and waits for review.",
+      "description": "Each major bump gets its own PR and waits for review. Majors open weekly, so they get reviewed in one sitting. The zgeoff, impz and sync-tag rules below override the schedule.",
       "matchUpdateTypes": ["major"],
-      "automerge": false
+      "automerge": false,
+      "schedule": ["* 0-5 * * 1"]
     },
     {
       "description": "An override pins a transitive dependency, usually to a patched release, so a major bump would break the packages that depend on it.",
