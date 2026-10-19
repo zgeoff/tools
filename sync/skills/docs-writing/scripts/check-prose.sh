@@ -174,54 +174,131 @@ list_changed() {
   git ls-files -z --others --exclude-standard
 }
 
-# Prints file:line:words for each prose paragraph over the warning limit. A paragraph is a run of
-# lines between blank lines. Headings, list items and their lines, tables (with or without outer
-# pipes), block quotes, HTML blocks, link definitions, fenced code, frontmatter and any block whose
-# first line is indented (a list item's later paragraph, or indented code) never count. A line that
-# starts a list, heading, table, quote, HTML or code block ends the prose paragraph above it. A
-# Setext heading (prose underlined with = or -) never counts. A raw HTML region (a comment, a
-# processing instruction, a declaration, CDATA, or a script, pre, style or textarea block) is
-# tracked beside the fenced code: it opens on any line outside code, whatever block that line
-# follows, and runs to its closing marker across blank lines.
+# Prints file:line:words for each prose paragraph over the warning limit. The parser is one state
+# machine over CommonMark's block rules, so it counts what a renderer shows as a paragraph:
+#
+# - A paragraph runs until a blank line or a line that interrupts it: an ATX heading, a fence, an
+#   HTML block of types 1 to 6, a block quote, a thematic break, a bullet item with content, or an
+#   ordered item numbered 1 with content. Any other line continues it, indented or not.
+# - A line of = or - under a paragraph makes it a Setext heading, and a table delimiter row makes its
+#   last line a table header; neither counts. The paragraph lines above that header still count.
+# - Indented code (4 columns or more where no paragraph is open), fenced code, block quotes, tables,
+#   link definitions, frontmatter and ATX headings never count.
+# - HTML blocks of types 1 to 5 (script, pre, style or textarea; a comment; a processing
+#   instruction; a declaration; CDATA) run to their closing marker across blank lines. Types 6 (a
+#   block tag) and 7 (a lone tag, which cannot interrupt a paragraph) run to a blank line.
+# - Nothing inside a list counts. A list runs while each line is blank, indented to the content of
+#   its outermost item, a new item, or a lazy continuation of a paragraph. A fence or an HTML block
+#   opened in a list ends with it.
 paragraph_awk='
-function is_heading(line) {
-  return line ~ /^[ \t]*#+([ \t]|$)/
+function indent_of(line, i, c, col) {
+  col = 0
+  for (i = 1; i <= length(line); i++) {
+    c = substr(line, i, 1)
+    if (c == " ") col++
+    else if (c == "\t") col += 4 - col % 4
+    else break
+  }
+  return col
 }
-# Returns the pattern that closes the raw HTML region this line opens, as CommonMark HTML block
-# types 1 to 5 define them, "closed" when the same line closes it, or "" for any other line. A tag
-# name needs a boundary after it, so <preview> opens no pre region.
-function html_close(line, lower, marker) {
-  lower = tolower(line)
-  if (match(lower, /^[ \t]*<(script|pre|style|textarea)([ \t>]|$)/)) marker = "</(script|pre|style|textarea)>"
-  else if (match(lower, /^[ \t]*<!--/)) marker = "-->"
-  else if (match(lower, /^[ \t]*<\?/)) marker = "[?]>"
-  else if (match(lower, /^[ \t]*<!\[cdata\[/)) marker = "]]>"
-  else if (match(lower, /^[ \t]*<![a-z]/)) marker = ">"
-  else return ""
+function is_atx(s) {
+  return match(s, /^#+/) && RLENGTH <= 6 && substr(s, RLENGTH + 1) ~ /^([ \t]|$)/
+}
+function is_thematic(s) {
+  return s ~ /^\*[ \t]*\*[ \t]*\*[ \t*]*$/ || s ~ /^-[ \t]*-[ \t]*-[ \t-]*$/ || s ~ /^_[ \t]*_[ \t]*_[ \t_]*$/
+}
+function is_item(s) {
+  return s ~ /^([-*+]|[0-9]+[.)])([ \t]|$)/
+}
+function is_table_delimiter(s) {
+  return s ~ /\|/ && s ~ /^\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/
+}
+# A link definition holds a label, a destination and an optional title, and nothing else.
+function is_link_definition(s) {
+  return s ~ /^\[[^]]+\]:[ \t]*(<[^>]*>|[^ \t<][^ \t]*)([ \t]+("[^"]*"|\([^)]*\)))?[ \t]*$/
+}
+# Returns the pattern that closes the HTML block this line starts for types 1 to 5, "closed" when
+# the same line closes it, "block" for type 6, or "" for any other line. A tag name needs a boundary
+# after it, so <preview> starts no pre block.
+function html_start(s, lower) {
+  lower = tolower(s)
+  if (match(lower, /^<(script|pre|style|textarea)([ \t>]|$)/)) return html_marker(lower, "</(script|pre|style|textarea)>")
+  if (match(lower, /^<!--/)) return substr(lower, 5) ~ /^-?>|-->/ ? "closed" : "-->"
+  if (match(lower, /^<\?/)) return html_marker(lower, "[?]>")
+  if (match(lower, /^<!\[cdata\[/)) return html_marker(lower, "]]>")
+  if (match(lower, /^<![a-z]/)) return html_marker(lower, ">")
+  if (lower ~ /^<\/?(address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)([ \t>]|\/>|$)/) return "block"
+  return ""
+}
+function html_marker(lower, marker) {
   return substr(lower, RSTART + RLENGTH) ~ marker ? "closed" : marker
 }
-# Block-level HTML that a blank line ends, as CommonMark HTML block type 6 starts it: a block tag
-# such as div or table, in any case. An inline tag or an autolink starts a prose paragraph.
-function starts_html(line) {
-  return tolower(line) ~ /^[ \t]*<\/?(address|article|aside|blockquote|body|caption|center|col|colgroup|dd|details|dialog|div|dl|dt|fieldset|figcaption|figure|footer|form|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|nav|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)([ \t>]|\/>|$)/
+function is_lone_tag(s) {
+  return s ~ /^<\/?[A-Za-z][A-Za-z0-9-]*([ \t][^<>]*)?\/?>[ \t]*$/
 }
-# A line that holds one tag and nothing else starts an HTML block too, but never ends a paragraph.
-function is_lone_tag(line) {
-  return line ~ /^[ \t]*<\/?[A-Za-z][A-Za-z0-9-]*([ \t][^<>]*)?\/?>[ \t]*$/
-}
-function starts_other(line) {
-  return line ~ /^[ \t]*([-*+]([ \t]|$)|[0-9]+[.)]([ \t]|$)|[|>])/ || starts_html(line)
-}
-function is_table_delimiter(line) {
-  return line ~ /\|/ && line ~ /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/
+function interrupts(s, rel) {
+  return rel < 4 && (fence_marker(s) != "" || is_atx(s) || is_thematic(s) || s ~ /^>/ ||
+    html_start(s) != "" || s ~ /^[-*+][ \t]+[^ \t]/ || s ~ /^1[.)][ \t]+[^ \t]/)
 }
 function flush() {
-  if (kind == "prose" && words > warn) print start_file":"start_line":"words
-  kind = ""
+  if (block == "para" && counted && words > warn) print start_file":"start_line":"words
+  block = ""
   words = 0
+}
+# Starts the block that a line opens. s is the line without its indent, rel its indent in columns
+# past the enclosing list item, and ind the column where s starts.
+function start_block(s, rel, ind, m, h, mlen, rest, content, gap, off, parts) {
+  if (rel >= 4) {
+    block = "code"
+    return
+  }
+  m = fence_marker(s)
+  if (m != "") {
+    open = m
+    return
+  }
+  h = html_start(s)
+  if (h == "closed") return
+  if (h == "block" || (h == "" && is_lone_tag(s))) {
+    block = "html"
+    return
+  }
+  if (h != "") {
+    html_end = h
+    return
+  }
+  if (is_atx(s) || is_thematic(s)) return
+  if (s ~ /^>/) {
+    block = "quote"
+    return
+  }
+  if (is_item(s)) {
+    match(s, /^([-*+]|[0-9]+[.)])/)
+    mlen = RLENGTH
+    rest = substr(s, mlen + 1)
+    content = rest
+    sub(/^[ \t]+/, "", content)
+    gap = length(rest) - length(content)
+    off = ind + mlen + ((content == "" || gap >= 5) ? 1 : gap)
+    if (!in_list || ind < list_off) list_off = off
+    in_list = 1
+    if (content != "") start_block(content, gap >= 5 ? gap - 1 : 0, off)
+    return
+  }
+  if (is_link_definition(s)) {
+    block = "linkdef"
+    return
+  }
+  block = "para"
+  counted = !in_list
+  words = split(s, parts)
+  last_words = words
+  start_file = FILENAME
+  start_line = FNR
 }
 FNR == 1 {
   flush()
+  in_list = 0
   html_end = ""
   front = ($0 == "---")
   if (front) next
@@ -230,53 +307,76 @@ front {
   if ($0 == "---") front = 0
   next
 }
-# A region ends on the line that holds its closing marker, so the next line starts a new block.
-html_end != "" {
-  if (tolower($0) ~ html_end) html_end = ""
-  next
-}
 {
-  m = fence_marker($0)
-  if (m != "") {
-    flush()
-    rest = fence_rest($0, m)
-    if (open == "") open = m
-    else if (closes(m, rest)) open = ""
+  ind = indent_of($0)
+  s = $0
+  sub(/^[ \t]+/, "", s)
+  blank = (s == "")
+  # A line left of the list content ends the list, unless it starts a new item or lazily continues
+  # a paragraph. A fence or an HTML block opened in the list ends with it.
+  if (in_list && !blank && ind < list_off) {
+    if (open != "" || html_end != "") {
+      open = ""
+      html_end = ""
+      block = ""
+    }
+    if (ind < 4 && is_item(s) && !is_thematic(s)) {
+      flush()
+    } else if ((block == "para" || block == "quote" || block == "table") && !interrupts(s, ind)) {
+      next
+    } else {
+      flush()
+      in_list = 0
+    }
+  }
+  rel = (in_list && ind >= list_off) ? ind - list_off : ind
+  if (open != "") {
+    m = fence_marker(s)
+    if (m != "" && rel < 4 && closes(m, fence_rest(s, m))) open = ""
     next
   }
-  if (open != "") next
-  html_end = html_close($0)
   if (html_end != "") {
-    flush()
-    if (html_end == "closed") html_end = ""
+    if (tolower($0) ~ html_end) html_end = ""
     next
   }
-  if ($0 ~ /^[ \t]*$/) {
-    flush()
-    next
-  }
-  if (kind == "prose" && is_table_delimiter($0)) {
-    kind = "other"
-    words = 0
-  }
-  # A heading is one line, so the line after it starts a new block.
-  if (is_heading($0)) {
+  if (blank) {
     flush()
     next
   }
-  # A line of = or - under prose makes that prose a Setext heading.
-  if (kind == "prose" && $0 ~ /^[ \t]*(=+|-+)[ \t]*$/) {
-    kind = ""
-    words = 0
-    next
+  if (block == "linkdef") {
+    block = ""
+    if (rel < 4 && s ~ /^("[^"]*"|\([^)]*\))[ \t]*$/) next
   }
-  if (kind == "prose" && starts_other($0)) flush()
-  if (kind == "") {
-    kind = (starts_other($0) || is_lone_tag($0) || $0 ~ /^[ \t]/ || $0 ~ /^\[.*\]:/) ? "other" : "prose"
-    start_file = FILENAME
-    start_line = FNR
+  if (block == "html") next
+  if (block == "code") {
+    if (rel >= 4) next
+    block = ""
   }
-  if (kind == "prose") words += NF
+  if (block == "para") {
+    if (rel < 4 && s ~ /^(=+|-+)[ \t]*$/) {
+      block = ""
+      words = 0
+      next
+    }
+    if (rel < 4 && is_table_delimiter(s)) {
+      words -= last_words
+      flush()
+      block = "table"
+      next
+    }
+    if (!interrupts(s, rel)) {
+      last_words = split(s, parts)
+      words += last_words
+      next
+    }
+    flush()
+  }
+  if (block == "quote" || block == "table") {
+    if (block == "quote" && rel < 4 && s ~ /^>/) next
+    if (!interrupts(s, rel)) next
+    block = ""
+  }
+  start_block(s, rel, ind)
 }
 END { flush() }
 '

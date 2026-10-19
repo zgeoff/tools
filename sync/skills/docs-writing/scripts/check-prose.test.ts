@@ -111,29 +111,6 @@ test('it warns and passes on a 151-word paragraph', async () => {
   expect(result.stdout).toInclude('guide.md:3:151 words');
 });
 
-test('it warns and passes on a 250-word paragraph', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writeText('guide.md', `# Guide\n\n${'word '.repeat(250)}\n`);
-
-  const result = ctx.run('guide.md');
-
-  expect(result.status).toBe(0);
-  expect(result.stdout).toInclude('guide.md:3:250 words');
-  expect(result.stdout).not.toInclude('Paragraphs over 250 words');
-});
-
-test('it passes a 150-word paragraph without a warning', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writeText('guide.md', `# Guide\n\n${'word '.repeat(150)}\n`);
-
-  const result = ctx.run('guide.md');
-
-  expect(result.status).toBe(0);
-  expect(result.stdout).not.toInclude('Paragraphs over');
-});
-
 test('it passes a 300-word fenced code block', async () => {
   const ctx = await setupTest();
 
@@ -162,32 +139,207 @@ test('it passes a long list, its wrapped lines and its later paragraphs', async 
   expect(result.stdout).not.toInclude('Paragraphs over');
 });
 
-test('it passes a long table, block quote and frontmatter', async () => {
+// Each row holds a document, the exit status, and the paragraphs over the warning limit that the
+// script reports for it, as CommonMark parses the document's blocks.
+test.each<[string, string, number, string[]]>([
+  ['a 250-word paragraph', `${'word '.repeat(250)}\n`, 0, ['guide.md:1:250 words']],
+  ['a 150-word paragraph', `${'word '.repeat(150)}\n`, 0, []],
+  [
+    'a long table, block quote and frontmatter',
+    `---\ndescription: ${'word '.repeat(300)}\n---\n\n| Name |\n| ---- |\n| ${'word '.repeat(300)}|\n\n${'> word word word word word word word word word word\n'.repeat(30)}`,
+    0,
+    [],
+  ],
+  ['a block quote with a lazy line', `> A quote.\n${'word '.repeat(300)}\n`, 0, []],
+  [
+    'prose up to a list that interrupts it',
+    `${'word '.repeat(200)}\n- ${'word '.repeat(200)}\n`,
+    0,
+    ['guide.md:1:200 words'],
+  ],
+  [
+    'a table without outer pipes',
+    `Name | Description\n--- | ---\n${'word '.repeat(150)}| ${'word '.repeat(150)}\n`,
+    0,
+    [],
+  ],
+  [
+    'prose above a table header',
+    `${'word '.repeat(200)}\nName | Description\n--- | ---\n${'word '.repeat(150)}| ${'word '.repeat(150)}\n`,
+    0,
+    ['guide.md:1:200 words'],
+  ],
+  [
+    'an HTML comment and an upper-case pre block across blank lines',
+    `<!--\n\n${'word '.repeat(300)}\n\n-->\n\n<PRE>\n\n${'word '.repeat(300)}\n\n</PRE>\n\n${'word '.repeat(200)}\n`,
+    0,
+    ['guide.md:13:200 words'],
+  ],
+  [
+    'an HTML comment right after a list item',
+    `- An item.\n<!--\n\n${'word '.repeat(300)}\n\n-->\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:7:251 words'],
+  ],
+  [
+    'an HTML comment right after indented code',
+    `Intro.\n\n    const answer = 42;\n<!--\n\n${'word '.repeat(300)}\n\n-->\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:9:251 words'],
+  ],
+  [
+    'an HTML comment marker in indented code',
+    `    <!--\n\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:3:251 words'],
+  ],
+  [
+    'paragraphs right after an HTML comment closes',
+    `<!--\nA note for editors.\n-->\n${'word '.repeat(251)}\n\n<!-- A one-line note. -->\n${'word '.repeat(252)}\n`,
+    1,
+    ['guide.md:4:251 words', 'guide.md:7:252 words'],
+  ],
+  ['an empty HTML comment', `<!-->\n${'word '.repeat(251)}\n`, 1, ['guide.md:2:251 words']],
+  [
+    'a processing instruction',
+    `<?php\n\n${'word '.repeat(300)}\n\n?>\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:6:251 words'],
+  ],
+  [
+    'a declaration',
+    `<!DOCTYPE\n\n${'word '.repeat(300)}\n\n>\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:6:251 words'],
+  ],
+  [
+    'a CDATA section',
+    `<![CDATA[\n\n${'word '.repeat(300)}\n\n]]>\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:6:251 words'],
+  ],
+  [
+    'a script block with attributes',
+    `<script type="text/x">\n\n${'word '.repeat(300)}\n\n</script>\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:6:251 words'],
+  ],
+  [
+    'a tag whose name only starts with pre',
+    `<preview>Text</preview>\n\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:3:251 words'],
+  ],
+  [
+    'a block tag that a blank line ends',
+    `<div>\n${'word '.repeat(300)}\n\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:4:251 words'],
+  ],
+  [
+    'a lone tag that a blank line ends',
+    `<span>\n${'word '.repeat(300)}\n\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:4:251 words'],
+  ],
+  [
+    'a lone tag inside a paragraph',
+    `${'word '.repeat(200)}\n<span>\n${'word '.repeat(100)}\n`,
+    1,
+    ['guide.md:1:301 words'],
+  ],
+  [
+    'paragraphs that start with an inline tag or an autolink',
+    `<https://example.com> ${'word '.repeat(250)}\n\n<em>Read this</em> ${'word '.repeat(249)}\n`,
+    1,
+    ['guide.md:1:251 words', 'guide.md:3:251 words'],
+  ],
+  [
+    'a paragraph right after a link definition',
+    `[ref]: https://example.com\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:2:251 words'],
+  ],
+  [
+    'a link definition with its title on the next line',
+    `[ref]: https://example.com\n"The title"\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:3:251 words'],
+  ],
+  [
+    'a bracketed label that is not a link definition',
+    `[Note]: ${'word '.repeat(250)}\n`,
+    1,
+    ['guide.md:1:251 words'],
+  ],
+  [
+    'a paragraph right after a heading',
+    `# Guide\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:2:251 words'],
+  ],
+  ['a line of seven hashes', `####### ${'word '.repeat(250)}\n`, 1, ['guide.md:1:251 words']],
+  [
+    'a long Setext heading',
+    `${'word word word word word word word word word word\n'.repeat(26)}===\n\n${'word word word word word word word word word word\n'.repeat(26)}------\n`,
+    0,
+    [],
+  ],
+  [
+    'a thematic break between paragraphs',
+    `${'word '.repeat(200)}\n***\n${'word '.repeat(200)}\n`,
+    0,
+    ['guide.md:1:200 words', 'guide.md:3:200 words'],
+  ],
+  [
+    'a wrapped line that starts with a number other than 1',
+    `${'word '.repeat(200)}\n2024. ${'word '.repeat(100)}\n`,
+    1,
+    ['guide.md:1:301 words'],
+  ],
+  [
+    'an indented line inside a paragraph',
+    `${'word '.repeat(200)}\n    ${'word '.repeat(100)}\n`,
+    1,
+    ['guide.md:1:300 words'],
+  ],
+  [
+    'a paragraph indented by three spaces',
+    `   ${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:1:251 words'],
+  ],
+  ['a lazy line of a list item', `- ${'word '.repeat(100)}\n${'word '.repeat(200)}\n`, 0, []],
+  [
+    'a paragraph after a list and a blank line',
+    `- An item.\n\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:3:251 words'],
+  ],
+  [
+    'a nested list with a deeper paragraph',
+    `- One.\n  - Two.\n\n    ${'word '.repeat(300)}\n`,
+    0,
+    [],
+  ],
+  [
+    'a paragraph after a fence left open in a list item',
+    `- An item.\n  \`\`\`text\n  code\n${'word '.repeat(251)}\n`,
+    1,
+    ['guide.md:4:251 words'],
+  ],
+])('it reports the long paragraphs in %s', async (_label, text, status, reported) => {
   const ctx = await setupTest();
 
-  const row = `| ${'word '.repeat(300)}|`;
-  const quote = '> word word word word word word word word word word\n'.repeat(30);
+  await ctx.writeText('guide.md', text);
 
-  await ctx.writeText(
-    'guide.md',
-    `---\ndescription: ${'word '.repeat(300)}\n---\n\n| Name |\n| ---- |\n${row}\n\n${quote}`,
+  const result = ctx.run('guide.md');
+
+  expect(result.status).toBe(status);
+
+  expect(result.stdout.split('\n').filter((line) => line.startsWith('guide.md:'))).toStrictEqual(
+    reported,
   );
-
-  const result = ctx.run('guide.md');
-
-  expect(result.status).toBe(0);
-  expect(result.stdout).not.toInclude('Paragraphs over');
-});
-
-test('it counts prose up to a list that interrupts it', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writeText('guide.md', `${'word '.repeat(200)}\n- ${'word '.repeat(200)}\n`);
-
-  const result = ctx.run('guide.md');
-
-  expect(result.status).toBe(0);
-  expect(result.stdout).toInclude('guide.md:1:200 words');
 });
 
 test('it keeps a separate paragraph count for each changed file', async () => {
@@ -200,6 +352,18 @@ test('it keeps a separate paragraph count for each changed file', async () => {
 
   expect(result.status).toBe(0);
   expect(result.stdout).not.toInclude('Paragraphs over');
+});
+
+test('it ends a list and an open HTML comment at the end of their file', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('first.md', '- An item.\n<!--\n');
+  await ctx.writeText('second.md', `${'word '.repeat(251)}\n`);
+
+  const result = ctx.run('first.md', 'second.md');
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('second.md:1:251 words');
 });
 
 test('it skips a file the branch leaves unchanged since its base on origin', async () => {
@@ -278,131 +442,6 @@ test('it fetches the base branch in a pull-request run with no origin history', 
   expect(result.stdout).toInclude('new.md:1:260 words');
   expect(result.stdout).not.toInclude('old.md');
   expect(result.stderr).not.toInclude('no merge base');
-});
-
-test('it passes a long table without outer pipes', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writeText(
-    'guide.md',
-    `Name | Description\n--- | ---\n${'word '.repeat(150)}| ${'word '.repeat(150)}\n`,
-  );
-
-  const result = ctx.run('guide.md');
-
-  expect(result.status).toBe(0);
-  expect(result.stdout).not.toInclude('Paragraphs over');
-});
-
-test('it skips HTML comments and upper-case pre blocks across blank lines and counts the prose after them', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writeText(
-    'guide.md',
-    `<!--\n\n${'word '.repeat(300)}\n\n-->\n\n<PRE>\n\n${'word '.repeat(300)}\n\n</PRE>\n\n${'word '.repeat(200)}\n`,
-  );
-
-  const result = ctx.run('guide.md');
-
-  expect(result.status).toBe(0);
-  expect(result.stdout).not.toInclude('guide.md:3:');
-  expect(result.stdout).not.toInclude('guide.md:9:');
-  expect(result.stdout).toInclude('guide.md:13:200 words');
-});
-
-test('it skips an HTML comment that follows a list item with no blank line', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writeText(
-    'guide.md',
-    `- An item.\n<!--\n\n${'word '.repeat(300)}\n\n-->\n${'word '.repeat(251)}\n`,
-  );
-
-  const result = ctx.run('guide.md');
-
-  expect(result.status).toBe(1);
-  expect(result.stdout).not.toInclude('guide.md:4:');
-  expect(result.stdout).toInclude('guide.md:7:251 words');
-});
-
-test('it skips an HTML comment that follows an indented code block with no blank line', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writeText(
-    'guide.md',
-    `Intro.\n\n    const answer = 42;\n<!--\n\n${'word '.repeat(300)}\n\n-->\n${'word '.repeat(251)}\n`,
-  );
-
-  const result = ctx.run('guide.md');
-
-  expect(result.status).toBe(1);
-  expect(result.stdout).not.toInclude('guide.md:6:');
-  expect(result.stdout).toInclude('guide.md:9:251 words');
-});
-
-test('it counts the prose after a tag whose name only starts with pre', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writeText('guide.md', `<preview>Text</preview>\n\n${'word '.repeat(251)}\n`);
-
-  const result = ctx.run('guide.md');
-
-  expect(result.status).toBe(1);
-  expect(result.stdout).toInclude('guide.md:3:251 words');
-});
-
-test('it warns on a paragraph that starts with an inline tag or an autolink', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writeText(
-    'guide.md',
-    `<https://example.com> ${'word '.repeat(250)}\n\n<em>Read this</em> ${'word '.repeat(249)}\n`,
-  );
-
-  const result = ctx.run('guide.md');
-
-  expect(result.status).toBe(1);
-  expect(result.stdout).toInclude('guide.md:1:251 words');
-  expect(result.stdout).toInclude('guide.md:3:251 words');
-});
-
-test('it counts a paragraph that follows a heading with no blank line', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writeText('guide.md', `# Guide\n${'word '.repeat(251)}\n`);
-
-  const result = ctx.run('guide.md');
-
-  expect(result.status).toBe(1);
-  expect(result.stdout).toInclude('guide.md:2:251 words');
-});
-
-test('it skips a long Setext heading', async () => {
-  const ctx = await setupTest();
-
-  const lines = 'word word word word word word word word word word\n'.repeat(26);
-
-  await ctx.writeText('guide.md', `${lines}===\n\n${lines}------\n`);
-
-  const result = ctx.run('guide.md');
-
-  expect(result.status).toBe(0);
-  expect(result.stdout).not.toInclude('Paragraphs over');
-});
-
-test('it counts a paragraph that starts on the line after an HTML comment closes', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writeText(
-    'guide.md',
-    `<!--\nA note for editors.\n-->\n${'word '.repeat(251)}\n\n<!-- A one-line note. -->\n${'word '.repeat(252)}\n`,
-  );
-
-  const result = ctx.run('guide.md');
-
-  expect(result.status).toBe(1);
-  expect(result.stdout).toInclude('guide.md:4:251 words');
-  expect(result.stdout).toInclude('guide.md:7:252 words');
 });
 
 test('it counts only the PR documents in a shallow pull-request merge checkout', async () => {
