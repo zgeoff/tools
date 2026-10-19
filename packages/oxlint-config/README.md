@@ -94,10 +94,10 @@ rule reports it beside only `<name>.ts`.
 A `<name>.test.ts` or `<name>.test.tsx` file declares one function, `setupTest()`, and nothing else,
 as the testing skill requires. At module level the rule allows imports, `type` and `interface`
 declarations, one `setupTest` function declaration, and statements that call `test`, `test.each`,
-`test.skipIf` or `test.if`. It reports every other statement: a `let`, a `var`, a class, an enum, a
-second function, an export, and a call such as `beforeEach(...)`. The message holds the three ways
-out of a helper: inline it, swap it for a registered matcher, or move it to the shared test utils
-with tests of its own.
+`test.skipIf` or `test.if`, or a chain of them. It reports every other statement: a `let`, a `var`,
+a class, an enum, a second function, an export, and a call such as `beforeEach(...)`. The message
+holds the three ways out of a helper: inline it, swap it for a registered matcher, or move it to the
+shared test utils with tests of its own.
 
 A module-level `const` passes only as a skip gate: a `const` whose every read sits inside a
 `skipIf(...)` argument or inside the initializer of another gate. A gate derived from an awaited
