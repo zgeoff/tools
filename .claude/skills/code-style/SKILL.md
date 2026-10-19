@@ -42,8 +42,9 @@ own rules, and it only adds to this skill: a stricter rule, never an exception.
   types, and side-effect-only modules, which are named for what they do (`augment-bun-test.ts`).
 - Module order: imports, the primary export, then private helpers in composition order (depth-first)
   — never helpers first. Supporting declarations (consts, interfaces, type aliases) sit directly
-  above their first use, never below it and never leading the file; types for the primary export's
-  signature may sit just above it.
+  above their first use, never below it and never leading the file. The exception: declarations the
+  primary export uses may sit just above it. `zgeoff/module-order` reports each break, and its fix
+  moves each declaration it can move safely.
 - Build objects with a factory function, never a class. The factory takes the verb its result needs:
   `build<X>` for a value, `create<X>` for a resource, and `make<X>` for a function. The one
   exception is a custom error, `class <X>Error extends Error`, since `instanceof` checks and stack

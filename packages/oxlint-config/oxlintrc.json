@@ -32,6 +32,7 @@
     "zgeoff/no-comment-rule-override": "error",
     "zgeoff/function-verb": "error",
     "zgeoff/verb-contract": "error",
+    "zgeoff/module-order": "error",
     "zgeoff/test-beside-module": "error",
     "zgeoff/no-file-snapshot": "error",
     "zgeoff/setup-test-only": "error",
