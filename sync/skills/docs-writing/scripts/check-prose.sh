@@ -174,9 +174,9 @@ list_changed() {
   git ls-files -z --others --exclude-standard
 }
 
-# Prints file:line:words for each prose paragraph over the warning limit. The parser is one state
-# machine over the CommonMark block rules (with GFM tables), so it counts what a renderer shows as a
-# paragraph:
+# Prints file:line:words for each prose paragraph over the warning limit. The parser follows the
+# CommonMark leaf block rules (with GFM tables) outside lists and block quotes, and fails open
+# inside them: it never counts text that a renderer would not show as a top-level paragraph.
 #
 # - A paragraph runs until a blank line or a line that interrupts it: an ATX heading, a fence, an
 #   HTML block of types 1 to 6, a block quote, a thematic break, a bullet item with content, or an
@@ -186,24 +186,23 @@ list_changed() {
 # - A line of = or - under a paragraph makes it a Setext heading. A delimiter row with as many cells
 #   as the paragraph's last line makes that line a table header. Neither counts, but the paragraph
 #   lines above a header do.
-# - Indented code (4 columns or more where no paragraph is open), fenced code, block quotes, tables,
-#   HTML blocks, frontmatter and ATX headings never count. A quote takes a lazy line only while a
-#   paragraph is open inside it.
-# - HTML blocks of types 1 to 5 run to their closing marker across blank lines. Types 6 and 7 run to
-#   a blank line, and type 7 (one complete tag alone on its line) cannot interrupt a paragraph.
-# - Nothing inside a list counts. A list runs while each line is blank, indented to the content of
-#   its outermost item, a new item, or a lazy continuation of a paragraph. A fence or an HTML block
-#   opened in a list ends with it, and an empty item followed by a blank line ends it.
+# - Indented code (4 columns or more where no paragraph is open), fenced code, tables, HTML blocks,
+#   frontmatter and ATX headings never count. HTML blocks of types 1 to 5 run to their closing
+#   marker across blank lines; types 6 and 7 run to a blank line, and type 7 (one complete tag alone
+#   on its line) cannot interrupt a paragraph.
+# - A list or a block quote never counts, and neither does any line after it until a blank line is
+#   followed by a line at column 0 that starts no list item or quote. CommonMark ends both
+#   containers there at the latest. Text that it moves out of a container sooner, such as a lazy
+#   line after a quoted heading, is not counted. A fence or an HTML block opened inside a container
+#   is followed to its closing marker.
 paragraph_awk='
 BEGIN {
   q = sprintf("%c", 39)
   esc = "\\\\."
-  label = "\\[[ \t\n]*([^][\\\\ \t\n]|" esc ")([^][\\\\]|" esc ")*\\]:"
-  destination = "(<([^<>\n\\\\]|" esc ")*>|[^ \t\n<][^ \t\n]*)"
+  label = "^\\[[ \t\n]*([^][\\\\ \t\n]|" esc ")([^][\\\\]|" esc ")*\\]:"
+  angle_destination = "^<([^<>\n\\\\]|" esc ")*>"
   title = "(\"([^\"\\\\]|" esc ")*\"|" q "([^" q "\\\\]|" esc ")*" q "|\\(([^()\\\\]|" esc ")*\\))"
-  definition = "^" label "[ \t]*\n?[ \t]*" destination
-  titled_definition = definition "([ \t]+|[ \t]*\n[ \t]*)" title "[ \t]*(\n|$)"
-  bare_definition = definition "[ \t]*(\n|$)"
+  titled_end = "^([ \t]+|[ \t]*\n[ \t]*)" title "[ \t]*(\n|$)"
   value = "([^ \t\"" q "=<>`]+|" q "[^" q "]*" q "|\"[^\"]*\")"
   attribute = "[ \t]+[A-Za-z_:][A-Za-z0-9_.:-]*([ \t]*=[ \t]*" value ")?"
   open_tag = "^<[A-Za-z][A-Za-z0-9-]*(" attribute ")*[ \t]*/?>[ \t]*$"
@@ -231,6 +230,9 @@ function is_setext_underline(s) {
 # A bullet, or an ordered marker of 1 to 9 digits, followed by a space, a tab or the line end.
 function is_item(s) {
   return s ~ /^[-*+]([ \t]|$)/ || (match(s, /^[0-9]+[.)]([ \t]|$)/) && match(s, /^[0-9]+/) && RLENGTH <= 9)
+}
+function starts_container(s) {
+  return s ~ /^>/ || (is_item(s) && !is_thematic(s))
 }
 # Returns the fence marker this line opens, or "" when it opens none. A backtick fence takes no
 # backtick in its info string.
@@ -275,25 +277,60 @@ function html_marker(text, marker) {
 function is_lone_tag(s) {
   return (s ~ open_tag || s ~ closing_tag) && tolower(s) !~ /^<\/?(script|pre|style|textarea)[^a-z0-9-]/
 }
-function interrupts(s, rel) {
-  return rel < 4 && (fence_open(s) != "" || is_atx(s) || is_thematic(s) || s ~ /^>/ ||
+function interrupts(s, ind) {
+  return ind < 4 && (fence_open(s) != "" || is_atx(s) || is_thematic(s) || s ~ /^>/ ||
     html_start(s) != "" || s ~ /^[-*+][ \t]+[^ \t]/ || s ~ /^1[.)][ \t]+[^ \t]/)
 }
+# Returns the length of a bare link destination at the start of s, or 0 when there is none. As in
+# the CommonMark reference parser, it ends at a space, a control character or an unmatched ), and
+# an unclosed ( or an escape-free < at its start makes it invalid.
+function bare_destination_length(s, i, c, depth) {
+  if (substr(s, 1, 1) == "<") return 0
+  depth = 0
+  for (i = 1; i <= length(s); i++) {
+    c = substr(s, i, 1)
+    if (c == "\\" && substr(s, i + 1, 1) ~ /[!-\/:-@[-`{-~]/) i++
+    else if (c ~ /[[:space:][:cntrl:]]/) break
+    else if (c == "(") depth++
+    else if (c == ")") {
+      if (depth == 0) break
+      depth--
+    }
+  }
+  return (depth == 0) ? i - 1 : 0
+}
+# Returns the length of the link reference definition at the start of text, through its line end,
+# or 0 when text starts with none.
+function definition_length(text, n, rest, d) {
+  if (!match(text, label)) return 0
+  n = RLENGTH
+  rest = substr(text, n + 1)
+  match(rest, /^[ \t]*\n?[ \t]*/)
+  n += RLENGTH
+  rest = substr(rest, RLENGTH + 1)
+  if (match(rest, angle_destination)) d = RLENGTH
+  else d = bare_destination_length(rest)
+  if (d == 0) return 0
+  n += d
+  rest = substr(rest, d + 1)
+  if (match(rest, titled_end) || match(rest, /^[ \t]*(\n|$)/)) return n + RLENGTH
+  return 0
+}
 # Returns the index of the first paragraph line that no link reference definition holds.
-function first_text_line(text, i, k, matched, newlines) {
+function first_text_line(text, i, k, n, matched, newlines) {
   text = lines[1]
   for (i = 2; i <= line_count; i++) text = text "\n" lines[i]
   k = 0
-  while (text != "" && (match(text, titled_definition) || match(text, bare_definition))) {
-    matched = substr(text, 1, RLENGTH)
+  while (text != "" && (n = definition_length(text)) > 0) {
+    matched = substr(text, 1, n)
     newlines = gsub(/\n/, "\n", matched)
-    k += (substr(matched, length(matched)) == "\n") ? newlines : newlines + 1
-    text = substr(text, RLENGTH + 1)
+    k += (substr(matched, n) == "\n") ? newlines : newlines + 1
+    text = substr(text, n + 1)
   }
   return k + 1
 }
 function flush(i, first, words, parts) {
-  if (block == "para" && counted) {
+  if (block == "para") {
     first = first_text_line()
     words = 0
     for (i = first; i <= line_count; i++) words += split(lines[i], parts)
@@ -306,68 +343,28 @@ function add_line(s) {
   lines[++line_count] = s
   line_numbers[line_count] = FNR
 }
-# Reads one line of a block quote, given without its > markers, and records whether a paragraph,
-# a fence or an HTML block is open inside the quote.
-function read_quote(c, ind, t, h) {
-  ind = indent_of(c)
-  t = c
-  sub(/^[ \t]+/, "", t)
-  if (quote_fence != "") {
-    if (ind < 4 && fence_closes(quote_fence, t)) quote_fence = ""
+# Follows a fence or a raw HTML block that opens inside a list or a quote, given the line without
+# its quote markers and indent.
+function read_container(c, h) {
+  if (fence_open(c) != "") {
+    open = fence_open(c)
     return
   }
-  if (quote_html != "") {
-    if (tolower(c) ~ quote_html) quote_html = ""
-    return
-  }
-  if (t == "") {
-    quote_para = 0
-    quote_block = 0
-    return
-  }
-  if (quote_block) return
-  if (quote_para) {
-    if (ind < 4 && is_setext_underline(t)) {
-      quote_para = 0
-      return
-    }
-    if (!interrupts(t, ind)) return
-    quote_para = 0
-  }
-  if (ind >= 4) return
-  if (fence_open(t) != "") {
-    quote_fence = fence_open(t)
-    return
-  }
-  h = html_start(t)
-  if (h == "closed") return
-  if (h == "block" || (h == "" && is_lone_tag(t))) {
-    quote_block = 1
-    return
-  }
-  if (h != "") {
-    quote_html = h
-    return
-  }
-  if (is_atx(t) || is_thematic(t)) return
-  if (is_item(t)) {
-    sub(/^([-*+]|[0-9]+[.)])[ \t]*/, "", t)
-    quote_para = (t != "")
-    return
-  }
-  quote_para = 1
+  h = html_start(c)
+  if (h != "" && h != "closed" && h != "block") html_end = h
 }
-function strip_quote_markers(s) {
+function strip_container(s) {
   while (s ~ /^[ \t]*>/) {
     sub(/^[ \t]*>/, "", s)
-    sub(/^ /, "", s)
+    sub(/^[ \t]+/, "", s)
   }
+  if (is_item(s) && !is_thematic(s)) sub(/^([-*+]|[0-9]+[.)])[ \t]*/, "", s)
   return s
 }
-# Starts the block that a line opens. s is the line without its indent, rel its indent in columns
-# past the enclosing list item, and ind the column where s starts.
-function start_block(s, rel, ind, m, h, mlen, rest, content, gap, off) {
-  if (rel >= 4) {
+# Starts the block that a line opens. s is the line without its indent and ind its indent in
+# columns.
+function start_block(s, ind, m, h) {
+  if (ind >= 4) {
     block = "code"
     return
   }
@@ -387,37 +384,18 @@ function start_block(s, rel, ind, m, h, mlen, rest, content, gap, off) {
     return
   }
   if (is_atx(s) || is_thematic(s)) return
-  if (s ~ /^>/) {
-    block = "quote"
-    quote_para = quote_block = 0
-    quote_fence = quote_html = ""
-    read_quote(strip_quote_markers(s))
-    return
-  }
-  if (is_item(s)) {
-    match(s, /^([-*+]|[0-9]+[.)])/)
-    mlen = RLENGTH
-    rest = substr(s, mlen + 1)
-    content = rest
-    sub(/^[ \t]+/, "", content)
-    gap = length(rest) - length(content)
-    off = ind + mlen + ((content == "" || gap >= 5) ? 1 : gap)
-    if (!in_list || ind < list_off) {
-      list_off = off
-      empty_item = (content == "")
-    }
-    in_list = 1
-    if (content != "") start_block(content, gap >= 5 ? gap - 1 : 0, off)
+  if (starts_container(s)) {
+    block = "container"
+    after_blank = 0
+    read_container(strip_container(s))
     return
   }
   block = "para"
-  counted = !in_list
   start_file = FILENAME
   add_line(s)
 }
 FNR == 1 {
   flush()
-  in_list = 0
   html_end = ""
   front = ($0 == "---")
   if (front) next
@@ -431,34 +409,27 @@ front {
   s = $0
   sub(/^[ \t]+/, "", s)
   blank = (s == "")
-  # An empty item followed by a blank line holds nothing more, so the list ends there.
-  if (in_list && blank && empty_item && open == "" && html_end == "") in_list = 0
-  if (in_list && !blank) empty_item = 0
-  # A line left of the list content ends the list, unless it starts a new item or lazily continues
-  # a paragraph. A fence or an HTML block opened in the list ends with it.
-  if (in_list && !blank && ind < list_off) {
-    if (open != "" || html_end != "") {
-      open = ""
-      html_end = ""
-      block = ""
-    }
-    if (ind < 4 && is_item(s) && !is_thematic(s)) {
-      flush()
-    } else if ((block == "para" || (block == "quote" && quote_para)) && !interrupts(s, ind)) {
-      next
-    } else {
-      flush()
-      in_list = 0
-    }
-  }
-  rel = (in_list && ind >= list_off) ? ind - list_off : ind
+  # Inside a list or a quote, a fence or an HTML block is followed by its content without markers.
+  c = (block == "container") ? strip_container(s) : s
   if (open != "") {
-    if (rel < 4 && fence_closes(open, s)) open = ""
+    if ((block == "container" || ind < 4) && fence_closes(open, c)) open = ""
     next
   }
   if (html_end != "") {
     if (tolower($0) ~ html_end) html_end = ""
     next
+  }
+  if (block == "container") {
+    if (blank) {
+      after_blank = 1
+      next
+    }
+    if (!after_blank || ind > 0 || starts_container(s)) {
+      after_blank = 0
+      read_container(c)
+      next
+    }
+    block = ""
   }
   if (blank) {
     flush()
@@ -466,41 +437,33 @@ front {
   }
   if (block == "html") next
   if (block == "code") {
-    if (rel >= 4) next
+    if (ind >= 4) next
     block = ""
   }
   if (block == "para") {
-    if (rel < 4 && is_setext_underline(s)) {
+    if (ind < 4 && is_setext_underline(s)) {
       # A paragraph of link definitions alone has no text to underline, so the line is text.
       if (first_text_line() <= line_count) block = ""
       else add_line(s)
       next
     }
-    if (rel < 4 && is_table_delimiter(s) && cell_count(s) == cell_count(lines[line_count])) {
+    if (ind < 4 && is_table_delimiter(s) && cell_count(s) == cell_count(lines[line_count])) {
       line_count--
       flush()
       block = "table"
       next
     }
-    if (!interrupts(s, rel)) {
+    if (!interrupts(s, ind)) {
       add_line(s)
       next
     }
     flush()
   }
-  if (block == "quote") {
-    if (rel < 4 && s ~ /^>/) {
-      read_quote(strip_quote_markers(s))
-      next
-    }
-    if (quote_para && quote_fence == "" && quote_html == "" && !interrupts(s, rel)) next
-    block = ""
-  }
   if (block == "table") {
-    if (!interrupts(s, rel)) next
+    if (!interrupts(s, ind)) next
     block = ""
   }
-  start_block(s, rel, ind)
+  start_block(s, ind)
 }
 END { flush() }
 '

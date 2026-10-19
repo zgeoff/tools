@@ -139,9 +139,9 @@ test('it passes a long list, its wrapped lines and its later paragraphs', async 
   expect(result.stdout).not.toInclude('Paragraphs over');
 });
 
-// Each row holds a document, the exit status, and the paragraphs over the warning limit that the
-// script reports for it, as CommonMark parses the document's blocks. The rows after the general
-// cases follow the spec sections, one row for each block rule and its edge.
+// Each row holds a document, its exit status and the long paragraphs reported. Later rows follow
+// the spec sections, one per block rule and edge. Lists and quotes fail open: no text after one
+// counts until a blank line and a column-0 line.
 test.each<[string, string, number, string[]]>([
   ['a 250-word paragraph', `${'word '.repeat(250)}\n`, 0, ['guide.md:1:250 words']],
   ['a 150-word paragraph', `${'word '.repeat(150)}\n`, 0, []],
@@ -179,8 +179,8 @@ test.each<[string, string, number, string[]]>([
   [
     'an HTML comment right after a list item',
     `- An item.\n<!--\n\n${'word '.repeat(300)}\n\n-->\n${'word '.repeat(251)}\n`,
-    1,
-    ['guide.md:7:251 words'],
+    0,
+    [],
   ],
   [
     'an HTML comment right after indented code',
@@ -326,8 +326,8 @@ test.each<[string, string, number, string[]]>([
   [
     'a paragraph after a fence left open in a list item',
     `- An item.\n  \`\`\`text\n  code\n${'word '.repeat(251)}\n`,
-    1,
-    ['guide.md:4:251 words'],
+    0,
+    [],
   ],
 
   // CommonMark 4.1, thematic breaks.
@@ -501,6 +501,24 @@ test.each<[string, string, number, string[]]>([
     [],
   ],
   [
+    'a bare destination with an unclosed parenthesis',
+    `[ref]: /guide( '${'word '.repeat(251)}'\n`,
+    1,
+    ['guide.md:1:254 words'],
+  ],
+  [
+    'a bare destination with balanced parentheses',
+    `[ref]: /guide(a) '${'word '.repeat(251)}'\n`,
+    0,
+    [],
+  ],
+  [
+    'a bare destination with an escaped parenthesis',
+    `[ref]: /guide\\( '${'word '.repeat(251)}'\n`,
+    0,
+    [],
+  ],
+  [
     'a single-quoted title on the next line',
     `[ref]: /guide\n'The title'\n${'word '.repeat(251)}\n`,
     1,
@@ -590,29 +608,26 @@ test.each<[string, string, number, string[]]>([
   ['an escaped pipe in a table header', `a \\| b | c\n--- | ---\n${'word '.repeat(300)}\n`, 0, []],
 
   // CommonMark 5.1, block quotes.
-  [
-    'an unmarked line after a quoted heading',
-    `> # Heading\n${'word '.repeat(251)}\n`,
-    1,
-    ['guide.md:2:251 words'],
-  ],
+  ['an unmarked line after a quoted heading', `> # Heading\n${'word '.repeat(251)}\n`, 0, []],
   [
     'an unmarked line after quoted fenced code',
     `> \`\`\`\n> code\n${'word '.repeat(251)}\n`,
-    1,
-    ['guide.md:3:251 words'],
+    0,
+    [],
+  ],
+  ['an unmarked line after quoted indented code', `>     code\n${'word '.repeat(251)}\n`, 0, []],
+  ['a thematic break right after a quote', `> A quote.\n***\n${'word '.repeat(251)}\n`, 0, []],
+  [
+    'an unmarked line after a heading in a quoted list item',
+    `> - # Heading\n${'word '.repeat(251)}\n`,
+    0,
+    [],
   ],
   [
-    'an unmarked line after quoted indented code',
-    `>     code\n${'word '.repeat(251)}\n`,
+    'a column-0 paragraph after a quote, a blank line and a quoted line',
+    `> A quote.\n\n> More.\n\n${'word '.repeat(251)}\n`,
     1,
-    ['guide.md:2:251 words'],
-  ],
-  [
-    'a thematic break after a quote',
-    `> A quote.\n---\n${'word '.repeat(251)}\n`,
-    1,
-    ['guide.md:3:251 words'],
+    ['guide.md:5:251 words'],
   ],
   [
     'a blank line after a quote',
@@ -651,14 +666,27 @@ test.each<[string, string, number, string[]]>([
   [
     'an item whose content starts as indented code',
     `-     <!--\n\n${'word '.repeat(251)}\n`,
-    1,
-    ['guide.md:3:251 words'],
+    0,
+    [],
+  ],
+  ['an empty item followed by a blank line', `-\n\n  ${'word '.repeat(251)}\n`, 0, []],
+  [
+    'a paragraph indented less than a tab-padded item',
+    `-\tAn item.\n\n  ${'word '.repeat(251)}\n`,
+    0,
+    [],
   ],
   [
-    'an empty item followed by a blank line',
-    `-\n\n  ${'word '.repeat(251)}\n`,
+    'an indented paragraph after a list and a blank line',
+    `1. An item.\n\n  ${'word '.repeat(251)}\n`,
+    0,
+    [],
+  ],
+  [
+    'a column-0 paragraph after a list, a blank line and an indented line',
+    `- An item.\n\n  More.\n\n${'word '.repeat(251)}\n`,
     1,
-    ['guide.md:3:251 words'],
+    ['guide.md:5:251 words'],
   ],
   ['an item whose content starts on the next line', `-\n  ${'word '.repeat(300)}\n`, 0, []],
   ['an item marker indented four columns', `    - ${'word '.repeat(300)}\n`, 0, []],
