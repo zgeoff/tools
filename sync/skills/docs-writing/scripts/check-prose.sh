@@ -29,8 +29,16 @@ grep_docs() {
   git grep --untracked -I "$@"
 }
 
+# Prints the Markdown files the paths name, under the directory in $markdown_dir when it is set.
+# Each path ends in a NUL, so it may hold any character, and starts with ./, so awk never reads a
+# name that holds = as an assignment or one that starts with - as an option.
 list_markdown() {
-  git -c core.quotePath=false ls-files --cached --others --exclude-standard -- "$@" | grep '\.md$'
+  local file
+  while IFS= read -r -d '' file; do
+    if [[ $file == *.md && $file == "${markdown_dir:-}"* && -f $file ]]; then
+      printf './%s\0' "$file"
+    fi
+  done < <(git ls-files -z --cached --others --exclude-standard -- "$@")
 }
 
 # Tracks fenced code blocks (backtick or tilde, any indent, closed by the same marker at least as
@@ -49,6 +57,10 @@ function fence_rest(line, m) {
 }
 function closes(m, rest) {
   return substr(m, 1, 1) == substr(open, 1, 1) && length(m) >= length(open) && rest ~ /^[ \t]*$/
+}
+# Returns the file name without the ./ that list_markdown puts before it.
+function file_name() {
+  return substr(FILENAME, 3)
 }
 FNR == 1 { open = "" }
 '
@@ -96,7 +108,7 @@ report '"Should succeed" in a procedure — state the expected outcome instead:'
 report 'Number joined to its unit ("64KB"; write "64 KB"; code blocks are exempt):' \
   "$(
     grep_docs -nP '\b[0-9]+(KB|MB|GB|TB|KiB|MiB|GiB|ms)\b' -- "$@" ':(exclude)*.md'
-    list_markdown "$@" | xargs -r awk "$fence_awk"'
+    list_markdown "$@" | xargs -0 -r awk "$fence_awk"'
     {
       m = fence_marker($0)
       if (m != "") {
@@ -105,7 +117,7 @@ report 'Number joined to its unit ("64KB"; write "64 KB"; code blocks are exempt
         else if (closes(m, rest)) open = ""
         next
       }
-      if (open == "" && $0 ~ /(^|[^[:alnum:]_])[0-9]+(KB|MB|GB|TB|KiB|MiB|GiB|ms)([^[:alnum:]_]|$)/) print FILENAME":"FNR":"$0
+      if (open == "" && $0 ~ /(^|[^[:alnum:]_])[0-9]+(KB|MB|GB|TB|KiB|MiB|GiB|ms)([^[:alnum:]_]|$)/) print file_name()":"FNR":"$0
     }'
   )"
 
@@ -113,7 +125,7 @@ report 'Number joined to its unit ("64KB"; write "64 KB"; code blocks are exempt
 # reader types may hold a value. A bare s, d or h joined to its number is no unit here ("1990s",
 # "2d"); its spaced form is.
 report 'Values with units under docs/architecture (the code owns its values; code blocks are exempt):' \
-  "$(list_markdown "$@" | grep '^docs/architecture/' | xargs -r awk "$fence_awk"'
+  "$(markdown_dir=docs/architecture/ list_markdown "$@" | xargs -0 -r awk "$fence_awk"'
     {
       m = fence_marker($0)
       if (m != "") {
@@ -127,22 +139,22 @@ report 'Values with units under docs/architecture (the code owns its values; cod
       gsub(/`[^`]*`/, "", text)
       if (text ~ /(^|[^[:alnum:]_.])[0-9]+(\.[0-9]+)? ?(ms|min|KB|MB|GB|TB|KiB|MiB|GiB)([^[:alnum:]_]|$)/ ||
         text ~ /(^|[^[:alnum:]_.])[0-9]+(\.[0-9]+)? (s|h|d)([^[:alnum:]_]|$)/ ||
-        text ~ /(^|[^[:alnum:]_.])[0-9]+[ -](second|minute|hour|day|week)s?([^[:alnum:]_]|$)/) print FILENAME":"FNR":"$0
+        text ~ /(^|[^[:alnum:]_.])[0-9]+[ -](second|minute|hour|day|week)s?([^[:alnum:]_]|$)/) print file_name()":"FNR":"$0
     }')"
 
 report 'Horizontal rules outside YAML frontmatter:' \
-  "$(list_markdown "$@" | xargs -r awk \
-    'FNR==1{fm=($0=="---")} fm&&FNR>1&&$0=="---"{fm=0;next} !fm&&$0=="---"{print FILENAME": "FNR}')"
+  "$(list_markdown "$@" | xargs -0 -r awk \
+    'FNR==1{fm=($0=="---")} fm&&FNR>1&&$0=="---"{fm=0;next} !fm&&$0=="---"{print substr(FILENAME, 3)": "FNR}')"
 
 report 'Untagged code fences:' \
-  "$(list_markdown "$@" | xargs -r awk "$fence_awk"'
+  "$(list_markdown "$@" | xargs -0 -r awk "$fence_awk"'
     {
       m = fence_marker($0)
       if (m == "") next
       rest = fence_rest($0, m)
       if (open == "") {
         open = m
-        if (rest ~ /^[ \t]*$/) print FILENAME": "FNR
+        if (rest ~ /^[ \t]*$/) print file_name()": "FNR
       } else if (closes(m, rest)) {
         open = ""
       }
@@ -509,7 +521,7 @@ front {
   if (depth > 0) has_child[depth] = 1
   leaf = "para"
   para_depth = depth
-  start_file = FILENAME
+  start_file = file_name()
   add_line(t)
 }
 END { flush() }
@@ -520,13 +532,13 @@ while IFS= read -r -d '' file; do
   changed+=$file$'\n'
 done < <(list_changed)
 
-# The Markdown files the paths name that the branch changes, read NUL-separated like list_changed.
+# The Markdown files the paths name that the branch changes, each as ./<path> from list_markdown.
 paragraph_files=()
 while IFS= read -r -d '' file; do
-  if [[ $file == *.md && $changed == *$'\n'"$file"$'\n'* && -f $file ]]; then
+  if [[ $changed == *$'\n'"${file#./}"$'\n'* ]]; then
     paragraph_files+=("$file")
   fi
-done < <(git ls-files -z --cached --others --exclude-standard -- "$@")
+done < <(list_markdown "$@")
 
 paragraphs=
 if [ "${#paragraph_files[@]}" -gt 0 ]; then

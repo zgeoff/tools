@@ -944,6 +944,43 @@ test('it checks a changed file whose name holds a space', async () => {
   expect(result.stdout).toInclude('user guide.md:1:251 words');
 });
 
+test('it checks a changed file whose name holds an equals sign', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('mode=fast.md', `${'word '.repeat(251)}\n`);
+
+  const result = ctx.run('mode=fast.md');
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('mode=fast.md:1:251 words');
+});
+
+test('it checks a changed file whose name starts with a dash', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('-guide.md', `${'word '.repeat(251)}\n`);
+
+  const result = ctx.run('-guide.md');
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('-guide.md:1:251 words');
+});
+
+test('it reports a unit joined to its number in files named with an equals sign, a dash or a space', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('mode=fast.md', 'The cache holds 64KB.\n');
+  await ctx.writeText('-guide.md', 'The cache holds 64KB.\n');
+  await ctx.writeText('user guide.md', 'The cache holds 64KB.\n');
+
+  const result = ctx.run('mode=fast.md', '-guide.md', 'user guide.md');
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('mode=fast.md:1:The cache holds 64KB.');
+  expect(result.stdout).toInclude('-guide.md:1:The cache holds 64KB.');
+  expect(result.stdout).toInclude('user guide.md:1:The cache holds 64KB.');
+});
+
 test('it reads the default branch from origin/HEAD', async () => {
   const ctx = await setupTest();
 
