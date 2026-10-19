@@ -272,24 +272,7 @@ never appear in a test file.
 - Each test file keeps its own `setupTest()`. A shared one gathers a flag for every suite that uses
   it.
 
-In this made-up counter-example, `setupTest()` inserts a user row and returns it, so it creates
-data:
-
-```ts
-async function setupTest() {
-  const db = await createTestDatabase();
-  const client = createNotesClient({ db });
-  const user = await db
-    .insertInto('users')
-    .values({ name: 'ada' })
-    .returningAll()
-    .executeTakeFirstOrThrow();
-
-  return { db, client, user };
-}
-```
-
-In the made-up example, `setupTest()` returns only the wiring and the test inserts the user in its
+In this made-up example, `setupTest()` returns only the wiring, and the test inserts the user in its
 arrange phase:
 
 ```ts
@@ -310,6 +293,23 @@ test('it lists the notes of a user with none as empty', async () => {
 
   expect(await ctx.client.listNotes({ userID: user.id })).toStrictEqual([]);
 });
+```
+
+In the made-up counter-example, `setupTest()` inserts the user row and returns it, so it creates
+data:
+
+```ts
+async function setupTest() {
+  const db = await createTestDatabase();
+  const client = createNotesClient({ db });
+  const user = await db
+    .insertInto('users')
+    .values({ name: 'ada' })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+
+  return { db, client, user };
+}
 ```
 
 Repeated arrange lines stay inline, or move to a tested shared util that the test calls with its
