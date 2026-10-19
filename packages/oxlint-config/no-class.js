@@ -1,8 +1,6 @@
 // a custom error stays a class, since `instanceof` checks and stack traces
 // need one: its superclass is `Error` or another name that ends in `Error`,
 // bare or as a member such as `errors.BrewError`
-const errorNamePattern = /Error$/u;
-
 const noClass = {
   meta: {
     type: 'problem',
@@ -24,7 +22,7 @@ const noClass = {
 };
 
 function isCustomError(node) {
-  return errorNamePattern.test(getSuperName(node.superClass));
+  return getSuperName(node.superClass).endsWith('Error');
 }
 
 function getSuperName(superClass) {
