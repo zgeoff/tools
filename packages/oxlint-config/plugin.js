@@ -2,6 +2,7 @@ import functionVerb from './function-verb.js';
 import importZones from './import-zones.js';
 import maxConsecutiveLineComments from './max-consecutive-line-comments.js';
 import noAbbreviatedNames from './no-abbreviated-names.js';
+import noClass from './no-class.js';
 import noCommentRuleOverride from './no-comment-rule-override.js';
 import noFileSnapshot from './no-file-snapshot.js';
 import noJSDoc from './no-jsdoc.js';
@@ -104,6 +105,7 @@ const plugin = {
       'Branch with match(...).exhaustive() from ts-pattern, never switch.',
       ['SwitchStatement'],
     ),
+    'no-class': noClass,
     'no-jsdoc': noJSDoc,
     'max-consecutive-line-comments': maxConsecutiveLineComments,
     'no-comment-rule-override': noCommentRuleOverride,
