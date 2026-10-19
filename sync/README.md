@@ -130,7 +130,7 @@ The preset sorts each update by its kind:
 | Patch                 | 7 days           | the weekly `patch updates` group             | on green checks |
 | Dev-tool minor        | 7 days           | the weekly `dev tools` group                 | on green checks |
 | Other minor           | 7 days           | one per package                              | on green checks |
-| Major                 | 7 days           | one per package                              | after review    |
+| Major                 | 7 days           | one per package, opened weekly               | after review    |
 | `@zgeoff/*` package   | none             | one per package, at any level                | on green checks |
 | `@impz/*` package     | none             | one per package, at any level                | on green checks |
 | zgeoff/tools sync tag | none             | one per tag                                  | on green checks |
