@@ -14,6 +14,7 @@
         "@zgeoff/format-codemod": "workspace:*",
         "@zgeoff/oxfmt-config": "workspace:*",
         "@zgeoff/oxlint-config": "workspace:*",
+        "@zgeoff/skill-gate": "workspace:*",
         "@zgeoff/tsconfig": "workspace:*",
         "lefthook": "catalog:",
         "oxfmt": "catalog:",
@@ -148,6 +149,15 @@
       "devDependencies": {
         "@types/bun": "catalog:",
         "ajv": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
+    "packages/skill-gate": {
+      "name": "@zgeoff/skill-gate",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "tiny-invariant": "catalog:",
         "typescript": "catalog:",
       },
     },
@@ -511,6 +521,8 @@
     "@zgeoff/oxlint-config": ["@zgeoff/oxlint-config@workspace:packages/oxlint-config"],
 
     "@zgeoff/release-manifest": ["@zgeoff/release-manifest@workspace:packages/release-manifest"],
+
+    "@zgeoff/skill-gate": ["@zgeoff/skill-gate@workspace:packages/skill-gate"],
 
     "@zgeoff/std": ["@zgeoff/std@workspace:packages/std"],
 

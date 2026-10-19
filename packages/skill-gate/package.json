@@ -1,0 +1,44 @@
+{
+  "name": "@zgeoff/skill-gate",
+  "version": "0.1.0",
+  "description": "A Claude Code PreToolUse hook that denies an edit until the session loads the skills the path needs, and warns on a Bash command that writes a gated path",
+  "keywords": [
+    "claude-code",
+    "hook",
+    "skills"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zgeoff/tools.git",
+    "directory": "packages/skill-gate"
+  },
+  "files": [
+    "src",
+    "!src/*.test.ts",
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepare": "bun run build",
+    "typecheck": "tsc"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "tiny-invariant": "catalog:",
+    "typescript": "catalog:"
+  },
+  "engines": {
+    "bun": ">=1.3"
+  }
+}

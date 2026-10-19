@@ -60,6 +60,7 @@
     "@zgeoff/format-codemod": "workspace:*",
     "@zgeoff/oxfmt-config": "workspace:*",
     "@zgeoff/oxlint-config": "workspace:*",
+    "@zgeoff/skill-gate": "workspace:*",
     "@zgeoff/tsconfig": "workspace:*",
     "lefthook": "catalog:",
     "oxfmt": "catalog:",
