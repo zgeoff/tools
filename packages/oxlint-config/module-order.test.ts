@@ -907,6 +907,74 @@ function readValue(): number {
       "'savedValue' leads the file, but the primary export does not use it — move it directly above its first use in 'readValue'.",
     ],
   ],
+  [
+    "a const whose binary operator runs an object's valueOf",
+    `let phase = 'cold';
+
+const savedLength = 0 + { valueOf: () => phase.length };
+
+export function brewTea(): number {
+  return readLength();
+}
+
+phase = 'boiling';
+
+function readLength(): number {
+  return savedLength;
+}
+`,
+    `let phase = 'cold';
+
+const savedLength = 0 + { valueOf: () => phase.length };
+
+export function brewTea(): number {
+  return readLength();
+}
+
+phase = 'boiling';
+
+function readLength(): number {
+  return savedLength;
+}
+`,
+    [
+      "'savedLength' leads the file, but the primary export does not use it — move it directly above its first use in 'readLength'.",
+    ],
+  ],
+  [
+    "a const whose template runs an object's toString",
+    `let phase = 'cold';
+
+const savedPhase = \`\${{ toString: () => phase }}\`;
+
+export function brewTea(): string {
+  return readPhase();
+}
+
+phase = 'boiling';
+
+function readPhase(): string {
+  return savedPhase;
+}
+`,
+    `let phase = 'cold';
+
+const savedPhase = \`\${{ toString: () => phase }}\`;
+
+export function brewTea(): string {
+  return readPhase();
+}
+
+phase = 'boiling';
+
+function readPhase(): string {
+  return savedPhase;
+}
+`,
+    [
+      "'savedPhase' leads the file, but the primary export does not use it — move it directly above its first use in 'readPhase'.",
+    ],
+  ],
 ])('it fixes what it can and leaves reported %s', async (_, source, expected, messages) => {
   const ctx = await setupTest();
   const result = await ctx.fix(source);
