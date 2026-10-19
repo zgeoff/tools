@@ -247,7 +247,8 @@ never appear in a test file.
 - `setupTest()` wires dependencies and creates no data. Data is any row, file, store entry, or
   starting value that the code under test reads. Each test creates all of its data in its arrange
   phase, even when every test in the file needs the same data. A wired clock starts at a fixed
-  default; a test that reads the time sets the clock in its arrange phase.
+  default; a test that reads the time sets the clock in its arrange phase. A temp directory, a
+  schema, and a handle are wiring.
 - A shared helper whose arguments carry the scenario, such as `startTestSite(pages)`, is called in
   the test body with those arguments written there. `setupTest()` wraps only a helper that takes no
   scenario.
@@ -271,51 +272,48 @@ never appear in a test file.
 - Each test file keeps its own `setupTest()`. A shared one gathers a flag for every suite that uses
   it.
 
-In impz `e2e/lib/reset-baseline.test.ts:148-157`, `setupTest()` writes the `ubuntu` rootfs and
-creates the image, so it creates data:
+In this made-up counter-example, `setupTest()` inserts a user row and returns it, so it creates
+data:
 
 ```ts
 async function setupTest() {
-  // … wires the database, the stub VMM, impd, and the client
+  const db = await createTestDatabase();
+  const client = createNotesClient({ db });
+  const user = await db
+    .insertInto('users')
+    .values({ name: 'ada' })
+    .returningAll()
+    .executeTakeFirstOrThrow();
 
-  await Bun.write(join(dataDir, 'images', 'ubuntu', 'rootfs.ext4'), 'rootfs');
-
-  const image = await createImage(
-    db,
-    buildMockNewImage({ name: 'ubuntu', digest: 'sha256:ubuntu', sizeBytes: 6 }),
-  );
-
-  return { client, db, dataDir, vmm, impd, image };
+  return { db, client, user };
 }
 ```
 
-The test at `:160` of the same file follows the rule when `setupTest()` returns only the wiring and
-the test creates the image in its arrange phase:
+In the made-up example, `setupTest()` returns only the wiring and the test inserts the user in its
+arrange phase:
 
 ```ts
 async function setupTest() {
-  // … wires the database, the stub VMM, impd, and the client
+  const db = await createTestDatabase();
+  const client = createNotesClient({ db });
 
-  return { client, db, dataDir, vmm, impd };
+  return { db, client };
 }
 
-test('#resetBaseline removes the imps a journey named with its prefix, with their checkpoints and leases', async () => {
+test('it lists the notes of a user with none as empty', async () => {
   const ctx = await setupTest();
+  const user = await ctx.db
+    .insertInto('users')
+    .values({ name: 'ada' })
+    .returningAll()
+    .executeTakeFirstOrThrow();
 
-  await Bun.write(join(ctx.dataDir, 'images', 'ubuntu', 'rootfs.ext4'), 'rootfs');
-  await createImage(
-    ctx.db,
-    buildMockNewImage({ name: 'ubuntu', digest: 'sha256:ubuntu', sizeBytes: 6 }),
-  );
-
-  const imp = await ctx.client.imps.create({ name: 'e2e-x-dev' });
-
-  // … creates a checkpoint and a lease, then calls resetBaseline and asserts
+  expect(await ctx.client.listNotes({ userID: user.id })).toStrictEqual([]);
 });
 ```
 
 Repeated arrange lines stay inline, or move to a tested shared util that the test calls with its
-arguments, such as `createTestImage(ctx, { name: 'ubuntu' })`.
+arguments, such as `createTestUser(ctx, { name: 'ada' })`.
 
 Register cleanup with `onTestFinished` immediately after each successful resource acquisition, so a
 later setup step or assertion that throws still releases the resource. `setupTest()` returns named
