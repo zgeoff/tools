@@ -87,8 +87,8 @@ test.each([
     "export function buildThing(ctx: { writeText(text: string): void }): void {\n  ctx.writeText('a');\n}\n",
   ],
   [
-    "calls 'readConfig', whose verb may do I/O",
-    "import { readConfig } from './read-config.ts';\n\nexport function buildThing(): string {\n  return readConfig();\n}\n",
+    "calls 'loadReport', whose verb may do I/O",
+    "import { loadReport } from './load-report.ts';\n\nexport function buildThing(): string {\n  return loadReport();\n}\n",
   ],
 ])('it reports a no-I/O verb on a function that %s', async (reason, source) => {
   const ctx = await setupTest();
