@@ -10,6 +10,24 @@
     ]
   },
   {
+    "name": "issue-templates",
+    "description": "The issue templates for a bug report and a feature request, written for a visitor from outside, and the config that turns off blank issues",
+    "files": [
+      {
+        "source": ".github/ISSUE_TEMPLATE/bug.md",
+        "target": ".github/ISSUE_TEMPLATE/bug.md"
+      },
+      {
+        "source": ".github/ISSUE_TEMPLATE/feature.md",
+        "target": ".github/ISSUE_TEMPLATE/feature.md"
+      },
+      {
+        "source": ".github/ISSUE_TEMPLATE/config.yml",
+        "target": ".github/ISSUE_TEMPLATE/config.yml"
+      }
+    ]
+  },
+  {
     "name": "editorconfig",
     "description": "The root .editorconfig",
     "files": [
