@@ -84,15 +84,16 @@ function isArrayIndex(key) {
   return /^(?:0|[1-9]\d*)$/u.test(key) && Number(key) < 2 ** 32 - 1;
 }
 
-// step 3: an invalid entry or one with no match falls back to the next, and
-// the last invalid entry is the result when none resolves
+// step 3, as Node's resolver runs it: a null entry falls back like an invalid one, not "Return resolved"
 function resolveArrayTarget(target, patternMatch, lookup) {
   if (target.length === 0) {
     return null;
   }
 
   const results = target.map((entry) => resolvePackageTarget(entry, patternMatch, lookup));
-  const index = results.findIndex((result) => result !== undefined && result !== invalidTarget);
+  const index = results.findIndex((result) => !fallbacks.has(result));
 
-  return index === -1 ? results.findLast((result) => result === invalidTarget) : results[index];
+  return index === -1 ? results.findLast((result) => result !== undefined) : results[index];
 }
+
+const fallbacks = new Set([undefined, null, invalidTarget]);
