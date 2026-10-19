@@ -231,6 +231,16 @@ export function buildThing(): unknown {
     "'buildThing' starts with 'build', which promises no I/O, but it runs a `$` shell command",
   ],
   [
+    'a configured $ shell through a namespace import as a template tag',
+    `import * as bun from 'bun';
+
+export function buildThing(): unknown {
+  return bun.$.cwd('a')\`ls\`;
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it runs a `$` shell command",
+  ],
+  [
     'the global fetch',
     `export function buildThing(): unknown {
   return fetch('https://a.test');
@@ -515,6 +525,16 @@ export function buildThing(): unknown {
 `,
   ],
   [
+    'a local alias of a method on a value the function makes',
+    `export function buildValue(): number {
+  const state = { setValue: (next: number) => next };
+  const invoke = state.setValue;
+
+  return invoke(1);
+}
+`,
+  ],
+  [
     'a bare built-in method on a parameter',
     `export function buildIndex(index: Map<string, number>, names: readonly string[]): number {
   for (const name of names) {
@@ -639,6 +659,19 @@ export function isSettled(state: State): Ready {
 
 export function isFlag<T extends boolean>(flag: T): T {
   return flag;
+}
+`,
+  ],
+  [
+    'a predicate and a find that declare a type from a namespace import',
+    `import type * as Types from './types.ts';
+
+export function isReady(state: Types.State): Types.Ready {
+  return state.ready;
+}
+
+export function findEntry(entries: readonly Types.Entry[]): Types.Entry {
+  return entries[0] as Types.Entry;
 }
 `,
   ],

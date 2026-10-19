@@ -373,7 +373,7 @@ function findCallIO(context, node, frameNode) {
 
   const isOwn =
     isOwnCallee({ rootName, binding, source: findImportSource(binding), memberName }, frameNode) &&
-    isOwnCallee({ ...target, source: targetSource, memberName: null }, frameNode);
+    isOwnCallee({ ...target, source: targetSource }, frameNode);
 
   if (!isOwn) {
     return null;
