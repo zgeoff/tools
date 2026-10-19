@@ -2,9 +2,10 @@
 name: code-style
 description:
   Code style for zgeoff TypeScript repos — module layout and file naming, acronyms, state
-  lifecycles, branching on a union with ts-pattern, and the role table of function verbs whose
-  promises the function-verb and verb-contract lint rules check. Load before writing, reviewing, or
-  renaming any TypeScript, with the repo's project-code-style skill beside it.
+  lifecycles, branching on a union with ts-pattern, comments, one-off codemods, and the role table
+  of function verbs whose promises the function-verb and verb-contract lint rules check. Load before
+  writing, reviewing, or renaming any TypeScript, with the repo's project-code-style skill beside
+  it.
 ---
 
 # Code style
@@ -26,6 +27,10 @@ Each line links the section that explains it.
   table, and an in-process actor is an xstate machine.
 - [Branching on a union](#branching-on-a-union): branch with `match(...).exhaustive()` from
   `ts-pattern`, never `switch`.
+- [Comments](#comments): a `//` comment holds only the reason the obvious alternative is wrong, when
+  the cause lives outside the file.
+- [Mechanical changes](#mechanical-changes): a one-off codemod goes in the PR description, never
+  into the repo.
 - [Function naming](#function-naming): a function that does a job in the role table starts with that
   job's verb and keeps its promise, and the banned verbs never appear.
 
@@ -105,6 +110,35 @@ Branch on a union with `match(...).exhaustive()` from `ts-pattern`, never with `
 later cannot fall through to a default. `zgeoff/no-switch` reports every `switch`, but only the
 author can tell a union from an open value. End the match with `.otherwise()` only when the value is
 open, such as a string from outside the program.
+
+## Comments
+
+A fact a reader needs has a home that stays true: the code, a type, a named constant, a test whose
+name states the rule, the commit body, or the subsystem's architecture doc for an invariant that
+callers obey. A comment holds only the residue none of those can hold.
+
+- Write a `//` comment for one thing: the reason the obvious alternative is wrong, when the cause
+  lives outside the file. A library defect, a harness quirk, a runtime or platform behaviour, a
+  parser or compiler rule, a measured number, a production incident. Place it at the line or
+  declaration it explains, three lines at most.
+- Never write what the code shows: what a function does, its parameters, its outcomes, an invariant
+  a test already states, which step does what. An agent derives those from the code, its tests, and
+  its references; a comment that caches them goes stale.
+- A caller-facing contract is a test whose name states it. An invariant that code in another package
+  obeys is stated in the subsystem doc as well. The reason for a design decision lives in the commit
+  body, never in the doc. A reason a reader needs at the line follows the `//` rule.
+- Comments describe the code as it is now — no history ("previously", "now uses"), no project state
+  (issue numbers, phase labels, "not wired yet"); those live in the commit message.
+- Comments don't name other declarations, because a rename strands the reference. State the fact
+  instead: "a retry after the deadline is dropped", not "(see scheduleRetry)". A declaration's own
+  parameters and signature types are fine to name.
+
+## Mechanical changes
+
+A codemod or other one-off script that made a mechanical change never enters the repo. Put it in the
+PR description, in a collapsed `<details>` block with the command that ran it, so a reviewer can
+rerun it and the tree keeps no script that nothing runs again. The formatter and the lint fixes that
+the repo runs on every commit are not one-off scripts, and this rule leaves them alone.
 
 ## Function naming
 
