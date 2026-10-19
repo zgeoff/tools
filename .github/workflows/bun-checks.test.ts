@@ -269,3 +269,27 @@ test('it hands the picked list to the shfmt setup and the run through the workfl
   expect(installed).toBeTrue();
   expect(ran).toBe('audit\ndeadcode\nformat:check\nlint\ncheck\ntypecheck\ntest\n');
 });
+
+test('it gives a caller that passes no time limit the synced caller fallback', async () => {
+  const reusableText = await readFile(join(import.meta.dir, 'bun-checks.yml'), 'utf8');
+
+  const callerText = await readFile(
+    join(import.meta.dir, '../../sync/workflow-callers/pr.yml'),
+    'utf8',
+  );
+
+  const reusable: unknown = Bun.YAML.parse(reusableText);
+  const caller: unknown = Bun.YAML.parse(callerText);
+
+  expect(reusable).toMatchObject({
+    on: { workflow_call: { inputs: { 'timeout-minutes': { default: 20 } } } },
+  });
+
+  expect(caller).toMatchObject({
+    jobs: {
+      pr: {
+        with: { 'timeout-minutes': `\${{ fromJSON(vars.BUN_CHECK_TIMEOUT_MINUTES || '20') }}` },
+      },
+    },
+  });
+});

@@ -31,10 +31,12 @@ on:
         required: false
         default: true
       timeout-minutes:
-        description: Timeout for the checks job
+        # The same limit as the synced caller's fallback, for a caller that
+        # passes none.
+        description: Timeout for the checks job, in minutes
         type: number
         required: false
-        default: 10
+        default: 20
       setup-shfmt:
         description:
           Install shfmt even when the scripts do not run check, for a suite whose tests run it
