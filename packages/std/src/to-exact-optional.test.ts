@@ -28,7 +28,7 @@ test('it keeps falsy values that are not undefined', () => {
   expect(toExactOptional(input)).toStrictEqual({ zero: 0, empty: '', no: false, nan: Number.NaN });
 });
 
-test('it returns label new object and leaves the input untouched', () => {
+test('it returns a new object and leaves the input untouched', () => {
   const input: { label: string | undefined; count: number } = { label: undefined, count: 1 };
   const result = toExactOptional(input);
 
@@ -85,7 +85,7 @@ test('it skips non-enumerable keys', () => {
   expect(Reflect.ownKeys(toExactOptional(input))).toStrictEqual(['label']);
 });
 
-test('it keeps each member of label union input with its own keys', () => {
+test('it keeps each member of a union input with its own keys', () => {
   type Shape = { kind: 'circle'; radius: number | undefined } | { kind: 'square'; side: number };
 
   const input: Shape[] = [
