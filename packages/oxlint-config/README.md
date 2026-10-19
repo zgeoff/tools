@@ -99,11 +99,12 @@ a class, an enum, a second function, an export, and a call such as `beforeEach(.
 holds the three ways out of a helper: inline it, swap it for a registered matcher, or move it to the
 shared test utils with tests of its own.
 
-A module-level `const` passes only as a skip gate: a `const` whose every read sits inside a
-`skipIf(...)` argument or inside the initializer of another gate. A gate derived from an awaited
-probe therefore passes beside the probe. A `const` that a test body, `setupTest()` or another
-non-gate reads reports, and so does one that nothing reads. The rule does not check the comment that
-the skill asks a gate to carry.
+A module-level `const` passes only as a skip gate: a `const` whose every binding is read, and read
+only inside a `skipIf(...)` argument or inside the initializer of another gate. A gate derived from
+an awaited probe therefore passes beside the probe, but consts that only read each other never reach
+a `skipIf` and report. A `const` that a test body, `setupTest()` or another non-gate reads reports,
+and so does one that nothing reads. The rule does not check the comment that the skill asks a gate
+to carry.
 
 ## `zgeoff/no-restricted-words`
 

@@ -118,19 +118,19 @@ function findDeclaredName(context, statement) {
   return statement.id?.name;
 }
 
-// a skip gate is a `const` whose every read sits in a `skipIf(...)` argument
-// or in another gate's initializer, as a gate derived from the awaited probe
-// does; the set shrinks until every member holds
+// a gate's every binding is read, only in `skipIf(...)` or another gate's
+// initializer; the set grows out from the `skipIf` reads, so consts that only
+// read each other never join it
 function collectSkipGates(context, constants) {
-  const gates = new Set(constants);
+  const gates = new Set();
   let changed = true;
 
   while (changed) {
     changed = false;
 
-    for (const declaration of gates) {
-      if (!isSkipGate(context, declaration, gates)) {
-        gates.delete(declaration);
+    for (const declaration of constants) {
+      if (!gates.has(declaration) && isSkipGate(context, declaration, gates)) {
+        gates.add(declaration);
         changed = true;
       }
     }
@@ -140,18 +140,17 @@ function collectSkipGates(context, constants) {
 }
 
 function isSkipGate(context, declaration, gates) {
-  const reads = context.sourceCode
-    .getDeclaredVariables(declaration)
-    .flatMap((variable) => variable.references)
-    .filter((reference) => !reference.init && reference.isRead());
+  return context.sourceCode.getDeclaredVariables(declaration).every((variable) => {
+    const reads = variable.references.filter((reference) => !reference.init && reference.isRead());
 
-  return (
-    reads.length > 0 &&
-    reads.every(
-      (reference) =>
-        isInSkipIfArgument(reference.identifier) || isInGateInit(reference.identifier, gates),
-    )
-  );
+    return (
+      reads.length > 0 &&
+      reads.every(
+        (reference) =>
+          isInSkipIfArgument(reference.identifier) || isInGateInit(reference.identifier, gates),
+      )
+    );
+  });
 }
 
 function isInSkipIfArgument(identifier) {

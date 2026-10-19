@@ -706,9 +706,12 @@ test('it names the three ways out of a module-level declaration', async () => {
   expect(result.stdout).toInclude('move it to the shared test utils with tests of its own');
 });
 
-test('it flags a module-level statement that is not a test call', async () => {
-  const source =
-    "import { beforeEach, test } from 'bun:test';\n\nbeforeEach(() => {});\n\ntest('it pours', () => {});\n";
+test.each([
+  ['a hook call', 'beforeEach(() => {});\n'],
+  ['an exported const', 'export const cups = 2;\n'],
+  ['an exported type', 'export type Cups = number;\n'],
+])('it flags %s at module level', async (_, statement) => {
+  const source = `import { beforeEach, test } from 'bun:test';\n\n${statement}\ntest('it pours', () => {});\n`;
 
   const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', setupTestOnly);
 
@@ -753,6 +756,47 @@ test('it flags a gate derived from a probe that a test body reads', async () => 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('Remove the module-level `hasKettle`');
   expect(result.stdout).not.toInclude('Remove the module-level `skipBoil`');
+});
+
+test('it accepts a destructured probe whose every member only skipIf arguments read', async () => {
+  const source =
+    "import { test } from 'bun:test';\nimport { probeKitchen } from './probe-kitchen';\n\n// skipIf takes a boolean and has no in-body skip\nconst { hasKettle, hasStove } = await probeKitchen();\n\ntest.skipIf(!hasKettle)('it boils', () => {});\n\ntest.skipIf(!hasStove)('it simmers', () => {});\n";
+
+  const result = await runLintTree({ 'kitchen.test.ts': source }, 'kitchen.test.ts', setupTestOnly);
+
+  expect(result.stdout).not.toInclude('setup-test-only');
+});
+
+test('it flags a destructured probe with a member that nothing reads', async () => {
+  const source =
+    "import { test } from 'bun:test';\nimport { probeKitchen } from './probe-kitchen';\n\nconst { hasKettle, readStove } = await probeKitchen();\n\ntest.skipIf(!hasKettle)('it boils', () => {});\n";
+
+  const result = await runLintTree({ 'kitchen.test.ts': source }, 'kitchen.test.ts', setupTestOnly);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('readStove');
+});
+
+test('it flags consts that only read each other', async () => {
+  const source =
+    "import { test } from 'bun:test';\n\nconst first = () => second;\nconst second = () => first;\n\ntest('it pours', () => {});\n";
+
+  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', setupTestOnly);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('Remove the module-level `first`');
+  expect(result.stdout).toInclude('Remove the module-level `second`');
+});
+
+test('it flags a helper that only another helper reads', async () => {
+  const source =
+    "import { expect, test } from 'bun:test';\n\nconst cups = 2;\nconst doubled = cups * 2;\n\ntest('it pours', () => {\n  expect(doubled).toBe(4);\n});\n";
+
+  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', setupTestOnly);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('Remove the module-level `cups`');
+  expect(result.stdout).toInclude('Remove the module-level `doubled`');
 });
 
 test('it flags a module-level const that nothing reads', async () => {
