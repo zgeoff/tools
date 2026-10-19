@@ -1,5 +1,5 @@
-# Calls the repo-sync workflow in zgeoff/tools, which opens one pull request per
-# manifest entry whose files this repository is behind on.
+# Calls the repo-sync workflow in zgeoff/tools, which opens one pull request that
+# carries every manifest entry whose files this repository is behind on.
 #
 # Two optional string inputs under `with:` change which entries run. `skip`
 # takes the comma-separated names of the entries to leave alone. `include`

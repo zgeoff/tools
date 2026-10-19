@@ -1,9 +1,10 @@
 # sync
 
 Files every downstream repo carries a copy of. [`manifest.json`](./manifest.json) lists them as
-entries, and the [repo-sync workflow](../.github/workflows/repo-sync.yml) delivers each entry to a
-downstream repo as one pull request on the branch `sync/<name>`. [`repo-sync.yml`](./repo-sync.yml)
-is the stub a downstream repo installs to call it.
+entries, and the [repo-sync workflow](../.github/workflows/repo-sync.yml) delivers them to a
+downstream repo as one pull request on the branch `repo-sync/zgeoff-tools`, with one commit for each
+entry that changed. A run while that pull request is open updates it.
+[`repo-sync.yml`](./repo-sync.yml) is the stub a downstream repo installs to call it.
 
 ## Manifest entries
 
@@ -108,8 +109,9 @@ A repo changes what a baseline job runs through the package script that the job 
 `typecheck`. A job of the same name in `lefthook.yml` does not override it, because lefthook merges
 the extended file over the repo's own.
 
-A sync branch is force-pushed on every run, so a commit a person adds to it is lost on the next run.
-Edit the source here instead.
+The sync branch is force-pushed on every run, so a commit a person adds to it is lost on the next
+run. Edit the source here instead. An entry that fails, through a workflow conflict or its build, is
+left out of the pull request, and the run fails after the other entries sync.
 
 ## Dependency updates
 
@@ -266,5 +268,5 @@ A tag is never moved or deleted, because the repos that pin it read it on every 
 
 2. Copy [`repo-sync.yml`](./repo-sync.yml) to `.github/workflows/repo-sync.yml`, and pin it to the
    newest sync tag with `scripts/pin-tools-ref.sh`.
-3. Dispatch it once: `gh workflow run repo-sync.yml -R zgeoff/<repo>`. Expect one pull request per
-   entry the repo is behind on.
+3. Dispatch it once: `gh workflow run repo-sync.yml -R zgeoff/<repo>`. Expect one pull request that
+   carries every entry the repo is behind on.
