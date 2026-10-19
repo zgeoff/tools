@@ -36,14 +36,18 @@ function resolveManifestTarget(manifest, specifier, settings) {
     return toMappedTarget(manifest, mapped);
   }
 
+  // a builtin keeps its name even when the own or a workspace package shares it
+  if (isBuiltin(specifier)) {
+    return { kind: 'module', specifier };
+  }
+
   if (isPackageSpecifier(name, specifier)) {
     return { ...resolveExportTarget(manifest, specifier, conditions), self: true };
   }
 
-  // a builtin keeps its name even when a workspace package shares it
-  const workspace = isBuiltin(specifier)
-    ? undefined
-    : settings.workspaces.find((candidate) => isPackageSpecifier(candidate.name, specifier));
+  const workspace = settings.workspaces.find((candidate) =>
+    isPackageSpecifier(candidate.name, specifier),
+  );
 
   if (workspace === undefined) {
     return { kind: 'module', specifier };
@@ -165,28 +169,31 @@ function isPatternMatch(pattern, key) {
   return key.length >= pattern.length && key.startsWith(prefix) && key.endsWith(suffix);
 }
 
-// node's rule: the first key, in object order, that names an active
-// condition; in an array, the first entry that yields a target
 function findConditionTarget(value, conditions) {
-  if (typeof value === 'string') {
+  return findConditionValue(value, conditions) ?? null;
+}
+
+// node's rule: in an object, the first active condition, in key order, that
+// yields a target or a null block; in an array, the first entry that yields
+// a target. `undefined` means nothing matched, so an outer object goes on.
+function findConditionValue(value, conditions) {
+  if (typeof value === 'string' || value === null) {
     return value;
   }
 
-  if (typeof value !== 'object' || value === null) {
-    return null;
+  if (Array.isArray(value)) {
+    const targets = value.map((candidate) => findConditionValue(candidate, conditions));
+
+    return targets.find((target) => typeof target === 'string') ?? null;
   }
 
-  const candidates = Array.isArray(value)
-    ? value
-    : Object.keys(value)
-        .filter((condition) => conditions.has(condition))
-        .map((condition) => value[condition]);
+  // a number or boolean target matches nothing
+  const branches = typeof value === 'object' ? value : {};
+  const targets = Object.keys(branches)
+    .filter((condition) => conditions.has(condition))
+    .map((condition) => findConditionValue(branches[condition], conditions));
 
-  return (
-    candidates
-      .map((candidate) => findConditionTarget(candidate, conditions))
-      .find((target) => target !== null) ?? null
-  );
+  return targets.find((target) => target !== undefined);
 }
 
 function findImportedFile(filename, specifier, extensions) {
