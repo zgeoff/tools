@@ -1401,6 +1401,332 @@ test('it resolves # imports and export patterns through the package manifest', a
   expect(result.stdout).toInclude('parser: oxc-parser is allowed only in no zone');
 });
 
+// app/ and store/ under packages/, with the store's manifest and source; the
+// edges judge the path a workspace import maps to
+const workspaceZones = {
+  'zgeoff/import-zones': [
+    'error',
+    {
+      zones: {
+        app: ['packages/app{,/**}'],
+        store: ['packages/store{,/**}'],
+        testing: ['packages/**/testing{,/**}'],
+      },
+      workspaces: ['packages/*'],
+      edges: [
+        { name: 'no-testing', from: ['app'], to: ['testing'] },
+        { name: 'to-store', from: ['app'], to: ['store'] },
+      ],
+      modules: [{ name: 'store-module', modules: ['@demo/store'], allow: [] }],
+      unresolved: [{ name: 'unresolved', from: ['app'] }],
+      selfImports: [{ name: 'self', from: ['app', 'store'] }],
+    },
+  ],
+};
+
+test.each([
+  ['the root entry', { '.': './src/index.ts' }, '@demo/store', 'packages/store (store)'],
+  [
+    'a named entry',
+    { '.': './src/index.ts', './testing': './src/testing/index.ts' },
+    '@demo/store/testing',
+    'packages/store/testing (store, testing)',
+  ],
+  ['a * pattern key', { './*': './src/*.ts' }, '@demo/store/rows', 'packages/store/rows (store)'],
+  [
+    'a package with no exports map',
+    undefined,
+    '@demo/store/src/rows',
+    'packages/store/src/rows (store)',
+  ],
+  [
+    'a conditional root entry',
+    { import: './src/index.ts', default: './src/index.cjs' },
+    '@demo/store',
+    'packages/store (store)',
+  ],
+])(
+  'it maps a workspace import of %s to the path in the package folder',
+  async (_entry, exports, specifier, target) => {
+    const files = {
+      'packages/store/package.json': JSON.stringify({ name: '@demo/store', exports }),
+      'packages/app/src/run.ts': `import { store } from '${specifier}';\n\nexport const all = [store];\n`,
+    };
+
+    const result = await runLintTree(files, 'packages/app/src/run.ts', workspaceZones);
+
+    expect(result.stdout).toInclude(`app must not import ${target}`);
+    expect(result.stdout).not.toInclude('store-module');
+    expect(result.stdout).not.toInclude('unresolved:');
+  },
+);
+
+test.each([
+  ['a subpath no key lists', { '.': './src/index.ts' }, '@demo/store/src/rows'],
+  [
+    'a subpath a null key blocks',
+    { './*': './src/*.ts', './internal/*': null },
+    '@demo/store/internal/rows',
+  ],
+  ['a subpath beside a string exports field', './src/index.ts', '@demo/store/rows'],
+  [
+    'the root of an exports map with only named entries',
+    { './testing': './src/testing.ts' },
+    '@demo/store',
+  ],
+  ['the root of an empty exports map', {}, '@demo/store'],
+])('it reports a workspace import of %s as unresolved', async (_entry, exports, specifier) => {
+  const files = {
+    'packages/store/package.json': JSON.stringify({ name: '@demo/store', exports }),
+    'packages/app/src/run.ts': `import { store } from '${specifier}';\n\nexport const all = [store];\n`,
+  };
+
+  const result = await runLintTree(files, 'packages/app/src/run.ts', workspaceZones);
+
+  expect(result.stdout).toInclude(`unresolved: cannot resolve ${specifier}`);
+  expect(result.stdout).not.toInclude('to-store:');
+});
+
+test('it reads a workspace glob written with a leading ./', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { app: ['packages/app/**'], store: ['packages/store{,/**}'] },
+        workspaces: ['./packages/*'],
+        edges: [{ name: 'to-store', from: ['app'], to: ['store'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'packages/store/package.json': JSON.stringify({ name: '@demo/store' }),
+    'packages/app/src/run.ts':
+      "import { store } from '@demo/store';\n\nexport const all = [store];\n",
+  };
+
+  const result = await runLintTree(files, 'packages/app/src/run.ts', rules);
+
+  expect(result.stdout).toInclude('to-store: app must not import packages/store (store)');
+});
+
+test('it leaves a package below the workspace glob’s depth a module', async () => {
+  const files = {
+    'packages/group/store/package.json': JSON.stringify({ name: '@demo/store' }),
+    'packages/app/src/run.ts':
+      "import { store } from '@demo/store';\n\nexport const all = [store];\n",
+  };
+
+  const result = await runLintTree(files, 'packages/app/src/run.ts', workspaceZones);
+
+  expect(result.stdout).toInclude('store-module: @demo/store is allowed only in no zone');
+});
+
+test('it keeps a builtin a module when a workspace package shares its name', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { app: ['packages/app/**'] },
+        workspaces: ['packages/*'],
+        modules: [{ name: 'neutral', modules: ['node:*'], from: ['app'], allow: [] }],
+        unresolved: [{ name: 'unresolved', from: ['app'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'packages/path/package.json': JSON.stringify({ name: 'path', exports: {} }),
+    'packages/app/src/run.ts': "import { join } from 'path';\n\nexport const all = [join];\n",
+  };
+
+  const result = await runLintTree(files, 'packages/app/src/run.ts', rules);
+
+  expect(result.stdout).toInclude('neutral: path is allowed only in no zone');
+  expect(result.stdout).not.toInclude('unresolved:');
+});
+
+test('it keeps a builtin a module when the file’s own package shares its name', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { core: ['src/**'] },
+        modules: [{ name: 'neutral', modules: ['node:*'], from: ['core'], allow: [] }],
+        selfImports: [{ name: 'self', from: ['core'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'package.json': JSON.stringify({ name: 'path', exports: { '.': './src/index.ts' } }),
+    'src/index.ts': 'export const root = 1;\n',
+    'src/run.ts': "import { join } from 'path';\n\nexport const all = [join];\n",
+  };
+
+  const result = await runLintTree(files, 'src/run.ts', rules);
+
+  expect(result.stdout).toInclude('neutral: path is allowed only in no zone');
+  expect(result.stdout).not.toInclude('self:');
+});
+
+test('it keeps a builtin a module when a # import maps to its name', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { app: ['packages/app/**'] },
+        workspaces: ['packages/*'],
+        modules: [{ name: 'neutral', modules: ['node:*'], from: ['app'], allow: [] }],
+        unresolved: [{ name: 'unresolved', from: ['app'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'packages/path/package.json': JSON.stringify({ name: 'path', exports: {} }),
+    'packages/app/package.json': JSON.stringify({
+      name: '@demo/app',
+      imports: { '#path': 'path' },
+    }),
+    'packages/app/src/run.ts': "import { join } from '#path';\n\nexport const all = [join];\n",
+  };
+
+  const result = await runLintTree(files, 'packages/app/src/run.ts', rules);
+
+  expect(result.stdout).toInclude('neutral: path is allowed only in no zone');
+  expect(result.stdout).not.toInclude('unresolved:');
+});
+
+test('it maps a # import that names a workspace package as that name', async () => {
+  const files = {
+    'packages/store/package.json': JSON.stringify({
+      name: '@demo/store',
+      exports: { './testing': './src/testing/index.ts' },
+    }),
+    'packages/app/package.json': JSON.stringify({
+      name: '@demo/app',
+      imports: { '#store-testing': '@demo/store/testing' },
+    }),
+    'packages/app/src/run.ts':
+      "import { fake } from '#store-testing';\n\nexport const all = [fake];\n",
+  };
+
+  const result = await runLintTree(files, 'packages/app/src/run.ts', workspaceZones);
+
+  expect(result.stdout).toInclude(
+    'no-testing: app must not import packages/store/testing (store, testing)',
+  );
+});
+
+test('it reports no self-import for another workspace package', async () => {
+  const files = {
+    'packages/store/package.json': JSON.stringify({ name: '@demo/store' }),
+    'packages/app/package.json': JSON.stringify({ name: '@demo/app' }),
+    'packages/app/src/run.ts':
+      "import { store } from '@demo/store';\n\nexport const all = [store];\n",
+  };
+
+  const result = await runLintTree(files, 'packages/app/src/run.ts', workspaceZones);
+
+  expect(result.stdout).toInclude('to-store:');
+  expect(result.stdout).not.toInclude('self:');
+});
+
+test('it flags an import of the file’s own package by name, and accepts a relative one', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { store: ['packages/store/**'] },
+        workspaces: ['packages/*'],
+        selfImports: [
+          { name: 'self', from: ['store'], reason: 'a package imports itself by path' },
+        ],
+      },
+    ],
+  };
+
+  const files = {
+    'packages/store/package.json': JSON.stringify({
+      name: '@demo/store',
+      exports: { '.': './src/index.ts' },
+    }),
+    'packages/store/src/index.ts': 'export const store = 1;\n',
+    'packages/store/src/by-name.ts':
+      "import { store } from '@demo/store';\n\nexport const all = [store];\n",
+    'packages/store/src/by-path.ts':
+      "import { store } from './index';\n\nexport const all = [store];\n",
+  };
+
+  const dir = await createLintTree(files, rules);
+  const byName = await runLintIn(dir, dir, 'packages/store/src/by-name.ts');
+  const byPath = await runLintIn(dir, dir, 'packages/store/src/by-path.ts');
+
+  expect(byName.exitCode).toBe(1);
+
+  expect(byName.stdout).toInclude(
+    'self: @demo/store names the package this file belongs to; import it by a relative path — a package imports itself by path',
+  );
+
+  expect(byPath.exitCode).toBe(0);
+});
+
+test('it flags a # import that maps to the file’s own package name', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { core: ['src/**'] },
+        selfImports: [{ name: 'self', from: ['core'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'package.json': JSON.stringify({
+      name: '@demo/store',
+      exports: { '.': './src/index.ts' },
+      imports: { '#self': '@demo/store' },
+    }),
+    'src/index.ts': 'export const store = 1;\n',
+    'src/run.ts': "import { store } from '#self';\n\nexport const all = [store];\n",
+  };
+
+  const result = await runLintTree(files, 'src/run.ts', rules);
+
+  expect(result.stdout).toInclude(
+    'self: #self names the package this file belongs to; import it by a relative path',
+  );
+});
+
+test('it reports an own-package subpath the exports omit as a self-import and unresolved', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { core: ['src/**'] },
+        selfImports: [{ name: 'self', from: ['core'] }],
+        unresolved: [{ name: 'unresolved', from: ['core'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'package.json': JSON.stringify({ name: '@demo/store', exports: { '.': './src/index.ts' } }),
+    'src/index.ts': 'export const store = 1;\n',
+    'src/run.ts': "import { hidden } from '@demo/store/private';\n\nexport const all = [hidden];\n",
+  };
+
+  const result = await runLintTree(files, 'src/run.ts', rules);
+
+  expect(result.stdout).toInclude(
+    'self: @demo/store/private names the package this file belongs to; import it by a relative path',
+  );
+
+  expect(result.stdout).toInclude('unresolved: cannot resolve @demo/store/private');
+});
+
 test('it accepts a call of a local binding named like a restricted global', async () => {
   const source = [
     "import { fetch } from 'undici';",

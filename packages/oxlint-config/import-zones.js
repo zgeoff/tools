@@ -2,6 +2,7 @@ import { isBuiltin } from 'node:module';
 import { relative, sep } from 'node:path';
 import findRepoRoot from './find-repo-root.js';
 import importZonesSchema from './import-zones-schema.js';
+import loadWorkspaceManifests from './load-workspace-manifests.js';
 import loadZoneOptions from './load-zone-options.js';
 import resolveImportTarget from './resolve-import-target.js';
 
@@ -14,7 +15,17 @@ function buildFileState(context) {
   const root = findRepoRoot(filename) ?? context.cwd;
   const path = toRootPath(root, filename);
 
-  return { context, options, filename, root, path, zones: collectZones(options.zones, path) };
+  const workspaces = loadWorkspaceManifests(root, options.workspaces);
+
+  return {
+    context,
+    options,
+    filename,
+    root,
+    path,
+    workspaces,
+    zones: collectZones(options.zones, path),
+  };
 }
 
 function toRootPath(root, path) {
@@ -66,7 +77,12 @@ function checkImport(file, imported) {
     root: file.root,
     extensions: file.options.extensions,
     conditions: file.options.conditions,
+    workspaces: file.workspaces,
   });
+
+  if (target.self === true) {
+    emitSelfImport(file, imported.node, specifier);
+  }
 
   if (target.kind === 'module') {
     checkModule(file, imported, target.specifier);
@@ -93,6 +109,12 @@ function findStaticSpecifier(node) {
 function emitUnresolved(file, node, report) {
   for (const entry of collectEntries(file, file.options.unresolved)) {
     emitReport(file, entry, { at: { node }, ...report });
+  }
+}
+
+function emitSelfImport(file, node, specifier) {
+  for (const entry of collectEntries(file, file.options.selfImports)) {
+    emitReport(file, entry, { at: { node }, messageId: 'self', data: { specifier } });
   }
 }
 
@@ -270,6 +292,7 @@ const importZones = {
       global: '{{rule}}: {{global}}() is allowed only in {{allow}}{{reason}}',
       unzoned: '{{rule}}: this file belongs to none of {{zones}}; add its path to one{{reason}}',
       unresolved: '{{rule}}: cannot resolve {{specifier}}{{reason}}',
+      self: '{{rule}}: {{specifier}} names the package this file belongs to; import it by a relative path{{reason}}',
       computed: '{{rule}}: cannot check a computed import specifier{{reason}}',
     },
     schema: [importZonesSchema],
