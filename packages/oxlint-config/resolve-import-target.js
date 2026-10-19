@@ -10,10 +10,10 @@ const sourceExtensions = { '.js': ['.ts', '.tsx'], '.mjs': ['.mts'], '.cjs': ['.
 // names through `imports`, and a workspace name to a path in its folder.
 export default function resolveImportTarget(filename, specifier, settings) {
   if (isPathSpecifier(specifier)) {
-    return toTarget(findImportedFile(filename, toFileSpecifier(specifier), settings.extensions));
+    return toTarget(resolveImportedFile(filename, toFileSpecifier(specifier), settings.extensions));
   }
 
-  const manifest = findPackageManifest(dirname(filename), settings.root);
+  const manifest = readPackageManifest(dirname(filename), settings.root);
 
   return resolveManifestTarget(manifest, specifier, settings);
 }
@@ -107,7 +107,7 @@ function isPathSpecifier(specifier) {
 
 const manifests = new Map();
 
-function findPackageManifest(dir, root) {
+function readPackageManifest(dir, root) {
   if (manifests.has(dir)) {
     return manifests.get(dir);
   }
@@ -119,7 +119,7 @@ function findPackageManifest(dir, root) {
   if (existsSync(path)) {
     manifest = { dir, ...JSON.parse(readFileSync(path, 'utf8')) };
   } else if (dir !== root && parent !== dir) {
-    manifest = findPackageManifest(parent, root);
+    manifest = readPackageManifest(parent, root);
   }
 
   manifests.set(dir, manifest);
@@ -211,7 +211,7 @@ function findConditionTarget(value, conditions) {
   );
 }
 
-function findImportedFile(filename, specifier, extensions) {
+function resolveImportedFile(filename, specifier, extensions) {
   const base = resolve(dirname(filename), specifier);
   const swapped = Object.keys(sourceExtensions).flatMap((ext) =>
     base.endsWith(ext)
@@ -226,9 +226,9 @@ function findImportedFile(filename, specifier, extensions) {
     ...extensions.map((ext) => join(base, `index${ext}`)),
   ];
 
-  return candidates.find((candidate) => isFile(candidate)) ?? null;
+  return candidates.find((candidate) => probeFile(candidate)) ?? null;
 }
 
-function isFile(path) {
+function probeFile(path) {
   return statSync(path, { throwIfNoEntry: false })?.isFile() ?? false;
 }

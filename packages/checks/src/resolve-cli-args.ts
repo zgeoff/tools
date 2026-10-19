@@ -11,7 +11,7 @@ export interface CLIArgs {
 // Parses the command line, or returns the reason it is refused. Bun drops the first -- before the
 // module runs, so a --help that followed it reads as the option: help with files is refused, so it
 // can never stand in for a run over those files.
-export async function parseCLIArgs(argv: readonly string[]): Promise<CLIArgs | string> {
+export async function resolveCLIArgs(argv: readonly string[]): Promise<CLIArgs | string> {
   let parsed: CLIArgs | null = null;
 
   const command = define({

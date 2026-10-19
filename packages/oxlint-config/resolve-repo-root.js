@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 
 // the nearest ancestor holding `.git` (a directory, or a worktree's file), or
 // null outside a repository
-export default function findRepoRoot(filename) {
+export default function resolveRepoRoot(filename) {
   let dir = dirname(filename);
 
   while (!existsSync(join(dir, '.git'))) {

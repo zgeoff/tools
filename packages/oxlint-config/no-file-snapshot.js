@@ -33,7 +33,7 @@ const noFileSnapshot = {
         const filename = context.physicalFilename;
         const name = `${basename(filename)}.snap`;
 
-        if (!isFile(join(dirname(filename), '__snapshots__', name))) {
+        if (!probeFile(join(dirname(filename), '__snapshots__', name))) {
           return;
         }
 
@@ -51,7 +51,7 @@ function getMatcherName(node) {
   return node.type === 'Identifier' ? node.name : node.value;
 }
 
-function isFile(path) {
+function probeFile(path) {
   return statSync(path, { throwIfNoEntry: false })?.isFile() ?? false;
 }
 

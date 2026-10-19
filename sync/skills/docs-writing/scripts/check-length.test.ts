@@ -218,32 +218,6 @@ test('it fails when the repo has check-skill and a skill fails it', async () => 
   expect(result.stdout).toInclude('.claude/skills/demo/SKILL.md: has no description');
 });
 
-test('it fails when the repo has check-project-verbs and the verbs differ', async () => {
-  const ctx = await setupTest();
-
-  const checkVerbs = fileURLToPath(
-    new URL('../../code-style/scripts/check-project-verbs.sh', import.meta.url),
-  );
-
-  await ctx.writeLines('README.md', 10);
-
-  const source = await readFile(checkVerbs, 'utf8');
-
-  await ctx.writeText('.claude/skills/code-style/scripts/check-project-verbs.sh', source);
-
-  await ctx.writeText(
-    '.claude/skills/project-code-style/SKILL.md',
-    '## Project verbs\n\n- `mint`\n',
-  );
-
-  await ctx.writeText('.oxlintrc.json', '{ "rules": {} }\n');
-
-  const result = ctx.run();
-
-  expect(result.status).toBe(1);
-  expect(result.stdout).toInclude('lists `mint`, which .oxlintrc.json lacks in verbs');
-});
-
 test('it rejects --package naming a missing README', async () => {
   const ctx = await setupTest();
 

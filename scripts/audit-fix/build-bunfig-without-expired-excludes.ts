@@ -34,14 +34,14 @@ export function buildBunfigWithoutExpiredExcludes(
     return { bunfig, removed };
   }
 
-  return { bunfig: removeExcludeNames(withoutComments, removed), removed };
+  return { bunfig: buildBunfigWithoutNames(withoutComments, removed), removed };
 }
 
 function isGroups(value: unknown): value is Record<string, string | undefined> {
   return typeof value === 'object' && value !== null;
 }
 
-function removeExcludeNames(bunfig: string, names: readonly string[]): string {
+function buildBunfigWithoutNames(bunfig: string, names: readonly string[]): string {
   const start = /^minimumReleaseAgeExcludes\s*=\s*\[/mu.exec(bunfig);
 
   if (start === null) {

@@ -34,12 +34,11 @@ names, since the copy is otherwise verbatim. `workflow-bun-pr` runs
 Files under [`skills/`](./skills/) are the shared base of a Claude skill, each delivered by its
 opt-in `skill-<name>` entry to `.claude/skills/<name>/`. The code-style base lives in this repo's
 own [`.claude/skills/code-style/`](../.claude/skills/code-style/), because this repo's agents load
-it there and the function-verb lint rule's test reads its verb list from it. Its script and the
-script's test live in [`skills/code-style/`](./skills/code-style/). A repo keeps its own rules for
-the same area in a `project-<name>` skill beside it, which repo-sync never touches, and the shared
-skill tells the reader to load both. The entry lists every file in its skill folder, since the skill
-links its references by relative path; `scripts/check-sync-manifest.sh` fails on a file the entry
-omits. A skill's tests sit beside its scripts and stay here.
+it there and the verb-contract lint rule's test reads its role table from it. A repo keeps its own
+rules for the same area in a `project-<name>` skill beside it, which repo-sync never touches, and
+the shared skill tells the reader to load both. The entry lists every file in its skill folder,
+since the skill links its references by relative path; `scripts/check-sync-manifest.sh` fails on a
+file the entry omits. A skill's tests sit beside its scripts and stay here.
 
 A reference that fits only some repos, such as one for a language a repo never uses, names the other
 repos in its `except`, so they never load it. Every link to it in the entry's Markdown files sits in

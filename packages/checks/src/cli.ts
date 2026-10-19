@@ -2,7 +2,7 @@
 import { resolve } from 'node:path';
 import { allChecks } from './all-checks.ts';
 import { loadConfig } from './load-config.ts';
-import { parseCLIArgs } from './parse-cli-args.ts';
+import { resolveCLIArgs } from './resolve-cli-args.ts';
 import { runChecks } from './run-checks.ts';
 import { runGitShowToplevel } from './run-git-show-toplevel.ts';
 
@@ -13,7 +13,7 @@ Each finding prints as path:line: <check>: <message>, with the path from the rep
 Exits 0 with no finding, 1 with any finding, and 2 when the run could not finish.
 Checks: ${allChecks.map((check) => check.name).join(', ')}`;
 
-const parsed = await parseCLIArgs(process.argv.slice(2));
+const parsed = await resolveCLIArgs(process.argv.slice(2));
 
 if (typeof parsed === 'string') {
   process.stderr.write(`zgeoff-check: ${parsed}\n${USAGE}\n`);
