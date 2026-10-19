@@ -153,7 +153,10 @@ report 'Untagged code fences:' \
 list_changed() {
   local default base
   default=$(git rev-parse -q --abbrev-ref origin/HEAD 2>/dev/null) || default=origin/main
-  if git rev-parse -q --verify HEAD >/dev/null; then
+  # Before the first commit, every staged file is new.
+  if ! git rev-parse -q --verify HEAD >/dev/null; then
+    git ls-files -z --cached
+  else
     if base=$(git merge-base HEAD "$default" 2>/dev/null); then
       git diff -z --name-only --no-renames --diff-filter=d "$base" HEAD
     # A pull-request run in GitHub Actions checks out the PR's merge commit with no history and no
@@ -173,17 +176,32 @@ list_changed() {
 # lines between blank lines. Headings, list items and their lines, tables (with or without outer
 # pipes), block quotes, HTML blocks, link definitions, fenced code, frontmatter and any block whose
 # first line is indented (a list item's later paragraph, or indented code) never count. A line that
-# starts a list, heading, table, quote, HTML or code block ends the prose paragraph above it. An HTML
-# comment, script, pre, style or textarea block runs to its closing marker across blank lines, and
-# a Setext heading (prose underlined with = or -) never counts.
+# starts a list, heading, table, quote, HTML or code block ends the prose paragraph above it. A
+# Setext heading (prose underlined with = or -) never counts. A raw HTML region (a comment, a
+# processing instruction, a declaration, CDATA, or a script, pre, style or textarea block) is
+# tracked beside the fenced code: it opens on any line outside code, whatever block that line
+# follows, and runs to its closing marker across blank lines.
 paragraph_awk='
 function is_heading(line) {
   return line ~ /^[ \t]*#+([ \t]|$)/
 }
-# Block-level HTML, as CommonMark starts an HTML block: a comment, a declaration, or a block tag
-# such as div, pre or table, in any case. An inline tag or an autolink starts a prose paragraph.
+# Returns the pattern that closes the raw HTML region this line opens, as CommonMark HTML block
+# types 1 to 5 define them, "closed" when the same line closes it, or "" for any other line. A tag
+# name needs a boundary after it, so <preview> opens no pre region.
+function html_close(line, lower, marker) {
+  lower = tolower(line)
+  if (match(lower, /^[ \t]*<(script|pre|style|textarea)([ \t>]|$)/)) marker = "</(script|pre|style|textarea)>"
+  else if (match(lower, /^[ \t]*<!--/)) marker = "-->"
+  else if (match(lower, /^[ \t]*<\?/)) marker = "[?]>"
+  else if (match(lower, /^[ \t]*<!\[cdata\[/)) marker = "]]>"
+  else if (match(lower, /^[ \t]*<![a-z]/)) marker = ">"
+  else return ""
+  return substr(lower, RSTART + RLENGTH) ~ marker ? "closed" : marker
+}
+# Block-level HTML that a blank line ends, as CommonMark HTML block type 6 starts it: a block tag
+# such as div or table, in any case. An inline tag or an autolink starts a prose paragraph.
 function starts_html(line) {
-  return tolower(line) ~ /^[ \t]*<(!|\?|\/?(script|pre|style|textarea|address|article|aside|blockquote|body|caption|center|col|colgroup|dd|details|dialog|div|dl|dt|fieldset|figcaption|figure|footer|form|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|nav|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)([ \t>]|\/>|$))/
+  return tolower(line) ~ /^[ \t]*<\/?(address|article|aside|blockquote|body|caption|center|col|colgroup|dd|details|dialog|div|dl|dt|fieldset|figcaption|figure|footer|form|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|nav|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)([ \t>]|\/>|$)/
 }
 # A line that holds one tag and nothing else starts an HTML block too, but never ends a paragraph.
 function is_lone_tag(line) {
@@ -194,21 +212,6 @@ function starts_other(line) {
 }
 function is_table_delimiter(line) {
   return line ~ /\|/ && line ~ /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/
-}
-# Returns the marker that closes the HTML block this line opens, "closed" when the same line closes
-# it, or "" for a block that a blank line ends.
-function html_close(line, lower, tag, rest) {
-  lower = tolower(line)
-  if (match(lower, /^[ \t]*<!--/)) {
-    rest = substr(lower, RSTART + RLENGTH)
-    return index(rest, "-->") ? "closed" : "-->"
-  }
-  if (match(lower, /^[ \t]*<(script|pre|style|textarea)/)) {
-    tag = substr(lower, RSTART, RLENGTH)
-    sub(/^[ \t]*</, "", tag)
-    return index(lower, "</" tag ">") ? "closed" : "</" tag ">"
-  }
-  return ""
 }
 function flush() {
   if (kind == "prose" && words > warn) print start_file":"start_line":"words
@@ -225,12 +228,9 @@ front {
   if ($0 == "---") front = 0
   next
 }
-# The line after an HTML block closes starts a new block.
+# A region ends on the line that holds its closing marker, so the next line starts a new block.
 html_end != "" {
-  if (index(tolower($0), html_end)) {
-    html_end = ""
-    flush()
-  }
+  if (tolower($0) ~ html_end) html_end = ""
   next
 }
 {
@@ -243,6 +243,12 @@ html_end != "" {
     next
   }
   if (open != "") next
+  html_end = html_close($0)
+  if (html_end != "") {
+    flush()
+    if (html_end == "closed") html_end = ""
+    next
+  }
   if ($0 ~ /^[ \t]*$/) {
     flush()
     next
@@ -267,12 +273,6 @@ html_end != "" {
     kind = (starts_other($0) || is_lone_tag($0) || $0 ~ /^[ \t]/ || $0 ~ /^\[.*\]:/) ? "other" : "prose"
     start_file = FILENAME
     start_line = FNR
-    html_end = html_close($0)
-    if (html_end == "closed") {
-      html_end = ""
-      flush()
-      next
-    }
   }
   if (kind == "prose") words += NF
 }

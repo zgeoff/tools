@@ -26,12 +26,8 @@ async function setupTest() {
   const writeLines = async (path: string, count: number) => {
     await mkdir(dirname(join(dir, path)), { recursive: true });
 
-    // Every other line is blank, so no paragraph runs over the prose check's paragraph limit.
-    const lines = Array.from({ length: count }, (_, index) =>
-      index % 2 === 0 ? 'The tool reads one file.' : '',
-    );
-
-    await writeFile(join(dir, path), `${lines.join('\n')}\n`);
+    // Each line is a list item, which the prose check's paragraph limit skips.
+    await writeFile(join(dir, path), '- The tool reads one file.\n'.repeat(count));
   };
 
   const writeText = async (path: string, text: string) => {

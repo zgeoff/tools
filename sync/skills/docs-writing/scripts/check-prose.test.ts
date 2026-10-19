@@ -84,22 +84,13 @@ async function setupTest() {
   };
 }
 
-// Wraps the words ten to a line, as an editor wraps a paragraph.
-function buildWords(count: number, indent = '') {
-  const words = Array.from({ length: count }, () => 'word');
-  const lines: string[] = [];
-
-  for (let start = 0; start < count; start += 10) {
-    lines.push(indent + words.slice(start, start + 10).join(' '));
-  }
-
-  return lines.join('\n');
-}
-
 test('it fails on a 251-word paragraph', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('guide.md', `# Guide\n\n${buildWords(251)}\n`);
+  await ctx.writeText(
+    'guide.md',
+    `# Guide\n\n${'word word word word word word word word word word\n'.repeat(25)}word\n`,
+  );
 
   const result = ctx.run('guide.md');
 
@@ -111,7 +102,7 @@ test('it fails on a 251-word paragraph', async () => {
 test('it warns and passes on a 151-word paragraph', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('guide.md', `# Guide\n\n${buildWords(151)}\n`);
+  await ctx.writeText('guide.md', `# Guide\n\n${'word '.repeat(151)}\n`);
 
   const result = ctx.run('guide.md');
 
@@ -123,7 +114,7 @@ test('it warns and passes on a 151-word paragraph', async () => {
 test('it warns and passes on a 250-word paragraph', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('guide.md', `# Guide\n\n${buildWords(250)}\n`);
+  await ctx.writeText('guide.md', `# Guide\n\n${'word '.repeat(250)}\n`);
 
   const result = ctx.run('guide.md');
 
@@ -135,7 +126,7 @@ test('it warns and passes on a 250-word paragraph', async () => {
 test('it passes a 150-word paragraph without a warning', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('guide.md', `# Guide\n\n${buildWords(150)}\n`);
+  await ctx.writeText('guide.md', `# Guide\n\n${'word '.repeat(150)}\n`);
 
   const result = ctx.run('guide.md');
 
@@ -146,7 +137,10 @@ test('it passes a 150-word paragraph without a warning', async () => {
 test('it passes a 300-word fenced code block', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('guide.md', `# Guide\n\n\`\`\`text\n${buildWords(300)}\n\`\`\`\n`);
+  await ctx.writeText(
+    'guide.md',
+    `# Guide\n\n\`\`\`text\n${'word word word word word word word word word word\n'.repeat(30)}\`\`\`\n`,
+  );
 
   const result = ctx.run('guide.md');
 
@@ -157,10 +151,10 @@ test('it passes a 300-word fenced code block', async () => {
 test('it passes a long list, its wrapped lines and its later paragraphs', async () => {
   const ctx = await setupTest();
 
-  const item = `- ${buildWords(300, '  ').trimStart()}`;
-  const step = `1. The first step.\n\n${buildWords(300, '   ')}`;
+  const item = `- The first item.\n${'  word word word word word word word word word word\n'.repeat(30)}`;
+  const step = `1. The first step.\n\n${'   word word word word word word word word word word\n'.repeat(30)}`;
 
-  await ctx.writeText('guide.md', `# Guide\n\n${item}\n${item}\n\n${step}\n`);
+  await ctx.writeText('guide.md', `# Guide\n\n${item}${item}\n${step}`);
 
   const result = ctx.run('guide.md');
 
@@ -171,12 +165,12 @@ test('it passes a long list, its wrapped lines and its later paragraphs', async 
 test('it passes a long table, block quote and frontmatter', async () => {
   const ctx = await setupTest();
 
-  const row = `| ${buildWords(300).replaceAll('\n', ' ')} |`;
-  const quote = buildWords(300).replaceAll(/^/gmu, '> ');
+  const row = `| ${'word '.repeat(300)}|`;
+  const quote = '> word word word word word word word word word word\n'.repeat(30);
 
   await ctx.writeText(
     'guide.md',
-    `---\ndescription: ${buildWords(300).replaceAll('\n', ' ')}\n---\n\n| Name |\n| ---- |\n${row}\n\n${quote}\n`,
+    `---\ndescription: ${'word '.repeat(300)}\n---\n\n| Name |\n| ---- |\n${row}\n\n${quote}`,
   );
 
   const result = ctx.run('guide.md');
@@ -188,7 +182,7 @@ test('it passes a long table, block quote and frontmatter', async () => {
 test('it counts prose up to a list that interrupts it', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('guide.md', `${buildWords(200)}\n- ${buildWords(200)}\n`);
+  await ctx.writeText('guide.md', `${'word '.repeat(200)}\n- ${'word '.repeat(200)}\n`);
 
   const result = ctx.run('guide.md');
 
@@ -196,15 +190,27 @@ test('it counts prose up to a list that interrupts it', async () => {
   expect(result.stdout).toInclude('guide.md:1:200 words');
 });
 
+test('it keeps a separate paragraph count for each changed file', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('first.md', `${'word '.repeat(150)}\n`);
+  await ctx.writeText('second.md', `${'word '.repeat(150)}\n`);
+
+  const result = ctx.run('first.md', 'second.md');
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).not.toInclude('Paragraphs over');
+});
+
 test('it skips a file the branch leaves unchanged since its base on origin', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('old.md', `${buildWords(300)}\n`);
+  await ctx.writeText('old.md', `${'word '.repeat(300)}\n`);
 
   ctx.runCommit('add the old doc');
   ctx.runGit('update-ref', 'refs/remotes/origin/main', 'HEAD');
 
-  await ctx.writeText('new.md', `${buildWords(260)}\n`);
+  await ctx.writeText('new.md', `${'word '.repeat(260)}\n`);
 
   ctx.runCommit('add the new doc');
 
@@ -219,12 +225,12 @@ test('it skips a file the branch leaves unchanged since its base on origin', asy
 test('it checks uncommitted edits and says so when origin has no base', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('old.md', `${buildWords(300)}\n`);
+  await ctx.writeText('old.md', `${'word '.repeat(300)}\n`);
   await ctx.writeText('edited.md', 'A short doc.\n');
 
   ctx.runCommit('add the docs');
 
-  await ctx.writeText('edited.md', `${buildWords(260)}\n`);
+  await ctx.writeText('edited.md', `${'word '.repeat(260)}\n`);
 
   const result = ctx.run('old.md', 'edited.md');
 
@@ -237,10 +243,23 @@ test('it checks uncommitted edits and says so when origin has no base', async ()
   );
 });
 
+test('it checks a staged file before the first commit', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', `${'word '.repeat(251)}\n`);
+
+  ctx.runGit('add', 'guide.md');
+
+  const result = ctx.run('guide.md');
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('guide.md:1:251 words');
+});
+
 test('it fetches the base branch in a pull-request run with no origin history', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('old.md', `${buildWords(300)}\n`);
+  await ctx.writeText('old.md', `${'word '.repeat(300)}\n`);
 
   ctx.runCommit('add the old doc');
 
@@ -249,7 +268,7 @@ test('it fetches the base branch in a pull-request run with no origin history', 
   ctx.runGit('push', '-q', 'origin', 'HEAD:main');
   ctx.runGit('update-ref', '-d', 'refs/remotes/origin/main');
 
-  await ctx.writeText('new.md', `${buildWords(260)}\n`);
+  await ctx.writeText('new.md', `${'word '.repeat(260)}\n`);
 
   ctx.runCommit('add the new doc');
 
@@ -264,9 +283,10 @@ test('it fetches the base branch in a pull-request run with no origin history', 
 test('it passes a long table without outer pipes', async () => {
   const ctx = await setupTest();
 
-  const row = `${buildWords(150).replaceAll('\n', ' ')} | ${buildWords(150).replaceAll('\n', ' ')}`;
-
-  await ctx.writeText('guide.md', `Name | Description\n--- | ---\n${row}\n`);
+  await ctx.writeText(
+    'guide.md',
+    `Name | Description\n--- | ---\n${'word '.repeat(150)}| ${'word '.repeat(150)}\n`,
+  );
 
   const result = ctx.run('guide.md');
 
@@ -279,15 +299,56 @@ test('it skips HTML comments and upper-case pre blocks across blank lines and co
 
   await ctx.writeText(
     'guide.md',
-    `<!--\n\n${buildWords(300)}\n\n-->\n\n<PRE>\n\n${buildWords(300)}\n\n</PRE>\n\n${buildWords(200)}\n`,
+    `<!--\n\n${'word '.repeat(300)}\n\n-->\n\n<PRE>\n\n${'word '.repeat(300)}\n\n</PRE>\n\n${'word '.repeat(200)}\n`,
   );
 
   const result = ctx.run('guide.md');
 
   expect(result.status).toBe(0);
   expect(result.stdout).not.toInclude('guide.md:3:');
-  expect(result.stdout).not.toInclude('guide.md:38:');
-  expect(result.stdout).toInclude('guide.md:71:200 words');
+  expect(result.stdout).not.toInclude('guide.md:9:');
+  expect(result.stdout).toInclude('guide.md:13:200 words');
+});
+
+test('it skips an HTML comment that follows a list item with no blank line', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText(
+    'guide.md',
+    `- An item.\n<!--\n\n${'word '.repeat(300)}\n\n-->\n${'word '.repeat(251)}\n`,
+  );
+
+  const result = ctx.run('guide.md');
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).not.toInclude('guide.md:4:');
+  expect(result.stdout).toInclude('guide.md:7:251 words');
+});
+
+test('it skips an HTML comment that follows an indented code block with no blank line', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText(
+    'guide.md',
+    `Intro.\n\n    const answer = 42;\n<!--\n\n${'word '.repeat(300)}\n\n-->\n${'word '.repeat(251)}\n`,
+  );
+
+  const result = ctx.run('guide.md');
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).not.toInclude('guide.md:6:');
+  expect(result.stdout).toInclude('guide.md:9:251 words');
+});
+
+test('it counts the prose after a tag whose name only starts with pre', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', `<preview>Text</preview>\n\n${'word '.repeat(251)}\n`);
+
+  const result = ctx.run('guide.md');
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('guide.md:3:251 words');
 });
 
 test('it warns on a paragraph that starts with an inline tag or an autolink', async () => {
@@ -295,20 +356,20 @@ test('it warns on a paragraph that starts with an inline tag or an autolink', as
 
   await ctx.writeText(
     'guide.md',
-    `<https://example.com> ${buildWords(250)}\n\n<em>Read this</em> ${buildWords(249)}\n`,
+    `<https://example.com> ${'word '.repeat(250)}\n\n<em>Read this</em> ${'word '.repeat(249)}\n`,
   );
 
   const result = ctx.run('guide.md');
 
   expect(result.status).toBe(1);
   expect(result.stdout).toInclude('guide.md:1:251 words');
-  expect(result.stdout).toInclude('guide.md:27:251 words');
+  expect(result.stdout).toInclude('guide.md:3:251 words');
 });
 
 test('it counts a paragraph that follows a heading with no blank line', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('guide.md', `# Guide\n${buildWords(251)}\n`);
+  await ctx.writeText('guide.md', `# Guide\n${'word '.repeat(251)}\n`);
 
   const result = ctx.run('guide.md');
 
@@ -319,7 +380,9 @@ test('it counts a paragraph that follows a heading with no blank line', async ()
 test('it skips a long Setext heading', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('guide.md', `${buildWords(251)}\n===\n\n${buildWords(251)}\n------\n`);
+  const lines = 'word word word word word word word word word word\n'.repeat(26);
+
+  await ctx.writeText('guide.md', `${lines}===\n\n${lines}------\n`);
 
   const result = ctx.run('guide.md');
 
@@ -332,14 +395,14 @@ test('it counts a paragraph that starts on the line after an HTML comment closes
 
   await ctx.writeText(
     'guide.md',
-    `<!--\nA note for editors.\n-->\n${buildWords(251)}\n\n<!-- A one-line note. -->\n${buildWords(252)}\n`,
+    `<!--\nA note for editors.\n-->\n${'word '.repeat(251)}\n\n<!-- A one-line note. -->\n${'word '.repeat(252)}\n`,
   );
 
   const result = ctx.run('guide.md');
 
   expect(result.status).toBe(1);
   expect(result.stdout).toInclude('guide.md:4:251 words');
-  expect(result.stdout).toInclude('guide.md:32:252 words');
+  expect(result.stdout).toInclude('guide.md:7:252 words');
 });
 
 test('it counts only the PR documents in a shallow pull-request merge checkout', async () => {
@@ -351,12 +414,12 @@ test('it counts only the PR documents in a shallow pull-request merge checkout',
   ctx.runGit('branch', '-M', 'main');
   ctx.runGit('branch', 'feature');
 
-  await ctx.writeText('base.md', `${buildWords(260)}\n`);
+  await ctx.writeText('base.md', `${'word '.repeat(260)}\n`);
 
   ctx.runCommit('add a doc on the base');
   ctx.runGit('checkout', '-q', 'feature');
 
-  await ctx.writeText('pr.md', `${buildWords(270)}\n`);
+  await ctx.writeText('pr.md', `${'word '.repeat(270)}\n`);
 
   ctx.runCommit('add a doc on the PR');
   ctx.runGit('checkout', '-q', '-b', 'pull-merge', 'main');
@@ -378,7 +441,7 @@ test('it counts only the PR documents in a shallow pull-request merge checkout',
 test('it checks a changed file whose name holds a space', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('user guide.md', `${buildWords(251)}\n`);
+  await ctx.writeText('user guide.md', `${'word '.repeat(251)}\n`);
 
   const result = ctx.run('user guide.md');
 
@@ -389,13 +452,13 @@ test('it checks a changed file whose name holds a space', async () => {
 test('it reads the default branch from origin/HEAD', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('old.md', `${buildWords(300)}\n`);
+  await ctx.writeText('old.md', `${'word '.repeat(300)}\n`);
 
   ctx.runCommit('add the old doc');
   ctx.runGit('update-ref', 'refs/remotes/origin/trunk', 'HEAD');
   ctx.runGit('symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/trunk');
 
-  await ctx.writeText('new.md', `${buildWords(251)}\n`);
+  await ctx.writeText('new.md', `${'word '.repeat(251)}\n`);
 
   ctx.runCommit('add the new doc');
 
