@@ -1514,6 +1514,10 @@ test.each([
     'an array whose first entry yields nothing',
     { '.': [{ worker: './src/dist.ts' }, './src/index.ts'] },
   ],
+  [
+    'an array with no match under an active condition, which falls through to default',
+    { '.': { development: [{ worker: './src/dist.ts' }], default: './src/index.ts' } },
+  ],
 ])('it resolves a workspace package through %s', async (_shape, exports) => {
   const files = {
     'packages/store/package.json': JSON.stringify({ name: '@demo/store', exports }),
@@ -1535,7 +1539,7 @@ test.each([
   ],
   ['a null root entry', { '.': null }],
   ['conditions that none of the active ones match', { '.': { worker: './src/index.ts' } }],
-  ['an array with no entry that yields a target', { '.': [{ worker: './src/index.ts' }, null] }],
+  ['an array that holds a null and no target', { '.': [{ worker: './src/index.ts' }, null] }],
   ['a target file that does not exist', { '.': './src/missing.ts' }],
 ])('it reports a workspace import blocked by %s as unresolved', async (_shape, exports) => {
   const files = {
