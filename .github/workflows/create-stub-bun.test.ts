@@ -6,21 +6,21 @@ import { $ } from 'bun';
 import { createStubBun } from './create-stub-bun.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'create-stub-bun-'));
+  const directory = await mkdtemp(join(tmpdir(), 'create-stub-bun-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  return { dir };
+  return { directory };
 }
 
 test('it records the script name of each bun run call in order', async () => {
   const ctx = await setupTest();
 
-  await createStubBun(ctx.dir, join(ctx.dir, 'ran'));
+  await createStubBun(ctx.directory, join(ctx.directory, 'ran'));
 
-  await $`${join(ctx.dir, 'bun')} run lint && ${join(ctx.dir, 'bun')} run format:check`.quiet();
+  await $`${join(ctx.directory, 'bun')} run lint && ${join(ctx.directory, 'bun')} run format:check`.quiet();
 
-  const ran = await readFile(join(ctx.dir, 'ran'), 'utf8');
+  const ran = await readFile(join(ctx.directory, 'ran'), 'utf8');
 
   expect(ran).toBe('lint\nformat:check\n');
 });
@@ -32,10 +32,10 @@ test.each([
 ])('it exits 64 and records nothing for %s', async (_label, args) => {
   const ctx = await setupTest();
 
-  await createStubBun(ctx.dir, join(ctx.dir, 'ran'));
+  await createStubBun(ctx.directory, join(ctx.directory, 'ran'));
 
-  const result = await $`${join(ctx.dir, 'bun')} ${args}`.nothrow().quiet();
-  const recorded = await Bun.file(join(ctx.dir, 'ran')).exists();
+  const result = await $`${join(ctx.directory, 'bun')} ${args}`.nothrow().quiet();
+  const recorded = await Bun.file(join(ctx.directory, 'ran')).exists();
 
   expect(result.exitCode).toBe(64);
   expect(result.stderr.toString()).toBe('stub bun: supports only: bun run <script>\n');

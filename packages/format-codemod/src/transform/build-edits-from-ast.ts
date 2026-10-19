@@ -3,10 +3,10 @@ import { collectChildNodes } from './collect-child-nodes.ts';
 import { planGapEdit } from './plan-gap-edit.ts';
 import { shouldHaveBlankLine } from './should-have-blank-line.ts';
 
-export function buildEditsFromAST(src: string, parsed: ParsedSource): Edit[] {
-  const file: SourceFile = { src, comments: parsed.comments };
+export function buildEditsFromAST(source: string, parsed: ParsedSource): Edit[] {
+  const file: SourceFile = { source, comments: parsed.comments };
 
-  return walk(file, parsed.program).toSorted((a, b) => b.start - a.start);
+  return walk(file, parsed.program).toSorted((first, second) => second.start - first.start);
 }
 
 function walk(file: SourceFile, node: ASTNode): Edit[] {
@@ -43,17 +43,17 @@ function getStatementLists(node: ASTNode): (readonly ASTNode[])[] {
 function buildPairEdits(file: SourceFile, container: ASTNode, body: readonly ASTNode[]): Edit[] {
   const edits: Edit[] = [];
 
-  for (let i = 0; i < body.length - 1; i++) {
-    const prev = body[i];
-    const next = body[i + 1];
+  for (let index = 0; index < body.length - 1; index++) {
+    const previous = body[index];
+    const next = body[index + 1];
 
-    if (prev !== undefined && next !== undefined && !isImportPair(prev, next)) {
+    if (previous !== undefined && next !== undefined && !isImportPair(previous, next)) {
       const pad =
-        shouldHaveBlankLine(container, prev, next) ||
-        isMultiline(file.src, prev) ||
-        isMultiline(file.src, next);
+        shouldHaveBlankLine(container, previous, next) ||
+        isMultiline(file.source, previous) ||
+        isMultiline(file.source, next);
 
-      const edit = planGapEdit({ file, prev, next, pad });
+      const edit = planGapEdit({ file, previous, next, pad });
 
       if (edit !== null) {
         edits.push(edit);
@@ -66,14 +66,14 @@ function buildPairEdits(file: SourceFile, container: ASTNode, body: readonly AST
 
 // the interior of an import block belongs to the import sorter, which would
 // reorder or strip any edit made there
-function isImportPair(prev: ASTNode, next: ASTNode): boolean {
-  return prev.type === 'ImportDeclaration' && next.type === 'ImportDeclaration';
+function isImportPair(previous: ASTNode, next: ASTNode): boolean {
+  return previous.type === 'ImportDeclaration' && next.type === 'ImportDeclaration';
 }
 
-function isMultiline(src: string, node: ASTNode): boolean {
+function isMultiline(source: string, node: ASTNode): boolean {
   return (
     typeof node.start === 'number' &&
     typeof node.end === 'number' &&
-    src.slice(node.start, node.end).includes('\n')
+    source.slice(node.start, node.end).includes('\n')
   );
 }

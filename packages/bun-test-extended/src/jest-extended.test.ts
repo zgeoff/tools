@@ -18,7 +18,7 @@ test('it matches a member of a list with toBeOneOf', () => {
 });
 
 test('it accepts a custom predicate with toSatisfy', () => {
-  expect(12).toSatisfy((n: number) => n % 2 === 0);
+  expect(12).toSatisfy((value: number) => value % 2 === 0);
 });
 
 test('it identifies arrays with toBeArray', () => {
@@ -42,11 +42,11 @@ test('it requires at least one listed member with toIncludeAnyMembers', () => {
 });
 
 test('it applies a predicate to every element with toSatisfyAll', () => {
-  expect([2, 4, 6]).toSatisfyAll((n: number) => n % 2 === 0);
+  expect([2, 4, 6]).toSatisfyAll((value: number) => value % 2 === 0);
 });
 
 test('it applies a predicate to at least one element with toSatisfyAny', () => {
-  expect([1, 2, 3]).toSatisfyAny((n: number) => n === 2);
+  expect([1, 2, 3]).toSatisfyAny((value: number) => value === 2);
 });
 
 test('it finds an object by subset with toPartiallyContain', () => {

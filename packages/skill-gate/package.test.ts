@@ -11,18 +11,18 @@ const TSC_PATH = join(import.meta.dir, '../../node_modules/.bin/tsc');
 // repo carries at .claude/hooks/skill-gate/skill-gate.ts. Every build and pack writes under the
 // test's own folder, never the shared dist, so overlapping runs cannot race.
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'skill-gate-package-'));
+  const directory = await mkdtemp(join(tmpdir(), 'skill-gate-package-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   // The real HOME keeps bun install on the shared cache.
   const env = { PATH: process.env['PATH'], HOME: process.env['HOME'] };
-  const unpacked = join(dir, 'unpacked');
-  const packed = join(dir, 'packed');
-  const project = join(dir, 'project');
-  const stdSource = join(dir, 'std-source');
-  const stdUnpacked = join(dir, 'std-unpacked');
-  const stdPacked = join(dir, 'std-packed');
+  const unpacked = join(directory, 'unpacked');
+  const packed = join(directory, 'packed');
+  const project = join(directory, 'project');
+  const stdSource = join(directory, 'std-source');
+  const stdUnpacked = join(directory, 'std-unpacked');
+  const stdPacked = join(directory, 'std-packed');
 
   // A release PR bumps std before npm has the new version. The packed copies take a version npm
   // lacks, so an install that reaches npm for std fails.
@@ -39,18 +39,18 @@ async function setupTest() {
 
   // The source pack runs no build; it gives the published manifest, with workspace versions
   // resolved. The declarations then build into the unpacked copy, as the publish's prepare does.
-  await $`bun pm pack --ignore-scripts --destination ${dir}`
+  await $`bun pm pack --ignore-scripts --destination ${directory}`
     .cwd(import.meta.dir)
     .env(env)
     .quiet();
 
-  const entries = await readdir(dir);
+  const entries = await readdir(directory);
 
   const manifest = entries.find((name) => name.endsWith('.tgz'));
 
   invariant(manifest !== undefined, 'bun pm pack wrote no tarball');
 
-  await $`tar -xzf ${join(dir, manifest)} -C ${unpacked}`.env(env).quiet();
+  await $`tar -xzf ${join(directory, manifest)} -C ${unpacked}`.env(env).quiet();
 
   await $`bun pm pkg set dependencies.@zgeoff/std=${unpublishedStdVersion}`
     .cwd(join(unpacked, 'package'))

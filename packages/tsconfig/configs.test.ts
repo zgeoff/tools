@@ -6,20 +6,20 @@ import { join } from 'node:path';
 // The project sits inside this repo so `extends` resolves @zgeoff/tsconfig through the
 // workspace link in the root node_modules, the way a consumer's install resolves it.
 async function setupTest(variant: string, source: string) {
-  const dir = await mkdtemp(join(import.meta.dir, '.test-'));
+  const directory = await mkdtemp(join(import.meta.dir, '.test-'));
 
   await writeFile(
-    join(dir, 'tsconfig.json'),
+    join(directory, 'tsconfig.json'),
     JSON.stringify({ extends: `@zgeoff/tsconfig/${variant}`, include: ['index.ts'] }),
   );
 
-  await writeFile(join(dir, 'index.ts'), source);
+  await writeFile(join(directory, 'index.ts'), source);
 
   return {
     tsc: join(import.meta.dir, '../../node_modules/.bin/tsc'),
-    dir,
+    directory,
     async [Symbol.asyncDispose]() {
-      await rm(dir, { recursive: true, force: true });
+      await rm(directory, { recursive: true, force: true });
     },
   };
 }
@@ -27,7 +27,7 @@ async function setupTest(variant: string, source: string) {
 test('it layers the bundler-mode options over the strictest flags', async () => {
   await using project = await setupTest('base.json', 'export {};\n');
 
-  const result = Bun.spawnSync([project.tsc, '-p', project.dir, '--showConfig']);
+  const result = Bun.spawnSync([project.tsc, '-p', project.directory, '--showConfig']);
   const config: unknown = JSON.parse(result.stdout.toString());
 
   expect(config).toMatchObject({
@@ -49,7 +49,7 @@ test('it rejects an unchecked index access under the base config', async () => {
     'const names: string[] = [];\nexport const length: number = names[0].length;\n',
   );
 
-  const result = Bun.spawnSync([project.tsc, '-p', project.dir]);
+  const result = Bun.spawnSync([project.tsc, '-p', project.directory]);
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout.toString()).toInclude('TS2532');
@@ -58,7 +58,7 @@ test('it rejects an unchecked index access under the base config', async () => {
 test('it leaves the DOM out of the base config', async () => {
   await using project = await setupTest('base.json', 'export const body = document.body;\n');
 
-  const result = Bun.spawnSync([project.tsc, '-p', project.dir]);
+  const result = Bun.spawnSync([project.tsc, '-p', project.directory]);
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout.toString()).toInclude("Cannot find name 'document'");
@@ -70,7 +70,7 @@ test('it type-checks DOM code under the react config', async () => {
     'export const body: HTMLElement = document.body;\n',
   );
 
-  const result = Bun.spawnSync([project.tsc, '-p', project.dir]);
+  const result = Bun.spawnSync([project.tsc, '-p', project.directory]);
 
   expect(result.exitCode).toBe(0);
   expect(result.stdout.toString()).toBe('');
@@ -79,7 +79,7 @@ test('it type-checks DOM code under the react config', async () => {
 test('it sets the automatic JSX runtime and the DOM libs in the react config', async () => {
   await using project = await setupTest('react.json', 'export {};\n');
 
-  const result = Bun.spawnSync([project.tsc, '-p', project.dir, '--showConfig']);
+  const result = Bun.spawnSync([project.tsc, '-p', project.directory, '--showConfig']);
   const config: unknown = JSON.parse(result.stdout.toString());
 
   expect(config).toMatchObject({

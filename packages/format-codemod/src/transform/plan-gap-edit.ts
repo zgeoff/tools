@@ -2,13 +2,13 @@ import type { ASTNode, CommentSpan, Edit, SourceFile } from '../types.ts';
 
 export interface GapEditInput {
   readonly file: SourceFile;
-  readonly prev: ASTNode;
+  readonly previous: ASTNode;
   readonly next: ASTNode;
   readonly pad: boolean;
 }
 
 export function planGapEdit(input: GapEditInput): Edit | null {
-  const gap = buildGap(input.file, input.prev, input.next);
+  const gap = buildGap(input.file, input.previous, input.next);
 
   if (!isSafeToResize(gap)) {
     return null;
@@ -18,86 +18,90 @@ export function planGapEdit(input: GapEditInput): Edit | null {
 }
 
 interface Gap {
-  readonly src: string;
+  readonly source: string;
   readonly start: number;
   readonly end: number;
   readonly comments: readonly CommentSpan[];
 }
 
-function buildGap(file: SourceFile, prev: ASTNode, next: ASTNode): Gap {
-  const start = getNodeEnd(prev);
+function buildGap(file: SourceFile, previous: ASTNode, next: ASTNode): Gap {
+  const start = getNodeEnd(previous);
   const end = getNodeStart(next);
-  const comments = file.comments.filter((c) => c.start >= start && c.end <= end);
+  const comments = file.comments.filter((comment) => comment.start >= start && comment.end <= end);
 
-  return { src: file.src, start, end, comments };
+  return { source: file.source, start, end, comments };
 }
 
-function getNodeEnd(n: ASTNode): number {
-  if (typeof n.end !== 'number') {
+function getNodeEnd(node: ASTNode): number {
+  if (typeof node.end !== 'number') {
     throw new TypeError('AST node is missing an end position');
   }
 
-  return n.end;
+  return node.end;
 }
 
-function getNodeStart(n: ASTNode): number {
-  if (typeof n.start !== 'number') {
+function getNodeStart(node: ASTNode): number {
+  if (typeof node.start !== 'number') {
     throw new TypeError('AST node is missing a start position');
   }
 
-  return n.start;
+  return node.start;
 }
 
 // same-line statements come from a leading-semicolon ASI guard (`;(expr)`):
 // the parser folds that `;` into the prior node, so the gap falls between `;`
 // and `(` and a blank-only splice would orphan the `;`
 function isSafeToResize(gap: Gap): boolean {
-  return isTriviaOnly(gap) && gap.src.slice(gap.start, gap.end).includes('\n');
+  return isTriviaOnly(gap) && gap.source.slice(gap.start, gap.end).includes('\n');
 }
 
 function isTriviaOnly(gap: Gap): boolean {
   let cursor = gap.start;
 
-  for (const c of gap.comments) {
-    if (gap.src.slice(cursor, c.start).trim() !== '') {
+  for (const comment of gap.comments) {
+    if (gap.source.slice(cursor, comment.start).trim() !== '') {
       return false;
     }
 
-    cursor = c.end;
+    cursor = comment.end;
   }
 
-  return gap.src.slice(cursor, gap.end).trim() === '';
+  return gap.source.slice(cursor, gap.end).trim() === '';
 }
 
 function planBlankLineEdit(gap: Gap): Edit | null {
   const effectiveStart = getEffectiveGapStart(gap);
-  const leadingComment = gap.comments.find((c) => c.start >= effectiveStart);
+  const leadingComment = gap.comments.find((comment) => comment.start >= effectiveStart);
 
   if (leadingComment !== undefined) {
-    return planLeadingCommentEdit(gap.src, effectiveStart, leadingComment.start);
+    return planLeadingCommentEdit(gap.source, effectiveStart, leadingComment.start);
   }
 
-  return planWhitespaceGap(gap.src.slice(effectiveStart, gap.end), effectiveStart, gap.end);
+  return planWhitespaceGap(gap.source.slice(effectiveStart, gap.end), effectiveStart, gap.end);
 }
 
 function getEffectiveGapStart(gap: Gap): number {
-  let pos = gap.start;
+  let position = gap.start;
 
-  for (const c of gap.comments) {
-    if (gap.src.slice(pos, c.start).includes('\n')) {
+  for (const comment of gap.comments) {
+    if (gap.source.slice(position, comment.start).includes('\n')) {
       break;
     }
 
-    pos = c.end;
+    position = comment.end;
   }
 
-  return pos;
+  return position;
 }
 
 const MIN_NEWLINES = 2;
 
-function planLeadingCommentEdit(src: string, restStart: number, commentStart: number): Edit | null {
-  const leading = src.slice(restStart, commentStart);
+function planLeadingCommentEdit(
+  source: string,
+  restStart: number,
+  commentStart: number,
+): Edit | null {
+  const leading = source.slice(restStart, commentStart);
   const leadingNewlines = countNewlines(leading);
 
   if (leadingNewlines >= MIN_NEWLINES) {
@@ -111,8 +115,8 @@ function planLeadingCommentEdit(src: string, restStart: number, commentStart: nu
   };
 }
 
-function countNewlines(s: string): number {
-  return (s.match(/\n/gu) ?? []).length;
+function countNewlines(text: string): number {
+  return (text.match(/\n/gu) ?? []).length;
 }
 
 function planWhitespaceGap(gap: string, gapStart: number, gapEnd: number): Edit | null {
@@ -133,7 +137,7 @@ function planCollapseEdit(gap: Gap): Edit | null {
     return null;
   }
 
-  const text = gap.src.slice(gap.start, gap.end);
+  const text = gap.source.slice(gap.start, gap.end);
 
   if (countNewlines(text) < MIN_NEWLINES) {
     return null;

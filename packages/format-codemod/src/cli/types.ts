@@ -14,7 +14,7 @@ export interface FileReport {
 
 export interface FileEdit {
   readonly file: string;
-  readonly src: string;
+  readonly source: string;
   readonly result: TransformResult;
 }
 
@@ -22,7 +22,7 @@ export interface BenchStats {
   readonly files: number;
   readonly parsed: number;
   readonly bytes: number;
-  readonly ms: number;
+  readonly elapsed_ms: number;
   readonly us_per_file: number;
   readonly mb_per_sec: number;
 }

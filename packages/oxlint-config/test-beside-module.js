@@ -61,15 +61,15 @@ function isUnderExemptRoot(cwd, filename) {
 // a module is `<name>.<ext>` with a single-segment extension, so a
 // declaration file never stands in for one, and neither does another test
 // (`foo.test.ts` beside `foo.test.test.ts`)
-function probeModuleSibling(dir, name) {
-  return readdirSync(dir).some((entry) => {
+function probeModuleSibling(directory, name) {
+  return readdirSync(directory).some((entry) => {
     const dot = entry.lastIndexOf('.');
 
     return (
       dot > 0 &&
       entry.slice(0, dot) === name &&
       !testFilePattern.test(entry) &&
-      probeFile(join(dir, entry))
+      probeFile(join(directory, entry))
     );
   });
 }

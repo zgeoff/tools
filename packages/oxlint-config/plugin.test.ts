@@ -27,35 +27,41 @@ type RuleSettings = Readonly<Record<string, unknown>>;
 type FileTree = Readonly<Record<string, string>>;
 
 async function createLintTree(files: FileTree, rules: RuleSettings): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'oxlint-config-test-'));
+  const directory = await mkdtemp(join(tmpdir(), 'oxlint-config-test-'));
 
   const config = { jsPlugins: [pluginPath], rules };
 
-  await writeFile(join(dir, '.oxlintrc.json'), JSON.stringify(config));
+  await writeFile(join(directory, '.oxlintrc.json'), JSON.stringify(config));
 
   await Promise.all(
-    Object.entries(files).map((entry: readonly [string, string]) => writeTreeFile(dir, entry)),
+    Object.entries(files).map((entry: readonly [string, string]) =>
+      writeTreeFile(directory, entry),
+    ),
   );
 
-  return dir;
+  return directory;
 }
 
-async function writeTreeFile(dir: string, entry: readonly [string, string]): Promise<void> {
+async function writeTreeFile(directory: string, entry: readonly [string, string]): Promise<void> {
   const [path, content] = entry;
 
-  await mkdir(dirname(join(dir, path)), { recursive: true });
-  await writeFile(join(dir, path), content);
+  await mkdir(dirname(join(directory, path)), { recursive: true });
+  await writeFile(join(directory, path), content);
 }
 
 async function runLint(source: string, fix: boolean, rules: RuleSettings): Promise<LintResult> {
-  const dir = await createLintTree({ 'sample.ts': source }, rules);
+  const directory = await createLintTree({ 'sample.ts': source }, rules);
 
   const fixArgs = fix ? ['--fix'] : [];
   const args = [oxlintBin, '-c', '.oxlintrc.json', ...fixArgs, 'sample.ts'];
-  const proc = Bun.spawn(args, { cwd: dir, stdout: 'pipe', stderr: 'pipe' });
+  const subprocess = Bun.spawn(args, { cwd: directory, stdout: 'pipe', stderr: 'pipe' });
 
-  const [exitCode, stdout] = await Promise.all([proc.exited, new Response(proc.stdout).text()]);
-  const output = await readFile(join(dir, 'sample.ts'), 'utf8');
+  const [exitCode, stdout] = await Promise.all([
+    subprocess.exited,
+    new Response(subprocess.stdout).text(),
+  ]);
+
+  const output = await readFile(join(directory, 'sample.ts'), 'utf8');
 
   return { exitCode, stdout, output };
 }
@@ -67,24 +73,27 @@ async function runLintTree(
   target: string,
   rules: RuleSettings,
 ): Promise<TreeLintResult> {
-  const dir = await createLintTree(files, rules);
+  const directory = await createLintTree(files, rules);
 
-  return runLintIn(dir, dir, target);
+  return runLintIn(directory, directory, target);
 }
 
-async function runLintIn(dir: string, cwd: string, target: string): Promise<TreeLintResult> {
+async function runLintIn(directory: string, cwd: string, target: string): Promise<TreeLintResult> {
   const args = [
     oxlintBin,
     '-c',
-    join(dir, '.oxlintrc.json'),
+    join(directory, '.oxlintrc.json'),
     '--report-unused-disable-directives-severity',
     'error',
     target,
   ];
 
-  const proc = Bun.spawn(args, { cwd, stdout: 'pipe', stderr: 'pipe' });
+  const subprocess = Bun.spawn(args, { cwd, stdout: 'pipe', stderr: 'pipe' });
 
-  const [exitCode, stdout] = await Promise.all([proc.exited, new Response(proc.stdout).text()]);
+  const [exitCode, stdout] = await Promise.all([
+    subprocess.exited,
+    new Response(subprocess.stdout).text(),
+  ]);
 
   return { exitCode, stdout };
 }
@@ -510,11 +519,14 @@ test('it counts neither another test nor a declaration file as the module', asyn
 });
 
 test('it counts a symlinked module', async () => {
-  const dir = await createLintTree({ 'real.ts': '', 'link.test.ts': testSource }, besideModule);
+  const directory = await createLintTree(
+    { 'real.ts': '', 'link.test.ts': testSource },
+    besideModule,
+  );
 
-  await symlink(join(dir, 'real.ts'), join(dir, 'link.ts'));
+  await symlink(join(directory, 'real.ts'), join(directory, 'link.ts'));
 
-  const result = await runLintIn(dir, dir, 'link.test.ts');
+  const result = await runLintIn(directory, directory, 'link.test.ts');
 
   expect(result.exitCode).toBe(0);
 });
@@ -584,7 +596,7 @@ test('it flags tests under test-utils/ or a nested e2e/ directory', async () => 
 });
 
 test('it anchors the e2e/ exemption on the repo root, not the working directory', async () => {
-  const dir = await createLintTree(
+  const directory = await createLintTree(
     {
       '.git/HEAD': '',
       'e2e/root.test.ts': testSource,
@@ -593,10 +605,10 @@ test('it anchors the e2e/ exemption on the repo root, not the working directory'
     besideModule,
   );
 
-  const packageCWD = join(dir, 'packages', 'cli');
+  const packageCWD = join(directory, 'packages', 'cli');
 
-  const nested = await runLintIn(dir, packageCWD, 'e2e/run.test.ts');
-  const root = await runLintIn(dir, packageCWD, join(dir, 'e2e', 'root.test.ts'));
+  const nested = await runLintIn(directory, packageCWD, 'e2e/run.test.ts');
+  const root = await runLintIn(directory, packageCWD, join(directory, 'e2e', 'root.test.ts'));
 
   expect(nested.exitCode).toBe(1);
   expect(nested.stdout).toInclude('run.<ext>');
@@ -1062,8 +1074,17 @@ test('it reports nothing when the config names no words', async () => {
   expect(result.exitCode).toBe(0);
 });
 
+// the names sit in rows rather than keys, so they pass the rule under test
 const abbreviated = {
-  'zgeoff/no-abbreviated-names': ['error', { names: { src: '`source`', ms: 'a unit suffix' } }],
+  'zgeoff/no-abbreviated-names': [
+    'error',
+    {
+      names: Object.fromEntries([
+        ['src', '`source`'],
+        ['ms', 'a unit suffix'],
+      ]),
+    },
+  ],
 };
 
 // every form that binds a name, with NAME where the name goes; each row runs
@@ -1517,11 +1538,11 @@ test('it accepts a restricted module inside its zone, out of scope, or imported 
     'scripts/send.ts': "import { request } from 'node:https';\n\nrequest('https://x.test');\n",
   };
 
-  const dir = await createLintTree(files, layered);
+  const directory = await createLintTree(files, layered);
 
   const results = await Promise.all(
     ['src/model/send.ts', 'src/state/agent.ts', 'scripts/send.ts'].map((target: string) =>
-      runLintIn(dir, dir, target),
+      runLintIn(directory, directory, target),
     ),
   );
 
@@ -1535,9 +1556,9 @@ test('it flags a restricted global call outside its zones', async () => {
     'src/model/send.ts': "await fetch('https://x.test');\n",
   };
 
-  const dir = await createLintTree(files, layered);
-  const outside = await runLintIn(dir, dir, 'src/state/send.ts');
-  const inside = await runLintIn(dir, dir, 'src/model/send.ts');
+  const directory = await createLintTree(files, layered);
+  const outside = await runLintIn(directory, directory, 'src/state/send.ts');
+  const inside = await runLintIn(directory, directory, 'src/model/send.ts');
 
   expect(outside.exitCode).toBe(1);
   expect(outside.stdout.match(/network: fetch\(\) is allowed only in network/gu)).toHaveLength(2);
@@ -1550,9 +1571,9 @@ test('it flags a file that belongs to none of the required zones, unless ignored
     'src/stray/run.test.ts': 'export const answer = 42;\n',
   };
 
-  const dir = await createLintTree(files, layered);
-  const stray = await runLintIn(dir, dir, 'src/stray/run.ts');
-  const ignored = await runLintIn(dir, dir, 'src/stray/run.test.ts');
+  const directory = await createLintTree(files, layered);
+  const stray = await runLintIn(directory, directory, 'src/stray/run.ts');
+  const ignored = await runLintIn(directory, directory, 'src/stray/run.test.ts');
 
   expect(stray.exitCode).toBe(1);
 
@@ -1668,9 +1689,9 @@ test('it exempts an allow zone inside a to zone', async () => {
     'mods/app/hook.ts': 'export function hook(): void {}\n',
   };
 
-  const dir = await createLintTree(files, rules);
-  const contract = await runLintIn(dir, dir, 'src/read.ts');
-  const hook = await runLintIn(dir, dir, 'src/hook.ts');
+  const directory = await createLintTree(files, rules);
+  const contract = await runLintIn(directory, directory, 'src/read.ts');
+  const hook = await runLintIn(directory, directory, 'src/hook.ts');
 
   expect(contract.exitCode).toBe(0);
   expect(hook.exitCode).toBe(1);
@@ -1995,9 +2016,9 @@ test('it flags an import of the file’s own package by name, and accepts a rela
       "import { store } from './index';\n\nexport const all = [store];\n",
   };
 
-  const dir = await createLintTree(files, rules);
-  const byName = await runLintIn(dir, dir, 'packages/store/src/by-name.ts');
-  const byPath = await runLintIn(dir, dir, 'packages/store/src/by-path.ts');
+  const directory = await createLintTree(files, rules);
+  const byName = await runLintIn(directory, directory, 'packages/store/src/by-name.ts');
+  const byPath = await runLintIn(directory, directory, 'packages/store/src/by-path.ts');
 
   expect(byName.exitCode).toBe(1);
 

@@ -13,23 +13,23 @@ function createLongSource(lineCount: number): string {
 }
 
 async function setupTest(fileName: string, source: string) {
-  const dir = await mkdtemp(join(tmpdir(), 'oxlintrc-test-'));
+  const directory = await mkdtemp(join(tmpdir(), 'oxlintrc-test-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  await writeFile(join(dir, fileName), source);
+  await writeFile(join(directory, fileName), source);
 
-  return { dir };
+  return { directory };
 }
 
-async function runLint(dir: string, fileName: string): Promise<string> {
-  const proc = Bun.spawn([oxlintBin, '-c', configPath, fileName], {
-    cwd: dir,
+async function runLint(directory: string, fileName: string): Promise<string> {
+  const subprocess = Bun.spawn([oxlintBin, '-c', configPath, fileName], {
+    cwd: directory,
     stdout: 'pipe',
     stderr: 'pipe',
   });
 
-  const [, stdout] = await Promise.all([proc.exited, new Response(proc.stdout).text()]);
+  const [, stdout] = await Promise.all([subprocess.exited, new Response(subprocess.stdout).text()]);
 
   return stdout;
 }
@@ -42,7 +42,7 @@ test.each([
   ['hook.claude-check.ts', false],
 ])('it reports max-lines for a 501-line %s: %p', async (fileName, expected) => {
   const ctx = await setupTest(fileName, createLongSource(501));
-  const stdout = await runLint(ctx.dir, fileName);
+  const stdout = await runLint(ctx.directory, fileName);
 
   expect(stdout.includes('eslint(max-lines)')).toBe(expected);
 });
@@ -52,14 +52,14 @@ test('it reports a module-level helper in a test file', async () => {
     "import { expect, test } from 'bun:test';\n\nconst cups = 2;\n\ntest('it pours', () => {\n  expect(cups).toBe(2);\n});\n";
 
   const ctx = await setupTest('pot.test.ts', source);
-  const stdout = await runLint(ctx.dir, 'pot.test.ts');
+  const stdout = await runLint(ctx.directory, 'pot.test.ts');
 
   expect(stdout).toInclude('zgeoff(setup-test-only)');
 });
 
 test.each(['kettle.ts', 'kettle.test.ts'])('it reports a class in %s', async (fileName) => {
   const ctx = await setupTest(fileName, 'export class Kettle {}\n');
-  const stdout = await runLint(ctx.dir, fileName);
+  const stdout = await runLint(ctx.directory, fileName);
 
   expect(stdout).toInclude('zgeoff(no-class)');
 });
@@ -69,7 +69,7 @@ test('it reports a switch and names ts-pattern', async () => {
     "export function readTone(tone: 'warm' | 'cool'): number {\n  switch (tone) {\n    case 'warm': {\n      return 1;\n    }\n    default: {\n      return 2;\n    }\n  }\n}\n";
 
   const ctx = await setupTest('tone.ts', source);
-  const stdout = await runLint(ctx.dir, 'tone.ts');
+  const stdout = await runLint(ctx.directory, 'tone.ts');
 
   expect(stdout).toInclude('zgeoff(no-switch)');
   expect(stdout).toInclude('ts-pattern');
@@ -79,7 +79,7 @@ test('it reports a declaration that lists two variables, but not their order', a
   const source = 'export const width = 3, height = 4;\n';
 
   const ctx = await setupTest('size.ts', source);
-  const stdout = await runLint(ctx.dir, 'size.ts');
+  const stdout = await runLint(ctx.directory, 'size.ts');
 
   expect(stdout).toInclude('eslint(one-var)');
   expect(stdout).not.toInclude('eslint(sort-vars)');
@@ -89,7 +89,7 @@ test('it accepts one declaration per variable', async () => {
   const source = 'export const width = 3;\nexport const height = 4;\n';
 
   const ctx = await setupTest('size.ts', source);
-  const stdout = await runLint(ctx.dir, 'size.ts');
+  const stdout = await runLint(ctx.directory, 'size.ts');
 
   expect(stdout).not.toInclude('eslint(one-var)');
 });
@@ -99,7 +99,7 @@ test('it reports a file snapshot matcher', async () => {
     "import { expect, test } from 'bun:test';\n\ntest('it renders the banner', () => {\n  expect('ready').toMatchSnapshot();\n});\n";
 
   const ctx = await setupTest('banner.test.ts', source);
-  const stdout = await runLint(ctx.dir, 'banner.test.ts');
+  const stdout = await runLint(ctx.directory, 'banner.test.ts');
 
   expect(stdout).toInclude('zgeoff(no-file-snapshot)');
   expect(stdout).toInclude('toMatchSnapshot');
@@ -111,10 +111,14 @@ test('it reports a test file with a snapshot file in __snapshots__/', async () =
 
   const ctx = await setupTest('banner.test.ts', source);
 
-  await mkdir(join(ctx.dir, '__snapshots__'));
-  await writeFile(join(ctx.dir, '__snapshots__', 'banner.test.ts.snap'), '// Bun Snapshot v1\n');
+  await mkdir(join(ctx.directory, '__snapshots__'));
 
-  const stdout = await runLint(ctx.dir, 'banner.test.ts');
+  await writeFile(
+    join(ctx.directory, '__snapshots__', 'banner.test.ts.snap'),
+    '// Bun Snapshot v1\n',
+  );
+
+  const stdout = await runLint(ctx.directory, 'banner.test.ts');
 
   expect(stdout).toInclude('zgeoff(no-file-snapshot)');
   expect(stdout).toInclude('__snapshots__/banner.test.ts.snap');
@@ -137,14 +141,14 @@ test.each([
   ['a variable `ms`', 'export const ms = 1;\n', 'zgeoff(no-abbreviated-names)'],
 ])('it reports %s', async (_label, source, rule) => {
   const ctx = await setupTest('names.ts', source);
-  const stdout = await runLint(ctx.dir, 'names.ts');
+  const stdout = await runLint(ctx.directory, 'names.ts');
 
   expect(stdout).toInclude(rule);
 });
 
 test('it names `manager` when it reports `mgr`', async () => {
   const ctx = await setupTest('names.ts', 'export const mgr = 1;\n');
-  const stdout = await runLint(ctx.dir, 'names.ts');
+  const stdout = await runLint(ctx.directory, 'names.ts');
 
   expect(stdout).toInclude('Rename `mgr` to `manager`');
 });
@@ -153,7 +157,7 @@ test.each(['x', 'y', 'z', '$', '_', 'ctx', 'id', 'db', 'timeoutMs'])(
   'it accepts a variable `%s`',
   async (name) => {
     const ctx = await setupTest('names.ts', `export const ${name} = 1;\n`);
-    const stdout = await runLint(ctx.dir, 'names.ts');
+    const stdout = await runLint(ctx.directory, 'names.ts');
 
     expect(stdout).not.toInclude('eslint(id-length)');
     expect(stdout).not.toInclude('zgeoff(no-abbreviated-names)');
@@ -164,7 +168,7 @@ test('it accepts a one-letter type parameter', async () => {
   const source = 'export function buildValue<T>(value: T): T {\n  return value;\n}\n';
 
   const ctx = await setupTest('names.ts', source);
-  const stdout = await runLint(ctx.dir, 'names.ts');
+  const stdout = await runLint(ctx.directory, 'names.ts');
 
   expect(stdout).not.toInclude('eslint(id-length)');
 });
@@ -182,7 +186,7 @@ test.each([
   ['an object key', 'export const value = { s: 1 };\n'],
 ])('it reports a one-letter name in %s', async (_label, source) => {
   const ctx = await setupTest('names.ts', source);
-  const stdout = await runLint(ctx.dir, 'names.ts');
+  const stdout = await runLint(ctx.directory, 'names.ts');
 
   expect(stdout).toInclude('eslint(id-length)');
 });
@@ -199,25 +203,25 @@ test.each([
   ],
 ])('it accepts %s', async (_label, source) => {
   const ctx = await setupTest('names.ts', source);
-  const stdout = await runLint(ctx.dir, 'names.ts');
+  const stdout = await runLint(ctx.directory, 'names.ts');
 
   expect(stdout).not.toInclude('eslint(id-length)');
 });
 
-// each abbreviation the shipped config denies, with the text its report gives
-// in place of the name; an entry added to or removed from the config without
-// this list fails
-const abbreviations = {
-  mgr: '`manager`',
-  dir: '`directory`',
-  tmp: '`temporary`',
-  proc: '`process`',
-  src: '`source`',
-  dest: '`destination`',
-  prev: '`previous`',
-  msg: '`message`',
-  ms: 'a name for the value with `Ms` as its unit suffix, such as `timeoutMs`',
-};
+// each abbreviation the shipped config denies and the text its report gives,
+// as rows rather than keys so the names pass the rule; an entry added to or
+// removed from the config without this list fails
+const abbreviations = [
+  ['mgr', '`manager`'],
+  ['dir', '`directory`'],
+  ['tmp', '`temporary`'],
+  ['proc', '`process`'],
+  ['src', '`source`'],
+  ['dest', '`destination`'],
+  ['prev', '`previous`'],
+  ['msg', '`message`'],
+  ['ms', 'a name for the value with `Ms` as its unit suffix, such as `timeoutMs`'],
+] as const;
 
 test('it denies exactly the listed abbreviations', async () => {
   const text = await Bun.file(configPath).text();
@@ -226,13 +230,13 @@ test('it denies exactly the listed abbreviations', async () => {
 
   expect(config).toHaveProperty(
     ['rules', 'zgeoff/no-abbreviated-names', 1, 'names'],
-    abbreviations,
+    Object.fromEntries(abbreviations),
   );
 });
 
-test.each(Object.entries(abbreviations))('it reports `%s` as %s', async (name, replacement) => {
+test.each(abbreviations)('it reports `%s` as %s', async (name, replacement) => {
   const ctx = await setupTest('names.ts', `export const ${name} = 1;\n`);
-  const stdout = await runLint(ctx.dir, 'names.ts');
+  const stdout = await runLint(ctx.directory, 'names.ts');
 
   expect(stdout).toInclude(`Rename \`${name}\` to ${replacement}:`);
 });

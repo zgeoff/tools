@@ -59,8 +59,8 @@ for (const file of files) {
   printReport(file, report, quiet);
 }
 
-const failures = reports.filter((r) => r.outcome === 'failed').length;
-const anyChange = reports.some((r) => r.outcome === 'changed');
+const failures = reports.filter((report) => report.outcome === 'failed').length;
+const anyChange = reports.some((report) => report.outcome === 'changed');
 
 if (bench) {
   const stats = buildBenchStatsFromReports(reports, Date.now() - t0);

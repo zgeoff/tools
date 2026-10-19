@@ -5,30 +5,30 @@ export async function expandInputs(
   patterns: readonly string[],
   ignore: readonly string[] = [],
 ): Promise<string[]> {
-  const lists = await Promise.all(patterns.map((p) => expandPattern(p)));
+  const lists = await Promise.all(patterns.map((pattern) => expandPattern(pattern)));
 
   return [...new Set(lists.flat())].filter((file) => !isIgnored(file, ignore));
 }
 
-function expandPattern(p: string): Promise<string[]> {
+function expandPattern(input: string): Promise<string[]> {
   // A literal path is checked before the glob heuristic so bracketed names
   // (Next.js routes like `[slug]/page.tsx`) are treated as files, not as glob
   // character classes that match nothing and silently drop the file.
-  if (fs.existsSync(p)) {
-    if (fs.statSync(p).isDirectory()) {
-      const pattern = path.join(p, '**/*.{ts,tsx}');
+  if (fs.existsSync(input)) {
+    if (fs.statSync(input).isDirectory()) {
+      const pattern = path.join(input, '**/*.{ts,tsx}');
 
       return Array.fromAsync(fs.promises.glob(pattern, { exclude: isExcluded }));
     }
 
-    return Promise.resolve([p]);
+    return Promise.resolve([input]);
   }
 
-  if (/[*?[{]/u.test(p)) {
-    return Array.fromAsync(fs.promises.glob(p, { exclude: isExcluded }));
+  if (/[*?[{]/u.test(input)) {
+    return Array.fromAsync(fs.promises.glob(input, { exclude: isExcluded }));
   }
 
-  return Promise.resolve([p]);
+  return Promise.resolve([input]);
 }
 
 // Node passes directories to `exclude` (pruning descent) while Bun filters
@@ -36,9 +36,12 @@ function expandPattern(p: string): Promise<string[]> {
 function isExcluded(
   entry: string | { readonly name: string; readonly parentPath?: string },
 ): boolean {
-  const p = typeof entry === 'string' ? entry : path.join(entry.parentPath ?? '', entry.name);
+  const entryPath =
+    typeof entry === 'string' ? entry : path.join(entry.parentPath ?? '', entry.name);
 
-  return p.split(/[\\/]/u).some((seg) => seg === 'node_modules' || seg === '.git');
+  return entryPath
+    .split(/[\\/]/u)
+    .some((segment) => segment === 'node_modules' || segment === '.git');
 }
 
 function isIgnored(file: string, patterns: readonly string[]): boolean {

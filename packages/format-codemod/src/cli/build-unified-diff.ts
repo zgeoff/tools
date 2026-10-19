@@ -6,7 +6,7 @@ export function buildUnifiedDiff(before: string, after: string, label: string): 
     return '';
   }
 
-  return [`--- ${label}\n`, `+++ ${label}\n`, ...hunks.map((h) => renderHunk(h))].join('');
+  return [`--- ${label}\n`, `+++ ${label}\n`, ...hunks.map((hunk) => renderHunk(hunk))].join('');
 }
 
 interface DiffOp {
@@ -161,8 +161,8 @@ function pickX(furthestX: FurthestX, diagonal: number, depth: number): number {
   return moveDown ? above : below + 1;
 }
 
-function splitLines(s: string): string[] {
-  const lines = s.split('\n');
+function splitLines(text: string): string[] {
+  const lines = text.split('\n');
 
   if (lines.at(-1) === '') {
     lines.pop();
@@ -177,7 +177,7 @@ interface Hunk {
 }
 
 function buildHunks(ops: readonly DiffOp[]): Hunk[] {
-  return buildWindows(ops).map((w) => buildHunk(ops, w));
+  return buildWindows(ops).map((window) => buildHunk(ops, window));
 }
 
 const CONTEXT_LINES = 3;
@@ -190,10 +190,10 @@ interface Window {
 function buildWindows(ops: readonly DiffOp[]): Window[] {
   const windows: Window[] = [];
 
-  for (let i = 0; i < ops.length; i++) {
-    if (ops[i]?.kind !== ' ') {
-      const from = Math.max(0, i - CONTEXT_LINES);
-      const to = Math.min(ops.length, i + CONTEXT_LINES + 1);
+  for (let index = 0; index < ops.length; index++) {
+    if (ops[index]?.kind !== ' ') {
+      const from = Math.max(0, index - CONTEXT_LINES);
+      const to = Math.min(ops.length, index + CONTEXT_LINES + 1);
       const last = windows.at(-1);
 
       if (last !== undefined && from <= last.to) {
@@ -207,15 +207,15 @@ function buildWindows(ops: readonly DiffOp[]): Window[] {
   return windows;
 }
 
-function buildHunk(ops: readonly DiffOp[], w: Window): Hunk {
-  const preceding = countPrecedingLines(ops, w.from);
-  const slice = ops.slice(w.from, w.to);
-  const aCount = slice.filter((o) => o.kind !== '+').length;
-  const bCount = slice.filter((o) => o.kind !== '-').length;
+function buildHunk(ops: readonly DiffOp[], window: Window): Hunk {
+  const preceding = countPrecedingLines(ops, window.from);
+  const slice = ops.slice(window.from, window.to);
+  const aCount = slice.filter((op) => op.kind !== '+').length;
+  const bCount = slice.filter((op) => op.kind !== '-').length;
 
   return {
     header: `@@ -${formatRange(preceding.aLine, aCount)} +${formatRange(preceding.bLine, bCount)} @@\n`,
-    lines: slice.map((o) => `${o.kind}${o.text}\n`),
+    lines: slice.map((op) => `${op.kind}${op.text}\n`),
   };
 }
 
@@ -243,6 +243,6 @@ function formatRange(line: number, count: number): string {
   return count === 0 ? `${line},0` : `${line + 1},${count}`;
 }
 
-function renderHunk(h: Hunk): string {
-  return `${h.header}${h.lines.join('')}`;
+function renderHunk(hunk: Hunk): string {
+  return `${hunk.header}${hunk.lines.join('')}`;
 }

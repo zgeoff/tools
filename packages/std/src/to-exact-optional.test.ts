@@ -2,21 +2,24 @@ import { expect, test } from 'bun:test';
 import { toExactOptional } from './to-exact-optional.ts';
 
 test('it drops the keys whose value is undefined', () => {
-  const input: { a: string | undefined; b: number } = { a: undefined, b: 1 };
+  const input: { label: string | undefined; count: number } = { label: undefined, count: 1 };
 
-  expect(toExactOptional(input)).toStrictEqual({ b: 1 });
+  expect(toExactOptional(input)).toStrictEqual({ count: 1 });
 });
 
 test('it keeps the keys whose value is defined', () => {
-  const input: { a: string | undefined; b: number } = { a: 'x', b: 1 };
+  const input: { label: string | undefined; count: number } = { label: 'x', count: 1 };
 
-  expect(toExactOptional(input)).toStrictEqual({ a: 'x', b: 1 });
+  expect(toExactOptional(input)).toStrictEqual({ label: 'x', count: 1 });
 });
 
 test('it keeps null values', () => {
-  const input: { a: string | null; b: number | undefined } = { a: null, b: undefined };
+  const input: { label: string | null; count: number | undefined } = {
+    label: null,
+    count: undefined,
+  };
 
-  expect(toExactOptional(input)).toStrictEqual({ a: null });
+  expect(toExactOptional(input)).toStrictEqual({ label: null });
 });
 
 test('it keeps falsy values that are not undefined', () => {
@@ -26,36 +29,39 @@ test('it keeps falsy values that are not undefined', () => {
 });
 
 test('it returns a new object and leaves the input untouched', () => {
-  const input: { a: string | undefined; b: number } = { a: undefined, b: 1 };
+  const input: { label: string | undefined; count: number } = { label: undefined, count: 1 };
   const result = toExactOptional(input);
 
   expect(result).not.toBe(input);
-  expect(input).toStrictEqual({ a: undefined, b: 1 });
-  expect(input).toContainAllKeys(['a', 'b']);
+  expect(input).toStrictEqual({ label: undefined, count: 1 });
+  expect(input).toContainAllKeys(['label', 'count']);
 });
 
 test('it returns an empty object when every value is undefined', () => {
-  const input: { a: string | undefined; b: number | undefined } = { a: undefined, b: undefined };
+  const input: { label: string | undefined; count: number | undefined } = {
+    label: undefined,
+    count: undefined,
+  };
 
   expect(toExactOptional(input)).toBeEmpty();
 });
 
 test('it types undefined-admitting keys as optional without undefined', () => {
-  const input: { a: string | undefined; b: number } = { a: 'x', b: 1 };
-  const result: { a?: string; b: number } = toExactOptional(input);
+  const input: { label: string | undefined; count: number } = { label: 'x', count: 1 };
+  const result: { label?: string; count: number } = toExactOptional(input);
 
-  // @ts-expect-error -- `a` is optional in the result, so it no longer fits a required key
-  const required: { a: string | undefined; b: number } = toExactOptional(input);
+  // @ts-expect-error -- `label` is optional in the result, so it no longer fits a required key
+  const required: { label: string | undefined; count: number } = toExactOptional(input);
 
-  expect(result).toStrictEqual({ a: 'x', b: 1 });
-  expect(required).toStrictEqual({ a: 'x', b: 1 });
+  expect(result).toStrictEqual({ label: 'x', count: 1 });
+  expect(required).toStrictEqual({ label: 'x', count: 1 });
 });
 
 test('it types an optional input key as optional without undefined', () => {
-  const input: { a?: string | undefined; b: number | null } = { b: null };
-  const result: { a?: string; b: number | null } = toExactOptional(input);
+  const input: { label?: string | undefined; count: number | null } = { count: null };
+  const result: { label?: string; count: number | null } = toExactOptional(input);
 
-  expect(result).toStrictEqual({ b: null });
+  expect(result).toStrictEqual({ count: null });
 });
 
 test('it keeps symbol keys and drops undefined ones', () => {
@@ -74,9 +80,9 @@ test('it keeps symbol keys and drops undefined ones', () => {
 });
 
 test('it skips non-enumerable keys', () => {
-  const input = Object.defineProperty({ a: 1 }, 'hidden', { value: 2, enumerable: false });
+  const input = Object.defineProperty({ label: 1 }, 'hidden', { value: 2, enumerable: false });
 
-  expect(Reflect.ownKeys(toExactOptional(input))).toStrictEqual(['a']);
+  expect(Reflect.ownKeys(toExactOptional(input))).toStrictEqual(['label']);
 });
 
 test('it keeps each member of a union input with its own keys', () => {

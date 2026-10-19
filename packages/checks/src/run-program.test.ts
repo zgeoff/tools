@@ -6,17 +6,17 @@ import { MissingProgramError } from './missing-program-error.ts';
 import { runProgram } from './run-program.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'run-program-'));
+  const directory = await mkdtemp(join(tmpdir(), 'run-program-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  return { dir };
+  return { directory };
 }
 
 test('it returns the exit code and the output of a program on the PATH', async () => {
   const ctx = await setupTest();
 
-  const result = runProgram('demo', { cwd: ctx.dir, env: process.env }, [
+  const result = runProgram('demo', { cwd: ctx.directory, env: process.env }, [
     'sh',
     '-c',
     'echo out; echo err >&2; exit 3',
@@ -29,7 +29,10 @@ test('it throws MissingProgramError when the PATH lacks the program', async () =
   const ctx = await setupTest();
 
   expect(() =>
-    runProgram('demo', { cwd: ctx.dir, env: { PATH: ctx.dir } }, ['shellcheck', '--version']),
+    runProgram('demo', { cwd: ctx.directory, env: { PATH: ctx.directory } }, [
+      'shellcheck',
+      '--version',
+    ]),
   ).toThrowWithMessage(
     MissingProgramError,
     'demo: shellcheck is not on the PATH, and the demo check needs it. Install shellcheck, then run zgeoff-check again.',

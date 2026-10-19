@@ -2,11 +2,11 @@ import { expect, test } from 'bun:test';
 import { planGapEdit } from './plan-gap-edit.ts';
 
 test('it plans a splice that widens a single-newline gap to one blank line', () => {
-  const src = 'const a = 1;\nuse(a);\n';
+  const source = 'const a = 1;\nuse(a);\n';
 
   const edit = planGapEdit({
-    file: { src, comments: [] },
-    prev: { type: 'VariableDeclaration', start: 0, end: 12 },
+    file: { source, comments: [] },
+    previous: { type: 'VariableDeclaration', start: 0, end: 12 },
     next: { type: 'ExpressionStatement', start: 13, end: 20 },
     pad: true,
   });
@@ -15,11 +15,11 @@ test('it plans a splice that widens a single-newline gap to one blank line', () 
 });
 
 test('it returns null when the gap already holds exactly one blank line', () => {
-  const src = 'const a = 1;\n\nuse(a);\n';
+  const source = 'const a = 1;\n\nuse(a);\n';
 
   const edit = planGapEdit({
-    file: { src, comments: [] },
-    prev: { type: 'VariableDeclaration', start: 0, end: 12 },
+    file: { source, comments: [] },
+    previous: { type: 'VariableDeclaration', start: 0, end: 12 },
     next: { type: 'ExpressionStatement', start: 14, end: 21 },
     pad: true,
   });
@@ -28,11 +28,11 @@ test('it returns null when the gap already holds exactly one blank line', () => 
 });
 
 test('it preserves the next statement indentation in the replacement', () => {
-  const src = '{\n  const a = 1;\n  use(a);\n}\n';
+  const source = '{\n  const a = 1;\n  use(a);\n}\n';
 
   const edit = planGapEdit({
-    file: { src, comments: [] },
-    prev: { type: 'VariableDeclaration', start: 4, end: 16 },
+    file: { source, comments: [] },
+    previous: { type: 'VariableDeclaration', start: 4, end: 16 },
     next: { type: 'ExpressionStatement', start: 19, end: 26 },
     pad: true,
   });
@@ -41,11 +41,11 @@ test('it preserves the next statement indentation in the replacement', () => {
 });
 
 test('it returns null when the statements share a physical line', () => {
-  const src = 'const a = 1; use(a);\n';
+  const source = 'const a = 1; use(a);\n';
 
   const edit = planGapEdit({
-    file: { src, comments: [] },
-    prev: { type: 'VariableDeclaration', start: 0, end: 12 },
+    file: { source, comments: [] },
+    previous: { type: 'VariableDeclaration', start: 0, end: 12 },
     next: { type: 'ExpressionStatement', start: 13, end: 20 },
     pad: true,
   });
@@ -55,11 +55,11 @@ test('it returns null when the statements share a physical line', () => {
 
 test('it returns null when the gap holds anything besides whitespace and comments', () => {
   // a fabricated gap that swallows a stray token — must never be resized
-  const src = 'const a = 1; @ \nuse(a);\n';
+  const source = 'const a = 1; @ \nuse(a);\n';
 
   const edit = planGapEdit({
-    file: { src, comments: [] },
-    prev: { type: 'VariableDeclaration', start: 0, end: 12 },
+    file: { source, comments: [] },
+    previous: { type: 'VariableDeclaration', start: 0, end: 12 },
     next: { type: 'ExpressionStatement', start: 16, end: 23 },
     pad: true,
   });
@@ -68,11 +68,11 @@ test('it returns null when the gap holds anything besides whitespace and comment
 });
 
 test('it keeps a trailing same-line comment attached to the previous statement', () => {
-  const src = 'const a = 1; // note\nuse(a);\n';
+  const source = 'const a = 1; // note\nuse(a);\n';
 
   const edit = planGapEdit({
-    file: { src, comments: [{ start: 13, end: 20 }] },
-    prev: { type: 'VariableDeclaration', start: 0, end: 12 },
+    file: { source, comments: [{ start: 13, end: 20 }] },
+    previous: { type: 'VariableDeclaration', start: 0, end: 12 },
     next: { type: 'ExpressionStatement', start: 21, end: 28 },
     pad: true,
   });
@@ -81,17 +81,17 @@ test('it keeps a trailing same-line comment attached to the previous statement',
 });
 
 test('it keeps multiple same-line trailing comments together on the previous line', () => {
-  const src = 'const a = 1; /* x */ /* y */\nuse(a);\n';
+  const source = 'const a = 1; /* x */ /* y */\nuse(a);\n';
 
   const edit = planGapEdit({
     file: {
-      src,
+      source,
       comments: [
         { start: 13, end: 20 },
         { start: 21, end: 28 },
       ],
     },
-    prev: { type: 'VariableDeclaration', start: 0, end: 12 },
+    previous: { type: 'VariableDeclaration', start: 0, end: 12 },
     next: { type: 'ExpressionStatement', start: 29, end: 36 },
     pad: true,
   });
@@ -100,11 +100,11 @@ test('it keeps multiple same-line trailing comments together on the previous lin
 });
 
 test('it puts the blank line before a leading comment of the next statement', () => {
-  const src = 'const a = 1;\n// about use\nuse(a);\n';
+  const source = 'const a = 1;\n// about use\nuse(a);\n';
 
   const edit = planGapEdit({
-    file: { src, comments: [{ start: 13, end: 25 }] },
-    prev: { type: 'VariableDeclaration', start: 0, end: 12 },
+    file: { source, comments: [{ start: 13, end: 25 }] },
+    previous: { type: 'VariableDeclaration', start: 0, end: 12 },
     next: { type: 'ExpressionStatement', start: 26, end: 33 },
     pad: true,
   });
@@ -113,11 +113,11 @@ test('it puts the blank line before a leading comment of the next statement', ()
 });
 
 test('it returns null when a leading comment is already preceded by a blank line', () => {
-  const src = 'const a = 1;\n\n// about use\nuse(a);\n';
+  const source = 'const a = 1;\n\n// about use\nuse(a);\n';
 
   const edit = planGapEdit({
-    file: { src, comments: [{ start: 14, end: 26 }] },
-    prev: { type: 'VariableDeclaration', start: 0, end: 12 },
+    file: { source, comments: [{ start: 14, end: 26 }] },
+    previous: { type: 'VariableDeclaration', start: 0, end: 12 },
     next: { type: 'ExpressionStatement', start: 27, end: 34 },
     pad: true,
   });
@@ -126,11 +126,11 @@ test('it returns null when a leading comment is already preceded by a blank line
 });
 
 test('it plans a splice that collapses a one-blank-line gap to flush', () => {
-  const src = 'use(a);\n\nuse(b);\n';
+  const source = 'use(a);\n\nuse(b);\n';
 
   const edit = planGapEdit({
-    file: { src, comments: [] },
-    prev: { type: 'ExpressionStatement', start: 0, end: 7 },
+    file: { source, comments: [] },
+    previous: { type: 'ExpressionStatement', start: 0, end: 7 },
     next: { type: 'ExpressionStatement', start: 9, end: 16 },
     pad: false,
   });
@@ -139,11 +139,11 @@ test('it plans a splice that collapses a one-blank-line gap to flush', () => {
 });
 
 test('it collapses several blank lines to flush in one splice', () => {
-  const src = 'use(a);\n\n\n\nuse(b);\n';
+  const source = 'use(a);\n\n\n\nuse(b);\n';
 
   const edit = planGapEdit({
-    file: { src, comments: [] },
-    prev: { type: 'ExpressionStatement', start: 0, end: 7 },
+    file: { source, comments: [] },
+    previous: { type: 'ExpressionStatement', start: 0, end: 7 },
     next: { type: 'ExpressionStatement', start: 11, end: 18 },
     pad: false,
   });
@@ -152,11 +152,11 @@ test('it collapses several blank lines to flush in one splice', () => {
 });
 
 test('it preserves the next statement indentation when collapsing', () => {
-  const src = '{\n  use(a);\n\n  use(b);\n}\n';
+  const source = '{\n  use(a);\n\n  use(b);\n}\n';
 
   const edit = planGapEdit({
-    file: { src, comments: [] },
-    prev: { type: 'ExpressionStatement', start: 4, end: 11 },
+    file: { source, comments: [] },
+    previous: { type: 'ExpressionStatement', start: 4, end: 11 },
     next: { type: 'ExpressionStatement', start: 15, end: 22 },
     pad: false,
   });
@@ -165,11 +165,11 @@ test('it preserves the next statement indentation when collapsing', () => {
 });
 
 test('it returns null when a flush target is already flush', () => {
-  const src = 'use(a);\nuse(b);\n';
+  const source = 'use(a);\nuse(b);\n';
 
   const edit = planGapEdit({
-    file: { src, comments: [] },
-    prev: { type: 'ExpressionStatement', start: 0, end: 7 },
+    file: { source, comments: [] },
+    previous: { type: 'ExpressionStatement', start: 0, end: 7 },
     next: { type: 'ExpressionStatement', start: 8, end: 15 },
     pad: false,
   });
@@ -178,11 +178,11 @@ test('it returns null when a flush target is already flush', () => {
 });
 
 test('it never collapses a gap that holds a comment', () => {
-  const src = 'use(a);\n\n// group two\nuse(b);\n';
+  const source = 'use(a);\n\n// group two\nuse(b);\n';
 
   const edit = planGapEdit({
-    file: { src, comments: [{ start: 9, end: 21 }] },
-    prev: { type: 'ExpressionStatement', start: 0, end: 7 },
+    file: { source, comments: [{ start: 9, end: 21 }] },
+    previous: { type: 'ExpressionStatement', start: 0, end: 7 },
     next: { type: 'ExpressionStatement', start: 22, end: 29 },
     pad: false,
   });
@@ -191,11 +191,11 @@ test('it never collapses a gap that holds a comment', () => {
 });
 
 test('it never collapses a gap whose comment sits on the previous line', () => {
-  const src = 'use(a); // note\n\nuse(b);\n';
+  const source = 'use(a); // note\n\nuse(b);\n';
 
   const edit = planGapEdit({
-    file: { src, comments: [{ start: 8, end: 15 }] },
-    prev: { type: 'ExpressionStatement', start: 0, end: 7 },
+    file: { source, comments: [{ start: 8, end: 15 }] },
+    previous: { type: 'ExpressionStatement', start: 0, end: 7 },
     next: { type: 'ExpressionStatement', start: 17, end: 24 },
     pad: false,
   });
@@ -204,11 +204,11 @@ test('it never collapses a gap whose comment sits on the previous line', () => {
 });
 
 test('it returns null when a flush target shares a physical line', () => {
-  const src = 'use(a); use(b);\n';
+  const source = 'use(a); use(b);\n';
 
   const edit = planGapEdit({
-    file: { src, comments: [] },
-    prev: { type: 'ExpressionStatement', start: 0, end: 7 },
+    file: { source, comments: [] },
+    previous: { type: 'ExpressionStatement', start: 0, end: 7 },
     next: { type: 'ExpressionStatement', start: 8, end: 15 },
     pad: false,
   });

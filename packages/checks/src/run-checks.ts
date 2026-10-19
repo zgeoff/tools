@@ -46,7 +46,9 @@ export async function runChecks(options: Readonly<RunChecksOptions>): Promise<Ch
 
     findings.push(
       ...checkFindings
-        .toSorted((a, b) => a.path.localeCompare(b.path) || a.line - b.line)
+        .toSorted(
+          (first, second) => first.path.localeCompare(second.path) || first.line - second.line,
+        )
         .map((finding) => ({
           check: check.name,
           path: finding.path,

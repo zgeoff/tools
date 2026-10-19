@@ -6,28 +6,28 @@ import { ConfigError } from './config-error.ts';
 import { loadConfig } from './load-config.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'load-config-'));
+  const directory = await mkdtemp(join(tmpdir(), 'load-config-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  return { dir };
+  return { directory };
 }
 
 test('it turns no check off when the repo has no config file', async () => {
   const ctx = await setupTest();
 
-  expect(loadConfig(ctx.dir, ['shell'])).toStrictEqual({ off: new Map() });
+  expect(loadConfig(ctx.directory, ['shell'])).toStrictEqual({ off: new Map() });
 });
 
 test('it turns a check off with the reason the entry gives', async () => {
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.dir, 'zgeoff-check.json'),
+    join(ctx.directory, 'zgeoff-check.json'),
     JSON.stringify({ off: [{ check: 'shell', reason: 'the scripts are vendored' }] }),
   );
 
-  expect(loadConfig(ctx.dir, ['shell'])).toStrictEqual({
+  expect(loadConfig(ctx.directory, ['shell'])).toStrictEqual({
     off: new Map([['shell', 'the scripts are vendored']]),
   });
 });
@@ -73,17 +73,17 @@ test.each([
 ])('it rejects %s', async (_label, config, message) => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'zgeoff-check.json'), JSON.stringify(config));
+  await writeFile(join(ctx.directory, 'zgeoff-check.json'), JSON.stringify(config));
 
-  expect(() => loadConfig(ctx.dir, ['shell'])).toThrowWithMessage(ConfigError, message);
+  expect(() => loadConfig(ctx.directory, ['shell'])).toThrowWithMessage(ConfigError, message);
 });
 
 test('it rejects a file that is not JSON', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'zgeoff-check.json'), '{ off: ');
+  await writeFile(join(ctx.directory, 'zgeoff-check.json'), '{ off: ');
 
-  expect(() => loadConfig(ctx.dir, ['shell'])).toThrowWithMessage(
+  expect(() => loadConfig(ctx.directory, ['shell'])).toThrowWithMessage(
     ConfigError,
     /^zgeoff-check\.json: /u,
   );

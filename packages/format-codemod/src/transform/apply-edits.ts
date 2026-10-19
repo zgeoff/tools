@@ -1,16 +1,16 @@
 import type { Edit } from '../types.ts';
 
-export function applyEdits(src: string, edits: readonly Edit[]): string {
+export function applyEdits(source: string, edits: readonly Edit[]): string {
   const segments: string[] = [];
-  let tail = src.length;
+  let tail = source.length;
 
-  for (const e of edits) {
-    segments.push(src.slice(e.end, tail), e.replacement);
+  for (const edit of edits) {
+    segments.push(source.slice(edit.end, tail), edit.replacement);
 
-    tail = e.start;
+    tail = edit.start;
   }
 
-  segments.push(src.slice(0, tail));
+  segments.push(source.slice(0, tail));
 
   return segments.toReversed().join('');
 }

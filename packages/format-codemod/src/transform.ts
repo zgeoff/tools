@@ -7,15 +7,15 @@ export interface TransformOptions {
   readonly filename?: string;
 }
 
-export function transform(src: string, options?: TransformOptions): TransformResult {
-  const parsed = parseSource(src, options?.filename ?? 'source.ts');
+export function transform(source: string, options?: TransformOptions): TransformResult {
+  const parsed = parseSource(source, options?.filename ?? 'source.ts');
 
   if (typeof parsed === 'string') {
-    return { output: src, edits: 0, parseError: parsed };
+    return { output: source, edits: 0, parseError: parsed };
   }
 
-  const editList = buildEditsFromAST(src, parsed);
-  const output = applyEdits(src, editList);
+  const editList = buildEditsFromAST(source, parsed);
+  const output = applyEdits(source, editList);
 
   return { output, edits: editList.length, parseError: null };
 }

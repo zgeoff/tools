@@ -20,7 +20,7 @@ export interface ParsedSource {
 }
 
 export interface SourceFile {
-  readonly src: string;
+  readonly source: string;
   readonly comments: readonly CommentSpan[];
 }
 

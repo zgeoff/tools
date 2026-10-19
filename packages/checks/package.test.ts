@@ -8,9 +8,9 @@ import invariant from 'tiny-invariant';
 // The package packed and installed from its tarball into a fresh git repo. Every build and pack
 // writes under the test's own folder, never the shared dist, so overlapping runs cannot race.
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'checks-package-'));
+  const directory = await mkdtemp(join(tmpdir(), 'checks-package-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   // A clean git environment keeps a hook's GIT_DIR out, and the real HOME keeps bun install on the
   // shared cache.
@@ -21,25 +21,25 @@ async function setupTest() {
     GIT_CONFIG_NOSYSTEM: '1',
   };
 
-  const unpacked = join(dir, 'unpacked');
-  const packed = join(dir, 'packed');
-  const project = join(dir, 'project');
+  const unpacked = join(directory, 'unpacked');
+  const packed = join(directory, 'packed');
+  const project = join(directory, 'project');
 
   await Promise.all([mkdir(unpacked), mkdir(packed), mkdir(project)]);
 
   // The source pack runs no build; it gives the published manifest, with catalog versions resolved.
-  await $`bun pm pack --ignore-scripts --destination ${dir}`
+  await $`bun pm pack --ignore-scripts --destination ${directory}`
     .cwd(import.meta.dir)
     .env(env)
     .quiet();
 
-  const entries = await readdir(dir);
+  const entries = await readdir(directory);
 
   const manifest = entries.find((name) => name.endsWith('.tgz'));
 
   invariant(manifest !== undefined, 'bun pm pack wrote no tarball');
 
-  await $`tar -xzf ${join(dir, manifest)} -C ${unpacked}`.env(env).quiet();
+  await $`tar -xzf ${join(directory, manifest)} -C ${unpacked}`.env(env).quiet();
 
   await rm(join(unpacked, 'package/dist'), { recursive: true, force: true });
 

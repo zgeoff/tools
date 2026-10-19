@@ -16,9 +16,9 @@ test('it prints its usage when a file argument is missing', () => {
 });
 
 test('it runs from the sparse checkout that audit-fix.yml makes, with no install', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'audit-fix-sparse-'));
+  const directory = await mkdtemp(join(tmpdir(), 'audit-fix-sparse-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   const root = fileURLToPath(new URL('../..', import.meta.url));
   const folders = ['scripts/audit-fix', 'packages/std/src'];
@@ -42,12 +42,12 @@ test('it runs from the sparse checkout that audit-fix.yml makes, with no install
   // The same folders, and no node_modules, as in a caller repo whose install lacks the tools
   // packages.
   await Promise.all(
-    folders.map((folder) => cp(join(root, folder), join(dir, folder), { recursive: true })),
+    folders.map((folder) => cp(join(root, folder), join(directory, folder), { recursive: true })),
   );
 
   const result = Bun.spawnSync(
-    ['bun', join(dir, 'scripts/audit-fix/audit-fix.ts'), '--title-file', 'title.txt'],
-    { cwd: dir },
+    ['bun', join(directory, 'scripts/audit-fix/audit-fix.ts'), '--title-file', 'title.txt'],
+    { cwd: directory },
   );
 
   expect(result.exitCode).toBe(1);

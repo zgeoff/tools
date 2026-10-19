@@ -18,8 +18,8 @@ test('it reports failed with an ERROR message when the file cannot be read', () 
 });
 
 test('it passes readable files through to the transform', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'process-file-'));
-  const file = path.join(dir, 'unpadded.ts');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'process-file-'));
+  const file = path.join(directory, 'unpadded.ts');
 
   fs.writeFileSync(file, 'const a = 1;\nuse(a);\n');
 
