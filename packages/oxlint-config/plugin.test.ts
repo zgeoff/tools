@@ -1570,6 +1570,34 @@ test('it keeps a builtin a module when the file’s own package shares its name'
   expect(result.stdout).not.toInclude('self:');
 });
 
+test('it keeps a builtin a module when a # import maps to its name', async () => {
+  const rules = {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: { app: ['packages/app/**'] },
+        workspaces: ['packages/*'],
+        modules: [{ name: 'neutral', modules: ['node:*'], from: ['app'], allow: [] }],
+        unresolved: [{ name: 'unresolved', from: ['app'] }],
+      },
+    ],
+  };
+
+  const files = {
+    'packages/path/package.json': JSON.stringify({ name: 'path', exports: {} }),
+    'packages/app/package.json': JSON.stringify({
+      name: '@demo/app',
+      imports: { '#path': 'path' },
+    }),
+    'packages/app/src/run.ts': "import { join } from '#path';\n\nexport const all = [join];\n",
+  };
+
+  const result = await runLintTree(files, 'packages/app/src/run.ts', rules);
+
+  expect(result.stdout).toInclude('neutral: path is allowed only in no zone');
+  expect(result.stdout).not.toInclude('unresolved:');
+});
+
 test('it maps a # import that names a workspace package as that name', async () => {
   const files = {
     'packages/store/package.json': JSON.stringify({

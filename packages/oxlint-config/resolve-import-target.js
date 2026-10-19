@@ -25,23 +25,25 @@ function resolveManifestTarget(manifest, specifier, settings) {
     const mapped = findMappedTarget(manifest?.imports, specifier, settings.conditions);
 
     return mapped !== null && !isPathSpecifier(mapped)
-      ? resolveWorkspaceTarget(settings.workspaces, mapped)
+      ? resolveBareTarget(settings.workspaces, mapped)
       : toMappedTarget(manifest, mapped);
   }
 
-  // a builtin keeps its name even when a package shares it
-  if (isBuiltin(specifier)) {
-    return { kind: 'module', specifier };
-  }
-
-  if (isPackageSpecifier(name, specifier)) {
+  if (isPackageSpecifier(name, specifier) && !isBuiltin(specifier)) {
     const subpath = `.${specifier.slice(name.length)}`;
     const mapped = findMappedTarget(toSubpathMap(manifest.exports), subpath, settings.conditions);
 
     return { ...toMappedTarget(manifest, mapped), self: true };
   }
 
-  return resolveWorkspaceTarget(settings.workspaces, specifier);
+  return resolveBareTarget(settings.workspaces, specifier);
+}
+
+// a builtin keeps its name even when a package shares it
+function resolveBareTarget(workspaces, specifier) {
+  return isBuiltin(specifier)
+    ? { kind: 'module', specifier }
+    : resolveWorkspaceTarget(workspaces, specifier);
 }
 
 function isPackageSpecifier(name, specifier) {
