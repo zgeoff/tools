@@ -171,7 +171,7 @@ test.each([
     ].join('\n'),
   );
 
-  await expect(
+  expect(
     runWorkflowSteps(ctx.workflow, 'build', ['Write'], {
       cwd: ctx.directory,
       env: process.env,
@@ -197,7 +197,7 @@ test('it rejects a condition other than an equality with a quoted text', async (
     ].join('\n'),
   );
 
-  await expect(
+  expect(
     runWorkflowSteps(ctx.workflow, 'build', ['Write'], {
       cwd: ctx.directory,
       env: process.env,
@@ -223,7 +223,7 @@ test('it rejects an output line with no equals sign', async () => {
     ].join('\n'),
   );
 
-  await expect(
+  expect(
     runWorkflowSteps(ctx.workflow, 'build', ['Pick'], {
       cwd: ctx.directory,
       env: process.env,
