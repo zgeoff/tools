@@ -11,7 +11,7 @@ const allowedStatementTypes = new Set([
 ]);
 
 // the members a `test` call may chain: `test.each(rows)(…)`,
-// `test.skipIf(gate)(…)`, `test.if(gate)(…)`
+// `test.skipIf(gate)(…)`, `test.if(gate)(…)`, and chains of them
 const testModifiers = new Set(['each', 'skipIf', 'if']);
 
 const setupTestOnly = {
@@ -32,11 +32,12 @@ const setupTestOnly = {
           return;
         }
 
+        const testNames = collectTestNames(program);
         const constants = [];
         let hasSetupTest = false;
 
         for (const statement of program.body) {
-          if (allowedStatementTypes.has(statement.type) || isTestCall(statement)) {
+          if (allowedStatementTypes.has(statement.type) || isTestCall(statement, testNames)) {
             continue;
           }
 
@@ -59,7 +60,7 @@ const setupTestOnly = {
           emitReport(context, statement);
         }
 
-        const gates = collectSkipGates(context, constants);
+        const gates = collectSkipGates(context, constants, testNames);
         const declarations = new Set(constants.map((declarator) => declarator.parent));
 
         for (const declaration of declarations) {
@@ -74,28 +75,66 @@ const setupTestOnly = {
   },
 };
 
-function isTestCall(statement) {
-  if (statement.type !== 'ExpressionStatement' || statement.expression.type !== 'CallExpression') {
-    return false;
+// the local names that `test` from `bun:test` goes by, so an aliased import
+// such as `import { test as check }` counts; a file that imports no `test`
+// reads the global one
+function collectTestNames(program) {
+  const names = program.body
+    .filter(
+      (statement) =>
+        statement.type === 'ImportDeclaration' &&
+        statement.source.value === 'bun:test' &&
+        statement.importKind !== 'type',
+    )
+    .flatMap((statement) => statement.specifiers)
+    .filter(
+      (specifier) =>
+        specifier.type === 'ImportSpecifier' &&
+        specifier.importKind !== 'type' &&
+        getImportedName(specifier) === 'test',
+    )
+    .map((specifier) => specifier.local.name);
+
+  if (names.length === 0) {
+    return new Set(['test']);
   }
 
-  let node = statement.expression.callee;
+  return new Set(names);
+}
 
-  while (node.type !== 'Identifier') {
-    if (node.type === 'CallExpression') {
-      node = node.callee;
+function getImportedName(specifier) {
+  return specifier.imported.type === 'Identifier'
+    ? specifier.imported.name
+    : specifier.imported.value;
+}
+
+function isTestCall(statement, testNames) {
+  return (
+    statement.type === 'ExpressionStatement' &&
+    statement.expression.type === 'CallExpression' &&
+    isTestRunner(statement.expression.callee, testNames)
+  );
+}
+
+// `test` itself or a chain of its modifiers, such as `test.skipIf(gate).each(rows)`
+function isTestRunner(node, testNames) {
+  let current = node;
+
+  while (current.type !== 'Identifier') {
+    if (current.type === 'CallExpression') {
+      current = current.callee;
     } else if (
-      node.type === 'MemberExpression' &&
-      !node.computed &&
-      testModifiers.has(node.property.name)
+      current.type === 'MemberExpression' &&
+      !current.computed &&
+      testModifiers.has(current.property.name)
     ) {
-      node = node.object;
+      current = current.object;
     } else {
       return false;
     }
   }
 
-  return node.name === 'test';
+  return testNames.has(current.name);
 }
 
 function emitReport(context, statement, declarators) {
@@ -124,7 +163,7 @@ function findDeclaredName(context, statement, declarators) {
 // a gate is a declarator whose every binding is read, only in a `skipIf(...)`
 // argument or another gate's initializer; the set grows out from the `skipIf`
 // reads, so consts that only read each other never join it
-function collectSkipGates(context, constants) {
+function collectSkipGates(context, constants, testNames) {
   const gates = new Set();
   let changed = true;
 
@@ -132,7 +171,7 @@ function collectSkipGates(context, constants) {
     changed = false;
 
     for (const declarator of constants) {
-      if (!gates.has(declarator) && isSkipGate(context, declarator, gates)) {
+      if (!gates.has(declarator) && isSkipGate(context, declarator, gates, testNames)) {
         gates.add(declarator);
         changed = true;
       }
@@ -142,18 +181,28 @@ function collectSkipGates(context, constants) {
   return gates;
 }
 
-function isSkipGate(context, declarator, gates) {
-  return context.sourceCode.getDeclaredVariables(declarator).every((variable) => {
-    const reads = variable.references.filter((reference) => !reference.init && reference.isRead());
+function isSkipGate(context, declarator, gates, testNames) {
+  const variables = context.sourceCode.getDeclaredVariables(declarator);
 
-    return (
-      reads.length > 0 &&
-      reads.every(
-        (reference) =>
-          isInSkipIfArgument(reference.identifier) || isInGateInit(reference.identifier, gates),
-      )
-    );
-  });
+  // a declarator that binds nothing, such as `const {} = registerHooks()`, is
+  // a module-level call, not a gate
+  return (
+    variables.length > 0 &&
+    variables.every((variable) => {
+      const reads = variable.references.filter(
+        (reference) => !reference.init && reference.isRead(),
+      );
+
+      return (
+        reads.length > 0 &&
+        reads.every(
+          (reference) =>
+            isInSkipIfArgument(reference.identifier, testNames) ||
+            isInGateInit(reference.identifier, gates),
+        )
+      );
+    })
+  );
 }
 
 const functionTypes = new Set([
@@ -164,7 +213,7 @@ const functionTypes = new Set([
 
 // a read counts only at collection time, so no function may enclose it: a
 // `skipIf` inside `setupTest()` or a test runs later
-function isInSkipIfArgument(identifier) {
+function isInSkipIfArgument(identifier, testNames) {
   let child = identifier;
   let isSkipIfArgument = false;
 
@@ -178,7 +227,8 @@ function isInSkipIfArgument(identifier) {
       node.arguments.includes(child) &&
       node.callee.type === 'MemberExpression' &&
       !node.callee.computed &&
-      node.callee.property.name === 'skipIf'
+      node.callee.property.name === 'skipIf' &&
+      isTestRunner(node.callee.object, testNames)
     ) {
       isSkipIfArgument = true;
     }

@@ -829,6 +829,92 @@ test('it names only the non-gate binding of a declaration that holds a gate', as
   expect(result.stdout).not.toInclude('`hasKettle`');
 });
 
+test.each([
+  ['an empty object pattern', true, 'const {} = probeKitchen();\n'],
+  ['an empty array pattern', true, 'const [] = probeKitchen();\n'],
+  [
+    'a nested object pattern',
+    false,
+    "const {\n  kitchen: { hasKettle },\n} = await probeKitchen();\n\ntest.skipIf(!hasKettle)('it boils', () => {});\n",
+  ],
+  [
+    'a nested array pattern',
+    false,
+    "const [[hasKettle]] = await probeKitchen();\n\ntest.skipIf(!hasKettle)('it boils', () => {});\n",
+  ],
+  [
+    'an unread rest element',
+    true,
+    "const { hasKettle, ...others } = await probeKitchen();\n\ntest.skipIf(!hasKettle)('it boils', () => {});\n",
+  ],
+  [
+    'a rest element read in skipIf',
+    false,
+    "const { ...kitchen } = await probeKitchen();\n\ntest.skipIf(!kitchen.hasKettle)('it boils', () => {});\n",
+  ],
+  [
+    'a default value',
+    false,
+    "const { hasKettle = false } = await probeKitchen();\n\ntest.skipIf(!hasKettle)('it boils', () => {});\n",
+  ],
+  [
+    'a default value that reads a non-gate',
+    true,
+    "const cups = 2;\nconst { hasKettle = cups > 1 } = await probeKitchen();\n\ntest.skipIf(!hasKettle)('it boils', () => {});\n",
+  ],
+])('it reports a gate declared with %s: %p', async (_, expected, body) => {
+  const source = `import { test } from 'bun:test';\nimport { probeKitchen } from './probe-kitchen';\n\n${body}`;
+
+  const result = await runLintTree({ 'kitchen.test.ts': source }, 'kitchen.test.ts', setupTestOnly);
+
+  expect(result.stdout.includes('setup-test-only')).toBe(expected);
+});
+
+test.each([
+  [
+    'test',
+    false,
+    "import { test } from 'bun:test';\n",
+    "test.skipIf(!hasKettle)('it boils', () => {});\n",
+  ],
+  [
+    'an aliased test import',
+    false,
+    "import { test as check } from 'bun:test';\n",
+    "check.skipIf(!hasKettle)('it boils', () => {});\n",
+  ],
+  [
+    'a member chain',
+    false,
+    "import { test } from 'bun:test';\n",
+    "test.skipIf(!hasKettle).each([[1]])('it boils %d', () => {});\n",
+  ],
+  [
+    'another object',
+    true,
+    "import { test } from 'bun:test';\nimport { matrix } from './matrix';\n",
+    "test.each(matrix.skipIf(hasKettle))('it boils', () => {});\n",
+  ],
+  [
+    'test.each',
+    true,
+    "import { test } from 'bun:test';\n",
+    "test.each([[hasKettle]])('it boils %p', () => {});\n",
+  ],
+  [
+    'a test name that an alias replaced',
+    true,
+    "import { test as check } from 'bun:test';\n",
+    "test.skipIf(!hasKettle)('it boils', () => {});\n",
+  ],
+])('it reports a gate whose skipIf receiver is %s: %p', async (_, expected, imports, call) => {
+  const source = `${imports}import { probeKettle } from './probe-kettle';\n\nconst hasKettle = await probeKettle();\n\n${call}`;
+
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+
+  expect(result.stdout.includes('setup-test-only')).toBe(expected);
+});
+
 test('it flags a module-level const that nothing reads', async () => {
   const source =
     "import { test } from 'bun:test';\n\nconst cups = 2;\n\ntest('it pours', () => {});\n";
