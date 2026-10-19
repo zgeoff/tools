@@ -809,6 +809,17 @@ test('it flags a gate that only a skipIf inside setupTest reads', async () => {
   expect(result.stdout).toInclude('Remove the module-level `hasKettle`');
 });
 
+test('it flags a probe that only a function inside a gate initializer reads', async () => {
+  const source =
+    "import { test } from 'bun:test';\n\nconst hasKettle = true;\nconst skipBoil = (() => !hasKettle)();\n\ntest.skipIf(skipBoil)('it boils', () => {});\n";
+
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('Remove the module-level `hasKettle`');
+  expect(result.stdout).not.toInclude('`skipBoil`');
+});
+
 test('it accepts a probe and its derived gate in one declaration', async () => {
   const source =
     "import { test } from 'bun:test';\nimport { probeKettle } from './probe-kettle';\n\n// skipIf takes a boolean and has no in-body skip\nconst hasKettle = await probeKettle(),\n  skipBoil = !hasKettle;\n\ntest.skipIf(skipBoil)('it boils', () => {});\n";
