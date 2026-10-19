@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.13](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.12...@zgeoff/oxlint-config@0.2.13) (2026-10-19)
+
+
+### Features
+
+* **geo-1274:** add zgeoff/setup-test-only to keep test files to setupTest and tests ([#205](https://github.com/zgeoff/tools/issues/205)) ([fbb3697](https://github.com/zgeoff/tools/commit/fbb369773bbd8acb8a55f474ec441cc57f20d7dc))
+
 ## [0.2.12](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.2.11...@zgeoff/oxlint-config@0.2.12) (2026-10-19)
 
 ### Features
