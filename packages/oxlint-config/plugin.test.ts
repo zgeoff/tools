@@ -877,6 +877,7 @@ test.each([
     "import { test } from 'bun:test';\n",
     "test.skipIf(!hasKettle)('it boils', () => {});\n",
   ],
+  ['the global test', false, '', "test.skipIf(!hasKettle)('it boils', () => {});\n"],
   [
     'an aliased test import',
     false,
