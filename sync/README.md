@@ -132,6 +132,7 @@ The preset sorts each update by its kind:
 | Other minor           | 7 days           | one per package                              | on green checks |
 | Major                 | 7 days           | one per package                              | after review    |
 | `@zgeoff/*` package   | none             | one per package, at any level                | on green checks |
+| `@impz/*` package     | none             | one per package, at any level                | on green checks |
 | zgeoff/tools sync tag | none             | one per tag                                  | on green checks |
 | Lock-file maintenance | none             | weekly, for the dependencies of dependencies | on green checks |
 
@@ -139,8 +140,9 @@ The 7-day wait matches the `minimumReleaseAge = 604800` in each repo's `bunfig.t
 proposes no version that `bun install` would refuse. Security fixes come from OSV, through
 `osvVulnerabilityAlerts`, for every package Renovate finds. Their lock refresh runs
 `bun install --minimum-release-age=0`, so a fix younger than the gate installs, and so do the new
-dependencies it brings. A `@zgeoff/*` bump keeps the gate for its dependencies: `bun install`
-accepts the new release only when the repo lists the package in `minimumReleaseAgeExcludes`.
+dependencies it brings. A `@zgeoff/*` or `@impz/*` bump keeps the gate for its dependencies:
+`bun install` accepts the new release only when the repo lists the package in
+`minimumReleaseAgeExcludes`.
 
 Renovate's bun manager reads no Bun catalog until renovatebot/renovate#42909 ships, so a regex
 manager in the preset finds each `catalog` entry in `package.json`. A regex-manager bump changes

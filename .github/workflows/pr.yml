@@ -18,3 +18,23 @@ jobs:
       scripts: check:sync format:check lint:full typecheck test test:workflows check
       # The @zgeoff/checks tests and the check script run shfmt.
       setup-shfmt: true
+
+  # Validates the shared Renovate preset as a repo config, which is how each
+  # repo's renovate.json loads it. The validator takes its version from
+  # renovate.yml's renovate-version, so the check reads the preset as the
+  # scheduled run does.
+  renovate-config:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+      - name: Validate default.json
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^ *renovate-version: *//p' .github/workflows/renovate.yml)
+          test -n "$version"
+          npx --yes --package "renovate@$version" -- renovate-config-validator --strict --no-global default.json
