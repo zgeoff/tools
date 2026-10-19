@@ -26,6 +26,7 @@
     "load-zone-options.js",
     "make-glob-matcher.js",
     "resolve-import-target.js",
+    "resolve-package-target.js",
     "index.js"
   ],
   "type": "module",

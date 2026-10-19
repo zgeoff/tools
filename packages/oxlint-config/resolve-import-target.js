@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { isBuiltin } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
+import resolvePackageTarget from './resolve-package-target.js';
 
 // a `.js` specifier in TypeScript source names the `.ts` file beside it
 const sourceExtensions = { '.js': ['.ts', '.tsx'], '.mjs': ['.mts'], '.cjs': ['.cts'] };
@@ -23,7 +24,7 @@ function resolveManifestTarget(manifest, specifier, settings) {
   const name = manifest?.name;
 
   if (specifier.startsWith('#')) {
-    const mapped = findMappedTarget(manifest?.imports, specifier, conditions);
+    const mapped = findMappedTarget(manifest?.imports, specifier, { conditions, isImports: true });
 
     // a package the alias names resolves as that name would; a `#` target is
     // not a valid mapping, so it stays a module
@@ -53,7 +54,6 @@ function resolveManifestTarget(manifest, specifier, settings) {
     return { kind: 'module', specifier };
   }
 
-  // a workspace export names a source file, which must exist
   const target = resolveExportTarget(workspace, specifier, conditions);
 
   return target.kind === 'file' && !isFile(target.path) ? { kind: 'missing' } : target;
@@ -68,7 +68,7 @@ function resolveExportTarget(manifest, specifier, conditions) {
 
   return toMappedTarget(
     manifest,
-    findMappedTarget(toSubpathMap(manifest.exports), subpath, conditions),
+    findMappedTarget(toSubpathMap(manifest.exports), subpath, { conditions, isImports: false }),
   );
 }
 
@@ -128,13 +128,13 @@ function toSubpathMap(exports) {
 
 // an exact key wins; otherwise the `*` pattern with the longest prefix, then
 // the longest key, as node picks it, its match substituted into the target
-function findMappedTarget(map, key, conditions) {
+function findMappedTarget(map, key, lookup) {
   if (typeof map !== 'object' || map === null) {
     return null;
   }
 
   if (Object.hasOwn(map, key)) {
-    return findConditionTarget(map[key], conditions);
+    return toTargetString(resolvePackageTarget(map[key], null, lookup));
   }
 
   const [pattern] = Object.keys(map)
@@ -145,15 +145,19 @@ function findMappedTarget(map, key, conditions) {
       return byPrefix === 0 ? right.length - left.length : byPrefix;
     });
 
-  return pattern === undefined ? null : findPatternTarget(map, pattern, { key, conditions });
+  if (pattern === undefined) {
+    return null;
+  }
+
+  const star = pattern.indexOf('*');
+  const match = key.slice(star, key.length - (pattern.length - star - 1));
+
+  return toTargetString(resolvePackageTarget(map[pattern], match, lookup));
 }
 
-function findPatternTarget(map, pattern, lookup) {
-  const star = pattern.indexOf('*');
-  const match = lookup.key.slice(star, lookup.key.length - (pattern.length - star - 1));
-  const target = findConditionTarget(map[pattern], lookup.conditions);
-
-  return target === null ? null : target.replaceAll('*', match);
+// a blocked, unmatched or invalid target leaves the import unresolved
+function toTargetString(resolved) {
+  return typeof resolved === 'string' ? resolved : null;
 }
 
 function isPatternMatch(pattern, key) {
@@ -167,33 +171,6 @@ function isPatternMatch(pattern, key) {
   const suffix = pattern.slice(star + 1);
 
   return key.length >= pattern.length && key.startsWith(prefix) && key.endsWith(suffix);
-}
-
-function findConditionTarget(value, conditions) {
-  return findConditionValue(value, conditions) ?? null;
-}
-
-// node's rule: an object takes its first active condition that resolves, a
-// null there blocking the import; an array takes its first target, else a null
-// it holds. `undefined`, where nothing matched, lets an outer object go on.
-function findConditionValue(value, conditions) {
-  if (typeof value === 'string' || value === null) {
-    return value;
-  }
-
-  if (Array.isArray(value)) {
-    const targets = value.map((candidate) => findConditionValue(candidate, conditions));
-    const blocked = targets.includes(null) ? null : undefined;
-
-    return targets.find((target) => typeof target === 'string') ?? blocked;
-  }
-
-  const branches = typeof value === 'object' ? value : {};
-  const targets = Object.keys(branches)
-    .filter((condition) => conditions.has(condition))
-    .map((condition) => findConditionValue(branches[condition], conditions));
-
-  return targets.find((target) => target !== undefined);
 }
 
 function findImportedFile(filename, specifier, extensions) {
