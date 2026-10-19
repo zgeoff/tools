@@ -31,11 +31,7 @@ const checks = {
     value.callee.type === 'Identifier' &&
     valueConstructors.has(value.callee.name) &&
     !names.locals.has(value.callee.name) &&
-    value.arguments.every(
-      (argument) =>
-        isLiteralSpread(argument, names) ||
-        (argument.type !== 'SpreadElement' && isStaticValue(argument, names, false)),
-    ),
+    value.arguments.every((argument) => isStaticArgument(argument, names)),
 };
 
 // a value that runs no code and reads nothing that load-time code can change,
@@ -93,4 +89,11 @@ function isStaticProperty(property, names) {
     (!property.computed || isStaticValue(property.key, names, false)) &&
     isStaticValue(property.value, names)
   );
+}
+
+// a constructor reads through its arguments, so an import never stands there
+function isStaticArgument(argument, names) {
+  return argument.type === 'SpreadElement'
+    ? isLiteralSpread(argument, names)
+    : isStaticValue(argument, names, false);
 }
