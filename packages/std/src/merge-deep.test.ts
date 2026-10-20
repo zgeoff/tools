@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { isRecord } from './is-record.ts';
 import { mergeDeep } from './merge-deep.ts';
 
 interface Settings {
@@ -73,4 +74,23 @@ test('it refuses an explicit undefined for a key whose type lacks it', () => {
   const merged = mergeDeep(buildSettings(), { theme: undefined });
 
   expect(merged.theme).toBeUndefined();
+});
+
+test('it keeps a __proto__ key of the patch as an own key and leaves the prototype alone', () => {
+  const patch: unknown = JSON.parse('{"__proto__":{"isAdmin":true}}');
+
+  if (!isRecord(patch)) {
+    throw new Error('the patch is not a record');
+  }
+
+  const merged = mergeDeep<Record<string, unknown>>({}, patch);
+  const prototype: unknown = Object.getPrototypeOf(merged);
+  const isAdmin: unknown = Reflect.get(merged, 'isAdmin');
+  const ownProto: unknown = Object.getOwnPropertyDescriptor(merged, '__proto__')?.value;
+
+  expect({ prototype, isAdmin, ownProto }).toStrictEqual({
+    prototype: Object.prototype,
+    isAdmin: undefined,
+    ownProto: { isAdmin: true },
+  });
 });

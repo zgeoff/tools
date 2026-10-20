@@ -20,15 +20,24 @@ export function mergeDeep<T extends object>(base: T, patch: PartialDeep<T>): T {
 }
 
 function mergeRecords(base: object, patch: object): object {
-  const merged: Record<PropertyKey, unknown> = { ...base };
+  const merged: object = { ...base };
 
   for (const key of Reflect.ownKeys(patch)) {
     if (Object.prototype.propertyIsEnumerable.call(patch, key)) {
-      const current = merged[key];
+      const current: unknown = Object.getOwnPropertyDescriptor(merged, key)?.value;
       const next: unknown = Reflect.get(patch, key);
 
-      merged[key] =
+      const value =
         isPlainObject(current) && isPlainObject(next) ? mergeRecords(current, next) : next;
+
+      // an assignment to a `__proto__` key calls the inherited setter and
+      // replaces the prototype, so each key is defined as an own data property
+      Object.defineProperty(merged, key, {
+        value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
     }
   }
 
