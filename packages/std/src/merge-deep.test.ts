@@ -104,3 +104,55 @@ test('it replaces a Date at the root whole', () => {
 
   expect(merged).toStrictEqual(new Date('2026-06-01'));
 });
+
+interface Toolbox {
+  readonly format: (value: number) => string;
+  readonly pattern: RegExp;
+  readonly owners: ReadonlyMap<string, { readonly name: string; readonly city: string }>;
+  readonly labels: ReadonlySet<string>;
+  readonly ready: Promise<number>;
+}
+
+function buildToolbox(): Toolbox {
+  return {
+    format: (value) => value.toFixed(1),
+    pattern: /^tool-/u,
+    owners: new Map([['wrench', { name: 'Ada', city: 'Hobart' }]]),
+    labels: new Set(['steel']),
+    ready: Promise.resolve(1),
+  };
+}
+
+test('it replaces a function, a RegExp, a Map, a Set and a Promise whole', () => {
+  const format = String;
+  const pattern = /^kit-/u;
+
+  const owners = new Map([['hammer', { name: 'Lin', city: 'Perth' }]]);
+  const labels = new Set(['brass']);
+
+  const ready = Promise.resolve(2);
+  const merged = mergeDeep(buildToolbox(), { format, pattern, owners, labels, ready });
+
+  expect(merged).toStrictEqual({ format, pattern, owners, labels, ready });
+});
+
+test('it types a function, a RegExp, a Map, a Set and a Promise patch as the whole value', () => {
+  const toolbox = buildToolbox();
+
+  // @ts-expect-error -- a Map patch is a whole Map, not a partial of one
+  const mapPatch = mergeDeep(toolbox, { owners: { size: 1 } });
+
+  // @ts-expect-error -- a RegExp patch is a whole RegExp, not a partial of one
+  const patternPatch = mergeDeep(toolbox, { pattern: { source: 'x' } });
+
+  // @ts-expect-error -- a Set patch is a whole Set, not a partial of one
+  const setPatch = mergeDeep(toolbox, { labels: { size: 1 } });
+
+  // @ts-expect-error -- a Promise patch is a whole Promise, not a partial of one
+  const promisePatch = mergeDeep(toolbox, { ready: { catch: undefined } });
+
+  // @ts-expect-error -- a function patch is a whole function, not a partial of one
+  const formatPatch = mergeDeep(toolbox, { format: { length: 1 } });
+
+  expect([mapPatch, patternPatch, setPatch, promisePatch, formatPatch]).toHaveLength(5);
+});
