@@ -261,3 +261,10 @@ test.each([
 
   expect(stdout).not.toInclude('consistent-type-assertions');
 });
+
+test('it reports a type argument on a sql tag', async () => {
+  const ctx = await setupTest('rows.ts', 'export const rows = sql<number>`select 1`;\n');
+  const stdout = await runLint(ctx.directory, 'rows.ts');
+
+  expect(stdout).toInclude('zgeoff(no-hidden-cast)');
+});
