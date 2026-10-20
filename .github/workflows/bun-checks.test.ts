@@ -505,6 +505,91 @@ test('it hands the picked list to the actionlint setup through the workflow bind
   expect(installed).toBeTrue();
 });
 
+test('it installs actionlint for a test job when the caller sets the setup-actionlint input', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, 'release'));
+  await writeFile(join(ctx.directory, 'release/actionlint'), 'fake actionlint\n', { mode: 0o755 });
+
+  await $`tar -czf ${join(ctx.directory, 'release.tar.gz')} -C ${join(ctx.directory, 'release')} actionlint`.quiet();
+
+  const archive = await readFile(join(ctx.directory, 'release.tar.gz'));
+
+  await createStubCurl(ctx.bin, archive);
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { test: 'true' } }),
+  );
+
+  const text = await readFile(join(import.meta.dir, 'bun-checks.yml'), 'utf8');
+
+  const workflow: unknown = Bun.YAML.parse(text);
+
+  // The caller's inputs, under the expression each step uses to read them.
+  const inputs: Record<string, string> = {
+    [`\${{ inputs.scripts }}`]: 'test',
+    [`\${{ inputs.setup-actionlint }}`]: 'true',
+  };
+
+  await $`bash -c ${ctx.read.run}`
+    .cwd(ctx.directory)
+    .env({ PATH: ctx.path, GITHUB_OUTPUT: join(ctx.directory, 'read') })
+    .quiet();
+
+  const read = await readFile(join(ctx.directory, 'read'), 'utf8');
+
+  const readOutputs: Record<string, string> = {
+    ...inputs,
+    [`\${{ steps.${ctx.read.id}.outputs.defined }}`]: read.slice('defined='.length, -1),
+  };
+
+  await $`bash -c ${ctx.plan.run}`
+    .cwd(ctx.directory)
+    .env({
+      PATH: ctx.path,
+      SCRIPTS: readOutputs[ctx.plan.env['SCRIPTS'] ?? ''],
+      DEFINED: readOutputs[ctx.plan.env['DEFINED'] ?? ''],
+      PART: 'test',
+      GITHUB_OUTPUT: join(ctx.directory, 'planned'),
+    })
+    .quiet();
+
+  const planned = await readFile(join(ctx.directory, 'planned'), 'utf8');
+
+  const outputs: Record<string, string> = {
+    ...inputs,
+    [`\${{ steps.${ctx.plan.id}.outputs.scripts }}`]:
+      /^scripts=(?<list>.*)$/mu.exec(planned)?.groups?.['list'] ?? '',
+  };
+
+  await $`bash -c ${ctx.setupActionlint.run}`
+    .cwd(ctx.directory)
+    .env({
+      ...ctx.setupActionlint.env,
+      PATH: ctx.path,
+      SCRIPTS: outputs[ctx.setupActionlint.env['SCRIPTS'] ?? ''],
+      SETUP_ACTIONLINT: outputs[ctx.setupActionlint.env['SETUP_ACTIONLINT'] ?? ''],
+      ACTIONLINT_SHA256: new Bun.CryptoHasher('sha256').update(archive).digest('hex'),
+      RUNNER_TEMP: ctx.directory,
+      GITHUB_PATH: join(ctx.directory, 'github-path'),
+    })
+    .quiet();
+
+  const installed = await Bun.file(join(ctx.directory, 'actionlint-bin/actionlint')).exists();
+
+  expect(workflow).toMatchObject({
+    on: {
+      workflow_call: {
+        inputs: { 'setup-actionlint': { type: 'boolean', required: false, default: false } },
+      },
+    },
+  });
+
+  expect(outputs[ctx.setupActionlint.env['SCRIPTS'] ?? '']).toBe(' test ');
+  expect(installed).toBeTrue();
+});
+
 test('it gives a caller that passes no time limit the synced caller fallback', async () => {
   const reusableText = await readFile(join(import.meta.dir, 'bun-checks.yml'), 'utf8');
 
