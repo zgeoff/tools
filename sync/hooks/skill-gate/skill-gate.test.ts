@@ -178,6 +178,33 @@ test('it blocks an edit inside the project when the gate cannot load and the rul
   expect(result.stderr).toContain("Cannot find package '@zgeoff/skill-gate'");
 });
 
+test('it blocks an edit inside the project when the gate cannot load and a gate names no skills', async () => {
+  const ctx = await setupTest();
+
+  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
+
+  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await copyFile(ctx.hookPath, copiedHookPath);
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.md', skills: [] }] }),
+  );
+
+  const result = spawnSync('bun', [copiedHookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      cwd: ctx.directory,
+      transcript_path: join(ctx.directory, 'transcript.jsonl'),
+      tool_input: { file_path: join(ctx.directory, 'src/index.ts') },
+    }),
+  });
+
+  expect(result.status).toBe(2);
+  expect(result.stderr).toContain("Cannot find package '@zgeoff/skill-gate'");
+});
+
 test('it blocks an edit inside the project and names both errors when the gate cannot load or read the rules file', async () => {
   const ctx = await setupTest();
 

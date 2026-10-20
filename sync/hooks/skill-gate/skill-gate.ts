@@ -127,7 +127,11 @@ function parseRules(text: string): Rules | null {
   }
 
   const matches = gates.map((entry: unknown) =>
-    isRecord(entry) && typeof entry['match'] === 'string' && entry['match'] !== ''
+    isRecord(entry) &&
+    typeof entry['match'] === 'string' &&
+    entry['match'] !== '' &&
+    isStringArray(entry['skills']) &&
+    entry['skills'].length > 0
       ? entry['match']
       : null,
   );
