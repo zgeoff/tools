@@ -617,6 +617,53 @@ test('it runs a private repo as one checks job with the scan, the static checks,
   });
 });
 
+test('it runs the static checks, the tests and a lane once each through the private job bindings', async () => {
+  const ctx = await setupTest();
+
+  const workflow = join(import.meta.dir, 'bun-checks.yml');
+
+  const sort = await loadWorkflowStep(workflow, 'checks', 'Sort the check scripts');
+  const staticChecks = await loadWorkflowStep(workflow, 'checks', 'Static checks');
+  const tests = await loadWorkflowStep(workflow, 'checks', 'Tests');
+  const laneE2E = await loadWorkflowStep(workflow, 'checks', 'Lane e2e');
+
+  await $`bash -c ${sort.run}`
+    .cwd(ctx.directory)
+    .env({
+      PATH: ctx.path,
+      SCRIPTS: ' lint test test:e2e ',
+      PART: 'all',
+      GITHUB_OUTPUT: join(ctx.directory, 'sorted'),
+    })
+    .quiet();
+
+  const sorted = await readFile(join(ctx.directory, 'sorted'), 'utf8');
+
+  const outputs: Record<string, string> = {
+    [`\${{ steps.${sort.id}.outputs.static }}`]:
+      /^static=(?<list>.*)$/mu.exec(sorted)?.groups?.['list'] ?? '',
+    [`\${{ steps.${sort.id}.outputs.test }}`]:
+      /^test=(?<list>.*)$/mu.exec(sorted)?.groups?.['list'] ?? '',
+  };
+
+  for (const step of [staticChecks, tests]) {
+    await $`bash -c ${step.run}`
+      .cwd(ctx.directory)
+      .env({ PATH: ctx.path, SCRIPTS: outputs[step.env['SCRIPTS'] ?? ''] })
+      .quiet();
+  }
+
+  await $`bash -c ${laneE2E.run}`
+    .cwd(ctx.directory)
+    .env({ PATH: ctx.path, SCRIPTS: laneE2E.env['SCRIPTS'] })
+    .quiet();
+
+  const ran = await readFile(join(ctx.directory, 'ran'), 'utf8');
+
+  expect(sorted).toInclude('lanes=["e2e"]\n');
+  expect(ran).toBe('lint\ntest\ntest:e2e\n');
+});
+
 test('it sorts the picked scripts into static checks, tests and lanes', async () => {
   const ctx = await setupTest();
 
