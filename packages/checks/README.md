@@ -33,11 +33,12 @@ The package runs on Bun.
 
 ## Checks
 
-| Check       | Files                            | It runs                        | It needs on the PATH  |
-| ----------- | -------------------------------- | ------------------------------ | --------------------- |
-| `shell`     | `**/*.sh`                        | `shellcheck -x` and `shfmt -d` | `shellcheck`, `shfmt` |
-| `workflows` | `.github/workflows/*.{yml,yaml}` | `actionlint`                   | `actionlint`          |
-| `commits`   | the branch's commits             | `commitlint`                   | `commitlint`          |
+| Check         | Files                              | It runs                        | It needs on the PATH  |
+| ------------- | ---------------------------------- | ------------------------------ | --------------------- |
+| `shell`       | `**/*.sh`                          | `shellcheck -x` and `shfmt -d` | `shellcheck`, `shfmt` |
+| `workflows`   | `.github/workflows/*.{yml,yaml}`   | `actionlint`                   | `actionlint`          |
+| `commits`     | the branch's commits               | `commitlint`                   | `commitlint`          |
+| `local-paths` | the lines the branch's commits add | `git log -p`                   | `git`                 |
 
 The `shell` check runs `shfmt` with no style flags, so `shfmt` reads its style from the repo's
 `.editorconfig`. The `shfmt` finding sits at the first line of each block that `shfmt` would change.
@@ -68,6 +69,14 @@ installs `commitlint`, which `bun run` puts on the PATH:
 ```sh
 bun add -d @commitlint/cli
 ```
+
+The `local-paths` check reads each line that a commit of the branch adds, in every commit, because a
+later commit that removes the line still pushes the commit that adds it. A line fails when it holds
+the home directory of whoever runs the check, followed by a slash, or the machine's host name as a
+whole word. Each finding sits at the line's number in the file as that commit leaves it. The check
+reads no home of `/` and no host named `localhost`, which match too much to mean a leak. In CI the
+home and the host belong to the runner, so the check catches a leak only where it runs on the
+machine that made it, such as in the pre-push hook.
 
 ## Exit codes
 

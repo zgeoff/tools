@@ -1,0 +1,185 @@
+import { expect, onTestFinished, test } from 'bun:test';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { hostname, tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { $ } from 'bun';
+import invariant from 'tiny-invariant';
+import { localPathsCheck } from './local-paths-check.ts';
+
+// A git repo in a temp folder that is also the HOME of the check, with a first commit that stands
+// for the base branch. The host name is the real one, because the check reads it from the system.
+async function setupTest() {
+  const directory = await mkdtemp(join(tmpdir(), 'local-paths-check-'));
+
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+
+  const host = hostname();
+
+  invariant(host !== '' && host !== 'localhost', 'the host needs a name of its own');
+
+  const env = {
+    PATH: process.env['PATH'],
+    HOME: directory,
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_AUTHOR_NAME: 'Test Author',
+    GIT_AUTHOR_EMAIL: 'author@example.com',
+    GIT_COMMITTER_NAME: 'Test Author',
+    GIT_COMMITTER_EMAIL: 'author@example.com',
+  };
+
+  await $`git init --quiet`.cwd(directory).env(env);
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`.cwd(directory).env(env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(directory).env(env).text();
+
+  return { directory, env, host, base: baseText.trim() };
+}
+
+test('it passes a branch whose added lines hold no local path', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'greet.txt'),
+    'cache: ~/.cache/greeting\nhost: example.com\n',
+  );
+
+  await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'feat: add the greeting'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = await localPathsCheck.check({
+    cwd: ctx.directory,
+    base: ctx.base,
+    env: ctx.env,
+  });
+
+  expect(findings).toStrictEqual([]);
+});
+
+test('it reports an added line that holds the home directory at its path and line', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'greet.txt'),
+    `greeting: hello\ncache: ${ctx.directory}/.cache/greeting\n`,
+  );
+
+  await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'feat: add the greeting'}`.cwd(ctx.directory).env(ctx.env);
+
+  const hashText = await $`git rev-parse --short HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  const findings = await localPathsCheck.check({
+    cwd: ctx.directory,
+    base: ctx.base,
+    env: ctx.env,
+  });
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'greet.txt',
+      line: 2,
+      message: `commit ${hashText.trim()} adds the home directory ${ctx.directory}/; remove it before you push`,
+    },
+  ]);
+});
+
+test('it reports an added line that holds the host name as a whole word', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'greet.txt'), `built on ${ctx.host}, at noon\n`);
+
+  await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'feat: add the greeting'}`.cwd(ctx.directory).env(ctx.env);
+
+  const hashText = await $`git rev-parse --short HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  const findings = await localPathsCheck.check({
+    cwd: ctx.directory,
+    base: ctx.base,
+    env: ctx.env,
+  });
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'greet.txt',
+      line: 1,
+      message: `commit ${hashText.trim()} adds the host name ${ctx.host}; remove it before you push`,
+    },
+  ]);
+});
+
+test('it passes the host name inside a longer word', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'greet.txt'), `the ${ctx.host}_backup and x${ctx.host}\n`);
+
+  await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'feat: add the greeting'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = await localPathsCheck.check({
+    cwd: ctx.directory,
+    base: ctx.base,
+    env: ctx.env,
+  });
+
+  expect(findings).toStrictEqual([]);
+});
+
+test('it reads only the lines the branch adds, not the lines it keeps or removes', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'greet.txt'),
+    `greeting: hello\ncache: ${ctx.directory}/.cache/greeting\nhost: ${ctx.host}\n`,
+  );
+
+  await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'feat: add the greeting'}`.cwd(ctx.directory).env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  await writeFile(
+    join(ctx.directory, 'greet.txt'),
+    `greeting: good day\ncache: ${ctx.directory}/.cache/greeting\n`,
+  );
+
+  await $`git commit --quiet -am ${'fix: change the greeting'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = await localPathsCheck.check({
+    cwd: ctx.directory,
+    base: baseText.trim(),
+    env: ctx.env,
+  });
+
+  expect(findings).toStrictEqual([]);
+});
+
+test('it reports a line that a later commit of the branch removes', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'greet.txt'), `cache: ${ctx.directory}/.cache/greeting\n`);
+
+  await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'feat: add the greeting'}`.cwd(ctx.directory).env(ctx.env);
+
+  const hashText = await $`git rev-parse --short HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  await writeFile(join(ctx.directory, 'greet.txt'), 'cache: ~/.cache/greeting\n');
+
+  await $`git commit --quiet -am ${'fix: drop the local path'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = await localPathsCheck.check({
+    cwd: ctx.directory,
+    base: ctx.base,
+    env: ctx.env,
+  });
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'greet.txt',
+      line: 1,
+      message: `commit ${hashText.trim()} adds the home directory ${ctx.directory}/; remove it before you push`,
+    },
+  ]);
+});
