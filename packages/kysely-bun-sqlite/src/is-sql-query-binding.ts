@@ -9,6 +9,6 @@ export function isSQLQueryBinding(value: unknown): value is SQLQueryBinding {
     typeof value === 'bigint' ||
     typeof value === 'number' ||
     typeof value === 'boolean' ||
-    (ArrayBuffer.isView(value) && !(value instanceof DataView))
+    (ArrayBuffer.isView(value) && Object.prototype.toString.call(value) !== '[object DataView]')
   );
 }

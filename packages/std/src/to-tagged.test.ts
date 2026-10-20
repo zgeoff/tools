@@ -38,3 +38,12 @@ test('it refuses a type that carries no tag', () => {
 
   expect<string>(size).toBe('medium');
 });
+
+test('it refuses a tag over a literal base', () => {
+  type Size = 'small' & { readonly brand: 'Size' };
+
+  // @ts-expect-error -- a Size is made from the literal 'small', not from any string
+  const size: unknown = toTagged<Size>('medium');
+
+  expect(size).toBe('medium');
+});
