@@ -28,22 +28,48 @@ if [ "$(git -C "$tools" rev-parse --is-shallow-repository)" = true ]; then
   exit 1
 fi
 
-# Prints the content on stdin with the parts a sync run changes per repo put
-# back in one form: every call to a zgeoff/tools workflow names @main, and a
-# Markdown file loses every block that needs a file, kept or removed, with the
-# blank line after it.
+here=$(dirname "${BASH_SOURCE[0]}")
+
+# Prints the hash of each form in which a sync run could deliver the blob to
+# the target. A workflow's calls to a zgeoff/tools workflow name the ref of the
+# run, so every such call reads @main in the hash, and the copy is hashed the
+# same way. A Markdown file loses the blocks that need a file the repo does
+# not receive, so each subset of the needed paths gives one form. A file that
+# needs more than 8 paths gets only its unchanged form, which keeps the copy
+# rather than hash 2^n forms.
+print_delivered_hashes() {
+  local target=$1 blob=$2 work count mask index
+  local needs=() excluded=()
+  if [[ "$target" != *.md ]]; then
+    git -C "$tools" cat-file blob "$blob" | to_delivered_form "$target" | git hash-object --stdin
+    return
+  fi
+  work=$(mktemp -d)
+  git -C "$tools" cat-file blob "$blob" > "$work/source.md"
+  mapfile -t needs < <(sed -nE 's/^<!-- repo-sync needs ([^[:space:]]+) -->$/\1/p' "$work/source.md" | sort -u)
+  count=${#needs[@]}
+  if [ "$count" -gt 8 ]; then
+    count=0
+  fi
+  for ((mask = 0; mask < (1 << count); mask++)); do
+    excluded=()
+    for ((index = 0; index < count; index++)); do
+      if ((mask & (1 << index))); then
+        excluded+=("$work/${needs[$index]}")
+      fi
+    done
+    cp "$work/source.md" "$work/copy.md"
+    if bash "$here/remove-excluded-blocks.sh" "$work/copy.md" "${excluded[@]}"; then
+      git hash-object --no-filters "$work/copy.md"
+    fi
+  done
+  rm -rf "$work"
+}
+
 to_delivered_form() {
   local target=$1
   if [[ "$target" == .github/workflows/* ]]; then
     sed -E "s#(zgeoff/tools/\.github/workflows/[^]@[:space:]\"'{},]+)@[A-Za-z0-9._/-]+#\1@main#g"
-  elif [[ "$target" == *.md ]]; then
-    awk '
-      /^<!-- repo-sync needs [^[:space:]]+ -->$/ { open = 1; next }
-      open && $0 == "<!-- repo-sync end -->" { open = 0; blank = 1; next }
-      blank && $0 == "" { blank = 0; next }
-      { blank = 0 }
-      !open { print }
-    '
   else
     cat
   fi
@@ -105,7 +131,7 @@ while IFS= read -r target; do
     printf '%s' "${sources[$target]}" | sort -u | while IFS= read -r source; do
       git -C "$tools" log --format=%H -- "$source" | while IFS= read -r commit; do
         if blob=$(git -C "$tools" rev-parse -q --verify "$commit:$source"); then
-          git -C "$tools" cat-file blob "$blob" | to_delivered_form "$target" | git hash-object --stdin
+          print_delivered_hashes "$target" "$blob"
         fi
       done
     done
