@@ -13,6 +13,7 @@
     "plugin.js",
     "function-verb.js",
     "verb-contract.js",
+    "collect-type-kinds.js",
     "module-order.js",
     "collect-module-entries.js",
     "build-module-order-fix.js",

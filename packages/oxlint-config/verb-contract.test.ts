@@ -479,6 +479,16 @@ export function getFirst(items: readonly number[]): MaybeNumber {
 `,
     "'getEntry' starts with 'get', which promises it cannot miss",
   ],
+  [
+    'a local alias of a nested method with an effectful verb',
+    `export function buildThing(deps: { io: { writeText(text: string): void } }): void {
+  const go = deps.io.writeText;
+
+  go('a');
+}
+`,
+    "'buildThing' starts with 'build', which promises no I/O, but it calls 'writeText', whose verb may do I/O",
+  ],
 ])('it reports %s', async (_, source, message) => {
   const ctx = await setupTest();
   const result = await ctx.lint(source);
@@ -762,6 +772,32 @@ export function getItem<T>(items: readonly T[]): T {
 }
 
 export const getName = (entry: { name: string }): string => entry.name;
+`,
+  ],
+  [
+    'a method called on a parameter property with an effectful verb',
+    `export function buildScope(agent: { spawnTargets: readonly string[] }): string[] {
+  return agent.spawnTargets.filter((target) => target.length > 0);
+}
+`,
+  ],
+  [
+    'a method called on a property of this with an effectful verb',
+    `export const pool = {
+  openHandles: new Set<string>(),
+  hasHandle(handle: string): boolean {
+    return this.openHandles.has(handle);
+  },
+};
+`,
+  ],
+  [
+    'a local alias of a pure method on a property with an effectful verb',
+    `export function buildScope(agent: { spawnTargets: { pick(): string } }): string {
+  const choose = agent.spawnTargets.pick;
+
+  return choose();
+}
 `,
   ],
 ])('it accepts %s', async (_, source) => {
