@@ -157,7 +157,7 @@
     },
     "packages/skill-gate": {
       "name": "@zgeoff/skill-gate",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "devDependencies": {
         "@types/bun": "catalog:",
         "@zgeoff/std": "workspace:*",
