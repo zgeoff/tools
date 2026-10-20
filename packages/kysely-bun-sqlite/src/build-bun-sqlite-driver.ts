@@ -1,6 +1,8 @@
 import type { Database, SQLQueryBindings } from 'bun:sqlite';
 import { CompiledQuery } from 'kysely';
 import type { DatabaseConnection, Driver, QueryResult } from 'kysely';
+import { isSQLQueryBinding } from './is-sql-query-binding.ts';
+import type { SQLQueryBinding } from './is-sql-query-binding.ts';
 
 // oxlint-disable zgeoff/function-verb -- Kysely's Driver interface fixes the method names
 
@@ -61,9 +63,7 @@ function buildConnection(sqlite: Database): DatabaseConnection {
   return {
     executeQuery<R>(compiledQuery: CompiledQuery): Promise<QueryResult<R>> {
       const stmt = sqlite.query<R, SQLQueryBindings[]>(compiledQuery.sql);
-
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Kysely's SQLite compiler binds only values that bun:sqlite accepts
-      const bindings = compiledQuery.parameters as SQLQueryBindings[];
+      const bindings = toBindings(compiledQuery.parameters);
 
       if (stmt.columnNames.length > 0) {
         return Promise.resolve({ rows: stmt.all(...bindings) });
@@ -82,4 +82,16 @@ function buildConnection(sqlite: Database): DatabaseConnection {
       throw new Error('The bun:sqlite driver does not support streaming queries');
     },
   };
+}
+
+function toBindings(parameters: readonly unknown[]): SQLQueryBinding[] {
+  return parameters.map((parameter) => {
+    if (!isSQLQueryBinding(parameter)) {
+      const kind = Object.prototype.toString.call(parameter).slice('[object '.length, -1);
+
+      throw new TypeError(`bun:sqlite cannot bind a parameter of type ${kind}`);
+    }
+
+    return parameter;
+  });
 }

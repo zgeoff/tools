@@ -25,6 +25,6 @@ export function toExactOptional<T extends object>(value: T): ExactOptional<T> {
     .map((key): [PropertyKey, unknown] => [key, Reflect.get(value, key)])
     .filter(([, entry]) => entry !== undefined);
 
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the filter above is what makes the keys optional; the type system cannot follow it
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- approved GEO-1460: Object.fromEntries loses key types inside a generic
   return Object.fromEntries(entries) as ExactOptional<T>;
 }

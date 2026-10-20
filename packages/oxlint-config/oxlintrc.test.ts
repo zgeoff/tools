@@ -240,3 +240,24 @@ test.each(abbreviations)('it reports `%s` as %s', async (name, replacement) => {
 
   expect(stdout).toInclude(`Rename \`${name}\` to ${replacement}:`);
 });
+
+test.each([
+  ['an as assertion', 'export const size = JSON.parse("1") as number;\n'],
+  ['an angle-bracket assertion', 'export const size = <number>JSON.parse("1");\n'],
+  ['a double assertion', 'export const size = "1" as unknown as number;\n'],
+])('it reports %s', async (_label, source) => {
+  const ctx = await setupTest('size.ts', source);
+  const stdout = await runLint(ctx.directory, 'size.ts');
+
+  expect(stdout).toInclude('typescript(consistent-type-assertions)');
+});
+
+test.each([
+  ['an as const assertion', "export const sizes = ['small', 'large'] as const;\n"],
+  ['a satisfies check', "export const sizes = ['small', 'large'] satisfies string[];\n"],
+])('it accepts %s', async (_label, source) => {
+  const ctx = await setupTest('size.ts', source);
+  const stdout = await runLint(ctx.directory, 'size.ts');
+
+  expect(stdout).not.toInclude('consistent-type-assertions');
+});
