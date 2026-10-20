@@ -158,13 +158,11 @@
     "packages/skill-gate": {
       "name": "@zgeoff/skill-gate",
       "version": "0.2.1",
-      "dependencies": {
-        "@zgeoff/std": "workspace:*",
-        "ts-pattern": "catalog:",
-      },
       "devDependencies": {
         "@types/bun": "catalog:",
+        "@zgeoff/std": "workspace:*",
         "tiny-invariant": "catalog:",
+        "ts-pattern": "catalog:",
         "typescript": "catalog:",
       },
     },
