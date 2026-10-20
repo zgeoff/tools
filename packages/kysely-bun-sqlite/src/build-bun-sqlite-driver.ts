@@ -1,8 +1,9 @@
-import type { Database, SQLQueryBindings } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 import { CompiledQuery } from 'kysely';
 import type { DatabaseConnection, Driver, QueryResult } from 'kysely';
 import { isSQLQueryBinding } from './is-sql-query-binding.ts';
 import type { SQLQueryBinding } from './is-sql-query-binding.ts';
+import { toQueryRows } from './to-query-rows.ts';
 
 // oxlint-disable zgeoff/function-verb -- Kysely's Driver interface fixes the method names
 
@@ -62,11 +63,11 @@ export function buildBunSQLiteDriver(sqlite: Database): Driver {
 function buildConnection(sqlite: Database): DatabaseConnection {
   return {
     executeQuery<R>(compiledQuery: CompiledQuery): Promise<QueryResult<R>> {
-      const stmt = sqlite.query<R, SQLQueryBindings[]>(compiledQuery.sql);
+      const stmt = sqlite.query(compiledQuery.sql);
       const bindings = toBindings(compiledQuery.parameters);
 
       if (stmt.columnNames.length > 0) {
-        return Promise.resolve({ rows: stmt.all(...bindings) });
+        return Promise.resolve({ rows: toQueryRows<R>(stmt.all(...bindings)) });
       }
 
       const result = stmt.run(...bindings);

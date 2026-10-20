@@ -50,3 +50,11 @@ such a value first, such as a `Date` to its ISO string.
 
 `isSQLQueryBinding` is exported for a driver of its own that binds Kysely's parameters to
 bun:sqlite. It accepts a string, a number, a bigint, a boolean, `null`, or a typed array.
+
+## Rows
+
+Kysely's driver interface has each driver return its rows typed as the row type that the query
+names, though the database hands back untyped rows. `toQueryRows<R>()` holds that one claim with an
+approved type assertion, and this package's driver returns its rows through it. Another driver that
+binds Kysely to bun:sqlite returns its rows through the same helper, so it needs no assertion of its
+own.
