@@ -30,7 +30,7 @@ Each line links the section that explains it.
 - [Type claims](#type-claims): no type assertion and no `any` value reaching a typed place; narrow
   or parse instead.
 - [Structure](#structure): typed contracts between processes, decisions split from I/O, no
-  forwarding layer or unused option, I/O through given dependencies, and reuse before a new helper.
+  forwarding layer or unused option, and I/O through given dependencies.
 - [Errors and logs](#errors-and-logs): return an expected outcome, guard only what can be wrong,
   assert what only a bug reaches, and log nothing per call on a hot path.
 - [Comments](#comments): a `//` comment holds only the reason the obvious alternative is wrong, when
@@ -144,8 +144,6 @@ Each of these rules keeps the next change small.
   because one that nothing passes is code that no test runs.
 - A unit reaches I/O through the dependencies its caller passes in, never by importing a client or
   calling a global, so a test passes a stand-in at the boundary.
-- Before writing a function, search the repo for one that does the same job. Call it, or add the one
-  argument it lacks, instead of writing a second copy.
 
 ## Errors and logs
 
