@@ -150,12 +150,17 @@ The preset sorts each update by its kind:
 | Security fix          | none             | one per package, labelled `security`         | on green checks |
 | Patch                 | 7 days           | the weekly `patch updates` group             | on green checks |
 | Dev-tool minor        | 7 days           | the weekly `dev tools` group                 | on green checks |
+| TanStack router       | 7 days           | the `tanstack-router monorepo` group         | on green checks |
 | Other minor           | 7 days           | one per package                              | on green checks |
 | Major                 | 7 days           | one per package, opened weekly               | after review    |
 | `@zgeoff/*` package   | none             | one per package, at any level                | on green checks |
 | `@impz/*` package     | none             | one per package, at any level                | on green checks |
 | zgeoff/tools sync tag | none             | one per tag                                  | on green checks |
 | Lock-file maintenance | none             | weekly, for the dependencies of dependencies | on green checks |
+
+A TanStack router release, React Start among its packages, reaches a repo as one pull request for
+its patch and minor bumps, so the router and React Start never ship at different versions. That
+group opens at any time, as other minor bumps do.
 
 The 7-day wait matches the `minimumReleaseAge = 604800` in each repo's `bunfig.toml`, so Renovate
 proposes no version that `bun install` would refuse. Security fixes come from OSV, through
