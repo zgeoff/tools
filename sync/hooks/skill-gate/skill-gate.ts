@@ -20,8 +20,6 @@ function formatError(error: unknown): string {
   return String(error);
 }
 
-// Blocks a call the gate covers, and lets any other call run with the load error on stderr. With no
-// gate to read the rules, a rules file that does not parse blocks every edit inside the project.
 async function reportLoadFailure(loadError: string): Promise<never> {
   const payload: unknown = await Bun.stdin.json().catch(() => null);
 
