@@ -476,7 +476,7 @@ test('it checks out the full history without the file contents, so the branch ch
   expect(workflow).toMatchObject({ jobs: { gitleaks: { steps }, checks: { steps } } });
 });
 
-test('it restores the install cache keyed on the lockfile before it installs', async () => {
+test('it restores the install cache keyed on the lockfile, or the newest older cache for the runner OS, before it installs', async () => {
   const text = await readFile(join(import.meta.dir, 'bun-checks.yml'), 'utf8');
 
   const workflow: unknown = Bun.YAML.parse(text);
@@ -485,7 +485,8 @@ test('it restores the install cache keyed on the lockfile before it installs', a
     name: 'Cache bun install',
     with: expect.objectContaining({
       path: '~/.bun/install/cache',
-      key: expect.stringContaining("hashFiles('bun.lock')"),
+      key: `bun-install-\${{ runner.os }}-\${{ hashFiles('bun.lock') }}`,
+      'restore-keys': `bun-install-\${{ runner.os }}-`,
     }),
   });
 
