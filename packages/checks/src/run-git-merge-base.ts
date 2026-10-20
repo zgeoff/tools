@@ -1,5 +1,3 @@
-// Returns the merge base of HEAD and origin's default branch: the commit the branch grows from. It
-// throws when git finds none, so a branch check never reads an empty range as a clean branch.
 export function runGitMergeBase(
   cwd: string,
   env: Readonly<Record<string, string | undefined>>,
