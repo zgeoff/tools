@@ -331,3 +331,34 @@ test('it reports the real path of a file whose name git quotes', async () => {
     },
   ]);
 });
+
+test('it reports the real path of a quoted file name that holds an emoji', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  await writeFile(join(ctx.directory, '😀\tnotes.txt'), `cache: ${ctx.directory}/.cache\n`);
+
+  await $`git add -A`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'feat: add the notes'}`.cwd(ctx.directory).env(ctx.env);
+
+  const hashText = await $`git rev-parse --short HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  const findings = await localPathsCheck.check({
+    cwd: ctx.directory,
+    base: baseText.trim(),
+    env: ctx.env,
+  });
+
+  expect(findings).toStrictEqual([
+    {
+      path: '😀\tnotes.txt',
+      line: 1,
+      message: `commit ${hashText.trim()} adds the home directory ${ctx.directory}/; remove it before you push`,
+    },
+  ]);
+});
