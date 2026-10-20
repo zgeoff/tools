@@ -2,12 +2,12 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { collectBranchFiles } from './collect-branch-files.ts';
+import { readBranchFiles } from './read-branch-files.ts';
 
 // A bare upstream and a clone of it whose main holds one pushed commit, so
 // every test starts from a repository whose history predates the branch.
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'collect-branch-files-'));
+  const directory = await mkdtemp(join(tmpdir(), 'read-branch-files-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
@@ -85,15 +85,12 @@ async function createCommit(
 }
 
 async function runScript(cwd: string, env: Readonly<Record<string, string | undefined>>) {
-  const subprocess = Bun.spawn(
-    [process.execPath, join(import.meta.dir, 'collect-branch-files.ts')],
-    {
-      cwd,
-      env,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    },
-  );
+  const subprocess = Bun.spawn([process.execPath, join(import.meta.dir, 'read-branch-files.ts')], {
+    cwd,
+    env,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
 
   const [stdout, stderr, exitCode] = await Promise.all([
     new Response(subprocess.stdout).text(),
@@ -110,7 +107,7 @@ test('it lists the files a new branch with no upstream changes', async () => {
   await ctx.runGit('switch', '--quiet', '--create', 'feature');
   await ctx.createCommit({ 'a.ts': 'a', 'b.ts': 'b' });
 
-  const files = await collectBranchFiles({ cwd: ctx.repo, env: ctx.env });
+  const files = await readBranchFiles({ cwd: ctx.repo, env: ctx.env });
 
   expect(files).toIncludeSameMembers(['a.ts', 'b.ts']);
 });
@@ -122,7 +119,7 @@ test('it lists only the branch files once the branch is pushed with an upstream'
   await ctx.createCommit({ 'a.ts': 'a' });
   await ctx.runGit('push', '--quiet', '-u', 'origin', 'feature');
 
-  const files = await collectBranchFiles({ cwd: ctx.repo, env: ctx.env });
+  const files = await readBranchFiles({ cwd: ctx.repo, env: ctx.env });
 
   expect(files).toStrictEqual(['a.ts']);
 });
@@ -137,7 +134,7 @@ test('it leaves out the files main gained after the branch started', async () =>
   await ctx.runGit('push', '--quiet', 'origin', 'main');
   await ctx.runGit('switch', '--quiet', 'feature');
 
-  const files = await collectBranchFiles({ cwd: ctx.repo, env: ctx.env });
+  const files = await readBranchFiles({ cwd: ctx.repo, env: ctx.env });
 
   expect(files).toStrictEqual(['a.ts']);
 });
@@ -147,7 +144,7 @@ test('it lists nothing when the branch has no commits of its own', async () => {
 
   await ctx.runGit('switch', '--quiet', '--create', 'feature');
 
-  const files = await collectBranchFiles({ cwd: ctx.repo, env: ctx.env });
+  const files = await readBranchFiles({ cwd: ctx.repo, env: ctx.env });
 
   expect(files).toBeEmpty();
 });
@@ -159,7 +156,7 @@ test('it leaves out a file the branch deleted', async () => {
   await ctx.runGit('rm', '--quiet', 'README.md');
   await ctx.createCommit({ 'a.ts': 'a' });
 
-  const files = await collectBranchFiles({ cwd: ctx.repo, env: ctx.env });
+  const files = await readBranchFiles({ cwd: ctx.repo, env: ctx.env });
 
   expect(files).toStrictEqual(['a.ts']);
 });
@@ -171,7 +168,7 @@ test('it lists the new path of a file the branch renamed', async () => {
   await ctx.runGit('mv', 'README.md', 'GUIDE.md');
   await ctx.runGit('commit', '--quiet', '-m', 'rename');
 
-  const files = await collectBranchFiles({ cwd: ctx.repo, env: ctx.env });
+  const files = await readBranchFiles({ cwd: ctx.repo, env: ctx.env });
 
   expect(files).toStrictEqual(['GUIDE.md']);
 });
@@ -183,7 +180,7 @@ test('it falls back to origin/main when origin/HEAD is unset', async () => {
   await ctx.runGit('switch', '--quiet', '--create', 'feature');
   await ctx.createCommit({ 'a.ts': 'a' });
 
-  const files = await collectBranchFiles({ cwd: ctx.repo, env: ctx.env });
+  const files = await readBranchFiles({ cwd: ctx.repo, env: ctx.env });
 
   expect(files).toStrictEqual(['a.ts']);
 });
@@ -193,7 +190,7 @@ test('it rejects a repository with no origin', async () => {
 
   await ctx.runGit('remote', 'remove', 'origin');
 
-  const rejection: unknown = await collectBranchFiles({ cwd: ctx.repo, env: ctx.env }).catch(
+  const rejection: unknown = await readBranchFiles({ cwd: ctx.repo, env: ctx.env }).catch(
     (error: unknown) => error,
   );
 
@@ -214,7 +211,7 @@ test('it exits 1 with a message when run in a repository with no origin', async 
 
   expect(run.exitCode).toBe(1);
   expect(run.stdout).toBeEmpty();
-  expect(run.stderr).toStartWith('collect-branch-files: cannot find the base of this branch');
+  expect(run.stderr).toStartWith('read-branch-files: cannot find the base of this branch');
 });
 
 test('it prints one file per line when run on a branch', async () => {
