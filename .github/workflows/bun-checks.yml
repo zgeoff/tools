@@ -101,7 +101,7 @@ jobs:
           GITLEAKS_VERSION: 8.30.1
 
   # Lists the lanes for the test-<lane> jobs, so a repo without lanes starts
-  # none. It reads package.json alone.
+  # none. It checks out package.json and .bun-version alone.
   plan:
     if:
       ${{ !((github.event.repository && github.event.repository.private) ||
@@ -119,89 +119,42 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          sparse-checkout: package.json
+          sparse-checkout: |
+            package.json
+            .bun-version
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
-      # The one file the plan needs, read in a step of its own, so the plan
-      # works from names alone.
-      - &read-scripts
-        name: Read the package scripts
-        id: read
+      - &setup-bun
+        name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      # The planner lives beside this workflow, not in the caller's checkout,
+      # so the step downloads it from the commit that defines this job: a
+      # caller at a sync tag runs that tag's planner. actionlint does not know
+      # job.workflow_repository or job.workflow_sha, so the step reads them
+      # from the job context as JSON.
+      - &fetch-planner
+        name: Fetch the check planner
+        env:
+          JOB_CONTEXT: ${{ toJSON(job) }}
         run: |
           set -euo pipefail
-          echo "defined= $(jq -r '.scripts // {} | keys | join(" ")' package.json) " >> "$GITHUB_OUTPUT"
+          repository=$(jq -er .workflow_repository <<< "$JOB_CONTEXT")
+          sha=$(jq -er .workflow_sha <<< "$JOB_CONTEXT")
+          mkdir -p "$RUNNER_TEMP/check-plan"
+          for file in plan-check-scripts.ts write-check-plan.ts; do
+            curl -fsSL -o "$RUNNER_TEMP/check-plan/$file" "https://raw.githubusercontent.com/$repository/$sha/.github/workflows/$file"
+          done
 
-      # Plans the part each job runs before anything runs, from the caller's
-      # list, the names package.json defines and the job's part, so a missing
-      # name fails fast. It writes only the notice or error and the outputs.
       - &plan
         name: Plan the check scripts
         id: plan
         env:
           SCRIPTS: ${{ inputs.scripts }}
-          DEFINED: ${{ steps.read.outputs.defined }}
-        run: |
-          set -euo pipefail
-          is_defined() { [[ "$DEFINED" == *" $1 "* ]]; }
-          notice=""
-          # A value of only whitespace parses to no names and gets the standard list too.
-          read -ra list <<< "$SCRIPTS"
-          if [ "${#list[@]}" -eq 0 ]; then
-            list=(audit deadcode format:check lint)
-            # The standard list runs check only when the repo defines it, so a
-            # repo turns the check on by adding the script.
-            if is_defined check; then
-              list+=(check)
-            else
-              notice='check skipped, because package.json has no check script; add "check": "zgeoff-check" to run it.'
-            fi
-            list+=(typecheck test)
-            for lane in e2e browser docker host; do
-              if is_defined "test:$lane"; then
-                list+=("test:$lane")
-              fi
-            done
-          fi
-          missing=""
-          for name in "${list[@]}"; do
-            is_defined "$name" || missing="$missing $name"
-          done
-          static=()
-          tests=()
-          lanes=()
-          for name in "${list[@]}"; do
-            case "$name" in
-              test:e2e | test:browser | test:docker | test:host) lanes+=("${name#test:}") ;;
-              test | test:*) tests+=("$name") ;;
-              *) static+=("$name") ;;
-            esac
-          done
-          # scripts is the part this job runs: all of them in the private
-          # checks job, one group in a public job.
-          case "$PART" in
-            static) part=("${static[@]}") ;;
-            test) part=("${tests[@]}") ;;
-            lane) part=("test:$LANE") ;;
-            *) part=("${static[@]}" "${tests[@]}") ;;
-          esac
-          if [ "$PART" = all ]; then
-            for lane in "${lanes[@]}"; do part+=("test:$lane"); done
-          fi
-          if [ -n "$notice" ]; then
-            echo "::notice::$notice"
-          fi
-          if [ -n "$missing" ]; then
-            echo "::error::package.json defines no script named:$missing. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list."
-            exit 1
-          fi
-          # Spaces around each list let a step match one whole name.
-          {
-            echo "scripts= ${part[*]} "
-            echo "static= ${static[*]} "
-            echo "test= ${tests[*]} "
-            echo "lanes=$(printf '%s\n' "${lanes[@]}" | jq -Rnc '[inputs | select(. != "")]')"
-          } >> "$GITHUB_OUTPUT"
+        run: bun "$RUNNER_TEMP/check-plan/write-check-plan.ts"
 
   static:
     if:
@@ -226,11 +179,7 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
 
-      - &setup-bun
-        name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: .bun-version
+      - *setup-bun
 
       # Bun's install cache, keyed on the lockfile. A lockfile change restores
       # the newest older cache, and the job saves a new one when it passes.
@@ -246,7 +195,7 @@ jobs:
         name: Install
         run: bun install --frozen-lockfile
 
-      - *read-scripts
+      - *fetch-planner
       - *plan
 
       # The shell check of zgeoff-check runs shellcheck, which the runner image
@@ -325,7 +274,7 @@ jobs:
       - *setup-bun
       - *cache
       - *install
-      - *read-scripts
+      - *fetch-planner
       - *plan
       - *setup-shfmt
       - *setup-actionlint
@@ -355,7 +304,7 @@ jobs:
       - *setup-bun
       - *cache
       - *install
-      - *read-scripts
+      - *fetch-planner
       - *plan
       - *setup-shfmt
       - *setup-actionlint
@@ -392,7 +341,7 @@ jobs:
       - *setup-bun
       - *cache
       - *install
-      - *read-scripts
+      - *fetch-planner
       - *plan
       - *setup-shfmt
       - *setup-actionlint
