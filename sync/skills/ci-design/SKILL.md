@@ -1,11 +1,11 @@
 ---
 name: ci-design
 description:
-  The shape of a GitHub Actions pipeline in a zgeoff repo — reusable workflows instead of composite
-  actions, path gates on pull requests with a full run on main, which jobs cancel and which never
-  do, building once and passing the result, checkout depth, and triggers that rerun nothing. Load it
-  before adding, changing, or reviewing a workflow, a job, a trigger, or a Renovate setting that
-  starts CI runs.
+  How CI runs in a zgeoff repo — the public and private job profiles, job timeouts, test budgets and
+  the audit data each main run uploads, reusable workflows instead of composite actions, path gates
+  on pull requests with a full run on main, which jobs cancel and which never do, building once and
+  passing the result, checkout depth, and triggers that rerun nothing. Load it before adding,
+  changing, or reviewing a workflow, a job, a trigger, or a Renovate setting that starts CI runs.
 ---
 
 # CI design
@@ -21,6 +21,13 @@ when a new tag is cut.
 
 Each line links the section that explains it.
 
+- [Two profiles](#two-profiles): a public repo runs parallel jobs for wall time, and a private repo
+  runs one `checks` job of named steps for minutes.
+- [Timeouts](#timeouts): every job sets a limit, 20 minutes until the repo's tests are within budget
+  for a week, then the formula.
+- [Test budgets and audit data](#test-budgets-and-audit-data): the budget covers the slowest test
+  job in a public repo and the sum of the test steps in a private one, and each main run uploads the
+  data the weekly audit reads.
 - [Reusable workflows](#reusable-workflows): share setup as a reusable workflow in zgeoff/tools,
   never as a composite action.
 - [Path gates](#path-gates): a pull-request job runs only when its input paths change, through a
@@ -40,6 +47,73 @@ downstream repo. When the repo has a `project-ci-design` skill, load it too. It 
 pipeline, such as its required checks and its deploy jobs, and where the two disagree, the project
 skill wins.
 
+This skill covers how CI runs. How a test is written and run, including the worker count, the lanes
+and the per-test time limit, is in the [testing](../testing/SKILL.md) skill, and this skill repeats
+none of it.
+
+## Two profiles
+
+A repo's visibility picks the layout of its checks. A public repo spends no paid minutes, so it
+splits work into parallel jobs to cut wall time. A private repo pays for every job, at least a full
+minute each, so it runs one job. `bun-checks.yml` picks the profile from
+`github.event.repository.private`, which in a reusable workflow reads the calling repo, and takes
+the `private` input as the fallback for an event whose payload has no repository. A hand-written
+workflow follows the same layout by hand.
+
+| Profile | Jobs                                        | Required checks | Test budget covers        |
+| ------- | ------------------------------------------- | --------------- | ------------------------- |
+| Public  | `gitleaks`, `static`, `test`, `test-<lane>` | each of these   | the slowest test job      |
+| Private | `checks`                                    | `checks`        | the sum of the test steps |
+
+A public repo runs one `test-<lane>` job for each lane it has. A private repo's `checks` job runs
+the secret scan, the static checks, the tests and each lane as named steps.
+
+In a public repo:
+
+- **Split work into its own job only when the split saves at least 60 s of wall time** against
+  running it as a step. A job that saves less costs a runner start, a checkout and an install for
+  nothing.
+- **Start at most 10 jobs at once in one run.** The account's concurrent-job limit is shared by
+  every repo, so a wide run queues the others.
+- **Shard the test job only when the repo is over its budget after the speed work** in the testing
+  skill.
+
+In a private repo:
+
+- **Add a second job only for another runner, such as KVM or macOS, or another trigger.** A heavy
+  check runs nightly or on dispatch, not on each pull request.
+- **Make the `checks` job the required check**, with no aggregator job after it.
+- **Run the secret scan as a step.** A scan of a few seconds in its own job bills a full minute.
+- **Path-gate a lane inside the job.** A step diffs the pull request's merge commit against its
+  base, as the [path gate](#path-gates) does, and the lane's step `if:` reads its output, so a lane
+  that a pull request cannot affect skips without a second job.
+
+Both profiles gate side work on paths, cancel a superseded pull-request run, build once, cache the
+install and set a timeout on every job.
+
+## Timeouts
+
+Every job sets `timeout-minutes`. A job without one runs until the platform's own limit, and a hung
+test burns that whole time. The limit is 20 minutes, the `bun-checks.yml` default, until the repo's
+median test step is within its budget for a week, the same gate as the switch to the per-test time
+limit. From then, the limit is twice the test budget plus the job's median time outside its tests,
+with a floor of 5 minutes, so a regression fails the job instead of running long.
+
+## Test budgets and audit data
+
+A repo's test budget is a wall-time limit on its tests in CI. In a public repo, the budget covers
+the slowest test job, because that job sets the run's wall time. In a private repo, the budget
+covers the sum of the test steps in the `checks` job, because those steps bill one after another.
+
+The budget is measured from data each run on main uploads. A weekly fleet audit reads the data from
+every repo, compares it with each repo's time and memory budgets, and files an issue for a repo over
+budget. A hand-written workflow uploads the same data from its test steps on each push to main, as
+one JSON artifact:
+
+- **Per-test times**, from `bun test --reporter=junit --reporter-outfile=<file>`. Bun writes no
+  report unless both flags are present.
+- **Peak memory**, from the memory cap script that wraps the test step.
+
 ## Reusable workflows
 
 Share a run of steps between jobs or repos as a reusable workflow, called with `uses:` at the job
@@ -51,10 +125,6 @@ A shared reusable workflow lives in zgeoff/tools, and a repo calls it as
 `zgeoff/tools/.github/workflows/<name>.yml@<sync tag>`. A repo-local reusable workflow sits in the
 repo's own `.github/workflows/` and is called by its path. Before writing setup steps by hand, check
 whether a tools reusable workflow covers them, and call it.
-
-A job that does a different kind of work stays its own job, even when it is short. A secret scan
-that needs write access to comment on a pull request stays beside the checks job, so the checks job
-keeps read-only permissions.
 
 ## Path gates
 
@@ -142,8 +212,8 @@ of rebuilding them. A file passes on with `actions/upload-artifact` and `actions
 
 Cache each dependency install, keyed on the lockfile. A Bun job caches `~/.bun/install/cache` with
 `actions/cache`, keyed on `hashFiles('bun.lock')`, and restores the newest older cache when the
-lockfile changes. Prefer one job with several named steps to several jobs that each install the same
-dependencies: each job pays for a runner, a checkout and an install.
+lockfile changes. Each job pays for its own runner, checkout and install, which
+[Two profiles](#two-profiles) weighs against wall time.
 
 ## Checkout depth
 
