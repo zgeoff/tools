@@ -262,17 +262,23 @@ jobs:
 
           # A file that an earlier manifest delivered and this one drops goes
           # in one more commit, unless the repo changed it, or its entry failed
-          # or sits outside this run.
+          # or sits outside this run. A tools ref from before the cleanup
+          # holds no script for it, so that run removes nothing.
           name=retired-files
-          set +e
-          removed=$(bash .repo-sync/scripts/remove-retired-sync-files.sh .repo-sync "$taken" "$SKIP")
-          status=$?
-          set -e
-          if [ "$status" -ne 0 ]; then
-            echo "::error::$name failed, so the sync leaves it out."
-            git reset -q --hard
-            failed=$(printf '%s' "$failed" | jq -c --arg name "$name" '. + [$name]')
-            removed=
+          removed=
+          if [ ! -f .repo-sync/scripts/remove-retired-sync-files.sh ]; then
+            echo "The tools ref has no retired-file cleanup; nothing to remove."
+          else
+            set +e
+            removed=$(bash .repo-sync/scripts/remove-retired-sync-files.sh .repo-sync "$taken" "$SKIP")
+            status=$?
+            set -e
+            if [ "$status" -ne 0 ]; then
+              echo "::error::$name failed, so the sync leaves it out."
+              git reset -q --hard
+              failed=$(printf '%s' "$failed" | jq -c --arg name "$name" '. + [$name]')
+              removed=
+            fi
           fi
           # The token cannot push a change under .github/workflows/ without
           # workflows write, so a retired workflow stays until the repo takes

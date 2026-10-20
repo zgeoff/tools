@@ -113,6 +113,10 @@ async function setupTest() {
     await writeFile(join(tools, path), content);
   };
 
+  const removeSource = async (path: string) => {
+    await rm(join(tools, path));
+  };
+
   const writeManifestCommit = async (manifest: unknown[]) => {
     await writeFile(join(tools, 'sync', 'manifest.json'), JSON.stringify(manifest));
 
@@ -170,6 +174,7 @@ async function setupTest() {
     runSync,
     writeSource,
     writeManifestCommit,
+    removeSource,
     readBranch,
     readBranchFiles,
     readBranchNames,
@@ -636,4 +641,27 @@ test('it keeps a file the repo owns outside the synced paths', async () => {
   expect(exitCode).toBe(0);
   expect(files).toStrictEqual(['.claude/skills/demo/SKILL.md', 'README.md', 'scripts/check.sh']);
   expect(subjects).toStrictEqual(['chore: sync skill-demo from zgeoff/tools']);
+});
+
+test('it syncs from a tools ref that has no retired-file cleanup', async () => {
+  const ctx = await setupTest();
+
+  await ctx.removeSource('scripts/remove-retired-sync-files.sh');
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const exitCode = await ctx.runSync(
+    [
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+      },
+    ],
+    'sync-v15',
+  );
+
+  const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
+
+  expect(exitCode).toBe(0);
+  expect(subjects).toStrictEqual(['chore: sync editorconfig from zgeoff/tools']);
 });
