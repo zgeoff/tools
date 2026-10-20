@@ -664,6 +664,80 @@ test('it runs the static checks, the tests and a lane once each through the priv
   expect(ran).toBe('lint\ntest\ntest:e2e\n');
 });
 
+test('it starts one public lane job per selected lane, each running its own script', async () => {
+  const ctx = await setupTest();
+
+  const workflowPath = join(import.meta.dir, 'bun-checks.yml');
+
+  const text = await readFile(workflowPath, 'utf8');
+
+  const workflow: unknown = Bun.YAML.parse(text);
+
+  const planSort = await loadWorkflowStep(workflowPath, 'plan', 'Sort the check scripts');
+  const laneSort = await loadWorkflowStep(workflowPath, 'test-lane', 'Sort the check scripts');
+  const laneRun = await loadWorkflowStep(workflowPath, 'test-lane', 'Run the check scripts');
+
+  expect(workflow).toMatchObject({
+    jobs: {
+      plan: {
+        env: { PART: 'all' },
+        outputs: { lanes: `\${{ steps.${planSort.id}.outputs.lanes }}` },
+      },
+      'test-lane': {
+        strategy: { matrix: { lane: `\${{ fromJSON(needs.plan.outputs.lanes) }}` } },
+        env: { PART: 'lane', LANE: `\${{ matrix.lane }}` },
+      },
+    },
+  });
+
+  await $`bash -c ${planSort.run}`
+    .cwd(ctx.directory)
+    .env({
+      PATH: ctx.path,
+      SCRIPTS: ' lint test test:e2e test:host ',
+      PART: 'all',
+      GITHUB_OUTPUT: join(ctx.directory, 'planned'),
+    })
+    .quiet();
+
+  const planned = await readFile(join(ctx.directory, 'planned'), 'utf8');
+
+  const lanes = /^lanes=(?<list>.*)$/mu.exec(planned)?.groups?.['list'] ?? '';
+
+  const listed = await $`echo ${lanes} | jq -r '.[]'`.text();
+
+  const matrix = listed.trim().split('\n');
+
+  for (const lane of matrix) {
+    const sorted = join(ctx.directory, `sorted-${lane}`);
+
+    await $`bash -c ${laneSort.run}`
+      .cwd(ctx.directory)
+      .env({
+        PATH: ctx.path,
+        SCRIPTS: ' lint test test:e2e test:host ',
+        PART: 'lane',
+        LANE: lane,
+        GITHUB_OUTPUT: sorted,
+      })
+      .quiet();
+
+    const sortedText = await readFile(sorted, 'utf8');
+
+    const scripts = /^scripts=(?<list>.*)$/mu.exec(sortedText)?.groups?.['list'] ?? '';
+
+    await $`bash -c ${laneRun.run}`
+      .cwd(ctx.directory)
+      .env({ PATH: ctx.path, SCRIPTS: scripts })
+      .quiet();
+  }
+
+  const ran = await readFile(join(ctx.directory, 'ran'), 'utf8');
+
+  expect(matrix).toStrictEqual(['e2e', 'host']);
+  expect(ran).toBe('test:e2e\ntest:host\n');
+});
+
 test('it sorts the picked scripts into static checks, tests and lanes', async () => {
   const ctx = await setupTest();
 
