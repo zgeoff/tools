@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/kysely-bun-sqlite",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A Kysely driver and dialect for a bun:sqlite database handle",
   "license": "MIT",
   "repository": {

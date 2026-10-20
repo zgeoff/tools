@@ -1,14 +1,14 @@
 {
-  "packages/bun-test-extended": "0.2.0",
+  "packages/bun-test-extended": "0.2.1",
   "packages/format-codemod": "0.3.0",
-  "packages/oxlint-config": "0.5.2",
+  "packages/oxlint-config": "0.6.0",
   "packages/tsconfig": "2.0.0",
   "packages/commitlint-config": "0.1.0",
   "packages/oxfmt-config": "0.1.1",
   "packages/bun-test-react": "0.2.1",
   "packages/release-manifest": "0.1.0",
-  "packages/std": "0.2.0",
-  "packages/kysely-bun-sqlite": "0.2.0",
-  "packages/checks": "0.2.2",
-  "packages/skill-gate": "0.2.0"
+  "packages/std": "0.3.0",
+  "packages/kysely-bun-sqlite": "0.3.0",
+  "packages/checks": "0.2.3",
+  "packages/skill-gate": "0.2.1"
 }
