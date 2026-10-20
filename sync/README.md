@@ -206,8 +206,9 @@ repo's settings lets GitHub merge it sooner.
 The `workflow-audit-fix` caller runs the reusable
 [`audit-fix.yml`](../.github/workflows/audit-fix.yml) every day, by hand, and after a run fails in
 the workflow that holds a repo's `bun audit`: `PR`, `pr`, `CI`, `Dependency Health` or `Dep Health`.
-The job audits the default branch, and it opens a pull request on the branch `audit-fix` only when
-the audit needs a change:
+Only a failed run on `main` starts it, because the job audits the default branch, and a failure on a
+pull-request branch leaves that audit unchanged. The job opens a pull request on the branch
+`audit-fix` only when the audit needs a change:
 
 - `bun audit fix` updates each vulnerable package to the lowest fixed release that every dependent's
   range accepts.
