@@ -6,8 +6,7 @@ import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 import { localPathsCheck } from './local-paths-check.ts';
 
-// A git repo in a temp folder that is also the HOME of the check, with a first commit that stands
-// for the base branch. The host name is the real one, because the check reads it from the system.
+// The host name is the real one, because the check reads it from the system.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'local-paths-check-'));
 
