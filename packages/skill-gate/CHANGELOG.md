@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.2...@zgeoff/skill-gate@0.2.3) (2026-10-20)
+
+
+### Bug Fixes
+
+* **geo-1533:** block a gated edit when the skill-gate hook cannot load ([#270](https://github.com/zgeoff/tools/issues/270)) ([0841b27](https://github.com/zgeoff/tools/commit/0841b2751ac0880228d2598178843912740f747f))
+
 ## [0.2.2](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.1...@zgeoff/skill-gate@0.2.2) (2026-10-20)
 
 ### Bug Fixes
