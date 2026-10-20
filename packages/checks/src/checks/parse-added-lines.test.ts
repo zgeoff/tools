@@ -58,7 +58,11 @@ test('it reads an added line that starts with ++ as content, not a header', () =
 
 test.each([
   ['a name with a space, which git ends with a tab', '+++ b/odd name.txt\t', 'odd name.txt'],
-  ['a quoted name', String.raw`+++ "b/tab\there.txt"`, String.raw`tab\there.txt`],
+  [
+    'a quoted name with escapes',
+    String.raw`+++ "b/tab\there \"q\" back\\slash \303\251.txt"`,
+    'tab\there "q" back\\slash \u00E9.txt',
+  ],
 ])('it reads the path of %s', (_label, header, path) => {
   const patch = [
     '\u00001a2b3c4',

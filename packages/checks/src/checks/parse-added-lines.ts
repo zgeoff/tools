@@ -48,7 +48,7 @@ export function parseAddedLines(patch: string): AddedLine[] {
 }
 
 // `b/path`, or `/dev/null` for a file the commit deletes. git ends the name with a tab when it holds
-// a space, and quotes it when it holds a character it escapes.
+// a space, and quotes it in C style when it holds a tab, a newline, a quote or a backslash.
 function parseNewPath(name: string): string | null {
   const bare = name.replace(/\t$/u, '');
 
@@ -56,7 +56,51 @@ function parseNewPath(name: string): string | null {
     return null;
   }
 
-  const unquoted = bare.startsWith('"') && bare.endsWith('"') ? bare.slice(1, -1) : bare;
+  const unquoted =
+    bare.startsWith('"') && bare.endsWith('"') ? parseQuotedName(bare.slice(1, -1)) : bare;
 
   return unquoted.replace(/^b\//u, '');
+}
+
+const ESCAPED_BYTES: ReadonlyMap<string, number> = new Map([
+  ['a', 0x07],
+  ['b', 0x08],
+  ['t', 0x09],
+  ['n', 0x0a],
+  ['v', 0x0b],
+  ['f', 0x0c],
+  ['r', 0x0d],
+  ['"', 0x22],
+  ['\\', 0x5c],
+]);
+
+// git writes each escaped byte as a letter or as three octal digits, and the bytes are UTF-8.
+function parseQuotedName(quoted: string): string {
+  const bytes: number[] = [];
+
+  const encoder = new TextEncoder();
+
+  for (let index = 0; index < quoted.length; index += 1) {
+    const char = quoted.charAt(index);
+
+    if (char !== '\\') {
+      bytes.push(...encoder.encode(char));
+      continue;
+    }
+
+    const next = quoted.charAt(index + 1);
+    const octal = /^[0-7]{3}/u.exec(quoted.slice(index + 1))?.[0];
+
+    if (octal === undefined) {
+      bytes.push(ESCAPED_BYTES.get(next) ?? next.codePointAt(0) ?? 0x5c);
+
+      index += 1;
+    } else {
+      bytes.push(Number.parseInt(octal, 8));
+
+      index += 3;
+    }
+  }
+
+  return new TextDecoder().decode(new Uint8Array(bytes));
 }

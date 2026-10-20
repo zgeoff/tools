@@ -297,3 +297,37 @@ test('it reports a line that a merge adds when it resolves a conflict', async ()
     },
   ]);
 });
+
+test('it reports the real path of a file whose name git quotes', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  await writeFile(
+    join(ctx.directory, 'odd\tname "q" back\\slash.txt'),
+    `cache: ${ctx.directory}/.cache\n`,
+  );
+
+  await $`git add -A`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'feat: add the odd file'}`.cwd(ctx.directory).env(ctx.env);
+
+  const hashText = await $`git rev-parse --short HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  const findings = await localPathsCheck.check({
+    cwd: ctx.directory,
+    base: baseText.trim(),
+    env: ctx.env,
+  });
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'odd\tname "q" back\\slash.txt',
+      line: 1,
+      message: `commit ${hashText.trim()} adds the home directory ${ctx.directory}/; remove it before you push`,
+    },
+  ]);
+});
