@@ -23,8 +23,8 @@ and exits the process.
 
 The entry point fails closed. When the package cannot load, the entry point blocks each edit that a
 gate in the rules file matches, and its error names the load failure. It also blocks every edit
-inside the project when the rules file does not parse. Any other call runs, and the hook reports the
-load failure as a non-blocking error.
+inside the project when it cannot read the rules file or the file does not parse. Any other call
+runs, and the hook reports the load failure as a non-blocking error.
 
 Register the entry point in `.claude/settings.json`:
 

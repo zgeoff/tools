@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';
-import { copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -176,6 +176,40 @@ test('it blocks an edit inside the project when the gate cannot load and the rul
 
   expect(result.status).toBe(2);
   expect(result.stderr).toContain("Cannot find package '@zgeoff/skill-gate'");
+});
+
+test('it blocks an edit inside the project and names both errors when the gate cannot load or read the rules file', async () => {
+  const ctx = await setupTest();
+
+  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
+  const rulesPath = join(ctx.directory, '.claude/skill-gate.json');
+
+  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await copyFile(ctx.hookPath, copiedHookPath);
+
+  await writeFile(
+    rulesPath,
+    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
+  );
+
+  await chmod(rulesPath, 0o000);
+
+  const result = spawnSync('bun', [copiedHookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      cwd: ctx.directory,
+      transcript_path: join(ctx.directory, 'transcript.jsonl'),
+      tool_input: { file_path: join(ctx.directory, 'src/index.ts') },
+    }),
+  });
+
+  expect(result.status).toBe(2);
+  expect(result.stderr).toContain('The skill gate cannot read .claude/skill-gate.json:');
+
+  expect(result.stderr).toContain(
+    `The skill gate cannot load, so it blocks this edit to ${join(ctx.directory, 'src/index.ts')}: Cannot find package '@zgeoff/skill-gate'`,
+  );
 });
 
 test.each([

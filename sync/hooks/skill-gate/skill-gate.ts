@@ -6,13 +6,13 @@ import path from 'node:path';
 // that fails would let a gated edit through. This file therefore imports only Node builtins.
 const runGate = await import('@zgeoff/skill-gate').then(
   (gate) => gate.runSkillGate,
-  (error: unknown) => () => reportLoadFailure(formatLoadError(error)),
+  (error: unknown) => () => reportLoadFailure(formatError(error)),
 );
 
 await runGate();
 
 // Bun rejects a failed import with a ResolveMessage, which is not an Error.
-function formatLoadError(error: unknown): string {
+function formatError(error: unknown): string {
   if (isRecord(error) && typeof error['message'] === 'string') {
     return error['message'];
   }
@@ -84,9 +84,13 @@ async function probeGatedEdit(edit: Edit | null): Promise<boolean> {
     return false;
   }
 
-  const rulesText = await rulesFile.text();
+  const rulesText = await rulesFile.text().catch((error: unknown) => {
+    console.error(`The skill gate cannot read .claude/skill-gate.json: ${formatError(error)}`);
 
-  return isGatedPath(rulesText, relativePath);
+    return null;
+  });
+
+  return rulesText === null || isGatedPath(rulesText, relativePath);
 }
 
 function isGatedPath(rulesText: string, relativePath: string): boolean {
