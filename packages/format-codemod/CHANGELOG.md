@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.3.0...@zgeoff/format-codemod@0.3.1) (2026-10-20)
+
+
+### Bug Fixes
+
+* **deps:** update oxc-parser to v0.154.0 ([#259](https://github.com/zgeoff/tools/issues/259)) ([2b4e200](https://github.com/zgeoff/tools/commit/2b4e2002e6fa28ac6022278f6be0450a32995927))
+
 ## [0.3.0](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.2.0...@zgeoff/format-codemod@0.3.0) (2026-10-19)
 
 ### ⚠ BREAKING CHANGES
