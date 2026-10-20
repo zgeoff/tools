@@ -254,3 +254,46 @@ test('it reads no home directory when HOME is the root folder', async () => {
 
   expect(findings).toStrictEqual([]);
 });
+
+test('it reports a line that a merge adds when it resolves a conflict', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'greet.txt'), 'greeting: hello\n');
+
+  await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: start the repo'}`.cwd(ctx.directory).env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  await $`git switch --quiet -c side`.cwd(ctx.directory).env(ctx.env);
+
+  await writeFile(join(ctx.directory, 'greet.txt'), 'greeting: good day\n');
+
+  await $`git commit --quiet -am ${'feat: greet by day'}`.cwd(ctx.directory).env(ctx.env);
+  await $`git switch --quiet -`.cwd(ctx.directory).env(ctx.env);
+
+  await writeFile(join(ctx.directory, 'greet.txt'), 'greeting: good evening\n');
+
+  await $`git commit --quiet -am ${'feat: greet by evening'}`.cwd(ctx.directory).env(ctx.env);
+  await $`git merge --quiet side`.cwd(ctx.directory).env(ctx.env).nothrow().quiet();
+
+  await writeFile(join(ctx.directory, 'greet.txt'), `greeting: ${ctx.directory}/.cache/greeting\n`);
+
+  await $`git commit --quiet -am ${'Merge the greetings'}`.cwd(ctx.directory).env(ctx.env);
+
+  const hashText = await $`git rev-parse --short HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  const findings = await localPathsCheck.check({
+    cwd: ctx.directory,
+    base: baseText.trim(),
+    env: ctx.env,
+  });
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'greet.txt',
+      line: 1,
+      message: `commit ${hashText.trim()} adds the home directory ${ctx.directory}/; remove it before you push`,
+    },
+  ]);
+});

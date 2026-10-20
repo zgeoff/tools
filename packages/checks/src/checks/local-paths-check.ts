@@ -31,6 +31,10 @@ function checkLocalPaths(context: BranchCheckContext): Finding[] {
     '--no-color',
     '--no-ext-diff',
     '--no-textconv',
+
+    // A merge shows the lines its author adds beyond git's own merge, such as a conflict's
+    // resolution; the lines it brings from either parent come from commits the log reads anyway.
+    '--diff-merges=remerge',
     '--format=%x00%h',
     `${context.base}..HEAD`,
   ]);
