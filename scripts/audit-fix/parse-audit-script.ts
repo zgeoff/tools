@@ -53,5 +53,5 @@ function findFlagValue(tokens: readonly string[], index: number, flag: string): 
 }
 
 function isSeverity(value: string): value is Severity {
-  return (severities as readonly string[]).includes(value);
+  return severities.some((severity) => severity === value);
 }
