@@ -16,18 +16,17 @@ Install it at the repo root, so that Bun resolves it from `.claude/hooks/`. The 
 
 ## Entry point
 
-The hook runs a file in the repo that calls the package, at
-`.claude/hooks/skill-gate/skill-gate.ts`:
+The hook runs a file in the repo that calls the package's `runSkillGate`, at
+`.claude/hooks/skill-gate/skill-gate.ts`. The `hook-skill-gate` entry of repo-sync delivers this
+file from zgeoff/tools. `runSkillGate` reads the hook payload from stdin, prints the hook output,
+and exits the process.
 
-```ts
-import { runSkillGate } from '@zgeoff/skill-gate';
+The entry point fails closed. When the package cannot load, the entry point blocks each edit that a
+gate in the rules file matches, and its error names the load failure. It also blocks every edit
+inside the project when it cannot read the rules file or the file does not parse. Any other call
+runs, and the hook reports the load failure as a non-blocking error.
 
-await runSkillGate();
-```
-
-The `hook-skill-gate` entry of repo-sync delivers this file from zgeoff/tools. `runSkillGate` reads
-the hook payload from stdin, prints the hook output, and exits the process. Register the entry point
-in `.claude/settings.json`:
+Register the entry point in `.claude/settings.json`:
 
 ```json
 {
