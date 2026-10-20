@@ -416,7 +416,6 @@ test('it hands the picked list to the actionlint setup through the workflow bind
 
   const output = await readFile(join(ctx.directory, 'output'), 'utf8');
 
-  // The pick step's output, under the expression a later step uses to read it.
   const outputs: Record<string, string> = {
     [`\${{ steps.${ctx.pick.id}.outputs.scripts }}`]: output.slice('scripts='.length, -1),
   };
