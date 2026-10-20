@@ -15,7 +15,6 @@ export const docsCheck: FileCheck = {
   check: checkDocs,
 };
 
-// repo-sync delivers the scripts to .claude/skills, and tools keeps their sources under sync/skills.
 const SCRIPT_FOLDERS = ['.claude/skills/docs-writing/scripts', 'sync/skills/docs-writing/scripts'];
 
 function checkDocs(context: CheckContext): Finding[] {
