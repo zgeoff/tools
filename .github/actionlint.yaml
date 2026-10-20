@@ -1,0 +1,8 @@
+# actionlint 1.7.12 lacks two GitHub features that these workflows use: the
+# job.workflow_* properties (rhysd/actionlint#757) and the queue key of
+# concurrency (rhysd/actionlint#746, closed as not planned).
+paths:
+  .github/workflows/*.{yml,yaml}:
+    ignore:
+      - 'property "workflow_(sha|ref)" is not defined in object type \{check_run_id: '
+      - 'unexpected key "queue" for "concurrency" section'

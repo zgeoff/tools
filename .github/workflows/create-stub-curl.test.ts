@@ -25,6 +25,18 @@ test('it writes the body to the -o path of a download', async () => {
   expect(body).toBe('fake shfmt\n');
 });
 
+test('it writes a byte body to the -o path unchanged', async () => {
+  const ctx = await setupTest();
+
+  await createStubCurl(ctx.directory, new Uint8Array([0x1f, 0x8b, 0x00, 0xff]));
+
+  await $`${join(ctx.directory, 'curl')} -fsSL -o ${join(ctx.directory, 'out')} https://example.com/a.tar.gz`.quiet();
+
+  const body = await readFile(join(ctx.directory, 'out'));
+
+  expect([...body]).toStrictEqual([0x1f, 0x8b, 0x00, 0xff]);
+});
+
 test.each([
   ['a download with no -o', ['-fsSL', 'https://example.com/shfmt']],
   ['a download with other flags', ['-sL', '-o', 'out', 'https://example.com/shfmt']],
