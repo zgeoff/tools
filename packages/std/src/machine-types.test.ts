@@ -185,7 +185,9 @@ test('it types a machine with actors declared in its types', async () => {
           src: 'countRings',
           onDone: {
             target: 'counted',
-            actions: assign({ rings: (args) => args.event.output }),
+
+            // createMachine types a declared actor's done output as any
+            actions: assign({ rings: (args) => Number(args.event.output) }),
           },
         },
       },
