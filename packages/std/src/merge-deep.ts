@@ -1,3 +1,5 @@
+import { types } from 'node:util';
+
 // A value the merge replaces whole rather than merging key by key.
 type WholeValue =
   | readonly unknown[]
@@ -20,7 +22,20 @@ export function mergeDeep<T extends object>(base: T, patch: PartialDeep<T>): T {
 }
 
 function mergeValues(base: unknown, patch: unknown): unknown {
-  return isPlainObject(base) && isPlainObject(patch) ? mergeRecords(base, patch) : patch;
+  return isMergeable(base) && isPlainObject(patch) ? mergeRecords(base, patch) : patch;
+}
+
+function isMergeable(value: unknown): value is object {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    !types.isDate(value) &&
+    !types.isRegExp(value) &&
+    !types.isMap(value) &&
+    !types.isSet(value) &&
+    !types.isPromise(value)
+  );
 }
 
 function isPlainObject(value: unknown): value is object {
@@ -35,6 +50,8 @@ function isPlainObject(value: unknown): value is object {
 
 function mergeRecords(base: object, patch: object): object {
   const merged: object = { ...base };
+
+  Reflect.setPrototypeOf(merged, Reflect.getPrototypeOf(base));
 
   for (const key of Reflect.ownKeys(patch)) {
     if (Object.prototype.propertyIsEnumerable.call(patch, key)) {

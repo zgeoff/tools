@@ -36,3 +36,19 @@ test('it accepts a byte array made in another realm', () => {
 
   expect(isSQLQueryBinding(bytes)).toBeTrue();
 });
+
+test('it rejects a DataView whose string tag is overridden', () => {
+  const dataView = Object.defineProperty(new DataView(new ArrayBuffer(2)), Symbol.toStringTag, {
+    value: 'CustomView',
+  });
+
+  expect(isSQLQueryBinding(dataView)).toBeFalse();
+});
+
+test('it accepts a byte array whose string tag is overridden', () => {
+  const bytes = Object.defineProperty(new Uint8Array([1, 2]), Symbol.toStringTag, {
+    value: 'DataView',
+  });
+
+  expect(isSQLQueryBinding(bytes)).toBeTrue();
+});
