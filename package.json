@@ -71,6 +71,7 @@
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
     "tiny-invariant": "catalog:",
+    "ts-pattern": "catalog:",
     "typescript": "catalog:"
   }
 }

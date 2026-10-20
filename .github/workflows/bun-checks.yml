@@ -101,7 +101,7 @@ jobs:
           GITLEAKS_VERSION: 8.30.1
 
   # Lists the lanes for the test-<lane> jobs, so a repo without lanes starts
-  # none. It reads package.json alone.
+  # none. It checks out package.json and .bun-version alone.
   plan:
     if:
       ${{ !((github.event.repository && github.event.repository.private) ||
@@ -114,90 +114,60 @@ jobs:
       PART: all
       LANE: ''
     outputs:
-      lanes: ${{ steps.sort.outputs.lanes }}
+      lanes: ${{ steps.plan.outputs.lanes }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          sparse-checkout: package.json
+          sparse-checkout: |
+            package.json
+            .bun-version
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
-      # Picks the scripts before anything runs, so a missing name fails fast.
-      - &pick
-        name: Pick the check scripts
-        id: pick
+      - &setup-bun
+        name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      # The planner lives beside this workflow, not in the caller's checkout,
+      # so the step downloads it from the commit that defines this job: a
+      # caller at a sync tag runs that tag's planner. actionlint does not know
+      # job.workflow_repository or job.workflow_sha, so the step reads them
+      # from the job context as JSON.
+      - &fetch-planner
+        name: Fetch the check planner
+        env:
+          JOB_CONTEXT: ${{ toJSON(job) }}
+        run: |
+          set -euo pipefail
+          repository=$(jq -er .workflow_repository <<< "$JOB_CONTEXT")
+          sha=$(jq -er .workflow_sha <<< "$JOB_CONTEXT")
+          mkdir -p "$RUNNER_TEMP/check-plan"
+          base="https://raw.githubusercontent.com/$repository/$sha"
+          for file in plan-check-scripts.ts write-check-plan.ts; do
+            curl -fsSL -o "$RUNNER_TEMP/check-plan/$file" "$base/.github/workflows/$file"
+          done
+          curl -fsSL -o "$RUNNER_TEMP/check-plan/tools-package.json" "$base/package.json"
+
+      # The adapter imports ts-pattern, which the caller's checkout need not
+      # hold. The step installs the version tools' catalog pins, beside the
+      # planner, from the package.json the fetch downloaded.
+      - &install-planner
+        name: Install the check planner
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/check-plan"
+          jq '{dependencies: {"ts-pattern": (.workspaces.catalog["ts-pattern"] // error("tools pins no ts-pattern"))}}' tools-package.json > package.json
+          bun install
+
+      - &plan
+        name: Plan the check scripts
+        id: plan
         env:
           SCRIPTS: ${{ inputs.scripts }}
-        run: |
-          set -euo pipefail
-          # A value of only whitespace parses to no names and gets the standard list too.
-          read -ra list <<< "$SCRIPTS"
-          if [ "${#list[@]}" -eq 0 ]; then
-            list=(audit deadcode format:check lint)
-            # The standard list runs check only when the repo defines it, so a
-            # repo turns the check on by adding the script.
-            if jq -e '.scripts.check' package.json > /dev/null; then
-              list+=(check)
-            else
-              echo '::notice::check skipped, because package.json has no check script; add "check": "zgeoff-check" to run it.'
-            fi
-            list+=(typecheck test)
-            for lane in e2e browser docker host; do
-              if jq -e --arg name "test:$lane" '.scripts[$name]' package.json > /dev/null; then
-                list+=("test:$lane")
-              fi
-            done
-          fi
-          missing=""
-          for name in "${list[@]}"; do
-            jq -e --arg name "$name" '.scripts[$name]' package.json > /dev/null || missing="$missing $name"
-          done
-          if [ -n "$missing" ]; then
-            echo "::error::package.json defines no script named:$missing. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list."
-            exit 1
-          fi
-          # Spaces around the list let a step match one whole name.
-          echo "list= ${list[*]} " >> "$GITHUB_OUTPUT"
-
-      # Sorts the picked list into the part each job runs, from the names
-      # alone.
-      - &sort
-        name: Sort the check scripts
-        id: sort
-        env:
-          SCRIPTS: ${{ steps.pick.outputs.list }}
-        run: |
-          set -euo pipefail
-          read -ra list <<< "$SCRIPTS"
-          static=()
-          tests=()
-          lanes=()
-          for name in "${list[@]}"; do
-            case "$name" in
-              test:e2e | test:browser | test:docker | test:host) lanes+=("${name#test:}") ;;
-              test | test:*) tests+=("$name") ;;
-              *) static+=("$name") ;;
-            esac
-          done
-          # scripts is the part this job runs: all of them in the private
-          # checks job, one group in a public job.
-          case "$PART" in
-            static) part=("${static[@]}") ;;
-            test) part=("${tests[@]}") ;;
-            lane) part=("test:$LANE") ;;
-            *) part=("${static[@]}" "${tests[@]}") ;;
-          esac
-          if [ "$PART" = all ]; then
-            for lane in "${lanes[@]}"; do part+=("test:$lane"); done
-          fi
-          # Spaces around each list let a step match one whole name.
-          {
-            echo "scripts= ${part[*]} "
-            echo "static= ${static[*]} "
-            echo "test= ${tests[*]} "
-            echo "lanes=$(printf '%s\n' "${lanes[@]}" | jq -Rnc '[inputs | select(. != "")]')"
-          } >> "$GITHUB_OUTPUT"
+        run: bun "$RUNNER_TEMP/check-plan/write-check-plan.ts"
 
   static:
     if:
@@ -222,11 +192,7 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
 
-      - &setup-bun
-        name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: .bun-version
+      - *setup-bun
 
       # Bun's install cache, keyed on the lockfile. A lockfile change restores
       # the newest older cache, and the job saves a new one when it passes.
@@ -242,8 +208,9 @@ jobs:
         name: Install
         run: bun install --frozen-lockfile
 
-      - *pick
-      - *sort
+      - *fetch-planner
+      - *install-planner
+      - *plan
 
       # The shell check of zgeoff-check runs shellcheck, which the runner image
       # carries, and shfmt, which it lacks. The step installs the pinned binary
@@ -252,7 +219,7 @@ jobs:
       - &setup-shfmt
         name: Setup shfmt
         env:
-          SCRIPTS: ${{ steps.sort.outputs.scripts }}
+          SCRIPTS: ${{ steps.plan.outputs.scripts }}
           SETUP_SHFMT: ${{ inputs.setup-shfmt }}
           SHFMT_VERSION: v3.13.1
           SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
@@ -274,7 +241,7 @@ jobs:
       - &setup-actionlint
         name: Setup actionlint
         env:
-          SCRIPTS: ${{ steps.sort.outputs.scripts }}
+          SCRIPTS: ${{ steps.plan.outputs.scripts }}
           SETUP_ACTIONLINT: ${{ inputs.setup-actionlint }}
           ACTIONLINT_VERSION: 1.7.12
           ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
@@ -293,7 +260,7 @@ jobs:
       - &run-scripts
         name: Run the check scripts
         env:
-          SCRIPTS: ${{ steps.sort.outputs.scripts }}
+          SCRIPTS: ${{ steps.plan.outputs.scripts }}
         run: &run-body |
           set -euo pipefail
           read -ra list <<< "$SCRIPTS"
@@ -321,8 +288,9 @@ jobs:
       - *setup-bun
       - *cache
       - *install
-      - *pick
-      - *sort
+      - *fetch-planner
+      - *install-planner
+      - *plan
       - *setup-shfmt
       - *setup-actionlint
       - *run-scripts
@@ -351,8 +319,9 @@ jobs:
       - *setup-bun
       - *cache
       - *install
-      - *pick
-      - *sort
+      - *fetch-planner
+      - *install-planner
+      - *plan
       - *setup-shfmt
       - *setup-actionlint
       - *run-scripts
@@ -388,41 +357,42 @@ jobs:
       - *setup-bun
       - *cache
       - *install
-      - *pick
-      - *sort
+      - *fetch-planner
+      - *install-planner
+      - *plan
       - *setup-shfmt
       - *setup-actionlint
 
       - name: Static checks
         env:
-          SCRIPTS: ${{ steps.sort.outputs.static }}
+          SCRIPTS: ${{ steps.plan.outputs.static }}
         run: *run-body
 
       - name: Tests
         env:
-          SCRIPTS: ${{ steps.sort.outputs.test }}
+          SCRIPTS: ${{ steps.plan.outputs.test }}
         run: *run-body
 
       - name: Lane e2e
-        if: contains(steps.sort.outputs.lanes, '"e2e"')
+        if: contains(steps.plan.outputs.lanes, '"e2e"')
         env:
           SCRIPTS: test:e2e
         run: *run-body
 
       - name: Lane browser
-        if: contains(steps.sort.outputs.lanes, '"browser"')
+        if: contains(steps.plan.outputs.lanes, '"browser"')
         env:
           SCRIPTS: test:browser
         run: *run-body
 
       - name: Lane docker
-        if: contains(steps.sort.outputs.lanes, '"docker"')
+        if: contains(steps.plan.outputs.lanes, '"docker"')
         env:
           SCRIPTS: test:docker
         run: *run-body
 
       - name: Lane host
-        if: contains(steps.sort.outputs.lanes, '"host"')
+        if: contains(steps.plan.outputs.lanes, '"host"')
         env:
           SCRIPTS: test:host
         run: *run-body
