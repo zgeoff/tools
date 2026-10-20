@@ -25,3 +25,13 @@ pre-commit:
       glob: '*.{ts,tsx}'
       run: bun packages/format-codemod/src/cli.ts --quiet {staged_files}
       stage_fixed: true
+
+# The baseline's check job runs only a check script that is zgeoff-check, and
+# this repo's check script runs the checks from source, so the baseline skips
+# it here. This job runs the script over the same file list in its place.
+pre-push:
+  jobs:
+    - name: check from source
+      files: bun run --silent files:branch
+      run: >-
+        set -- {files}; for file; do set -- "$@" "./$file"; shift; done; bun run check "$@"

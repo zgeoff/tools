@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
@@ -13,9 +13,13 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
+  const bin = join(directory, 'bin');
+
+  await mkdir(bin);
+
   // The workspace's node_modules/.bin holds the commitlint that zgeoff-check's commits check runs.
   const env = {
-    PATH: `${join(import.meta.dir, '../../node_modules/.bin')}:${process.env['PATH']}`,
+    PATH: `${bin}:${join(import.meta.dir, '../../node_modules/.bin')}:${process.env['PATH']}`,
     HOME: directory,
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
@@ -40,6 +44,7 @@ async function setupTest() {
 
   return {
     env,
+    bin,
     main,
     worktree,
     baseline: join(import.meta.dir, 'lefthook-pre-push.yml'),
@@ -126,6 +131,47 @@ test('it passes the push with a notice when the repo has no check script', async
   );
 });
 
+test('it passes the push with a notice that names the check script when it is not zgeoff-check', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.worktree, 'fixture.sh'), 'echo $1\n');
+
+  // An aggregate whose last command fails on the paths the job would append, so the push passes
+  // only when the job skips the script.
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        check: 'bun run typecheck && test $# -eq 0',
+        typecheck: 'true',
+        'files:branch': 'echo fixture.sh',
+        'test:related': 'true',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  expect(result.exitCode).toBe(0);
+
+  expect(`${result.stdout.toString()}${result.stderr.toString()}`).toInclude(
+    'check: skipped, because the check script is "bun run typecheck && test $# -eq 0", not "zgeoff-check"',
+  );
+});
+
 test('it fails the push when zgeoff-check finds a problem in a file the branch changes', async () => {
   const ctx = await setupTest();
 
@@ -138,13 +184,20 @@ test('it fails the push when zgeoff-check finds a problem in a file the branch c
       scripts: {
         'format:check': 'true',
         'lint:files': 'true',
-        check: `bun ${join(import.meta.dir, '../../packages/checks/src/cli.ts')}`,
+        check: 'zgeoff-check',
         typecheck: 'true',
         'files:branch': 'echo bad.sh',
         'test:related': 'true',
       },
     }),
   );
+
+  await writeFile(
+    join(ctx.bin, 'zgeoff-check'),
+    `#!/bin/sh\nexec ${process.execPath} ${join(import.meta.dir, '../../packages/checks/src/cli.ts')} "$@"\n`,
+  );
+
+  await chmod(join(ctx.bin, 'zgeoff-check'), 0o755);
 
   await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
   await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
@@ -177,13 +230,20 @@ test('it passes the push when only a file the branch leaves unchanged fails zgeo
       scripts: {
         'format:check': 'true',
         'lint:files': 'true',
-        check: `bun ${join(import.meta.dir, '../../packages/checks/src/cli.ts')}`,
+        check: 'zgeoff-check',
         typecheck: 'true',
         'files:branch': 'echo clean.sh',
         'test:related': 'true',
       },
     }),
   );
+
+  await writeFile(
+    join(ctx.bin, 'zgeoff-check'),
+    `#!/bin/sh\nexec ${process.execPath} ${join(import.meta.dir, '../../packages/checks/src/cli.ts')} "$@"\n`,
+  );
+
+  await chmod(join(ctx.bin, 'zgeoff-check'), 0o755);
 
   await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
   await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
@@ -214,13 +274,20 @@ test('it passes the push when the branch changes a clean file whose name starts 
       scripts: {
         'format:check': 'true',
         'lint:files': 'true',
-        check: `bun ${join(import.meta.dir, '../../packages/checks/src/cli.ts')}`,
+        check: 'zgeoff-check',
         typecheck: 'true',
         'files:branch': String.raw`printf '%s\n' -helpers.sh`,
         'test:related': 'true',
       },
     }),
   );
+
+  await writeFile(
+    join(ctx.bin, 'zgeoff-check'),
+    `#!/bin/sh\nexec ${process.execPath} ${join(import.meta.dir, '../../packages/checks/src/cli.ts')} "$@"\n`,
+  );
+
+  await chmod(join(ctx.bin, 'zgeoff-check'), 0o755);
 
   await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
   await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
@@ -248,14 +315,23 @@ test('it forwards every file the branch changes to zgeoff-check when the branch 
     ),
   );
 
-  // The check script stands in for zgeoff-check and writes each argument it gets on its own line.
+  // The stand-in zgeoff-check writes each argument it gets on its own line.
+  await writeFile(
+    join(ctx.bin, 'zgeoff-check'),
+    String.raw`#!/bin/sh
+printf '%s\n' "$@" > forwarded.txt
+`,
+  );
+
+  await chmod(join(ctx.bin, 'zgeoff-check'), 0o755);
+
   await writeFile(
     join(ctx.worktree, 'package.json'),
     JSON.stringify({
       scripts: {
         'format:check': 'true',
         'lint:files': 'true',
-        check: String.raw`sh -c 'printf "%s\n" "$@" > forwarded.txt' sh`,
+        check: 'zgeoff-check',
         typecheck: 'true',
         'files:branch': String.raw`printf '%s\n' first.sh second.sh third.sh`,
         'test:related': 'true',

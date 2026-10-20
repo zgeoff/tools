@@ -96,9 +96,10 @@ Files under [`pre-push/`](./pre-push/) are the pre-push baseline, delivered by t
 a machine shared by parallel agents. It runs `format:check` and `typecheck` over the whole tree, and
 plain `oxlint`, the repo's `check` script and the sibling tests over the files the branch changes.
 The `check` script is `zgeoff-check` from [`@zgeoff/checks`](../packages/checks/README.md), which
-the repo installs itself. A repo without the script gets a notice in place of the job until it adds
-one. CI keeps every whole-tree check required. The entry delivers three files, and its tests stay
-here:
+the repo installs itself. bun appends the branch's paths to the script's last command, and only
+`zgeoff-check` is sure to take them, so the job runs only when the script is exactly `zgeoff-check`.
+A repo whose `check` script is missing or runs anything else gets a notice in place of the job. CI
+keeps every whole-tree check required. The entry delivers three files, and its tests stay here:
 
 - `.lefthook/pre-push-baseline.yml` — the lefthook jobs.
 - `scripts/read-branch-files.ts` — lists the files changed since the merge base with origin's
@@ -124,8 +125,8 @@ The file list comes from the checked-out branch. `git push origin <other-branch>
 the checked-out branch's files, not the pushed branch's, and CI catches what the hook skips.
 
 A repo changes what a baseline job runs through the package script that the job calls, such as
-`typecheck`. A job of the same name in `lefthook.yml` does not override it, because lefthook merges
-the extended file over the repo's own.
+`typecheck`. The one exception is `check`, which runs only `zgeoff-check`. A job of the same name in
+`lefthook.yml` does not override it, because lefthook merges the extended file over the repo's own.
 
 The sync branch is force-pushed on every run, so a commit a person adds to it is lost on the next
 run. Edit the source here instead. An entry that fails, through a workflow conflict or its build, is
