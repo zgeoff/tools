@@ -156,3 +156,33 @@ test('it types a function, a RegExp, a Map, a Set and a Promise patch as the who
 
   expect([mapPatch, patternPatch, setPatch, promisePatch, formatPatch]).toHaveLength(5);
 });
+
+// oxlint-disable-next-line zgeoff/no-class -- the merge must keep a class instance's fields and prototype
+class Kettle {
+  color = 'teal';
+
+  size = 12;
+}
+
+test('it merges a class instance at the root key by key and keeps its prototype', () => {
+  const merged = mergeDeep(new Kettle(), { size: 14 });
+
+  expect({
+    isKettle: merged instanceof Kettle,
+    color: merged.color,
+    size: merged.size,
+  }).toStrictEqual({ isKettle: true, color: 'teal', size: 14 });
+});
+
+test('it merges a nested class instance key by key', () => {
+  const merged = mergeDeep<{ kettle: Kettle }>(
+    { kettle: new Kettle() },
+    { kettle: { color: 'red' } },
+  );
+
+  expect({
+    isKettle: merged.kettle instanceof Kettle,
+    color: merged.kettle.color,
+    size: merged.kettle.size,
+  }).toStrictEqual({ isKettle: true, color: 'red', size: 12 });
+});
