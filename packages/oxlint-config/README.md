@@ -5,8 +5,8 @@ restriction-rule cherry-picks, comment-style enforcement via `@stylistic`, and a
 (`zgeoff/*` rules) banning shapes no native oxlint rule can express — top-level arrows, nested
 function declarations, bare named exports, destructured and inline-typed parameters, ternary and
 await arguments, awaits hidden inside a control-flow condition or a `&&`/`||`/`??` chain, every
-`switch` statement, every JSDoc block, any run of more than three line comments, and a repo config
-that loosens either comment rule.
+`switch` statement, every JSDoc block, any run of more than three line comments, a type claim with
+no `as`, and a repo config that loosens a comment rule or a type-assertion rule.
 
 The plugin's other rules each check one convention. `zgeoff/function-verb` bans the vague and
 near-synonym verbs of the shared function-naming rules, `zgeoff/verb-contract` checks the promise
@@ -59,6 +59,22 @@ approval and reason after `--`:
 ```ts
 // oxlint-disable-next-line typescript/consistent-type-assertions -- approved <issue>: <reason>
 ```
+
+`zgeoff/no-hidden-cast` reports a claim of a type that has no `as` for the ban to see:
+
+- a type argument on a `sql` tagged template, such as Kysely's `sql<T>`;
+- a call to Kysely's `$castTo()`, `$narrowType()` or `$assertType()`;
+- a type argument on a `query()` or `prepare()` call, such as bun:sqlite's;
+- a type argument on Pulumi `Config`'s `getObject()`, `requireObject()`, `getSecretObject()` or
+  `requireSecretObject()`.
+
+The rule needs no type information, so it matches by name: a method of another library with the same
+name and a type argument is reported too. Read such a value as `unknown` and parse it with zod, or
+query through Kysely over declared table types.
+
+Every repo runs both rules as this config ships them. `zgeoff/no-comment-rule-override` reports a
+repo-root `.oxlintrc*.json` that sets either rule under any plugin prefix, so a disable comment on
+the line is the only way to keep an assertion.
 
 ## `zgeoff/function-verb`
 

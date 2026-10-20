@@ -6,6 +6,7 @@ import noAbbreviatedNames from './no-abbreviated-names.js';
 import noClass from './no-class.js';
 import noCommentRuleOverride from './no-comment-rule-override.js';
 import noFileSnapshot from './no-file-snapshot.js';
+import noHiddenCast from './no-hidden-cast.js';
 import noJSDoc from './no-jsdoc.js';
 import noRestrictedWords from './no-restricted-words.js';
 import setupTestOnly from './setup-test-only.js';
@@ -90,6 +91,7 @@ const plugin = {
       ['SwitchStatement'],
     ),
     'no-class': noClass,
+    'no-hidden-cast': noHiddenCast,
     'no-jsdoc': noJSDoc,
     'max-consecutive-line-comments': maxConsecutiveLineComments,
     'no-comment-rule-override': noCommentRuleOverride,
