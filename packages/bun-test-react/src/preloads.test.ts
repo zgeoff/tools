@@ -144,6 +144,32 @@ test('it resets a store from zustand/vanilla createStore before the next test', 
   expect(result.stderr.toString()).toInclude('2 pass');
 });
 
+test('it resets a store built through a middleware before the next test', async () => {
+  await using project = await setupTest(
+    [
+      "import { expect, test } from 'bun:test';",
+      "import { subscribeWithSelector } from 'zustand/middleware';",
+      "import { createStore } from 'zustand/vanilla';",
+      '',
+      'const counter = createStore(subscribeWithSelector(() => ({ count: 0 })));',
+      '',
+      "test('increments', () => {",
+      '  counter.setState({ count: 5 });',
+      '});',
+      '',
+      "test('starts from zero', () => {",
+      '  expect(counter.getState().count).toBe(0);',
+      '});',
+      '',
+    ].join('\n'),
+  );
+
+  const result = Bun.spawnSync([process.execPath, 'test'], { cwd: project.directory });
+
+  expect(result.exitCode).toBe(0);
+  expect(result.stderr.toString()).toInclude('2 pass');
+});
+
 test('it pipes a Bun response body into a WritableStream under happy-dom', async () => {
   await using project = await setupTest(
     [

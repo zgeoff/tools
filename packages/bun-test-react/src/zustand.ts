@@ -1,5 +1,5 @@
 import { mock } from 'bun:test';
-import type { StateCreator, StoreApi } from 'zustand/vanilla';
+import type { Mutate, StateCreator, StoreApi, StoreMutatorIdentifier } from 'zustand/vanilla';
 import { storeResets } from './store-resets.ts';
 
 // zustand's own `create` builds its store through this module's `createStore`, so wrapping
@@ -10,9 +10,34 @@ const actualVanilla = await import('zustand/vanilla');
 // the wrapper would recurse.
 const actualCreateStore = actualVanilla.createStore;
 
-function registerStoreReset<T>(store: StoreApi<T>): void {
-  const initialState = store.getInitialState();
+type Mutators = [StoreMutatorIdentifier, unknown][];
 
+function createStore<T, Mos extends Mutators = []>(
+  initializer: StateCreator<T, [], Mos>,
+): Mutate<StoreApi<T>, Mos>;
+
+function createStore<T>(): <Mos extends Mutators = []>(
+  initializer: StateCreator<T, [], Mos>,
+) => Mutate<StoreApi<T>, Mos>;
+
+function createStore<T, Mos extends Mutators = []>(initializer?: StateCreator<T, [], Mos>) {
+  return initializer === undefined ? createTrackedStore : createTrackedStore(initializer);
+}
+
+function createTrackedStore<T, Mos extends Mutators = []>(
+  initializer: StateCreator<T, [], Mos>,
+): Mutate<StoreApi<T>, Mos> {
+  // zustand hands the initializer the same store object it returns, typed as the plain store
+  // before any middleware type wraps it; the initial state exists only once the initializer
+  // returns, so the reset reads it when it runs
+  return actualCreateStore<T, Mos>((setState, getState, store) => {
+    registerStoreReset(store);
+
+    return initializer(setState, getState, store);
+  });
+}
+
+function registerStoreReset<T>(store: StoreApi<T>): void {
   // A WeakRef lets a store that a single test created be collected; a module-level store stays
   // reachable and is reset after every test.
   const storeRef = new WeakRef(store);
@@ -26,25 +51,10 @@ function registerStoreReset<T>(store: StoreApi<T>): void {
       return;
     }
 
-    liveStore.setState(initialState, true);
+    liveStore.setState(liveStore.getInitialState(), true);
   };
 
   storeResets.add(resetStore);
 }
-
-function createTrackedStore<T>(creator: StateCreator<T>) {
-  const store = actualCreateStore(creator);
-
-  registerStoreReset(store);
-
-  return store;
-}
-
-function createStoreWithReset<T>(creator?: StateCreator<T>) {
-  return typeof creator === 'function' ? createTrackedStore(creator) : createTrackedStore;
-}
-
-// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- mirrors zustand's overloaded generic `createStore`; call-compatible but structurally distinct
-const createStore = createStoreWithReset as typeof actualVanilla.createStore;
 
 void mock.module('zustand/vanilla', () => ({ ...actualVanilla, createStore }));
