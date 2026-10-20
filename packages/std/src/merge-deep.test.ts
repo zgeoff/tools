@@ -94,3 +94,13 @@ test('it keeps a __proto__ key of the patch as an own key and leaves the prototy
     ownProto: { isAdmin: true },
   });
 });
+
+test('it replaces an array at the root whole', () => {
+  expect(mergeDeep([1, 2], [3])).toStrictEqual([3]);
+});
+
+test('it replaces a Date at the root whole', () => {
+  const merged = mergeDeep(new Date('2026-01-01'), new Date('2026-06-01'));
+
+  expect(merged).toStrictEqual(new Date('2026-06-01'));
+});
