@@ -545,44 +545,40 @@ test('it restores the install cache keyed on the lockfile, or the newest older c
   });
 });
 
-// The expression the private checks job runs on; each public job runs on its negation.
-const privateProfile =
-  '(github.event.repository && github.event.repository.private) || (!github.event.repository && inputs.private)';
-
-const installSteps = [
-  { name: 'Checkout', with: { 'fetch-depth': 0, filter: 'blob:none' } },
-  { name: 'Setup Node' },
-  { name: 'Setup Bun' },
-  { name: 'Cache bun install' },
-  { name: 'Install' },
-  { name: 'Pick the check scripts' },
-  { name: 'Sort the check scripts' },
-  { name: 'Setup shfmt' },
-  { name: 'Setup actionlint' },
-];
-
 test('it runs a public repo as separate gitleaks, static, test and lane jobs', async () => {
   const text = await readFile(join(import.meta.dir, 'bun-checks.yml'), 'utf8');
 
   const workflow: unknown = Bun.YAML.parse(text);
-  const publicProfile = `\${{ !(${privateProfile}) }}`;
-  const scriptSteps = [...installSteps, { name: 'Run the check scripts' }];
+  const publicProfile = `\${{ !((github.event.repository && github.event.repository.private) || (!github.event.repository && inputs.private)) }}`;
+
+  const steps = [
+    { name: 'Checkout', with: { 'fetch-depth': 0, filter: 'blob:none' } },
+    { name: 'Setup Node' },
+    { name: 'Setup Bun' },
+    { name: 'Cache bun install' },
+    { name: 'Install' },
+    { name: 'Pick the check scripts' },
+    { name: 'Sort the check scripts' },
+    { name: 'Setup shfmt' },
+    { name: 'Setup actionlint' },
+    { name: 'Run the check scripts' },
+  ];
 
   expect(workflow).toMatchObject({
     jobs: {
       gitleaks: {
-        if: `\${{ inputs.gitleaks && !(${privateProfile}) }}`,
+        if: `\${{ inputs.gitleaks && !((github.event.repository && github.event.repository.private) || (!github.event.repository && inputs.private)) }}`,
         steps: [{ name: 'Checkout' }, { name: 'Gitleaks' }],
       },
       plan: { if: publicProfile },
-      static: { if: publicProfile, env: { PART: 'static' }, steps: scriptSteps },
-      test: { if: publicProfile, env: { PART: 'test' }, steps: scriptSteps },
+      static: { if: publicProfile, env: { PART: 'static' }, steps },
+      test: { if: publicProfile, env: { PART: 'test' }, steps },
       'test-lane': {
         name: `test-\${{ matrix.lane }}`,
         needs: 'plan',
-        if: `\${{ !(${privateProfile}) && needs.plan.outputs.lanes != '[]' }}`,
+        if: `\${{ !((github.event.repository && github.event.repository.private) || (!github.event.repository && inputs.private)) && needs.plan.outputs.lanes != '[]' }}`,
         env: { PART: 'lane' },
-        steps: scriptSteps,
+        steps,
       },
     },
   });
@@ -592,17 +588,23 @@ test('it runs a private repo as one checks job with the scan, the static checks,
   const text = await readFile(join(import.meta.dir, 'bun-checks.yml'), 'utf8');
 
   const workflow: unknown = Bun.YAML.parse(text);
-  const [checkout, ...setup] = installSteps;
 
   expect(workflow).toMatchObject({
     jobs: {
       checks: {
-        if: `\${{ ${privateProfile} }}`,
+        if: `\${{ (github.event.repository && github.event.repository.private) || (!github.event.repository && inputs.private) }}`,
         env: { PART: 'all' },
         steps: [
-          checkout,
+          { name: 'Checkout', with: { 'fetch-depth': 0, filter: 'blob:none' } },
           { name: 'Gitleaks', if: 'inputs.gitleaks' },
-          ...setup,
+          { name: 'Setup Node' },
+          { name: 'Setup Bun' },
+          { name: 'Cache bun install' },
+          { name: 'Install' },
+          { name: 'Pick the check scripts' },
+          { name: 'Sort the check scripts' },
+          { name: 'Setup shfmt' },
+          { name: 'Setup actionlint' },
           { name: 'Static checks', env: { SCRIPTS: `\${{ steps.sort.outputs.static }}` } },
           { name: 'Tests', env: { SCRIPTS: `\${{ steps.sort.outputs.test }}` } },
           { name: 'Lane e2e', if: `contains(steps.sort.outputs.lanes, '"e2e"')` },
