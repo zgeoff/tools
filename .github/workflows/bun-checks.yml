@@ -1,15 +1,27 @@
-# Reusable workflow: the pull-request checks every zgeoff Bun repo runs. A
-# gitleaks job scans the commits, and a checks job installs with the frozen
-# lockfile, then runs each package script in `scripts` in order.
+# Reusable workflow: the pull-request checks every zgeoff Bun repo runs, in
+# one of two profiles that the calling repo's visibility picks. A public repo
+# runs for wall time: a gitleaks job, a static job for every check that is not
+# a test, a test job, and a test-<lane> job for each lane, at most 8 jobs. A
+# private repo runs for minutes: one checks job that holds the scan, the static
+# checks, the tests and each lane as named steps, because each job bills at
+# least a full minute there. Every job installs with the frozen lockfile from a
+# cache keyed on bun.lock.
 #
 # `scripts` is a space-separated list of package.json script names. Empty means
 # the standard list: audit deadcode format:check lint check typecheck test,
-# where check runs only when the repo defines it. Any other name the repo's
-# package.json does not define fails the run before any script runs, so a
-# renamed script cannot drop a check without notice. The synced caller passes
-# the BUN_CHECK_SCRIPTS, NODE_VERSION and BUN_CHECK_TIMEOUT_MINUTES repo
-# variables, so a repo changes the list, adds Node or sets the checks job's time
-# limit without editing the caller.
+# then each lane script the repo defines, where check runs only when the repo
+# defines it. A lane script is test:e2e, test:browser, test:docker or
+# test:host; test and any other test:<name> run with the tests, and every other
+# script runs with the static checks, each group in the list's order. Any name
+# the repo's package.json does not define fails the run before any script
+# runs, so a renamed script cannot drop a check without notice. The synced
+# caller passes the BUN_CHECK_SCRIPTS, NODE_VERSION and
+# BUN_CHECK_TIMEOUT_MINUTES repo variables, so a repo changes the list, adds
+# Node or sets the jobs' time limit without editing the caller.
+#
+# The profile comes from github.event.repository.private, which in a reusable
+# workflow reads the caller's event. The private input is the fallback for an
+# event whose payload has no repository.
 name: Bun checks (reusable)
 
 on:
@@ -33,20 +45,35 @@ on:
       timeout-minutes:
         # The same limit as the synced caller's fallback, for a caller that
         # passes none.
-        description: Timeout for the checks job, in minutes
+        description: Timeout for each job that installs and runs scripts, in minutes
         type: number
         required: false
         default: 20
+      private:
+        description:
+          Run the private profile when the event payload has no repository; ignored otherwise
+        type: boolean
+        required: false
+        default: false
       setup-shfmt:
         description:
           Install shfmt even when the scripts do not run check, for a suite whose tests run it
         type: boolean
         required: false
         default: false
+      setup-actionlint:
+        description:
+          Install actionlint even when the scripts do not run check, for a suite whose tests run it
+        type: boolean
+        required: false
+        default: false
 
 jobs:
+  # Public profile.
   gitleaks:
-    if: inputs.gitleaks
+    if:
+      ${{ inputs.gitleaks && !((github.event.repository && github.event.repository.private) ||
+      (!github.event.repository && inputs.private)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # The action comments findings on the PR, which needs write on pull-requests.
@@ -54,10 +81,12 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      # The scan reads every commit of the pull request. A blobless clone
-      # fetches the history without the file contents, and git fetches a
-      # file's content when the scan first reads it.
-      - name: Checkout
+      # The scan reads every commit of the pull request, and the branch checks
+      # of zgeoff-check read the base branch and every commit since it; a
+      # shallow clone has neither. The clone is blobless, so it skips the file
+      # contents of older commits, and git fetches one when a reader needs it.
+      - &checkout
+        name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -71,51 +100,33 @@ jobs:
           # syntax and silently ignores it.
           GITLEAKS_VERSION: 8.30.1
 
-  checks:
+  # Lists the lanes for the test-<lane> jobs, so a repo without lanes starts
+  # none. It reads package.json alone.
+  plan:
+    if:
+      ${{ !((github.event.repository && github.event.repository.private) ||
+      (!github.event.repository && inputs.private)) }}
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.timeout-minutes }}
+    timeout-minutes: 5
     permissions:
       contents: read
     env:
-      # CI never commits; skip hook install and execution.
-      LEFTHOOK: 0
+      PART: all
+      LANE: ''
+    outputs:
+      lanes: ${{ steps.pick.outputs.lanes }}
     steps:
-      # The full history gives the branch checks of zgeoff-check the base
-      # branch and every commit since it; a shallow clone has neither. The
-      # clone is blobless, so it skips the file contents of older commits, and
-      # git fetches one when a check reads it.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
-          filter: blob:none
-
-      - name: Setup Node
-        if: inputs.node-version != ''
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          node-version: ${{ inputs.node-version }}
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: .bun-version
-
-      # Bun's install cache, keyed on the lockfile. A lockfile change restores
-      # the newest older cache, and the job saves a new one when it passes.
-      - name: Cache bun install
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.bun/install/cache
-          key: bun-install-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-          restore-keys: bun-install-${{ runner.os }}-
-
-      - name: Install
-        run: bun install --frozen-lockfile
+          sparse-checkout: package.json
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
 
       # Picks the scripts before anything runs, so a missing name fails fast
       # and the shfmt setup knows whether check runs.
-      - name: Pick the check scripts
+      - &pick
+        name: Pick the check scripts
         id: pick
         env:
           SCRIPTS: ${{ inputs.scripts }}
@@ -133,6 +144,11 @@ jobs:
               echo '::notice::check skipped, because package.json has no check script; add "check": "zgeoff-check" to run it.'
             fi
             list+=(typecheck test)
+            for lane in e2e browser docker host; do
+              if jq -e --arg name "test:$lane" '.scripts[$name]' package.json > /dev/null; then
+                list+=("test:$lane")
+              fi
+            done
           fi
           missing=""
           for name in "${list[@]}"; do
@@ -142,14 +158,86 @@ jobs:
             echo "::error::package.json defines no script named:$missing. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list."
             exit 1
           fi
-          # Spaces around the list let a step match one whole name.
-          echo "scripts= ${list[*]} " >> "$GITHUB_OUTPUT"
+          static=()
+          tests=()
+          lanes=()
+          for name in "${list[@]}"; do
+            case "$name" in
+              test:e2e | test:browser | test:docker | test:host) lanes+=("${name#test:}") ;;
+              test | test:*) tests+=("$name") ;;
+              *) static+=("$name") ;;
+            esac
+          done
+          # scripts is the part this job runs: all of them in the private
+          # checks job, one group in a public job.
+          case "$PART" in
+            static) part=("${static[@]}") ;;
+            test) part=("${tests[@]}") ;;
+            lane) part=("test:$LANE") ;;
+            *) part=("${static[@]}" "${tests[@]}") ;;
+          esac
+          if [ "$PART" = all ]; then
+            for lane in "${lanes[@]}"; do part+=("test:$lane"); done
+          fi
+          # Spaces around each list let a step match one whole name.
+          {
+            echo "scripts= ${part[*]} "
+            echo "static= ${static[*]} "
+            echo "test= ${tests[*]} "
+            echo "lanes=$(printf '%s\n' "${lanes[@]}" | jq -Rnc '[inputs | select(. != "")]')"
+          } >> "$GITHUB_OUTPUT"
+
+  static:
+    if:
+      ${{ !((github.event.repository && github.event.repository.private) ||
+      (!github.event.repository && inputs.private)) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+    env:
+      # CI never commits; skip hook install and execution.
+      LEFTHOOK: 0
+      PART: static
+      LANE: ''
+    steps:
+      - *checkout
+
+      - &setup-node
+        name: Setup Node
+        if: inputs.node-version != ''
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - &setup-bun
+        name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      # Bun's install cache, keyed on the lockfile. A lockfile change restores
+      # the newest older cache, and the job saves a new one when it passes.
+      - &cache
+        name: Cache bun install
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-install-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-install-${{ runner.os }}-
+
+      - &install
+        name: Install
+        run: bun install --frozen-lockfile
+
+      - *pick
 
       # The shell check of zgeoff-check runs shellcheck, which the runner image
       # carries, and shfmt, which it lacks. The step installs the pinned binary
       # when check runs or the caller asks for it, into a folder the runner
       # owns, put on the PATH of the later steps.
-      - name: Setup shfmt
+      - &setup-shfmt
+        name: Setup shfmt
         env:
           SCRIPTS: ${{ steps.pick.outputs.scripts }}
           SETUP_SHFMT: ${{ inputs.setup-shfmt }}
@@ -168,16 +256,18 @@ jobs:
           echo "$RUNNER_TEMP/shfmt-bin" >> "$GITHUB_PATH"
 
       # The workflows check of zgeoff-check runs actionlint, which the runner
-      # image lacks. The step installs the pinned release when check runs, the
-      # same way as shfmt.
-      - name: Setup actionlint
+      # image lacks. The step installs the pinned release when check runs or
+      # the caller asks for it, the same way as shfmt.
+      - &setup-actionlint
+        name: Setup actionlint
         env:
           SCRIPTS: ${{ steps.pick.outputs.scripts }}
+          SETUP_ACTIONLINT: ${{ inputs.setup-actionlint }}
           ACTIONLINT_VERSION: 1.7.12
           ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
         run: |
           set -euo pipefail
-          if [[ "$SCRIPTS" != *" check "* ]]; then
+          if [ "$SETUP_ACTIONLINT" != true ] && [[ "$SCRIPTS" != *" check "* ]]; then
             echo "actionlint: not needed, because the scripts do not run check"
             exit 0
           fi
@@ -187,10 +277,11 @@ jobs:
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/actionlint-bin" actionlint
           echo "$RUNNER_TEMP/actionlint-bin" >> "$GITHUB_PATH"
 
-      - name: Run the check scripts
+      - &run-scripts
+        name: Run the check scripts
         env:
           SCRIPTS: ${{ steps.pick.outputs.scripts }}
-        run: |
+        run: &run-body |
           set -euo pipefail
           read -ra list <<< "$SCRIPTS"
           for name in "${list[@]}"; do
@@ -198,3 +289,124 @@ jobs:
             bun run "$name"
             echo "::endgroup::"
           done
+
+  test:
+    if:
+      ${{ !((github.event.repository && github.event.repository.private) ||
+      (!github.event.repository && inputs.private)) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+    env:
+      LEFTHOOK: 0
+      PART: test
+      LANE: ''
+    steps:
+      - *checkout
+      - *setup-node
+      - *setup-bun
+      - *cache
+      - *install
+      - *pick
+      - *setup-shfmt
+      - *setup-actionlint
+      - *run-scripts
+
+  test-lane:
+    name: test-${{ matrix.lane }}
+    needs: plan
+    if:
+      ${{ !((github.event.repository && github.event.repository.private) ||
+      (!github.event.repository && inputs.private)) && needs.plan.outputs.lanes != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: ${{ fromJSON(needs.plan.outputs.lanes) }}
+    env:
+      LEFTHOOK: 0
+      PART: lane
+      LANE: ${{ matrix.lane }}
+    steps:
+      - *checkout
+      - *setup-node
+      - *setup-bun
+      - *cache
+      - *install
+      - *pick
+      - *setup-shfmt
+      - *setup-actionlint
+      - *run-scripts
+
+  # Private profile: one job, so the run bills one runner.
+  checks:
+    if:
+      ${{ (github.event.repository && github.event.repository.private) || (!github.event.repository
+      && inputs.private) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    # The scan comments findings on the PR, which needs write on pull-requests.
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      LEFTHOOK: 0
+      PART: all
+      LANE: ''
+    steps:
+      - *checkout
+
+      - name: Gitleaks
+        if: inputs.gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The action's default (8.24.3) predates the root-level [[allowlists]]
+          # syntax and silently ignores it.
+          GITLEAKS_VERSION: 8.30.1
+
+      - *setup-node
+      - *setup-bun
+      - *cache
+      - *install
+      - *pick
+      - *setup-shfmt
+      - *setup-actionlint
+
+      - name: Static checks
+        env:
+          SCRIPTS: ${{ steps.pick.outputs.static }}
+        run: *run-body
+
+      - name: Tests
+        env:
+          SCRIPTS: ${{ steps.pick.outputs.test }}
+        run: *run-body
+
+      - name: Lane e2e
+        if: contains(steps.pick.outputs.lanes, '"e2e"')
+        env:
+          SCRIPTS: test:e2e
+        run: *run-body
+
+      - name: Lane browser
+        if: contains(steps.pick.outputs.lanes, '"browser"')
+        env:
+          SCRIPTS: test:browser
+        run: *run-body
+
+      - name: Lane docker
+        if: contains(steps.pick.outputs.lanes, '"docker"')
+        env:
+          SCRIPTS: test:docker
+        run: *run-body
+
+      - name: Lane host
+        if: contains(steps.pick.outputs.lanes, '"host"')
+        env:
+          SCRIPTS: test:host
+        run: *run-body

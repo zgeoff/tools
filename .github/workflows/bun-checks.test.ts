@@ -21,10 +21,10 @@ async function setupTest() {
   await mkdir(bin);
   await createStubBun(bin, join(directory, 'ran'));
 
-  const pick = await loadWorkflowStep(workflow, 'checks', 'Pick the check scripts');
-  const setupShfmt = await loadWorkflowStep(workflow, 'checks', 'Setup shfmt');
-  const setupActionlint = await loadWorkflowStep(workflow, 'checks', 'Setup actionlint');
-  const run = await loadWorkflowStep(workflow, 'checks', 'Run the check scripts');
+  const pick = await loadWorkflowStep(workflow, 'static', 'Pick the check scripts');
+  const setupShfmt = await loadWorkflowStep(workflow, 'static', 'Setup shfmt');
+  const setupActionlint = await loadWorkflowStep(workflow, 'static', 'Setup actionlint');
+  const run = await loadWorkflowStep(workflow, 'static', 'Run the check scripts');
 
   return {
     directory,
@@ -57,12 +57,20 @@ test('it picks check in the standard list when the repo defines the script', asy
 
   await $`bash -c ${ctx.pick.run}`
     .cwd(ctx.directory)
-    .env({ PATH: ctx.path, SCRIPTS: '', GITHUB_OUTPUT: join(ctx.directory, 'output') })
+    .env({ PATH: ctx.path, SCRIPTS: '', PART: 'all', GITHUB_OUTPUT: join(ctx.directory, 'output') })
     .quiet();
 
   const output = await readFile(join(ctx.directory, 'output'), 'utf8');
 
-  expect(output).toBe('scripts= audit deadcode format:check lint check typecheck test \n');
+  expect(output).toBe(
+    [
+      'scripts= audit deadcode format:check lint check typecheck test ',
+      'static= audit deadcode format:check lint check typecheck ',
+      'test= test ',
+      'lanes=[]',
+      '',
+    ].join('\n'),
+  );
 });
 
 test('it leaves check out of the standard list with a notice when the repo has no check script', async () => {
@@ -84,7 +92,7 @@ test('it leaves check out of the standard list with a notice when the repo has n
 
   const result = await $`bash -c ${ctx.pick.run}`
     .cwd(ctx.directory)
-    .env({ PATH: ctx.path, SCRIPTS: '', GITHUB_OUTPUT: join(ctx.directory, 'output') })
+    .env({ PATH: ctx.path, SCRIPTS: '', PART: 'all', GITHUB_OUTPUT: join(ctx.directory, 'output') })
     .quiet();
 
   const output = await readFile(join(ctx.directory, 'output'), 'utf8');
@@ -93,7 +101,15 @@ test('it leaves check out of the standard list with a notice when the repo has n
     '::notice::check skipped, because package.json has no check script; add "check": "zgeoff-check" to run it.',
   );
 
-  expect(output).toBe('scripts= audit deadcode format:check lint typecheck test \n');
+  expect(output).toBe(
+    [
+      'scripts= audit deadcode format:check lint typecheck test ',
+      'static= audit deadcode format:check lint typecheck ',
+      'test= test ',
+      'lanes=[]',
+      '',
+    ].join('\n'),
+  );
 });
 
 test('it fails the pick when a listed script is missing', async () => {
@@ -106,7 +122,12 @@ test('it fails the pick when a listed script is missing', async () => {
 
   const result = await $`bash -c ${ctx.pick.run}`
     .cwd(ctx.directory)
-    .env({ PATH: ctx.path, SCRIPTS: 'lint check', GITHUB_OUTPUT: join(ctx.directory, 'output') })
+    .env({
+      PATH: ctx.path,
+      SCRIPTS: 'lint check',
+      PART: 'all',
+      GITHUB_OUTPUT: join(ctx.directory, 'output'),
+    })
     .nothrow()
     .quiet();
 
@@ -242,6 +263,7 @@ test('it hands the picked list to the shfmt setup and the run through the workfl
     .env({
       PATH: ctx.path,
       SCRIPTS: inputs[ctx.pick.env['SCRIPTS'] ?? ''],
+      PART: 'static',
       GITHUB_OUTPUT: join(ctx.directory, 'output'),
     })
     .quiet();
@@ -251,7 +273,8 @@ test('it hands the picked list to the shfmt setup and the run through the workfl
   // The pick step's output, under the expression a later step uses to read it.
   const outputs: Record<string, string> = {
     ...inputs,
-    [`\${{ steps.${ctx.pick.id}.outputs.scripts }}`]: output.slice('scripts='.length, -1),
+    [`\${{ steps.${ctx.pick.id}.outputs.scripts }}`]:
+      /^scripts=(?<list>.*)$/mu.exec(output)?.groups?.['list'] ?? '',
   };
 
   await $`bash -c ${ctx.setupShfmt.run}`
@@ -276,7 +299,7 @@ test('it hands the picked list to the shfmt setup and the run through the workfl
   const ran = await readFile(join(ctx.directory, 'ran'), 'utf8');
 
   expect(installed).toBeTrue();
-  expect(ran).toBe('audit\ndeadcode\nformat:check\nlint\ncheck\ntypecheck\ntest\n');
+  expect(ran).toBe('audit\ndeadcode\nformat:check\nlint\ncheck\ntypecheck\n');
 });
 
 test('it installs actionlint from the release archive into a runner folder on the PATH when the checksum matches', async () => {
@@ -297,6 +320,7 @@ test('it installs actionlint from the release archive into a runner folder on th
     .env({
       PATH: ctx.path,
       SCRIPTS: ' lint check test ',
+      SETUP_ACTIONLINT: 'false',
       RUNNER_TEMP: ctx.directory,
       GITHUB_PATH: join(ctx.directory, 'github-path'),
       ACTIONLINT_VERSION: '1.7.12',
@@ -334,6 +358,7 @@ test('it installs no actionlint when the archive fails its checksum', async () =
     .env({
       PATH: ctx.path,
       SCRIPTS: ' lint check test ',
+      SETUP_ACTIONLINT: 'false',
       RUNNER_TEMP: ctx.directory,
       GITHUB_PATH: join(ctx.directory, 'github-path'),
       ACTIONLINT_VERSION: '1.7.12',
@@ -351,9 +376,10 @@ test('it installs no actionlint when the archive fails its checksum', async () =
 });
 
 test.each([
-  ['the scripts run check', ' lint check test ', true],
-  ['the scripts leave check out', ' lint check:sync test ', false],
-])('it installs actionlint only when %s', async (_label, scripts, installs) => {
+  ['the scripts run check', ' lint check test ', 'false', true],
+  ['the caller asks for it', ' test ', 'true', true],
+  ['the scripts leave check out', ' lint check:sync test ', 'false', false],
+])('it installs actionlint only when %s', async (_label, scripts, setupActionlint, installs) => {
   const ctx = await setupTest();
 
   await mkdir(join(ctx.directory, 'release'));
@@ -370,6 +396,7 @@ test.each([
     .env({
       PATH: ctx.path,
       SCRIPTS: scripts,
+      SETUP_ACTIONLINT: setupActionlint,
       RUNNER_TEMP: ctx.directory,
       GITHUB_PATH: join(ctx.directory, 'github-path'),
       ACTIONLINT_VERSION: '1.7.12',
@@ -411,13 +438,19 @@ test('it hands the picked list to the actionlint setup through the workflow bind
 
   await $`bash -c ${ctx.pick.run}`
     .cwd(ctx.directory)
-    .env({ PATH: ctx.path, SCRIPTS: '', GITHUB_OUTPUT: join(ctx.directory, 'output') })
+    .env({
+      PATH: ctx.path,
+      SCRIPTS: '',
+      PART: 'static',
+      GITHUB_OUTPUT: join(ctx.directory, 'output'),
+    })
     .quiet();
 
   const output = await readFile(join(ctx.directory, 'output'), 'utf8');
 
   const outputs: Record<string, string> = {
-    [`\${{ steps.${ctx.pick.id}.outputs.scripts }}`]: output.slice('scripts='.length, -1),
+    [`\${{ steps.${ctx.pick.id}.outputs.scripts }}`]:
+      /^scripts=(?<list>.*)$/mu.exec(output)?.groups?.['list'] ?? '',
   };
 
   await $`bash -c ${ctx.setupActionlint.run}`
@@ -495,6 +528,177 @@ test('it restores the install cache keyed on the lockfile, or the newest older c
   expect(workflow).toMatchObject({
     jobs: { checks: { steps: expect.arrayContaining([cache, install]) } },
   });
+});
 
-  expect(text.indexOf('- name: Cache bun install')).toBeLessThan(text.indexOf('- name: Install'));
+// The expression the private checks job runs on; each public job runs on its negation.
+const privateProfile =
+  '(github.event.repository && github.event.repository.private) || (!github.event.repository && inputs.private)';
+
+const installSteps = [
+  { name: 'Checkout', with: { 'fetch-depth': 0, filter: 'blob:none' } },
+  { name: 'Setup Node' },
+  { name: 'Setup Bun' },
+  { name: 'Cache bun install' },
+  { name: 'Install' },
+  { name: 'Pick the check scripts' },
+  { name: 'Setup shfmt' },
+  { name: 'Setup actionlint' },
+];
+
+test('it runs a public repo as separate gitleaks, static, test and lane jobs', async () => {
+  const text = await readFile(join(import.meta.dir, 'bun-checks.yml'), 'utf8');
+
+  const workflow: unknown = Bun.YAML.parse(text);
+  const publicProfile = `\${{ !(${privateProfile}) }}`;
+  const scriptSteps = [...installSteps, { name: 'Run the check scripts' }];
+
+  expect(workflow).toMatchObject({
+    jobs: {
+      gitleaks: {
+        if: `\${{ inputs.gitleaks && !(${privateProfile}) }}`,
+        steps: [{ name: 'Checkout' }, { name: 'Gitleaks' }],
+      },
+      plan: { if: publicProfile },
+      static: { if: publicProfile, env: { PART: 'static' }, steps: scriptSteps },
+      test: { if: publicProfile, env: { PART: 'test' }, steps: scriptSteps },
+      'test-lane': {
+        name: `test-\${{ matrix.lane }}`,
+        needs: 'plan',
+        if: `\${{ !(${privateProfile}) && needs.plan.outputs.lanes != '[]' }}`,
+        env: { PART: 'lane' },
+        steps: scriptSteps,
+      },
+    },
+  });
+});
+
+test('it runs a private repo as one checks job with the scan, the static checks, the tests and each lane as steps', async () => {
+  const text = await readFile(join(import.meta.dir, 'bun-checks.yml'), 'utf8');
+
+  const workflow: unknown = Bun.YAML.parse(text);
+  const [checkout, ...setup] = installSteps;
+
+  expect(workflow).toMatchObject({
+    jobs: {
+      checks: {
+        if: `\${{ ${privateProfile} }}`,
+        env: { PART: 'all' },
+        steps: [
+          checkout,
+          { name: 'Gitleaks', if: 'inputs.gitleaks' },
+          ...setup,
+          { name: 'Static checks', env: { SCRIPTS: `\${{ steps.pick.outputs.static }}` } },
+          { name: 'Tests', env: { SCRIPTS: `\${{ steps.pick.outputs.test }}` } },
+          { name: 'Lane e2e', if: `contains(steps.pick.outputs.lanes, '"e2e"')` },
+          { name: 'Lane browser', if: `contains(steps.pick.outputs.lanes, '"browser"')` },
+          { name: 'Lane docker', if: `contains(steps.pick.outputs.lanes, '"docker"')` },
+          { name: 'Lane host', if: `contains(steps.pick.outputs.lanes, '"host"')` },
+        ],
+      },
+    },
+  });
+});
+
+test('it sorts the listed scripts into static checks, tests and lanes', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        lint: 'true',
+        test: 'true',
+        'test:e2e': 'true',
+        'test:slow': 'true',
+        check: 'true',
+      },
+    }),
+  );
+
+  await $`bash -c ${ctx.pick.run}`
+    .cwd(ctx.directory)
+    .env({
+      PATH: ctx.path,
+      SCRIPTS: 'lint test:e2e test test:slow check',
+      PART: 'all',
+      GITHUB_OUTPUT: join(ctx.directory, 'output'),
+    })
+    .quiet();
+
+  const output = await readFile(join(ctx.directory, 'output'), 'utf8');
+
+  expect(output).toBe(
+    [
+      'scripts= lint check test test:slow test:e2e ',
+      'static= lint check ',
+      'test= test test:slow ',
+      'lanes=["e2e"]',
+      '',
+    ].join('\n'),
+  );
+});
+
+test('it adds each lane script the repo defines to the standard list', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        audit: 'true',
+        deadcode: 'true',
+        'format:check': 'true',
+        lint: 'true',
+        typecheck: 'true',
+        test: 'true',
+        'test:host': 'true',
+        'test:browser': 'true',
+      },
+    }),
+  );
+
+  await $`bash -c ${ctx.pick.run}`
+    .cwd(ctx.directory)
+    .env({ PATH: ctx.path, SCRIPTS: '', PART: 'all', GITHUB_OUTPUT: join(ctx.directory, 'output') })
+    .quiet();
+
+  const output = await readFile(join(ctx.directory, 'output'), 'utf8');
+
+  expect(output).toInclude('lanes=["browser","host"]\n');
+});
+
+test.each([
+  ['static', '', 'scripts= lint check '],
+  ['test', '', 'scripts= test test:slow '],
+  ['lane', 'e2e', 'scripts= test:e2e '],
+])('it gives a public %s job only its own scripts', async (part, lane, expected) => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        lint: 'true',
+        test: 'true',
+        'test:e2e': 'true',
+        'test:slow': 'true',
+        check: 'true',
+      },
+    }),
+  );
+
+  await $`bash -c ${ctx.pick.run}`
+    .cwd(ctx.directory)
+    .env({
+      PATH: ctx.path,
+      SCRIPTS: 'lint test:e2e test test:slow check',
+      PART: part,
+      LANE: lane,
+      GITHUB_OUTPUT: join(ctx.directory, 'output'),
+    })
+    .quiet();
+
+  const output = await readFile(join(ctx.directory, 'output'), 'utf8');
+
+  expect(output.split('\n')[0]).toBe(expected);
 });
