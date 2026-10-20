@@ -109,7 +109,8 @@ jobs:
   sync:
     name: Sync the entries
     needs: prepare
-    if: ${{ success() && needs.prepare.outputs.entries != '[]' }}
+    # The job runs with no entry too, since it still removes retired files.
+    if: ${{ success() }}
     runs-on: ubuntu-latest
     # Two runs at once could push one release's files and then write the other
     # release's title and body. The group names only the caller, so runs from

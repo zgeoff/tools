@@ -665,3 +665,28 @@ test('it syncs from a tools ref that has no retired-file cleanup', async () => {
   expect(exitCode).toBe(0);
   expect(subjects).toStrictEqual(['chore: sync editorconfig from zgeoff/tools']);
 });
+
+test('it removes a retired file when the run syncs no entry', async () => {
+  const ctx = await setupTest();
+
+  const agents = { source: 'agents/shared.md', target: 'agents/shared.md' };
+
+  await ctx.writeSource(agents.source, '# Shared\n');
+  await ctx.writeManifestCommit([{ name: 'agents', files: [agents] }]);
+  await ctx.writeManifestCommit([]);
+  await ctx.writeBranch('main', agents.target, '# Shared\n');
+
+  const exitCode = await ctx.runSync([], 'sync-v7');
+  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
+  const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
+
+  expect(exitCode).toBe(0);
+  expect(files).toStrictEqual(['README.md']);
+  expect(subjects).toStrictEqual(['chore: remove the files zgeoff/tools no longer syncs']);
+});
+
+test('it runs the sync job when the run takes no entry', async () => {
+  const workflow = await readFile(join(import.meta.dir, 'repo-sync.yml'), 'utf8');
+
+  expect(workflow).not.toInclude("needs.prepare.outputs.entries != '[]'");
+});
