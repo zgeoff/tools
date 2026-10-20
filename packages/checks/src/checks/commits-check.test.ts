@@ -77,6 +77,29 @@ test('it reports each problem of a commit that is not a Conventional Commit at i
   ]);
 });
 
+test('it reports a commit that is not a Conventional Commit when a later commit is', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'tidy up'}`.cwd(ctx.directory).env(ctx.env);
+
+  const hashText = await $`git rev-parse --short HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  await $`git commit --quiet --allow-empty -m ${'feat: add the greeting'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const findings = await commitsCheck.check({ cwd: ctx.directory, base: ctx.base, env: ctx.env });
+
+  expect(findings).toStrictEqual([
+    {
+      path: hashText.trim(),
+      line: 1,
+      message: 'commitlint: subject may not be empty [subject-empty]',
+    },
+    { path: hashText.trim(), line: 1, message: 'commitlint: type may not be empty [type-empty]' },
+  ]);
+});
+
 test('it lints with @zgeoff/commitlint-config, not a commitlint config in the repo', async () => {
   const ctx = await setupTest();
 
