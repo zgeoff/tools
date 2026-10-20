@@ -28,6 +28,27 @@ if [ "$(git -C "$tools" rev-parse --is-shallow-repository)" = true ]; then
   exit 1
 fi
 
+# Prints the content on stdin with the parts a sync run changes per repo put
+# back in one form: every call to a zgeoff/tools workflow names @main, and a
+# Markdown file loses every block that needs a file, kept or removed, with the
+# blank line after it.
+to_delivered_form() {
+  local target=$1
+  if [[ "$target" == .github/workflows/* ]]; then
+    sed -E "s#(zgeoff/tools/\.github/workflows/[^]@[:space:]\"'{},]+)@[A-Za-z0-9._/-]+#\1@main#g"
+  elif [[ "$target" == *.md ]]; then
+    awk '
+      /^<!-- repo-sync needs [^[:space:]]+ -->$/ { open = 1; next }
+      open && $0 == "<!-- repo-sync end -->" { open = 0; blank = 1; next }
+      blank && $0 == "" { blank = 0; next }
+      { blank = 0 }
+      !open { print }
+    '
+  else
+    cat
+  fi
+}
+
 declare -A current=() listed=() entries=() sources=() taken=() skipped=()
 while IFS= read -r target; do
   current["$target"]=1
@@ -80,14 +101,17 @@ while IFS= read -r target; do
   if [ "$kept" -eq 1 ]; then
     continue
   fi
-  blobs=$(
+  delivered=$(
     printf '%s' "${sources[$target]}" | sort -u | while IFS= read -r source; do
       git -C "$tools" log --format=%H -- "$source" | while IFS= read -r commit; do
-        git -C "$tools" rev-parse -q --verify "$commit:$source" || true
+        if blob=$(git -C "$tools" rev-parse -q --verify "$commit:$source"); then
+          git -C "$tools" cat-file blob "$blob" | to_delivered_form "$target" | git hash-object --stdin
+        fi
       done
     done
   )
-  if grep -qxF "$(git hash-object --no-filters -- "$target")" <<< "$blobs"; then
+  copy="$target"
+  if grep -qxF "$(to_delivered_form "$target" < "$copy" | git hash-object --stdin)" <<< "$delivered"; then
     rm -f -- "$target"
     printf '%s\n' "$target"
   fi

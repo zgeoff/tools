@@ -258,3 +258,61 @@ test('it fails on a shallow checkout of tools', async () => {
     `remove-retired-sync-files: ${shallow} is a shallow clone, so it lacks the earlier manifests\n`,
   );
 });
+
+test('it deletes a retired workflow whose calls the sync pinned to a tag', async () => {
+  const ctx = await setupTest();
+
+  await writeToolsCommit(ctx.tools, {
+    'sync/workflow-callers/lint.yml':
+      'jobs:\n  lint:\n    uses: zgeoff/tools/.github/workflows/lint.yml@main\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'workflow-lint',
+        files: [{ source: 'sync/workflow-callers/lint.yml', target: '.github/workflows/lint.yml' }],
+      },
+    ]),
+  });
+
+  await writeToolsCommit(ctx.tools, { 'sync/manifest.json': '[]' });
+
+  await writeFiles(ctx.caller, {
+    '.github/workflows/lint.yml':
+      'jobs:\n  lint:\n    uses: zgeoff/tools/.github/workflows/lint.yml@sync-v7\n',
+  });
+
+  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, ''], {
+    cwd: ctx.caller,
+    encoding: 'utf8',
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('.github/workflows/lint.yml\n');
+  expect(existsSync(join(ctx.caller, '.github/workflows/lint.yml'))).toBeFalse();
+});
+
+test('it deletes a retired Markdown copy that lost a block the repo was excepted from', async () => {
+  const ctx = await setupTest();
+
+  await writeToolsCommit(ctx.tools, {
+    'sync/skills/demo/SKILL.md':
+      '# Demo\n\n<!-- repo-sync needs ./go.md -->\n\nRead [Go](./go.md).\n\n<!-- repo-sync end -->\n\nThe end.\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-demo',
+        files: [{ source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' }],
+      },
+    ]),
+  });
+
+  await writeToolsCommit(ctx.tools, { 'sync/manifest.json': '[]' });
+  await writeFiles(ctx.caller, { '.claude/skills/demo/SKILL.md': '# Demo\n\nThe end.\n' });
+
+  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, ''], {
+    cwd: ctx.caller,
+    encoding: 'utf8',
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('.claude/skills/demo/SKILL.md\n');
+  expect(existsSync(join(ctx.caller, '.claude/skills/demo/SKILL.md'))).toBeFalse();
+});
