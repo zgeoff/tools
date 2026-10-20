@@ -764,6 +764,42 @@ test('it sorts the picked scripts into static checks, tests and lanes', async ()
   );
 });
 
+test('it plans no lanes for a repo without lane scripts, so no public lane job starts', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { lint: 'true', test: 'true' } }),
+  );
+
+  await $`bash -c ${ctx.pick.run}`
+    .cwd(ctx.directory)
+    .env({ PATH: ctx.path, SCRIPTS: 'lint test', GITHUB_OUTPUT: join(ctx.directory, 'picked') })
+    .quiet();
+
+  const picked = await readFile(join(ctx.directory, 'picked'), 'utf8');
+
+  const pickOutputs: Record<string, string> = {
+    [`\${{ steps.${ctx.pick.id}.outputs.list }}`]: picked.slice('list='.length, -1),
+  };
+
+  await $`bash -c ${ctx.sort.run}`
+    .cwd(ctx.directory)
+    .env({
+      PATH: ctx.path,
+      SCRIPTS: pickOutputs[ctx.sort.env['SCRIPTS'] ?? ''],
+      PART: 'all',
+      GITHUB_OUTPUT: join(ctx.directory, 'output'),
+    })
+    .quiet();
+
+  const output = await readFile(join(ctx.directory, 'output'), 'utf8');
+
+  expect(output).toBe(
+    ['scripts= lint test ', 'static= lint ', 'test= test ', 'lanes=[]', ''].join('\n'),
+  );
+});
+
 test('it adds each lane script the repo defines to the standard list', async () => {
   const ctx = await setupTest();
 
