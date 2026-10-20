@@ -1,8 +1,6 @@
 import type { ProgramResult } from '../run-program.ts';
 import type { Finding } from '../types.ts';
 
-// Turns one `actionlint -format '{{json .}}'` run into findings, one per reported error. A run that
-// did not check every file throws instead, so the caller never reads it as a clean result.
 export function parseActionlintOutput(result: ProgramResult): Finding[] {
   // actionlint exits 1 when it reports an error, 2 on a bad option, and 3 when it cannot run.
   if (result.exitCode > 1) {

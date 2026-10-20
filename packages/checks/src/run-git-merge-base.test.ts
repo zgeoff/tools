@@ -85,3 +85,26 @@ test('it throws when the repo has no default branch to start from', async () => 
     'cannot find the base of this branch: no merge base between HEAD and origin/main (is the remote fetched?)',
   );
 });
+
+test('it returns the common ancestor when the branch and the default branch diverge', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  await $`git commit --quiet --allow-empty -m ${'feat: add the trunk'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  await $`git update-ref refs/remotes/origin/main HEAD`.cwd(ctx.directory).env(ctx.env);
+  await $`git reset --quiet --hard ${baseText.trim()}`.cwd(ctx.directory).env(ctx.env);
+
+  await $`git commit --quiet --allow-empty -m ${'feat: add the greeting'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  expect(runGitMergeBase(ctx.directory, ctx.env)).toBe(baseText.trim());
+});

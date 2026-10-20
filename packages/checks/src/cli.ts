@@ -8,7 +8,8 @@ import { runGitShowToplevel } from './run-git-show-toplevel.ts';
 
 const USAGE = `usage: zgeoff-check [--] [file ...]
 
-Runs every check over the files that git tracks, or over the files given.
+Runs the file checks over the files that git tracks, or over the files given, and the
+branch checks over the commits since the branch's base.
 Each finding prints as path:line: <check>: <message>, with the path from the repo root.
 Exits 0 with no finding, 1 with any finding, and 2 when the run could not finish.
 Checks: ${allChecks.map((check) => check.name).join(', ')}`;
