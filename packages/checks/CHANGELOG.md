@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.2](https://github.com/zgeoff/tools/compare/@zgeoff/checks@0.2.1...@zgeoff/checks@0.2.2) (2026-10-20)
+
+### Features
+
+- **geo-1310:** add a docs check that runs the docs-writing scripts
+  ([#243](https://github.com/zgeoff/tools/issues/243))
+  ([9202181](https://github.com/zgeoff/tools/commit/9202181bb5d85323c21e6c8bb1bc4ecced5b6147))
+
 ## [0.2.1](https://github.com/zgeoff/tools/compare/@zgeoff/checks@0.2.0...@zgeoff/checks@0.2.1) (2026-10-20)
 
 ### Features
