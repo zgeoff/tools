@@ -27,7 +27,7 @@
     },
     "packages/bun-test-extended": {
       "name": "@zgeoff/bun-test-extended",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "dependencies": {
         "jest-extended": "catalog:",
         "jest-matcher-utils": "catalog:",
@@ -67,7 +67,7 @@
     },
     "packages/checks": {
       "name": "@zgeoff/checks",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "bin": {
         "zgeoff-check": "./dist/cli.js",
       },
@@ -111,7 +111,7 @@
     },
     "packages/kysely-bun-sqlite": {
       "name": "@zgeoff/kysely-bun-sqlite",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "devDependencies": {
         "@types/bun": "catalog:",
         "kysely": "catalog:",
@@ -134,7 +134,7 @@
     },
     "packages/oxlint-config": {
       "name": "@zgeoff/oxlint-config",
-      "version": "0.5.2",
+      "version": "0.6.0",
       "dependencies": {
         "@stylistic/eslint-plugin": "catalog:",
       },
@@ -157,7 +157,7 @@
     },
     "packages/skill-gate": {
       "name": "@zgeoff/skill-gate",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "dependencies": {
         "@zgeoff/std": "workspace:*",
         "ts-pattern": "catalog:",
@@ -170,7 +170,7 @@
     },
     "packages/std": {
       "name": "@zgeoff/std",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "devDependencies": {
         "@types/bun": "catalog:",
         "type-fest": "catalog:",

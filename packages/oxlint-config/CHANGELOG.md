@@ -2,15 +2,20 @@
 
 ## [0.6.0](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.5.2...@zgeoff/oxlint-config@0.6.0) (2026-10-20)
 
-
 ### ⚠ BREAKING CHANGES
 
-* **geo-1467:** a repo on this config fails lint on each type assertion other than as const until it removes the assertion or adds an approved disable comment. The kysely-bun-sqlite driver throws on a parameter that bun:sqlite would bind as NULL.
+- **geo-1467:** a repo on this config fails lint on each type assertion other than as const until it
+  removes the assertion or adds an approved disable comment. The kysely-bun-sqlite driver throws on
+  a parameter that bun:sqlite would bind as NULL.
 
 ### Features
 
-* **geo-1467:** add no-hidden-cast and lock both type-assertion rules ([#249](https://github.com/zgeoff/tools/issues/249)) ([2213b88](https://github.com/zgeoff/tools/commit/2213b8805bf121778b90d560a67fa2cb349d1f44))
-* **geo-1467:** ban every type assertion other than as const ([#246](https://github.com/zgeoff/tools/issues/246)) ([50bde87](https://github.com/zgeoff/tools/commit/50bde87bdf36327f5b2e1b4f4183faae9cd5e1ac))
+- **geo-1467:** add no-hidden-cast and lock both type-assertion rules
+  ([#249](https://github.com/zgeoff/tools/issues/249))
+  ([2213b88](https://github.com/zgeoff/tools/commit/2213b8805bf121778b90d560a67fa2cb349d1f44))
+- **geo-1467:** ban every type assertion other than as const
+  ([#246](https://github.com/zgeoff/tools/issues/246))
+  ([50bde87](https://github.com/zgeoff/tools/commit/50bde87bdf36327f5b2e1b4f4183faae9cd5e1ac))
 
 ## [0.5.2](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.5.1...@zgeoff/oxlint-config@0.5.2) (2026-10-19)
 
