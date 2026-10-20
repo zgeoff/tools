@@ -10,8 +10,6 @@ type Untagged<T> = T extends string
 
 type TagKey<T> = Exclude<keyof T, keyof Untagged<T>>;
 
-// type-fest's Tagged<string, 'UserID'> carries its tag under a key its base
-// lacks; a type with no tag, or a tag over a literal base, takes never
 type TaggedSource<T> = [TagKey<T>] extends [never]
   ? never
   : Untagged<T> & Pick<T, TagKey<T>> extends T
