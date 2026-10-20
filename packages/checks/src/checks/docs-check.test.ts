@@ -3,6 +3,7 @@ import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
+import { runChecks } from '../run-checks.ts';
 import { docsCheck } from './docs-check.ts';
 
 // A git repo in a temp folder, with the real docs scripts copied to where repo-sync puts them or
@@ -186,4 +187,28 @@ test('it names the repo-sync entry when the repo has no docs scripts', async () 
   expect(() =>
     docsCheck.check({ cwd: ctx.directory, files: ['README.md'], env: ctx.env }),
   ).toThrowWithMessage(Error, /Take the skill-docs-writing entry of repo-sync/u);
+});
+
+test('it reads every doc when the run lists only some of them', async () => {
+  const ctx = await setupTest('synced');
+
+  await ctx.writeDoc('README.md', '# Lantern\n\nLantern prints the time in each city you list.\n');
+  await ctx.writeDoc('docs/guide.md', '# Guide\n\nRead [the setup](setup.md) first.\n');
+
+  const findings = await runChecks({
+    cwd: ctx.directory,
+    checks: [docsCheck],
+    config: { off: new Map() },
+    files: ['README.md'],
+    env: ctx.env,
+  });
+
+  expect(findings).toStrictEqual([
+    {
+      check: 'docs',
+      path: 'docs/guide.md',
+      line: 3,
+      message: 'check-links: (setup.md) docs/setup.md does not exist',
+    },
+  ]);
 });
