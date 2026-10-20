@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/zgeoff/tools/compare/@zgeoff/bun-test-extended@0.2.0...@zgeoff/bun-test-extended@0.2.1) (2026-10-20)
+
+
+### Features
+
+* **geo-1467:** type bun's core asymmetric matchers as never ([#248](https://github.com/zgeoff/tools/issues/248)) ([ebd22cf](https://github.com/zgeoff/tools/commit/ebd22cf65d638a14a728398f20a3e0e008d00cb0))
+
 ## [0.2.0](https://github.com/zgeoff/tools/compare/@zgeoff/bun-test-extended@0.1.0...@zgeoff/bun-test-extended@0.2.0) (2026-10-11)
 
 ### ⚠ BREAKING CHANGES

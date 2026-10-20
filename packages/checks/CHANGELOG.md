@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.3](https://github.com/zgeoff/tools/compare/@zgeoff/checks@0.2.2...@zgeoff/checks@0.2.3) (2026-10-20)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/std bumped to 0.3.0
+
 ## [0.2.2](https://github.com/zgeoff/tools/compare/@zgeoff/checks@0.2.1...@zgeoff/checks@0.2.2) (2026-10-20)
 
 ### Features

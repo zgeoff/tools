@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.1](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.0...@zgeoff/skill-gate@0.2.1) (2026-10-20)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zgeoff/std bumped to 0.3.0
+
 ## [0.2.0](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.1.1...@zgeoff/skill-gate@0.2.0) (2026-10-19)
 
 ### ⚠ BREAKING CHANGES

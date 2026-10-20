@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/checks",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "One check runner for every zgeoff repo: zgeoff-check runs each check over the tracked files and prints one line per finding",
   "keywords": [
     "actionlint",
