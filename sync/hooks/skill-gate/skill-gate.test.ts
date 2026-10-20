@@ -82,6 +82,36 @@ test('it blocks a gated edit and names the load failure when the repo lacks @zge
   );
 });
 
+test('it blocks a gated edit to a path relative to cwd when the gate cannot load', async () => {
+  const ctx = await setupTest();
+
+  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
+
+  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await copyFile(ctx.hookPath, copiedHookPath);
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
+  );
+
+  const result = spawnSync('bun', [copiedHookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      cwd: join(ctx.directory, 'docs'),
+      transcript_path: join(ctx.directory, 'transcript.jsonl'),
+      tool_input: { file_path: 'guide.md' },
+    }),
+  });
+
+  expect(result.status).toBe(2);
+
+  expect(result.stderr).toContain(
+    `The skill gate cannot load, so it blocks this edit to ${join(ctx.directory, 'docs/guide.md')}: Cannot find package '@zgeoff/skill-gate'`,
+  );
+});
+
 test('it blocks a gated edit and names the load failure when a dependency of @zgeoff/skill-gate is missing', async () => {
   const ctx = await setupTest();
 
