@@ -316,3 +316,34 @@ test('it deletes a retired Markdown copy that lost a block the repo was excepted
   expect(result.stdout).toBe('.claude/skills/demo/SKILL.md\n');
   expect(existsSync(join(ctx.caller, '.claude/skills/demo/SKILL.md'))).toBeFalse();
 });
+
+test('it keeps a retired Markdown copy whose edit sits inside a kept block', async () => {
+  const ctx = await setupTest();
+
+  await writeToolsCommit(ctx.tools, {
+    'sync/skills/demo/SKILL.md':
+      '# Demo\n\n<!-- repo-sync needs ./go.md -->\n\nRead [Go](./go.md).\n\n<!-- repo-sync end -->\n\nThe end.\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-demo',
+        files: [{ source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' }],
+      },
+    ]),
+  });
+
+  await writeToolsCommit(ctx.tools, { 'sync/manifest.json': '[]' });
+
+  await writeFiles(ctx.caller, {
+    '.claude/skills/demo/SKILL.md':
+      '# Demo\n\n<!-- repo-sync needs ./go.md -->\n\nRead [Go](./go.md) before the repo notes.\n\n<!-- repo-sync end -->\n\nThe end.\n',
+  });
+
+  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, ''], {
+    cwd: ctx.caller,
+    encoding: 'utf8',
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+  expect(existsSync(join(ctx.caller, '.claude/skills/demo/SKILL.md'))).toBeTrue();
+});
