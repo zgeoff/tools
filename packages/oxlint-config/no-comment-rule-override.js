@@ -12,7 +12,7 @@ const noCommentRuleOverride = {
     type: 'problem',
     messages: {
       override:
-        '{{config}} sets {{rule}}. Delete the setting: every repo runs the comment rules as @zgeoff/oxlint-config ships them.',
+        '{{config}} sets {{rule}}. Delete the setting: every repo runs {{rule}} as @zgeoff/oxlint-config ships it.',
     },
     schema: [],
   },
@@ -45,14 +45,21 @@ export default noCommentRuleOverride;
 
 const configPattern = /^\.oxlintrc(?:\.[\w-]+)?\.jsonc?$/u;
 
-// every repo runs the comment rules exactly as this config ships them
-const lockedRules = ['zgeoff/no-jsdoc', 'zgeoff/max-consecutive-line-comments'];
+// every repo runs the comment rules and the type-assertion rules exactly as
+// this config ships them, each named here without its plugin prefix
+const lockedRules = [
+  'no-jsdoc',
+  'max-consecutive-line-comments',
+  'consistent-type-assertions',
+  'no-hidden-cast',
+];
 
-// a rule key, as opposed to the same text inside a comment or a string value
-const keyPatterns = lockedRules.map((rule) => ({
-  rule,
-  pattern: new RegExp(`"${rule}"\\s*:`, 'u'),
-}));
+// a rule key under any plugin prefix or none, since oxlint also reads
+// `@typescript-eslint/consistent-type-assertions` and the bare name, as
+// opposed to the same text inside a comment or a string value
+const keyPatterns = lockedRules.map(
+  (rule) => new RegExp(`"(?<key>(?:[^"/\\s]+/)?${rule})"\\s*:`, 'gu'),
+);
 
 function loadOverrides(root) {
   const configs = readdirSync(root).filter((name) => configPattern.test(name));
@@ -60,9 +67,11 @@ function loadOverrides(root) {
   return configs.flatMap((name) => {
     const text = buildCommentFreeText(readFileSync(join(root, name), 'utf8'));
 
-    return keyPatterns
-      .filter((entry) => entry.pattern.test(text))
-      .map((entry) => ({ config: name, rule: entry.rule }));
+    return keyPatterns.flatMap((pattern) => {
+      const keys = new Set(Array.from(text.matchAll(pattern), (match) => match.groups.key));
+
+      return [...keys].map((rule) => ({ config: name, rule }));
+    });
   });
 }
 

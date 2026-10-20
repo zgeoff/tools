@@ -2156,6 +2156,44 @@ test('it reports a comment rule set in a second repo config', async () => {
   );
 });
 
+test.each([
+  ['typescript/consistent-type-assertions'],
+  ['@typescript-eslint/consistent-type-assertions'],
+  ['consistent-type-assertions'],
+  ['zgeoff/no-hidden-cast'],
+])('it reports a repo config that sets the type-assertion rule %s', async (rule) => {
+  const extra = `{\n  "overrides": [{ "files": ["*.ts"], "rules": { "${rule}": "off" } }]\n}\n`;
+
+  const files = {
+    '.git': 'gitdir: elsewhere\n',
+    '.oxlintrc.casts.json': extra,
+    'sample.ts': 'export const value = 1;\n',
+  };
+
+  const result = await runLintTree(files, 'sample.ts', {
+    'zgeoff/no-comment-rule-override': 'error',
+  });
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude(`.oxlintrc.casts.json sets ${rule}`);
+});
+
+test('it ignores a rule whose name only ends in a locked rule name', async () => {
+  const extra = '{\n  "rules": { "acme/strict-no-hidden-cast": "off" }\n}\n';
+
+  const files = {
+    '.git': 'gitdir: elsewhere\n',
+    '.oxlintrc.extra.json': extra,
+    'sample.ts': 'export const value = 1;\n',
+  };
+
+  const result = await runLintTree(files, 'sample.ts', {
+    'zgeoff/no-comment-rule-override': 'error',
+  });
+
+  expect(result.exitCode).toBe(0);
+});
+
 test('it ignores a comment rule named only inside a config comment', async () => {
   const extra = '{\n  // "zgeoff/no-jsdoc": "off",\n  "rules": {}\n}\n';
 
@@ -2221,4 +2259,68 @@ test('it names the factory and the custom-error exception in its message', async
   expect(result.stdout).toInclude(
     'Build this with a factory function (`create<X>` or `make<X>`), not a class. Only a custom error may be a class: `class XError extends Error`.',
   );
+});
+
+const noHiddenCast = { 'zgeoff/no-hidden-cast': 'error' };
+
+test.each([
+  [
+    'a type argument on a sql tag',
+    'export const rows = sql<{ id: number }>`select id from plants`;\n',
+  ],
+  ['a type argument on a member sql tag', 'export const rows = db.sql<number>`select 1`;\n'],
+  ['$castTo', 'export const rows = query.$castTo<Plant>();\n'],
+  ['$narrowType', 'export const rows = query.$narrowType<{ name: string }>();\n'],
+  ['$assertType', 'export const rows = query.$assertType<Plant>();\n'],
+  ['a type argument on query()', "export const statement = sqlite.query<Plant, []>('select 1');\n"],
+  ['a type argument on prepare()', "export const statement = sqlite.prepare<Plant>('select 1');\n"],
+  ['a type argument on getObject()', "export const shape = config.getObject<Shape>('shape');\n"],
+  [
+    'a type argument on requireObject()',
+    "export const shape = new Config().requireObject<Shape>('shape');\n",
+  ],
+  [
+    'a type argument on getSecretObject()',
+    "export const key = config.getSecretObject<Key>('key');\n",
+  ],
+  [
+    'a type argument on requireSecretObject()',
+    "export const key = config.requireSecretObject<Key>('key');\n",
+  ],
+  ['a computed method name', "export const statement = sqlite['query']<Plant>('select 1');\n"],
+  ['an optional call', "export const statement = sqlite?.query<Plant>('select 1');\n"],
+])('it flags %s', async (_label, source) => {
+  const result = await runLint(source, false, noHiddenCast);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('zgeoff(no-hidden-cast)');
+});
+
+test.each([
+  ['a sql tag with no type argument', 'export const rows = sql`select id from plants`;\n'],
+  ['query() with no type argument', "export const statement = sqlite.query('select 1');\n"],
+  ['getObject() with no type argument', "export const shape = config.getObject('shape');\n"],
+  ['a type argument on another method', "export const rows = db.selectFrom<Plant>('plants');\n"],
+  ['an as const assertion', "export const sizes = ['small', 'large'] as const;\n"],
+  ['a satisfies check', "export const sizes = ['small', 'large'] satisfies string[];\n"],
+])('it accepts %s', async (_label, source) => {
+  const result = await runLint(source, false, noHiddenCast);
+
+  expect(result.stdout).not.toInclude('no-hidden-cast');
+});
+
+test('it tells a sql tag to read its result as unknown and parse it', async () => {
+  const result = await runLint('export const rows = sql<number>`select 1`;\n', false, noHiddenCast);
+
+  expect(result.stdout).toInclude('read the result as `unknown`, and parse it with zod');
+});
+
+test('it names the Kysely method that claims a type', async () => {
+  const result = await runLint(
+    'export const rows = query.$castTo<Plant>();\n',
+    false,
+    noHiddenCast,
+  );
+
+  expect(result.stdout).toInclude('`$castTo()` claims a type that Kysely never checks');
 });

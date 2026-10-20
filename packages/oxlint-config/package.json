@@ -25,6 +25,7 @@
     "no-class.js",
     "no-jsdoc.js",
     "no-comment-rule-override.js",
+    "no-hidden-cast.js",
     "test-beside-module.js",
     "no-file-snapshot.js",
     "setup-test-only.js",
