@@ -32,9 +32,10 @@ The package runs on Bun.
 
 ## Checks
 
-| Check   | Files     | It runs                        | It needs on the PATH  |
-| ------- | --------- | ------------------------------ | --------------------- |
-| `shell` | `**/*.sh` | `shellcheck -x` and `shfmt -d` | `shellcheck`, `shfmt` |
+| Check       | Files                            | It runs                        | It needs on the PATH  |
+| ----------- | -------------------------------- | ------------------------------ | --------------------- |
+| `shell`     | `**/*.sh`                        | `shellcheck -x` and `shfmt -d` | `shellcheck`, `shfmt` |
+| `workflows` | `.github/workflows/*.{yml,yaml}` | `actionlint`                   | `actionlint`          |
 
 The `shell` check runs `shfmt` with no style flags, so `shfmt` reads its style from the repo's
 `.editorconfig`. The `shfmt` finding sits at the first line of each block that `shfmt` would change.
@@ -42,6 +43,12 @@ The `shell` check runs `shfmt` with no style flags, so `shfmt` reads its style f
 script and then from the repo root. A sourced file is followed even when the run does not list it.
 The shared pull-request checks install `shfmt` when their list runs `check`, and the runner image
 already has `shellcheck`.
+
+The `workflows` check reads only the top of `.github/workflows`, because GitHub runs no workflow
+from a subfolder. `actionlint` reads its config from `.github/actionlint.yaml`, where a repo ignores
+an error message that the pinned release reports wrongly. `actionlint` also runs `shellcheck` on
+each `run:` script. The shared pull-request checks install a pinned `actionlint` when their list
+runs `check`.
 
 ## Exit codes
 

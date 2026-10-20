@@ -36,6 +36,19 @@ jobs:
           mkdir -p "$RUNNER_TEMP/shfmt-bin"
           install -m 0755 "$RUNNER_TEMP/shfmt.download" "$RUNNER_TEMP/shfmt-bin/shfmt"
           echo "$RUNNER_TEMP/shfmt-bin" >> "$GITHUB_PATH"
+      # The @zgeoff/checks tests run actionlint, which the runner image lacks.
+      # The step and its pin match the Setup actionlint step of bun-checks.yml.
+      - name: Setup actionlint
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/actionlint.tar.gz" "https://github.com/rhysd/actionlint/releases/download/v$ACTIONLINT_VERSION/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/actionlint-bin"
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/actionlint-bin" actionlint
+          echo "$RUNNER_TEMP/actionlint-bin" >> "$GITHUB_PATH"
       - run: bun run check:sync
       - run: bun run format:check
       - run: bun run lint:full

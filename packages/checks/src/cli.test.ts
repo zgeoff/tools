@@ -374,3 +374,42 @@ test('it reads the root config when it runs from a subfolder', async () => {
 
   expect(result.exitCode).toBe(0);
 });
+
+test('it exits 1 and prints the actionlint finding of a tracked workflow', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, '.github/workflows'), { recursive: true });
+
+  await writeFile(
+    join(ctx.directory, '.github/workflows/greet.yml'),
+    [
+      'on: push',
+      'jobs:',
+      '  greet:',
+      '    runs-on: ubuntu-latest',
+      '    needs: build',
+      '    steps:',
+      '      - run: echo "hello"',
+      '',
+    ].join('\n'),
+  );
+
+  await $`git add .github/workflows/greet.yml`.cwd(ctx.directory).env(ctx.env);
+
+  const result = await $`${process.execPath} ${ctx.cli}`
+    .cwd(ctx.directory)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      '.github/workflows/greet.yml:3: workflows: actionlint: job "greet" needs job "build" which does not exist in this workflow [job-needs]\n',
+    stderr: '',
+  });
+});
