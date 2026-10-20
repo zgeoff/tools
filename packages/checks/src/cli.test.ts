@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
@@ -471,6 +471,39 @@ test('it exits 1 and prints the actionlint finding of a tracked workflow', async
     exitCode: 1,
     stdout:
       '.github/workflows/greet.yml:3: workflows: actionlint: job "greet" needs job "build" which does not exist in this workflow [job-needs]\n',
+    stderr: '',
+  });
+});
+
+test('it exits 1 and prints the docs finding of a tracked README', async () => {
+  const ctx = await setupTest();
+
+  await cp(
+    join(import.meta.dir, '../../../sync/skills/docs-writing/scripts'),
+    join(ctx.directory, '.claude/skills/docs-writing/scripts'),
+    { recursive: true },
+  );
+
+  await writeFile(
+    join(ctx.directory, 'README.md'),
+    '# Lantern\n\nLantern shows a surface for each city.\n',
+  );
+
+  await $`git add README.md`.cwd(ctx.directory).env(ctx.env);
+
+  const result = await $`${process.execPath} ${ctx.cli}`
+    .cwd(ctx.directory)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: 'README.md:3: docs: check-prose: Banned words\n',
     stderr: '',
   });
 });

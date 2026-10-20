@@ -33,12 +33,13 @@ The package runs on Bun.
 
 ## Checks
 
-| Check         | Files                              | It runs                        | It needs on the PATH  |
-| ------------- | ---------------------------------- | ------------------------------ | --------------------- |
-| `shell`       | `**/*.sh`                          | `shellcheck -x` and `shfmt -d` | `shellcheck`, `shfmt` |
-| `workflows`   | `.github/workflows/*.{yml,yaml}`   | `actionlint`                   | `actionlint`          |
-| `commits`     | the branch's commits               | `commitlint`                   | `commitlint`          |
-| `local-paths` | the lines the branch's commits add | `git log -p`                   | `git`                 |
+| Check         | Files                              | It runs                             | It needs on the PATH  |
+| ------------- | ---------------------------------- | ----------------------------------- | --------------------- |
+| `shell`       | `**/*.sh`                          | `shellcheck -x` and `shfmt -d`      | `shellcheck`, `shfmt` |
+| `docs`        | `**/*.md`                          | `check-length.sh`, `check-links.sh` | `bash`, `perl`        |
+| `workflows`   | `.github/workflows/*.{yml,yaml}`   | `actionlint`                        | `actionlint`          |
+| `commits`     | the branch's commits               | `commitlint`                        | `commitlint`          |
+| `local-paths` | the lines the branch's commits add | `git log -p`                        | `git`                 |
 
 The `shell` check runs `shfmt` with no style flags, so `shfmt` reads its style from the repo's
 `.editorconfig`. The `shfmt` finding sits at the first line of each block that `shfmt` would change.
@@ -46,6 +47,16 @@ The `shell` check runs `shfmt` with no style flags, so `shfmt` reads its style f
 script and then from the repo root. A sourced file is followed even when the run does not list it.
 The shared pull-request checks install `shfmt` when their list runs `check`, and the runner image
 already has `shellcheck`.
+
+The `docs` check runs the scripts of the docs-writing skill from the repo's own copy in
+`.claude/skills/docs-writing/scripts/`, which repo-sync delivers with the skill, or from
+`sync/skills/docs-writing/scripts/` in tools. `check-length.sh` checks each README against its line
+limit, then runs `check-prose.sh`, and `check-skill.sh` when the repo has the skill-writing skill.
+`check-links.sh` checks each relative link. Each script picks the docs it reads, so a list of files
+decides only whether the check runs, and the scripts then read every doc. Only a problem that fails
+a script becomes a finding, never a warning or a prose candidate. A README over its limit and a
+problem in a skill's frontmatter sit at line 1. In a repo without the scripts the run exits 2, until
+the repo takes the `skill-docs-writing` entry of repo-sync or turns the check off.
 
 The `workflows` check reads only the top of `.github/workflows`, because GitHub runs no workflow
 from a subfolder. `actionlint` reads its config from `.github/actionlint.yaml`, where a repo ignores

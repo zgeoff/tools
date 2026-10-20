@@ -6,6 +6,7 @@
     "actionlint",
     "check",
     "commitlint",
+    "docs",
     "lint",
     "local-paths",
     "shellcheck",
