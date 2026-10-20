@@ -231,3 +231,26 @@ test('it reports nothing for a file that the branch only renames', async () => {
 
   expect(findings).toStrictEqual([]);
 });
+
+test('it reads no home directory when HOME is the root folder', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  await writeFile(join(ctx.directory, 'greet.txt'), 'docs: https://example.com/greeting\n');
+
+  await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'feat: add the greeting'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = await localPathsCheck.check({
+    cwd: ctx.directory,
+    base: baseText.trim(),
+    env: { ...ctx.env, HOME: '/' },
+  });
+
+  expect(findings).toStrictEqual([]);
+});
