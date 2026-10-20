@@ -209,3 +209,25 @@ test('it reports a line that a later commit of the branch removes', async () => 
     },
   ]);
 });
+
+test('it reports nothing for a file that the branch only renames', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'greet.txt'), `cache: ${ctx.directory}/.cache/greeting\n`);
+
+  await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'feat: add the greeting'}`.cwd(ctx.directory).env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  await $`git mv greet.txt welcome.txt`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'refactor: rename the greeting'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = await localPathsCheck.check({
+    cwd: ctx.directory,
+    base: baseText.trim(),
+    env: ctx.env,
+  });
+
+  expect(findings).toStrictEqual([]);
+});
