@@ -28,15 +28,18 @@ async function setupTest() {
   };
 
   await $`git init --quiet`.cwd(directory).env(env);
-  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`.cwd(directory).env(env);
 
-  const baseText = await $`git rev-parse HEAD`.cwd(directory).env(env).text();
-
-  return { directory, env, host, base: baseText.trim() };
+  return { directory, env, host };
 }
 
 test('it passes a branch whose added lines hold no local path', async () => {
   const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
 
   await writeFile(
     join(ctx.directory, 'greet.txt'),
@@ -48,7 +51,7 @@ test('it passes a branch whose added lines hold no local path', async () => {
 
   const findings = await localPathsCheck.check({
     cwd: ctx.directory,
-    base: ctx.base,
+    base: baseText.trim(),
     env: ctx.env,
   });
 
@@ -57,6 +60,12 @@ test('it passes a branch whose added lines hold no local path', async () => {
 
 test('it reports an added line that holds the home directory at its path and line', async () => {
   const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
 
   await writeFile(
     join(ctx.directory, 'greet.txt'),
@@ -70,7 +79,7 @@ test('it reports an added line that holds the home directory at its path and lin
 
   const findings = await localPathsCheck.check({
     cwd: ctx.directory,
-    base: ctx.base,
+    base: baseText.trim(),
     env: ctx.env,
   });
 
@@ -86,6 +95,12 @@ test('it reports an added line that holds the home directory at its path and lin
 test('it reports an added line that holds the host name as a whole word', async () => {
   const ctx = await setupTest();
 
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
   await writeFile(join(ctx.directory, 'greet.txt'), `built on ${ctx.host}, at noon\n`);
 
   await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
@@ -95,7 +110,7 @@ test('it reports an added line that holds the host name as a whole word', async 
 
   const findings = await localPathsCheck.check({
     cwd: ctx.directory,
-    base: ctx.base,
+    base: baseText.trim(),
     env: ctx.env,
   });
 
@@ -111,6 +126,12 @@ test('it reports an added line that holds the host name as a whole word', async 
 test('it passes the host name inside a longer word', async () => {
   const ctx = await setupTest();
 
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
   await writeFile(join(ctx.directory, 'greet.txt'), `the ${ctx.host}_backup and x${ctx.host}\n`);
 
   await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
@@ -118,7 +139,7 @@ test('it passes the host name inside a longer word', async () => {
 
   const findings = await localPathsCheck.check({
     cwd: ctx.directory,
-    base: ctx.base,
+    base: baseText.trim(),
     env: ctx.env,
   });
 
@@ -157,6 +178,12 @@ test('it reads only the lines the branch adds, not the lines it keeps or removes
 test('it reports a line that a later commit of the branch removes', async () => {
   const ctx = await setupTest();
 
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
   await writeFile(join(ctx.directory, 'greet.txt'), `cache: ${ctx.directory}/.cache/greeting\n`);
 
   await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
@@ -170,7 +197,7 @@ test('it reports a line that a later commit of the branch removes', async () => 
 
   const findings = await localPathsCheck.check({
     cwd: ctx.directory,
-    base: ctx.base,
+    base: baseText.trim(),
     env: ctx.env,
   });
 
