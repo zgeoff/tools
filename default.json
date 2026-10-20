@@ -67,6 +67,13 @@
       "schedule": ["* 0-5 * * 1"]
     },
     {
+      "description": "TanStack router packages, React Start among them, ship together, so their patch and minor bumps stay in Renovate's monorepo group. The rule sits after the patch rule, which would otherwise take their patch bumps. The group opens at any time, as a minor bump does.",
+      "extends": ["monorepo:tanstack-router"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "tanstack-router monorepo",
+      "schedule": ["at any time"]
+    },
+    {
       "description": "Dev-tool minor bumps go in one weekly PR. Their patch bumps go in the patch group.",
       "matchPackageNames": [
         "@commitlint/**",
