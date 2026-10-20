@@ -461,17 +461,40 @@ test('it gives a caller that passes no time limit the synced caller fallback', a
   });
 });
 
-test('it checks out the full history, so the branch checks find the base branch', async () => {
+test('it checks out the full history without the file contents, so the branch checks and the scan find every commit', async () => {
   const text = await readFile(join(import.meta.dir, 'bun-checks.yml'), 'utf8');
 
   const workflow: unknown = Bun.YAML.parse(text);
 
   const checkout: unknown = expect.objectContaining({
     name: 'Checkout',
-    with: { 'fetch-depth': 0 },
+    with: { 'fetch-depth': 0, filter: 'blob:none' },
   });
 
   const steps: unknown = expect.arrayContaining([checkout]);
 
-  expect(workflow).toMatchObject({ jobs: { checks: { steps } } });
+  expect(workflow).toMatchObject({ jobs: { gitleaks: { steps }, checks: { steps } } });
+});
+
+test('it restores the install cache keyed on the lockfile, or the newest older cache for the runner OS, before it installs', async () => {
+  const text = await readFile(join(import.meta.dir, 'bun-checks.yml'), 'utf8');
+
+  const workflow: unknown = Bun.YAML.parse(text);
+
+  const cache: unknown = expect.objectContaining({
+    name: 'Cache bun install',
+    with: expect.objectContaining({
+      path: '~/.bun/install/cache',
+      key: `bun-install-\${{ runner.os }}-\${{ hashFiles('bun.lock') }}`,
+      'restore-keys': `bun-install-\${{ runner.os }}-`,
+    }),
+  });
+
+  const install: unknown = expect.objectContaining({ name: 'Install' });
+
+  expect(workflow).toMatchObject({
+    jobs: { checks: { steps: expect.arrayContaining([cache, install]) } },
+  });
+
+  expect(text.indexOf('- name: Cache bun install')).toBeLessThan(text.indexOf('- name: Install'));
 });
