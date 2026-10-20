@@ -1007,6 +1007,31 @@ test('it passes a banned word in a code span or a code block', async () => {
   expect(result.stdout).not.toInclude('Banned words');
 });
 
+test('it passes a banned word in a code span that opens with a run of backticks', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText(
+    'guide.md',
+    '# Guide\n\nRun the ``lint-seams`` check, then ``echo `seams` `` and ```seams```.\n',
+  );
+
+  const result = ctx.run('guide.md');
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).not.toInclude('Banned words');
+});
+
+test('it reports a banned word after a backtick run that nothing closes', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', '# Guide\n\nThe ``lint` check covers the seams.\n');
+
+  const result = ctx.run('guide.md');
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('guide.md:3:The ``lint` check covers the seams.');
+});
+
 test('it reports a banned word in prose beside a code span', async () => {
   const ctx = await setupTest();
 

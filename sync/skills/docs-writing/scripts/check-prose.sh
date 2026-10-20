@@ -97,6 +97,37 @@ report 'Banned words:' \
   "$(
     grep_docs -nPi "$banned_words" -- "$@" ':(exclude)*.md' ':(exclude)AGENTS.md' ':(exclude)agents'
     list_markdown "$@" ':(exclude)AGENTS.md' ':(exclude)agents' | xargs -0 -r awk "$fence_awk"'
+    # Replaces each code span with a space. As in CommonMark, a span closes at the next backtick run
+    # as long as the one that opens it, and a run that nothing closes stays as text.
+    function strip_spans(s, out, start, n, rest, r, off, closed) {
+      out = ""
+      while (match(s, /`+/)) {
+        start = RSTART
+        n = RLENGTH
+        out = out substr(s, 1, start - 1)
+        rest = substr(s, start + n)
+        r = rest
+        off = 0
+        closed = 0
+        while (match(r, /`+/)) {
+          if (RLENGTH == n) {
+            closed = 1
+            off += RSTART
+            break
+          }
+          off += RSTART + RLENGTH - 1
+          r = substr(r, RSTART + RLENGTH)
+        }
+        if (closed) {
+          out = out " "
+          s = substr(rest, off + n)
+        } else {
+          out = out substr(s, start, n)
+          s = rest
+        }
+      }
+      return out s
+    }
     {
       m = fence_marker($0)
       if (m != "") {
@@ -108,7 +139,7 @@ report 'Banned words:' \
       if (open != "") next
       text = $0
       gsub(/\037/, "", text)
-      gsub(/`[^`]*`/, " ", text)
+      text = strip_spans(text)
       print text "\037" file_name()":"FNR":"$0
     }' | grep -aPi "^[^\\x1f]*(?:$banned_words)" | cut -d $'\037' -f 2-
   )"
