@@ -1,0 +1,8 @@
+{
+  "off": [
+    {
+      "check": "docs",
+      "reason": "three READMEs are over their line limits and one has a role-label heading; the check turns on once they are cut"
+    }
+  ]
+}
