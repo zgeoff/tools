@@ -30,7 +30,9 @@
   },
   "devDependencies": {
     "@types/bun": "catalog:",
-    "typescript": "catalog:"
+    "type-fest": "catalog:",
+    "typescript": "catalog:",
+    "xstate": "catalog:"
   },
   "engines": {
     "bun": ">=1.3"
