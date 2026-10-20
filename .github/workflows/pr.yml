@@ -16,8 +16,10 @@ jobs:
     uses: ./.github/workflows/bun-checks.yml
     with:
       scripts: check:sync format:check lint:full typecheck test test:workflows check
-      # The @zgeoff/checks tests and the check script run shfmt.
+      # The @zgeoff/checks tests run shfmt and actionlint, in the test job,
+      # which does not run the check script.
       setup-shfmt: true
+      setup-actionlint: true
 
   # Validates the shared Renovate preset as a repo config, which is how each
   # repo's renovate.json loads it. The validator takes its version from
