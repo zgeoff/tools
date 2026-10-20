@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.1](https://github.com/zgeoff/tools/compare/@zgeoff/checks@0.2.0...@zgeoff/checks@0.2.1) (2026-10-20)
+
+### Features
+
+- **geo-1311:** add a workflows check that runs actionlint
+  ([#238](https://github.com/zgeoff/tools/issues/238))
+  ([4e90068](https://github.com/zgeoff/tools/commit/4e90068397b1e2b11969fc1cd8e7dfb40211c6e8))
+- **geo-1312:** add a commits check that runs commitlint
+  ([#239](https://github.com/zgeoff/tools/issues/239))
+  ([9329ed7](https://github.com/zgeoff/tools/commit/9329ed727023214e9885fbd6d237987d3ca7a7fc))
+- **geo-1313:** add a local-paths check for home and host leaks
+  ([#241](https://github.com/zgeoff/tools/issues/241))
+  ([13a0010](https://github.com/zgeoff/tools/commit/13a00106a17031a89cfa3701e7630263ef50ba4a))
+
 ## [0.2.0](https://github.com/zgeoff/tools/compare/@zgeoff/checks@0.1.1...@zgeoff/checks@0.2.0) (2026-10-19)
 
 ### ⚠ BREAKING CHANGES
