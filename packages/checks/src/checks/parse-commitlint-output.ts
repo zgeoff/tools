@@ -1,9 +1,6 @@
 import type { ProgramResult } from '../run-program.ts';
 import type { Finding } from '../types.ts';
 
-// Turns one commitlint run over the message of the commit `hash` into findings, one per problem,
-// each at line 1 of the commit. A run that did not lint the message throws instead, so the caller
-// never reads it as a clean result.
 export function parseCommitlintOutput(hash: string, result: ProgramResult): Finding[] {
   // The default formatter: `✖   subject may not be empty [subject-empty]`. The summary line,
   // `✖   found 1 problems, 0 warnings`, ends with no rule name.
