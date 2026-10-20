@@ -89,11 +89,15 @@ test('it throws with the reason when check-length exits on a bad argument', () =
   );
 });
 
-test('it throws when check-length fails and prints no problem it can read', () => {
+test('it throws with what check-length printed when it fails and prints no problem it can read', () => {
   expect(() =>
-    parseCheckLengthOutput({ exitCode: 1, stdout: 'something went wrong\n', stderr: '' }),
+    parseCheckLengthOutput({
+      exitCode: 1,
+      stdout: 'README.md: 40 lines (plain repo README; target 50, limit 60)\n\n',
+      stderr: 'bash: check-prose.sh: No such file or directory\n',
+    }),
   ).toThrowWithMessage(
     Error,
-    'docs: check-length failed, and it printed no problem the check can read:\nsomething went wrong',
+    'docs: check-length failed, and it printed no problem the check can read:\nREADME.md: 40 lines (plain repo README; target 50, limit 60)\nbash: check-prose.sh: No such file or directory',
   );
 });

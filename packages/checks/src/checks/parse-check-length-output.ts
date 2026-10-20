@@ -20,7 +20,13 @@ export function parseCheckLengthOutput(result: ProgramResult): Finding[] {
   // format, so the check stops instead of passing it.
   if (findings.length === 0) {
     throw new Error(
-      `docs: check-length failed, and it printed no problem the check can read:\n${result.stdout.trim()}`,
+      `docs: check-length failed, and it printed no problem the check can read:\n${[
+        result.stdout,
+        result.stderr,
+      ]
+        .map((text) => text.trim())
+        .filter((text) => text !== '')
+        .join('\n')}`,
     );
   }
 
