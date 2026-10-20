@@ -5,6 +5,7 @@
   "keywords": [
     "actionlint",
     "check",
+    "commitlint",
     "lint",
     "shellcheck",
     "shfmt"
@@ -32,7 +33,9 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "gunshi": "catalog:"
+    "@zgeoff/commitlint-config": "workspace:*",
+    "gunshi": "catalog:",
+    "ts-pattern": "catalog:"
   },
   "devDependencies": {
     "@types/bun": "catalog:",

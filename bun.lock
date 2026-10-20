@@ -5,6 +5,7 @@
     "": {
       "name": "tools",
       "devDependencies": {
+        "@commitlint/cli": "catalog:",
         "@tsconfig/strictest": "catalog:",
         "@types/bun": "catalog:",
         "@zgeoff/bun-test-extended": "workspace:*",
@@ -71,7 +72,9 @@
         "zgeoff-check": "./dist/cli.js",
       },
       "dependencies": {
+        "@zgeoff/commitlint-config": "workspace:*",
         "gunshi": "catalog:",
+        "ts-pattern": "catalog:",
       },
       "devDependencies": {
         "@types/bun": "catalog:",

@@ -1,11 +1,12 @@
 import { runProgram } from '../run-program.ts';
-import type { Check, CheckContext, Finding } from '../types.ts';
+import type { CheckContext, FileCheck, Finding } from '../types.ts';
 import { parseShellcheckOutput } from './parse-shellcheck-output.ts';
 import { parseShfmtOutput } from './parse-shfmt-output.ts';
 
 // shellcheck and `shfmt -d` over every shell script. shfmt runs with no style flags, so it reads
 // the repo's .editorconfig.
-export const shellCheck: Check = {
+export const shellCheck: FileCheck = {
+  kind: 'files',
   name: 'shell',
   glob: '**/*.sh',
   check: checkShellFiles,

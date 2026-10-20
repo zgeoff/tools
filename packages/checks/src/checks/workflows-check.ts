@@ -1,10 +1,11 @@
 import { runProgram } from '../run-program.ts';
-import type { Check, CheckContext, Finding } from '../types.ts';
+import type { CheckContext, FileCheck, Finding } from '../types.ts';
 import { parseActionlintOutput } from './parse-actionlint-output.ts';
 
 // actionlint over each workflow file. GitHub reads workflows only from the top of
 // .github/workflows, so the glob leaves out subfolders.
-export const workflowsCheck: Check = {
+export const workflowsCheck: FileCheck = {
+  kind: 'files',
   name: 'workflows',
   glob: '.github/workflows/*.{yml,yaml}',
   check: checkWorkflowFiles,

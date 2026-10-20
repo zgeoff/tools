@@ -1,13 +1,14 @@
 # @zgeoff/checks
 
 `zgeoff-check` runs the checks that every zgeoff repo shares, so a repo runs them with one package
-script instead of a lint script of its own. Each check is a module with a name, a file glob, and a
-function that returns findings. The runner prints each finding as `path:line: <check>: <message>`
-and exits 1 when it prints any. With no arguments it checks every file that git tracks, and with a
-list of files it checks only those. It runs from any folder in the repo: it reads the config at the
-repo root, prints each path from the root, and reads a file argument from the folder it runs in. It
-skips a listed file that does not exist, such as one the branch deletes, so a misspelled path checks
-nothing.
+script instead of a lint script of its own. Each check is a module with a name and a function that
+returns findings. A file check also has a file glob, and a branch check reads the commits of the
+branch instead of files. The runner prints each finding as `path:line: <check>: <message>` and exits
+1 when it prints any. With no arguments the file checks read every file that git tracks, and with a
+list of files they read only those. The branch checks run in both cases. It runs from any folder in
+the repo: it reads the config at the repo root, prints each path from the root, and reads a file
+argument from the folder it runs in. It skips a listed file that does not exist, such as one the
+branch deletes, so a misspelled path checks nothing.
 
 ## Install
 
@@ -36,6 +37,7 @@ The package runs on Bun.
 | ----------- | -------------------------------- | ------------------------------ | --------------------- |
 | `shell`     | `**/*.sh`                        | `shellcheck -x` and `shfmt -d` | `shellcheck`, `shfmt` |
 | `workflows` | `.github/workflows/*.{yml,yaml}` | `actionlint`                   | `actionlint`          |
+| `commits`   | the branch's commits             | `commitlint`                   | `commitlint`          |
 
 The `shell` check runs `shfmt` with no style flags, so `shfmt` reads its style from the repo's
 `.editorconfig`. The `shfmt` finding sits at the first line of each block that `shfmt` would change.
@@ -50,15 +52,32 @@ an error message that the pinned release reports wrongly. `actionlint` also runs
 each `run:` script. The shared pull-request checks install a pinned `actionlint` when their list
 runs `check`.
 
+## Branch checks
+
+A branch check reads the commits from the branch's base to HEAD. The base is the merge base of HEAD
+and origin's default branch, which `origin/HEAD` names, or `origin/main` when origin has no HEAD.
+The run exits 2 when git finds no base, so a clone without the default branch never passes
+unchecked. The shared pull-request checks fetch the full history for this. A repo with its own CI
+checks out with `fetch-depth: 0`.
+
+The `commits` check runs `commitlint` on the message of each commit except merge commits. It passes
+the rules of `@zgeoff/commitlint-config` with `--config`, so a `commitlint.config.js` in the repo
+has no effect. Each finding prints the commit's short hash as its path and 1 as its line. The repo
+installs `commitlint`, which `bun run` puts on the PATH:
+
+```sh
+bun add -d @commitlint/cli
+```
+
 ## Exit codes
 
 - `0`: no check found a problem.
 - `1`: a check found at least one problem.
 - `2`: the run could not finish, so the runner prints the reason and no findings, even when some
   checks found problems before it stopped. That happens when the config file breaks a rule, a check
-  needs a program that the PATH lacks, git or a check's program fails, a listed file cannot be read
-  for a reason other than being absent, or the command line holds an unknown option or `--help` with
-  files.
+  needs a program that the PATH lacks, a branch check finds no base, git or a check's program fails,
+  a listed file cannot be read for a reason other than being absent, or the command line holds an
+  unknown option or `--help` with files.
 
 ## Turning a check off
 

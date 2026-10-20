@@ -460,3 +460,18 @@ test('it gives a caller that passes no time limit the synced caller fallback', a
     },
   });
 });
+
+test('it checks out the full history, so the branch checks find the base branch', async () => {
+  const text = await readFile(join(import.meta.dir, 'bun-checks.yml'), 'utf8');
+
+  const workflow: unknown = Bun.YAML.parse(text);
+
+  const checkout: unknown = expect.objectContaining({
+    name: 'Checkout',
+    with: { 'fetch-depth': 0 },
+  });
+
+  const steps: unknown = expect.arrayContaining([checkout]);
+
+  expect(workflow).toMatchObject({ jobs: { checks: { steps } } });
+});

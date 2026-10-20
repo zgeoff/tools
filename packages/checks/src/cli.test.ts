@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 
 // A git repo in a temp folder, and the entry module that zgeoff-check runs. Every process gets a
-// clean environment, so a GIT_DIR that a pre-push hook exports cannot point git at this repo.
+// clean environment, so a GIT_DIR that a pre-push hook exports cannot point git at this repo. An
+// empty first commit stands for origin's default branch, so the branch has a base and no commits.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'zgeoff-check-'));
 
@@ -16,9 +17,15 @@ async function setupTest() {
     HOME: directory,
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
+    GIT_AUTHOR_NAME: 'Test Author',
+    GIT_AUTHOR_EMAIL: 'author@example.com',
+    GIT_COMMITTER_NAME: 'Test Author',
+    GIT_COMMITTER_EMAIL: 'author@example.com',
   };
 
   await $`git init --quiet`.cwd(directory).env(env);
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`.cwd(directory).env(env);
+  await $`git update-ref refs/remotes/origin/main HEAD`.cwd(directory).env(env);
 
   return { directory, env, cli: join(import.meta.dir, 'cli.ts') };
 }
@@ -373,6 +380,60 @@ test('it reads the root config when it runs from a subfolder', async () => {
     .quiet();
 
   expect(result.exitCode).toBe(0);
+});
+
+test('it exits 1 and prints each problem of a commit that is not a Conventional Commit at its hash', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'tidy up'}`.cwd(ctx.directory).env(ctx.env);
+
+  const hash = await $`git rev-parse --short HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  // `bun run check` puts the repo's node_modules/.bin, which holds commitlint, on the PATH.
+  const bin = join(import.meta.dir, '../../../node_modules/.bin');
+
+  const result = await $`${process.execPath} ${ctx.cli}`
+    .cwd(ctx.directory)
+    .env({ ...ctx.env, PATH: `${bin}:${ctx.env.PATH}` })
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: [
+      `${hash.trim()}:1: commits: commitlint: subject may not be empty [subject-empty]`,
+      `${hash.trim()}:1: commits: commitlint: type may not be empty [type-empty]`,
+      '',
+    ].join('\n'),
+    stderr: '',
+  });
+});
+
+test('it exits 2 with the reason when the branch has no base', async () => {
+  const ctx = await setupTest();
+
+  await $`git update-ref -d refs/remotes/origin/main`.cwd(ctx.directory).env(ctx.env);
+
+  const result = await $`${process.execPath} ${ctx.cli}`
+    .cwd(ctx.directory)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr:
+      'zgeoff-check: cannot find the base of this branch: no merge base between HEAD and origin/main (is the remote fetched?)\n',
+  });
 });
 
 test('it exits 1 and prints the actionlint finding of a tracked workflow', async () => {

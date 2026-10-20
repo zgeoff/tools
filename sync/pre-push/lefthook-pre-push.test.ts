@@ -13,8 +13,9 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
+  // The workspace's node_modules/.bin holds the commitlint that zgeoff-check's commits check runs.
   const env = {
-    PATH: process.env['PATH'],
+    PATH: `${join(import.meta.dir, '../../node_modules/.bin')}:${process.env['PATH']}`,
     HOME: directory,
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
@@ -32,7 +33,7 @@ async function setupTest() {
     .env(env);
 
   await $`git init --quiet --initial-branch=main ${main}`.cwd(directory).env(env);
-  await $`git commit --quiet --allow-empty -m start`.cwd(main).env(env);
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`.cwd(main).env(env);
   await $`git remote add origin ${join(directory, 'upstream.git')}`.cwd(main).env(env);
   await $`git push --quiet -u origin main`.cwd(main).env(env);
   await $`git worktree add --quiet -b feature ${worktree}`.cwd(main).env(env);
@@ -70,7 +71,7 @@ test('it leaves the main checkout non-bare when the test job runs in a pre-push 
   );
 
   await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
-  await $`git commit --quiet -m fixture`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
 
   await writeFile(
     join(ctx.main, '.git/hooks/pre-push'),
@@ -107,7 +108,7 @@ test('it passes the push with a notice when the repo has no check script', async
   );
 
   await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
-  await $`git commit --quiet -m fixture`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
 
   await writeFile(
     join(ctx.main, '.git/hooks/pre-push'),
@@ -146,7 +147,7 @@ test('it fails the push when zgeoff-check finds a problem in a file the branch c
   );
 
   await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
-  await $`git commit --quiet -m fixture`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
 
   await writeFile(
     join(ctx.main, '.git/hooks/pre-push'),
@@ -185,7 +186,7 @@ test('it passes the push when only a file the branch leaves unchanged fails zgeo
   );
 
   await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
-  await $`git commit --quiet -m fixture`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
 
   await writeFile(
     join(ctx.main, '.git/hooks/pre-push'),
@@ -222,7 +223,7 @@ test('it passes the push when the branch changes a clean file whose name starts 
   );
 
   await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
-  await $`git commit --quiet -m fixture`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
 
   await writeFile(
     join(ctx.main, '.git/hooks/pre-push'),
@@ -263,7 +264,7 @@ test('it forwards every file the branch changes to zgeoff-check when the branch 
   );
 
   await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
-  await $`git commit --quiet -m fixture`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
 
   await writeFile(
     join(ctx.main, '.git/hooks/pre-push'),

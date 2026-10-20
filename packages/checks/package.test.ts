@@ -19,6 +19,10 @@ async function setupTest() {
     HOME: process.env['HOME'],
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
+    GIT_AUTHOR_NAME: 'Test Author',
+    GIT_AUTHOR_EMAIL: 'author@example.com',
+    GIT_COMMITTER_NAME: 'Test Author',
+    GIT_COMMITTER_EMAIL: 'author@example.com',
   };
 
   const unpacked = join(directory, 'unpacked');
@@ -57,18 +61,31 @@ async function setupTest() {
 
   invariant(tarball !== undefined && extra.length === 0, 'bun pm pack must write one tarball');
 
+  // The repo installs commitlint itself, at the version the workspace pins.
+  const commitlintVersion =
+    await $`${join(import.meta.dir, '../../node_modules/.bin/commitlint')} --version`
+      .env(env)
+      .text();
+
   await writeFile(
     join(project, 'package.json'),
     JSON.stringify({
       name: 'project',
       private: true,
       scripts: { check: 'zgeoff-check' },
-      devDependencies: { '@zgeoff/checks': `file:${join(packed, tarball)}` },
+      devDependencies: {
+        '@commitlint/cli': commitlintVersion.trim().replace('@commitlint/cli@', ''),
+        '@zgeoff/checks': `file:${join(packed, tarball)}`,
+      },
     }),
   );
 
   await $`bun install`.cwd(project).env(env).quiet();
   await $`git init --quiet`.cwd(project).env(env);
+
+  // An empty first commit stands for origin's default branch, so the branch has a base.
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`.cwd(project).env(env);
+  await $`git update-ref refs/remotes/origin/main HEAD`.cwd(project).env(env);
 
   return { project, env };
 }
@@ -99,4 +116,22 @@ test('it exits 1 through the installed bin and prints the finding for an unquote
   expect(result.stdout.toString()).toBe(
     'unquoted.sh:2: shell: shellcheck note: Double quote to prevent globbing and word splitting. [SC2086]\n',
   );
+});
+
+test('it exits 1 through the installed bin and prints the problems of a commit that is not a Conventional Commit', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'tidy up'}`.cwd(ctx.project).env(ctx.env);
+
+  const hash = await $`git rev-parse --short HEAD`.cwd(ctx.project).env(ctx.env).text();
+  const result = await $`bun run check`.cwd(ctx.project).env(ctx.env).nothrow().quiet();
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 1,
+    stdout: [
+      `${hash.trim()}:1: commits: commitlint: subject may not be empty [subject-empty]`,
+      `${hash.trim()}:1: commits: commitlint: type may not be empty [type-empty]`,
+      '',
+    ].join('\n'),
+  });
 });

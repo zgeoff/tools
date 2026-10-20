@@ -52,6 +52,7 @@
     "check": "bun packages/checks/src/cli.ts"
   },
   "devDependencies": {
+    "@commitlint/cli": "catalog:",
     "@tsconfig/strictest": "catalog:",
     "@types/bun": "catalog:",
     "@zgeoff/bun-test-extended": "workspace:*",
