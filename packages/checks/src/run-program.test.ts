@@ -38,3 +38,16 @@ test('it throws MissingProgramError when the PATH lacks the program', async () =
     'demo: shellcheck is not on the PATH, and the demo check needs it. Install shellcheck, then run zgeoff-check again.',
   );
 });
+
+test('it hands the program its stdin when one is given', async () => {
+  const ctx = await setupTest();
+
+  const result = runProgram(
+    'demo',
+    { cwd: ctx.directory, env: process.env },
+    ['cat'],
+    'feat: add the greeting\n',
+  );
+
+  expect(result).toStrictEqual({ exitCode: 0, stdout: 'feat: add the greeting\n', stderr: '' });
+});

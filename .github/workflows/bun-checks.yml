@@ -76,8 +76,12 @@ jobs:
       # CI never commits; skip hook install and execution.
       LEFTHOOK: 0
     steps:
+      # The full history gives the branch checks of zgeoff-check the base
+      # branch and every commit since it; a shallow clone has neither.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         if: inputs.node-version != ''

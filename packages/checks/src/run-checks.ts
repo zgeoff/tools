@@ -1,6 +1,8 @@
 import { statSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
+import { match } from 'ts-pattern';
 import type { CheckConfig } from './load-config.ts';
+import { runGitMergeBase } from './run-git-merge-base.ts';
 import type { Check, Finding } from './types.ts';
 
 export interface RunChecksOptions {
@@ -20,8 +22,9 @@ export interface CheckFinding extends Finding {
   readonly check: string;
 }
 
-// Runs each check that the config leaves on over the files that match its glob, and returns every
-// finding, sorted by path and line within each check.
+// Runs each check that the config leaves on: a file check over the files that match its glob, and a
+// branch check over the commits since the branch's base. It returns every finding, sorted by path
+// and line within each check.
 export async function runChecks(options: Readonly<RunChecksOptions>): Promise<CheckFinding[]> {
   const files = (options.files ?? runGitLsFiles(options))
     .map((file) => toRepoPath(options.cwd, file))
@@ -29,20 +32,30 @@ export async function runChecks(options: Readonly<RunChecksOptions>): Promise<Ch
 
   const findings: CheckFinding[] = [];
 
+  // The base is found once, and only when a branch check is on, so a repo that turns every branch
+  // check off runs without a fetched remote.
+  let base: string | undefined;
+  const readBranchBase = () => (base ??= runGitMergeBase(options.cwd, options.env));
+
   for (const check of options.checks) {
     if (options.config.off.has(check.name)) {
       continue;
     }
 
-    const glob = new Bun.Glob(check.glob);
+    const checkFindings = await match(check)
+      .with({ kind: 'files' }, (fileCheck) => {
+        const glob = new Bun.Glob(fileCheck.glob);
 
-    const matched = files.filter((file) => glob.match(file));
+        const matched = files.filter((file) => glob.match(file));
 
-    if (matched.length === 0) {
-      continue;
-    }
-
-    const checkFindings = await check.check({ cwd: options.cwd, files: matched, env: options.env });
+        return matched.length === 0
+          ? []
+          : fileCheck.check({ cwd: options.cwd, files: matched, env: options.env });
+      })
+      .with({ kind: 'branch' }, (branchCheck) =>
+        branchCheck.check({ cwd: options.cwd, base: readBranchBase(), env: options.env }),
+      )
+      .exhaustive();
 
     findings.push(
       ...checkFindings
