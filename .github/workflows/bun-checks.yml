@@ -114,7 +114,7 @@ jobs:
       PART: all
       LANE: ''
     outputs:
-      lanes: ${{ steps.sort.outputs.lanes }}
+      lanes: ${{ steps.plan.outputs.lanes }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -123,53 +123,50 @@ jobs:
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
-      # Picks the scripts before anything runs, so a missing name fails fast.
-      - &pick
-        name: Pick the check scripts
-        id: pick
-        env:
-          SCRIPTS: ${{ inputs.scripts }}
+      # The one file the plan needs, read in a step of its own, so the plan
+      # works from names alone.
+      - &read-scripts
+        name: Read the package scripts
+        id: read
         run: |
           set -euo pipefail
+          echo "defined= $(jq -r '.scripts // {} | keys | join(" ")' package.json) " >> "$GITHUB_OUTPUT"
+
+      # Plans the part each job runs before anything runs, from the caller's
+      # list, the names package.json defines and the job's part, so a missing
+      # name fails fast. It writes only the notice or error and the outputs.
+      - &plan
+        name: Plan the check scripts
+        id: plan
+        env:
+          SCRIPTS: ${{ inputs.scripts }}
+          DEFINED: ${{ steps.read.outputs.defined }}
+        run: |
+          set -euo pipefail
+          is_defined() { [[ "$DEFINED" == *" $1 "* ]]; }
+          notice=""
           # A value of only whitespace parses to no names and gets the standard list too.
           read -ra list <<< "$SCRIPTS"
           if [ "${#list[@]}" -eq 0 ]; then
             list=(audit deadcode format:check lint)
             # The standard list runs check only when the repo defines it, so a
             # repo turns the check on by adding the script.
-            if jq -e '.scripts.check' package.json > /dev/null; then
+            if is_defined check; then
               list+=(check)
             else
-              echo '::notice::check skipped, because package.json has no check script; add "check": "zgeoff-check" to run it.'
+              notice='check skipped, because package.json has no check script; add "check": "zgeoff-check" to run it.'
             fi
             list+=(typecheck test)
             for lane in e2e browser docker host; do
-              if jq -e --arg name "test:$lane" '.scripts[$name]' package.json > /dev/null; then
+              if is_defined "test:$lane"; then
                 list+=("test:$lane")
               fi
             done
           fi
           missing=""
           for name in "${list[@]}"; do
-            jq -e --arg name "$name" '.scripts[$name]' package.json > /dev/null || missing="$missing $name"
+            is_defined "$name" || missing="$missing $name"
           done
-          if [ -n "$missing" ]; then
-            echo "::error::package.json defines no script named:$missing. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list."
-            exit 1
-          fi
-          # Spaces around the list let a step match one whole name.
-          echo "list= ${list[*]} " >> "$GITHUB_OUTPUT"
-
-      # Sorts the picked list into the part each job runs, from the names
-      # alone.
-      - &sort
-        name: Sort the check scripts
-        id: sort
-        env:
-          SCRIPTS: ${{ steps.pick.outputs.list }}
-        run: |
-          set -euo pipefail
-          read -ra list <<< "$SCRIPTS"
           static=()
           tests=()
           lanes=()
@@ -190,6 +187,13 @@ jobs:
           esac
           if [ "$PART" = all ]; then
             for lane in "${lanes[@]}"; do part+=("test:$lane"); done
+          fi
+          if [ -n "$notice" ]; then
+            echo "::notice::$notice"
+          fi
+          if [ -n "$missing" ]; then
+            echo "::error::package.json defines no script named:$missing. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list."
+            exit 1
           fi
           # Spaces around each list let a step match one whole name.
           {
@@ -242,8 +246,8 @@ jobs:
         name: Install
         run: bun install --frozen-lockfile
 
-      - *pick
-      - *sort
+      - *read-scripts
+      - *plan
 
       # The shell check of zgeoff-check runs shellcheck, which the runner image
       # carries, and shfmt, which it lacks. The step installs the pinned binary
@@ -252,7 +256,7 @@ jobs:
       - &setup-shfmt
         name: Setup shfmt
         env:
-          SCRIPTS: ${{ steps.sort.outputs.scripts }}
+          SCRIPTS: ${{ steps.plan.outputs.scripts }}
           SETUP_SHFMT: ${{ inputs.setup-shfmt }}
           SHFMT_VERSION: v3.13.1
           SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
@@ -274,7 +278,7 @@ jobs:
       - &setup-actionlint
         name: Setup actionlint
         env:
-          SCRIPTS: ${{ steps.sort.outputs.scripts }}
+          SCRIPTS: ${{ steps.plan.outputs.scripts }}
           SETUP_ACTIONLINT: ${{ inputs.setup-actionlint }}
           ACTIONLINT_VERSION: 1.7.12
           ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
@@ -293,7 +297,7 @@ jobs:
       - &run-scripts
         name: Run the check scripts
         env:
-          SCRIPTS: ${{ steps.sort.outputs.scripts }}
+          SCRIPTS: ${{ steps.plan.outputs.scripts }}
         run: &run-body |
           set -euo pipefail
           read -ra list <<< "$SCRIPTS"
@@ -321,8 +325,8 @@ jobs:
       - *setup-bun
       - *cache
       - *install
-      - *pick
-      - *sort
+      - *read-scripts
+      - *plan
       - *setup-shfmt
       - *setup-actionlint
       - *run-scripts
@@ -351,8 +355,8 @@ jobs:
       - *setup-bun
       - *cache
       - *install
-      - *pick
-      - *sort
+      - *read-scripts
+      - *plan
       - *setup-shfmt
       - *setup-actionlint
       - *run-scripts
@@ -388,41 +392,41 @@ jobs:
       - *setup-bun
       - *cache
       - *install
-      - *pick
-      - *sort
+      - *read-scripts
+      - *plan
       - *setup-shfmt
       - *setup-actionlint
 
       - name: Static checks
         env:
-          SCRIPTS: ${{ steps.sort.outputs.static }}
+          SCRIPTS: ${{ steps.plan.outputs.static }}
         run: *run-body
 
       - name: Tests
         env:
-          SCRIPTS: ${{ steps.sort.outputs.test }}
+          SCRIPTS: ${{ steps.plan.outputs.test }}
         run: *run-body
 
       - name: Lane e2e
-        if: contains(steps.sort.outputs.lanes, '"e2e"')
+        if: contains(steps.plan.outputs.lanes, '"e2e"')
         env:
           SCRIPTS: test:e2e
         run: *run-body
 
       - name: Lane browser
-        if: contains(steps.sort.outputs.lanes, '"browser"')
+        if: contains(steps.plan.outputs.lanes, '"browser"')
         env:
           SCRIPTS: test:browser
         run: *run-body
 
       - name: Lane docker
-        if: contains(steps.sort.outputs.lanes, '"docker"')
+        if: contains(steps.plan.outputs.lanes, '"docker"')
         env:
           SCRIPTS: test:docker
         run: *run-body
 
       - name: Lane host
-        if: contains(steps.sort.outputs.lanes, '"host"')
+        if: contains(steps.plan.outputs.lanes, '"host"')
         env:
           SCRIPTS: test:host
         run: *run-body
