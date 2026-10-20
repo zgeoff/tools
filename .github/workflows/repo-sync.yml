@@ -218,6 +218,7 @@ jobs:
                 fi
               done
             fi
+            printf '%s\n' "${copied[@]}" > "$entry_copied"
             return "$conflicts"
           }
 
@@ -229,8 +230,13 @@ jobs:
           synced='[]'
           failed='[]'
           taken=
+          # The targets each entry wrote, and those of the entries that synced,
+          # which name the files that replace a renamed file's old path.
+          entry_copied=$(mktemp)
+          copied_list=$(mktemp)
           while IFS= read -r entry; do
             name=$(printf '%s' "$entry" | jq -r '.name')
+            : > "$entry_copied"
             # Each entry runs in a subshell with errexit on, outside any
             # condition, so its first failing command stops it.
             set +e
@@ -252,6 +258,7 @@ jobs:
               continue
             fi
             taken+="$name,"
+            cat "$entry_copied" >> "$copied_list"
             git add -A
             if git diff --cached --quiet; then
               echo "$name matches the source; nothing to sync."
@@ -264,7 +271,7 @@ jobs:
           # A file that an earlier manifest delivered and this one drops goes
           # in one more commit, unless the repo changed it, or its entry failed
           # or sits outside this run. The old path of a renamed file goes even
-          # when the repo changed it. A tools ref from before the cleanup
+          # when the repo changed it, once this run wrote the new path. A tools ref from before the cleanup
           # holds no script for it, so that run removes nothing.
           name=retired-files
           removed=
@@ -272,7 +279,7 @@ jobs:
             echo "The tools ref has no retired-file cleanup; nothing to remove."
           else
             set +e
-            removed=$(bash .repo-sync/scripts/remove-retired-sync-files.sh .repo-sync "$taken" "$SKIP")
+            removed=$(bash .repo-sync/scripts/remove-retired-sync-files.sh .repo-sync "$taken" "$SKIP" "$(cat "$copied_list")")
             status=$?
             set -e
             if [ "$status" -ne 0 ]; then

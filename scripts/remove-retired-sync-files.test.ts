@@ -392,10 +392,11 @@ test('it deletes the edited old copy of a renamed file across the skipped tags',
       'const first = 1;\nconst second = 2;\nconst third = 3;\nconst fourth = 4;\nconst fifth = 5;\nconst sixth = 6;\n',
   });
 
-  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, 'pre-push-demo'], {
-    cwd: ctx.caller,
-    encoding: 'utf8',
-  });
+  const result = spawnSync(
+    'bash',
+    [ctx.scriptPath, ctx.tools, 'pre-push-demo', '', 'scripts/read-files.ts'],
+    { cwd: ctx.caller, encoding: 'utf8' },
+  );
 
   expect(result.status).toBe(0);
   expect(result.stdout).toBe('scripts/list-files.ts\n');
@@ -403,7 +404,7 @@ test('it deletes the edited old copy of a renamed file across the skipped tags',
   expect(existsSync(join(ctx.caller, 'scripts/read-files.ts'))).toBeTrue();
 });
 
-test('it keeps the edited old copy of a renamed file when the run wrote no new copy', async () => {
+test('it keeps the edited old copy of a renamed file when the run did not copy the new one', async () => {
   const ctx = await setupTest();
 
   await writeRenamedSourceHistory(ctx.tools);
@@ -411,9 +412,10 @@ test('it keeps the edited old copy of a renamed file when the run wrote no new c
   await writeFiles(ctx.caller, {
     'scripts/list-files.ts':
       'const first = 1;\nconst second = 2;\nconst own = 3;\nconst fourth = 4;\n',
+    'scripts/read-files.ts': 'const own = 1;\n',
   });
 
-  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, 'pre-push-demo'], {
+  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, 'pre-push-demo', '', ''], {
     cwd: ctx.caller,
     encoding: 'utf8',
   });
@@ -435,10 +437,11 @@ test('it keeps the edited old copy of a renamed file when the run did not sync i
       'const first = 1;\nconst second = 2;\nconst third = 3;\nconst fourth = 4;\nconst fifth = 5;\nconst sixth = 6;\n',
   });
 
-  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, 'socket'], {
-    cwd: ctx.caller,
-    encoding: 'utf8',
-  });
+  const result = spawnSync(
+    'bash',
+    [ctx.scriptPath, ctx.tools, 'socket', '', 'scripts/read-files.ts'],
+    { cwd: ctx.caller, encoding: 'utf8' },
+  );
 
   expect(result.status).toBe(0);
   expect(result.stdout).toBe('');

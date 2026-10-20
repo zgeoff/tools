@@ -10,7 +10,9 @@
 # and wrote the new target, the old copy goes whatever its content, because the
 # sync overwrites the same file at its new path. git's rename detection over
 # the checkout's history finds the move, so a repo that skipped the tags
-# between the move and this run loses the old copy too.
+# between the move and this run loses the old copy too. The newline-separated
+# list of targets the run copied names the new targets it wrote; a target that
+# `except` kept from the repo is not in it, so its old copy stays.
 #
 # A retired file stays while an entry that delivered it is still in the
 # manifest and is not in the comma-separated list of entries this run synced,
@@ -18,17 +20,18 @@
 # entry that the comma-separated skip list names stays too, because skip leaves
 # an entry alone. The earlier manifests come from the checkout's history, so a
 # shallow checkout fails.
-# Usage: remove-retired-sync-files.sh <tools-checkout> <synced> [skip]
+# Usage: remove-retired-sync-files.sh <tools-checkout> <synced> [skip [copied]]
 set -euo pipefail
 
-if [ $# -lt 2 ] || [ $# -gt 3 ]; then
-  echo "usage: remove-retired-sync-files.sh <tools-checkout> <synced> [skip]" >&2
+if [ $# -lt 2 ] || [ $# -gt 4 ]; then
+  echo "usage: remove-retired-sync-files.sh <tools-checkout> <synced> [skip [copied]]" >&2
   exit 2
 fi
 
 tools="$1"
 synced="$2"
 skip="${3:-}"
+copied_targets="${4:-}"
 
 if [ "$(git -C "$tools" rev-parse --is-shallow-repository)" = true ]; then
   echo "remove-retired-sync-files: $tools is a shallow clone, so it lacks the earlier manifests" >&2
@@ -82,7 +85,7 @@ to_delivered_form() {
   fi
 }
 
-declare -A current=() listed=() entries=() sources=() taken=() skipped=() moved=() renamed=()
+declare -A current=() listed=() entries=() sources=() taken=() skipped=() moved=() renamed=() copied=()
 while IFS= read -r target; do
   current["$target"]=1
 done < <(jq -r '.[].files[].target' "$tools/sync/manifest.json")
@@ -112,6 +115,12 @@ while IFS= read -r name; do
     skipped["$name"]=1
   fi
 done < <(printf '%s\n' "$skip" | tr ',' '\n' | sed 's/[[:space:]]//g')
+
+while IFS= read -r target; do
+  if [ -n "$target" ]; then
+    copied["$target"]=1
+  fi
+done <<< "$copied_targets"
 
 rows=$(
   git -C "$tools" log --format=%H -- sync/manifest.json | while IFS= read -r commit; do
@@ -147,7 +156,7 @@ while IFS= read -r target; do
   if [ "$kept" -eq 1 ]; then
     continue
   fi
-  if [ -n "${renamed[$target]:-}" ] && [ -f "${renamed[$target]}" ]; then
+  if [ -n "${renamed[$target]:-}" ] && [ -n "${copied[${renamed[$target]}]:-}" ]; then
     rm -f -- "$target"
     printf '%s\n' "$target"
     continue
