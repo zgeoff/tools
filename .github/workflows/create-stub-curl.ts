@@ -2,8 +2,8 @@ import { chmod, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 // Writes a curl executable into `bin` that stands in for a download: `curl -fsSL -o <path> <url>`
-// writes `body`, text or bytes, to <path> and reads no network. Any other command line exits 64, so
-// a step that calls curl some other way fails instead of passing unseen.
+// writes `body`, text or bytes, to <path>, appends <url> to `curl.urls` in `bin`, and reads no
+// network. Any other command line exits 64, so a step that calls curl some other way fails.
 export async function createStubCurl(bin: string, body: string | Uint8Array): Promise<void> {
   const path = join(bin, 'curl');
   const bodyPath = join(bin, 'curl.body');
@@ -19,6 +19,7 @@ export async function createStubCurl(bin: string, body: string | Uint8Array): Pr
       '  exit 64',
       'fi',
       `cat '${bodyPath}' > "$3"`,
+      `echo "$4" >> '${join(bin, 'curl.urls')}'`,
       '',
     ].join('\n'),
   );

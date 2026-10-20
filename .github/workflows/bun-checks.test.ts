@@ -449,15 +449,7 @@ test('it installs actionlint for a test job when the caller sets the setup-actio
   expect(installed).toBeTrue();
 });
 
-test.each([
-  [
-    'downloads both planner files',
-    '{"workflow_repository":"acme/tools","workflow_sha":"abc123"}',
-    0,
-    true,
-  ],
-  ['fails without the commit in the job context', '{"workflow_repository":"acme/tools"}', 1, false],
-])('it %s', async (_label, jobContext, exitCode, downloaded) => {
+test('it downloads both planner files from the commit that defines the job', async () => {
   const ctx = await setupTest();
 
   const fetch = await loadWorkflowStep(
@@ -470,22 +462,58 @@ test.each([
 
   await createStubCurl(ctx.bin, '// planner\n');
 
+  await $`bash -c ${fetch.run}`
+    .cwd(ctx.directory)
+    .env({
+      PATH: ctx.path,
+      JOB_CONTEXT: '{"workflow_repository":"acme/tools","workflow_sha":"abc123"}',
+      RUNNER_TEMP: runnerTemp,
+    })
+    .quiet();
+
+  const urls = await readFile(join(ctx.bin, 'curl.urls'), 'utf8');
+  const files = await readdir(join(runnerTemp, 'check-plan'));
+
+  expect(fetch.env).toStrictEqual({ JOB_CONTEXT: `\${{ toJSON(job) }}` });
+
+  expect(urls).toBe(
+    [
+      'https://raw.githubusercontent.com/acme/tools/abc123/.github/workflows/plan-check-scripts.ts',
+      'https://raw.githubusercontent.com/acme/tools/abc123/.github/workflows/write-check-plan.ts',
+      '',
+    ].join('\n'),
+  );
+
+  expect(files.toSorted()).toStrictEqual(['plan-check-scripts.ts', 'write-check-plan.ts']);
+});
+
+test('it fails the fetch and downloads nothing when the job context lacks the commit', async () => {
+  const ctx = await setupTest();
+
+  const fetch = await loadWorkflowStep(
+    join(import.meta.dir, 'bun-checks.yml'),
+    'static',
+    'Fetch the check planner',
+  );
+
+  await createStubCurl(ctx.bin, '// planner\n');
+
   const result = await $`bash -c ${fetch.run}`
     .cwd(ctx.directory)
-    .env({ PATH: ctx.path, JOB_CONTEXT: jobContext, RUNNER_TEMP: runnerTemp })
+    .env({
+      PATH: ctx.path,
+      JOB_CONTEXT: '{"workflow_repository":"acme/tools"}',
+      RUNNER_TEMP: join(ctx.directory, 'runner'),
+    })
     .nothrow()
     .quiet();
 
-  const planner = await Bun.file(join(runnerTemp, 'check-plan/plan-check-scripts.ts')).exists();
-  const writer = await Bun.file(join(runnerTemp, 'check-plan/write-check-plan.ts')).exists();
+  const downloaded = await Bun.file(join(ctx.bin, 'curl.urls')).exists();
 
-  expect({ exitCode: result.exitCode, planner, writer }).toStrictEqual({
-    exitCode,
-    planner: downloaded,
-    writer: downloaded,
+  expect({ exitCode: result.exitCode, downloaded }).toStrictEqual({
+    exitCode: 1,
+    downloaded: false,
   });
-
-  expect(fetch.env).toStrictEqual({ JOB_CONTEXT: `\${{ toJSON(job) }}` });
 });
 
 test('it gives a caller that passes no time limit the synced caller fallback', async () => {
