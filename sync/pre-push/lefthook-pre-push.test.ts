@@ -214,6 +214,48 @@ test('it fails the push when zgeoff-check finds a problem in a file the branch c
   expect(result.exitCode).not.toBe(0);
 });
 
+test("it fails the push when this repo's source check finds a problem in a file the branch changes", async () => {
+  const ctx = await setupTest();
+
+  // This repo's own lefthook.yml, with its extends pointed at the baseline from the fixture.
+  const config = await readFile(join(import.meta.dir, '../../lefthook.yml'), 'utf8');
+
+  await writeFile(
+    join(ctx.worktree, 'lefthook.yml'),
+    config.replace('sync/pre-push/lefthook-pre-push.yml', ctx.baseline),
+  );
+
+  await writeFile(join(ctx.worktree, 'bad.sh'), '#!/usr/bin/env bash\necho $1\n');
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        check: `bun ${join(import.meta.dir, '../../packages/checks/src/cli.ts')}`,
+        typecheck: 'true',
+        'files:branch': 'echo bad.sh',
+        'test:related': 'true',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  expect(result.exitCode).not.toBe(0);
+});
+
 test('it passes the push when only a file the branch leaves unchanged fails zgeoff-check', async () => {
   const ctx = await setupTest();
 
