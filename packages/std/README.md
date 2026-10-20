@@ -99,9 +99,10 @@ const summary = pick(order, ['id', 'total']);
 ### `mergeDeep`
 
 Merges a deep partial of an object over the whole object and returns a new object of the same type.
-A nested plain object merges key by key. An array, a function, a `Date`, a `RegExp`, a `Map`, a
-`Set` or a `Promise` in the patch replaces the base value whole. The base and the patch stay
-untouched. The `PartialDeep<T>` type describes the patch.
+A plain object in the patch merges key by key over an object in the base, at the root or nested, and
+the result keeps the base object's prototype, so a class instance stays one. An array, a function, a
+`Date`, a `RegExp`, a `Map`, a `Set` or a `Promise` replaces the base value whole. The base and the
+patch stay untouched. The `PartialDeep<T>` type describes the patch.
 
 ```ts
 import { mergeDeep } from '@zgeoff/std';
