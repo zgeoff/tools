@@ -6,6 +6,8 @@
 # this repository reaches each repo as one pull request. A later run while that
 # pull request is open force-pushes the branch and updates the same pull
 # request. A new shared file is a manifest entry here with no change downstream.
+# A file that an earlier manifest delivered and the current one drops goes in
+# one more commit, as sync/README.md describes.
 #
 # Callers pin this workflow to a sync tag, such as `@sync-v1`, and the run syncs
 # the files that tag holds: both checkouts of this repository read the commit of
@@ -107,7 +109,8 @@ jobs:
   sync:
     name: Sync the entries
     needs: prepare
-    if: ${{ success() && needs.prepare.outputs.entries != '[]' }}
+    # The job runs with no entry too, since it still removes retired files.
+    if: ${{ success() }}
     runs-on: ubuntu-latest
     # Two runs at once could push one release's files and then write the other
     # release's title and body. The group names only the caller, so runs from
@@ -143,6 +146,8 @@ jobs:
           ref: ${{ inputs.tools-ref || job.workflow_sha }}
           path: .repo-sync
           persist-credentials: false
+          # The earlier manifests in the history name the files to delete.
+          fetch-depth: 0
 
       # Each entry becomes one commit on the sync branch. An entry that fails,
       # through a conflict or its build, is reset away and left out, the other
@@ -169,6 +174,8 @@ jobs:
           TOOLS_REF: ${{ inputs.tools-ref }}
           WORKFLOW_REF: ${{ job.workflow_ref }}
           REPO: ${{ github.repository }}
+          SKIP: ${{ inputs.skip }}
+          WORKFLOWS: ${{ needs.prepare.outputs.workflows }}
         run: |
           set -euo pipefail
           # A delivered workflow calls this repository at the ref this run syncs
@@ -221,6 +228,7 @@ jobs:
           git checkout -q -B "$BRANCH"
           synced='[]'
           failed='[]'
+          taken=
           while IFS= read -r entry; do
             name=$(printf '%s' "$entry" | jq -r '.name')
             # Each entry runs in a subshell with errexit on, outside any
@@ -243,6 +251,7 @@ jobs:
               failed=$(printf '%s' "$failed" | jq -c --arg name "$name" '. + [$name]')
               continue
             fi
+            taken+="$name,"
             git add -A
             if git diff --cached --quiet; then
               echo "$name matches the source; nothing to sync."
@@ -251,6 +260,40 @@ jobs:
             git commit -q -m "chore: sync $name from zgeoff/tools"
             synced=$(printf '%s' "$synced" | jq -c --argjson entry "$entry" '. + [$entry | {name, description}]')
           done < <(printf '%s' "$ENTRIES" | jq -c '.[]')
+
+          # A file that an earlier manifest delivered and this one drops goes
+          # in one more commit, unless the repo changed it, or its entry failed
+          # or sits outside this run. A tools ref from before the cleanup
+          # holds no script for it, so that run removes nothing.
+          name=retired-files
+          removed=
+          if [ ! -f .repo-sync/scripts/remove-retired-sync-files.sh ]; then
+            echo "The tools ref has no retired-file cleanup; nothing to remove."
+          else
+            set +e
+            removed=$(bash .repo-sync/scripts/remove-retired-sync-files.sh .repo-sync "$taken" "$SKIP")
+            status=$?
+            set -e
+            if [ "$status" -ne 0 ]; then
+              echo "::error::$name failed, so the sync leaves it out."
+              git reset -q --hard
+              failed=$(printf '%s' "$failed" | jq -c --arg name "$name" '. + [$name]')
+              removed=
+            fi
+          fi
+          # The token cannot push a change under .github/workflows/ without
+          # workflows write, so a retired workflow stays until the repo takes
+          # an entry with a workflow target.
+          if [ "$WORKFLOWS" != true ] && grep -q '^\.github/workflows/' <<< "$removed"; then
+            git checkout -q -- .github/workflows
+            removed=$(grep -v '^\.github/workflows/' <<< "$removed" || true)
+          fi
+          if [ -n "$removed" ]; then
+            git add -A
+            git commit -q -m "chore: remove the files zgeoff/tools no longer syncs"
+            description=$(printf '%s\n' "$removed" | jq -R -s -r 'split("\n") | map(select(. != "") | "`\(.)`") | "The copies of files zgeoff/tools no longer syncs: \(join(", "))"')
+            synced=$(printf '%s' "$synced" | jq -c --arg name "$name" --arg description "$description" '. + [{name: $name, description: $description}]')
+          fi
           {
             echo "pin=$pin"
             echo "synced=$synced"

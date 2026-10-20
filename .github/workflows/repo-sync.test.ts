@@ -31,9 +31,20 @@ async function setupTest() {
   await createStubGh(bin, state);
   await mkdir(join(tools, 'scripts'), { recursive: true });
 
-  for (const script of ['select-sync-files.sh', 'remove-excluded-blocks.sh']) {
+  for (const script of [
+    'select-sync-files.sh',
+    'remove-excluded-blocks.sh',
+    'remove-retired-sync-files.sh',
+  ]) {
     await cp(join(root, 'scripts', script), join(tools, 'scripts', script));
   }
+
+  await mkdir(join(tools, 'sync'));
+  await writeFile(join(tools, 'sync', 'manifest.json'), '[]');
+
+  await $`git -C ${tools} init -q && git -C ${tools} add -A && git -C ${tools} commit -q -m init`
+    .env(env)
+    .quiet();
 
   await $`git init -q --bare -b main ${origin}`.env(env);
   await $`git clone -q ${origin} ${seed}`.env(env).quiet();
@@ -44,7 +55,7 @@ async function setupTest() {
     .env(env)
     .quiet();
 
-  const runSync = async (entries: unknown[], toolsRef: string) => {
+  const runSync = async (entries: unknown[], toolsRef: string, workflows = 'false') => {
     const caller = await mkdtemp(join(directory, 'caller-'));
 
     await $`git clone -q ${origin} ${caller}`.env(env).quiet();
@@ -66,7 +77,9 @@ async function setupTest() {
         env: { ...env, PATH: `${bin}:${process.env['PATH']}` },
         expressions: {
           'needs.prepare.outputs.entries': JSON.stringify(entries),
+          'needs.prepare.outputs.workflows': workflows,
           'inputs.tools-ref': toolsRef,
+          'inputs.skip': '',
           'job.workflow_ref': 'zgeoff/tools/.github/workflows/repo-sync.yml@refs/tags/sync-v1',
           'github.repository': 'example/app',
           'github.ref_name': 'main',
@@ -98,6 +111,18 @@ async function setupTest() {
   const writeSource = async (path: string, content: string) => {
     await mkdir(dirname(join(tools, path)), { recursive: true });
     await writeFile(join(tools, path), content);
+  };
+
+  const removeSource = async (path: string) => {
+    await rm(join(tools, path));
+  };
+
+  const writeManifestCommit = async (manifest: unknown[]) => {
+    await writeFile(join(tools, 'sync', 'manifest.json'), JSON.stringify(manifest));
+
+    await $`git -C ${tools} add -A && git -C ${tools} commit -q -m ${'chore: change the manifest'}`
+      .env(env)
+      .quiet();
   };
 
   const readBranch = async (branch: string, path: string) => {
@@ -148,6 +173,8 @@ async function setupTest() {
     runPrepare,
     runSync,
     writeSource,
+    writeManifestCommit,
+    removeSource,
     readBranch,
     readBranchFiles,
     readBranchNames,
@@ -534,6 +561,212 @@ test('it keeps the sync branch and its pull request when every entry of a later 
       body:
         'Copied from zgeoff/tools at sync-v7 by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry:\n\n' +
         '- `editorconfig`: The editor config',
+      state: 'open',
+    },
+  ]);
+});
+
+test('it deletes a file that tools no longer syncs in a commit of its own', async () => {
+  const ctx = await setupTest();
+
+  const skill = { source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' };
+
+  const check = {
+    source: 'sync/skills/demo/scripts/check.sh',
+    target: '.claude/skills/demo/scripts/check.sh',
+  };
+
+  await ctx.writeSource(skill.source, '# Demo\n');
+  await ctx.writeSource(check.source, 'echo check\n');
+  await ctx.writeManifestCommit([{ name: 'skill-demo', files: [skill, check] }]);
+  await ctx.writeManifestCommit([{ name: 'skill-demo', files: [skill] }]);
+  await ctx.writeBranch('main', check.target, 'echo check\n');
+
+  const exitCode = await ctx.runSync(
+    [{ name: 'skill-demo', description: 'The demo skill', files: [skill] }],
+    'sync-v7',
+  );
+
+  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
+  const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
+  const pulls = await ctx.readPullRequests();
+
+  expect(exitCode).toBe(0);
+  expect(files).toStrictEqual(['.claude/skills/demo/SKILL.md', 'README.md']);
+
+  expect(subjects).toStrictEqual([
+    'chore: sync skill-demo from zgeoff/tools',
+    'chore: remove the files zgeoff/tools no longer syncs',
+  ]);
+
+  expect(pulls).toStrictEqual([
+    {
+      number: 1,
+      base: 'main',
+      head: 'repo-sync/zgeoff-tools',
+      title: 'chore: sync zgeoff/tools sync-v7',
+      body:
+        'Copied from zgeoff/tools at sync-v7 by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry:\n\n' +
+        '- `skill-demo`: The demo skill\n' +
+        '- `retired-files`: The copies of files zgeoff/tools no longer syncs: `.claude/skills/demo/scripts/check.sh`',
+      state: 'open',
+    },
+  ]);
+});
+
+test('it keeps a file the repo owns outside the synced paths', async () => {
+  const ctx = await setupTest();
+
+  const skill = { source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' };
+
+  const check = {
+    source: 'sync/skills/demo/scripts/check.sh',
+    target: '.claude/skills/demo/scripts/check.sh',
+  };
+
+  await ctx.writeSource(skill.source, '# Demo\n');
+  await ctx.writeSource(check.source, 'echo check\n');
+  await ctx.writeManifestCommit([{ name: 'skill-demo', files: [skill, check] }]);
+  await ctx.writeManifestCommit([{ name: 'skill-demo', files: [skill] }]);
+  await ctx.writeBranch('main', 'scripts/check.sh', 'echo check\n');
+
+  const exitCode = await ctx.runSync(
+    [{ name: 'skill-demo', description: 'The demo skill', files: [skill] }],
+    'sync-v7',
+  );
+
+  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
+  const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
+
+  expect(exitCode).toBe(0);
+  expect(files).toStrictEqual(['.claude/skills/demo/SKILL.md', 'README.md', 'scripts/check.sh']);
+  expect(subjects).toStrictEqual(['chore: sync skill-demo from zgeoff/tools']);
+});
+
+test('it syncs from a tools ref that has no retired-file cleanup', async () => {
+  const ctx = await setupTest();
+
+  await ctx.removeSource('scripts/remove-retired-sync-files.sh');
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const exitCode = await ctx.runSync(
+    [
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+      },
+    ],
+    'sync-v15',
+  );
+
+  const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
+
+  expect(exitCode).toBe(0);
+  expect(subjects).toStrictEqual(['chore: sync editorconfig from zgeoff/tools']);
+});
+
+test('it removes a retired file when the run syncs no entry', async () => {
+  const ctx = await setupTest();
+
+  const agents = { source: 'agents/shared.md', target: 'agents/shared.md' };
+
+  await ctx.writeSource(agents.source, '# Shared\n');
+  await ctx.writeManifestCommit([{ name: 'agents', files: [agents] }]);
+  await ctx.writeManifestCommit([]);
+  await ctx.writeBranch('main', agents.target, '# Shared\n');
+
+  const exitCode = await ctx.runSync([], 'sync-v7');
+  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
+  const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
+
+  expect(exitCode).toBe(0);
+  expect(files).toStrictEqual(['README.md']);
+  expect(subjects).toStrictEqual(['chore: remove the files zgeoff/tools no longer syncs']);
+});
+
+test('it runs the sync job when the run takes no entry', async () => {
+  const workflow = await readFile(join(import.meta.dir, 'repo-sync.yml'), 'utf8');
+
+  expect(workflow).not.toInclude("needs.prepare.outputs.entries != '[]'");
+});
+
+test('it keeps the retired files of an entry that fails', async () => {
+  const ctx = await setupTest();
+
+  const run = { source: 'sync/hooks/demo/run.ts', target: '.claude/hooks/demo/run.ts' };
+  const helper = { source: 'sync/hooks/demo/helper.ts', target: '.claude/hooks/demo/helper.ts' };
+  const editorconfig = { source: 'sync/editorconfig', target: '.editorconfig' };
+
+  await ctx.writeSource(run.source, 'export {};\n');
+  await ctx.writeSource(helper.source, 'export {};\n');
+  await ctx.writeSource(editorconfig.source, 'root = true\n');
+  await ctx.writeManifestCommit([{ name: 'hook-demo', files: [run, helper] }]);
+
+  await ctx.writeManifestCommit([
+    { name: 'hook-demo', files: [run] },
+    { name: 'editorconfig', files: [editorconfig] },
+  ]);
+
+  await ctx.writeBranch('main', helper.target, 'export {};\n');
+
+  const exitCode = await ctx.runSync(
+    [
+      { name: 'hook-demo', description: 'The demo hook', files: [run], build: 'exit 3' },
+      { name: 'editorconfig', description: 'The editor config', files: [editorconfig] },
+    ],
+    'sync-v7',
+  );
+
+  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
+  const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
+
+  expect(exitCode).toBe(1);
+  expect(files).toStrictEqual(['.claude/hooks/demo/helper.ts', '.editorconfig', 'README.md']);
+  expect(subjects).toStrictEqual(['chore: sync editorconfig from zgeoff/tools']);
+});
+
+test('it keeps a retired workflow and removes the rest when the token lacks workflows write', async () => {
+  const ctx = await setupTest();
+
+  const workflow = {
+    source: 'sync/workflow-callers/lint.yml',
+    target: '.github/workflows/lint.yml',
+  };
+
+  const script = { source: 'sync/scripts/lint.sh', target: 'scripts/lint.sh' };
+  const editorconfig = { source: 'sync/editorconfig', target: '.editorconfig' };
+
+  await ctx.writeSource(workflow.source, 'jobs: {}\n');
+  await ctx.writeSource(script.source, 'echo lint\n');
+  await ctx.writeSource(editorconfig.source, 'root = true\n');
+  await ctx.writeManifestCommit([{ name: 'lint', files: [workflow, script] }]);
+  await ctx.writeManifestCommit([{ name: 'editorconfig', files: [editorconfig] }]);
+  await ctx.writeBranch('main', workflow.target, 'jobs: {}\n');
+  await ctx.writeBranch('main', script.target, 'echo lint\n');
+
+  const exitCode = await ctx.runSync(
+    [{ name: 'editorconfig', description: 'The editor config', files: [editorconfig] }],
+    'sync-v7',
+    'false',
+  );
+
+  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
+  const pulls = await ctx.readPullRequests();
+
+  expect(exitCode).toBe(0);
+  expect(files).toStrictEqual(['.editorconfig', '.github/workflows/lint.yml', 'README.md']);
+
+  expect(pulls).toStrictEqual([
+    {
+      number: 1,
+      base: 'main',
+      head: 'repo-sync/zgeoff-tools',
+      title: 'chore: sync zgeoff/tools sync-v7',
+      body:
+        'Copied from zgeoff/tools at sync-v7 by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry:\n\n' +
+        '- `editorconfig`: The editor config\n' +
+        '- `retired-files`: The copies of files zgeoff/tools no longer syncs: `scripts/lint.sh`',
       state: 'open',
     },
   ]);
