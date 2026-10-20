@@ -507,9 +507,6 @@ function isLocalVariable(binding, frameNode) {
   );
 }
 
-// the function a call reaches, followed through each local alias: a chain
-// such as `agent.spawnTargets.filter(...)` calls `filter`, and the member it
-// reads off its root names only the object the call runs on
 function buildCalledName(context, node, callee) {
   let current = callee;
   let scopeNode = node;
