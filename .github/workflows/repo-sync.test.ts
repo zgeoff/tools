@@ -690,3 +690,38 @@ test('it runs the sync job when the run takes no entry', async () => {
 
   expect(workflow).not.toInclude("needs.prepare.outputs.entries != '[]'");
 });
+
+test('it keeps the retired files of an entry that fails', async () => {
+  const ctx = await setupTest();
+
+  const run = { source: 'sync/hooks/demo/run.ts', target: '.claude/hooks/demo/run.ts' };
+  const helper = { source: 'sync/hooks/demo/helper.ts', target: '.claude/hooks/demo/helper.ts' };
+  const editorconfig = { source: 'sync/editorconfig', target: '.editorconfig' };
+
+  await ctx.writeSource(run.source, 'export {};\n');
+  await ctx.writeSource(helper.source, 'export {};\n');
+  await ctx.writeSource(editorconfig.source, 'root = true\n');
+  await ctx.writeManifestCommit([{ name: 'hook-demo', files: [run, helper] }]);
+
+  await ctx.writeManifestCommit([
+    { name: 'hook-demo', files: [run] },
+    { name: 'editorconfig', files: [editorconfig] },
+  ]);
+
+  await ctx.writeBranch('main', helper.target, 'export {};\n');
+
+  const exitCode = await ctx.runSync(
+    [
+      { name: 'hook-demo', description: 'The demo hook', files: [run], build: 'exit 3' },
+      { name: 'editorconfig', description: 'The editor config', files: [editorconfig] },
+    ],
+    'sync-v7',
+  );
+
+  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
+  const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
+
+  expect(exitCode).toBe(1);
+  expect(files).toStrictEqual(['.claude/hooks/demo/helper.ts', '.editorconfig', 'README.md']);
+  expect(subjects).toStrictEqual(['chore: sync editorconfig from zgeoff/tools']);
+});
