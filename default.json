@@ -21,7 +21,9 @@
     }
   },
   "lockFileMaintenance": {
+    "description": "A lock-file refresh has no release timestamp, so the 7-day gate would hold it pending forever. bun install still applies the bunfig.toml release age to each version it resolves.",
     "enabled": true,
+    "minimumReleaseAge": null,
     "automerge": true,
     "schedule": ["* 0-5 * * 1"]
   },
