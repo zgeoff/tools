@@ -7,9 +7,9 @@ import invariant from 'tiny-invariant';
 
 const TSC_PATH = join(import.meta.dir, '../../node_modules/.bin/tsc');
 
-// The package packed and installed from its tarball into a fresh project, with the entry point a
-// repo carries at .claude/hooks/skill-gate/skill-gate.ts. Every build and pack writes under the
-// test's own folder, never the shared dist, so overlapping runs cannot race.
+// The package packed and installed from its tarball alone into a fresh project, with the entry
+// point a repo carries at .claude/hooks/skill-gate/skill-gate.ts. Every build and pack writes under
+// the test's own folder, never the shared dist, so overlapping runs cannot race.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'skill-gate-package-'));
 
@@ -20,25 +20,15 @@ async function setupTest() {
   const unpacked = join(directory, 'unpacked');
   const packed = join(directory, 'packed');
   const project = join(directory, 'project');
-  const stdSource = join(directory, 'std-source');
-  const stdUnpacked = join(directory, 'std-unpacked');
-  const stdPacked = join(directory, 'std-packed');
-
-  // A release PR bumps std before npm has the new version. The packed copies take a version npm
-  // lacks, so an install that reaches npm for std fails.
-  const unpublishedStdVersion = '0.0.0-workspace';
 
   await Promise.all([
     mkdir(unpacked),
     mkdir(packed),
-    mkdir(stdSource),
-    mkdir(stdUnpacked),
-    mkdir(stdPacked),
     mkdir(join(project, '.claude/hooks/skill-gate'), { recursive: true }),
   ]);
 
-  // The source pack runs no build; it gives the published manifest, with workspace versions
-  // resolved. The declarations then build into the unpacked copy, as the publish's prepare does.
+  // The source pack runs no build; it gives the published manifest. The bundle and the
+  // declarations then build into the unpacked copy, as the publish's prepare does.
   await $`bun pm pack --ignore-scripts --destination ${directory}`
     .cwd(import.meta.dir)
     .env(env)
@@ -51,11 +41,6 @@ async function setupTest() {
   invariant(manifest !== undefined, 'bun pm pack wrote no tarball');
 
   await $`tar -xzf ${join(directory, manifest)} -C ${unpacked}`.env(env).quiet();
-
-  await $`bun pm pkg set dependencies.@zgeoff/std=${unpublishedStdVersion}`
-    .cwd(join(unpacked, 'package'))
-    .env(env)
-    .quiet();
 
   await rm(join(unpacked, 'package/dist'), { recursive: true, force: true });
 
@@ -73,45 +58,12 @@ async function setupTest() {
 
   invariant(tarball !== undefined && extra.length === 0, 'bun pm pack must write one tarball');
 
-  // The shipped declarations never import std, so its source pack needs no build.
-  await $`bun pm pack --ignore-scripts --destination ${stdSource}`
-    .cwd(join(import.meta.dir, '../std'))
-    .env(env)
-    .quiet();
-
-  const [stdSourceTarball, ...stdSourceExtra] = await readdir(stdSource);
-
-  invariant(
-    stdSourceTarball !== undefined && stdSourceExtra.length === 0,
-    'bun pm pack must write one tarball',
-  );
-
-  await $`tar -xzf ${join(stdSource, stdSourceTarball)} -C ${stdUnpacked}`.env(env).quiet();
-
-  await $`bun pm pkg set version=${unpublishedStdVersion}`
-    .cwd(join(stdUnpacked, 'package'))
-    .env(env)
-    .quiet();
-
-  await $`bun pm pack --ignore-scripts --destination ${stdPacked}`
-    .cwd(join(stdUnpacked, 'package'))
-    .env(env)
-    .quiet();
-
-  const [stdTarball, ...stdExtra] = await readdir(stdPacked);
-
-  invariant(
-    stdTarball !== undefined && stdExtra.length === 0,
-    'bun pm pack must write one tarball',
-  );
-
   await writeFile(
     join(project, 'package.json'),
     JSON.stringify({
       name: 'project',
       private: true,
       devDependencies: { '@zgeoff/skill-gate': `file:${join(packed, tarball)}` },
-      overrides: { '@zgeoff/std': `file:${join(stdPacked, stdTarball)}` },
     }),
   );
 
@@ -122,8 +74,26 @@ async function setupTest() {
 
   await $`bun install`.cwd(project).env(env).quiet();
 
-  return { project, env, hookPath: join(project, '.claude/hooks/skill-gate/skill-gate.ts') };
+  return {
+    project,
+    env,
+    hookPath: join(project, '.claude/hooks/skill-gate/skill-gate.ts'),
+    packageManifestPath: join(unpacked, 'package/package.json'),
+  };
 }
+
+// Bun's auto-install, which loads the package when a repo has no node_modules, resolves a
+// dependency against a cached registry manifest that it never refreshes.
+test('it ships with no runtime dependencies, so an install fetches the package alone', async () => {
+  const ctx = await setupTest();
+  const packageManifest: unknown = await Bun.file(ctx.packageManifestPath).json();
+
+  expect(packageManifest).not.toContainKey('dependencies');
+
+  const installed = await readdir(join(ctx.project, 'node_modules/@zgeoff'));
+
+  expect(installed).toStrictEqual(['skill-gate']);
+});
 
 test('it denies a gated edit through the entry point when the session has not loaded the skill', async () => {
   const ctx = await setupTest();
