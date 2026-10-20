@@ -73,7 +73,7 @@ async function setupTest() {
     return { exitCode: result.exitCode, output: await readFile(output, 'utf8') };
   };
 
-  return { repo, writeFiles, createMerge, runMatch };
+  return { repo, matchID: match.id, writeFiles, createMerge, runMatch };
 }
 
 test('it answers true when the pull request changes a file that a pattern matches', async () => {
@@ -140,3 +140,29 @@ test('it fails the step when the checkout lacks the base commit', async () => {
 
   expect(result).toStrictEqual({ exitCode: 128, output: '' });
 });
+
+test.each([
+  ['true', 'a file that a pattern matches', 'docker/app/Dockerfile'],
+  ['false', 'only a file that no pattern matches', 'README.md'],
+])(
+  'it exposes changed=%s to the caller when the pull request changes %s',
+  async (expected, _label, path) => {
+    const ctx = await setupTest();
+    const text = await readFile(join(import.meta.dir, 'paths-changed.yml'), 'utf8');
+
+    const workflow: unknown = Bun.YAML.parse(text);
+
+    await ctx.createMerge(() => ctx.writeFiles({ [path]: 'changed\n' }));
+
+    const result = await ctx.runMatch('pull_request', 'docker/**\n');
+
+    expect(workflow).toMatchObject({
+      on: {
+        workflow_call: { outputs: { changed: { value: `\${{ jobs.changes.outputs.changed }}` } } },
+      },
+      jobs: { changes: { outputs: { changed: `\${{ steps.${ctx.matchID}.outputs.changed }}` } } },
+    });
+
+    expect(result).toStrictEqual({ exitCode: 0, output: `changed=${expected}\n` });
+  },
+);
