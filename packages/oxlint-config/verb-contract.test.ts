@@ -800,6 +800,20 @@ export const getName = (entry: { name: string }): string => entry.name;
 }
 `,
   ],
+  [
+    'a call through call on a parameter method with an effectful verb',
+    `export function buildThing(deps: { writeText(text: string): void }): void {
+  deps.writeText.call(deps, 'a');
+}
+`,
+  ],
+  [
+    'a call through apply on a parameter method with an effectful verb',
+    `export function buildThing(deps: { writeText(text: string): void }): void {
+  deps.writeText.apply(deps, ['a']);
+}
+`,
+  ],
 ])('it accepts %s', async (_, source) => {
   const ctx = await setupTest();
   const result = await ctx.lint(source);
