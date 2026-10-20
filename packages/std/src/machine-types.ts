@@ -16,8 +16,6 @@ export type MachineTypeKey =
 
 type MachineTypeSpec = Partial<Readonly<Record<MachineTypeKey, unknown>>>;
 
-// A key outside xstate's own set fails the constraint, so the helper cannot
-// claim an arbitrary type.
 export function machineTypes<
   T extends MachineTypeSpec & Record<Exclude<keyof T, MachineTypeKey>, never>,
 >(): T {

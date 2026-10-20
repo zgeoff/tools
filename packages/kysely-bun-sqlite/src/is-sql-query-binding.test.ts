@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { runInNewContext } from 'node:vm';
 import { isSQLQueryBinding } from './is-sql-query-binding.ts';
 
 test.each([
@@ -22,4 +23,16 @@ test.each([
   ['a symbol', Symbol('fern')],
 ])('it rejects %s', (_label, value) => {
   expect(isSQLQueryBinding(value)).toBeFalse();
+});
+
+test('it rejects a DataView made in another realm', () => {
+  const dataView: unknown = runInNewContext('new DataView(new ArrayBuffer(2))');
+
+  expect(isSQLQueryBinding(dataView)).toBeFalse();
+});
+
+test('it accepts a byte array made in another realm', () => {
+  const bytes: unknown = runInNewContext('new Uint8Array([1, 2])');
+
+  expect(isSQLQueryBinding(bytes)).toBeTrue();
 });
