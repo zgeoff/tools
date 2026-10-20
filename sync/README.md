@@ -61,12 +61,16 @@ a copy from before its `except` removes that copy itself.
 A file that an earlier manifest delivered and the current one no longer lists is retired, and the
 workflow deletes the repo's copy in its own commit, `retired-files`. It deletes a copy only when the
 copy matches a version of a source that tools delivered to that path, so a file the repo wrote
-itself or edited after the sync stays. A retired file also stays while its entry is still in the
-manifest and the run did not sync that entry, because the entry's current files can still need it.
-That covers an entry the repo skips or leaves out of `include`, and an entry that failed. A retired
-file of an entry that the manifest no longer holds stays when the repo lists that entry in `skip`. A
-retired workflow file stays while the repo takes no entry with a workflow target, because the run's
-token then cannot push a change under `.github/workflows/`.
+itself or edited after the sync stays. A renamed file is the exception: when its source moved to a
+source that the same entry still delivers, and the run wrote the new target, the old copy goes even
+when the repo edited it, since the sync overwrites the file at its new path. git's rename detection
+finds the move in this repo's history, so a repo that skipped the tags since the move loses the old
+copy too. A retired file also stays while its entry is still in the manifest and the run did not
+sync that entry, because the entry's current files can still need it. That covers an entry the repo
+skips or leaves out of `include`, and an entry that failed. A retired file of an entry that the
+manifest no longer holds stays when the repo lists that entry in `skip`. A retired workflow file
+stays while the repo takes no entry with a workflow target, because the run's token then cannot push
+a change under `.github/workflows/`.
 [`scripts/remove-retired-sync-files.sh`](../scripts/remove-retired-sync-files.sh) reads the earlier
 manifests from this repo's history, so the workflow checks out the full history.
 

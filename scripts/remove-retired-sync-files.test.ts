@@ -347,3 +347,100 @@ test('it keeps a retired Markdown copy whose edit sits inside a kept block', asy
   expect(result.stdout).toBe('');
   expect(existsSync(join(ctx.caller, '.claude/skills/demo/SKILL.md'))).toBeTrue();
 });
+
+async function writeRenamedSourceHistory(tools: string) {
+  const lines = ['const first = 1;', 'const second = 2;', 'const third = 3;', 'const fourth = 4;'];
+
+  await writeToolsCommit(tools, {
+    'sync/demo/list-files.ts': `${lines.join('\n')}\n`,
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'pre-push-demo',
+        files: [{ source: 'sync/demo/list-files.ts', target: 'scripts/list-files.ts' }],
+      },
+    ]),
+  });
+
+  await writeToolsCommit(tools, {
+    'sync/demo/list-files.ts': `${lines.join('\n')}\nconst fifth = 5;\n`,
+  });
+
+  await rm(join(tools, 'sync/demo/list-files.ts'));
+
+  await writeToolsCommit(tools, {
+    'sync/demo/read-files.ts': `${lines.join('\n')}\nconst fifth = 5;\nconst sixth = 6;\n`,
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'pre-push-demo',
+        files: [{ source: 'sync/demo/read-files.ts', target: 'scripts/read-files.ts' }],
+      },
+    ]),
+  });
+
+  await writeToolsCommit(tools, { 'sync/README.md': '# Sync\n' });
+}
+
+test('it deletes the edited old copy of a renamed file across the skipped tags', async () => {
+  const ctx = await setupTest();
+
+  await writeRenamedSourceHistory(ctx.tools);
+
+  await writeFiles(ctx.caller, {
+    'scripts/list-files.ts':
+      'const first = 1;\nconst second = 2;\nconst own = 3;\nconst fourth = 4;\n',
+    'scripts/read-files.ts':
+      'const first = 1;\nconst second = 2;\nconst third = 3;\nconst fourth = 4;\nconst fifth = 5;\nconst sixth = 6;\n',
+  });
+
+  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, 'pre-push-demo'], {
+    cwd: ctx.caller,
+    encoding: 'utf8',
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('scripts/list-files.ts\n');
+  expect(existsSync(join(ctx.caller, 'scripts/list-files.ts'))).toBeFalse();
+  expect(existsSync(join(ctx.caller, 'scripts/read-files.ts'))).toBeTrue();
+});
+
+test('it keeps the edited old copy of a renamed file when the run wrote no new copy', async () => {
+  const ctx = await setupTest();
+
+  await writeRenamedSourceHistory(ctx.tools);
+
+  await writeFiles(ctx.caller, {
+    'scripts/list-files.ts':
+      'const first = 1;\nconst second = 2;\nconst own = 3;\nconst fourth = 4;\n',
+  });
+
+  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, 'pre-push-demo'], {
+    cwd: ctx.caller,
+    encoding: 'utf8',
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+  expect(existsSync(join(ctx.caller, 'scripts/list-files.ts'))).toBeTrue();
+});
+
+test('it keeps the edited old copy of a renamed file when the run did not sync its entry', async () => {
+  const ctx = await setupTest();
+
+  await writeRenamedSourceHistory(ctx.tools);
+
+  await writeFiles(ctx.caller, {
+    'scripts/list-files.ts':
+      'const first = 1;\nconst second = 2;\nconst own = 3;\nconst fourth = 4;\n',
+    'scripts/read-files.ts':
+      'const first = 1;\nconst second = 2;\nconst third = 3;\nconst fourth = 4;\nconst fifth = 5;\nconst sixth = 6;\n',
+  });
+
+  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, 'socket'], {
+    cwd: ctx.caller,
+    encoding: 'utf8',
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+  expect(existsSync(join(ctx.caller, 'scripts/list-files.ts'))).toBeTrue();
+});

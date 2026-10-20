@@ -5,6 +5,13 @@
 # content matches a version of a source that some manifest delivered to its
 # path, so a file the repo wrote itself, or edited after the sync, stays.
 #
+# A renamed file is the exception. When the source of a retired file moved to
+# a source that the same entry still delivers, and the run synced that entry
+# and wrote the new target, the old copy goes whatever its content, because the
+# sync overwrites the same file at its new path. git's rename detection over
+# the checkout's history finds the move, so a repo that skipped the tags
+# between the move and this run loses the old copy too.
+#
 # A retired file stays while an entry that delivered it is still in the
 # manifest and is not in the comma-separated list of entries this run synced,
 # because the entry's current files can still need it. A retired file of an
@@ -75,7 +82,7 @@ to_delivered_form() {
   fi
 }
 
-declare -A current=() listed=() entries=() sources=() taken=() skipped=()
+declare -A current=() listed=() entries=() sources=() taken=() skipped=() moved=() renamed=()
 while IFS= read -r target; do
   current["$target"]=1
 done < <(jq -r '.[].files[].target' "$tools/sync/manifest.json")
@@ -83,6 +90,16 @@ done < <(jq -r '.[].files[].target' "$tools/sync/manifest.json")
 while IFS= read -r name; do
   listed["$name"]=1
 done < <(jq -r '.[].name' "$tools/sync/manifest.json")
+
+# Each earlier path of a source that an entry delivers now, keyed by the entry
+# and that path, maps to the source's current target.
+while IFS=$'\t' read -r name source target; do
+  while IFS= read -r path; do
+    if [ -n "$path" ] && [ "$path" != "$source" ]; then
+      moved["$name"$'\t'"$path"]="$target"
+    fi
+  done < <(git -C "$tools" log --follow --name-only --format= -- "$source" | sort -u)
+done < <(jq -r '.[] | .name as $name | .files[] | [$name, .source, .target] | @tsv' "$tools/sync/manifest.json")
 
 while IFS= read -r name; do
   if [ -n "$name" ]; then
@@ -109,6 +126,9 @@ while IFS=$'\t' read -r target name source; do
   fi
   entries["$target"]+="$name"$'\n'
   sources["$target"]+="$source"$'\n'
+  if [ -n "${moved[$name$'\t'$source]:-}" ]; then
+    renamed["$target"]="${moved[$name$'\t'$source]}"
+  fi
 done <<< "$rows"
 
 while IFS= read -r target; do
@@ -125,6 +145,11 @@ while IFS= read -r target; do
     fi
   done <<< "${entries[$target]}"
   if [ "$kept" -eq 1 ]; then
+    continue
+  fi
+  if [ -n "${renamed[$target]:-}" ] && [ -f "${renamed[$target]}" ]; then
+    rm -f -- "$target"
+    printf '%s\n' "$target"
     continue
   fi
   delivered=$(

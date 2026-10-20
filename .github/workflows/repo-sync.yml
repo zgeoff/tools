@@ -263,7 +263,8 @@ jobs:
 
           # A file that an earlier manifest delivered and this one drops goes
           # in one more commit, unless the repo changed it, or its entry failed
-          # or sits outside this run. A tools ref from before the cleanup
+          # or sits outside this run. The old path of a renamed file goes even
+          # when the repo changed it. A tools ref from before the cleanup
           # holds no script for it, so that run removes nothing.
           name=retired-files
           removed=
