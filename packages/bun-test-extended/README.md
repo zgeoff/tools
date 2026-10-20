@@ -35,6 +35,12 @@ test('it works', () => {
   builtins, and unknown matcher names fail typecheck (upstream's own types would let typos through).
 - `toResolve`/`toReject` return `Promise<void>` — un-awaited use is visible.
 - Asymmetric matchers (`expect.toBeOneOf(…)` inside `toEqual`) fit any value position.
+- bun's core asymmetric matchers `any`, `anything`, `arrayContaining`, `objectContaining`,
+  `stringContaining` and `stringMatching` return `never` instead of bun's `any`, so
+  `{ id: expect.any(String) }` passed to `toStrictEqual` trips no `no-unsafe-*` rule and needs no
+  cast. A matcher typed `never` fits any value position, so the type check no longer compares its
+  shape with the expected type. `expect.closeTo` and the negated `expect.not.*` matchers keep bun's
+  `any`.
 
 ## Gaps
 

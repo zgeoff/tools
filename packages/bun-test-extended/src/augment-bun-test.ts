@@ -16,10 +16,19 @@ declare module 'bun:test' {
       Pick<CustomMatchers<Promise<void>>, 'toResolve' | 'toReject'> {}
 
   // `never`, not `any`: an asymmetric matcher then fits any value position in
-  // toEqual/toMatchObject without tripping typescript/no-unsafe-assignment
-  // oxlint-disable-next-line typescript/no-empty-interface -- module augmentation, emptiness is the point
+  // toEqual/toMatchObject without tripping typescript/no-unsafe-assignment.
+  // bun's own core matchers return `any`, so each one is redeclared here.
   interface AsymmetricMatchers extends Pick<
     CustomMatchers<never>,
     Exclude<JestExtendedMatcherName, keyof AsymmetricMatchersBuiltin>
-  > {}
+  > {
+    any: (
+      constructor: ((...args: never[]) => unknown) | (abstract new (...args: never[]) => unknown),
+    ) => never;
+    anything: () => never;
+    arrayContaining: (array: readonly unknown[]) => never;
+    objectContaining: (object: object) => never;
+    stringContaining: (text: string) => never;
+    stringMatching: (pattern: string | RegExp) => never;
+  }
 }
