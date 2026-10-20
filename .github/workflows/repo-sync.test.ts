@@ -55,7 +55,7 @@ async function setupTest() {
     .env(env)
     .quiet();
 
-  const runSync = async (entries: unknown[], toolsRef: string) => {
+  const runSync = async (entries: unknown[], toolsRef: string, workflows = 'false') => {
     const caller = await mkdtemp(join(directory, 'caller-'));
 
     await $`git clone -q ${origin} ${caller}`.env(env).quiet();
@@ -77,7 +77,7 @@ async function setupTest() {
         env: { ...env, PATH: `${bin}:${process.env['PATH']}` },
         expressions: {
           'needs.prepare.outputs.entries': JSON.stringify(entries),
-          'needs.prepare.outputs.workflows': 'false',
+          'needs.prepare.outputs.workflows': workflows,
           'inputs.tools-ref': toolsRef,
           'inputs.skip': '',
           'job.workflow_ref': 'zgeoff/tools/.github/workflows/repo-sync.yml@refs/tags/sync-v1',
@@ -724,4 +724,50 @@ test('it keeps the retired files of an entry that fails', async () => {
   expect(exitCode).toBe(1);
   expect(files).toStrictEqual(['.claude/hooks/demo/helper.ts', '.editorconfig', 'README.md']);
   expect(subjects).toStrictEqual(['chore: sync editorconfig from zgeoff/tools']);
+});
+
+test('it keeps a retired workflow and removes the rest when the token lacks workflows write', async () => {
+  const ctx = await setupTest();
+
+  const workflow = {
+    source: 'sync/workflow-callers/lint.yml',
+    target: '.github/workflows/lint.yml',
+  };
+
+  const script = { source: 'sync/scripts/lint.sh', target: 'scripts/lint.sh' };
+  const editorconfig = { source: 'sync/editorconfig', target: '.editorconfig' };
+
+  await ctx.writeSource(workflow.source, 'jobs: {}\n');
+  await ctx.writeSource(script.source, 'echo lint\n');
+  await ctx.writeSource(editorconfig.source, 'root = true\n');
+  await ctx.writeManifestCommit([{ name: 'lint', files: [workflow, script] }]);
+  await ctx.writeManifestCommit([{ name: 'editorconfig', files: [editorconfig] }]);
+  await ctx.writeBranch('main', workflow.target, 'jobs: {}\n');
+  await ctx.writeBranch('main', script.target, 'echo lint\n');
+
+  const exitCode = await ctx.runSync(
+    [{ name: 'editorconfig', description: 'The editor config', files: [editorconfig] }],
+    'sync-v7',
+    'false',
+  );
+
+  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
+  const pulls = await ctx.readPullRequests();
+
+  expect(exitCode).toBe(0);
+  expect(files).toStrictEqual(['.editorconfig', '.github/workflows/lint.yml', 'README.md']);
+
+  expect(pulls).toStrictEqual([
+    {
+      number: 1,
+      base: 'main',
+      head: 'repo-sync/zgeoff-tools',
+      title: 'chore: sync zgeoff/tools sync-v7',
+      body:
+        'Copied from zgeoff/tools at sync-v7 by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry:\n\n' +
+        '- `editorconfig`: The editor config\n' +
+        '- `retired-files`: The copies of files zgeoff/tools no longer syncs: `scripts/lint.sh`',
+      state: 'open',
+    },
+  ]);
 });
