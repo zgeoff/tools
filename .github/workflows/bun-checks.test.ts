@@ -22,6 +22,7 @@ async function setupTest() {
   await createStubBun(bin, join(directory, 'ran'));
 
   const pick = await loadWorkflowStep(workflow, 'static', 'Pick the check scripts');
+  const sort = await loadWorkflowStep(workflow, 'static', 'Sort the check scripts');
   const setupShfmt = await loadWorkflowStep(workflow, 'static', 'Setup shfmt');
   const setupActionlint = await loadWorkflowStep(workflow, 'static', 'Setup actionlint');
   const run = await loadWorkflowStep(workflow, 'static', 'Run the check scripts');
@@ -30,6 +31,7 @@ async function setupTest() {
     directory,
     bin,
     pick,
+    sort,
     setupShfmt,
     setupActionlint,
     run,
@@ -57,20 +59,12 @@ test('it picks check in the standard list when the repo defines the script', asy
 
   await $`bash -c ${ctx.pick.run}`
     .cwd(ctx.directory)
-    .env({ PATH: ctx.path, SCRIPTS: '', PART: 'all', GITHUB_OUTPUT: join(ctx.directory, 'output') })
+    .env({ PATH: ctx.path, SCRIPTS: '', GITHUB_OUTPUT: join(ctx.directory, 'output') })
     .quiet();
 
   const output = await readFile(join(ctx.directory, 'output'), 'utf8');
 
-  expect(output).toBe(
-    [
-      'scripts= audit deadcode format:check lint check typecheck test ',
-      'static= audit deadcode format:check lint check typecheck ',
-      'test= test ',
-      'lanes=[]',
-      '',
-    ].join('\n'),
-  );
+  expect(output).toBe('list= audit deadcode format:check lint check typecheck test \n');
 });
 
 test('it leaves check out of the standard list with a notice when the repo has no check script', async () => {
@@ -92,7 +86,7 @@ test('it leaves check out of the standard list with a notice when the repo has n
 
   const result = await $`bash -c ${ctx.pick.run}`
     .cwd(ctx.directory)
-    .env({ PATH: ctx.path, SCRIPTS: '', PART: 'all', GITHUB_OUTPUT: join(ctx.directory, 'output') })
+    .env({ PATH: ctx.path, SCRIPTS: '', GITHUB_OUTPUT: join(ctx.directory, 'output') })
     .quiet();
 
   const output = await readFile(join(ctx.directory, 'output'), 'utf8');
@@ -101,15 +95,7 @@ test('it leaves check out of the standard list with a notice when the repo has n
     '::notice::check skipped, because package.json has no check script; add "check": "zgeoff-check" to run it.',
   );
 
-  expect(output).toBe(
-    [
-      'scripts= audit deadcode format:check lint typecheck test ',
-      'static= audit deadcode format:check lint typecheck ',
-      'test= test ',
-      'lanes=[]',
-      '',
-    ].join('\n'),
-  );
+  expect(output).toBe('list= audit deadcode format:check lint typecheck test \n');
 });
 
 test('it fails the pick when a listed script is missing', async () => {
@@ -125,7 +111,6 @@ test('it fails the pick when a listed script is missing', async () => {
     .env({
       PATH: ctx.path,
       SCRIPTS: 'lint check',
-      PART: 'all',
       GITHUB_OUTPUT: join(ctx.directory, 'output'),
     })
     .nothrow()
@@ -263,18 +248,33 @@ test('it hands the picked list to the shfmt setup and the run through the workfl
     .env({
       PATH: ctx.path,
       SCRIPTS: inputs[ctx.pick.env['SCRIPTS'] ?? ''],
-      PART: 'static',
-      GITHUB_OUTPUT: join(ctx.directory, 'output'),
+      GITHUB_OUTPUT: join(ctx.directory, 'picked'),
     })
     .quiet();
 
-  const output = await readFile(join(ctx.directory, 'output'), 'utf8');
+  const picked = await readFile(join(ctx.directory, 'picked'), 'utf8');
 
-  // The pick step's output, under the expression a later step uses to read it.
+  // Each step's output, under the expression a later step uses to read it.
+  const pickOutputs: Record<string, string> = {
+    [`\${{ steps.${ctx.pick.id}.outputs.list }}`]: picked.slice('list='.length, -1),
+  };
+
+  await $`bash -c ${ctx.sort.run}`
+    .cwd(ctx.directory)
+    .env({
+      PATH: ctx.path,
+      SCRIPTS: pickOutputs[ctx.sort.env['SCRIPTS'] ?? ''],
+      PART: 'static',
+      GITHUB_OUTPUT: join(ctx.directory, 'sorted'),
+    })
+    .quiet();
+
+  const sorted = await readFile(join(ctx.directory, 'sorted'), 'utf8');
+
   const outputs: Record<string, string> = {
     ...inputs,
-    [`\${{ steps.${ctx.pick.id}.outputs.scripts }}`]:
-      /^scripts=(?<list>.*)$/mu.exec(output)?.groups?.['list'] ?? '',
+    [`\${{ steps.${ctx.sort.id}.outputs.scripts }}`]:
+      /^scripts=(?<list>.*)$/mu.exec(sorted)?.groups?.['list'] ?? '',
   };
 
   await $`bash -c ${ctx.setupShfmt.run}`
@@ -441,16 +441,31 @@ test('it hands the picked list to the actionlint setup through the workflow bind
     .env({
       PATH: ctx.path,
       SCRIPTS: '',
-      PART: 'static',
-      GITHUB_OUTPUT: join(ctx.directory, 'output'),
+      GITHUB_OUTPUT: join(ctx.directory, 'picked'),
     })
     .quiet();
 
-  const output = await readFile(join(ctx.directory, 'output'), 'utf8');
+  const picked = await readFile(join(ctx.directory, 'picked'), 'utf8');
+
+  const pickOutputs: Record<string, string> = {
+    [`\${{ steps.${ctx.pick.id}.outputs.list }}`]: picked.slice('list='.length, -1),
+  };
+
+  await $`bash -c ${ctx.sort.run}`
+    .cwd(ctx.directory)
+    .env({
+      PATH: ctx.path,
+      SCRIPTS: pickOutputs[ctx.sort.env['SCRIPTS'] ?? ''],
+      PART: 'static',
+      GITHUB_OUTPUT: join(ctx.directory, 'sorted'),
+    })
+    .quiet();
+
+  const sorted = await readFile(join(ctx.directory, 'sorted'), 'utf8');
 
   const outputs: Record<string, string> = {
-    [`\${{ steps.${ctx.pick.id}.outputs.scripts }}`]:
-      /^scripts=(?<list>.*)$/mu.exec(output)?.groups?.['list'] ?? '',
+    [`\${{ steps.${ctx.sort.id}.outputs.scripts }}`]:
+      /^scripts=(?<list>.*)$/mu.exec(sorted)?.groups?.['list'] ?? '',
   };
 
   await $`bash -c ${ctx.setupActionlint.run}`
@@ -541,6 +556,7 @@ const installSteps = [
   { name: 'Cache bun install' },
   { name: 'Install' },
   { name: 'Pick the check scripts' },
+  { name: 'Sort the check scripts' },
   { name: 'Setup shfmt' },
   { name: 'Setup actionlint' },
 ];
@@ -587,39 +603,26 @@ test('it runs a private repo as one checks job with the scan, the static checks,
           checkout,
           { name: 'Gitleaks', if: 'inputs.gitleaks' },
           ...setup,
-          { name: 'Static checks', env: { SCRIPTS: `\${{ steps.pick.outputs.static }}` } },
-          { name: 'Tests', env: { SCRIPTS: `\${{ steps.pick.outputs.test }}` } },
-          { name: 'Lane e2e', if: `contains(steps.pick.outputs.lanes, '"e2e"')` },
-          { name: 'Lane browser', if: `contains(steps.pick.outputs.lanes, '"browser"')` },
-          { name: 'Lane docker', if: `contains(steps.pick.outputs.lanes, '"docker"')` },
-          { name: 'Lane host', if: `contains(steps.pick.outputs.lanes, '"host"')` },
+          { name: 'Static checks', env: { SCRIPTS: `\${{ steps.sort.outputs.static }}` } },
+          { name: 'Tests', env: { SCRIPTS: `\${{ steps.sort.outputs.test }}` } },
+          { name: 'Lane e2e', if: `contains(steps.sort.outputs.lanes, '"e2e"')` },
+          { name: 'Lane browser', if: `contains(steps.sort.outputs.lanes, '"browser"')` },
+          { name: 'Lane docker', if: `contains(steps.sort.outputs.lanes, '"docker"')` },
+          { name: 'Lane host', if: `contains(steps.sort.outputs.lanes, '"host"')` },
         ],
       },
     },
   });
 });
 
-test('it sorts the listed scripts into static checks, tests and lanes', async () => {
+test('it sorts the picked scripts into static checks, tests and lanes', async () => {
   const ctx = await setupTest();
 
-  await writeFile(
-    join(ctx.directory, 'package.json'),
-    JSON.stringify({
-      scripts: {
-        lint: 'true',
-        test: 'true',
-        'test:e2e': 'true',
-        'test:slow': 'true',
-        check: 'true',
-      },
-    }),
-  );
-
-  await $`bash -c ${ctx.pick.run}`
+  await $`bash -c ${ctx.sort.run}`
     .cwd(ctx.directory)
     .env({
       PATH: ctx.path,
-      SCRIPTS: 'lint test:e2e test test:slow check',
+      SCRIPTS: ' lint test:e2e test test:slow check ',
       PART: 'all',
       GITHUB_OUTPUT: join(ctx.directory, 'output'),
     })
@@ -659,12 +662,14 @@ test('it adds each lane script the repo defines to the standard list', async () 
 
   await $`bash -c ${ctx.pick.run}`
     .cwd(ctx.directory)
-    .env({ PATH: ctx.path, SCRIPTS: '', PART: 'all', GITHUB_OUTPUT: join(ctx.directory, 'output') })
+    .env({ PATH: ctx.path, SCRIPTS: '', GITHUB_OUTPUT: join(ctx.directory, 'output') })
     .quiet();
 
   const output = await readFile(join(ctx.directory, 'output'), 'utf8');
 
-  expect(output).toInclude('lanes=["browser","host"]\n');
+  expect(output).toBe(
+    'list= audit deadcode format:check lint typecheck test test:browser test:host \n',
+  );
 });
 
 test.each([
@@ -674,24 +679,11 @@ test.each([
 ])('it gives a public %s job only its own scripts', async (part, lane, expected) => {
   const ctx = await setupTest();
 
-  await writeFile(
-    join(ctx.directory, 'package.json'),
-    JSON.stringify({
-      scripts: {
-        lint: 'true',
-        test: 'true',
-        'test:e2e': 'true',
-        'test:slow': 'true',
-        check: 'true',
-      },
-    }),
-  );
-
-  await $`bash -c ${ctx.pick.run}`
+  await $`bash -c ${ctx.sort.run}`
     .cwd(ctx.directory)
     .env({
       PATH: ctx.path,
-      SCRIPTS: 'lint test:e2e test test:slow check',
+      SCRIPTS: ' lint test:e2e test test:slow check ',
       PART: part,
       LANE: lane,
       GITHUB_OUTPUT: join(ctx.directory, 'output'),

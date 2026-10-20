@@ -114,7 +114,7 @@ jobs:
       PART: all
       LANE: ''
     outputs:
-      lanes: ${{ steps.pick.outputs.lanes }}
+      lanes: ${{ steps.sort.outputs.lanes }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -123,8 +123,7 @@ jobs:
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
-      # Picks the scripts before anything runs, so a missing name fails fast
-      # and the shfmt setup knows whether check runs.
+      # Picks the scripts before anything runs, so a missing name fails fast.
       - &pick
         name: Pick the check scripts
         id: pick
@@ -158,6 +157,19 @@ jobs:
             echo "::error::package.json defines no script named:$missing. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list."
             exit 1
           fi
+          # Spaces around the list let a step match one whole name.
+          echo "list= ${list[*]} " >> "$GITHUB_OUTPUT"
+
+      # Sorts the picked list into the part each job runs, from the names
+      # alone.
+      - &sort
+        name: Sort the check scripts
+        id: sort
+        env:
+          SCRIPTS: ${{ steps.pick.outputs.list }}
+        run: |
+          set -euo pipefail
+          read -ra list <<< "$SCRIPTS"
           static=()
           tests=()
           lanes=()
@@ -231,6 +243,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - *pick
+      - *sort
 
       # The shell check of zgeoff-check runs shellcheck, which the runner image
       # carries, and shfmt, which it lacks. The step installs the pinned binary
@@ -239,7 +252,7 @@ jobs:
       - &setup-shfmt
         name: Setup shfmt
         env:
-          SCRIPTS: ${{ steps.pick.outputs.scripts }}
+          SCRIPTS: ${{ steps.sort.outputs.scripts }}
           SETUP_SHFMT: ${{ inputs.setup-shfmt }}
           SHFMT_VERSION: v3.13.1
           SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
@@ -261,7 +274,7 @@ jobs:
       - &setup-actionlint
         name: Setup actionlint
         env:
-          SCRIPTS: ${{ steps.pick.outputs.scripts }}
+          SCRIPTS: ${{ steps.sort.outputs.scripts }}
           SETUP_ACTIONLINT: ${{ inputs.setup-actionlint }}
           ACTIONLINT_VERSION: 1.7.12
           ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
@@ -280,7 +293,7 @@ jobs:
       - &run-scripts
         name: Run the check scripts
         env:
-          SCRIPTS: ${{ steps.pick.outputs.scripts }}
+          SCRIPTS: ${{ steps.sort.outputs.scripts }}
         run: &run-body |
           set -euo pipefail
           read -ra list <<< "$SCRIPTS"
@@ -309,6 +322,7 @@ jobs:
       - *cache
       - *install
       - *pick
+      - *sort
       - *setup-shfmt
       - *setup-actionlint
       - *run-scripts
@@ -338,6 +352,7 @@ jobs:
       - *cache
       - *install
       - *pick
+      - *sort
       - *setup-shfmt
       - *setup-actionlint
       - *run-scripts
@@ -374,39 +389,40 @@ jobs:
       - *cache
       - *install
       - *pick
+      - *sort
       - *setup-shfmt
       - *setup-actionlint
 
       - name: Static checks
         env:
-          SCRIPTS: ${{ steps.pick.outputs.static }}
+          SCRIPTS: ${{ steps.sort.outputs.static }}
         run: *run-body
 
       - name: Tests
         env:
-          SCRIPTS: ${{ steps.pick.outputs.test }}
+          SCRIPTS: ${{ steps.sort.outputs.test }}
         run: *run-body
 
       - name: Lane e2e
-        if: contains(steps.pick.outputs.lanes, '"e2e"')
+        if: contains(steps.sort.outputs.lanes, '"e2e"')
         env:
           SCRIPTS: test:e2e
         run: *run-body
 
       - name: Lane browser
-        if: contains(steps.pick.outputs.lanes, '"browser"')
+        if: contains(steps.sort.outputs.lanes, '"browser"')
         env:
           SCRIPTS: test:browser
         run: *run-body
 
       - name: Lane docker
-        if: contains(steps.pick.outputs.lanes, '"docker"')
+        if: contains(steps.sort.outputs.lanes, '"docker"')
         env:
           SCRIPTS: test:docker
         run: *run-body
 
       - name: Lane host
-        if: contains(steps.pick.outputs.lanes, '"host"')
+        if: contains(steps.sort.outputs.lanes, '"host"')
         env:
           SCRIPTS: test:host
         run: *run-body
