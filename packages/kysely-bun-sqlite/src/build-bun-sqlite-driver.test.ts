@@ -71,6 +71,39 @@ test('it answers a write with the rows it changed and the last inserted row id',
   expect(result).toStrictEqual({ rows: [], numAffectedRows: 1n, insertId: 2n });
 });
 
+test('it binds each parameter of a query', async () => {
+  const ctx = setupTest();
+
+  ctx.sqlite.run('CREATE TABLE plants (species TEXT NOT NULL, height REAL NOT NULL)');
+
+  const connection = await ctx.driver.acquireConnection();
+
+  await connection.executeQuery(
+    CompiledQuery.raw('INSERT INTO plants (species, height) VALUES (?, ?)', ['fern', 0.5]),
+  );
+
+  expect(ctx.sqlite.query('SELECT species, height FROM plants').all()).toStrictEqual([
+    { species: 'fern', height: 0.5 },
+  ]);
+});
+
+test('it refuses a parameter that bun:sqlite would bind as NULL', async () => {
+  const ctx = setupTest();
+
+  ctx.sqlite.run('CREATE TABLE plants (planted TEXT)');
+
+  const connection = await ctx.driver.acquireConnection();
+
+  const query = CompiledQuery.raw('INSERT INTO plants (planted) VALUES (?)', [new Date(0)]);
+
+  expect(() => connection.executeQuery(query)).toThrowWithMessage(
+    TypeError,
+    'bun:sqlite cannot bind a parameter of type Date',
+  );
+
+  expect(ctx.sqlite.query('SELECT planted FROM plants').all()).toBeEmpty();
+});
+
 test('it refuses a streaming query', async () => {
   const ctx = setupTest();
 

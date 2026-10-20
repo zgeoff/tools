@@ -96,6 +96,12 @@
     // restriction-category cherry-picks
     "typescript/no-explicit-any": "error",
     "typescript/no-non-null-assertion": "error",
+
+    // every type assertion other than `as const` fails; one that survives
+    // carries a disable comment naming this rule, which already covers each
+    // assertion the type-aware no-unsafe-type-assertion would check
+    "typescript/consistent-type-assertions": ["error", { "assertionStyle": "never" }],
+    "typescript/no-unsafe-type-assertion": "off",
     "import/no-cycle": "error",
 
     "no-shadow": "error",
@@ -215,8 +221,7 @@
         "typescript/no-unsafe-assignment": "off",
         "typescript/no-unsafe-call": "off",
         "typescript/no-unsafe-member-access": "off",
-        "typescript/no-unsafe-return": "off",
-        "typescript/no-unsafe-type-assertion": "off"
+        "typescript/no-unsafe-return": "off"
       }
     }
   ]

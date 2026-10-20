@@ -40,3 +40,13 @@ The opener owns the handle. `db.destroy()` waits for the caller that holds the c
 the handle open, so the opener closes the handle after `db.destroy()` resolves.
 
 The driver refuses a streaming query, so `stream()` on a Kysely query throws.
+
+## Parameters
+
+bun:sqlite binds a parameter it does not support, such as a `Date`, a plain object or `undefined`,
+as `NULL` without an error. The driver checks each parameter with `isSQLQueryBinding` before it
+binds, and when one fails it throws a `TypeError` whose message holds the parameter's type. Convert
+such a value first, such as a `Date` to its ISO string.
+
+`isSQLQueryBinding` is exported for a driver of its own that binds Kysely's parameters to
+bun:sqlite. It accepts a string, a number, a bigint, a boolean, `null`, or a typed array.

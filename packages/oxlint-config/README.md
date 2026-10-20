@@ -45,6 +45,21 @@ import config from '@zgeoff/oxlint-config';
 The plugin is addressable on its own at `@zgeoff/oxlint-config/plugin` for configs that want the
 `zgeoff/*` rules without the rest.
 
+## Type assertions
+
+`typescript/consistent-type-assertions` runs with `assertionStyle: "never"`, so every type assertion
+fails: `x as T`, `<T>x` and `x as unknown as T`. `as const` and `satisfies` pass, because neither
+claims a type the checker cannot prove. `typescript/no-unsafe-type-assertion` is off, because the
+ban reports every assertion that rule checks.
+
+Replace an assertion with a type guard, a type annotation, `satisfies`, or a typed helper from
+`@zgeoff/std`. An assertion that survives carries a disable comment on the line above it, with its
+approval and reason after `--`:
+
+```ts
+// oxlint-disable-next-line typescript/consistent-type-assertions -- approved <issue>: <reason>
+```
+
 ## `zgeoff/function-verb`
 
 The rule reports a function, method, or function-valued variable or property whose name starts with
