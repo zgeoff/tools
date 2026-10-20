@@ -97,14 +97,16 @@ one. CI keeps every whole-tree check required. The entry delivers three files, a
 here:
 
 - `.lefthook/pre-push-baseline.yml` — the lefthook jobs.
-- `scripts/collect-branch-files.ts` — lists the files changed since the merge base with origin's
+- `scripts/read-branch-files.ts` — lists the files changed since the merge base with origin's
   default branch. lefthook's `{push_files}` lists every file in history for a branch with no
   upstream, so the baseline does not use it.
 - `scripts/run-related-tests.ts` — runs each changed file's sibling test through the repo's `test`
   script.
 
 Its build adds the package scripts `files:branch`, `lint:files` and `test:related` when the repo
-lacks them, and never changes a script the repo already has. A repo opts in with three changes:
+lacks them. It changes one script the repo already has: a `files:branch` that runs the old
+`scripts/collect-branch-files.ts` moves to `scripts/read-branch-files.ts`. A repo opts in with three
+changes:
 
 1. Add `pre-push-baseline` to `include` in `.github/workflows/repo-sync.yml`.
 2. In `lefthook.yml`, add `extends: [.lefthook/pre-push-baseline.yml]`, and delete `parallel` and
