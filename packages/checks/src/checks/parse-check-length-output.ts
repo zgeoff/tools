@@ -1,9 +1,6 @@
 import type { ProgramResult } from '../run-program.ts';
 import type { Finding } from '../types.ts';
 
-// Reads what check-length.sh prints: its README lines, then check-prose's blocks, then check-skill's
-// lines. Only what fails the script's run becomes a finding; warnings, candidates and summaries
-// never fail it.
 export function parseCheckLengthOutput(result: ProgramResult): Finding[] {
   // check-length exits 1 when a check fails, and 2 on a bad argument.
   if (result.exitCode > 1) {
