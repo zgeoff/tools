@@ -1,5 +1,15 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { cp, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import {
+  cp,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
@@ -25,6 +35,12 @@ async function setupTest() {
   for (const file of ['plan-check-scripts.ts', 'write-check-plan.ts']) {
     await cp(join(import.meta.dir, file), join(directory, 'check-plan', file));
   }
+
+  // The install step's node_modules, from this repo's install.
+  await symlink(
+    join(import.meta.dir, '../../node_modules'),
+    join(directory, 'check-plan/node_modules'),
+  );
 
   const plan = await loadWorkflowStep(workflow, 'static', 'Plan the check scripts');
   const setupShfmt = await loadWorkflowStep(workflow, 'static', 'Setup shfmt');
@@ -449,7 +465,7 @@ test('it installs actionlint for a test job when the caller sets the setup-actio
   expect(installed).toBeTrue();
 });
 
-test('it downloads both planner files from the commit that defines the job', async () => {
+test('it downloads the planner files and the catalog from the commit that defines the job', async () => {
   const ctx = await setupTest();
 
   const fetch = await loadWorkflowStep(
@@ -480,11 +496,16 @@ test('it downloads both planner files from the commit that defines the job', asy
     [
       'https://raw.githubusercontent.com/acme/tools/abc123/.github/workflows/plan-check-scripts.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/.github/workflows/write-check-plan.ts',
+      'https://raw.githubusercontent.com/acme/tools/abc123/package.json',
       '',
     ].join('\n'),
   );
 
-  expect(files.toSorted()).toStrictEqual(['plan-check-scripts.ts', 'write-check-plan.ts']);
+  expect(files.toSorted()).toStrictEqual([
+    'plan-check-scripts.ts',
+    'tools-package.json',
+    'write-check-plan.ts',
+  ]);
 });
 
 test('it fails the fetch and downloads nothing when the job context lacks the commit', async () => {
@@ -589,6 +610,7 @@ test('it runs a public repo as separate gitleaks, static, test and lane jobs', a
     { name: 'Cache bun install' },
     { name: 'Install' },
     { name: 'Fetch the check planner' },
+    { name: 'Install the check planner' },
     { name: 'Plan the check scripts' },
     { name: 'Setup shfmt' },
     { name: 'Setup actionlint' },
@@ -633,6 +655,7 @@ test('it runs a private repo as one checks job with the scan, the static checks,
           { name: 'Cache bun install' },
           { name: 'Install' },
           { name: 'Fetch the check planner' },
+          { name: 'Install the check planner' },
           { name: 'Plan the check scripts' },
           { name: 'Setup shfmt' },
           { name: 'Setup actionlint' },

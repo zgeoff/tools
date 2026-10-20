@@ -1,7 +1,8 @@
 // The bun-checks plan step: reads the repo's script names and the job's part, plans the check
 // scripts, and writes the plan to the step outputs. The caller's runner downloads this file and
-// the planner beside it on their own, so it imports nothing else.
+// the planner, and installs ts-pattern beside them at the version tools pins.
 import { appendFile, readFile } from 'node:fs/promises';
+import { match } from 'ts-pattern';
 import type { CheckPart } from './plan-check-scripts.ts';
 import { planCheckScripts } from './plan-check-scripts.ts';
 
@@ -26,29 +27,34 @@ const plan = planCheckScripts({
   lane: process.env['LANE'] ?? '',
 });
 
-if (plan.kind === 'missing') {
-  console.log(
-    `::error::package.json defines no script named: ${plan.missing.join(' ')}. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list.`,
-  );
+process.exitCode = await match(plan)
+  .with({ kind: 'missing' }, (missing) => {
+    console.log(
+      `::error::package.json defines no script named: ${missing.missing.join(' ')}. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list.`,
+    );
 
-  process.exit(1);
-}
+    return 1;
+  })
+  .with({ kind: 'planned' }, async (planned) => {
+    if (planned.notice !== null) {
+      console.log(`::notice::${planned.notice}`);
+    }
 
-if (plan.notice !== null) {
-  console.log(`::notice::${plan.notice}`);
-}
+    // Spaces around each list let a later step match one whole name.
+    await appendFile(
+      outputPath,
+      [
+        `scripts= ${planned.scripts.join(' ')} `,
+        `static= ${planned.static.join(' ')} `,
+        `test= ${planned.test.join(' ')} `,
+        `lanes=${JSON.stringify(planned.lanes)}`,
+        '',
+      ].join('\n'),
+    );
 
-// Spaces around each list let a later step match one whole name.
-await appendFile(
-  outputPath,
-  [
-    `scripts= ${plan.scripts.join(' ')} `,
-    `static= ${plan.static.join(' ')} `,
-    `test= ${plan.test.join(' ')} `,
-    `lanes=${JSON.stringify(plan.lanes)}`,
-    '',
-  ].join('\n'),
-);
+    return 0;
+  })
+  .exhaustive();
 
 function readScriptNames(value: unknown): string[] {
   if (typeof value !== 'object' || value === null || !('scripts' in value)) {

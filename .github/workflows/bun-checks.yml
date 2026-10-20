@@ -145,9 +145,22 @@ jobs:
           repository=$(jq -er .workflow_repository <<< "$JOB_CONTEXT")
           sha=$(jq -er .workflow_sha <<< "$JOB_CONTEXT")
           mkdir -p "$RUNNER_TEMP/check-plan"
+          base="https://raw.githubusercontent.com/$repository/$sha"
           for file in plan-check-scripts.ts write-check-plan.ts; do
-            curl -fsSL -o "$RUNNER_TEMP/check-plan/$file" "https://raw.githubusercontent.com/$repository/$sha/.github/workflows/$file"
+            curl -fsSL -o "$RUNNER_TEMP/check-plan/$file" "$base/.github/workflows/$file"
           done
+          curl -fsSL -o "$RUNNER_TEMP/check-plan/tools-package.json" "$base/package.json"
+
+      # The adapter imports ts-pattern, which the caller's checkout need not
+      # hold. The step installs the version tools' catalog pins, beside the
+      # planner, from the package.json the fetch downloaded.
+      - &install-planner
+        name: Install the check planner
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/check-plan"
+          jq '{dependencies: {"ts-pattern": (.workspaces.catalog["ts-pattern"] // error("tools pins no ts-pattern"))}}' tools-package.json > package.json
+          bun install
 
       - &plan
         name: Plan the check scripts
@@ -196,6 +209,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - *fetch-planner
+      - *install-planner
       - *plan
 
       # The shell check of zgeoff-check runs shellcheck, which the runner image
@@ -275,6 +289,7 @@ jobs:
       - *cache
       - *install
       - *fetch-planner
+      - *install-planner
       - *plan
       - *setup-shfmt
       - *setup-actionlint
@@ -305,6 +320,7 @@ jobs:
       - *cache
       - *install
       - *fetch-planner
+      - *install-planner
       - *plan
       - *setup-shfmt
       - *setup-actionlint
@@ -342,6 +358,7 @@ jobs:
       - *cache
       - *install
       - *fetch-planner
+      - *install-planner
       - *plan
       - *setup-shfmt
       - *setup-actionlint
