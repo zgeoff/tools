@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.1...@zgeoff/skill-gate@0.2.2) (2026-10-20)
+
+
+### Bug Fixes
+
+* **geo-1496:** bundle skill-gate with no runtime dependencies ([#253](https://github.com/zgeoff/tools/issues/253)) ([d8712d7](https://github.com/zgeoff/tools/commit/d8712d7e16df1aaf274867d88f5378ee5caddd23))
+
 ## [0.2.1](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.0...@zgeoff/skill-gate@0.2.1) (2026-10-20)
 
 ### Dependencies

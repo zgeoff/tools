@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.6.0...@zgeoff/oxlint-config@0.6.1) (2026-10-20)
+
+
+### Bug Fixes
+
+* **geo-1507:** read verb-contract's callee name from the called member ([#252](https://github.com/zgeoff/tools/issues/252)) ([b89124d](https://github.com/zgeoff/tools/commit/b89124d2a73cd139ff4d897bcca1fc7c8b7b3c57))
+
 ## [0.6.0](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.5.2...@zgeoff/oxlint-config@0.6.0) (2026-10-20)
 
 ### ⚠ BREAKING CHANGES
