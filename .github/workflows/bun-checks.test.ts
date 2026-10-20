@@ -617,7 +617,7 @@ test('it runs a private repo as one checks job with the scan, the static checks,
   });
 });
 
-test('it runs the static checks, the tests and a lane once each through the private job bindings', async () => {
+test('it runs the static checks, the tests and each lane once through the private job bindings', async () => {
   const ctx = await setupTest();
 
   const workflow = join(import.meta.dir, 'bun-checks.yml');
@@ -625,13 +625,19 @@ test('it runs the static checks, the tests and a lane once each through the priv
   const sort = await loadWorkflowStep(workflow, 'checks', 'Sort the check scripts');
   const staticChecks = await loadWorkflowStep(workflow, 'checks', 'Static checks');
   const tests = await loadWorkflowStep(workflow, 'checks', 'Tests');
-  const laneE2E = await loadWorkflowStep(workflow, 'checks', 'Lane e2e');
+
+  const lanes = [
+    await loadWorkflowStep(workflow, 'checks', 'Lane e2e'),
+    await loadWorkflowStep(workflow, 'checks', 'Lane browser'),
+    await loadWorkflowStep(workflow, 'checks', 'Lane docker'),
+    await loadWorkflowStep(workflow, 'checks', 'Lane host'),
+  ];
 
   await $`bash -c ${sort.run}`
     .cwd(ctx.directory)
     .env({
       PATH: ctx.path,
-      SCRIPTS: ' lint test test:e2e ',
+      SCRIPTS: ' lint test test:e2e test:browser test:docker test:host ',
       PART: 'all',
       GITHUB_OUTPUT: join(ctx.directory, 'sorted'),
     })
@@ -653,15 +659,17 @@ test('it runs the static checks, the tests and a lane once each through the priv
       .quiet();
   }
 
-  await $`bash -c ${laneE2E.run}`
-    .cwd(ctx.directory)
-    .env({ PATH: ctx.path, SCRIPTS: laneE2E.env['SCRIPTS'] })
-    .quiet();
+  for (const lane of lanes) {
+    await $`bash -c ${lane.run}`
+      .cwd(ctx.directory)
+      .env({ PATH: ctx.path, SCRIPTS: lane.env['SCRIPTS'] })
+      .quiet();
+  }
 
   const ran = await readFile(join(ctx.directory, 'ran'), 'utf8');
 
-  expect(sorted).toInclude('lanes=["e2e"]\n');
-  expect(ran).toBe('lint\ntest\ntest:e2e\n');
+  expect(sorted).toInclude('lanes=["e2e","browser","docker","host"]\n');
+  expect(ran).toBe('lint\ntest\ntest:e2e\ntest:browser\ntest:docker\ntest:host\n');
 });
 
 test('it starts one public lane job per selected lane, each running its own script', async () => {
