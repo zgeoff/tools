@@ -170,6 +170,12 @@ dependencies it brings. A `@zgeoff/*` or `@impz/*` bump keeps the gate for its d
 `bun install` accepts the new release only when the repo lists the package in
 `minimumReleaseAgeExcludes`.
 
+The preset sets `rebaseWhen` to `conflicted`, so Renovate rebases an open pull request only when it
+conflicts with the base branch. Renovate's default rebases every auto-merge pull request that falls
+behind the base branch, and each rebase reruns the pull request's checks, so a red pull request
+would rerun them on every Renovate run. No ruleset requires a branch to be up to date before it
+merges, and the push run on the default branch tests the merged tree.
+
 Renovate's bun manager reads no Bun catalog until renovatebot/renovate#42909 ships, so a regex
 manager in the preset finds each `catalog` entry in `package.json`. A regex-manager bump changes
 `package.json` alone, because Renovate runs a manager's lock-file update only for that manager's own
