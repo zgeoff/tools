@@ -993,6 +993,58 @@ test('it reports a unit joined to its number in files named with an equals sign,
   expect(result.stdout).toInclude('user guide.md:1:The cache holds 64KB.');
 });
 
+test('it passes a banned word in a code span or a code block', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText(
+    'guide.md',
+    '# Guide\n\nRun the `lint-seams` check.\n\n```text\nlint-seams --all\n```\n\n~~~text\nseams\n~~~\n',
+  );
+
+  const result = ctx.run('guide.md');
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).not.toInclude('Banned words');
+});
+
+test('it reports a banned word in prose beside a code span', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', '# Guide\n\nThe `lint` check covers the seams.\n');
+
+  const result = ctx.run('guide.md');
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('Banned words');
+  expect(result.stdout).toInclude('guide.md:3:The `lint` check covers the seams.');
+});
+
+test('it reports a banned word in a code span outside Markdown', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('notes.txt', 'Run the `lint-seams` check.\n');
+
+  const result = ctx.run('notes.txt');
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).toInclude('notes.txt:1:Run the `lint-seams` check.');
+});
+
+test.each<[string, string, number]>([
+  ['an uppercase CAS', 'The store does a CAS on each write.\n', 1],
+  ['a plural CAs', 'The cluster trusts two CAs.\n', 0],
+  ['a code fence', 'Close each code fence.\n', 0],
+  ['a Surface in any case', 'The Surface grows.\n', 1],
+])('it checks %s in Markdown prose', async (_name, text, status) => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', text);
+
+  const result = ctx.run('guide.md');
+
+  expect(result.status).toBe(status);
+});
+
 test('it reads the default branch from origin/HEAD', async () => {
   const ctx = await setupTest();
 
