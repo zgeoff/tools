@@ -2,10 +2,10 @@
 name: code-style
 description:
   Code style for zgeoff TypeScript repos — module layout and file naming, acronyms, state
-  lifecycles, branching on a union with ts-pattern, comments, one-off codemods, and the role table
-  of function verbs whose promises the function-verb and verb-contract lint rules check. Load before
-  writing, reviewing, or renaming any TypeScript, with the repo's project-code-style skill beside
-  it.
+  lifecycles, branching on a union with ts-pattern, type claims, structure, errors and logs,
+  comments, one-off codemods, and the role table of function verbs whose promises the function-verb
+  and verb-contract lint rules check. Load before writing, reviewing, or renaming any TypeScript,
+  with the repo's project-code-style skill beside it.
 ---
 
 # Code style
@@ -27,6 +27,12 @@ Each line links the section that explains it.
   table, and an in-process actor is an xstate machine.
 - [Branching on a union](#branching-on-a-union): branch with `match(...).exhaustive()` from
   `ts-pattern`, never `switch`.
+- [Type claims](#type-claims): no type assertion and no `any` value reaching a typed place; narrow
+  or parse instead.
+- [Structure](#structure): typed contracts between processes, decisions split from I/O, no
+  forwarding layer or unused option, and I/O through given dependencies.
+- [Errors and logs](#errors-and-logs): return an expected outcome, guard only what can be wrong,
+  assert what only a bug reaches, and log nothing per call on a hot path.
 - [Comments](#comments): a `//` comment holds only the reason the obvious alternative is wrong, when
   the cause lives outside the file.
 - [Mechanical changes](#mechanical-changes): a one-off codemod goes in the PR description, never
@@ -110,6 +116,47 @@ Branch on a union with `match(...).exhaustive()` from `ts-pattern`, never with `
 later cannot fall through to a default. `zgeoff/no-switch` reports every `switch`, but only the
 author can tell a union from an open value. End the match with `.otherwise()` only when the value is
 open, such as a string from outside the program.
+
+## Type claims
+
+A type the checker cannot confirm is a claim, and the checker trusts it everywhere the value goes.
+
+- Replace a type assertion with a type guard, a type annotation, `satisfies`, or a parse with a
+  schema. Lint bans every assertion except `as const`. An assertion that survives carries a disable
+  comment with its approval and reason, as the `@zgeoff/oxlint-config` README shows, and review
+  reports each new one, so the maintainer sees every cast the repo gains.
+- Never let an `any` value reach a typed parameter, return or variable. Type it `unknown` and narrow
+  it, or parse it with a schema. `JSON.parse` and some library calls return `any`, and lint cannot
+  see the claim, because `any` turns the type check off.
+
+## Structure
+
+Each of these rules keeps the next change small.
+
+- An interface between processes or packages goes through the repo's typed contract, such as a typed
+  RPC layer, a shared schema or the CLI library's argument parser. A hand-matched route, a
+  hand-parsed body or hand-read arguments drift from the other side with no type error.
+- A function that both branches heavily and does I/O splits in two: a pure step that decides what to
+  do, and a thin step that does it. A test then covers each branch with values.
+- A layer adds behaviour. A wrapper that only forwards its arguments goes, and its callers call the
+  wrapped function.
+- Every option, parameter and extension point has a caller. Add one when its first caller needs it,
+  because one that nothing passes is code that no test runs.
+- A unit reaches I/O through the dependencies its caller passes in, never by importing a client or
+  calling a global, so a test passes a stand-in at the boundary.
+
+## Errors and logs
+
+- Return an expected outcome, such as a miss or a refused input, as a result. Throw only for a
+  failure the caller cannot plan for.
+- Guard only a value that can be wrong. A check on a value whose origin already guarantees it is
+  dead code, and it tells the reader the guarantee does not hold.
+- Input from outside the process, such as a request body, a file or an environment variable, gets a
+  handled error, never an assertion, because bad outside input is expected.
+- A condition that only a bug can reach gets an assertion, never a normal branch, so the bug fails
+  where it starts instead of running on.
+- Log a failure, a state change or a slow path. A log on a hot path or a success path repeats on
+  every call and buries the lines an operator needs.
 
 ## Comments
 
