@@ -576,24 +576,20 @@ test('it checks out the full history without the file contents, so the branch ch
   expect(workflow).toMatchObject({ jobs: { gitleaks: { steps }, checks: { steps } } });
 });
 
-test('it restores the install cache keyed on the lockfile, or the newest older cache for the runner OS, before it installs', async () => {
+test('it installs without a cache step, because a restore of the install cache takes longer than the install', async () => {
   const text = await readFile(join(import.meta.dir, 'bun-checks.yml'), 'utf8');
 
   const workflow: unknown = Bun.YAML.parse(text);
 
   const cache: unknown = expect.objectContaining({
-    name: 'Cache bun install',
-    with: expect.objectContaining({
-      path: '~/.bun/install/cache',
-      key: `bun-install-\${{ runner.os }}-\${{ hashFiles('bun.lock') }}`,
-      'restore-keys': `bun-install-\${{ runner.os }}-`,
-    }),
+    uses: expect.stringMatching(/^actions\/cache@/u),
   });
 
-  const install: unknown = expect.objectContaining({ name: 'Install' });
+  const steps: unknown = expect.not.arrayContaining([cache]);
+  const job: unknown = expect.objectContaining({ steps });
 
   expect(workflow).toMatchObject({
-    jobs: { checks: { steps: expect.arrayContaining([cache, install]) } },
+    jobs: { static: job, test: job, 'test-lane': job, checks: job },
   });
 });
 
@@ -607,7 +603,6 @@ test('it runs a public repo as separate gitleaks, static, test and lane jobs', a
     { name: 'Checkout', with: { 'fetch-depth': 0, filter: 'blob:none' } },
     { name: 'Setup Node' },
     { name: 'Setup Bun' },
-    { name: 'Cache bun install' },
     { name: 'Install' },
     { name: 'Fetch the check planner' },
     { name: 'Install the check planner' },
@@ -652,7 +647,6 @@ test('it runs a private repo as one checks job with the scan, the static checks,
           { name: 'Gitleaks', if: 'inputs.gitleaks' },
           { name: 'Setup Node' },
           { name: 'Setup Bun' },
-          { name: 'Cache bun install' },
           { name: 'Install' },
           { name: 'Fetch the check planner' },
           { name: 'Install the check planner' },

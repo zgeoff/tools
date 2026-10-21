@@ -4,8 +4,8 @@
 # a test, a test job, and a test-<lane> job for each lane, at most 8 jobs. A
 # private repo runs for minutes: one checks job that holds the scan, the static
 # checks, the tests and each lane as named steps, because each job bills at
-# least a full minute there. Every job installs with the frozen lockfile from a
-# cache keyed on bun.lock.
+# least a full minute there. Every job installs with the frozen lockfile and no
+# install cache.
 #
 # `scripts` is a space-separated list of package.json script names. Empty means
 # the standard list: audit deadcode format:check lint check typecheck test,
@@ -194,16 +194,9 @@ jobs:
 
       - *setup-bun
 
-      # Bun's install cache, keyed on the lockfile. A lockfile change restores
-      # the newest older cache, and the job saves a new one when it passes.
-      - &cache
-        name: Cache bun install
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.bun/install/cache
-          key: bun-install-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-          restore-keys: bun-install-${{ runner.os }}-
-
+      # Bun installs from the registry, with no cache of ~/.bun/install/cache.
+      # A restore of that cache takes longer than the install it replaces, and
+      # a job that misses it spends more time to save a new one.
       - &install
         name: Install
         run: bun install --frozen-lockfile
@@ -286,7 +279,6 @@ jobs:
       - *checkout
       - *setup-node
       - *setup-bun
-      - *cache
       - *install
       - *fetch-planner
       - *install-planner
@@ -317,7 +309,6 @@ jobs:
       - *checkout
       - *setup-node
       - *setup-bun
-      - *cache
       - *install
       - *fetch-planner
       - *install-planner
@@ -355,7 +346,6 @@ jobs:
 
       - *setup-node
       - *setup-bun
-      - *cache
       - *install
       - *fetch-planner
       - *install-planner
