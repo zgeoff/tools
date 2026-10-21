@@ -53,15 +53,21 @@ async function setupTest() {
       .quiet();
   };
 
+  // The caller's event and inputs, resolved through the step's own env bindings.
   const runMatch = async (event: string, patterns: string) => {
     await writeFile(output, '');
+
+    const contexts: Record<string, string> = {
+      [`\${{ github.event_name }}`]: event,
+      [`\${{ inputs.paths }}`]: patterns,
+    };
 
     const result = await $`bash -c ${match.run}`
       .cwd(repo)
       .env({
         ...env,
-        EVENT: event,
-        PATTERNS: patterns,
+        EVENT: contexts[match.env['EVENT'] ?? ''],
+        PATTERNS: contexts[match.env['PATTERNS'] ?? ''],
         GITHUB_OUTPUT: output,
         RUNNER_TEMP: directory,
       })
