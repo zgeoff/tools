@@ -585,9 +585,8 @@ test('it installs without a cache step, because a restore of the install cache t
     uses: expect.stringMatching(/^actions\/cache@/u),
   });
 
-  const job: unknown = expect.objectContaining({
-    steps: expect.not.arrayContaining([cache]),
-  });
+  const steps: unknown = expect.not.arrayContaining([cache]);
+  const job: unknown = expect.objectContaining({ steps });
 
   expect(workflow).toMatchObject({
     jobs: { static: job, test: job, 'test-lane': job, checks: job },
