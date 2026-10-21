@@ -1,9 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { $ } from 'bun';
 import { loadWorkflowStep } from './load-workflow-step.ts';
+import { writeRepoFiles } from './write-repo-files.ts';
 
 // A repo whose HEAD merges a branch into the base, as the checkout of a pull request's merge commit
 // holds it, and the match step read from the workflow, so each test runs the step for real.
@@ -29,16 +30,13 @@ async function setupTest() {
     'Match changed files',
   );
 
-  const writeFiles = async (files: Readonly<Record<string, string>>) => {
-    for (const [path, content] of Object.entries(files)) {
-      await mkdir(dirname(join(repo, path)), { recursive: true });
-      await writeFile(join(repo, path), content);
-    }
-  };
-
   const createMerge = async (change: () => Promise<void>) => {
     await mkdir(repo);
-    await writeFiles({ 'README.md': '# app\n', 'docker/app/Dockerfile': 'FROM scratch\n' });
+
+    await writeRepoFiles(repo, {
+      'README.md': '# app\n',
+      'docker/app/Dockerfile': 'FROM scratch\n',
+    });
 
     await $`git -C ${repo} init -q -b main && git -C ${repo} add -A && git -C ${repo} commit -q -m base`
       .env(env)
@@ -55,15 +53,21 @@ async function setupTest() {
       .quiet();
   };
 
+  // The caller's event and inputs, resolved through the step's own env bindings.
   const runMatch = async (event: string, patterns: string) => {
     await writeFile(output, '');
+
+    const contexts: Record<string, string> = {
+      [`\${{ github.event_name }}`]: event,
+      [`\${{ inputs.paths }}`]: patterns,
+    };
 
     const result = await $`bash -c ${match.run}`
       .cwd(repo)
       .env({
         ...env,
-        EVENT: event,
-        PATTERNS: patterns,
+        EVENT: contexts[match.env['EVENT'] ?? ''],
+        PATTERNS: contexts[match.env['PATTERNS'] ?? ''],
         GITHUB_OUTPUT: output,
         RUNNER_TEMP: directory,
       })
@@ -73,13 +77,15 @@ async function setupTest() {
     return { exitCode: result.exitCode, output: await readFile(output, 'utf8') };
   };
 
-  return { repo, matchID: match.id, writeFiles, createMerge, runMatch };
+  return { repo, matchID: match.id, createMerge, runMatch };
 }
 
 test('it answers true when the pull request changes a file that a pattern matches', async () => {
   const ctx = await setupTest();
 
-  await ctx.createMerge(() => ctx.writeFiles({ 'docker/app/Dockerfile': 'FROM alpine\n' }));
+  await ctx.createMerge(() =>
+    writeRepoFiles(ctx.repo, { 'docker/app/Dockerfile': 'FROM alpine\n' }),
+  );
 
   const result = await ctx.runMatch('pull_request', 'docker/**\n');
 
@@ -89,7 +95,7 @@ test('it answers true when the pull request changes a file that a pattern matche
 test('it answers false when the pull request changes no file that a pattern matches', async () => {
   const ctx = await setupTest();
 
-  await ctx.createMerge(() => ctx.writeFiles({ 'README.md': '# app, renamed\n' }));
+  await ctx.createMerge(() => writeRepoFiles(ctx.repo, { 'README.md': '# app, renamed\n' }));
 
   const result = await ctx.runMatch('pull_request', 'docker/**\nflake.nix\n');
 
@@ -99,7 +105,9 @@ test('it answers false when the pull request changes no file that a pattern matc
 test('it matches a single star across folders', async () => {
   const ctx = await setupTest();
 
-  await ctx.createMerge(() => ctx.writeFiles({ 'docker/app/Dockerfile': 'FROM alpine\n' }));
+  await ctx.createMerge(() =>
+    writeRepoFiles(ctx.repo, { 'docker/app/Dockerfile': 'FROM alpine\n' }),
+  );
 
   const result = await ctx.runMatch('pull_request', 'docker/*\n');
 
@@ -152,7 +160,7 @@ test.each([
 
     const workflow: unknown = Bun.YAML.parse(text);
 
-    await ctx.createMerge(() => ctx.writeFiles({ [path]: 'changed\n' }));
+    await ctx.createMerge(() => writeRepoFiles(ctx.repo, { [path]: 'changed\n' }));
 
     const result = await ctx.runMatch('pull_request', 'docker/**\n');
 
