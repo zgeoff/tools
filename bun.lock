@@ -68,7 +68,7 @@
     },
     "packages/checks": {
       "name": "@zgeoff/checks",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "bin": {
         "zgeoff-check": "./dist/cli.js",
       },

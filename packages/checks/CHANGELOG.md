@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/zgeoff/tools/compare/@zgeoff/checks@0.2.3...@zgeoff/checks@0.2.4) (2026-10-21)
+
+### Bug Fixes
+
+- name the issue only in the pull-request body ([#282](https://github.com/zgeoff/tools/issues/282))
+  ([0c46011](https://github.com/zgeoff/tools/commit/0c46011a62f5e94f17565cebeca859b9700044f2))
+
 ## [0.2.3](https://github.com/zgeoff/tools/compare/@zgeoff/checks@0.2.2...@zgeoff/checks@0.2.3) (2026-10-20)
 
 ### Dependencies
