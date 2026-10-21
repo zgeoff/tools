@@ -1,148 +1,26 @@
 import { expect, test } from 'bun:test';
-import { mkdir, mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-
-const oxlintBin = join(import.meta.dir, '..', '..', 'node_modules', '.bin', 'oxlint');
-const pluginPath = join(import.meta.dir, 'plugin.js');
-
-const sharedSkillPath = join(
-  import.meta.dir,
-  '..',
-  '..',
-  '.claude',
-  'skills',
-  'code-style',
-  'SKILL.md',
-);
-
-interface LintResult {
-  exitCode: number;
-  stdout: string;
-  output: string;
-}
-
-type RuleSettings = Readonly<Record<string, unknown>>;
-
-type FileTree = Readonly<Record<string, string>>;
-
-async function createLintTree(files: FileTree, rules: RuleSettings): Promise<string> {
-  const directory = await mkdtemp(join(tmpdir(), 'oxlint-config-test-'));
-
-  const config = { jsPlugins: [pluginPath], rules };
-
-  await writeFile(join(directory, '.oxlintrc.json'), JSON.stringify(config));
-
-  await Promise.all(
-    Object.entries(files).map((entry: readonly [string, string]) =>
-      writeTreeFile(directory, entry),
-    ),
-  );
-
-  return directory;
-}
-
-async function writeTreeFile(directory: string, entry: readonly [string, string]): Promise<void> {
-  const [path, content] = entry;
-
-  await mkdir(dirname(join(directory, path)), { recursive: true });
-  await writeFile(join(directory, path), content);
-}
-
-async function runLint(source: string, fix: boolean, rules: RuleSettings): Promise<LintResult> {
-  const directory = await createLintTree({ 'sample.ts': source }, rules);
-
-  const fixArgs = fix ? ['--fix'] : [];
-  const args = [oxlintBin, '-c', '.oxlintrc.json', ...fixArgs, 'sample.ts'];
-  const subprocess = Bun.spawn(args, { cwd: directory, stdout: 'pipe', stderr: 'pipe' });
-
-  const [exitCode, stdout] = await Promise.all([
-    subprocess.exited,
-    new Response(subprocess.stdout).text(),
-  ]);
-
-  const output = await readFile(join(directory, 'sample.ts'), 'utf8');
-
-  return { exitCode, stdout, output };
-}
-
-type TreeLintResult = Omit<LintResult, 'output'>;
-
-async function runLintTree(
-  files: FileTree,
-  target: string,
-  rules: RuleSettings,
-): Promise<TreeLintResult> {
-  const directory = await createLintTree(files, rules);
-
-  return runLintIn(directory, directory, target);
-}
-
-async function runLintIn(directory: string, cwd: string, target: string): Promise<TreeLintResult> {
-  const args = [
-    oxlintBin,
-    '-c',
-    join(directory, '.oxlintrc.json'),
-    '--report-unused-disable-directives-severity',
-    'error',
-    target,
-  ];
-
-  const subprocess = Bun.spawn(args, { cwd, stdout: 'pipe', stderr: 'pipe' });
-
-  const [exitCode, stdout] = await Promise.all([
-    subprocess.exited,
-    new Response(subprocess.stdout).text(),
-  ]);
-
-  return { exitCode, stdout };
-}
-
-function collectBannedVerbs(markdown: string): string[] {
-  const start = markdown.indexOf('### Banned verbs');
-  const end = markdown.indexOf('### Changing the table');
-  const paragraph = markdown.slice(start, end);
-  const banned: string[] = [];
-
-  for (const match of paragraph.matchAll(/`(?<verb>[a-z]+)`/gu)) {
-    const preceding = paragraph.slice(0, match.index);
-    const verb = match.groups?.['verb'];
-
-    if (
-      verb !== undefined &&
-      countOccurrences(preceding, '(') === countOccurrences(preceding, ')')
-    ) {
-      banned.push(verb);
-    }
-  }
-
-  return banned;
-}
-
-function countOccurrences(text: string, part: string): number {
-  return text.split(part).length - 1;
-}
-
-const noJSDoc = { 'zgeoff/no-jsdoc': 'error' };
-const maxRun = { 'zgeoff/max-consecutive-line-comments': 'error' };
-const besideModule = { 'zgeoff/test-beside-module': 'error' };
-const testSource = "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n";
+import { readFile, symlink } from 'node:fs/promises';
+import { join } from 'node:path';
+import { collectBannedVerbs } from './test-utils/collect-banned-verbs.ts';
+import { createLintTree } from './test-utils/create-lint-tree.ts';
+import { runLintIn } from './test-utils/run-lint-in.ts';
+import { runLintTree } from './test-utils/run-lint-tree.ts';
+import { runLint } from './test-utils/run-lint.ts';
+import type { OxlintRun } from './test-utils/run-oxlint.ts';
 
 test('it flags a multi-line JSDoc block', async () => {
   const source = '/**\n * Documents the export.\n */\nexport const answer = 42;\n';
 
-  const result = await runLint(source, false, noJSDoc);
+  const result = await runLint(source, { 'zgeoff/no-jsdoc': 'error' });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('no-jsdoc');
 });
 
 test('it flags a single-line JSDoc block', async () => {
-  const result = await runLint(
-    '/** Documents the export. */\nexport const answer = 42;\n',
-    false,
-    noJSDoc,
-  );
+  const result = await runLint('/** Documents the export. */\nexport const answer = 42;\n', {
+    'zgeoff/no-jsdoc': 'error',
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('no-jsdoc');
@@ -151,7 +29,7 @@ test('it flags a single-line JSDoc block', async () => {
 test('it flags a JSDoc block inside a class body', async () => {
   const source = 'class Box {\n  /**\n   * Holds the value.\n   */\n  value = 1;\n}\n';
 
-  const result = await runLint(source, false, noJSDoc);
+  const result = await runLint(source, { 'zgeoff/no-jsdoc': 'error' });
 
   expect(result.exitCode).toBe(1);
 });
@@ -171,7 +49,7 @@ test('it leaves line comments and plain block comments alone', async () => {
     '',
   ].join('\n');
 
-  const result = await runLint(source, false, noJSDoc);
+  const result = await runLint(source, { 'zgeoff/no-jsdoc': 'error' });
 
   expect(result.exitCode).toBe(0);
 });
@@ -179,7 +57,7 @@ test('it leaves line comments and plain block comments alone', async () => {
 test('it exempts inline @type and @lends casts', async () => {
   const source = 'export const config = /** @type {const} */ ({ port: 3000 });\n';
 
-  const result = await runLint(source, false, noJSDoc);
+  const result = await runLint(source, { 'zgeoff/no-jsdoc': 'error' });
 
   expect(result.exitCode).toBe(0);
 });
@@ -188,8 +66,8 @@ test('it flags a run of four line comments and accepts three', async () => {
   const four = '// one\n// two\n// three\n// four\nexport const a = 1;\n';
   const three = '// one\n// two\n// three\nexport const a = 1;\n';
 
-  const fourResult = await runLint(four, false, maxRun);
-  const threeResult = await runLint(three, false, maxRun);
+  const fourResult = await runLint(four, { 'zgeoff/max-consecutive-line-comments': 'error' });
+  const threeResult = await runLint(three, { 'zgeoff/max-consecutive-line-comments': 'error' });
 
   expect(fourResult.exitCode).toBe(1);
   expect(fourResult.stdout).toInclude('max-consecutive-line-comments');
@@ -200,7 +78,7 @@ test('it flags a run of four line comments and accepts three', async () => {
 test('it honours the max option', async () => {
   const source = '// one\n// two\nexport const a = 1;\n';
 
-  const result = await runLint(source, false, {
+  const result = await runLint(source, {
     'zgeoff/max-consecutive-line-comments': ['error', { max: 1 }],
   });
 
@@ -220,7 +98,7 @@ test('it ends a run at a blank line, a statement, or a trailing comment', async 
     '',
   ].join('\n');
 
-  const result = await runLint(source, false, maxRun);
+  const result = await runLint(source, { 'zgeoff/max-consecutive-line-comments': 'error' });
 
   expect(result.exitCode).toBe(0);
 });
@@ -236,7 +114,7 @@ test('it neither counts a tool directive nor joins the prose around it', async (
     '',
   ].join('\n');
 
-  const result = await runLint(source, false, maxRun);
+  const result = await runLint(source, { 'zgeoff/max-consecutive-line-comments': 'error' });
 
   expect(result.exitCode).toBe(0);
 });
@@ -253,7 +131,7 @@ test('it counts an indented run inside a block', async () => {
     '',
   ].join('\n');
 
-  const result = await runLint(source, false, maxRun);
+  const result = await runLint(source, { 'zgeoff/max-consecutive-line-comments': 'error' });
 
   expect(result.exitCode).toBe(1);
 });
@@ -261,7 +139,7 @@ test('it counts an indented run inside a block', async () => {
 test('it accepts a free verb outside the role table', async () => {
   const source = 'export function grabConfig(): number {\n  return 1;\n}\n';
 
-  const result = await runLint(source, false, { 'zgeoff/function-verb': 'error' });
+  const result = await runLint(source, { 'zgeoff/function-verb': 'error' });
 
   expect(result.exitCode).toBe(0);
 });
@@ -269,7 +147,7 @@ test('it accepts a free verb outside the role table', async () => {
 test('it points a banned verb at its replacement', async () => {
   const source = 'export function fetchUser(): number {\n  return 1;\n}\n';
 
-  const result = await runLint(source, false, { 'zgeoff/function-verb': 'error' });
+  const result = await runLint(source, { 'zgeoff/function-verb': 'error' });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude("banned verb 'fetch'");
@@ -279,7 +157,7 @@ test('it points a banned verb at its replacement', async () => {
 test('it tells a vague banned verb to name what the function does', async () => {
   const source = 'export function processInput(): number {\n  return 1;\n}\n';
 
-  const result = await runLint(source, false, { 'zgeoff/function-verb': 'error' });
+  const result = await runLint(source, { 'zgeoff/function-verb': 'error' });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('name what the function does');
@@ -303,7 +181,7 @@ test('it accepts role-table verbs on declarations, const functions, and class me
     '',
   ].join('\n');
 
-  const result = await runLint(source, false, { 'zgeoff/function-verb': 'error' });
+  const result = await runLint(source, { 'zgeoff/function-verb': 'error' });
 
   expect(result.exitCode).toBe(0);
 });
@@ -313,7 +191,7 @@ test.each(['to', 'with', 'make', 'use', 'on'])(
   async (prefix) => {
     const source = `export const api = {\n  ${prefix}(): void {},\n};\n`;
 
-    const result = await runLint(source, false, { 'zgeoff/function-verb': 'error' });
+    const result = await runLint(source, { 'zgeoff/function-verb': 'error' });
 
     expect(result.exitCode).toBe(1);
     expect(result.stdout).toInclude(`'${prefix}' is a bare prefix`);
@@ -331,13 +209,13 @@ test('it accepts each template prefix with a suffix', async () => {
     '',
   ].join('\n');
 
-  const result = await runLint(source, false, { 'zgeoff/function-verb': 'error' });
+  const result = await runLint(source, { 'zgeoff/function-verb': 'error' });
 
   expect(result.exitCode).toBe(0);
 });
 
 test('it reports a bare handle as a vague banned verb', async () => {
-  const result = await runLint('export const handle = (): void => {};\n', false, {
+  const result = await runLint('export const handle = (): void => {};\n', {
     'zgeoff/function-verb': 'error',
   });
 
@@ -348,7 +226,7 @@ test('it reports a bare handle as a vague banned verb', async () => {
 test('it matches a banned verb only at a camelCase boundary', async () => {
   const source = 'export function processionLength(): number {\n  return 1;\n}\n';
 
-  const result = await runLint(source, false, { 'zgeoff/function-verb': 'error' });
+  const result = await runLint(source, { 'zgeoff/function-verb': 'error' });
 
   expect(result.exitCode).toBe(0);
 });
@@ -363,7 +241,7 @@ test('it accepts a digit as the boundary after a verb', async () => {
     '',
   ].join('\n');
 
-  const result = await runLint(source, false, { 'zgeoff/function-verb': 'error' });
+  const result = await runLint(source, { 'zgeoff/function-verb': 'error' });
 
   expect(result.exitCode).toBe(0);
 });
@@ -371,7 +249,7 @@ test('it accepts a digit as the boundary after a verb', async () => {
 test('it flags a banned verb at a digit boundary', async () => {
   const source = 'export function save2FABackupCodes(): void {}\n';
 
-  const result = await runLint(source, false, { 'zgeoff/function-verb': 'error' });
+  const result = await runLint(source, { 'zgeoff/function-verb': 'error' });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude("banned verb 'save'");
@@ -388,7 +266,7 @@ test('it flags a banned verb on object-literal methods and arrow properties', as
     '',
   ].join('\n');
 
-  const result = await runLint(source, false, { 'zgeoff/function-verb': 'error' });
+  const result = await runLint(source, { 'zgeoff/function-verb': 'error' });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude("'fetchUser' starts with the banned verb 'fetch'");
@@ -419,7 +297,7 @@ test('it skips PascalCase names, getters, setters, and quoted keys', async () =>
     '',
   ].join('\n');
 
-  const result = await runLint(source, false, { 'zgeoff/function-verb': 'error' });
+  const result = await runLint(source, { 'zgeoff/function-verb': 'error' });
 
   expect(result.exitCode).toBe(0);
 });
@@ -427,7 +305,7 @@ test('it skips PascalCase names, getters, setters, and quoted keys', async () =>
 test('it skips names listed in the exemptNames option', async () => {
   const source = 'export function executeQuery(): void {}\n';
 
-  const result = await runLint(source, false, {
+  const result = await runLint(source, {
     'zgeoff/function-verb': ['error', { exemptNames: ['executeQuery'] }],
   });
 
@@ -435,7 +313,10 @@ test('it skips names listed in the exemptNames option', async () => {
 });
 
 test('it rejects every verb the shared skill bans', async () => {
-  const markdown = await readFile(sharedSkillPath, 'utf8');
+  const markdown = await readFile(
+    join(import.meta.dir, '..', '..', '.claude', 'skills', 'code-style', 'SKILL.md'),
+    'utf8',
+  );
 
   const banned = collectBannedVerbs(markdown).filter((verb) => verb !== 'handle');
 
@@ -443,7 +324,7 @@ test('it rejects every verb the shared skill bans', async () => {
 
   const lines = banned.map((verb) => `export function ${verb}Thing(): void {}`);
 
-  const result = await runLint(`${lines.join('\n')}\n`, false, { 'zgeoff/function-verb': 'error' });
+  const result = await runLint(`${lines.join('\n')}\n`, { 'zgeoff/function-verb': 'error' });
 
   expect(result.exitCode).toBe(1);
 
@@ -454,9 +335,12 @@ test('it rejects every verb the shared skill bans', async () => {
 
 test('it flags a test file with no module beside it', async () => {
   const result = await runLintTree(
-    { 'src/parse-entry.test.ts': testSource, 'src/other.ts': '' },
+    {
+      'src/parse-entry.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+      'src/other.ts': '',
+    },
     'src/parse-entry.test.ts',
-    besideModule,
+    { 'zgeoff/test-beside-module': 'error' },
   );
 
   expect(result.exitCode).toBe(1);
@@ -466,9 +350,9 @@ test('it flags a test file with no module beside it', async () => {
 
 test('it flags a .test.tsx file with no module beside it', async () => {
   const result = await runLintTree(
-    { 'src/view.test.tsx': testSource },
+    { 'src/view.test.tsx': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n" },
     'src/view.test.tsx',
-    besideModule,
+    { 'zgeoff/test-beside-module': 'error' },
   );
 
   expect(result.exitCode).toBe(1);
@@ -480,20 +364,28 @@ test('it accepts a test beside a .ts, .tsx, .sh, or .json module', async () => {
     ['parse-entry.ts', 'view.tsx', 'install.sh', 'turbo.json'].map((module) => {
       const testFile = module.replace(/\.[a-z]+$/u, '.test.ts');
 
-      return runLintTree({ [module]: '', [testFile]: testSource }, testFile, besideModule);
+      return runLintTree(
+        {
+          [module]: '',
+          [testFile]: "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+        },
+        testFile,
+        { 'zgeoff/test-beside-module': 'error' },
+      );
     }),
   );
 
-  expect(results.map((result: Readonly<TreeLintResult>) => result.exitCode)).toStrictEqual([
-    0, 0, 0, 0,
-  ]);
+  expect(results.map((result: Readonly<OxlintRun>) => result.exitCode)).toStrictEqual([0, 0, 0, 0]);
 });
 
 test('it accepts a .test.tsx file beside its module', async () => {
   const result = await runLintTree(
-    { 'view.tsx': '', 'view.test.tsx': testSource },
+    {
+      'view.tsx': '',
+      'view.test.tsx': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
     'view.test.tsx',
-    besideModule,
+    { 'zgeoff/test-beside-module': 'error' },
   );
 
   expect(result.exitCode).toBe(0);
@@ -501,15 +393,21 @@ test('it accepts a .test.tsx file beside its module', async () => {
 
 test('it counts neither another test nor a declaration file as the module', async () => {
   const declaration = await runLintTree(
-    { 'egress.test.ts': testSource, 'egress.d.ts': '' },
+    {
+      'egress.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+      'egress.d.ts': '',
+    },
     'egress.test.ts',
-    besideModule,
+    { 'zgeoff/test-beside-module': 'error' },
   );
 
   const otherTest = await runLintTree(
-    { 'egress.test.ts': testSource, 'egress.test.test.ts': testSource },
+    {
+      'egress.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+      'egress.test.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
     'egress.test.test.ts',
-    besideModule,
+    { 'zgeoff/test-beside-module': 'error' },
   );
 
   expect(declaration.exitCode).toBe(1);
@@ -520,8 +418,11 @@ test('it counts neither another test nor a declaration file as the module', asyn
 
 test('it counts a symlinked module', async () => {
   const directory = await createLintTree(
-    { 'real.ts': '', 'link.test.ts': testSource },
-    besideModule,
+    {
+      'real.ts': '',
+      'link.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
+    { 'zgeoff/test-beside-module': 'error' },
   );
 
   await symlink(join(directory, 'real.ts'), join(directory, 'link.ts'));
@@ -533,9 +434,12 @@ test('it counts a symlinked module', async () => {
 
 test('it accepts a browser suite beside its module', async () => {
   const result = await runLintTree(
-    { 'view.tsx': '', 'view.browser.test.ts': testSource },
+    {
+      'view.tsx': '',
+      'view.browser.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
     'view.browser.test.ts',
-    besideModule,
+    { 'zgeoff/test-beside-module': 'error' },
   );
 
   expect(result.exitCode).toBe(0);
@@ -543,9 +447,12 @@ test('it accepts a browser suite beside its module', async () => {
 
 test('it flags a browser suite with no module beside it', async () => {
   const result = await runLintTree(
-    { 'view.browser.test.ts': testSource, 'other.ts': '' },
+    {
+      'view.browser.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+      'other.ts': '',
+    },
     'view.browser.test.ts',
-    besideModule,
+    { 'zgeoff/test-beside-module': 'error' },
   );
 
   expect(result.exitCode).toBe(1);
@@ -554,9 +461,13 @@ test('it flags a browser suite with no module beside it', async () => {
 
 test('it flags a test-kind suffix test beside only the base module', async () => {
   const result = await runLintTree(
-    { 'egress-ruleset.ts': '', 'egress-ruleset.host.test.ts': testSource },
+    {
+      'egress-ruleset.ts': '',
+      'egress-ruleset.host.test.ts':
+        "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
     'egress-ruleset.host.test.ts',
-    besideModule,
+    { 'zgeoff/test-beside-module': 'error' },
   );
 
   expect(result.exitCode).toBe(1);
@@ -564,12 +475,19 @@ test('it flags a test-kind suffix test beside only the base module', async () =>
 });
 
 test('it exempts tests under a root e2e/ or evals/ directory', async () => {
-  const e2e = await runLintTree({ 'e2e/cli.test.ts': testSource }, 'e2e/cli.test.ts', besideModule);
+  const e2e = await runLintTree(
+    { 'e2e/cli.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n" },
+    'e2e/cli.test.ts',
+    { 'zgeoff/test-beside-module': 'error' },
+  );
 
   const evals = await runLintTree(
-    { 'evals/agent/plan.test.ts': testSource },
+    {
+      'evals/agent/plan.test.ts':
+        "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
     'evals/agent/plan.test.ts',
-    besideModule,
+    { 'zgeoff/test-beside-module': 'error' },
   );
 
   expect(e2e.exitCode).toBe(0);
@@ -578,15 +496,21 @@ test('it exempts tests under a root e2e/ or evals/ directory', async () => {
 
 test('it flags tests under test-utils/ or a nested e2e/ directory', async () => {
   const testUtils = await runLintTree(
-    { 'test-utils/fixtures.test.ts': testSource },
+    {
+      'test-utils/fixtures.test.ts':
+        "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
     'test-utils/fixtures.test.ts',
-    besideModule,
+    { 'zgeoff/test-beside-module': 'error' },
   );
 
   const nestedE2E = await runLintTree(
-    { 'packages/cli/e2e/run.test.ts': testSource },
+    {
+      'packages/cli/e2e/run.test.ts':
+        "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
     'packages/cli/e2e/run.test.ts',
-    besideModule,
+    { 'zgeoff/test-beside-module': 'error' },
   );
 
   expect(testUtils.exitCode).toBe(1);
@@ -599,10 +523,11 @@ test('it anchors the e2e/ exemption on the repo root, not the working directory'
   const directory = await createLintTree(
     {
       '.git/HEAD': '',
-      'e2e/root.test.ts': testSource,
-      'packages/cli/e2e/run.test.ts': testSource,
+      'e2e/root.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+      'packages/cli/e2e/run.test.ts':
+        "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
     },
-    besideModule,
+    { 'zgeoff/test-beside-module': 'error' },
   );
 
   const packageCWD = join(directory, 'packages', 'cli');
@@ -616,21 +541,21 @@ test('it anchors the e2e/ exemption on the repo root, not the working directory'
 });
 
 test('it honours a file-level disable comment with a reason', async () => {
-  const source = `// oxlint-disable zgeoff/test-beside-module -- tests two configs at once\n${testSource}`;
+  const source = `// oxlint-disable zgeoff/test-beside-module -- tests two configs at once\nimport { test } from 'bun:test';\n\ntest('it runs', () => {});\n`;
 
-  const result = await runLintTree({ 'configs.test.ts': source }, 'configs.test.ts', besideModule);
+  const result = await runLintTree({ 'configs.test.ts': source }, 'configs.test.ts', {
+    'zgeoff/test-beside-module': 'error',
+  });
 
   expect(result.exitCode).toBe(0);
 });
-
-const noFileSnapshot = { 'zgeoff/no-file-snapshot': 'error' };
 
 test.each(['toMatchSnapshot', 'toThrowErrorMatchingSnapshot'])(
   'it flags the file-backed %s matcher',
   async (matcher) => {
     const source = `import { expect, test } from 'bun:test';\n\ntest('it renders the banner', () => {\n  expect('ready').${matcher}();\n});\n`;
 
-    const result = await runLint(source, false, noFileSnapshot);
+    const result = await runLint(source, { 'zgeoff/no-file-snapshot': 'error' });
 
     expect(result.exitCode).toBe(1);
     expect(result.stdout).toInclude('no-file-snapshot');
@@ -642,7 +567,7 @@ test('it flags a negated and a computed file snapshot matcher', async () => {
   const source =
     "import { expect, test } from 'bun:test';\n\ntest('it renders the banner', () => {\n  expect('ready').not.toMatchSnapshot();\n  expect('ready')['toMatchSnapshot']();\n});\n";
 
-  const result = await runLint(source, false, noFileSnapshot);
+  const result = await runLint(source, { 'zgeoff/no-file-snapshot': 'error' });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('sample.ts:4:23');
@@ -653,7 +578,7 @@ test('it accepts inline snapshot matchers', async () => {
   const source =
     "import { expect, test } from 'bun:test';\n\ntest('it renders the banner', () => {\n  expect('ready').toMatchInlineSnapshot(`\"ready\"`);\n  expect(() => {\n    throw new Error('late');\n  }).toThrowErrorMatchingInlineSnapshot(`\"late\"`);\n});\n";
 
-  const result = await runLint(source, false, noFileSnapshot);
+  const result = await runLint(source, { 'zgeoff/no-file-snapshot': 'error' });
 
   expect(result.exitCode).toBe(0);
 });
@@ -662,11 +587,11 @@ test('it flags a test file with a snapshot file beside it in __snapshots__/', as
   const result = await runLintTree(
     {
       'src/banner.ts': '',
-      'src/banner.test.ts': testSource,
+      'src/banner.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
       'src/__snapshots__/banner.test.ts.snap': '// Bun Snapshot v1\n',
     },
     'src/banner.test.ts',
-    noFileSnapshot,
+    { 'zgeoff/no-file-snapshot': 'error' },
   );
 
   expect(result.exitCode).toBe(1);
@@ -677,35 +602,35 @@ test('it flags a test file with a snapshot file beside it in __snapshots__/', as
 test('it accepts a test file whose name no snapshot file in __snapshots__/ matches', async () => {
   const result = await runLintTree(
     {
-      'banner.test.ts': testSource,
+      'banner.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
       '__snapshots__/footer.test.ts.snap': '// Bun Snapshot v1\n',
     },
     'banner.test.ts',
-    noFileSnapshot,
+    { 'zgeoff/no-file-snapshot': 'error' },
   );
 
   expect(result.exitCode).toBe(0);
 });
 
 test('it honours a file-level disable comment on a snapshot file', async () => {
-  const source = `// oxlint-disable zgeoff/no-file-snapshot -- migrates the legacy golden files\n${testSource}`;
+  const source = `// oxlint-disable zgeoff/no-file-snapshot -- migrates the legacy golden files\nimport { test } from 'bun:test';\n\ntest('it runs', () => {});\n`;
 
   const result = await runLintTree(
     { 'banner.test.ts': source, '__snapshots__/banner.test.ts.snap': '// Bun Snapshot v1\n' },
     'banner.test.ts',
-    noFileSnapshot,
+    { 'zgeoff/no-file-snapshot': 'error' },
   );
 
   expect(result.exitCode).toBe(0);
 });
 
-const setupTestOnly = { 'zgeoff/setup-test-only': 'error' };
-
 test('it accepts a test file of imports, types, setupTest and test calls', async () => {
   const source =
     "import { expect, test } from 'bun:test';\nimport type { Kettle } from './kettle';\n\ntype Reading = Readonly<{ celsius: number }>;\n\ninterface Brew {\n  kettle: Kettle;\n}\n\nfunction setupTest() {\n  return { reading: { celsius: 90 } satisfies Reading };\n}\n\ntest('it boils', () => {\n  const ctx = setupTest();\n\n  expect(ctx.reading.celsius).toBe(90);\n});\n\ntest.each([[1, 2]])('it adds %d', (left, right) => {\n  expect(left + 1).toBe(right);\n});\n\ntest.skipIf(process.platform === 'win32')('it steeps', () => {});\n\ntest.if(process.platform === 'linux')('it pours', () => {});\n\ntest.skipIf(false).each([[1]])('it chains %d', () => {});\n";
 
-  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.stdout).not.toInclude('setup-test-only');
 });
@@ -730,7 +655,9 @@ test.each([
 ])('it flags %s and names it', async (_, declaration, name) => {
   const source = `import { test } from 'bun:test';\n\n${declaration}\ntest('it pours', () => {});\n`;
 
-  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('setup-test-only');
@@ -741,7 +668,9 @@ test('it names the three ways out of a module-level declaration', async () => {
   const source =
     "import { test } from 'bun:test';\n\nconst cups = 2;\n\ntest('it pours', () => {});\n";
 
-  const result = await runLintTree({ 'pot.test.tsx': source }, 'pot.test.tsx', setupTestOnly);
+  const result = await runLintTree({ 'pot.test.tsx': source }, 'pot.test.tsx', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('Inline it where it is used');
@@ -756,7 +685,9 @@ test.each([
 ])('it flags %s at module level', async (_, statement) => {
   const source = `import { beforeEach, test } from 'bun:test';\n\n${statement}\ntest('it pours', () => {});\n`;
 
-  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('Move this statement into a test or `setupTest()`');
@@ -772,7 +703,9 @@ test.each([
 ])('it flags a call of a module binding named test that %s defines', async (_, binding) => {
   const source = `${binding}\ntest(() => {});\n`;
 
-  const result = await runLintTree({ 'hooks.test.ts': source }, 'hooks.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'hooks.test.ts': source }, 'hooks.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('Move this statement into a test or `setupTest()`');
@@ -782,7 +715,9 @@ test('it accepts a skip gate that only skipIf arguments read', async () => {
   const source =
     "import { test } from 'bun:test';\nimport { probeKettle } from './probe-kettle';\n\n// skipIf takes a boolean and has no in-body skip\nconst hasKettle = await probeKettle();\n\ntest.skipIf(!hasKettle)('it boils', () => {});\n\ntest.skipIf(!hasKettle)('it whistles', () => {});\n";
 
-  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.stdout).not.toInclude('setup-test-only');
 });
@@ -791,7 +726,9 @@ test('it accepts a gate derived from the probe when only skipIf reads the derive
   const source =
     "import { test } from 'bun:test';\nimport { probeKettle } from './probe-kettle';\n\n// skipIf takes a boolean and has no in-body skip\nconst hasKettle = await probeKettle();\nconst skipBoil = !hasKettle || process.platform === 'win32';\n\ntest.skipIf(skipBoil)('it boils', () => {});\n";
 
-  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.stdout).not.toInclude('setup-test-only');
 });
@@ -800,7 +737,9 @@ test('it flags a skip gate that a test body reads', async () => {
   const source =
     "import { expect, test } from 'bun:test';\nimport { probeKettle } from './probe-kettle';\n\nconst hasKettle = await probeKettle();\n\ntest.skipIf(!hasKettle)('it boils', () => {\n  expect(hasKettle).toBeTrue();\n});\n";
 
-  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('Remove the module-level `hasKettle`');
@@ -810,7 +749,9 @@ test('it flags a gate derived from a probe that a test body reads', async () => 
   const source =
     "import { expect, test } from 'bun:test';\nimport { probeKettle } from './probe-kettle';\n\nconst hasKettle = await probeKettle();\nconst skipBoil = !hasKettle;\n\ntest.skipIf(skipBoil)('it boils', () => {\n  expect(hasKettle).toBeTrue();\n});\n";
 
-  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('Remove the module-level `hasKettle`');
@@ -821,7 +762,9 @@ test('it accepts a destructured probe whose every member only skipIf arguments r
   const source =
     "import { test } from 'bun:test';\nimport { probeKitchen } from './probe-kitchen';\n\n// skipIf takes a boolean and has no in-body skip\nconst { hasKettle, hasStove } = await probeKitchen();\n\ntest.skipIf(!hasKettle)('it boils', () => {});\n\ntest.skipIf(!hasStove)('it simmers', () => {});\n";
 
-  const result = await runLintTree({ 'kitchen.test.ts': source }, 'kitchen.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'kitchen.test.ts': source }, 'kitchen.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.stdout).not.toInclude('setup-test-only');
 });
@@ -830,7 +773,9 @@ test('it flags a destructured probe with a member that nothing reads', async () 
   const source =
     "import { test } from 'bun:test';\nimport { probeKitchen } from './probe-kitchen';\n\nconst { hasKettle, readStove } = await probeKitchen();\n\ntest.skipIf(!hasKettle)('it boils', () => {});\n";
 
-  const result = await runLintTree({ 'kitchen.test.ts': source }, 'kitchen.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'kitchen.test.ts': source }, 'kitchen.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('readStove');
@@ -840,7 +785,9 @@ test('it flags consts that only read each other', async () => {
   const source =
     "import { test } from 'bun:test';\n\nconst first = () => second;\nconst second = () => first;\n\ntest('it pours', () => {});\n";
 
-  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('Remove the module-level `first`');
@@ -851,7 +798,9 @@ test('it flags a helper that only another helper reads', async () => {
   const source =
     "import { expect, test } from 'bun:test';\n\nconst cups = 2;\nconst doubled = cups * 2;\n\ntest('it pours', () => {\n  expect(doubled).toBe(4);\n});\n";
 
-  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('Remove the module-level `cups`');
@@ -862,7 +811,9 @@ test('it flags a gate that only a skipIf inside setupTest reads', async () => {
   const source =
     "import { test } from 'bun:test';\n\nconst hasKettle = true;\n\nfunction setupTest() {\n  return test.skipIf(hasKettle);\n}\n\ntest('it boils', () => {\n  setupTest();\n});\n";
 
-  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('Remove the module-level `hasKettle`');
@@ -872,7 +823,9 @@ test('it flags a probe that only a function inside a gate initializer reads', as
   const source =
     "import { test } from 'bun:test';\n\nconst hasKettle = true;\nconst skipBoil = (() => !hasKettle)();\n\ntest.skipIf(skipBoil)('it boils', () => {});\n";
 
-  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('Remove the module-level `hasKettle`');
@@ -883,7 +836,9 @@ test('it accepts a probe and its derived gate in one declaration', async () => {
   const source =
     "import { test } from 'bun:test';\nimport { probeKettle } from './probe-kettle';\n\n// skipIf takes a boolean and has no in-body skip\nconst hasKettle = await probeKettle(),\n  skipBoil = !hasKettle;\n\ntest.skipIf(skipBoil)('it boils', () => {});\n";
 
-  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.stdout).not.toInclude('setup-test-only');
 });
@@ -892,7 +847,9 @@ test('it names only the non-gate binding of a declaration that holds a gate', as
   const source =
     "import { expect, test } from 'bun:test';\nimport { probeKettle } from './probe-kettle';\n\nconst hasKettle = await probeKettle(),\n  cups = 2;\n\ntest.skipIf(!hasKettle)('it pours', () => {\n  expect(cups).toBe(2);\n});\n";
 
-  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('Remove the module-level `cups`');
@@ -935,7 +892,9 @@ test.each([
 ])('it reports a gate declared with %s: %p', async (_, expected, body) => {
   const source = `import { test } from 'bun:test';\nimport { probeKitchen } from './probe-kitchen';\n\n${body}`;
 
-  const result = await runLintTree({ 'kitchen.test.ts': source }, 'kitchen.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'kitchen.test.ts': source }, 'kitchen.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.stdout.includes('setup-test-only')).toBe(expected);
 });
@@ -981,7 +940,9 @@ test.each([
 ])('it reports a gate whose skipIf receiver is %s: %p', async (_, expected, imports, call) => {
   const source = `${imports}import { probeKettle } from './probe-kettle';\n\nconst hasKettle = await probeKettle();\n\n${call}`;
 
-  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.stdout.includes('setup-test-only')).toBe(expected);
 });
@@ -990,7 +951,9 @@ test('it flags a module-level const that nothing reads', async () => {
   const source =
     "import { test } from 'bun:test';\n\nconst cups = 2;\n\ntest('it pours', () => {});\n";
 
-  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', setupTestOnly);
+  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('Remove the module-level `cups`');
@@ -999,12 +962,12 @@ test('it flags a module-level const that nothing reads', async () => {
 test('it accepts module-level declarations in a file that is not a test', async () => {
   const source = 'const cups = 2;\n\nexport function readCups() {\n  return cups;\n}\n';
 
-  const result = await runLintTree({ 'pot.ts': source }, 'pot.ts', setupTestOnly);
+  const result = await runLintTree({ 'pot.ts': source }, 'pot.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
 
   expect(result.stdout).not.toInclude('setup-test-only');
 });
-
-const restricted = { 'zgeoff/no-restricted-words': ['error', { words: ['orb', 'orbd'] }] };
 
 test.each([
   ['string', "export const label = 'ask the orb daemon';\n"],
@@ -1012,7 +975,9 @@ test.each([
   ['comment', '// the orb owns this socket\nexport const label = 1;\n'],
   ['comment', '/* the orb owns this socket */\nexport const label = 1;\n'],
 ])('it flags a restricted word in a %s', async (place, source) => {
-  const result = await runLint(source, false, restricted);
+  const result = await runLint(source, {
+    'zgeoff/no-restricted-words': ['error', { words: ['orb', 'orbd'] }],
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('no-restricted-words');
@@ -1022,7 +987,9 @@ test.each([
 test('it flags a restricted word whatever its case and names it as written', async () => {
   const source = "export const label = 'the ORB daemon';\n";
 
-  const result = await runLint(source, false, restricted);
+  const result = await runLint(source, {
+    'zgeoff/no-restricted-words': ['error', { words: ['orb', 'orbd'] }],
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('Remove `ORB`');
@@ -1031,7 +998,9 @@ test('it flags a restricted word whatever its case and names it as written', asy
 test('it flags a restricted word bounded by punctuation', async () => {
   const source = "export const socket = '/run/orbd.sock';\nexport const vault = 'orb-e2e';\n";
 
-  const result = await runLint(source, false, restricted);
+  const result = await runLint(source, {
+    'zgeoff/no-restricted-words': ['error', { words: ['orb', 'orbd'] }],
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('Remove `orbd`');
@@ -1042,7 +1011,9 @@ test('it accepts a word that holds a restricted word inside it', async () => {
   const source =
     '// the orbit keeps its own clock\nexport const label = `orbs, absorb, sorbet, orb_name, orb2`;\n';
 
-  const result = await runLint(source, false, restricted);
+  const result = await runLint(source, {
+    'zgeoff/no-restricted-words': ['error', { words: ['orb', 'orbd'] }],
+  });
 
   expect(result.exitCode).toBe(0);
 });
@@ -1050,7 +1021,9 @@ test('it accepts a word that holds a restricted word inside it', async () => {
 test('it accepts a restricted word as an identifier', async () => {
   const source = 'const orb = 1;\n\nexport const label = orb;\n';
 
-  const result = await runLint(source, false, restricted);
+  const result = await runLint(source, {
+    'zgeoff/no-restricted-words': ['error', { words: ['orb', 'orbd'] }],
+  });
 
   expect(result.exitCode).toBe(0);
 });
@@ -1059,7 +1032,7 @@ test('it treats a restricted word as text, not as a pattern', async () => {
   const rules = { 'zgeoff/no-restricted-words': ['error', { words: ['a.b'] }] };
   const source = "export const label = 'axb';\nexport const other = 'a.b';\n";
 
-  const result = await runLint(source, false, rules);
+  const result = await runLint(source, rules);
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('sample.ts:2:');
@@ -1069,28 +1042,15 @@ test('it treats a restricted word as text, not as a pattern', async () => {
 test('it reports nothing when the config names no words', async () => {
   const source = "export const label = 'ask the orb daemon';\n";
 
-  const result = await runLint(source, false, { 'zgeoff/no-restricted-words': 'error' });
+  const result = await runLint(source, { 'zgeoff/no-restricted-words': 'error' });
 
   expect(result.exitCode).toBe(0);
 });
 
-// the names sit in rows rather than keys, so they pass the rule under test
-const abbreviated = {
-  'zgeoff/no-abbreviated-names': [
-    'error',
-    {
-      names: Object.fromEntries([
-        ['src', '`source`'],
-        ['ms', 'a unit suffix'],
-      ]),
-    },
-  ],
-};
-
 // every form that binds a name, with NAME where the name goes; each row runs
 // once with `src`, which the rule reports, and once with `source`, which it
-// accepts
-const nameForms = [
+// accepts; the rule's names sit in rows rather than keys, so they pass it
+test.each([
   ['a variable', 'export const NAME = 1;\n'],
   ['a loop variable', 'for (const NAME of [1]) {\n  globalThis.value = NAME;\n}\n'],
   ['a parameter', 'export function readPath(NAME: string): string {\n  return NAME;\n}\n'],
@@ -1203,37 +1163,176 @@ const nameForms = [
     'a loop member assignment',
     'export const paths = { path: 1 };\n\nfor (paths.NAME of [2]) {\n  globalThis.value = paths;\n}\n',
   ],
-] as const;
-
-// a private name reports with its `#`, so these rows take their own message
-const privateNameForms = [
-  ['a private field', 'export class Paths {\n  #NAME = 1;\n}\n'],
-  ['a private getter', 'export class Paths {\n  get #NAME(): number {\n    return 1;\n  }\n}\n'],
-  ['a private method', 'export class Paths {\n  #NAME(): number {\n    return 1;\n  }\n}\n'],
-] as const;
-
-test.each(nameForms)('it reports an abbreviated name in %s', async (_place, template) => {
-  const result = await runLint(template.replaceAll('NAME', 'src'), false, abbreviated);
+] as const)('it reports an abbreviated name in %s', async (_place, template) => {
+  const result = await runLint(template.replaceAll('NAME', 'src'), {
+    'zgeoff/no-abbreviated-names': [
+      'error',
+      {
+        names: Object.fromEntries([
+          ['src', '`source`'],
+          ['ms', 'a unit suffix'],
+        ]),
+      },
+    ],
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('Rename `src` to `source`');
 });
 
-test.each(privateNameForms)('it reports an abbreviated name in %s', async (_place, template) => {
-  const result = await runLint(template.replaceAll('NAME', 'src'), false, abbreviated);
+// a private name reports with its `#`, so these rows take their own message
+test.each([
+  ['a private field', 'export class Paths {\n  #NAME = 1;\n}\n'],
+  ['a private getter', 'export class Paths {\n  get #NAME(): number {\n    return 1;\n  }\n}\n'],
+  ['a private method', 'export class Paths {\n  #NAME(): number {\n    return 1;\n  }\n}\n'],
+] as const)('it reports an abbreviated name in %s', async (_place, template) => {
+  const result = await runLint(template.replaceAll('NAME', 'src'), {
+    'zgeoff/no-abbreviated-names': [
+      'error',
+      {
+        names: Object.fromEntries([
+          ['src', '`source`'],
+          ['ms', 'a unit suffix'],
+        ]),
+      },
+    ],
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('Rename `#src` to `source`');
 });
 
-test.each([...nameForms, ...privateNameForms])(
-  'it accepts a full name in %s',
-  async (_place, template) => {
-    const result = await runLint(template.replaceAll('NAME', 'source'), false, abbreviated);
+test.each([
+  ['a variable', 'export const NAME = 1;\n'],
+  ['a loop variable', 'for (const NAME of [1]) {\n  globalThis.value = NAME;\n}\n'],
+  ['a parameter', 'export function readPath(NAME: string): string {\n  return NAME;\n}\n'],
+  [
+    'a parameter with a default',
+    "export function readPath(NAME = ''): string {\n  return NAME;\n}\n",
+  ],
+  [
+    'a rest parameter',
+    'export function readPaths(...NAME: string[]): string[] {\n  return NAME;\n}\n',
+  ],
+  ['an arrow parameter', 'export const paths = [1].map((NAME) => NAME);\n'],
+  ['a destructured name', "const { NAME } = JSON.parse('{}');\n\nexport const value = NAME;\n"],
+  ['a destructured alias', 'const { path: NAME } = { path: 1 };\n\nexport const value = NAME;\n'],
+  ['a destructured rest', 'const { ...NAME } = { path: 1 };\n\nexport const value = NAME;\n'],
+  ['an array element', 'const [NAME] = [1];\n\nexport const value = NAME;\n'],
+  [
+    'a destructured parameter',
+    'export function readPath({ path: NAME }: { path: string }): string {\n  return NAME;\n}\n',
+  ],
+  [
+    'a catch parameter',
+    'export function readPath(): string {\n  try {\n    return String(globalThis);\n  } catch (NAME) {\n    return String(NAME);\n  }\n}\n',
+  ],
+  ['a function', 'export function NAME(): number {\n  return 1;\n}\n'],
+  ['a function expression', 'export const readPath = function NAME(): number {\n  return 1;\n};\n'],
+  ['a declared function', 'export declare function NAME(): number;\n'],
+  ['a class', 'export class NAME {}\n'],
+  ['a class expression', 'export const Paths = class NAME {};\n'],
+  ['an enum', 'export enum NAME {\n  Root,\n}\n'],
+  ['a namespace', 'export namespace NAME {\n  export const root = 1;\n}\n'],
+  ['an object key', 'export const paths = { NAME: 1 };\n'],
+  ['a quoted object key', "export const paths = { 'NAME': 1 };\n"],
+  ['a computed string key', "export const paths = { ['NAME']: 1 };\n"],
+  ['a computed template key', 'export const paths = { [`NAME`]: 1 };\n'],
+  ['an object method', 'export const paths = {\n  NAME(): number {\n    return 1;\n  },\n};\n'],
+  ['an object getter', 'export const paths = {\n  get NAME(): number {\n    return 1;\n  },\n};\n'],
+  ['a class property', 'export class Paths {\n  NAME = 1;\n}\n'],
+  ['a quoted class property', "export class Paths {\n  'NAME' = 1;\n}\n"],
+  ['a static class property', 'export class Paths {\n  static NAME = 1;\n}\n'],
+  ['an interface property', 'export interface Paths {\n  NAME: string;\n}\n'],
+  ['a quoted interface property', "export interface Paths {\n  'NAME': string;\n}\n"],
+  ['a type literal property', 'export type Paths = {\n  NAME: string;\n};\n'],
+  ['an index signature parameter', 'export interface Paths {\n  [NAME: string]: number;\n}\n'],
+  ['an accessor property', 'export class Paths {\n  accessor NAME = 1;\n}\n'],
+  ['an abstract property', 'export abstract class Paths {\n  abstract NAME: string;\n}\n'],
+  [
+    'an abstract accessor property',
+    'export abstract class Paths {\n  abstract accessor NAME: string;\n}\n',
+  ],
+  ['a parameter property', 'export class Reader {\n  constructor(public NAME: string) {}\n}\n'],
+  ['a class method', 'export class Paths {\n  NAME(): number {\n    return 1;\n  }\n}\n'],
+  ['a quoted class method', "export class Paths {\n  'NAME'(): number {\n    return 1;\n  }\n}\n"],
+  ['an abstract method', 'export abstract class Paths {\n  abstract NAME(): number;\n}\n'],
+  ['an interface method', 'export interface Paths {\n  NAME(): number;\n}\n'],
+  ['a function type parameter', 'export type Reader = (NAME: string) => string;\n'],
+  ['a constructor type parameter', 'export type MakeReader = new (NAME: string) => object;\n'],
+  [
+    'a method signature parameter',
+    'export interface Reader {\n  readPath(NAME: string): string;\n}\n',
+  ],
+  ['a call signature parameter', 'export interface Reader {\n  (NAME: string): string;\n}\n'],
+  [
+    'a construct signature parameter',
+    'export interface MakeReader {\n  new (NAME: string): object;\n}\n',
+  ],
+  ['a declared function parameter', 'export declare function readPath(NAME: string): string;\n'],
+  [
+    'an abstract method parameter',
+    'export abstract class Reader {\n  abstract readPath(NAME: string): string;\n}\n',
+  ],
+  [
+    'an overload parameter',
+    'export class Reader {\n  readPath(NAME: string): string;\n  readPath(path: string): string {\n    return path;\n  }\n}\n',
+  ],
+  ['a getter', 'export class Paths {\n  get NAME(): number {\n    return 1;\n  }\n}\n'],
+  ['a quoted getter', "export class Paths {\n  get 'NAME'(): number {\n    return 1;\n  }\n}\n"],
+  [
+    'a setter',
+    'export class Paths {\n  set NAME(value: number) {\n    globalThis.value = value;\n  }\n}\n',
+  ],
+  ['an abstract getter', 'export abstract class Paths {\n  abstract get NAME(): number;\n}\n'],
+  ['an abstract setter', 'export abstract class Paths {\n  abstract set NAME(value: number);\n}\n'],
+  ['an interface getter', 'export interface Paths {\n  get NAME(): number;\n}\n'],
+  ['an interface setter', 'export interface Paths {\n  set NAME(value: number);\n}\n'],
+  ['an enum member', 'export enum Paths {\n  NAME,\n}\n'],
+  ['a quoted enum member', "export enum Paths {\n  'NAME',\n}\n"],
+  [
+    'a named import alias',
+    "import { readFile as NAME } from 'node:fs';\n\nexport const value = NAME;\n",
+  ],
+  ['a default import', "import NAME from 'node:fs';\n\nexport const value = NAME;\n"],
+  ['a namespace import', "import * as NAME from 'node:fs';\n\nexport const value = NAME;\n"],
+  ['a require import', "import NAME = require('node:fs');\n\nexport const value = NAME;\n"],
+  [
+    'a namespace alias import',
+    'namespace Paths {\n  export const root = 1;\n}\n\nimport NAME = Paths.root;\n\nexport const value = NAME;\n',
+  ],
+  ['an export alias', 'const path = 1;\n\nexport { path as NAME };\n'],
+  ['a quoted export alias', "const path = 1;\n\nexport { path as 'NAME' };\n"],
+  ['a namespace re-export', "export * as NAME from 'node:fs';\n"],
+  ['a member assignment', 'export const paths = { path: 1 };\n\npaths.NAME = 2;\n'],
+  ['a computed member assignment', "export const paths = { path: 1 };\n\npaths['NAME'] = 2;\n"],
+  [
+    'a destructuring member assignment',
+    'export const paths = { path: 1 };\n\n({ path: paths.NAME } = { path: 2 });\n',
+  ],
+  ['an array member assignment', 'export const paths = { path: 1 };\n\n[paths.NAME] = [2];\n'],
+  [
+    'a loop member assignment',
+    'export const paths = { path: 1 };\n\nfor (paths.NAME of [2]) {\n  globalThis.value = paths;\n}\n',
+  ],
+  ['a private field', 'export class Paths {\n  #NAME = 1;\n}\n'],
+  ['a private getter', 'export class Paths {\n  get #NAME(): number {\n    return 1;\n  }\n}\n'],
+  ['a private method', 'export class Paths {\n  #NAME(): number {\n    return 1;\n  }\n}\n'],
+])('it accepts a full name in %s', async (_place, template) => {
+  const result = await runLint(template.replaceAll('NAME', 'source'), {
+    'zgeoff/no-abbreviated-names': [
+      'error',
+      {
+        names: Object.fromEntries([
+          ['src', '`source`'],
+          ['ms', 'a unit suffix'],
+        ]),
+      },
+    ],
+  });
 
-    expect(result.stdout).not.toInclude('no-abbreviated-names');
-  },
-);
+  expect(result.stdout).not.toInclude('no-abbreviated-names');
+});
 
 test.each([
   [
@@ -1275,7 +1374,17 @@ test.each([
   ['a type parameter', 'export type Paths<src> = src[];\n'],
   ['a label', 'src: for (const path of [1]) {\n  globalThis.value = path;\n  break src;\n}\n'],
 ])('it accepts an abbreviated name in %s', async (_place, source) => {
-  const result = await runLint(source, false, abbreviated);
+  const result = await runLint(source, {
+    'zgeoff/no-abbreviated-names': [
+      'error',
+      {
+        names: Object.fromEntries([
+          ['src', '`source`'],
+          ['ms', 'a unit suffix'],
+        ]),
+      },
+    ],
+  });
 
   expect(result.stdout).not.toInclude('no-abbreviated-names');
 });
@@ -1283,7 +1392,17 @@ test.each([
 test('it accepts an abbreviation inside a longer name', async () => {
   const source = 'export const timeoutMs = 1;\nexport const srcPath = 2;\n';
 
-  const result = await runLint(source, false, abbreviated);
+  const result = await runLint(source, {
+    'zgeoff/no-abbreviated-names': [
+      'error',
+      {
+        names: Object.fromEntries([
+          ['src', '`source`'],
+          ['ms', 'a unit suffix'],
+        ]),
+      },
+    ],
+  });
 
   expect(result.exitCode).toBe(0);
 });
@@ -1292,7 +1411,17 @@ test('it accepts a destructured key that an alias renames', async () => {
   const source =
     'const { src: source } = Object.fromEntries([["src", 1]]);\n\nexport const value = source;\n';
 
-  const result = await runLint(source, false, abbreviated);
+  const result = await runLint(source, {
+    'zgeoff/no-abbreviated-names': [
+      'error',
+      {
+        names: Object.fromEntries([
+          ['src', '`source`'],
+          ['ms', 'a unit suffix'],
+        ]),
+      },
+    ],
+  });
 
   expect(result.exitCode).toBe(0);
 });
@@ -1301,63 +1430,28 @@ test('it accepts an abbreviated name read from another object', async () => {
   const source =
     'const paths = { source: 1 };\n\nexport const value = Reflect.get(paths, "src") ?? process.src;\n';
 
-  const result = await runLint(source, false, abbreviated);
-
-  expect(result.exitCode).toBe(0);
-});
-
-test('it reports nothing when the config names no abbreviations', async () => {
-  const result = await runLint('export const src = 1;\n', false, {
-    'zgeoff/no-abbreviated-names': 'error',
+  const result = await runLint(source, {
+    'zgeoff/no-abbreviated-names': [
+      'error',
+      {
+        names: Object.fromEntries([
+          ['src', '`source`'],
+          ['ms', 'a unit suffix'],
+        ]),
+      },
+    ],
   });
 
   expect(result.exitCode).toBe(0);
 });
 
-const layered = {
-  'zgeoff/import-zones': [
-    'error',
-    {
-      zones: {
-        core: ['src/**'],
-        support: ['src/{config,state}/**'],
-        stage: ['src/{judge,rules}/**'],
-        network: ['src/model/**'],
-        tooling: ['scripts/**'],
-      },
-      edges: [
-        { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
-        {
-          name: 'support',
-          from: ['support'],
-          allow: ['support'],
-          allowTypeOnly: ['**/types.ts'],
-          reason: 'support modules sit below the stages',
-        },
-        { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
-      ],
-      modules: [
-        {
-          name: 'network',
-          modules: ['node:https', 'node:http'],
-          from: ['core'],
-          allow: ['network'],
-          allowTypeOnly: true,
-        },
-      ],
-      globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
-      unzoned: [
-        {
-          name: 'zone-assignment',
-          from: ['core'],
-          zones: ['support', 'stage', 'network'],
-          ignore: ['**/*.test.ts'],
-        },
-      ],
-      unresolved: [{ name: 'unresolved', from: ['core'] }],
-    },
-  ],
-};
+test('it reports nothing when the config names no abbreviations', async () => {
+  const result = await runLint('export const src = 1;\n', {
+    'zgeoff/no-abbreviated-names': 'error',
+  });
+
+  expect(result.exitCode).toBe(0);
+});
 
 test('it flags an import across a forbidden edge', async () => {
   const result = await runLintTree(
@@ -1366,7 +1460,50 @@ test('it flags an import across a forbidden edge', async () => {
       'scripts/run.ts': 'export function run(): void {}\n',
     },
     'src/config/read-config.ts',
-    layered,
+    {
+      'zgeoff/import-zones': [
+        'error',
+        {
+          zones: {
+            core: ['src/**'],
+            support: ['src/{config,state}/**'],
+            stage: ['src/{judge,rules}/**'],
+            network: ['src/model/**'],
+            tooling: ['scripts/**'],
+          },
+          edges: [
+            { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
+            {
+              name: 'support',
+              from: ['support'],
+              allow: ['support'],
+              allowTypeOnly: ['**/types.ts'],
+              reason: 'support modules sit below the stages',
+            },
+            { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
+          ],
+          modules: [
+            {
+              name: 'network',
+              modules: ['node:https', 'node:http'],
+              from: ['core'],
+              allow: ['network'],
+              allowTypeOnly: true,
+            },
+          ],
+          globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
+          unzoned: [
+            {
+              name: 'zone-assignment',
+              from: ['core'],
+              zones: ['support', 'stage', 'network'],
+              ignore: ['**/*.test.ts'],
+            },
+          ],
+          unresolved: [{ name: 'unresolved', from: ['core'] }],
+        },
+      ],
+    },
   );
 
   expect(result.exitCode).toBe(1);
@@ -1383,7 +1520,50 @@ test('it accepts an import the zones allow', async () => {
       'src/judge/split.ts': 'export function split(): void {}\n',
     },
     'src/judge/run-judge.ts',
-    layered,
+    {
+      'zgeoff/import-zones': [
+        'error',
+        {
+          zones: {
+            core: ['src/**'],
+            support: ['src/{config,state}/**'],
+            stage: ['src/{judge,rules}/**'],
+            network: ['src/model/**'],
+            tooling: ['scripts/**'],
+          },
+          edges: [
+            { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
+            {
+              name: 'support',
+              from: ['support'],
+              allow: ['support'],
+              allowTypeOnly: ['**/types.ts'],
+              reason: 'support modules sit below the stages',
+            },
+            { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
+          ],
+          modules: [
+            {
+              name: 'network',
+              modules: ['node:https', 'node:http'],
+              from: ['core'],
+              allow: ['network'],
+              allowTypeOnly: true,
+            },
+          ],
+          globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
+          unzoned: [
+            {
+              name: 'zone-assignment',
+              from: ['core'],
+              zones: ['support', 'stage', 'network'],
+              ignore: ['**/*.test.ts'],
+            },
+          ],
+          unresolved: [{ name: 'unresolved', from: ['core'] }],
+        },
+      ],
+    },
   );
 
   expect(result.exitCode).toBe(0);
@@ -1396,7 +1576,50 @@ test('it flags an import into a zone outside the allow list, with the reason', a
       'src/judge/judge.ts': 'export function judge(): void {}\n',
     },
     'src/config/read-config.ts',
-    layered,
+    {
+      'zgeoff/import-zones': [
+        'error',
+        {
+          zones: {
+            core: ['src/**'],
+            support: ['src/{config,state}/**'],
+            stage: ['src/{judge,rules}/**'],
+            network: ['src/model/**'],
+            tooling: ['scripts/**'],
+          },
+          edges: [
+            { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
+            {
+              name: 'support',
+              from: ['support'],
+              allow: ['support'],
+              allowTypeOnly: ['**/types.ts'],
+              reason: 'support modules sit below the stages',
+            },
+            { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
+          ],
+          modules: [
+            {
+              name: 'network',
+              modules: ['node:https', 'node:http'],
+              from: ['core'],
+              allow: ['network'],
+              allowTypeOnly: true,
+            },
+          ],
+          globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
+          unzoned: [
+            {
+              name: 'zone-assignment',
+              from: ['core'],
+              zones: ['support', 'stage', 'network'],
+              ignore: ['**/*.test.ts'],
+            },
+          ],
+          unresolved: [{ name: 'unresolved', from: ['core'] }],
+        },
+      ],
+    },
   );
 
   expect(result.exitCode).toBe(1);
@@ -1412,7 +1635,50 @@ test('it flags a stage that imports another stage but not its own folder', async
     'src/rules/split.ts': 'export function split(): void {}\n',
   };
 
-  const result = await runLintTree(files, 'src/judge/run-judge.ts', layered);
+  const result = await runLintTree(files, 'src/judge/run-judge.ts', {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: {
+          core: ['src/**'],
+          support: ['src/{config,state}/**'],
+          stage: ['src/{judge,rules}/**'],
+          network: ['src/model/**'],
+          tooling: ['scripts/**'],
+        },
+        edges: [
+          { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
+          {
+            name: 'support',
+            from: ['support'],
+            allow: ['support'],
+            allowTypeOnly: ['**/types.ts'],
+            reason: 'support modules sit below the stages',
+          },
+          { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
+        ],
+        modules: [
+          {
+            name: 'network',
+            modules: ['node:https', 'node:http'],
+            from: ['core'],
+            allow: ['network'],
+            allowTypeOnly: true,
+          },
+        ],
+        globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
+        unzoned: [
+          {
+            name: 'zone-assignment',
+            from: ['core'],
+            zones: ['support', 'stage', 'network'],
+            ignore: ['**/*.test.ts'],
+          },
+        ],
+        unresolved: [{ name: 'unresolved', from: ['core'] }],
+      },
+    ],
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('stages: stage must not import src/rules/split.ts (core, stage)');
@@ -1425,7 +1691,50 @@ test('it accepts a type-only import where the edge allows one', async () => {
     'src/judge/types.ts': "export type Verdict = 'allow' | 'deny';\n",
   };
 
-  const result = await runLintTree(files, 'src/config/read-config.ts', layered);
+  const result = await runLintTree(files, 'src/config/read-config.ts', {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: {
+          core: ['src/**'],
+          support: ['src/{config,state}/**'],
+          stage: ['src/{judge,rules}/**'],
+          network: ['src/model/**'],
+          tooling: ['scripts/**'],
+        },
+        edges: [
+          { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
+          {
+            name: 'support',
+            from: ['support'],
+            allow: ['support'],
+            allowTypeOnly: ['**/types.ts'],
+            reason: 'support modules sit below the stages',
+          },
+          { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
+        ],
+        modules: [
+          {
+            name: 'network',
+            modules: ['node:https', 'node:http'],
+            from: ['core'],
+            allow: ['network'],
+            allowTypeOnly: true,
+          },
+        ],
+        globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
+        unzoned: [
+          {
+            name: 'zone-assignment',
+            from: ['core'],
+            zones: ['support', 'stage', 'network'],
+            ignore: ['**/*.test.ts'],
+          },
+        ],
+        unresolved: [{ name: 'unresolved', from: ['core'] }],
+      },
+    ],
+  });
 
   expect(result.exitCode).toBe(0);
 });
@@ -1437,7 +1746,50 @@ test('it flags a type-only import of a file the edge does not exempt', async () 
     'src/judge/judge.ts': "export type Verdict = 'allow' | 'deny';\n",
   };
 
-  const result = await runLintTree(files, 'src/config/read-config.ts', layered);
+  const result = await runLintTree(files, 'src/config/read-config.ts', {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: {
+          core: ['src/**'],
+          support: ['src/{config,state}/**'],
+          stage: ['src/{judge,rules}/**'],
+          network: ['src/model/**'],
+          tooling: ['scripts/**'],
+        },
+        edges: [
+          { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
+          {
+            name: 'support',
+            from: ['support'],
+            allow: ['support'],
+            allowTypeOnly: ['**/types.ts'],
+            reason: 'support modules sit below the stages',
+          },
+          { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
+        ],
+        modules: [
+          {
+            name: 'network',
+            modules: ['node:https', 'node:http'],
+            from: ['core'],
+            allow: ['network'],
+            allowTypeOnly: true,
+          },
+        ],
+        globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
+        unzoned: [
+          {
+            name: 'zone-assignment',
+            from: ['core'],
+            zones: ['support', 'stage', 'network'],
+            ignore: ['**/*.test.ts'],
+          },
+        ],
+        unresolved: [{ name: 'unresolved', from: ['core'] }],
+      },
+    ],
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('support: support must not import src/judge/judge.ts');
@@ -1459,7 +1811,50 @@ test('it judges re-exports, dynamic imports, require calls and import types', as
     'scripts/run.ts': 'export type Run = () => void;\nexport function run(): void {}\n',
   };
 
-  const result = await runLintTree(files, 'src/model/send.ts', layered);
+  const result = await runLintTree(files, 'src/model/send.ts', {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: {
+          core: ['src/**'],
+          support: ['src/{config,state}/**'],
+          stage: ['src/{judge,rules}/**'],
+          network: ['src/model/**'],
+          tooling: ['scripts/**'],
+        },
+        edges: [
+          { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
+          {
+            name: 'support',
+            from: ['support'],
+            allow: ['support'],
+            allowTypeOnly: ['**/types.ts'],
+            reason: 'support modules sit below the stages',
+          },
+          { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
+        ],
+        modules: [
+          {
+            name: 'network',
+            modules: ['node:https', 'node:http'],
+            from: ['core'],
+            allow: ['network'],
+            allowTypeOnly: true,
+          },
+        ],
+        globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
+        unzoned: [
+          {
+            name: 'zone-assignment',
+            from: ['core'],
+            zones: ['support', 'stage', 'network'],
+            ignore: ['**/*.test.ts'],
+          },
+        ],
+        unresolved: [{ name: 'unresolved', from: ['core'] }],
+      },
+    ],
+  });
 
   const reports = result.stdout.match(/core-no-tooling: /gu) ?? [];
 
@@ -1478,7 +1873,50 @@ test('it flags a computed import.meta.require call and import.meta.require used 
     ].join('\n'),
   };
 
-  const result = await runLintTree(files, 'src/state/load.ts', layered);
+  const result = await runLintTree(files, 'src/state/load.ts', {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: {
+          core: ['src/**'],
+          support: ['src/{config,state}/**'],
+          stage: ['src/{judge,rules}/**'],
+          network: ['src/model/**'],
+          tooling: ['scripts/**'],
+        },
+        edges: [
+          { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
+          {
+            name: 'support',
+            from: ['support'],
+            allow: ['support'],
+            allowTypeOnly: ['**/types.ts'],
+            reason: 'support modules sit below the stages',
+          },
+          { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
+        ],
+        modules: [
+          {
+            name: 'network',
+            modules: ['node:https', 'node:http'],
+            from: ['core'],
+            allow: ['network'],
+            allowTypeOnly: true,
+          },
+        ],
+        globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
+        unzoned: [
+          {
+            name: 'zone-assignment',
+            from: ['core'],
+            zones: ['support', 'stage', 'network'],
+            ignore: ['**/*.test.ts'],
+          },
+        ],
+        unresolved: [{ name: 'unresolved', from: ['core'] }],
+      },
+    ],
+  });
 
   const reports = result.stdout.match(/unresolved: cannot check a computed import specifier/gu);
 
@@ -1491,7 +1929,50 @@ test('it flags a restricted module outside its zones', async () => {
     'src/state/send.ts': "import { request } from 'node:https';\n\nrequest('https://x.test');\n",
   };
 
-  const result = await runLintTree(files, 'src/state/send.ts', layered);
+  const result = await runLintTree(files, 'src/state/send.ts', {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: {
+          core: ['src/**'],
+          support: ['src/{config,state}/**'],
+          stage: ['src/{judge,rules}/**'],
+          network: ['src/model/**'],
+          tooling: ['scripts/**'],
+        },
+        edges: [
+          { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
+          {
+            name: 'support',
+            from: ['support'],
+            allow: ['support'],
+            allowTypeOnly: ['**/types.ts'],
+            reason: 'support modules sit below the stages',
+          },
+          { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
+        ],
+        modules: [
+          {
+            name: 'network',
+            modules: ['node:https', 'node:http'],
+            from: ['core'],
+            allow: ['network'],
+            allowTypeOnly: true,
+          },
+        ],
+        globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
+        unzoned: [
+          {
+            name: 'zone-assignment',
+            from: ['core'],
+            zones: ['support', 'stage', 'network'],
+            ignore: ['**/*.test.ts'],
+          },
+        ],
+        unresolved: [{ name: 'unresolved', from: ['core'] }],
+      },
+    ],
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('network: node:https is allowed only in network');
@@ -1538,7 +2019,50 @@ test('it accepts a restricted module inside its zone, out of scope, or imported 
     'scripts/send.ts': "import { request } from 'node:https';\n\nrequest('https://x.test');\n",
   };
 
-  const directory = await createLintTree(files, layered);
+  const directory = await createLintTree(files, {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: {
+          core: ['src/**'],
+          support: ['src/{config,state}/**'],
+          stage: ['src/{judge,rules}/**'],
+          network: ['src/model/**'],
+          tooling: ['scripts/**'],
+        },
+        edges: [
+          { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
+          {
+            name: 'support',
+            from: ['support'],
+            allow: ['support'],
+            allowTypeOnly: ['**/types.ts'],
+            reason: 'support modules sit below the stages',
+          },
+          { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
+        ],
+        modules: [
+          {
+            name: 'network',
+            modules: ['node:https', 'node:http'],
+            from: ['core'],
+            allow: ['network'],
+            allowTypeOnly: true,
+          },
+        ],
+        globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
+        unzoned: [
+          {
+            name: 'zone-assignment',
+            from: ['core'],
+            zones: ['support', 'stage', 'network'],
+            ignore: ['**/*.test.ts'],
+          },
+        ],
+        unresolved: [{ name: 'unresolved', from: ['core'] }],
+      },
+    ],
+  });
 
   const results = await Promise.all(
     ['src/model/send.ts', 'src/state/agent.ts', 'scripts/send.ts'].map((target: string) =>
@@ -1546,7 +2070,7 @@ test('it accepts a restricted module inside its zone, out of scope, or imported 
     ),
   );
 
-  expect(results.map((result: TreeLintResult) => result.exitCode)).toStrictEqual([0, 0, 0]);
+  expect(results.map((result: OxlintRun) => result.exitCode)).toStrictEqual([0, 0, 0]);
 });
 
 test('it flags a restricted global call outside its zones', async () => {
@@ -1556,7 +2080,51 @@ test('it flags a restricted global call outside its zones', async () => {
     'src/model/send.ts': "await fetch('https://x.test');\n",
   };
 
-  const directory = await createLintTree(files, layered);
+  const directory = await createLintTree(files, {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: {
+          core: ['src/**'],
+          support: ['src/{config,state}/**'],
+          stage: ['src/{judge,rules}/**'],
+          network: ['src/model/**'],
+          tooling: ['scripts/**'],
+        },
+        edges: [
+          { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
+          {
+            name: 'support',
+            from: ['support'],
+            allow: ['support'],
+            allowTypeOnly: ['**/types.ts'],
+            reason: 'support modules sit below the stages',
+          },
+          { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
+        ],
+        modules: [
+          {
+            name: 'network',
+            modules: ['node:https', 'node:http'],
+            from: ['core'],
+            allow: ['network'],
+            allowTypeOnly: true,
+          },
+        ],
+        globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
+        unzoned: [
+          {
+            name: 'zone-assignment',
+            from: ['core'],
+            zones: ['support', 'stage', 'network'],
+            ignore: ['**/*.test.ts'],
+          },
+        ],
+        unresolved: [{ name: 'unresolved', from: ['core'] }],
+      },
+    ],
+  });
+
   const outside = await runLintIn(directory, directory, 'src/state/send.ts');
   const inside = await runLintIn(directory, directory, 'src/model/send.ts');
 
@@ -1571,7 +2139,51 @@ test('it flags a file that belongs to none of the required zones, unless ignored
     'src/stray/run.test.ts': 'export const answer = 42;\n',
   };
 
-  const directory = await createLintTree(files, layered);
+  const directory = await createLintTree(files, {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: {
+          core: ['src/**'],
+          support: ['src/{config,state}/**'],
+          stage: ['src/{judge,rules}/**'],
+          network: ['src/model/**'],
+          tooling: ['scripts/**'],
+        },
+        edges: [
+          { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
+          {
+            name: 'support',
+            from: ['support'],
+            allow: ['support'],
+            allowTypeOnly: ['**/types.ts'],
+            reason: 'support modules sit below the stages',
+          },
+          { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
+        ],
+        modules: [
+          {
+            name: 'network',
+            modules: ['node:https', 'node:http'],
+            from: ['core'],
+            allow: ['network'],
+            allowTypeOnly: true,
+          },
+        ],
+        globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
+        unzoned: [
+          {
+            name: 'zone-assignment',
+            from: ['core'],
+            zones: ['support', 'stage', 'network'],
+            ignore: ['**/*.test.ts'],
+          },
+        ],
+        unresolved: [{ name: 'unresolved', from: ['core'] }],
+      },
+    ],
+  });
+
   const stray = await runLintIn(directory, directory, 'src/stray/run.ts');
   const ignored = await runLintIn(directory, directory, 'src/stray/run.test.ts');
 
@@ -1589,7 +2201,50 @@ test('it flags an unresolved relative import and a computed specifier', async ()
     'src/state/read.ts': "import { gone } from './gone';\n\nawait import(gone);\n",
   };
 
-  const result = await runLintTree(files, 'src/state/read.ts', layered);
+  const result = await runLintTree(files, 'src/state/read.ts', {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: {
+          core: ['src/**'],
+          support: ['src/{config,state}/**'],
+          stage: ['src/{judge,rules}/**'],
+          network: ['src/model/**'],
+          tooling: ['scripts/**'],
+        },
+        edges: [
+          { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
+          {
+            name: 'support',
+            from: ['support'],
+            allow: ['support'],
+            allowTypeOnly: ['**/types.ts'],
+            reason: 'support modules sit below the stages',
+          },
+          { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
+        ],
+        modules: [
+          {
+            name: 'network',
+            modules: ['node:https', 'node:http'],
+            from: ['core'],
+            allow: ['network'],
+            allowTypeOnly: true,
+          },
+        ],
+        globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
+        unzoned: [
+          {
+            name: 'zone-assignment',
+            from: ['core'],
+            zones: ['support', 'stage', 'network'],
+            ignore: ['**/*.test.ts'],
+          },
+        ],
+        unresolved: [{ name: 'unresolved', from: ['core'] }],
+      },
+    ],
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('unresolved: cannot resolve ./gone');
@@ -1634,7 +2289,50 @@ test('it resolves a .js specifier to the .ts source beside it', async () => {
     'scripts/run.ts': 'export function run(): void {}\n',
   };
 
-  const result = await runLintTree(files, 'src/config/read-config.ts', layered);
+  const result = await runLintTree(files, 'src/config/read-config.ts', {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: {
+          core: ['src/**'],
+          support: ['src/{config,state}/**'],
+          stage: ['src/{judge,rules}/**'],
+          network: ['src/model/**'],
+          tooling: ['scripts/**'],
+        },
+        edges: [
+          { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
+          {
+            name: 'support',
+            from: ['support'],
+            allow: ['support'],
+            allowTypeOnly: ['**/types.ts'],
+            reason: 'support modules sit below the stages',
+          },
+          { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
+        ],
+        modules: [
+          {
+            name: 'network',
+            modules: ['node:https', 'node:http'],
+            from: ['core'],
+            allow: ['network'],
+            allowTypeOnly: true,
+          },
+        ],
+        globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
+        unzoned: [
+          {
+            name: 'zone-assignment',
+            from: ['core'],
+            zones: ['support', 'stage', 'network'],
+            ignore: ['**/*.test.ts'],
+          },
+        ],
+        unresolved: [{ name: 'unresolved', from: ['core'] }],
+      },
+    ],
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('core-no-tooling: core must not import scripts/run.ts');
@@ -1646,7 +2344,50 @@ test('it resolves a specifier with a bundler query to the file before the query'
     'scripts/styles.css': 'body {}\n',
   };
 
-  const result = await runLintTree(files, 'src/config/theme.ts', layered);
+  const result = await runLintTree(files, 'src/config/theme.ts', {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: {
+          core: ['src/**'],
+          support: ['src/{config,state}/**'],
+          stage: ['src/{judge,rules}/**'],
+          network: ['src/model/**'],
+          tooling: ['scripts/**'],
+        },
+        edges: [
+          { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
+          {
+            name: 'support',
+            from: ['support'],
+            allow: ['support'],
+            allowTypeOnly: ['**/types.ts'],
+            reason: 'support modules sit below the stages',
+          },
+          { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
+        ],
+        modules: [
+          {
+            name: 'network',
+            modules: ['node:https', 'node:http'],
+            from: ['core'],
+            allow: ['network'],
+            allowTypeOnly: true,
+          },
+        ],
+        globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
+        unzoned: [
+          {
+            name: 'zone-assignment',
+            from: ['core'],
+            zones: ['support', 'stage', 'network'],
+            ignore: ['**/*.test.ts'],
+          },
+        ],
+        unresolved: [{ name: 'unresolved', from: ['core'] }],
+      },
+    ],
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('core-no-tooling: core must not import scripts/styles.css');
@@ -1666,7 +2407,50 @@ test('it honours a next-line disable comment with a reason on a forbidden edge',
     'scripts/run.ts': 'export function run(): void {}\n',
   };
 
-  const result = await runLintTree(files, 'src/config/read-config.ts', layered);
+  const result = await runLintTree(files, 'src/config/read-config.ts', {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: {
+          core: ['src/**'],
+          support: ['src/{config,state}/**'],
+          stage: ['src/{judge,rules}/**'],
+          network: ['src/model/**'],
+          tooling: ['scripts/**'],
+        },
+        edges: [
+          { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
+          {
+            name: 'support',
+            from: ['support'],
+            allow: ['support'],
+            allowTypeOnly: ['**/types.ts'],
+            reason: 'support modules sit below the stages',
+          },
+          { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
+        ],
+        modules: [
+          {
+            name: 'network',
+            modules: ['node:https', 'node:http'],
+            from: ['core'],
+            allow: ['network'],
+            allowTypeOnly: true,
+          },
+        ],
+        globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
+        unzoned: [
+          {
+            name: 'zone-assignment',
+            from: ['core'],
+            zones: ['support', 'stage', 'network'],
+            ignore: ['**/*.test.ts'],
+          },
+        ],
+        unresolved: [{ name: 'unresolved', from: ['core'] }],
+      },
+    ],
+  });
 
   expect(result.exitCode).toBe(0);
 });
@@ -1760,27 +2544,6 @@ test('it resolves # imports and export patterns through the package manifest', a
 
 // app/ and store/ under packages/, with the store's manifest and source; the
 // edges judge the path a workspace import maps to
-const workspaceZones = {
-  'zgeoff/import-zones': [
-    'error',
-    {
-      zones: {
-        app: ['packages/app{,/**}'],
-        store: ['packages/store{,/**}'],
-        testing: ['packages/**/testing{,/**}'],
-      },
-      workspaces: ['packages/*'],
-      edges: [
-        { name: 'no-testing', from: ['app'], to: ['testing'] },
-        { name: 'to-store', from: ['app'], to: ['store'] },
-      ],
-      modules: [{ name: 'store-module', modules: ['@demo/store'], allow: [] }],
-      unresolved: [{ name: 'unresolved', from: ['app'] }],
-      selfImports: [{ name: 'self', from: ['app', 'store'] }],
-    },
-  ],
-};
-
 test.each([
   ['the root entry', { '.': './src/index.ts' }, '@demo/store', 'packages/store (store)'],
   [
@@ -1810,7 +2573,26 @@ test.each([
       'packages/app/src/run.ts': `import { store } from '${specifier}';\n\nexport const all = [store];\n`,
     };
 
-    const result = await runLintTree(files, 'packages/app/src/run.ts', workspaceZones);
+    const result = await runLintTree(files, 'packages/app/src/run.ts', {
+      'zgeoff/import-zones': [
+        'error',
+        {
+          zones: {
+            app: ['packages/app{,/**}'],
+            store: ['packages/store{,/**}'],
+            testing: ['packages/**/testing{,/**}'],
+          },
+          workspaces: ['packages/*'],
+          edges: [
+            { name: 'no-testing', from: ['app'], to: ['testing'] },
+            { name: 'to-store', from: ['app'], to: ['store'] },
+          ],
+          modules: [{ name: 'store-module', modules: ['@demo/store'], allow: [] }],
+          unresolved: [{ name: 'unresolved', from: ['app'] }],
+          selfImports: [{ name: 'self', from: ['app', 'store'] }],
+        },
+      ],
+    });
 
     expect(result.stdout).toInclude(`app must not import ${target}`);
     expect(result.stdout).not.toInclude('store-module');
@@ -1838,7 +2620,26 @@ test.each([
     'packages/app/src/run.ts': `import { store } from '${specifier}';\n\nexport const all = [store];\n`,
   };
 
-  const result = await runLintTree(files, 'packages/app/src/run.ts', workspaceZones);
+  const result = await runLintTree(files, 'packages/app/src/run.ts', {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: {
+          app: ['packages/app{,/**}'],
+          store: ['packages/store{,/**}'],
+          testing: ['packages/**/testing{,/**}'],
+        },
+        workspaces: ['packages/*'],
+        edges: [
+          { name: 'no-testing', from: ['app'], to: ['testing'] },
+          { name: 'to-store', from: ['app'], to: ['store'] },
+        ],
+        modules: [{ name: 'store-module', modules: ['@demo/store'], allow: [] }],
+        unresolved: [{ name: 'unresolved', from: ['app'] }],
+        selfImports: [{ name: 'self', from: ['app', 'store'] }],
+      },
+    ],
+  });
 
   expect(result.stdout).toInclude(`unresolved: cannot resolve ${specifier}`);
   expect(result.stdout).not.toInclude('to-store:');
@@ -1874,7 +2675,26 @@ test('it leaves a package below the workspace glob’s depth a module', async ()
       "import { store } from '@demo/store';\n\nexport const all = [store];\n",
   };
 
-  const result = await runLintTree(files, 'packages/app/src/run.ts', workspaceZones);
+  const result = await runLintTree(files, 'packages/app/src/run.ts', {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: {
+          app: ['packages/app{,/**}'],
+          store: ['packages/store{,/**}'],
+          testing: ['packages/**/testing{,/**}'],
+        },
+        workspaces: ['packages/*'],
+        edges: [
+          { name: 'no-testing', from: ['app'], to: ['testing'] },
+          { name: 'to-store', from: ['app'], to: ['store'] },
+        ],
+        modules: [{ name: 'store-module', modules: ['@demo/store'], allow: [] }],
+        unresolved: [{ name: 'unresolved', from: ['app'] }],
+        selfImports: [{ name: 'self', from: ['app', 'store'] }],
+      },
+    ],
+  });
 
   expect(result.stdout).toInclude('store-module: @demo/store is allowed only in no zone');
 });
@@ -1969,7 +2789,26 @@ test('it maps a # import that names a workspace package as that name', async () 
       "import { fake } from '#store-testing';\n\nexport const all = [fake];\n",
   };
 
-  const result = await runLintTree(files, 'packages/app/src/run.ts', workspaceZones);
+  const result = await runLintTree(files, 'packages/app/src/run.ts', {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: {
+          app: ['packages/app{,/**}'],
+          store: ['packages/store{,/**}'],
+          testing: ['packages/**/testing{,/**}'],
+        },
+        workspaces: ['packages/*'],
+        edges: [
+          { name: 'no-testing', from: ['app'], to: ['testing'] },
+          { name: 'to-store', from: ['app'], to: ['store'] },
+        ],
+        modules: [{ name: 'store-module', modules: ['@demo/store'], allow: [] }],
+        unresolved: [{ name: 'unresolved', from: ['app'] }],
+        selfImports: [{ name: 'self', from: ['app', 'store'] }],
+      },
+    ],
+  });
 
   expect(result.stdout).toInclude(
     'no-testing: app must not import packages/store/testing (store, testing)',
@@ -1984,7 +2823,26 @@ test('it reports no self-import for another workspace package', async () => {
       "import { store } from '@demo/store';\n\nexport const all = [store];\n",
   };
 
-  const result = await runLintTree(files, 'packages/app/src/run.ts', workspaceZones);
+  const result = await runLintTree(files, 'packages/app/src/run.ts', {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: {
+          app: ['packages/app{,/**}'],
+          store: ['packages/store{,/**}'],
+          testing: ['packages/**/testing{,/**}'],
+        },
+        workspaces: ['packages/*'],
+        edges: [
+          { name: 'no-testing', from: ['app'], to: ['testing'] },
+          { name: 'to-store', from: ['app'], to: ['store'] },
+        ],
+        modules: [{ name: 'store-module', modules: ['@demo/store'], allow: [] }],
+        unresolved: [{ name: 'unresolved', from: ['app'] }],
+        selfImports: [{ name: 'self', from: ['app', 'store'] }],
+      },
+    ],
+  });
 
   expect(result.stdout).toInclude('to-store:');
   expect(result.stdout).not.toInclude('self:');
@@ -2096,7 +2954,50 @@ test('it accepts a call of a local binding named like a restricted global', asyn
     '',
   ].join('\n');
 
-  const result = await runLintTree({ 'src/state/send.ts': source }, 'src/state/send.ts', layered);
+  const result = await runLintTree({ 'src/state/send.ts': source }, 'src/state/send.ts', {
+    'zgeoff/import-zones': [
+      'error',
+      {
+        zones: {
+          core: ['src/**'],
+          support: ['src/{config,state}/**'],
+          stage: ['src/{judge,rules}/**'],
+          network: ['src/model/**'],
+          tooling: ['scripts/**'],
+        },
+        edges: [
+          { name: 'core-no-tooling', from: ['core'], to: ['tooling'] },
+          {
+            name: 'support',
+            from: ['support'],
+            allow: ['support'],
+            allowTypeOnly: ['**/types.ts'],
+            reason: 'support modules sit below the stages',
+          },
+          { name: 'stages', from: ['stage'], allow: ['support'], allowWithin: 'src/*' },
+        ],
+        modules: [
+          {
+            name: 'network',
+            modules: ['node:https', 'node:http'],
+            from: ['core'],
+            allow: ['network'],
+            allowTypeOnly: true,
+          },
+        ],
+        globals: [{ name: 'network', globals: ['fetch'], from: ['core'], allow: ['network'] }],
+        unzoned: [
+          {
+            name: 'zone-assignment',
+            from: ['core'],
+            zones: ['support', 'stage', 'network'],
+            ignore: ['**/*.test.ts'],
+          },
+        ],
+        unresolved: [{ name: 'unresolved', from: ['core'] }],
+      },
+    ],
+  });
 
   expect(result.exitCode).toBe(0);
 });
@@ -2225,8 +3126,6 @@ test('it reports an override once when a run lints several files', async () => {
   expect(result.stdout.split('sets zgeoff/no-jsdoc')).toHaveLength(2);
 });
 
-const noClass = { 'zgeoff/no-class': 'error' };
-
 test.each([
   ['a class declaration', 'export class Kettle {}\n'],
   ['a class expression', 'export const Kettle = class {};\n'],
@@ -2236,7 +3135,7 @@ test.each([
     "export class Kettle extends errors['BrewError'] {}\n",
   ],
 ])('it flags %s', async (_label, source) => {
-  const result = await runLint(source, false, noClass);
+  const result = await runLint(source, { 'zgeoff/no-class': 'error' });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('zgeoff(no-class)');
@@ -2248,20 +3147,18 @@ test.each([
   ['a class that extends a member error', 'export class KettleError extends errors.BrewError {}\n'],
   ['a class expression that extends Error', 'export const KettleError = class extends Error {};\n'],
 ])('it accepts %s', async (_label, source) => {
-  const result = await runLint(source, false, noClass);
+  const result = await runLint(source, { 'zgeoff/no-class': 'error' });
 
   expect(result.exitCode).toBe(0);
 });
 
 test('it names the factory and the custom-error exception in its message', async () => {
-  const result = await runLint('export class Kettle {}\n', false, noClass);
+  const result = await runLint('export class Kettle {}\n', { 'zgeoff/no-class': 'error' });
 
   expect(result.stdout).toInclude(
     'Build this with a factory function (`create<X>` or `make<X>`), not a class. Only a custom error may be a class: `class XError extends Error`.',
   );
 });
-
-const noHiddenCast = { 'zgeoff/no-hidden-cast': 'error' };
 
 test.each([
   [
@@ -2290,7 +3187,7 @@ test.each([
   ['a computed method name', "export const statement = sqlite['query']<Plant>('select 1');\n"],
   ['an optional call', "export const statement = sqlite?.query<Plant>('select 1');\n"],
 ])('it flags %s', async (_label, source) => {
-  const result = await runLint(source, false, noHiddenCast);
+  const result = await runLint(source, { 'zgeoff/no-hidden-cast': 'error' });
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('zgeoff(no-hidden-cast)');
@@ -2304,23 +3201,23 @@ test.each([
   ['an as const assertion', "export const sizes = ['small', 'large'] as const;\n"],
   ['a satisfies check', "export const sizes = ['small', 'large'] satisfies string[];\n"],
 ])('it accepts %s', async (_label, source) => {
-  const result = await runLint(source, false, noHiddenCast);
+  const result = await runLint(source, { 'zgeoff/no-hidden-cast': 'error' });
 
   expect(result.stdout).not.toInclude('no-hidden-cast');
 });
 
 test('it tells a sql tag to read its result as unknown and parse it', async () => {
-  const result = await runLint('export const rows = sql<number>`select 1`;\n', false, noHiddenCast);
+  const result = await runLint('export const rows = sql<number>`select 1`;\n', {
+    'zgeoff/no-hidden-cast': 'error',
+  });
 
   expect(result.stdout).toInclude('read the result as `unknown`, and parse it with zod');
 });
 
 test('it names the Kysely method that claims a type', async () => {
-  const result = await runLint(
-    'export const rows = query.$castTo<Plant>();\n',
-    false,
-    noHiddenCast,
-  );
+  const result = await runLint('export const rows = query.$castTo<Plant>();\n', {
+    'zgeoff/no-hidden-cast': 'error',
+  });
 
   expect(result.stdout).toInclude('`$castTo()` claims a type that Kysely never checks');
 });
