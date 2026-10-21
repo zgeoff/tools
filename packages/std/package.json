@@ -26,10 +26,11 @@
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "prepare": "bun run build",
-    "typecheck": "tsc"
+    "typecheck": "tsrs"
   },
   "devDependencies": {
     "@types/bun": "catalog:",
+    "tsrs": "catalog:",
     "type-fest": "catalog:",
     "typescript": "catalog:",
     "xstate": "catalog:"

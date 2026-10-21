@@ -32,7 +32,7 @@
     "build": "rm -rf dist && bun run build:outdir dist",
     "build:outdir": "bun build src/cli.ts --target bun --outdir",
     "prepare": "bun run build",
-    "typecheck": "tsc"
+    "typecheck": "tsrs"
   },
   "dependencies": {
     "@zgeoff/commitlint-config": "workspace:*",
@@ -42,6 +42,7 @@
   "devDependencies": {
     "@types/bun": "catalog:",
     "@zgeoff/std": "workspace:*",
+    "tsrs": "catalog:",
     "typescript": "catalog:"
   },
   "engines": {

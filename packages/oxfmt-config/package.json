@@ -23,10 +23,11 @@
     "access": "public"
   },
   "scripts": {
-    "typecheck": "tsc"
+    "typecheck": "tsrs"
   },
   "devDependencies": {
     "@types/bun": "catalog:",
+    "tsrs": "catalog:",
     "typescript": "catalog:"
   },
   "peerDependencies": {

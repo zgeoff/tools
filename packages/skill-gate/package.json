@@ -30,13 +30,14 @@
     "build": "rm -rf dist && bun run build:outdir dist",
     "build:outdir": "sh -c 'bun build src/index.ts --target bun --outdir \"$0\" && tsc -p tsconfig.build.json --outDir \"$0\"'",
     "prepare": "bun run build",
-    "typecheck": "tsc"
+    "typecheck": "tsrs"
   },
   "devDependencies": {
     "@types/bun": "catalog:",
     "@zgeoff/std": "workspace:*",
     "tiny-invariant": "catalog:",
     "ts-pattern": "catalog:",
+    "tsrs": "catalog:",
     "typescript": "catalog:"
   },
   "engines": {
