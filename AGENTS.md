@@ -13,6 +13,7 @@ The rules a task needs are not repeated here. Load the skill for the work before
 | `testing`       | `sync/skills/testing/`       | designing, writing, or reviewing tests                                                      |
 | `docs-writing`  | `sync/skills/docs-writing/`  | writing or editing any committed prose: READMEs, this file, skills                          |
 | `skill-writing` | `sync/skills/skill-writing/` | writing or editing a skill                                                                  |
+| `ci-design`     | `sync/skills/ci-design/`     | adding, changing, or reviewing a workflow, a job, or a trigger                              |
 
 Only `code-style` is installed as a skill here. For the others, read the `SKILL.md` in the source
 folder.

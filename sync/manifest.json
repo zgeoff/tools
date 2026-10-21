@@ -189,6 +189,17 @@
     ]
   },
   {
+    "name": "skill-ci-design",
+    "description": "The shared ci-design skill, which holds the patterns for a GitHub Actions pipeline; a repo keeps its own pipeline in a project-ci-design skill",
+    "optIn": true,
+    "files": [
+      {
+        "source": "sync/skills/ci-design/SKILL.md",
+        "target": ".claude/skills/ci-design/SKILL.md"
+      }
+    ]
+  },
+  {
     "name": "hook-skill-gate",
     "description": "The skill-gate PreToolUse hook's entry point, which runs the gate from the @zgeoff/skill-gate package; the repo installs the package, keeps its rules in .claude/skill-gate.json, and registers the hook in .claude/settings.json",
     "optIn": true,
