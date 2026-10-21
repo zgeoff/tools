@@ -1,60 +1,38 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-function runGit(directory: string, args: string[]) {
-  const result = spawnSync(
-    'git',
-    ['-c', 'user.name=Sync Test', '-c', 'user.email=sync-test@example.com', ...args],
-    { cwd: directory, encoding: 'utf8' },
-  );
-
-  if (result.status !== 0) {
-    throw new Error(`git ${args.join(' ')} failed: ${result.stderr}`);
-  }
-}
-
-async function writeFiles(directory: string, files: Record<string, string>) {
-  for (const [path, content] of Object.entries(files)) {
-    await mkdir(dirname(join(directory, path)), { recursive: true });
-    await writeFile(join(directory, path), content);
-  }
-}
-
-async function writeToolsCommit(directory: string, files: Record<string, string>) {
-  await writeFiles(directory, files);
-
-  runGit(directory, ['add', '-A']);
-  runGit(directory, ['commit', '-q', '-m', 'chore: change the synced files']);
-}
+import { createGitCommit } from '../test-utils/create-git-commit.ts';
+import { readGitEnv } from '../test-utils/read-git-env.ts';
+import { runGit } from '../test-utils/run-git.ts';
+import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'remove-retired-sync-files-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
+  const env = readGitEnv(directory);
   const tools = join(directory, 'tools');
   const caller = join(directory, 'caller');
 
   await mkdir(tools);
   await mkdir(caller);
-
-  runGit(tools, ['init', '-q']);
-  runGit(caller, ['init', '-q']);
+  await runGit(tools, env, ['init', '-q']);
+  await runGit(caller, env, ['init', '-q']);
 
   const scriptPath = fileURLToPath(new URL('remove-retired-sync-files.sh', import.meta.url));
 
-  return { directory, tools, caller, scriptPath };
+  return { directory, env, tools, caller, scriptPath };
 }
 
 test('it deletes a file an earlier manifest delivered and the current manifest drops', async () => {
   const ctx = await setupTest();
 
-  await writeToolsCommit(ctx.tools, {
+  await createGitCommit(ctx.tools, ctx.env, {
     'sync/demo/check.sh': 'echo check\n',
     'sync/demo/SKILL.md': '# Demo\n',
     'sync/manifest.json': JSON.stringify([
@@ -68,7 +46,7 @@ test('it deletes a file an earlier manifest delivered and the current manifest d
     ]),
   });
 
-  await writeToolsCommit(ctx.tools, {
+  await createGitCommit(ctx.tools, ctx.env, {
     'sync/manifest.json': JSON.stringify([
       {
         name: 'skill-demo',
@@ -77,7 +55,7 @@ test('it deletes a file an earlier manifest delivered and the current manifest d
     ]),
   });
 
-  await writeFiles(ctx.caller, {
+  await writeTreeFiles(ctx.caller, {
     '.claude/skills/demo/SKILL.md': '# Demo\n',
     '.claude/skills/demo/scripts/check.sh': 'echo check\n',
   });
@@ -96,7 +74,7 @@ test('it deletes a file an earlier manifest delivered and the current manifest d
 test('it deletes a retired file that matches an older version of its source', async () => {
   const ctx = await setupTest();
 
-  await writeToolsCommit(ctx.tools, {
+  await createGitCommit(ctx.tools, ctx.env, {
     'sync/demo/check.sh': 'echo first\n',
     'sync/manifest.json': JSON.stringify([
       {
@@ -106,9 +84,9 @@ test('it deletes a retired file that matches an older version of its source', as
     ]),
   });
 
-  await writeToolsCommit(ctx.tools, { 'sync/demo/check.sh': 'echo second\n' });
-  await writeToolsCommit(ctx.tools, { 'sync/manifest.json': '[]' });
-  await writeFiles(ctx.caller, { '.claude/skills/demo/scripts/check.sh': 'echo first\n' });
+  await createGitCommit(ctx.tools, ctx.env, { 'sync/demo/check.sh': 'echo second\n' });
+  await createGitCommit(ctx.tools, ctx.env, { 'sync/manifest.json': '[]' });
+  await writeTreeFiles(ctx.caller, { '.claude/skills/demo/scripts/check.sh': 'echo first\n' });
 
   const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, ''], {
     cwd: ctx.caller,
@@ -123,7 +101,7 @@ test('it deletes a retired file that matches an older version of its source', as
 test('it keeps a file the repo owns outside the synced paths', async () => {
   const ctx = await setupTest();
 
-  await writeToolsCommit(ctx.tools, {
+  await createGitCommit(ctx.tools, ctx.env, {
     'sync/demo/check.sh': 'echo check\n',
     'sync/manifest.json': JSON.stringify([
       {
@@ -133,9 +111,9 @@ test('it keeps a file the repo owns outside the synced paths', async () => {
     ]),
   });
 
-  await writeToolsCommit(ctx.tools, { 'sync/manifest.json': '[]' });
+  await createGitCommit(ctx.tools, ctx.env, { 'sync/manifest.json': '[]' });
 
-  await writeFiles(ctx.caller, {
+  await writeTreeFiles(ctx.caller, {
     '.claude/skills/demo/scripts/check.sh': 'echo check\n',
     'scripts/check.sh': 'echo check\n',
   });
@@ -153,15 +131,15 @@ test('it keeps a file the repo owns outside the synced paths', async () => {
 test('it keeps a file at a retired path whose content no source version matches', async () => {
   const ctx = await setupTest();
 
-  await writeToolsCommit(ctx.tools, {
+  await createGitCommit(ctx.tools, ctx.env, {
     'sync/build.sh': 'echo shared\n',
     'sync/manifest.json': JSON.stringify([
       { name: 'build', files: [{ source: 'sync/build.sh', target: 'scripts/build.sh' }] },
     ]),
   });
 
-  await writeToolsCommit(ctx.tools, { 'sync/manifest.json': '[]' });
-  await writeFiles(ctx.caller, { 'scripts/build.sh': 'echo own\n' });
+  await createGitCommit(ctx.tools, ctx.env, { 'sync/manifest.json': '[]' });
+  await writeTreeFiles(ctx.caller, { 'scripts/build.sh': 'echo own\n' });
 
   const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, ''], {
     cwd: ctx.caller,
@@ -176,7 +154,7 @@ test('it keeps a file at a retired path whose content no source version matches'
 test('it keeps a retired file whose entry is still in the manifest and did not sync', async () => {
   const ctx = await setupTest();
 
-  await writeToolsCommit(ctx.tools, {
+  await createGitCommit(ctx.tools, ctx.env, {
     'sync/demo/run.ts': 'export {};\n',
     'sync/demo/helper.ts': 'export {};\n',
     'sync/manifest.json': JSON.stringify([
@@ -190,7 +168,7 @@ test('it keeps a retired file whose entry is still in the manifest and did not s
     ]),
   });
 
-  await writeToolsCommit(ctx.tools, {
+  await createGitCommit(ctx.tools, ctx.env, {
     'sync/manifest.json': JSON.stringify([
       {
         name: 'hook-demo',
@@ -199,7 +177,7 @@ test('it keeps a retired file whose entry is still in the manifest and did not s
     ]),
   });
 
-  await writeFiles(ctx.caller, {
+  await writeTreeFiles(ctx.caller, {
     '.claude/hooks/demo/run.ts': 'export {};\n',
     '.claude/hooks/demo/helper.ts': 'export {};\n',
   });
@@ -217,15 +195,15 @@ test('it keeps a retired file whose entry is still in the manifest and did not s
 test('it keeps a retired file whose entry the skip list names', async () => {
   const ctx = await setupTest();
 
-  await writeToolsCommit(ctx.tools, {
+  await createGitCommit(ctx.tools, ctx.env, {
     'sync/build.sh': 'echo shared\n',
     'sync/manifest.json': JSON.stringify([
       { name: 'build', files: [{ source: 'sync/build.sh', target: 'scripts/build.sh' }] },
     ]),
   });
 
-  await writeToolsCommit(ctx.tools, { 'sync/manifest.json': '[]' });
-  await writeFiles(ctx.caller, { 'scripts/build.sh': 'echo shared\n' });
+  await createGitCommit(ctx.tools, ctx.env, { 'sync/manifest.json': '[]' });
+  await writeTreeFiles(ctx.caller, { 'scripts/build.sh': 'echo shared\n' });
 
   const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, '', 'socket, build'], {
     cwd: ctx.caller,
@@ -240,12 +218,19 @@ test('it keeps a retired file whose entry the skip list names', async () => {
 test('it fails on a shallow checkout of tools', async () => {
   const ctx = await setupTest();
 
-  await writeToolsCommit(ctx.tools, { 'sync/manifest.json': '[]' });
-  await writeToolsCommit(ctx.tools, { 'sync/README.md': '# Sync\n' });
+  await createGitCommit(ctx.tools, ctx.env, { 'sync/manifest.json': '[]' });
+  await createGitCommit(ctx.tools, ctx.env, { 'sync/README.md': '# Sync\n' });
 
   const shallow = join(ctx.directory, 'shallow');
 
-  runGit(ctx.directory, ['clone', '-q', '--depth', '1', `file://${ctx.tools}`, shallow]);
+  await runGit(ctx.directory, ctx.env, [
+    'clone',
+    '-q',
+    '--depth',
+    '1',
+    `file://${ctx.tools}`,
+    shallow,
+  ]);
 
   const result = spawnSync('bash', [ctx.scriptPath, shallow, ''], {
     cwd: ctx.caller,
@@ -262,7 +247,7 @@ test('it fails on a shallow checkout of tools', async () => {
 test('it deletes a retired workflow whose calls the sync pinned to a tag', async () => {
   const ctx = await setupTest();
 
-  await writeToolsCommit(ctx.tools, {
+  await createGitCommit(ctx.tools, ctx.env, {
     'sync/workflow-callers/lint.yml':
       'jobs:\n  lint:\n    uses: zgeoff/tools/.github/workflows/lint.yml@main\n',
     'sync/manifest.json': JSON.stringify([
@@ -273,9 +258,9 @@ test('it deletes a retired workflow whose calls the sync pinned to a tag', async
     ]),
   });
 
-  await writeToolsCommit(ctx.tools, { 'sync/manifest.json': '[]' });
+  await createGitCommit(ctx.tools, ctx.env, { 'sync/manifest.json': '[]' });
 
-  await writeFiles(ctx.caller, {
+  await writeTreeFiles(ctx.caller, {
     '.github/workflows/lint.yml':
       'jobs:\n  lint:\n    uses: zgeoff/tools/.github/workflows/lint.yml@sync-v7\n',
   });
@@ -293,7 +278,7 @@ test('it deletes a retired workflow whose calls the sync pinned to a tag', async
 test('it deletes a retired Markdown copy that lost a block the repo was excepted from', async () => {
   const ctx = await setupTest();
 
-  await writeToolsCommit(ctx.tools, {
+  await createGitCommit(ctx.tools, ctx.env, {
     'sync/skills/demo/SKILL.md':
       '# Demo\n\n<!-- repo-sync needs ./go.md -->\n\nRead [Go](./go.md).\n\n<!-- repo-sync end -->\n\nThe end.\n',
     'sync/manifest.json': JSON.stringify([
@@ -304,8 +289,8 @@ test('it deletes a retired Markdown copy that lost a block the repo was excepted
     ]),
   });
 
-  await writeToolsCommit(ctx.tools, { 'sync/manifest.json': '[]' });
-  await writeFiles(ctx.caller, { '.claude/skills/demo/SKILL.md': '# Demo\n\nThe end.\n' });
+  await createGitCommit(ctx.tools, ctx.env, { 'sync/manifest.json': '[]' });
+  await writeTreeFiles(ctx.caller, { '.claude/skills/demo/SKILL.md': '# Demo\n\nThe end.\n' });
 
   const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, ''], {
     cwd: ctx.caller,
@@ -320,7 +305,7 @@ test('it deletes a retired Markdown copy that lost a block the repo was excepted
 test('it keeps a retired Markdown copy whose edit sits inside a kept block', async () => {
   const ctx = await setupTest();
 
-  await writeToolsCommit(ctx.tools, {
+  await createGitCommit(ctx.tools, ctx.env, {
     'sync/skills/demo/SKILL.md':
       '# Demo\n\n<!-- repo-sync needs ./go.md -->\n\nRead [Go](./go.md).\n\n<!-- repo-sync end -->\n\nThe end.\n',
     'sync/manifest.json': JSON.stringify([
@@ -331,9 +316,9 @@ test('it keeps a retired Markdown copy whose edit sits inside a kept block', asy
     ]),
   });
 
-  await writeToolsCommit(ctx.tools, { 'sync/manifest.json': '[]' });
+  await createGitCommit(ctx.tools, ctx.env, { 'sync/manifest.json': '[]' });
 
-  await writeFiles(ctx.caller, {
+  await writeTreeFiles(ctx.caller, {
     '.claude/skills/demo/SKILL.md':
       '# Demo\n\n<!-- repo-sync needs ./go.md -->\n\nRead [Go](./go.md) before the repo notes.\n\n<!-- repo-sync end -->\n\nThe end.\n',
   });
@@ -348,11 +333,12 @@ test('it keeps a retired Markdown copy whose edit sits inside a kept block', asy
   expect(existsSync(join(ctx.caller, '.claude/skills/demo/SKILL.md'))).toBeTrue();
 });
 
-async function writeRenamedSourceHistory(tools: string) {
-  const lines = ['const first = 1;', 'const second = 2;', 'const third = 3;', 'const fourth = 4;'];
+test('it deletes the edited old copy of a renamed file across the skipped tags', async () => {
+  const ctx = await setupTest();
 
-  await writeToolsCommit(tools, {
-    'sync/demo/list-files.ts': `${lines.join('\n')}\n`,
+  await createGitCommit(ctx.tools, ctx.env, {
+    'sync/demo/list-files.ts':
+      'const first = 1;\nconst second = 2;\nconst third = 3;\nconst fourth = 4;\n',
     'sync/manifest.json': JSON.stringify([
       {
         name: 'pre-push-demo',
@@ -361,14 +347,16 @@ async function writeRenamedSourceHistory(tools: string) {
     ]),
   });
 
-  await writeToolsCommit(tools, {
-    'sync/demo/list-files.ts': `${lines.join('\n')}\nconst fifth = 5;\n`,
+  await createGitCommit(ctx.tools, ctx.env, {
+    'sync/demo/list-files.ts':
+      'const first = 1;\nconst second = 2;\nconst third = 3;\nconst fourth = 4;\nconst fifth = 5;\n',
   });
 
-  await rm(join(tools, 'sync/demo/list-files.ts'));
+  await rm(join(ctx.tools, 'sync/demo/list-files.ts'));
 
-  await writeToolsCommit(tools, {
-    'sync/demo/read-files.ts': `${lines.join('\n')}\nconst fifth = 5;\nconst sixth = 6;\n`,
+  await createGitCommit(ctx.tools, ctx.env, {
+    'sync/demo/read-files.ts':
+      'const first = 1;\nconst second = 2;\nconst third = 3;\nconst fourth = 4;\nconst fifth = 5;\nconst sixth = 6;\n',
     'sync/manifest.json': JSON.stringify([
       {
         name: 'pre-push-demo',
@@ -377,15 +365,9 @@ async function writeRenamedSourceHistory(tools: string) {
     ]),
   });
 
-  await writeToolsCommit(tools, { 'sync/README.md': '# Sync\n' });
-}
+  await createGitCommit(ctx.tools, ctx.env, { 'sync/README.md': '# Sync\n' });
 
-test('it deletes the edited old copy of a renamed file across the skipped tags', async () => {
-  const ctx = await setupTest();
-
-  await writeRenamedSourceHistory(ctx.tools);
-
-  await writeFiles(ctx.caller, {
+  await writeTreeFiles(ctx.caller, {
     'scripts/list-files.ts':
       'const first = 1;\nconst second = 2;\nconst own = 3;\nconst fourth = 4;\n',
     'scripts/read-files.ts':
@@ -407,9 +389,38 @@ test('it deletes the edited old copy of a renamed file across the skipped tags',
 test('it keeps the edited old copy of a renamed file when the run did not copy the new one', async () => {
   const ctx = await setupTest();
 
-  await writeRenamedSourceHistory(ctx.tools);
+  await createGitCommit(ctx.tools, ctx.env, {
+    'sync/demo/list-files.ts':
+      'const first = 1;\nconst second = 2;\nconst third = 3;\nconst fourth = 4;\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'pre-push-demo',
+        files: [{ source: 'sync/demo/list-files.ts', target: 'scripts/list-files.ts' }],
+      },
+    ]),
+  });
 
-  await writeFiles(ctx.caller, {
+  await createGitCommit(ctx.tools, ctx.env, {
+    'sync/demo/list-files.ts':
+      'const first = 1;\nconst second = 2;\nconst third = 3;\nconst fourth = 4;\nconst fifth = 5;\n',
+  });
+
+  await rm(join(ctx.tools, 'sync/demo/list-files.ts'));
+
+  await createGitCommit(ctx.tools, ctx.env, {
+    'sync/demo/read-files.ts':
+      'const first = 1;\nconst second = 2;\nconst third = 3;\nconst fourth = 4;\nconst fifth = 5;\nconst sixth = 6;\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'pre-push-demo',
+        files: [{ source: 'sync/demo/read-files.ts', target: 'scripts/read-files.ts' }],
+      },
+    ]),
+  });
+
+  await createGitCommit(ctx.tools, ctx.env, { 'sync/README.md': '# Sync\n' });
+
+  await writeTreeFiles(ctx.caller, {
     'scripts/list-files.ts':
       'const first = 1;\nconst second = 2;\nconst own = 3;\nconst fourth = 4;\n',
     'scripts/read-files.ts': 'const own = 1;\n',
@@ -428,9 +439,38 @@ test('it keeps the edited old copy of a renamed file when the run did not copy t
 test('it keeps the edited old copy of a renamed file when the run did not sync its entry', async () => {
   const ctx = await setupTest();
 
-  await writeRenamedSourceHistory(ctx.tools);
+  await createGitCommit(ctx.tools, ctx.env, {
+    'sync/demo/list-files.ts':
+      'const first = 1;\nconst second = 2;\nconst third = 3;\nconst fourth = 4;\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'pre-push-demo',
+        files: [{ source: 'sync/demo/list-files.ts', target: 'scripts/list-files.ts' }],
+      },
+    ]),
+  });
 
-  await writeFiles(ctx.caller, {
+  await createGitCommit(ctx.tools, ctx.env, {
+    'sync/demo/list-files.ts':
+      'const first = 1;\nconst second = 2;\nconst third = 3;\nconst fourth = 4;\nconst fifth = 5;\n',
+  });
+
+  await rm(join(ctx.tools, 'sync/demo/list-files.ts'));
+
+  await createGitCommit(ctx.tools, ctx.env, {
+    'sync/demo/read-files.ts':
+      'const first = 1;\nconst second = 2;\nconst third = 3;\nconst fourth = 4;\nconst fifth = 5;\nconst sixth = 6;\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'pre-push-demo',
+        files: [{ source: 'sync/demo/read-files.ts', target: 'scripts/read-files.ts' }],
+      },
+    ]),
+  });
+
+  await createGitCommit(ctx.tools, ctx.env, { 'sync/README.md': '# Sync\n' });
+
+  await writeTreeFiles(ctx.caller, {
     'scripts/list-files.ts':
       'const first = 1;\nconst second = 2;\nconst own = 3;\nconst fourth = 4;\n',
     'scripts/read-files.ts':

@@ -1,33 +1,33 @@
 import { expect, test } from 'bun:test';
 import { planAuditIgnores } from './plan-audit-ignores.ts';
 
-const tinypoolAdvisory = {
-  id: 1_241_261,
-  url: 'https://github.com/advisories/GHSA-85c8-ppgw-ccpr',
-  title: 'Tinypool: Prototype Pollution Gadget to RCE in run() options',
-  severity: 'critical',
-  vulnerable_versions: '<2.1.2',
-} as const;
-
-const blockedPlan = {
-  fixes: [],
-  blocked: [
-    {
-      name: 'tinypool',
-      from: '2.1.0',
-      to: '2.1.2',
-      blockers: [{ dependent: 'oxfmt@0.56.0', range: '2.1.0' }],
-    },
-  ],
-  unfixable: [],
-};
-
 test('it ignores an advisory the fix could not reach, naming the dependent that blocks it', () => {
   const plan = planAuditIgnores({
-    report: { tinypool: [tinypoolAdvisory] },
+    report: {
+      tinypool: [
+        {
+          id: 1_241_261,
+          url: 'https://github.com/advisories/GHSA-85c8-ppgw-ccpr',
+          title: 'Tinypool: Prototype Pollution Gadget to RCE in run() options',
+          severity: 'critical',
+          vulnerable_versions: '<2.1.2',
+        },
+      ],
+    },
     ignores: {},
     unmanagedIDs: [],
-    plan: blockedPlan,
+    plan: {
+      fixes: [],
+      blocked: [
+        {
+          name: 'tinypool',
+          from: '2.1.0',
+          to: '2.1.2',
+          blockers: [{ dependent: 'oxfmt@0.56.0', range: '2.1.0' }],
+        },
+      ],
+      unfixable: [],
+    },
     auditLevel: null,
     today: '2026-10-17',
     expiryDays: 30,
@@ -58,7 +58,17 @@ test('it ignores an advisory the fix could not reach, naming the dependent that 
 
 test('it says no release fixes an advisory the fix marks unfixable', () => {
   const plan = planAuditIgnores({
-    report: { tinypool: [tinypoolAdvisory] },
+    report: {
+      tinypool: [
+        {
+          id: 1_241_261,
+          url: 'https://github.com/advisories/GHSA-85c8-ppgw-ccpr',
+          title: 'Tinypool: Prototype Pollution Gadget to RCE in run() options',
+          severity: 'critical',
+          vulnerable_versions: '<2.1.2',
+        },
+      ],
+    },
     ignores: {},
     unmanagedIDs: [],
     plan: { fixes: [], blocked: [], unfixable: [{ name: 'tinypool' }] },
@@ -74,11 +84,30 @@ test('it says no release fixes an advisory the fix marks unfixable', () => {
 test('it keys an advisory with no GHSA ID by its numeric ID', () => {
   const plan = planAuditIgnores({
     report: {
-      tinypool: [{ ...tinypoolAdvisory, url: 'https://registry.example/advisories/1241261' }],
+      tinypool: [
+        {
+          id: 1_241_261,
+          url: 'https://registry.example/advisories/1241261',
+          title: 'Tinypool: Prototype Pollution Gadget to RCE in run() options',
+          severity: 'critical',
+          vulnerable_versions: '<2.1.2',
+        },
+      ],
     },
     ignores: {},
     unmanagedIDs: [],
-    plan: blockedPlan,
+    plan: {
+      fixes: [],
+      blocked: [
+        {
+          name: 'tinypool',
+          from: '2.1.0',
+          to: '2.1.2',
+          blockers: [{ dependent: 'oxfmt@0.56.0', range: '2.1.0' }],
+        },
+      ],
+      unfixable: [],
+    },
     auditLevel: null,
     today: '2026-10-17',
     expiryDays: 30,
@@ -92,10 +121,31 @@ test('it keeps an ignore that has not expired', () => {
   const ignore = { package: 'tinypool', reason: 'Waiting on oxfmt.', expires: '2026-11-01' };
 
   const plan = planAuditIgnores({
-    report: { tinypool: [tinypoolAdvisory] },
+    report: {
+      tinypool: [
+        {
+          id: 1_241_261,
+          url: 'https://github.com/advisories/GHSA-85c8-ppgw-ccpr',
+          title: 'Tinypool: Prototype Pollution Gadget to RCE in run() options',
+          severity: 'critical',
+          vulnerable_versions: '<2.1.2',
+        },
+      ],
+    },
     ignores: { 'GHSA-85c8-ppgw-ccpr': ignore },
     unmanagedIDs: [],
-    plan: blockedPlan,
+    plan: {
+      fixes: [],
+      blocked: [
+        {
+          name: 'tinypool',
+          from: '2.1.0',
+          to: '2.1.2',
+          blockers: [{ dependent: 'oxfmt@0.56.0', range: '2.1.0' }],
+        },
+      ],
+      unfixable: [],
+    },
     auditLevel: null,
     today: '2026-10-17',
     expiryDays: 30,
@@ -112,7 +162,17 @@ test('it keeps an ignore that has not expired', () => {
 
 test('it renews an expired ignore whose advisory the fix still could not reach', () => {
   const plan = planAuditIgnores({
-    report: { tinypool: [tinypoolAdvisory] },
+    report: {
+      tinypool: [
+        {
+          id: 1_241_261,
+          url: 'https://github.com/advisories/GHSA-85c8-ppgw-ccpr',
+          title: 'Tinypool: Prototype Pollution Gadget to RCE in run() options',
+          severity: 'critical',
+          vulnerable_versions: '<2.1.2',
+        },
+      ],
+    },
     ignores: {
       'GHSA-85c8-ppgw-ccpr': {
         package: 'tinypool',
@@ -121,7 +181,18 @@ test('it renews an expired ignore whose advisory the fix still could not reach',
       },
     },
     unmanagedIDs: [],
-    plan: blockedPlan,
+    plan: {
+      fixes: [],
+      blocked: [
+        {
+          name: 'tinypool',
+          from: '2.1.0',
+          to: '2.1.2',
+          blockers: [{ dependent: 'oxfmt@0.56.0', range: '2.1.0' }],
+        },
+      ],
+      unfixable: [],
+    },
     auditLevel: null,
     today: '2026-10-17',
     expiryDays: 30,
@@ -167,10 +238,31 @@ test('it drops an ignore whose advisory the audit no longer reports', () => {
 
 test('it leaves an advisory alone that the audit script already ignores without an entry', () => {
   const plan = planAuditIgnores({
-    report: { tinypool: [tinypoolAdvisory] },
+    report: {
+      tinypool: [
+        {
+          id: 1_241_261,
+          url: 'https://github.com/advisories/GHSA-85c8-ppgw-ccpr',
+          title: 'Tinypool: Prototype Pollution Gadget to RCE in run() options',
+          severity: 'critical',
+          vulnerable_versions: '<2.1.2',
+        },
+      ],
+    },
     ignores: {},
     unmanagedIDs: ['GHSA-85c8-ppgw-ccpr'],
-    plan: blockedPlan,
+    plan: {
+      fixes: [],
+      blocked: [
+        {
+          name: 'tinypool',
+          from: '2.1.0',
+          to: '2.1.2',
+          blockers: [{ dependent: 'oxfmt@0.56.0', range: '2.1.0' }],
+        },
+      ],
+      unfixable: [],
+    },
     auditLevel: null,
     today: '2026-10-17',
     expiryDays: 30,
@@ -182,10 +274,31 @@ test('it leaves an advisory alone that the audit script already ignores without 
 
 test('it adds no ignore for an advisory below the audit level', () => {
   const plan = planAuditIgnores({
-    report: { tinypool: [{ ...tinypoolAdvisory, severity: 'moderate' }] },
+    report: {
+      tinypool: [
+        {
+          id: 1_241_261,
+          url: 'https://github.com/advisories/GHSA-85c8-ppgw-ccpr',
+          title: 'Tinypool: Prototype Pollution Gadget to RCE in run() options',
+          severity: 'moderate',
+          vulnerable_versions: '<2.1.2',
+        },
+      ],
+    },
     ignores: {},
     unmanagedIDs: [],
-    plan: blockedPlan,
+    plan: {
+      fixes: [],
+      blocked: [
+        {
+          name: 'tinypool',
+          from: '2.1.0',
+          to: '2.1.2',
+          blockers: [{ dependent: 'oxfmt@0.56.0', range: '2.1.0' }],
+        },
+      ],
+      unfixable: [],
+    },
     auditLevel: 'high',
     today: '2026-10-17',
     expiryDays: 30,
@@ -197,12 +310,33 @@ test('it adds no ignore for an advisory below the audit level', () => {
 
 test('it renews an ignore set further out than 90 days, so it comes back for review', () => {
   const plan = planAuditIgnores({
-    report: { tinypool: [tinypoolAdvisory] },
+    report: {
+      tinypool: [
+        {
+          id: 1_241_261,
+          url: 'https://github.com/advisories/GHSA-85c8-ppgw-ccpr',
+          title: 'Tinypool: Prototype Pollution Gadget to RCE in run() options',
+          severity: 'critical',
+          vulnerable_versions: '<2.1.2',
+        },
+      ],
+    },
     ignores: {
       'GHSA-85c8-ppgw-ccpr': { package: 'tinypool', reason: 'Forever.', expires: '9999-12-31' },
     },
     unmanagedIDs: [],
-    plan: blockedPlan,
+    plan: {
+      fixes: [],
+      blocked: [
+        {
+          name: 'tinypool',
+          from: '2.1.0',
+          to: '2.1.2',
+          blockers: [{ dependent: 'oxfmt@0.56.0', range: '2.1.0' }],
+        },
+      ],
+      unfixable: [],
+    },
     auditLevel: null,
     today: '2026-10-17',
     expiryDays: 30,
@@ -214,10 +348,31 @@ test('it renews an ignore set further out than 90 days, so it comes back for rev
 
 test('it caps the expiry of a new ignore at 90 days', () => {
   const plan = planAuditIgnores({
-    report: { tinypool: [tinypoolAdvisory] },
+    report: {
+      tinypool: [
+        {
+          id: 1_241_261,
+          url: 'https://github.com/advisories/GHSA-85c8-ppgw-ccpr',
+          title: 'Tinypool: Prototype Pollution Gadget to RCE in run() options',
+          severity: 'critical',
+          vulnerable_versions: '<2.1.2',
+        },
+      ],
+    },
     ignores: {},
     unmanagedIDs: [],
-    plan: blockedPlan,
+    plan: {
+      fixes: [],
+      blocked: [
+        {
+          name: 'tinypool',
+          from: '2.1.0',
+          to: '2.1.2',
+          blockers: [{ dependent: 'oxfmt@0.56.0', range: '2.1.0' }],
+        },
+      ],
+      unfixable: [],
+    },
     auditLevel: null,
     today: '2026-10-17',
     expiryDays: 3650,
@@ -229,10 +384,31 @@ test('it caps the expiry of a new ignore at 90 days', () => {
 
 test('it keeps the expiry the open fix branch already holds for a new ignore', () => {
   const plan = planAuditIgnores({
-    report: { tinypool: [tinypoolAdvisory] },
+    report: {
+      tinypool: [
+        {
+          id: 1_241_261,
+          url: 'https://github.com/advisories/GHSA-85c8-ppgw-ccpr',
+          title: 'Tinypool: Prototype Pollution Gadget to RCE in run() options',
+          severity: 'critical',
+          vulnerable_versions: '<2.1.2',
+        },
+      ],
+    },
     ignores: {},
     unmanagedIDs: [],
-    plan: blockedPlan,
+    plan: {
+      fixes: [],
+      blocked: [
+        {
+          name: 'tinypool',
+          from: '2.1.0',
+          to: '2.1.2',
+          blockers: [{ dependent: 'oxfmt@0.56.0', range: '2.1.0' }],
+        },
+      ],
+      unfixable: [],
+    },
     auditLevel: null,
     today: '2026-10-18',
     expiryDays: 30,
@@ -246,10 +422,31 @@ test('it keeps the expiry the open fix branch already holds for a new ignore', (
 
 test('it ignores an open fix branch expiry set further out than 90 days', () => {
   const plan = planAuditIgnores({
-    report: { tinypool: [tinypoolAdvisory] },
+    report: {
+      tinypool: [
+        {
+          id: 1_241_261,
+          url: 'https://github.com/advisories/GHSA-85c8-ppgw-ccpr',
+          title: 'Tinypool: Prototype Pollution Gadget to RCE in run() options',
+          severity: 'critical',
+          vulnerable_versions: '<2.1.2',
+        },
+      ],
+    },
     ignores: {},
     unmanagedIDs: [],
-    plan: blockedPlan,
+    plan: {
+      fixes: [],
+      blocked: [
+        {
+          name: 'tinypool',
+          from: '2.1.0',
+          to: '2.1.2',
+          blockers: [{ dependent: 'oxfmt@0.56.0', range: '2.1.0' }],
+        },
+      ],
+      unfixable: [],
+    },
     auditLevel: null,
     today: '2026-10-18',
     expiryDays: 30,

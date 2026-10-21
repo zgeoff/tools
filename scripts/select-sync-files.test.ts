@@ -2,8 +2,6 @@ import { expect, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const scriptPath = fileURLToPath(new URL('select-sync-files.sh', import.meta.url));
-
 test('it skips a file whose except names the repo and copies the rest', () => {
   const files = [
     { source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' },
@@ -14,10 +12,14 @@ test('it skips a file whose except names the repo and copies the rest', () => {
     },
   ];
 
-  const result = spawnSync('bash', [scriptPath, 'acme/ledger'], {
-    input: JSON.stringify(files),
-    encoding: 'utf8',
-  });
+  const result = spawnSync(
+    'bash',
+    [fileURLToPath(new URL('select-sync-files.sh', import.meta.url)), 'acme/ledger'],
+    {
+      input: JSON.stringify(files),
+      encoding: 'utf8',
+    },
+  );
 
   expect(result.status).toBe(0);
 
@@ -36,10 +38,14 @@ test('it copies an excepted file to a repo the except does not name', () => {
     },
   ];
 
-  const result = spawnSync('bash', [scriptPath, 'acme/storefront'], {
-    input: JSON.stringify(files),
-    encoding: 'utf8',
-  });
+  const result = spawnSync(
+    'bash',
+    [fileURLToPath(new URL('select-sync-files.sh', import.meta.url)), 'acme/storefront'],
+    {
+      input: JSON.stringify(files),
+      encoding: 'utf8',
+    },
+  );
 
   expect(result.status).toBe(0);
 
@@ -53,10 +59,14 @@ test('it matches the repo name without regard to case', () => {
     { source: 'sync/demo.md', target: 'demo.md', mode: '0755', except: ['Acme/Ledger'] },
   ];
 
-  const result = spawnSync('bash', [scriptPath, 'acme/LEDGER'], {
-    input: JSON.stringify(files),
-    encoding: 'utf8',
-  });
+  const result = spawnSync(
+    'bash',
+    [fileURLToPath(new URL('select-sync-files.sh', import.meta.url)), 'acme/LEDGER'],
+    {
+      input: JSON.stringify(files),
+      encoding: 'utf8',
+    },
+  );
 
   expect(result.status).toBe(0);
   expect(result.stdout).toBe('skip\tsync/demo.md\tdemo.md\t0755\n');

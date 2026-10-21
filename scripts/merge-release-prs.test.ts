@@ -1,66 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-// Stands in for the GitHub API: the nth call to an endpoint answers with line n
-// of its response file, or the last line, and a body of "error" fails the call.
-// calls.log records each call's arguments, less the GraphQL query.
-const FAKE_GH = `#!/usr/bin/env bash
-dir=$(dirname "$0")
-call="$*"
-printf '%s\\n' "\${call%% -f query=*}" >> "$dir/calls.log"
-take() {
-  local file="$dir/$1" n total
-  [ -f "$file" ] || { printf '%s\\n' "$2"; return; }
-  n=$(cat "$file.n" 2>/dev/null || echo 0)
-  total=$(wc -l < "$file")
-  body=$(sed -n "$(( n < total ? n + 1 : total ))p" "$file")
-  echo $((n + 1)) > "$file.n"
-  [ "$body" != '"error"' ] || { echo "HTTP 502" >&2; exit 1; }
-  printf '%s\\n' "$body"
-}
-case "$*" in
-  "pr list "*) take prs '[]' ;;
-  "api graphql -f owner=zgeoff -f name=tools -f ref=refs/heads/release-please--branches--main -f query="*)
-    take heads '' ;;
-  "pr view "*) take mergeable '{"mergeable":"MERGEABLE"}' ;;
-  "pr merge "*) ;;
-  *) echo "unexpected gh call: $*" >&2; exit 1 ;;
-esac
-`;
-
-interface Check {
-  name: string;
-  status: string;
-  conclusion: string | null;
-  app?: string;
-}
-
-interface Status {
-  context: string;
-  state: string;
-}
-
-// The body GitHub returns for the script's query: the branch head, and its
-// status rollup, which is null until the first check registers.
-function buildHeadResponse(oid: string, checks: Check[], statuses: Status[] = []) {
-  const nodes = [
-    ...checks.map((check) => ({
-      __typename: 'CheckRun',
-      name: check.name,
-      status: check.status,
-      conclusion: check.conclusion,
-      checkSuite: { app: { slug: check.app ?? 'github-actions' } },
-    })),
-    ...statuses.map((status) => ({ __typename: 'StatusContext', ...status })),
-  ];
-
-  const statusCheckRollup = nodes.length === 0 ? null : { contexts: { nodes } };
-
-  return { data: { repository: { ref: { target: { oid, statusCheckRollup } } } } };
-}
+import { buildMockHeadResponse } from '../test-utils/build-mock-head-response.ts';
+import { createStubGH } from '../test-utils/create-stub-gh.ts';
 
 async function setupTest() {
   // Inside the checkout, not the system temp dir: the folder is git-ignored.
@@ -68,18 +12,9 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  await writeFile(join(directory, 'gh'), FAKE_GH);
-  await chmod(join(directory, 'gh'), 0o755);
-  await writeFile(join(directory, 'calls.log'), '');
+  const gh = await createStubGH(directory);
 
   const scriptPath = fileURLToPath(new URL('merge-release-prs.sh', import.meta.url));
-
-  const writeResponses = async (name: string, bodies: unknown[]) => {
-    await writeFile(
-      join(directory, name),
-      bodies.map((body) => `${JSON.stringify(body)}\n`).join(''),
-    );
-  };
 
   const runScript = (env: Record<string, string> = {}) =>
     spawnSync('bash', [scriptPath, 'zgeoff/tools'], {
@@ -92,19 +27,8 @@ async function setupTest() {
       },
     });
 
-  const readCalls = async () => {
-    const log = await readFile(join(directory, 'calls.log'), 'utf8');
-
-    return log.split('\n').filter(Boolean);
-  };
-
-  return { writeResponses, runScript, readCalls };
+  return { writeResponses: gh.writeResponses, runScript, readCalls: gh.readCalls };
 }
-
-const HEAD_QUERY_CALL =
-  'api graphql -f owner=zgeoff -f name=tools -f ref=refs/heads/release-please--branches--main';
-
-const MERGE_CALL = 'pr merge 145 --repo zgeoff/tools --squash --match-head-commit';
 
 test('it waits for checks that have not started yet, then merges the checked head', async () => {
   const ctx = await setupTest();
@@ -112,10 +36,12 @@ test('it waits for checks that have not started yet, then merges the checked hea
   await ctx.writeResponses('prs', [[{ number: 145 }]]);
 
   await ctx.writeResponses('heads', [
-    buildHeadResponse('abc123', []),
-    buildHeadResponse('abc123', []),
-    buildHeadResponse('abc123', [{ name: 'pr / checks', status: 'IN_PROGRESS', conclusion: null }]),
-    buildHeadResponse('abc123', [
+    buildMockHeadResponse('abc123', []),
+    buildMockHeadResponse('abc123', []),
+    buildMockHeadResponse('abc123', [
+      { name: 'pr / checks', status: 'IN_PROGRESS', conclusion: null },
+    ]),
+    buildMockHeadResponse('abc123', [
       { name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
     ]),
   ]);
@@ -127,8 +53,16 @@ test('it waits for checks that have not started yet, then merges the checked hea
   expect(result.stderr).toBe('');
   expect(result.status).toBe(0);
   expect(result.stdout).toBe('merged release PR #145 at abc123\n');
-  expect(calls.filter((call) => call === HEAD_QUERY_CALL)).toHaveLength(4);
-  expect(calls.at(-1)).toBe(`${MERGE_CALL} abc123`);
+
+  expect(
+    calls.filter(
+      (call) =>
+        call ===
+        'api graphql -f owner=zgeoff -f name=tools -f ref=refs/heads/release-please--branches--main',
+    ),
+  ).toHaveLength(4);
+
+  expect(calls.at(-1)).toBe(`pr merge 145 --repo zgeoff/tools --squash --match-head-commit abc123`);
 });
 
 test('it waits on the head a push moved the branch to, and merges that head', async () => {
@@ -137,9 +71,11 @@ test('it waits on the head a push moved the branch to, and merges that head', as
   await ctx.writeResponses('prs', [[{ number: 145 }]]);
 
   await ctx.writeResponses('heads', [
-    buildHeadResponse('old111', [{ name: 'pr / checks', status: 'IN_PROGRESS', conclusion: null }]),
-    buildHeadResponse('new222', []),
-    buildHeadResponse('new222', [
+    buildMockHeadResponse('old111', [
+      { name: 'pr / checks', status: 'IN_PROGRESS', conclusion: null },
+    ]),
+    buildMockHeadResponse('new222', []),
+    buildMockHeadResponse('new222', [
       { name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
     ]),
   ]);
@@ -149,8 +85,16 @@ test('it waits on the head a push moved the branch to, and merges that head', as
   const calls = await ctx.readCalls();
 
   expect(result.status).toBe(0);
-  expect(calls.filter((call) => call === HEAD_QUERY_CALL)).toHaveLength(3);
-  expect(calls.at(-1)).toBe(`${MERGE_CALL} new222`);
+
+  expect(
+    calls.filter(
+      (call) =>
+        call ===
+        'api graphql -f owner=zgeoff -f name=tools -f ref=refs/heads/release-please--branches--main',
+    ),
+  ).toHaveLength(3);
+
+  expect(calls.at(-1)).toBe(`pr merge 145 --repo zgeoff/tools --squash --match-head-commit new222`);
 });
 
 test('it waits for the GitHub Actions checks when other apps pass first', async () => {
@@ -168,14 +112,14 @@ test('it waits for the GitHub Actions checks when other apps pass first', async 
   const coderabbit = { context: 'CodeRabbit', state: 'SUCCESS' };
 
   await ctx.writeResponses('heads', [
-    buildHeadResponse('abc123', [], [coderabbit]),
-    buildHeadResponse('abc123', [socket], [coderabbit]),
-    buildHeadResponse(
+    buildMockHeadResponse('abc123', [], [coderabbit]),
+    buildMockHeadResponse('abc123', [socket], [coderabbit]),
+    buildMockHeadResponse(
       'abc123',
       [socket, { name: 'pr / checks', status: 'IN_PROGRESS', conclusion: null }],
       [coderabbit],
     ),
-    buildHeadResponse(
+    buildMockHeadResponse(
       'abc123',
       [socket, { name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' }],
       [coderabbit],
@@ -187,8 +131,16 @@ test('it waits for the GitHub Actions checks when other apps pass first', async 
   const calls = await ctx.readCalls();
 
   expect(result.status).toBe(0);
-  expect(calls.filter((call) => call === HEAD_QUERY_CALL)).toHaveLength(4);
-  expect(calls.at(-1)).toBe(`${MERGE_CALL} abc123`);
+
+  expect(
+    calls.filter(
+      (call) =>
+        call ===
+        'api graphql -f owner=zgeoff -f name=tools -f ref=refs/heads/release-please--branches--main',
+    ),
+  ).toHaveLength(4);
+
+  expect(calls.at(-1)).toBe(`pr merge 145 --repo zgeoff/tools --squash --match-head-commit abc123`);
 });
 
 test('it counts skipped checks and passed commit statuses as passed', async () => {
@@ -197,7 +149,7 @@ test('it counts skipped checks and passed commit statuses as passed', async () =
   await ctx.writeResponses('prs', [[{ number: 145 }]]);
 
   await ctx.writeResponses('heads', [
-    buildHeadResponse(
+    buildMockHeadResponse(
       'abc123',
       [
         { name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
@@ -212,7 +164,7 @@ test('it counts skipped checks and passed commit statuses as passed', async () =
   const calls = await ctx.readCalls();
 
   expect(result.status).toBe(0);
-  expect(calls.at(-1)).toBe(`${MERGE_CALL} abc123`);
+  expect(calls.at(-1)).toBe(`pr merge 145 --repo zgeoff/tools --squash --match-head-commit abc123`);
 });
 
 test('it retries a poll whose API call fails', async () => {
@@ -222,7 +174,7 @@ test('it retries a poll whose API call fails', async () => {
 
   await ctx.writeResponses('heads', [
     'error',
-    buildHeadResponse('abc123', [
+    buildMockHeadResponse('abc123', [
       { name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
     ]),
   ]);
@@ -232,7 +184,7 @@ test('it retries a poll whose API call fails', async () => {
   const calls = await ctx.readCalls();
 
   expect(result.status).toBe(0);
-  expect(calls.at(-1)).toBe(`${MERGE_CALL} abc123`);
+  expect(calls.at(-1)).toBe(`pr merge 145 --repo zgeoff/tools --squash --match-head-commit abc123`);
 });
 
 test.each(['FAILURE', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE'])(
@@ -243,7 +195,7 @@ test.each(['FAILURE', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAIL
     await ctx.writeResponses('prs', [[{ number: 145 }]]);
 
     await ctx.writeResponses('heads', [
-      buildHeadResponse('abc123', [
+      buildMockHeadResponse('abc123', [
         { name: 'pr / checks', status: 'COMPLETED', conclusion },
         { name: 'pr / gitleaks', status: 'COMPLETED', conclusion: 'SUCCESS' },
       ]),
@@ -265,7 +217,7 @@ test('it fails without a merge when a commit status fails', async () => {
   await ctx.writeResponses('prs', [[{ number: 145 }]]);
 
   await ctx.writeResponses('heads', [
-    buildHeadResponse(
+    buildMockHeadResponse(
       'abc123',
       [{ name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' }],
       [{ context: 'ci/legacy', state: 'ERROR' }],
@@ -285,7 +237,7 @@ test('it fails without a merge when the checks do not finish before the timeout'
   const ctx = await setupTest();
 
   await ctx.writeResponses('prs', [[{ number: 145 }]]);
-  await ctx.writeResponses('heads', [buildHeadResponse('abc123', [])]);
+  await ctx.writeResponses('heads', [buildMockHeadResponse('abc123', [])]);
 
   const result = ctx.runScript({ CHECKS_TIMEOUT: '0' });
 
@@ -302,7 +254,7 @@ test('it fails when the release PR has conflicts', async () => {
   await ctx.writeResponses('prs', [[{ number: 145 }]]);
 
   await ctx.writeResponses('heads', [
-    buildHeadResponse('abc123', [
+    buildMockHeadResponse('abc123', [
       { name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
     ]),
   ]);
