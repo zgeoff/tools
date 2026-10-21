@@ -38,7 +38,7 @@
   "type": "module",
   "scripts": {
     "prepare": "lefthook install --force || true",
-    "typecheck": "bun run --filter '*' typecheck && tsc -p scripts && tsc -p sync && tsc -p .github/workflows",
+    "typecheck": "bun run --filter '*' typecheck && tsc -p scripts && tsc -p sync && tsc -p test-utils && tsc -p .github/workflows",
     "test": "bun test",
     "test:workflows": "bun test ./.github/workflows",
     "test:related": "bun sync/pre-push/run-related-tests.ts",
