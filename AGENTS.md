@@ -28,7 +28,8 @@ packages/           the @zgeoff/* packages; release-please versions each one and
 sync/               the sources that repo-sync delivers, listed in sync/manifest.json; an edit here
                     reaches every repo that takes the entry, as sync/README.md describes
   skills/           the shared skill bases, each delivered to .claude/skills/<name>/
-  pre-push/         the lefthook pre-push baseline, which this repo's lefthook.yml extends too
+  pre-push/         the lefthook pre-push baseline and its pre-commit typecheck, which this repo's
+                    lefthook.yml extends too
   workflow-callers/ opt-in workflow stubs that call this repo's reusable workflows
   hooks/            the skill-gate hook
 scripts/            the shell scripts that repo-sync and CI run, plus the manual ones that pin a

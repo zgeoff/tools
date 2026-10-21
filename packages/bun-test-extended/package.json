@@ -26,7 +26,7 @@
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "prepare": "bun run build",
-    "typecheck": "tsc"
+    "typecheck": "tsrs"
   },
   "dependencies": {
     "jest-extended": "catalog:",
@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@types/bun": "catalog:",
+    "tsrs": "catalog:",
     "typescript": "catalog:"
   },
   "engines": {

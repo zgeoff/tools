@@ -30,7 +30,7 @@
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "prepare": "bun run build",
-    "typecheck": "tsc"
+    "typecheck": "tsrs"
   },
   "dependencies": {
     "@happy-dom/global-registrator": "catalog:",
@@ -44,6 +44,7 @@
     "@types/react-dom": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "tsrs": "catalog:",
     "typescript": "catalog:",
     "zustand": "catalog:"
   },

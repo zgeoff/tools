@@ -212,7 +212,7 @@
   },
   {
     "name": "pre-push-baseline",
-    "description": "The light pre-push baseline: lefthook jobs that lint and test only the files the branch changes and run one at a time, the two scripts they call, the package scripts files:branch, lint:files and test:related where the repo lacks them, and a move of a files:branch script left on the old script path",
+    "description": "The light pre-push baseline: lefthook jobs that lint and test only the files the branch changes and run one at a time, a pre-commit typecheck, the two scripts they call, the package scripts files:branch, lint:files and test:related where the repo lacks them, and a move of a files:branch script left on the old script path",
     "optIn": true,
     "files": [
       {

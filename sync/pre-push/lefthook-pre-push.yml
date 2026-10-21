@@ -7,10 +7,20 @@
 #
 # It checks what the branch changes, plus the whole-tree gates that fit a
 # small host: format:check and typecheck. CI runs every whole-tree check:
-# type-aware lint, dead code, and the full test suite. A repo adds its own
-# pre-push jobs under pre-push.jobs in lefthook.yml; they run before these.
-# A repo changes what a job runs through the package script it calls, except
-# check, which runs only zgeoff-check.
+# type-aware lint, dead code, and the full test suite. It also runs typecheck
+# before a commit that changes code or config, after the repo's own pre-commit
+# fixers. A repo adds its own jobs under pre-commit.jobs and pre-push.jobs in
+# lefthook.yml; they run before these. A repo changes what a job runs through
+# the package script it calls, except check, which runs only zgeoff-check.
+
+pre-commit:
+  # Sequential, so typecheck reads the files the fixers before it rewrote.
+  piped: true
+  jobs:
+    # lefthook skips the job when no staged file matches the glob.
+    - name: typecheck
+      glob: '*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,json,jsonc}'
+      run: bun run typecheck
 
 pre-push:
   # Sequential, to bound memory on a small host or with parallel agents.
