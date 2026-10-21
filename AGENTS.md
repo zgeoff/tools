@@ -32,8 +32,8 @@ sync/               the sources that repo-sync delivers, listed in sync/manifest
   hooks/            the skill-gate hook
 scripts/            the shell scripts that repo-sync and CI run, plus the manual ones that pin a
                     repo to a sync tag and do a package's first npm publish; tests sit beside them
-.github/workflows/  this repo's CI and release, and the reusable bun-checks and repo-sync workflows
-                    that other repos call
+.github/workflows/  this repo's CI and release, and the reusable workflows that other repos call:
+                    bun-checks, repo-sync, audit-fix and the paths-changed gate
 .claude/skills/     the code-style skill, which is both this repo's skill and the shared base
 ```
 
