@@ -5,8 +5,6 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 
-const TSC_PATH = join(import.meta.dir, '../../node_modules/.bin/tsc');
-
 // The package packed and installed from its tarball alone into a fresh project, with the entry
 // point a repo carries at .claude/hooks/skill-gate/skill-gate.ts. Every build and pack writes under
 // the test's own folder, never the shared dist, so overlapping runs cannot race.
@@ -77,6 +75,7 @@ async function setupTest() {
   return {
     project,
     env,
+    tscPath: join(import.meta.dir, '../../node_modules/.bin/tsc'),
     hookPath: join(project, '.claude/hooks/skill-gate/skill-gate.ts'),
     packageManifestPath: join(unpacked, 'package/package.json'),
   };
@@ -190,7 +189,7 @@ test('it types runSkillGate from the shipped declarations for a TypeScript consu
     }),
   );
 
-  const result = await $`${TSC_PATH} -p ${ctx.project} --listFilesOnly`
+  const result = await $`${ctx.tscPath} -p ${ctx.project} --listFilesOnly`
     .cwd(ctx.project)
     .env(ctx.env)
     .nothrow()
@@ -202,7 +201,7 @@ test('it types runSkillGate from the shipped declarations for a TypeScript consu
   expect(listed).toContain('node_modules/@zgeoff/skill-gate/dist/index.d.ts');
   expect(listed).not.toContain('node_modules/@zgeoff/skill-gate/src/');
 
-  const checked = await $`${TSC_PATH} -p ${ctx.project}`
+  const checked = await $`${ctx.tscPath} -p ${ctx.project}`
     .cwd(ctx.project)
     .env(ctx.env)
     .nothrow()

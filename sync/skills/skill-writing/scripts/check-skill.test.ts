@@ -34,18 +34,18 @@ async function setupTest() {
   return { writePage, run };
 }
 
-const frontmatter = [
-  '---',
-  'name: demo',
-  'description:',
-  '  Commands and traps for the demo service. Load it before running or writing a demo test.',
-  '---',
-];
-
 test('it passes a skill with a name, a description, and short files', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePage('.claude/skills/demo/SKILL.md', [...frontmatter, '', '# Demo']);
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Commands and traps for the demo service. Load it before running or writing a demo test.',
+    '---',
+    '',
+    '# Demo',
+  ]);
 
   const result = ctx.run();
 
@@ -147,7 +147,11 @@ test('it fails a line anchor in a single-quoted HTML link', async () => {
   const ctx = await setupTest();
 
   await ctx.writePage('.claude/skills/demo/SKILL.md', [
-    ...frontmatter,
+    '---',
+    'name: demo',
+    'description:',
+    '  Commands and traps for the demo service. Load it before running or writing a demo test.',
+    '---',
     '',
     "See <a href='guide.md#L42'>the guide</a>.",
   ]);
@@ -161,7 +165,13 @@ test('it fails a line anchor in a single-quoted HTML link', async () => {
 test('it fails a name that differs from the folder', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePage('.claude/skills/widgets/SKILL.md', frontmatter);
+  await ctx.writePage('.claude/skills/widgets/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Commands and traps for the demo service. Load it before running or writing a demo test.',
+    '---',
+  ]);
 
   const result = ctx.run();
 
@@ -198,7 +208,11 @@ test('it fails a link with a line anchor, but not one inside code', async () => 
   const ctx = await setupTest();
 
   await ctx.writePage('.claude/skills/demo/SKILL.md', [
-    ...frontmatter,
+    '---',
+    'name: demo',
+    'description:',
+    '  Commands and traps for the demo service. Load it before running or writing a demo test.',
+    '---',
     '',
     'See [`loadTheme`](../../../src/load-theme.ts#L42).',
     'Never write `[x](y.ts#L1)`.',
@@ -222,7 +236,11 @@ test('it warns and passes when SKILL.md is over 500 lines', async () => {
   const ctx = await setupTest();
 
   await ctx.writePage('.claude/skills/demo/SKILL.md', [
-    ...frontmatter,
+    '---',
+    'name: demo',
+    'description:',
+    '  Commands and traps for the demo service. Load it before running or writing a demo test.',
+    '---',
     ...Array.from({ length: 500 }, () => 'The tool reads one file.'),
   ]);
 
@@ -239,7 +257,11 @@ test('it warns about a reference that SKILL.md does not list under References', 
   const ctx = await setupTest();
 
   await ctx.writePage('.claude/skills/demo/SKILL.md', [
-    ...frontmatter,
+    '---',
+    'name: demo',
+    'description:',
+    '  Commands and traps for the demo service. Load it before running or writing a demo test.',
+    '---',
     '',
     '## References',
     '',
@@ -266,7 +288,13 @@ test('it warns about a reference that SKILL.md does not list under References', 
 test('it warns about a long reference with no contents list', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePage('.claude/skills/demo/SKILL.md', frontmatter);
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Commands and traps for the demo service. Load it before running or writing a demo test.',
+    '---',
+  ]);
 
   await ctx.writePage('.claude/skills/demo/references/e2e.md', [
     '# The harness',
@@ -286,7 +314,11 @@ test('it accepts a long reference that opens with a contents list', async () => 
   const ctx = await setupTest();
 
   await ctx.writePage('.claude/skills/demo/SKILL.md', [
-    ...frontmatter,
+    '---',
+    'name: demo',
+    'description:',
+    '  Commands and traps for the demo service. Load it before running or writing a demo test.',
+    '---',
     '',
     '## References',
     '',
@@ -313,7 +345,14 @@ test('it accepts a long reference that opens with a contents list', async () => 
 test('it warns about a reference that links to another reference', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePage('.claude/skills/demo/SKILL.md', frontmatter);
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Commands and traps for the demo service. Load it before running or writing a demo test.',
+    '---',
+  ]);
+
   await ctx.writePage('.claude/skills/demo/references/http.md', ['# HTTP']);
   await ctx.writePage('.claude/skills/demo/references/frontend.md', ['See [HTTP](./http.md).']);
 
@@ -332,7 +371,11 @@ test('it warns about a code-formatted path to a repo file, but not a linked one'
   await ctx.writePage('src/load-theme.ts', ['export {};']);
 
   await ctx.writePage('.claude/skills/demo/SKILL.md', [
-    ...frontmatter,
+    '---',
+    'name: demo',
+    'description:',
+    '  Commands and traps for the demo service. Load it before running or writing a demo test.',
+    '---',
     '',
     'Read `src/load-theme.ts` first.',
     'Then [`loadTheme`](../../../src/load-theme.ts) and [`src/load-theme.ts`](../../../src/load-theme.ts).',
@@ -354,7 +397,11 @@ test('it reads no code-formatted path in a table row as a missing link', async (
   await ctx.writePage('scripts/test-go.sh', ['echo go']);
 
   await ctx.writePage('.claude/skills/demo/SKILL.md', [
-    ...frontmatter,
+    '---',
+    'name: demo',
+    'description:',
+    '  Commands and traps for the demo service. Load it before running or writing a demo test.',
+    '---',
     '',
     '| Run   | Command              |',
     '| ----- | -------------------- |',
@@ -386,7 +433,14 @@ test('it skips a vendored reference inside a skill it checks', async () => {
     '.claude/skills/demo/references/vendor.md linguist-vendored',
   ]);
 
-  await ctx.writePage('.claude/skills/demo/SKILL.md', frontmatter);
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Commands and traps for the demo service. Load it before running or writing a demo test.',
+    '---',
+  ]);
+
   await ctx.writePage('.claude/skills/demo/references/vendor.md', ['See [x](y.ts#L1).']);
 
   const result = ctx.run();
@@ -398,7 +452,14 @@ test('it skips a vendored reference inside a skill it checks', async () => {
 test('it checks only the skill folders it is given', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePage('.claude/skills/demo/SKILL.md', frontmatter);
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Commands and traps for the demo service. Load it before running or writing a demo test.',
+    '---',
+  ]);
+
   await ctx.writePage('.claude/skills/broken/SKILL.md', ['# No frontmatter']);
 
   const result = ctx.run('.claude/skills/demo');

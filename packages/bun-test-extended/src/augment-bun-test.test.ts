@@ -8,22 +8,20 @@ interface Parcel {
   readonly note: string | null;
 }
 
-function buildParcel(): Parcel {
-  return {
+test('it matches a property with expect.any inside toStrictEqual', () => {
+  expect({ id: 'parcel-12' }).toStrictEqual({ id: expect.any(String) });
+});
+
+test('it matches every core asymmetric matcher inside toStrictEqual', () => {
+  const parcel: Parcel = {
     id: 'parcel-12',
     weight: 2.5,
     tags: ['fragile', 'express'],
     sender: { name: 'Ada', city: 'Hobart' },
     note: 'leave at the door',
   };
-}
 
-test('it matches a property with expect.any inside toStrictEqual', () => {
-  expect({ id: 'parcel-12' }).toStrictEqual({ id: expect.any(String) });
-});
-
-test('it matches every core asymmetric matcher inside toStrictEqual', () => {
-  expect(buildParcel()).toStrictEqual({
+  expect(parcel).toStrictEqual({
     id: expect.stringMatching(/^parcel-\d+$/u),
     weight: expect.any(Number),
     tags: expect.arrayContaining(['express']),

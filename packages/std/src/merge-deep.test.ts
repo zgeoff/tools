@@ -1,3 +1,4 @@
+// oxlint-disable max-classes-per-file -- setup-test-only bans a module-level class, so each class-instance test declares its own
 import { expect, test } from 'bun:test';
 import { isRecord } from './is-record.ts';
 import { mergeDeep } from './merge-deep.ts';
@@ -9,52 +10,97 @@ interface Settings {
   readonly note: string | undefined;
 }
 
-function buildSettings(): Settings {
-  return {
+test('it merges a nested object key by key', () => {
+  const base: Settings = {
     theme: { color: 'teal', size: 12 },
     tags: ['work', 'home'],
     createdAt: new Date('2026-01-01'),
     note: 'draft',
   };
-}
 
-test('it merges a nested object key by key', () => {
-  const merged = mergeDeep(buildSettings(), { theme: { size: 14 } });
+  const merged = mergeDeep(base, { theme: { size: 14 } });
 
   expect(merged.theme).toStrictEqual({ color: 'teal', size: 14 });
 });
 
 test('it replaces an array whole', () => {
-  const merged = mergeDeep(buildSettings(), { tags: ['garden'] });
+  const base: Settings = {
+    theme: { color: 'teal', size: 12 },
+    tags: ['work', 'home'],
+    createdAt: new Date('2026-01-01'),
+    note: 'draft',
+  };
+
+  const merged = mergeDeep(base, { tags: ['garden'] });
 
   expect(merged.tags).toStrictEqual(['garden']);
 });
 
 test('it replaces a Date whole', () => {
-  const merged = mergeDeep(buildSettings(), { createdAt: new Date('2026-06-01') });
+  const base: Settings = {
+    theme: { color: 'teal', size: 12 },
+    tags: ['work', 'home'],
+    createdAt: new Date('2026-01-01'),
+    note: 'draft',
+  };
+
+  const merged = mergeDeep(base, { createdAt: new Date('2026-06-01') });
 
   expect(merged.createdAt).toStrictEqual(new Date('2026-06-01'));
 });
 
 test('it sets a key to undefined when the type admits undefined', () => {
-  const merged = mergeDeep(buildSettings(), { note: undefined });
+  const base: Settings = {
+    theme: { color: 'teal', size: 12 },
+    tags: ['work', 'home'],
+    createdAt: new Date('2026-01-01'),
+    note: 'draft',
+  };
+
+  const merged = mergeDeep(base, { note: undefined });
 
   expect(merged.note).toBeUndefined();
 });
 
 test('it keeps every key the patch leaves out', () => {
-  const merged = mergeDeep(buildSettings(), {});
+  const base: Settings = {
+    theme: { color: 'teal', size: 12 },
+    tags: ['work', 'home'],
+    createdAt: new Date('2026-01-01'),
+    note: 'draft',
+  };
 
-  expect(merged).toStrictEqual(buildSettings());
+  const merged = mergeDeep(base, {});
+
+  expect(merged).toStrictEqual({
+    theme: { color: 'teal', size: 12 },
+    tags: ['work', 'home'],
+    createdAt: new Date('2026-01-01'),
+    note: 'draft',
+  });
 });
 
 test('it leaves the base and the patch untouched', () => {
-  const base = buildSettings();
+  const base: Settings = {
+    theme: { color: 'teal', size: 12 },
+    tags: ['work', 'home'],
+    createdAt: new Date('2026-01-01'),
+    note: 'draft',
+  };
+
   const patch = { theme: { size: 14 } };
 
   mergeDeep(base, patch);
 
-  expect({ base, patch }).toStrictEqual({ base: buildSettings(), patch: { theme: { size: 14 } } });
+  expect({ base, patch }).toStrictEqual({
+    base: {
+      theme: { color: 'teal', size: 12 },
+      tags: ['work', 'home'],
+      createdAt: new Date('2026-01-01'),
+      note: 'draft',
+    },
+    patch: { theme: { size: 14 } },
+  });
 });
 
 test('it merges a symbol key', () => {
@@ -70,8 +116,15 @@ test('it merges a symbol key', () => {
 });
 
 test('it refuses an explicit undefined for a key whose type lacks it', () => {
+  const base: Settings = {
+    theme: { color: 'teal', size: 12 },
+    tags: ['work', 'home'],
+    createdAt: new Date('2026-01-01'),
+    note: 'draft',
+  };
+
   // @ts-expect-error -- `theme` does not admit undefined
-  const merged = mergeDeep(buildSettings(), { theme: undefined });
+  const merged = mergeDeep(base, { theme: undefined });
 
   expect(merged.theme).toBeUndefined();
 });
@@ -113,17 +166,15 @@ interface Toolbox {
   readonly ready: Promise<number>;
 }
 
-function buildToolbox(): Toolbox {
-  return {
+test('it replaces a function, a RegExp, a Map, a Set and a Promise whole', () => {
+  const toolbox: Toolbox = {
     format: (value) => value.toFixed(1),
     pattern: /^tool-/u,
     owners: new Map([['wrench', { name: 'Ada', city: 'Hobart' }]]),
     labels: new Set(['steel']),
     ready: Promise.resolve(1),
   };
-}
 
-test('it replaces a function, a RegExp, a Map, a Set and a Promise whole', () => {
   const format = String;
   const pattern = /^kit-/u;
 
@@ -131,13 +182,19 @@ test('it replaces a function, a RegExp, a Map, a Set and a Promise whole', () =>
   const labels = new Set(['brass']);
 
   const ready = Promise.resolve(2);
-  const merged = mergeDeep(buildToolbox(), { format, pattern, owners, labels, ready });
+  const merged = mergeDeep(toolbox, { format, pattern, owners, labels, ready });
 
   expect(merged).toStrictEqual({ format, pattern, owners, labels, ready });
 });
 
 test('it types a function, a RegExp, a Map, a Set and a Promise patch as the whole value', () => {
-  const toolbox = buildToolbox();
+  const toolbox: Toolbox = {
+    format: (value) => value.toFixed(1),
+    pattern: /^tool-/u,
+    owners: new Map([['wrench', { name: 'Ada', city: 'Hobart' }]]),
+    labels: new Set(['steel']),
+    ready: Promise.resolve(1),
+  };
 
   // @ts-expect-error -- a Map patch is a whole Map, not a partial of one
   const mapPatch = mergeDeep(toolbox, { owners: { size: 1 } });
@@ -157,14 +214,14 @@ test('it types a function, a RegExp, a Map, a Set and a Promise patch as the who
   expect([mapPatch, patternPatch, setPatch, promisePatch, formatPatch]).toHaveLength(5);
 });
 
-// oxlint-disable-next-line zgeoff/no-class -- the merge must keep a class instance's fields and prototype
-class Kettle {
-  color = 'teal';
-
-  size = 12;
-}
-
 test('it merges a class instance at the root key by key and keeps its prototype', () => {
+  // oxlint-disable-next-line zgeoff/no-class -- the merge must keep a class instance's fields and prototype
+  class Kettle {
+    color = 'teal';
+
+    size = 12;
+  }
+
   const merged = mergeDeep(new Kettle(), { size: 14 });
 
   expect({
@@ -175,6 +232,13 @@ test('it merges a class instance at the root key by key and keeps its prototype'
 });
 
 test('it merges a nested class instance key by key', () => {
+  // oxlint-disable-next-line zgeoff/no-class -- the merge must keep a class instance's fields and prototype
+  class Kettle {
+    color = 'teal';
+
+    size = 12;
+  }
+
   const merged = mergeDeep<{ kettle: Kettle }>(
     { kettle: new Kettle() },
     { kettle: { color: 'red' } },

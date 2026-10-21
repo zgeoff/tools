@@ -5,6 +5,7 @@
     "oxlintrc.test.ts",
     "verb-contract.test.ts",
     "module-order.test.ts",
-    "import-zones-entry.test.ts"
+    "import-zones-entry.test.ts",
+    "test-utils"
   ]
 }

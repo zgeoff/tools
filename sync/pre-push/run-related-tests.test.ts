@@ -15,21 +15,6 @@ async function setupTest() {
   return { directory };
 }
 
-async function runScript(cwd: string, args: readonly string[]) {
-  const subprocess = Bun.spawn(
-    [process.execPath, join(import.meta.dir, 'run-related-tests.ts'), ...args],
-    { cwd, stdout: 'pipe', stderr: 'pipe' },
-  );
-
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(subprocess.stdout).text(),
-    new Response(subprocess.stderr).text(),
-    subprocess.exited,
-  ]);
-
-  return { stdout, stderr, exitCode };
-}
-
 test('#resolveRelatedTests selects a test file that exists', async () => {
   const ctx = await setupTest();
 
@@ -96,10 +81,14 @@ test('#resolveRelatedTests keeps the order of the paths and drops duplicates', a
 
 test('#runRelatedTests exits 0 and says so when no path has a related test', async () => {
   const ctx = await setupTest();
-  const run = await runScript(ctx.directory, ['src/a.ts']);
+
+  const run = Bun.spawnSync(
+    [process.execPath, join(import.meta.dir, 'run-related-tests.ts'), 'src/a.ts'],
+    { cwd: ctx.directory },
+  );
 
   expect(run.exitCode).toBe(0);
-  expect(run.stdout).toBe('run-related-tests: no related tests\n');
+  expect(run.stdout.toString()).toBe('run-related-tests: no related tests\n');
 });
 
 test('#runRelatedTests runs only the related test through the test script and exits 0', async () => {
@@ -124,11 +113,14 @@ test('#runRelatedTests runs only the related test through the test script and ex
     "import { expect, test } from 'bun:test';\n\ntest('it fails', () => {\n  expect(1).toBe(2);\n});\n",
   );
 
-  const run = await runScript(ctx.directory, ['src/a.ts']);
+  const run = Bun.spawnSync(
+    [process.execPath, join(import.meta.dir, 'run-related-tests.ts'), 'src/a.ts'],
+    { cwd: ctx.directory },
+  );
 
   expect(run.exitCode).toBe(0);
-  expect(run.stderr).toInclude('1 pass');
-  expect(run.stderr).toInclude('0 fail');
+  expect(run.stderr.toString()).toInclude('1 pass');
+  expect(run.stderr.toString()).toInclude('0 fail');
 });
 
 test('#runRelatedTests exits with the failing code when the related test fails', async () => {
@@ -144,7 +136,10 @@ test('#runRelatedTests exits with the failing code when the related test fails',
     "import { expect, test } from 'bun:test';\n\ntest('it adds', () => {\n  expect(1 + 1).toBe(3);\n});\n",
   );
 
-  const run = await runScript(ctx.directory, ['src/a.test.ts']);
+  const run = Bun.spawnSync(
+    [process.execPath, join(import.meta.dir, 'run-related-tests.ts'), 'src/a.test.ts'],
+    { cwd: ctx.directory },
+  );
 
   expect(run.exitCode).toBe(1);
 });

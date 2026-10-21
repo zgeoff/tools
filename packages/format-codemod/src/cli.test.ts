@@ -3,25 +3,6 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const cliPath = fileURLToPath(new URL('cli.ts', import.meta.url));
-
-function runCLI(
-  args: readonly string[],
-  cwd?: string,
-): {
-  status: number | null;
-  stdout: string;
-  stderr: string;
-} {
-  const result = spawnSync(process.execPath, [cliPath, ...args], {
-    encoding: 'utf8',
-    cwd,
-  });
-
-  return { status: result.status, stdout: result.stdout, stderr: result.stderr };
-}
 
 test('it exits cleanly in check mode when files are already padded', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
@@ -29,7 +10,11 @@ test('it exits cleanly in check mode when files are already padded', () => {
 
   fs.writeFileSync(file, 'const a = 1;\n\nexport function f() {\n  return a;\n}\n');
 
-  const status = runCLI(['--check', file]).status;
+  const status = spawnSync(
+    process.execPath,
+    [path.join(import.meta.dir, 'cli.ts'), '--check', file],
+    { encoding: 'utf8' },
+  ).status;
 
   expect(status).toBe(0);
 });
@@ -41,7 +26,12 @@ test('it exits with the diff code in check mode when a file needs padding and le
 
   fs.writeFileSync(file, source);
 
-  const result = runCLI(['--check', file]);
+  const result = spawnSync(
+    process.execPath,
+    [path.join(import.meta.dir, 'cli.ts'), '--check', file],
+    { encoding: 'utf8' },
+  );
+
   const status = result.status;
   const stderr = result.stderr;
 
@@ -56,7 +46,12 @@ test('it fails the batch in check mode when a file cannot be parsed', () => {
 
   fs.writeFileSync(file, 'const = (((\n');
 
-  const result = runCLI(['--check', file]);
+  const result = spawnSync(
+    process.execPath,
+    [path.join(import.meta.dir, 'cli.ts'), '--check', file],
+    { encoding: 'utf8' },
+  );
+
   const status = result.status;
   const stderr = result.stderr;
 
@@ -67,7 +62,13 @@ test('it fails the batch in check mode when a file cannot be parsed', () => {
 test('it fails the batch when a named file does not exist', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
   const missing = path.join(directory, 'missing.ts');
-  const result = runCLI(['--check', missing]);
+
+  const result = spawnSync(
+    process.execPath,
+    [path.join(import.meta.dir, 'cli.ts'), '--check', missing],
+    { encoding: 'utf8' },
+  );
+
   const status = result.status;
   const stderr = result.stderr;
 
@@ -83,7 +84,11 @@ test('it still checks the remaining files after one fails to parse', () => {
   fs.writeFileSync(broken, 'const = (((\n');
   fs.writeFileSync(unpadded, 'export function f() {\n  const a = 1;\n  return a;\n}\n');
 
-  const result = runCLI(['--check', broken, unpadded]);
+  const result = spawnSync(
+    process.execPath,
+    [path.join(import.meta.dir, 'cli.ts'), '--check', broken, unpadded],
+    { encoding: 'utf8' },
+  );
 
   expect(result.status).toBe(2);
   expect(result.stderr).toInclude('PARSE-ERR');
@@ -97,7 +102,12 @@ test('it rejects an unknown flag with a usage error and leaves files untouched',
 
   fs.writeFileSync(file, source);
 
-  const result = runCLI(['--chekc', file]);
+  const result = spawnSync(
+    process.execPath,
+    [path.join(import.meta.dir, 'cli.ts'), '--chekc', file],
+    { encoding: 'utf8' },
+  );
+
   const status = result.status;
   const stderr = result.stderr;
 
@@ -112,7 +122,12 @@ test('it formats .tsx files containing JSX', () => {
 
   fs.writeFileSync(file, 'const el = <div>hi</div>;\nexport function C() {\n  return el;\n}\n');
 
-  const result = runCLI(['--check', file]);
+  const result = spawnSync(
+    process.execPath,
+    [path.join(import.meta.dir, 'cli.ts'), '--check', file],
+    { encoding: 'utf8' },
+  );
+
   const status = result.status;
   const stderr = result.stderr;
 
@@ -126,13 +141,20 @@ test('it processes a file only once when patterns overlap', () => {
 
   fs.writeFileSync(file, 'export function f() {\n  const a = 1;\n  return a;\n}\n');
 
-  const stderr = runCLI(['--check', directory, file]).stderr;
+  const stderr = spawnSync(
+    process.execPath,
+    [path.join(import.meta.dir, 'cli.ts'), '--check', directory, file],
+    { encoding: 'utf8' },
+  ).stderr;
 
   expect(stderr.match(/DIFF/gu)).toHaveLength(1);
 });
 
 test('it prints the package version for --version', () => {
-  const result = runCLI(['--version']);
+  const result = spawnSync(process.execPath, [path.join(import.meta.dir, 'cli.ts'), '--version'], {
+    encoding: 'utf8',
+  });
+
   const status = result.status;
   const stdout = result.stdout;
 
@@ -146,7 +168,11 @@ test('it only reports files that would change in quiet mode', () => {
   fs.writeFileSync(path.join(directory, 'clean.ts'), 'const a = 1;\n\nuse(a);\n');
   fs.writeFileSync(path.join(directory, 'unpadded.ts'), 'const a = 1;\nuse(a);\n');
 
-  const stderr = runCLI(['--check', '--quiet', directory]).stderr;
+  const stderr = spawnSync(
+    process.execPath,
+    [path.join(import.meta.dir, 'cli.ts'), '--check', '--quiet', directory],
+    { encoding: 'utf8' },
+  ).stderr;
 
   expect(stderr).toInclude('DIFF');
   expect(stderr).not.toInclude('OK ');
@@ -168,7 +194,12 @@ test('it does not descend into node_modules when expanding a directory', () => {
     'const a = 1;\n\nexport function f() {\n  return a;\n}\n',
   );
 
-  const result = runCLI(['--check', directory]);
+  const result = spawnSync(
+    process.execPath,
+    [path.join(import.meta.dir, 'cli.ts'), '--check', directory],
+    { encoding: 'utf8' },
+  );
+
   const status = result.status;
   const stderr = result.stderr;
 
@@ -189,7 +220,17 @@ test('it skips files matching --ignore globs', () => {
     'const a = 1;\n\nexport function f() {\n  return a;\n}\n',
   );
 
-  const result = runCLI(['--check', '--ignore', path.join(directory, 'generated/**'), directory]);
+  const result = spawnSync(
+    process.execPath,
+    [
+      path.join(import.meta.dir, 'cli.ts'),
+      '--check',
+      '--ignore',
+      path.join(directory, 'generated/**'),
+      directory,
+    ],
+    { encoding: 'utf8' },
+  );
 
   expect(result.status).toBe(0);
   expect(result.stderr).not.toInclude('generated');
@@ -209,7 +250,11 @@ test('it skips files matching globs from a .formatignore in the working director
     'const a = 1;\n\nexport function f() {\n  return a;\n}\n',
   );
 
-  const result = runCLI(['--check', '.'], directory);
+  const result = spawnSync(
+    process.execPath,
+    [path.join(import.meta.dir, 'cli.ts'), '--check', '.'],
+    { encoding: 'utf8', cwd: directory },
+  );
 
   expect(result.status).toBe(0);
   expect(result.stderr).not.toInclude('generated');
@@ -225,7 +270,11 @@ test('it merges .formatignore globs with --ignore flags', () => {
   fs.writeFileSync(path.join(directory, 'vendored/dep.ts'), unpadded);
   fs.writeFileSync(path.join(directory, '.formatignore'), 'generated/**\n');
 
-  const result = runCLI(['--check', '--ignore', 'vendored/**', '.'], directory);
+  const result = spawnSync(
+    process.execPath,
+    [path.join(import.meta.dir, 'cli.ts'), '--check', '--ignore', 'vendored/**', '.'],
+    { encoding: 'utf8', cwd: directory },
+  );
 
   expect(result.status).toBe(2);
   expect(result.stderr).toInclude('no files matched');

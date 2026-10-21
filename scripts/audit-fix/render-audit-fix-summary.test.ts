@@ -1,14 +1,6 @@
 import { expect, test } from 'bun:test';
 import { renderAuditFixSummary } from './render-audit-fix-summary.ts';
 
-const tinypoolIgnore = {
-  advisory: 'GHSA-85c8-ppgw-ccpr',
-  title: 'Tinypool: Prototype Pollution Gadget to RCE in run() options',
-  package: 'tinypool',
-  reason: 'The fix is tinypool 2.1.2, but oxfmt@0.56.0 accepts only 2.1.0.',
-  expires: '2026-11-16',
-};
-
 test('it titles a change that updates a package as a fix', () => {
   const summary = renderAuditFixSummary({
     fixes: [
@@ -24,7 +16,15 @@ test('it titles a change that updates a package as a fix', () => {
         advisories: ['GHSA-q2hr-2g5m-vwhr'],
       },
     ],
-    added: [tinypoolIgnore],
+    added: [
+      {
+        advisory: 'GHSA-85c8-ppgw-ccpr',
+        title: 'Tinypool: Prototype Pollution Gadget to RCE in run() options',
+        package: 'tinypool',
+        reason: 'The fix is tinypool 2.1.2, but oxfmt@0.56.0 accepts only 2.1.0.',
+        expires: '2026-11-16',
+      },
+    ],
     renewed: [],
     removed: [],
   });
@@ -53,7 +53,15 @@ test('it titles a change that only records ignores as a chore', () => {
     excludes: [],
     expiredExcludes: [],
     added: [],
-    renewed: [tinypoolIgnore],
+    renewed: [
+      {
+        advisory: 'GHSA-85c8-ppgw-ccpr',
+        title: 'Tinypool: Prototype Pollution Gadget to RCE in run() options',
+        package: 'tinypool',
+        reason: 'The fix is tinypool 2.1.2, but oxfmt@0.56.0 accepts only 2.1.0.',
+        expires: '2026-11-16',
+      },
+    ],
     removed: [],
   });
 

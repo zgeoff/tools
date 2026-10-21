@@ -1,11 +1,8 @@
 import { expect, test } from 'bun:test';
 import { buildBunfigWithoutExpiredExcludes } from './build-bunfig-without-expired-excludes.ts';
 
-const honoComment =
-  '# hono 4.13.0 (published 2026-10-08, patches GHSA-8j4g-w8fx-2239) ages past the gate ~2026-10-15 — remove then (audit-fix)\n';
-
 test('it drops an audit-fix exclude whose release has aged past the gate', () => {
-  const bunfig = `minimumReleaseAge = 604800\n# qs is a person's exclude\n${honoComment}minimumReleaseAgeExcludes = [\n  "qs",\n  "hono",\n]\n`;
+  const bunfig = `minimumReleaseAge = 604800\n# qs is a person's exclude\n# hono 4.13.0 (published 2026-10-08, patches GHSA-8j4g-w8fx-2239) ages past the gate ~2026-10-15 — remove then (audit-fix)\nminimumReleaseAgeExcludes = [\n  "qs",\n  "hono",\n]\n`;
   const result = buildBunfigWithoutExpiredExcludes(bunfig, '2026-10-17');
 
   expect(result).toStrictEqual({
@@ -20,7 +17,7 @@ test('it drops an audit-fix exclude whose release has aged past the gate', () =>
 });
 
 test('it drops an aged exclude from a list on one line', () => {
-  const bunfig = `minimumReleaseAge = 604800\n${honoComment}minimumReleaseAgeExcludes = ["qs", "hono"]\n`;
+  const bunfig = `minimumReleaseAge = 604800\n# hono 4.13.0 (published 2026-10-08, patches GHSA-8j4g-w8fx-2239) ages past the gate ~2026-10-15 — remove then (audit-fix)\nminimumReleaseAgeExcludes = ["qs", "hono"]\n`;
 
   expect(buildBunfigWithoutExpiredExcludes(bunfig, '2026-10-15').bunfig).toBe(
     'minimumReleaseAge = 604800\nminimumReleaseAgeExcludes = ["qs"]\n',
@@ -28,7 +25,7 @@ test('it drops an aged exclude from a list on one line', () => {
 });
 
 test('it keeps an audit-fix exclude whose release is still younger than the gate', () => {
-  const bunfig = `minimumReleaseAge = 604800\n${honoComment}minimumReleaseAgeExcludes = ["hono"]\n`;
+  const bunfig = `minimumReleaseAge = 604800\n# hono 4.13.0 (published 2026-10-08, patches GHSA-8j4g-w8fx-2239) ages past the gate ~2026-10-15 — remove then (audit-fix)\nminimumReleaseAgeExcludes = ["hono"]\n`;
 
   expect(buildBunfigWithoutExpiredExcludes(bunfig, '2026-10-14')).toStrictEqual({
     bunfig,
@@ -44,7 +41,7 @@ test('it keeps an exclude with no audit-fix comment', () => {
 });
 
 test("it keeps a person's entry that shares a row with an aged exclude", () => {
-  const bunfig = `minimumReleaseAge = 604800\n${honoComment}minimumReleaseAgeExcludes = [\n  "hono", "qs",\n  "nanoid",\n]\n`;
+  const bunfig = `minimumReleaseAge = 604800\n# hono 4.13.0 (published 2026-10-08, patches GHSA-8j4g-w8fx-2239) ages past the gate ~2026-10-15 — remove then (audit-fix)\nminimumReleaseAgeExcludes = [\n  "hono", "qs",\n  "nanoid",\n]\n`;
   const result = buildBunfigWithoutExpiredExcludes(bunfig, '2026-10-17');
 
   expect(result).toStrictEqual({
