@@ -7,6 +7,12 @@ export function parseActionlintOutput(result: ProgramResult): Finding[] {
     throw new Error(`workflows: actionlint failed: ${result.stderr.trim()}`);
   }
 
+  // A clean run prints `[]`, so empty stdout means actionlint never ran, such as a version manager's
+  // shim that exits 1 with its own error on stderr.
+  if (result.stdout.trim() === '') {
+    throw new Error(`workflows: actionlint failed: ${result.stderr.trim()}`);
+  }
+
   const errors = parseErrors(result);
 
   // An exit of 1 with no error it could read is a crash, not a clean run.

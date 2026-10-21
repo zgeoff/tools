@@ -58,6 +58,11 @@ test.each([
     'workflows: actionlint failed: out of memory',
   ],
   [
+    'empty output',
+    { exitCode: 1, stdout: '', stderr: 'shim error: no version is set for actionlint\n' },
+    'workflows: actionlint failed: shim error: no version is set for actionlint',
+  ],
+  [
     'output that is not JSON',
     { exitCode: 1, stdout: 'panic: runtime error\n', stderr: '' },
     'workflows: actionlint printed output that is not JSON: panic: runtime error',
