@@ -95,11 +95,13 @@ Files under [`pre-push/`](./pre-push/) are the pre-push baseline, delivered by t
 `pre-push-baseline` entry. The baseline runs its jobs one at a time, so a push fits a 2 GiB host or
 a machine shared by parallel agents. It runs `format:check` and `typecheck` over the whole tree, and
 plain `oxlint`, the repo's `check` script and the sibling tests over the files the branch changes.
-The `check` script is `zgeoff-check` from [`@zgeoff/checks`](../packages/checks/README.md), which
-the repo installs itself. bun appends the branch's paths to the script's last command, and only
-`zgeoff-check` is sure to take them, so the job runs only when the script is exactly `zgeoff-check`.
-A repo whose `check` script is missing or runs anything else gets a notice in place of the job. CI
-keeps every whole-tree check required. The entry delivers three files, and its tests stay here:
+It also runs `typecheck` before a commit that stages a code or JSON file, after the repo's own
+pre-commit jobs, so the type check sees what the fixers wrote. The `check` script is `zgeoff-check`
+from [`@zgeoff/checks`](../packages/checks/README.md), which the repo installs itself. bun appends
+the branch's paths to the script's last command, and only `zgeoff-check` is sure to take them, so
+the job runs only when the script is exactly `zgeoff-check`. A repo whose `check` script is missing
+or runs anything else gets a notice in place of the job. CI keeps every whole-tree check required.
+The entry delivers three files, and its tests stay here:
 
 - `.lefthook/pre-push-baseline.yml` — the lefthook jobs.
 - `scripts/read-branch-files.ts` — lists the files changed since the merge base with origin's
@@ -115,9 +117,9 @@ changes:
 
 1. Add `pre-push-baseline` to `include` in `.github/workflows/repo-sync.yml`.
 2. In `lefthook.yml`, add `extends: [.lefthook/pre-push-baseline.yml]`, and delete `parallel` and
-   the baseline's jobs from `pre-push`. lefthook refuses to run a hook that sets both `parallel` and
-   the baseline's `piped`. A job the repo keeps under `pre-push.jobs` runs before the baseline's, so
-   keep only cheap repo-specific gates there.
+   the baseline's jobs from `pre-push` and `pre-commit`. lefthook refuses to run a hook that sets
+   both `parallel` and the baseline's `piped`. A job the repo keeps under `pre-push.jobs` runs
+   before the baseline's, so keep only cheap repo-specific gates there.
 3. Move every whole-tree check the baseline drops, such as type-aware lint, dead code and the full
    suite, into CI as a required check, if CI does not run it already.
 

@@ -398,6 +398,77 @@ printf '%s\n' "$@" > forwarded.txt
   expect(forwarded).toBe('./first.sh\n./second.sh\n./third.sh\n');
 });
 
+test("it fails the commit when typecheck fails, after the repo's own pre-commit job runs", async () => {
+  const ctx = await setupTest();
+
+  // The repo's own job and typecheck each record that they ran, so the file shows their order.
+  await writeFile(
+    join(ctx.worktree, 'lefthook.yml'),
+    `extends:\n  - ${ctx.baseline}\npre-commit:\n  jobs:\n    - name: fixer\n      run: echo fixer >> ran.txt\n`,
+  );
+
+  await writeFile(join(ctx.worktree, 'fixture.ts'), 'export {};\n');
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({ scripts: { typecheck: 'echo typecheck >> ran.txt && exit 1' } }),
+  );
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-commit'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-commit "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-commit'), 0o755);
+
+  await $`git add lefthook.yml fixture.ts package.json`.cwd(ctx.worktree).env(ctx.env);
+
+  const result = await $`git commit -m ${'test: add the fixture'}`
+    .cwd(ctx.worktree)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  const ran = await readFile(join(ctx.worktree, 'ran.txt'), 'utf8');
+
+  expect(result.exitCode).not.toBe(0);
+  expect(ran).toBe('fixer\ntypecheck\n');
+});
+
+test('it skips typecheck on a commit that stages no code or config file', async () => {
+  const ctx = await setupTest();
+
+  // The repo's lefthook.yml and package.json are committed first, so the commit under test stages
+  // only the page.
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({ scripts: { typecheck: 'exit 1' } }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the config'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-commit'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-commit "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-commit'), 0o755);
+  await writeFile(join(ctx.worktree, 'notes.md'), '# Notes\n');
+
+  await $`git add notes.md`.cwd(ctx.worktree).env(ctx.env);
+
+  const result = await $`git commit -m ${'docs: add the notes'}`
+    .cwd(ctx.worktree)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect(result.exitCode).toBe(0);
+});
+
 // Each suite that spawns git must stay safe without the baseline's env -u, so it runs here with
 // the GIT_DIR a pre-push hook in the worktree exports.
 test.each([
