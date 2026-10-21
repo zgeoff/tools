@@ -88,8 +88,8 @@ In a private repo:
   base, as the [path gate](#path-gates) does, and the lane's step `if:` reads its output, so a lane
   that a pull request cannot affect skips without a second job.
 
-Both profiles gate side work on paths, cancel a superseded pull-request run, build once, cache the
-install and set a timeout on every job.
+Both profiles gate side work on paths, cancel a superseded pull-request run, build once and set a
+timeout on every job.
 
 ## Timeouts
 
@@ -210,10 +210,10 @@ in one job and passes on through the registry, or through buildx with the GitHub
 (`cache-from: type=gha` and `cache-to: type=gha,mode=max`), so a later job pulls the layers instead
 of rebuilding them. A file passes on with `actions/upload-artifact` and `actions/download-artifact`.
 
-Cache each dependency install, keyed on the lockfile. A Bun job caches `~/.bun/install/cache` with
-`actions/cache`, keyed on `hashFiles('bun.lock')`, and restores the newest older cache when the
-lockfile changes. Each job pays for its own runner, checkout and install, which
-[Two profiles](#two-profiles) weighs against wall time.
+A Bun job runs `bun install --frozen-lockfile` with no `actions/cache` step for
+`~/.bun/install/cache`. On a GitHub-hosted runner, a restore of that cache takes longer than the
+install it replaces, and a job that misses the cache spends more time to save one. Each job pays for
+its own runner, checkout and install, which [Two profiles](#two-profiles) weighs against wall time.
 
 ## Checkout depth
 
