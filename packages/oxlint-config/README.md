@@ -59,8 +59,9 @@ The plugin is addressable on its own at `@zgeoff/oxlint-config/plugin` for confi
 
 ## Rules
 
-- Type assertions: every `as` fails, and `zgeoff/no-hidden-cast` reports a type claim with no `as`.
-  See [type assertions](../../docs/architecture/oxlint-config.md#type-assertions).
+- Type assertions: every `as` other than `as const` fails, and `zgeoff/no-hidden-cast` reports a
+  type claim with no `as`. See
+  [type assertions](../../docs/architecture/oxlint-config.md#type-assertions).
 - Comments: `zgeoff/no-jsdoc` and `zgeoff/max-consecutive-line-comments` keep comments to the reason
   for a line. See
   [the comment rules](../../docs/architecture/oxlint-config.md#zgeoffno-jsdoc-and-zgeoffmax-consecutive-line-comments).
