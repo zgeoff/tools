@@ -7,10 +7,13 @@
 # least a full minute there. Every job installs with the frozen lockfile and no
 # install cache.
 #
+# The static job, and the checks job in a private repo, run the shared checks
+# as named steps beside the scripts: shell, docs, workflows, commits and local
+# paths. A check that needs a tool the repo lacks prints a notice and passes.
+#
 # `scripts` is a space-separated list of package.json script names. Empty means
-# the standard list: audit deadcode format:check lint check typecheck test,
-# then each lane script the repo defines, where check runs only when the repo
-# defines it. A lane script is test:e2e, test:browser, test:docker or
+# the standard list: audit deadcode format:check lint typecheck test, then each
+# lane script the repo defines. A lane script is test:e2e, test:browser, test:docker or
 # test:host; test and any other test:<name> run with the tests, and every other
 # script runs with the static checks, each group in the list's order. Any name
 # the repo's package.json does not define fails the run before any script
@@ -56,14 +59,12 @@ on:
         required: false
         default: false
       setup-shfmt:
-        description:
-          Install shfmt even when the scripts do not run check, for a suite whose tests run it
+        description: Install shfmt in the test jobs too, for a suite whose tests run it
         type: boolean
         required: false
         default: false
       setup-actionlint:
-        description:
-          Install actionlint even when the scripts do not run check, for a suite whose tests run it
+        description: Install actionlint in the test jobs too, for a suite whose tests run it
         type: boolean
         required: false
         default: false
@@ -81,8 +82,8 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      # The scan reads every commit of the pull request, and the branch checks
-      # of zgeoff-check read the base branch and every commit since it; a
+      # The scan reads every commit of the pull request, and the commits and
+      # local paths checks read the base branch and every commit since it; a
       # shallow clone has neither. The clone is blobless, so it skips the file
       # contents of older commits, and git fetches one when a reader needs it.
       - &checkout
@@ -131,13 +132,13 @@ jobs:
         with:
           bun-version-file: .bun-version
 
-      # The planner lives beside this workflow, not in the caller's checkout,
-      # so the step downloads it from the commit that defines this job: a
-      # caller at a sync tag runs that tag's planner. actionlint does not know
-      # job.workflow_repository or job.workflow_sha, so the step reads them
-      # from the job context as JSON.
+      # The planner and the branch check scripts live in this repo, not in the
+      # caller's checkout, so the step downloads them from the commit that
+      # defines this job: a caller at a sync tag runs that tag's scripts.
+      # actionlint does not know job.workflow_repository or job.workflow_sha,
+      # so the step reads them from the job context as JSON.
       - &fetch-planner
-        name: Fetch the check planner
+        name: Fetch the check scripts
         env:
           JOB_CONTEXT: ${{ toJSON(job) }}
         run: |
@@ -148,6 +149,9 @@ jobs:
           base="https://raw.githubusercontent.com/$repository/$sha"
           for file in plan-check-scripts.ts write-check-plan.ts; do
             curl -fsSL -o "$RUNNER_TEMP/check-plan/$file" "$base/.github/workflows/$file"
+          done
+          for file in read-branch-base.ts parse-added-lines.ts run-commits-check.ts run-local-paths-check.ts; do
+            curl -fsSL -o "$RUNNER_TEMP/check-plan/$file" "$base/sync/pre-push/$file"
           done
           curl -fsSL -o "$RUNNER_TEMP/check-plan/tools-package.json" "$base/package.json"
 
@@ -205,21 +209,20 @@ jobs:
       - *install-planner
       - *plan
 
-      # The shell check of zgeoff-check runs shellcheck, which the runner image
-      # carries, and shfmt, which it lacks. The step installs the pinned binary
-      # when check runs or the caller asks for it, into a folder the runner
-      # owns, put on the PATH of the later steps.
+      # The shell check runs shellcheck, which the runner image carries, and
+      # shfmt, which it lacks. The step installs the pinned binary in a job
+      # that runs the shell check, or when the caller asks for it, into a
+      # folder the runner owns, put on the PATH of the later steps.
       - &setup-shfmt
         name: Setup shfmt
         env:
-          SCRIPTS: ${{ steps.plan.outputs.scripts }}
           SETUP_SHFMT: ${{ inputs.setup-shfmt }}
           SHFMT_VERSION: v3.13.1
           SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
         run: |
           set -euo pipefail
-          if [ "$SETUP_SHFMT" != true ] && [[ "$SCRIPTS" != *" check "* ]]; then
-            echo "shfmt: not needed, because the scripts do not run check"
+          if [ "$SETUP_SHFMT" != true ] && [ "$PART" != static ] && [ "$PART" != all ]; then
+            echo "shfmt: not needed, because this job runs no shell check"
             exit 0
           fi
           curl -fsSL -o "$RUNNER_TEMP/shfmt.download" "https://github.com/mvdan/sh/releases/download/$SHFMT_VERSION/shfmt_${SHFMT_VERSION}_linux_amd64"
@@ -228,20 +231,19 @@ jobs:
           install -m 0755 "$RUNNER_TEMP/shfmt.download" "$RUNNER_TEMP/shfmt-bin/shfmt"
           echo "$RUNNER_TEMP/shfmt-bin" >> "$GITHUB_PATH"
 
-      # The workflows check of zgeoff-check runs actionlint, which the runner
-      # image lacks. The step installs the pinned release when check runs or
-      # the caller asks for it, the same way as shfmt.
+      # The workflows check runs actionlint, which the runner image lacks. The
+      # step installs the pinned release the same way as shfmt.
       - &setup-actionlint
         name: Setup actionlint
+        id: setup-actionlint
         env:
-          SCRIPTS: ${{ steps.plan.outputs.scripts }}
           SETUP_ACTIONLINT: ${{ inputs.setup-actionlint }}
           ACTIONLINT_VERSION: 1.7.12
           ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
         run: |
           set -euo pipefail
-          if [ "$SETUP_ACTIONLINT" != true ] && [[ "$SCRIPTS" != *" check "* ]]; then
-            echo "actionlint: not needed, because the scripts do not run check"
+          if [ "$SETUP_ACTIONLINT" != true ] && [ "$PART" != static ] && [ "$PART" != all ]; then
+            echo "actionlint: not needed, because this job runs no workflows check"
             exit 0
           fi
           curl -fsSL -o "$RUNNER_TEMP/actionlint.tar.gz" "https://github.com/rhysd/actionlint/releases/download/v$ACTIONLINT_VERSION/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
@@ -250,8 +252,58 @@ jobs:
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/actionlint-bin" actionlint
           echo "$RUNNER_TEMP/actionlint-bin" >> "$GITHUB_PATH"
 
+      # Each check and script step after the setup runs even when an earlier
+      # one fails, so the run shows every check that fails, each by name.
+      - &check-shell
+        name: Check shell
+        if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          list=$(mktemp)
+          git ls-files -z -- '*.sh' > "$list"
+          if [ ! -s "$list" ]; then
+            echo "shell: the repo tracks no shell script"
+            exit 0
+          fi
+          status=0
+          xargs -0 -a "$list" shellcheck --external-sources --source-path=SCRIPTDIR "--source-path=$PWD" -- || status=1
+          xargs -0 -a "$list" shfmt -d -- || status=1
+          exit "$status"
+
+      # The docs-writing skill's scripts pick the docs they read themselves.
+      - &check-docs
+        name: Check docs
+        if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          scripts=.claude/skills/docs-writing/scripts
+          if [ ! -f "$scripts/check-length.sh" ]; then
+            echo "::notice::docs: skipped, because the repo has no $scripts/check-length.sh; take the skill-docs-writing entry of repo-sync to run it"
+            exit 0
+          fi
+          status=0
+          bash "$scripts/check-length.sh" || status=1
+          bash "$scripts/check-links.sh" || status=1
+          exit "$status"
+
+      - &check-workflows
+        name: Check workflows
+        if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
+        run: actionlint
+
+      - &check-commits
+        name: Check commits
+        if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
+        run: bun "$RUNNER_TEMP/check-plan/run-commits-check.ts"
+
+      - &check-local-paths
+        name: Check local paths
+        if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
+        run: bun "$RUNNER_TEMP/check-plan/run-local-paths-check.ts"
+
       - &run-scripts
         name: Run the check scripts
+        if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
         env:
           SCRIPTS: ${{ steps.plan.outputs.scripts }}
         run: &run-body |
@@ -352,37 +404,52 @@ jobs:
       - *plan
       - *setup-shfmt
       - *setup-actionlint
+      - *check-shell
+      - *check-docs
+      - *check-workflows
+      - *check-commits
+      - *check-local-paths
 
       - name: Static checks
+        if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
         env:
           SCRIPTS: ${{ steps.plan.outputs.static }}
         run: *run-body
 
       - name: Tests
+        if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
         env:
           SCRIPTS: ${{ steps.plan.outputs.test }}
         run: *run-body
 
       - name: Lane e2e
-        if: contains(steps.plan.outputs.lanes, '"e2e"')
+        if:
+          ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' &&
+          contains(steps.plan.outputs.lanes, '"e2e"') }}
         env:
           SCRIPTS: test:e2e
         run: *run-body
 
       - name: Lane browser
-        if: contains(steps.plan.outputs.lanes, '"browser"')
+        if:
+          ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' &&
+          contains(steps.plan.outputs.lanes, '"browser"') }}
         env:
           SCRIPTS: test:browser
         run: *run-body
 
       - name: Lane docker
-        if: contains(steps.plan.outputs.lanes, '"docker"')
+        if:
+          ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' &&
+          contains(steps.plan.outputs.lanes, '"docker"') }}
         env:
           SCRIPTS: test:docker
         run: *run-body
 
       - name: Lane host
-        if: contains(steps.plan.outputs.lanes, '"host"')
+        if:
+          ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' &&
+          contains(steps.plan.outputs.lanes, '"host"') }}
         env:
           SCRIPTS: test:host
         run: *run-body

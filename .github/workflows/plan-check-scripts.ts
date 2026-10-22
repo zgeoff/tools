@@ -18,7 +18,6 @@ export interface CheckPlanRequest {
 export type CheckPlan =
   | {
       readonly kind: 'planned';
-      readonly notice: string | null;
       readonly scripts: readonly string[];
       readonly static: readonly string[];
       readonly test: readonly string[];
@@ -30,8 +29,7 @@ export function planCheckScripts(request: CheckPlanRequest): CheckPlan {
   const defined = new Set(request.defined);
 
   const listed = request.scripts.split(/\s+/u).filter((name) => name !== '');
-  const isStandard = listed.length === 0;
-  const list = isStandard ? buildStandardList(defined) : listed;
+  const list = listed.length === 0 ? buildStandardList(defined) : listed;
   const missing = list.filter((name) => !defined.has(name));
 
   if (missing.length > 0) {
@@ -51,10 +49,6 @@ export function planCheckScripts(request: CheckPlanRequest): CheckPlan {
 
   return {
     kind: 'planned',
-    notice:
-      isStandard && !defined.has('check')
-        ? 'check skipped, because package.json has no check script; add "check": "zgeoff-check" to run it.'
-        : null,
     scripts: parts[request.part],
     static: staticChecks,
     test: tests,
@@ -64,8 +58,8 @@ export function planCheckScripts(request: CheckPlanRequest): CheckPlan {
 
 const laneNames = ['e2e', 'browser', 'docker', 'host'];
 
-// The standard list runs check, and each lane, only when the repo defines the script, so a repo
-// turns one on by adding it.
+// The standard list runs each lane only when the repo defines its script, so a repo turns a lane on
+// by adding it.
 function buildStandardList(defined: ReadonlySet<string>): string[] {
   const optional = (name: string) => (defined.has(name) ? [name] : []);
 
@@ -74,7 +68,6 @@ function buildStandardList(defined: ReadonlySet<string>): string[] {
     'deadcode',
     'format:check',
     'lint',
-    ...optional('check'),
     'typecheck',
     'test',
     ...laneNames.flatMap((lane) => optional(`test:${lane}`)),
