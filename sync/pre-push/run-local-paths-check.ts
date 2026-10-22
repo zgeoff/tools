@@ -1,6 +1,8 @@
 import { hostname } from 'node:os';
 import { parseAddedLines } from './parse-added-lines.ts';
 import { readBranchBase } from './read-branch-base.ts';
+import type { RunProgram } from './run-program.ts';
+import { runProgram } from './run-program.ts';
 
 export interface LocalPathsCheckOptions {
   readonly cwd: string;
@@ -13,6 +15,8 @@ export interface LocalPathsCheckOptions {
 
   // The machine's host name, which the check looks for as a whole word.
   readonly host: string;
+
+  readonly runProgram: RunProgram;
 }
 
 export interface LocalPathFinding {
@@ -35,7 +39,7 @@ export function runLocalPathsCheck(options: Readonly<LocalPathsCheckOptions>): L
     return [];
   }
 
-  const result = Bun.spawnSync(
+  const result = options.runProgram(
     [
       'git',
       '-c',
@@ -54,20 +58,14 @@ export function runLocalPathsCheck(options: Readonly<LocalPathsCheckOptions>): L
       '--format=%x00%h',
       `${options.base}..HEAD`,
     ],
-    {
-      cwd: options.cwd,
-      env: { ...options.env },
-      stdin: 'ignore',
-      stdout: 'pipe',
-      stderr: 'pipe',
-    },
+    { cwd: options.cwd, env: options.env },
   );
 
   if (result.exitCode !== 0) {
-    throw new Error(`git log failed: ${result.stderr.toString().trim()}`);
+    throw new Error(`git log failed: ${result.stderr.trim()}`);
   }
 
-  return parseAddedLines(result.stdout.toString()).flatMap((added) => {
+  return parseAddedLines(result.stdout).flatMap((added) => {
     const findings: LocalPathFinding[] = [];
 
     if (home !== null && added.text.includes(home)) {
@@ -118,6 +116,7 @@ async function runCLI(): Promise<void> {
       base,
       env: process.env,
       host: hostname(),
+      runProgram,
     });
 
     for (const finding of findings) {

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { runLocalPathsCheck } from './run-local-paths-check.ts';
+import { runProgram } from './run-program.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'run-local-paths-check-'));
@@ -45,6 +46,7 @@ test('it passes a branch whose added lines hold no local path', async () => {
 
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
+    runProgram,
     base: baseText.trim(),
     env: ctx.env,
     host: 'greeter-box',
@@ -74,6 +76,7 @@ test('it reports an added line that holds the home directory at its path and lin
 
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
+    runProgram,
     base: baseText.trim(),
     env: ctx.env,
     host: 'greeter-box',
@@ -106,6 +109,7 @@ test('it reports an added line that holds the host name as a whole word', async 
 
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
+    runProgram,
     base: baseText.trim(),
     env: ctx.env,
     host: 'greeter-box',
@@ -136,6 +140,7 @@ test('it passes the host name inside a longer word', async () => {
 
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
+    runProgram,
     base: baseText.trim(),
     env: ctx.env,
     host: 'greeter-box',
@@ -163,6 +168,7 @@ test.each([
 
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
+    runProgram,
     base: baseText.trim(),
     env: ctx.env,
     host,
@@ -193,6 +199,7 @@ test('it reads only the lines the branch adds, not the lines it keeps or removes
 
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
+    runProgram,
     base: baseText.trim(),
     env: ctx.env,
     host: 'greeter-box',
@@ -223,6 +230,7 @@ test('it reports a line that a later commit of the branch removes', async () => 
 
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
+    runProgram,
     base: baseText.trim(),
     env: ctx.env,
     host: 'greeter-box',
@@ -252,6 +260,7 @@ test('it reports nothing for a file that the branch only renames', async () => {
 
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
+    runProgram,
     base: baseText.trim(),
     env: ctx.env,
     host: 'greeter-box',
@@ -276,6 +285,7 @@ test('it reads no home directory when HOME is the root folder', async () => {
 
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
+    runProgram,
     base: baseText.trim(),
     env: { ...ctx.env, HOME: '/' },
     host: 'greeter-box',
@@ -314,6 +324,7 @@ test('it reports a line that a merge adds when it resolves a conflict', async ()
 
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
+    runProgram,
     base: baseText.trim(),
     env: ctx.env,
     host: 'greeter-box',
@@ -349,6 +360,7 @@ test('it reports the real path of a file whose name git quotes', async () => {
 
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
+    runProgram,
     base: baseText.trim(),
     env: ctx.env,
     host: 'greeter-box',
@@ -381,6 +393,7 @@ test('it reports the real path of a quoted file name that holds an emoji', async
 
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
+    runProgram,
     base: baseText.trim(),
     env: ctx.env,
     host: 'greeter-box',
@@ -415,6 +428,7 @@ test('it reports the right line when the repo joins nearby hunks with diff.inter
 
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
+    runProgram,
     base: baseText.trim(),
     env: ctx.env,
     host: 'greeter-box',
