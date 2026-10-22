@@ -1171,6 +1171,43 @@ test('it lets a Bash command through when a gated file was dirty before and the 
   expect(result.stdout).toBe('');
 });
 
+test('it stays silent after a Bash command whose PreToolUse call left no record', async () => {
+  const ctx = await setupTest();
+
+  const project = join(ctx.directory, 'project');
+
+  await mkdir(join(project, '.claude/skills/testing'), { recursive: true });
+  await mkdir(join(project, 'src'), { recursive: true });
+  await writeFile(join(project, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(project, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+  );
+
+  await writeFile(join(ctx.directory, 'session.jsonl'), '');
+
+  await $`git init --quiet`.cwd(project).env({ PATH: process.env['PATH'] });
+
+  await writeFile(join(project, 'src/a.test.ts'), "test('it rounds down', () => {});\n");
+
+  const result = spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: project },
+    input: JSON.stringify({
+      hook_event_name: 'PostToolUse',
+      cwd: project,
+      transcript_path: join(ctx.directory, 'session.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command: 'node scripts/stamp.mjs' },
+      tool_use_id: 'toolu_bash_1',
+    }),
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});
+
 test('it blocks after a Bash command rewrites a gated file that was dirty before', async () => {
   const ctx = await setupTest();
 
