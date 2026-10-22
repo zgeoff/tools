@@ -105,11 +105,12 @@ The gate checks what a Bash command changed, not what the command says. Before t
 records `HEAD` and the content of each gated file that `git status` lists as changed, staged or
 untracked. After the command, it reads `git status` again, plus the files that differ between the
 old and the new `HEAD`. A gated file that the command created, changed, deleted, renamed or
-committed counts as a change, and a file that was dirty before and kept its content does not. A
-command that moves `HEAD` another way, such as a pull or a checkout, counts each gated file it
-brought in. When the session that ran the command lacks a skill that a changed file needs, the hook
-blocks: the agent gets a reason that names the skills to load and asks it to review what the command
-changed. The same load check as an edit applies, with its compaction and subagent rules.
+committed counts as a change. A file that keeps its content does not: one dirty before and left
+alone, or one whose mode alone changed, compared with its content at the old `HEAD`. A command that
+moves `HEAD` another way, such as a pull or a checkout, counts each gated file it brought in. When
+the session that ran the command lacks a skill that a changed file needs, the hook blocks: the agent
+gets a reason that names the skills to load and asks it to review what the command changed. The same
+load check as an edit applies, with its compaction and subagent rules.
 
 Claude Code runs a `PostToolUse` hook after the command, so a block cannot undo the change. It stops
 the agent's next step and puts the reason beside the command's output, as the
@@ -128,6 +129,8 @@ The check has limits:
   inside one, such as on an index it cannot read, the hook warns the user and the agent that the
   command went unchecked.
 - A command that runs in the background returns before it writes, so the check sees no change.
+- A file that a git filter rewrites on checkout, such as a Git LFS file, never matches its content
+  at `HEAD`, so a mode change to one counts as a change.
 - Bash commands that run in parallel share one work tree, so each one's check also sees the other's
   changes.
 - A command whose `PreToolUse` call left no record, such as one that started before the hook was

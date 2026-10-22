@@ -16,6 +16,7 @@ import { collectWrittenPaths } from './collect-written-paths.ts';
 import { parseSkillGateRules } from './parse-skill-gate-rules.ts';
 import { planBashSkillGate } from './plan-bash-skill-gate.ts';
 import { planSkillGate } from './plan-skill-gate.ts';
+import { readCommitHashes } from './read-commit-hashes.ts';
 import { readCommittedPaths } from './read-committed-paths.ts';
 import { readFileHashes } from './read-file-hashes.ts';
 import { readWorkTree } from './read-work-tree.ts';
@@ -475,5 +476,13 @@ async function readChangedPaths(
     ...new Set([...Object.keys(before.hashes), ...candidates]),
   ]);
 
-  return collectChangedPaths(before.hashes, after);
+  // A path git lists, such as one whose mode changed, can keep its content, so a path that was
+  // clean before compares with its content at the recorded HEAD.
+  const cleanBefore = candidates.filter(
+    (relativePath) => !Object.hasOwn(before.hashes, relativePath),
+  );
+
+  const committedBefore = await readCommitHashes(result.git, before.head, cleanBefore);
+
+  return collectChangedPaths({ ...committedBefore, ...before.hashes }, after);
 }

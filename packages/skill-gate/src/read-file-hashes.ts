@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { toContentHash } from './to-content-hash.ts';
 import type { FileHashes } from './types.ts';
 
 // Reads a hash of each project path's content, or null for a path that holds no readable file.
@@ -20,7 +21,7 @@ async function readFileHash(filePath: string): Promise<string | null> {
   try {
     const bytes = await Bun.file(filePath).bytes();
 
-    return Bun.hash(bytes).toString(16);
+    return toContentHash(bytes);
   } catch {
     // A deleted path, or one git lists as a folder such as a submodule, has no content to hash.
     return null;
