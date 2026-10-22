@@ -1,5 +1,6 @@
 // The skill gate's entry point, which repo-sync delivers from zgeoff/tools. The gate lives in
 // @zgeoff/skill-gate, which the repo installs at its root.
+import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 // Claude Code runs the call when a PreToolUse hook exits with any status but 2, so a static import
@@ -86,19 +87,17 @@ async function probeGatedEdit(edit: Edit | null): Promise<boolean> {
     return false;
   }
 
-  const rulesFile = Bun.file(path.join(edit.projectDir, '.claude', 'skill-gate.json'));
-
-  const hasRules = await rulesFile.exists();
-
-  if (!hasRules) {
-    return false;
-  }
-
-  const rulesText = await rulesFile.text().catch((error: unknown) => {
+  const rulesText = await readTextFile(
+    path.join(edit.projectDir, '.claude', 'skill-gate.json'),
+  ).catch((error: unknown) => {
     console.error(`The skill gate cannot read .claude/skill-gate.json: ${formatError(error)}`);
 
     return null;
   });
+
+  if (rulesText === undefined) {
+    return false;
+  }
 
   return rulesText === null || isGatedPath(rulesText, relativePath);
 }
@@ -197,12 +196,23 @@ async function probeGatedToolCall(toolCall: ToolCall | null, readText: ReadText)
 // Reads a file's text, or undefined for a path that holds no file; a file it cannot read rejects.
 type ReadText = (filePath: string) => Promise<string | undefined>;
 
+// Bun.file(...).exists() is false for a folder, so the hook stats the path instead.
 async function readTextFile(filePath: string): Promise<string | undefined> {
-  const file = Bun.file(filePath);
+  const isPresent = await probePath(filePath);
 
-  const exists = await file.exists();
+  return isPresent ? readFile(filePath, 'utf8') : undefined;
+}
 
-  return exists ? file.text() : undefined;
+// Only a path that names nothing is absent, so a path the hook cannot stat counts as present and
+// its read fails.
+async function probePath(filePath: string): Promise<boolean> {
+  try {
+    await stat(filePath);
+
+    return true;
+  } catch (error) {
+    return !(isRecord(error) && (error['code'] === 'ENOENT' || error['code'] === 'ENOTDIR'));
+  }
 }
 
 function parseGatedTools(text: string): readonly string[] | null {

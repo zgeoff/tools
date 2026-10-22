@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';
-import { chmod, copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -214,12 +214,8 @@ test('it blocks an edit inside the project and names both errors when the gate c
   await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
   await copyFile(ctx.hookPath, copiedHookPath);
 
-  await writeFile(
-    rulesPath,
-    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
-  );
-
-  await chmod(rulesPath, 0o000);
+  // A folder in the file's place fails the read for root too, which a chmod does not.
+  await mkdir(rulesPath);
 
   const result = spawnSync('bun', [copiedHookPath], {
     encoding: 'utf8',
