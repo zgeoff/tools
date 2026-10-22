@@ -309,7 +309,9 @@ test('it denies a workflow subagent edit when the subagent loads one of the test
 
   expect(result.status).toBe(0);
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
+  const output: unknown = JSON.parse(result.stdout);
+
+  expect(output).toStrictEqual({
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
       permissionDecision: 'deny',
