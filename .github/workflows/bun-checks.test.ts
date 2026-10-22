@@ -858,6 +858,64 @@ test('it fails the shell check with the findings of both shellcheck and shfmt', 
   expect(stdout).toInclude('+++ cramped.sh');
 });
 
+test('it fails the shell check when only shellcheck rejects a script', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.repo)
+    .env(ctx.gitEnv);
+
+  await $`git update-ref refs/remotes/origin/main HEAD`.cwd(ctx.repo).env(ctx.gitEnv);
+
+  const step = await loadWorkflowStep(
+    join(import.meta.dir, 'bun-checks.yml'),
+    'static',
+    'Check shell',
+  );
+
+  // shfmt leaves this script as it is, and shellcheck rejects the unquoted $1.
+  await writeFile(join(ctx.repo, 'unquoted.sh'), '#!/usr/bin/env bash\necho $1\n');
+
+  await $`git add unquoted.sh`.cwd(ctx.repo).env(ctx.gitEnv);
+
+  const result = await $`bash -c ${step.run}`.cwd(ctx.repo).env(ctx.gitEnv).nothrow().quiet();
+
+  const stdout = result.stdout.toString();
+
+  expect(result.exitCode).toBe(1);
+  expect(stdout).toInclude('SC2086');
+  expect(stdout).not.toInclude('+++ unquoted.sh');
+});
+
+test('it fails the shell check when only shfmt rejects a script', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.repo)
+    .env(ctx.gitEnv);
+
+  await $`git update-ref refs/remotes/origin/main HEAD`.cwd(ctx.repo).env(ctx.gitEnv);
+
+  const step = await loadWorkflowStep(
+    join(import.meta.dir, 'bun-checks.yml'),
+    'static',
+    'Check shell',
+  );
+
+  // shellcheck accepts this script, and shfmt would space it out.
+  await writeFile(join(ctx.repo, 'cramped.sh'), '#!/usr/bin/env bash\nif true;then echo "a";fi\n');
+
+  await $`git add cramped.sh`.cwd(ctx.repo).env(ctx.gitEnv);
+
+  const result = await $`bash -c ${step.run}`.cwd(ctx.repo).env(ctx.gitEnv).nothrow().quiet();
+
+  const stdout = result.stdout.toString();
+
+  expect(result.exitCode).toBe(1);
+  expect(stdout).toInclude('+++ cramped.sh');
+  expect(stdout).not.toInclude('SC');
+});
+
 test('it passes the shell check with a note when the repo tracks no shell script', async () => {
   const ctx = await setupTest();
 
