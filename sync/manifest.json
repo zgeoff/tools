@@ -236,6 +236,10 @@
         "target": "scripts/parse-added-lines.ts"
       },
       {
+        "source": "sync/pre-push/run-program.ts",
+        "target": "scripts/run-program.ts"
+      },
+      {
         "source": "sync/pre-push/run-commits-check.ts",
         "target": "scripts/run-commits-check.ts"
       },

@@ -118,8 +118,8 @@ The entry delivers these files, and their tests stay here:
 - `scripts/run-local-paths-check.ts` — fails each line that a commit since that merge base adds and
   that holds the home directory of whoever runs it, followed by a slash, or the machine's host name
   as a whole word. A home of `/` and the host `localhost` are left out.
-- `scripts/read-branch-base.ts` and `scripts/parse-added-lines.ts` — the modules these scripts
-  import.
+- `scripts/read-branch-base.ts`, `scripts/parse-added-lines.ts` and `scripts/run-program.ts` — the
+  modules these scripts import.
 
 Both check scripts exit 0 when clean or skipped, 1 with a problem, and 2 when they cannot run, such
 as in a clone without origin's default branch.

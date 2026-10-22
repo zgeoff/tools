@@ -1,5 +1,7 @@
 import { join } from 'node:path';
 import { readBranchBase } from './read-branch-base.ts';
+import type { ProgramResult, RunProgram } from './run-program.ts';
+import { runProgram } from './run-program.ts';
 
 export interface CommitsCheckOptions {
   readonly cwd: string;
@@ -12,16 +14,17 @@ export interface CommitsCheckOptions {
   // The paths of the commitlint program and of the @zgeoff/commitlint-config module.
   readonly commitlint: string;
   readonly config: string;
+
+  readonly runProgram: RunProgram;
 }
 
 // --config replaces any commitlint config the repo keeps, so every repo that runs the check lints
 // with the same rules.
 export function runCommitsCheck(options: Readonly<CommitsCheckOptions>): string[] {
   return readBranchCommits(options).flatMap((commit) => {
-    const result = runProgram(
-      options,
+    const result = options.runProgram(
       [options.commitlint, '--config', options.config, '--color=false'],
-      commit.message,
+      { cwd: options.cwd, env: options.env, stdin: commit.message },
     );
 
     return parseCommitlintOutput(commit.hash, result);
@@ -35,14 +38,10 @@ interface Commit {
 
 // A merge commit carries the message git wrote, so the check leaves it out.
 function readBranchCommits(options: Readonly<CommitsCheckOptions>): Commit[] {
-  const result = runProgram(options, [
-    'git',
-    'log',
-    '--no-merges',
-    '-z',
-    '--format=%h%n%B',
-    `${options.base}..HEAD`,
-  ]);
+  const result = options.runProgram(
+    ['git', 'log', '--no-merges', '-z', '--format=%h%n%B', `${options.base}..HEAD`],
+    { cwd: options.cwd, env: options.env },
+  );
 
   if (result.exitCode !== 0) {
     throw new Error(`git log failed: ${result.stderr.trim()}`);
@@ -56,32 +55,6 @@ function readBranchCommits(options: Readonly<CommitsCheckOptions>): Commit[] {
 
       return { hash: entry.slice(0, newline), message: entry.slice(newline + 1) };
     });
-}
-
-interface ProgramResult {
-  readonly exitCode: number;
-  readonly stdout: string;
-  readonly stderr: string;
-}
-
-function runProgram(
-  options: Readonly<CommitsCheckOptions>,
-  argv: readonly string[],
-  stdin?: string,
-): ProgramResult {
-  const result = Bun.spawnSync([...argv], {
-    cwd: options.cwd,
-    env: { ...options.env },
-    stdin: stdin === undefined ? 'ignore' : Buffer.from(stdin),
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
-
-  return {
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  };
 }
 
 function parseCommitlintOutput(hash: string, result: ProgramResult): string[] {
@@ -137,7 +110,14 @@ async function runCLI(): Promise<void> {
   try {
     const base = await readBranchBase({ cwd });
 
-    const problems = runCommitsCheck({ cwd, base, env: process.env, commitlint, config });
+    const problems = runCommitsCheck({
+      cwd,
+      base,
+      env: process.env,
+      commitlint,
+      config,
+      runProgram,
+    });
 
     for (const problem of problems) {
       process.stdout.write(`${problem}\n`);

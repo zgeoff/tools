@@ -4,6 +4,7 @@ import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
 import { runCommitsCheck } from './run-commits-check.ts';
+import { runProgram } from './run-program.ts';
 
 // A repo in a temp folder whose node_modules is the workspace's, so the check finds the real
 // commitlint and @zgeoff/commitlint-config there, as it does in a repo that installs both.
@@ -63,6 +64,7 @@ test('it passes a branch whose commits are all Conventional Commits', async () =
 
   const problems = runCommitsCheck({
     cwd: ctx.directory,
+    runProgram,
     base: baseText.trim(),
     env: ctx.env,
     commitlint: ctx.commitlint,
@@ -93,6 +95,7 @@ test('it reports each problem of a commit that is not a Conventional Commit at i
 
   const problems = runCommitsCheck({
     cwd: ctx.directory,
+    runProgram,
     base: baseText.trim(),
     env: ctx.env,
     commitlint: ctx.commitlint,
@@ -124,6 +127,7 @@ test('it reports a commit that is not a Conventional Commit when a later commit 
 
   const problems = runCommitsCheck({
     cwd: ctx.directory,
+    runProgram,
     base: baseText.trim(),
     env: ctx.env,
     commitlint: ctx.commitlint,
@@ -162,6 +166,7 @@ test('it lints with @zgeoff/commitlint-config, not a commitlint config in the re
 
   const problems = runCommitsCheck({
     cwd: ctx.directory,
+    runProgram,
     base: baseText.trim(),
     env: ctx.env,
     commitlint: ctx.commitlint,
@@ -190,6 +195,7 @@ test('it reads only the commits after the base', async () => {
 
   const problems = runCommitsCheck({
     cwd: ctx.directory,
+    runProgram,
     base,
     env: ctx.env,
     commitlint: ctx.commitlint,
@@ -226,6 +232,7 @@ test('it leaves out a merge commit', async () => {
 
   const problems = runCommitsCheck({
     cwd: ctx.directory,
+    runProgram,
     base: baseText.trim(),
     env: ctx.env,
     commitlint: ctx.commitlint,
