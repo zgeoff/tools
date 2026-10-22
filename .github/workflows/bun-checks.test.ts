@@ -994,6 +994,43 @@ test('it fails the docs check on a broken link even when every doc is within its
   expect(`${result.stdout.toString()}${result.stderr.toString()}`).toInclude('guide.md');
 });
 
+test('it fails the docs check on a README over its line limit even when every link resolves', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.repo)
+    .env(ctx.gitEnv);
+
+  await $`git update-ref refs/remotes/origin/main HEAD`.cwd(ctx.repo).env(ctx.gitEnv);
+
+  const step = await loadWorkflowStep(
+    join(import.meta.dir, 'bun-checks.yml'),
+    'static',
+    'Check docs',
+  );
+
+  await cp(
+    join(import.meta.dir, '../../sync/skills/docs-writing/scripts'),
+    join(ctx.repo, '.claude/skills/docs-writing/scripts'),
+    { recursive: true },
+  );
+
+  // A plain repo README holds 60 lines at most, and this one has 61 and no link.
+  const lines = Array.from({ length: 60 }, (_, index) => `Step ${index + 1} greets the visitor.`);
+
+  await writeFile(join(ctx.repo, 'README.md'), `# Greeter\n${lines.join('\n')}\n`);
+
+  await $`git add -A`.cwd(ctx.repo).env(ctx.gitEnv);
+
+  const result = await $`bash -c ${step.run}`.cwd(ctx.repo).env(ctx.gitEnv).nothrow().quiet();
+
+  expect(result.exitCode).toBe(1);
+
+  expect(`${result.stdout.toString()}${result.stderr.toString()}`).toInclude(
+    'README.md: 61 lines, over the plain repo README limit of 60',
+  );
+});
+
 test('it fails the workflows check with the actionlint error of a tracked workflow', async () => {
   const ctx = await setupTest();
 
