@@ -490,3 +490,21 @@ test('it exits 2 and names the missing base when run as a script in a repo with 
       'local-paths: cannot find the base of this branch: no merge base between HEAD and origin/main (is the remote fetched?)\n',
   });
 });
+
+test('it throws the git log error when the base is not a commit', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  expect(() =>
+    runLocalPathsCheck({
+      cwd: ctx.directory,
+      runProgram,
+      base: 'no-such-greeting',
+      env: ctx.env,
+      host: 'greeter-box',
+    }),
+  ).toThrow(/^git log failed: fatal: ambiguous argument 'no-such-greeting\.\.HEAD'/u);
+});

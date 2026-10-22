@@ -437,6 +437,25 @@ test('it exits 2 when commitlint crashes with exit 1 and reports no problem', as
   expect(stderr).toInclude('the greeting config cannot load');
 });
 
+test('it throws the git log error when the base is not a commit', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  expect(() =>
+    runCommitsCheck({
+      cwd: ctx.directory,
+      runProgram,
+      base: 'no-such-greeting',
+      env: ctx.env,
+      commitlint: ctx.commitlint,
+      config: ctx.config,
+    }),
+  ).toThrow(/^git log failed: fatal: ambiguous argument 'no-such-greeting\.\.HEAD'/u);
+});
+
 test('it exits 2 when the repo installs a @zgeoff/commitlint-config that does not resolve', async () => {
   const ctx = await setupTest();
 
