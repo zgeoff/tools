@@ -172,6 +172,9 @@ function pickHookEvent(value: unknown): HookEvent {
   return value === 'PostToolUse' || value === 'PostToolUseFailure' ? value : 'PreToolUse';
 }
 
+// The path and Bash checks report a broken rules file for these tools.
+const PATH_GATED_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'Bash']);
+
 interface ToolCallCheck {
   readonly hookInput: HookInput;
   readonly toolName: string;
@@ -179,12 +182,28 @@ interface ToolCallCheck {
   readonly rulesText: string;
 }
 
-// A call that no tool gate names returns to the path and Bash checks. A broken rules file lets
-// every gated call through, since the next edit reports it.
+// A call that no tool gate names returns to the path and Bash checks. A broken rules file lets a
+// gated call through with a warning, since the hook matcher names only gated tools beside those.
 async function checkToolCall(check: ToolCallCheck): Promise<void> {
   const parsedRules = parseSkillGateRules(check.rulesText);
 
-  if (!parsedRules.ok || !parsedRules.tools.some((gate) => gate.tool === check.toolName)) {
+  if (!parsedRules.ok) {
+    if (!PATH_GATED_TOOLS.has(check.toolName)) {
+      printOutput(
+        buildToolGateOutput(
+          check.toolName,
+          { missingSkills: [], missingReferences: [], unknown: [] },
+          { rulesError: parsedRules.error },
+        ),
+      );
+
+      process.exit(0);
+    }
+
+    return;
+  }
+
+  if (!parsedRules.tools.some((gate) => gate.tool === check.toolName)) {
     return;
   }
 
@@ -211,6 +230,12 @@ async function checkToolCall(check: ToolCallCheck): Promise<void> {
   );
 
   process.exit(0);
+}
+
+function printOutput(output: object | null): void {
+  if (output !== null) {
+    console.log(JSON.stringify(output));
+  }
 }
 
 async function readTranscript(transcriptPath: string | null): Promise<string> {
@@ -269,12 +294,6 @@ async function readAvailableReferences(
   );
 
   return references.filter((_, index) => found[index] === true);
-}
-
-function printOutput(output: object | null): void {
-  if (output !== null) {
-    console.log(JSON.stringify(output));
-  }
 }
 
 interface BashCheck {

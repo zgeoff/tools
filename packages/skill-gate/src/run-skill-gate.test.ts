@@ -2167,3 +2167,44 @@ test('it warns on a gated tool call and denies nothing for a key it does not kno
     hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: warning },
   });
 });
+
+test('it warns and allows a gated tool call when its references value is a string', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, '.claude'), { recursive: true });
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({
+      gates: [],
+      tools: [
+        {
+          tool: 'mcp__linear-server__save_issue',
+          references: 'ticket-review/references/follow-ups.md',
+        },
+      ],
+    }),
+  );
+
+  const result = spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'mcp__linear-server__save_issue',
+      cwd: ctx.directory,
+      transcript_path: join(ctx.directory, 'transcript.jsonl'),
+      tool_input: { title: 'Rotate the staging keys' },
+    }),
+  });
+
+  const warning =
+    'skill-gate: .claude/skill-gate.json tool gate "mcp__linear-server__save_issue" needs `skills` and `references` arrays of non-empty strings.';
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    systemMessage: warning,
+    hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: warning },
+  });
+});

@@ -1,15 +1,25 @@
 import { formatSkillList } from './format-skill-list.ts';
 import { formatUnknownKeyWarning } from './format-unknown-key-warning.ts';
-import type { SkillGateHookOutput, ToolGatePlan, UnknownToolRequirement } from './types.ts';
+import type {
+  SkillGateHookOutput,
+  SkillGateOutputContext,
+  ToolGatePlan,
+  UnknownToolRequirement,
+} from './types.ts';
 
-// A rule that names a skill or reference the repo does not have, or a key the rules parser does not
-// know, never denies: it warns, and the call goes ahead.
+const RULES_PATH = '.claude/skill-gate.json';
+
+// A broken rules file, a rule that names a skill or reference the repo does not have, or a key the
+// rules parser does not know never denies: it warns, and the call goes ahead.
 export function buildToolGateOutput(
   toolName: string,
   plan: ToolGatePlan,
-  context: { readonly compacted?: boolean; readonly unknownKeys?: readonly string[] } = {},
+  context: SkillGateOutputContext = {},
 ): SkillGateHookOutput | null {
   const warnings = [
+    ...(context.rulesError === undefined
+      ? []
+      : [`skill-gate: ${RULES_PATH} ${context.rulesError}.`]),
     ...(context.unknownKeys ?? []).map((key) => formatUnknownKeyWarning(key)),
     ...plan.unknown.map((entry) => formatUnknownWarning(entry)),
   ];
@@ -38,8 +48,6 @@ export function buildToolGateOutput(
     hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: warning },
   };
 }
-
-const RULES_PATH = '.claude/skill-gate.json';
 
 function formatUnknownWarning(entry: UnknownToolRequirement): string {
   return entry.kind === 'skill'

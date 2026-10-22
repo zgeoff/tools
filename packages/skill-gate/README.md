@@ -93,8 +93,9 @@ so write one gate per pattern.
 ```
 
 The gate skips a skill that a rule names but `.claude/skills/` lacks, and it still requires the
-rule's other skills. A rules file that does not parse denies no edit. In both cases the hook warns
-the user and the agent on every edit until the rules file is fixed.
+rule's other skills. A rules file that does not parse denies no edit and no tool call. In both cases
+the hook warns the user and the agent on every edit, and on every call to a tool that the hook
+matcher names, until the rules file is fixed.
 
 The gate skips a key it does not know, at the top level or inside a gate, and keeps the rest of the
 rules. It warns on every edit and every gated tool call, and the key itself denies nothing. A rules

@@ -76,3 +76,22 @@ test('it warns and allows the call for a reference the repo lacks or a key it do
     hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: warning },
   });
 });
+
+test('it warns and allows the call when the rules file does not parse', () => {
+  const warning =
+    'skill-gate: .claude/skill-gate.json tool gate "mcp__tracker__update_ticket" needs `skills` and `references` arrays of non-empty strings.';
+
+  expect(
+    buildToolGateOutput(
+      'mcp__tracker__update_ticket',
+      { missingSkills: [], missingReferences: [], unknown: [] },
+      {
+        rulesError:
+          'tool gate "mcp__tracker__update_ticket" needs `skills` and `references` arrays of non-empty strings',
+      },
+    ),
+  ).toStrictEqual({
+    systemMessage: warning,
+    hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: warning },
+  });
+});
