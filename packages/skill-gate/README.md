@@ -124,7 +124,9 @@ that blocks.
 
 The check has limits:
 
-- It needs a git work tree. Outside one, the gate gives only the early warning.
+- It needs a git work tree. Outside one, the gate gives only the early warning. When git fails
+  inside one, such as on an index it cannot read, the hook warns the user and the agent that the
+  command went unchecked.
 - A command that runs in the background returns before it writes, so the check sees no change.
 - Bash commands that run in parallel share one work tree, so each one's check also sees the other's
   changes.

@@ -119,5 +119,13 @@ export interface WorkTree {
   readonly dirtyPaths: readonly string[];
 }
 
-// The gated files dirty before a Bash command, and the commit HEAD named then.
+// The gated files dirty before a Bash command and the commit HEAD named then, or git's error.
 export type BashSnapshot = Readonly<z.infer<typeof bashSnapshotSchema>>;
+
+export interface BashCheckFailureHookOutput {
+  readonly systemMessage: string;
+  readonly hookSpecificOutput: {
+    readonly hookEventName: PostToolEvent;
+    readonly additionalContext: string;
+  };
+}

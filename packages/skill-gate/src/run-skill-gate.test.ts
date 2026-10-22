@@ -875,6 +875,128 @@ test('it blocks after a Bash command changes a gated file before the session loa
   });
 });
 
+test('it warns after a Bash command when git cannot read the index afterwards', async () => {
+  const ctx = await setupTest();
+
+  const project = join(ctx.directory, 'project');
+
+  await mkdir(join(project, '.claude/skills/testing'), { recursive: true });
+  await mkdir(join(project, 'src'), { recursive: true });
+  await writeFile(join(project, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(project, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+  );
+
+  await writeFile(join(ctx.directory, 'session.jsonl'), '');
+
+  await $`git init --quiet`.cwd(project).env({ PATH: process.env['PATH'] });
+
+  spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: project },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      cwd: project,
+      transcript_path: join(ctx.directory, 'session.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command: 'node scripts/stamp.mjs' },
+      tool_use_id: 'toolu_bash_1',
+    }),
+  });
+
+  await writeFile(join(project, '.git/index'), 'not an index');
+
+  const result = spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: project },
+    input: JSON.stringify({
+      hook_event_name: 'PostToolUse',
+      cwd: project,
+      transcript_path: join(ctx.directory, 'session.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command: 'node scripts/stamp.mjs' },
+      tool_use_id: 'toolu_bash_1',
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    systemMessage: expect.stringMatching(
+      /^skill-gate: git failed, so the gate could not check what this Bash command changed: .*index/u,
+    ),
+    hookSpecificOutput: {
+      hookEventName: 'PostToolUse',
+      additionalContext: expect.stringMatching(
+        /^skill-gate: git failed, so the gate could not check what this Bash command changed: .*index/u,
+      ),
+    },
+  });
+});
+
+test('it warns after a Bash command when git could not read the index before it', async () => {
+  const ctx = await setupTest();
+
+  const project = join(ctx.directory, 'project');
+
+  await mkdir(join(project, '.claude/skills/testing'), { recursive: true });
+  await mkdir(join(project, 'src'), { recursive: true });
+  await writeFile(join(project, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(project, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+  );
+
+  await writeFile(join(ctx.directory, 'session.jsonl'), '');
+
+  await $`git init --quiet`.cwd(project).env({ PATH: process.env['PATH'] });
+
+  await writeFile(join(project, '.git/index'), 'not an index');
+
+  spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: project },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      cwd: project,
+      transcript_path: join(ctx.directory, 'session.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command: 'node scripts/stamp.mjs' },
+      tool_use_id: 'toolu_bash_1',
+    }),
+  });
+
+  const result = spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: project },
+    input: JSON.stringify({
+      hook_event_name: 'PostToolUse',
+      cwd: project,
+      transcript_path: join(ctx.directory, 'session.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command: 'node scripts/stamp.mjs' },
+      tool_use_id: 'toolu_bash_1',
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    systemMessage: expect.stringMatching(
+      /^skill-gate: git failed, so the gate could not check what this Bash command changed: .*index/u,
+    ),
+    hookSpecificOutput: {
+      hookEventName: 'PostToolUse',
+      additionalContext: expect.stringMatching(
+        /^skill-gate: git failed, so the gate could not check what this Bash command changed: .*index/u,
+      ),
+    },
+  });
+});
+
 test('it blocks after a Bash change by a subagent when only the main session loaded the skills', async () => {
   const ctx = await setupTest();
 

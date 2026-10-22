@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { simpleGit } from 'simple-git';
+import { GitError, simpleGit } from 'simple-git';
 import { readCommittedPaths } from './read-committed-paths.ts';
 
 async function setupTest() {
@@ -75,7 +75,7 @@ test('it reads every path of the first commit from the repo root when there was 
   expect(paths).toIncludeSameMembers([join(repo, 'README.md'), join(repo, 'src/a.test.ts')]);
 });
 
-test('it reads no path for a commit git does not have', async () => {
+test('it rejects with a GitError for a commit git does not have', async () => {
   const ctx = await setupTest();
 
   const repo = join(ctx.directory, 'repo');
@@ -85,7 +85,7 @@ test('it reads no path for a commit git does not have', async () => {
 
   await $`git init --quiet && git add -A && git commit --quiet -m one`.cwd(repo).env(ctx.gitEnv);
 
-  const paths = await readCommittedPaths(simpleGit(repo), repo, 'deadbeef', 'HEAD');
+  const reading = readCommittedPaths(simpleGit(repo), repo, 'deadbeef', 'HEAD');
 
-  expect(paths).toStrictEqual([]);
+  await expect(reading).rejects.toBeInstanceOf(GitError);
 });

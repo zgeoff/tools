@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { simpleGit } from 'simple-git';
+import { GitError, simpleGit } from 'simple-git';
 import { readWorkTree } from './read-work-tree.ts';
 
 async function setupTest() {
@@ -76,4 +76,20 @@ test('it reads null outside a git work tree', async () => {
   const workTree = await readWorkTree(simpleGit(ctx.directory), ctx.directory);
 
   expect(workTree).toBeNull();
+});
+
+test('it rejects with a GitError when git cannot read the index', async () => {
+  const ctx = await setupTest();
+
+  const repo = join(ctx.directory, 'repo');
+
+  await mkdir(repo);
+
+  await $`git init --quiet`.cwd(repo).env(ctx.gitEnv);
+
+  await writeFile(join(repo, '.git/index'), 'not an index');
+
+  const reading = readWorkTree(simpleGit(repo), repo);
+
+  await expect(reading).rejects.toBeInstanceOf(GitError);
 });

@@ -2,10 +2,11 @@ import { statSync } from 'node:fs';
 import { mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { isRecord } from '@zgeoff/std';
-import { simpleGit } from 'simple-git';
+import { GitError, simpleGit } from 'simple-git';
 import type { SimpleGit } from 'simple-git';
 import { bashSnapshotSchema } from './bash-snapshot-schema.ts';
 import { buildBashChangeOutput } from './build-bash-change-output.ts';
+import { buildBashCheckFailureOutput } from './build-bash-check-failure-output.ts';
 import { buildBashSkillGateOutput } from './build-bash-skill-gate-output.ts';
 import { buildSkillGateOutput } from './build-skill-gate-output.ts';
 import { collectChangedPaths } from './collect-changed-paths.ts';
@@ -198,18 +199,11 @@ async function writeGatedSnapshot(
   projectDir: string,
   rules: SkillGateRules,
 ): Promise<void> {
-  const workTree = await readWorkTree(git, projectDir);
+  const snapshot = await readGatedSnapshot(git, projectDir, rules);
 
-  if (workTree === null) {
+  if (snapshot === null) {
     return;
   }
-
-  const hashes = await readFileHashes(
-    projectDir,
-    collectGatedProjectPaths(projectDir, rules, workTree.dirtyPaths),
-  );
-
-  const snapshot: BashSnapshot = { head: workTree.head, hashes };
 
   try {
     await mkdir(path.dirname(snapshotPath), { recursive: true });
@@ -217,6 +211,34 @@ async function writeGatedSnapshot(
     await Bun.write(snapshotPath, JSON.stringify(snapshot));
   } catch {
     await rm(snapshotPath, { force: true });
+  }
+}
+
+// A git failure becomes a failed record, which the check after the command reports.
+async function readGatedSnapshot(
+  git: SimpleGit,
+  projectDir: string,
+  rules: SkillGateRules,
+): Promise<BashSnapshot | null> {
+  try {
+    const workTree = await readWorkTree(git, projectDir);
+
+    if (workTree === null) {
+      return null;
+    }
+
+    const hashes = await readFileHashes(
+      projectDir,
+      collectGatedProjectPaths(projectDir, rules, workTree.dirtyPaths),
+    );
+
+    return { kind: 'recorded', head: workTree.head, hashes };
+  } catch (error) {
+    if (error instanceof GitError) {
+      return { kind: 'failed', error: error.message };
+    }
+
+    throw error;
   }
 }
 
@@ -358,27 +380,29 @@ async function checkBashResult(
 
   await rm(result.snapshotPath, { force: true });
 
-  const workTree = before === null ? null : await readWorkTree(result.git, check.projectDir);
-
-  if (before === null || workTree === null) {
+  if (before === null) {
     return;
   }
 
-  const committed =
-    workTree.head === null || before.head === workTree.head
-      ? []
-      : await readCommittedPaths(result.git, check.projectDir, before.head, workTree.head);
+  if (before.kind === 'failed') {
+    printOutput(buildBashCheckFailureOutput(result.event, before.error));
 
-  const candidates = collectGatedProjectPaths(check.projectDir, rules, [
-    ...workTree.dirtyPaths,
-    ...committed,
-  ]);
+    return;
+  }
 
-  const after = await readFileHashes(check.projectDir, [
-    ...new Set([...Object.keys(before.hashes), ...candidates]),
-  ]);
+  const changed = await readChangedPaths(check, rules, result, before).catch((error: unknown) => {
+    if (error instanceof GitError) {
+      printOutput(buildBashCheckFailureOutput(result.event, error.message));
 
-  const changed = collectChangedPaths(before.hashes, after);
+      return null;
+    }
+
+    throw error;
+  });
+
+  if (changed === null) {
+    return;
+  }
 
   if (changed.length === 0) {
     return;
@@ -423,4 +447,33 @@ function parseJSON(text: string): unknown {
   } catch {
     return null;
   }
+}
+
+async function readChangedPaths(
+  check: BashCheck,
+  rules: SkillGateRules,
+  result: BashResult,
+  before: Extract<BashSnapshot, { kind: 'recorded' }>,
+): Promise<readonly string[] | null> {
+  const workTree = await readWorkTree(result.git, check.projectDir);
+
+  if (workTree === null) {
+    return null;
+  }
+
+  const committed =
+    workTree.head === null || before.head === workTree.head
+      ? []
+      : await readCommittedPaths(result.git, check.projectDir, before.head, workTree.head);
+
+  const candidates = collectGatedProjectPaths(check.projectDir, rules, [
+    ...workTree.dirtyPaths,
+    ...committed,
+  ]);
+
+  const after = await readFileHashes(check.projectDir, [
+    ...new Set([...Object.keys(before.hashes), ...candidates]),
+  ]);
+
+  return collectChangedPaths(before.hashes, after);
 }
