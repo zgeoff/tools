@@ -44,7 +44,7 @@ interface Edit {
   readonly filePath: string;
 }
 
-// Only an Edit, Write or MultiEdit call carries `file_path`; the gate never blocks a Bash call.
+// Only an Edit, Write or MultiEdit call carries `file_path`; a Bash call goes unchecked here.
 function parseEdit(payload: unknown, projectDir: string | undefined): Edit | null {
   if (!isRecord(payload) || !isRecord(payload['tool_input'])) {
     return null;

@@ -1,0 +1,61 @@
+import { expect, onTestFinished, test } from 'bun:test';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { readFileContent } from './read-file-content.ts';
+
+async function setupTest() {
+  const directory = await mkdtemp(join(tmpdir(), 'skill-gate-content-'));
+
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+
+  return { directory };
+}
+
+test('it reads the bytes of a file', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'a.test.ts'), "test('it adds', () => {});\n");
+
+  const content = await readFileContent(join(ctx.directory, 'a.test.ts'));
+
+  expect(new TextDecoder().decode(content ?? undefined)).toBe("test('it adds', () => {});\n");
+});
+
+test('it reads null for a path that holds no file', async () => {
+  const ctx = await setupTest();
+  const content = await readFileContent(join(ctx.directory, 'gone.test.ts'));
+
+  expect(content).toBeNull();
+});
+
+test('it reads null for a folder', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, 'vendor'));
+
+  const content = await readFileContent(join(ctx.directory, 'vendor'));
+
+  expect(content).toBeNull();
+});
+
+test('it reads the link text of a dangling symlink', async () => {
+  const ctx = await setupTest();
+
+  await symlink('absent.ts', join(ctx.directory, 'a.test.ts'));
+
+  const content = await readFileContent(join(ctx.directory, 'a.test.ts'));
+
+  expect(new TextDecoder().decode(content ?? undefined)).toBe('absent.ts');
+});
+
+test('it reads the link text of a symlink to a file, not the file', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'real.ts'), 'export const real = 1;\n');
+  await symlink('real.ts', join(ctx.directory, 'a.test.ts'));
+
+  const content = await readFileContent(join(ctx.directory, 'a.test.ts'));
+
+  expect(new TextDecoder().decode(content ?? undefined)).toBe('real.ts');
+});

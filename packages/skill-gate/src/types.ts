@@ -1,3 +1,6 @@
+import type { z } from 'zod';
+import type { bashSnapshotSchema } from './bash-snapshot-schema.ts';
+
 export interface SkillGate {
   readonly match: string;
   readonly skills: readonly string[];
@@ -94,3 +97,64 @@ export interface SkillGateHookOutput {
     readonly additionalContext?: string;
   };
 }
+
+// A content hash per project path, or null for a path that holds no file.
+export type FileHashes = Readonly<Record<string, string | null>>;
+
+export type PostToolEvent = 'PostToolUse' | 'PostToolUseFailure';
+
+export type HookEvent = 'PreToolUse' | PostToolEvent;
+
+export type BashChangeHookOutput =
+  | { readonly decision: 'block'; readonly reason: string }
+  | {
+      readonly hookSpecificOutput: {
+        readonly hookEventName: 'PostToolUseFailure';
+        readonly additionalContext: string;
+      };
+    };
+
+export interface WorkTree {
+  readonly head: string | null;
+  readonly dirtyPaths: readonly string[];
+}
+
+// The gated files dirty before a Bash command and the commit HEAD named then, or git's error.
+export type BashSnapshot = Readonly<z.infer<typeof bashSnapshotSchema>>;
+
+export interface BashCheckFailureHookOutput {
+  readonly systemMessage: string;
+  readonly hookSpecificOutput: {
+    readonly hookEventName: PostToolEvent;
+    readonly additionalContext: string;
+  };
+}
+
+export interface CommitRange {
+  readonly from: string | null;
+  readonly to: string;
+}
+
+export interface BashCandidates {
+  readonly hashedPaths: readonly string[];
+  readonly cleanBefore: readonly string[];
+}
+
+// Reads a file's content, or null for a path that holds no file.
+export type ReadFileContent = (filePath: string) => Promise<Uint8Array | null>;
+
+export type RecordedSnapshot = Extract<BashSnapshot, { kind: 'recorded' }>;
+
+export type BashComparison =
+  | { readonly kind: 'no-work-tree' }
+  | { readonly kind: 'git-failed'; readonly error: string }
+  | { readonly kind: 'compared'; readonly changedPaths: readonly string[] };
+
+export type BashResultStep =
+  | { readonly kind: 'skip' }
+  | { readonly kind: 'report'; readonly error: string }
+  | { readonly kind: 'gate'; readonly changedPaths: readonly string[] };
+
+export type RecordStep =
+  | Exclude<BashResultStep, { kind: 'gate' }>
+  | { readonly kind: 'compare'; readonly recorded: RecordedSnapshot };

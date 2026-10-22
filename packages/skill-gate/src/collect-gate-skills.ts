@@ -1,3 +1,4 @@
+import picomatch from 'picomatch';
 import type { SkillGateRules } from './types.ts';
 
 // Collects the skills that every gate matching a path names, in gate order and with repeats. A
@@ -12,8 +13,7 @@ export function collectGateSkills(rules: SkillGateRules, relativePath: string): 
     .flatMap((gate) => gate.skills);
 }
 
+// picomatch skips a dot folder such as .claude by default, and a gate covers it.
 function isGlobMatch(pattern: string, relativePath: string): boolean {
-  const glob = new Bun.Glob(pattern);
-
-  return glob.match(relativePath);
+  return picomatch.isMatch(relativePath, pattern, { dot: true });
 }

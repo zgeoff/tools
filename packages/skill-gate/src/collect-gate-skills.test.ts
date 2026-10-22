@@ -25,3 +25,21 @@ test('it collects no skill for a path that holds an ignore segment', () => {
     ),
   ).toStrictEqual([]);
 });
+
+test('it matches a path inside a dot folder', () => {
+  expect(
+    collectGateSkills(
+      { ignore: [], gates: [{ match: '**/*.md', skills: ['docs-writing'] }] },
+      '.claude/skills/testing/SKILL.md',
+    ),
+  ).toStrictEqual(['docs-writing']);
+});
+
+test('it matches a deep path under a brace group of two globstar patterns', () => {
+  expect(
+    collectGateSkills(
+      { ignore: [], gates: [{ match: '{e2e/**,test/**}', skills: ['testing'] }] },
+      'test/journeys/sign-in.ts',
+    ),
+  ).toStrictEqual(['testing']);
+});
