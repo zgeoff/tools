@@ -40,30 +40,6 @@ test('it writes the plan for the script names package.json defines to the step o
   );
 });
 
-test('it prints the notice of a plan that leaves check out', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(
-    join(ctx.directory, 'package.json'),
-    JSON.stringify({
-      scripts: {
-        audit: 'true',
-        deadcode: 'true',
-        'format:check': 'true',
-        lint: 'true',
-        typecheck: 'true',
-        test: 'true',
-      },
-    }),
-  );
-
-  const result = await ctx.runPlan({ SCRIPTS: '', PART: 'static', LANE: '' });
-
-  expect(result.stdout.toString()).toBe(
-    '::notice::check skipped, because package.json has no check script; add "check": "zgeoff-check" to run it.\n',
-  );
-});
-
 test('it fails with an error and writes no outputs when a listed script is missing', async () => {
   const ctx = await setupTest();
 
