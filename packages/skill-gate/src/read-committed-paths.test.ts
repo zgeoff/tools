@@ -87,5 +87,5 @@ test('it rejects with a GitError for a commit git does not have', async () => {
 
   const reading = readCommittedPaths(simpleGit(repo), repo, 'deadbeef', 'HEAD');
 
-  await expect(reading).rejects.toBeInstanceOf(GitError);
+  expect(reading).rejects.toBeInstanceOf(GitError);
 });

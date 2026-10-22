@@ -91,5 +91,5 @@ test('it rejects with a GitError when git cannot read the index', async () => {
 
   const reading = readWorkTree(simpleGit(repo), repo);
 
-  await expect(reading).rejects.toBeInstanceOf(GitError);
+  expect(reading).rejects.toBeInstanceOf(GitError);
 });
