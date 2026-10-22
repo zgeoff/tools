@@ -191,10 +191,10 @@ A `<name>.test.ts` or `<name>.test.tsx` file declares one function, `setupTest()
 as the testing skill requires. At module level the rule allows imports, `type` and `interface`
 declarations, one `setupTest` function declaration, and statements that call `test`, `test.each`,
 `test.skipIf` or `test.if`, or a chain of them, with `test` under its local alias when the
-`bun:test` import renames it. It reports every other statement: a `let`, a `var`, a class, an enum,
-a second function, an export, and a call such as `beforeEach(...)`. The message holds the three ways
-out of a helper: inline it, swap it for a registered matcher, or move it to the shared test utils
-with tests of its own.
+`bun:test` or `claude-code/testing` import renames it. It reports every other statement: a `let`, a
+`var`, a class, an enum, a second function, an export, and a call such as `beforeEach(...)`. The
+message holds the three ways out of a helper: inline it, swap it for a registered matcher, or move
+it to the shared test utils with tests of its own.
 
 A module-level `const` passes only as a skip gate: a declarator that binds at least one name, each
 binding read, and read only at collection time, inside an argument of the test runner's `skipIf` or
