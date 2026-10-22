@@ -129,3 +129,13 @@ export interface BashCheckFailureHookOutput {
     readonly additionalContext: string;
   };
 }
+
+export interface CommitRange {
+  readonly from: string | null;
+  readonly to: string;
+}
+
+export interface BashCandidates {
+  readonly hashedPaths: readonly string[];
+  readonly cleanBefore: readonly string[];
+}

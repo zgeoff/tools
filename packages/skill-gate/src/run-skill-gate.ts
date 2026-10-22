@@ -9,11 +9,13 @@ import { buildBashChangeOutput } from './build-bash-change-output.ts';
 import { buildBashCheckFailureOutput } from './build-bash-check-failure-output.ts';
 import { buildBashSkillGateOutput } from './build-bash-skill-gate-output.ts';
 import { buildSkillGateOutput } from './build-skill-gate-output.ts';
+import { collectBashCandidates } from './collect-bash-candidates.ts';
 import { collectChangedPaths } from './collect-changed-paths.ts';
 import { collectGateSkills } from './collect-gate-skills.ts';
 import { collectLoadedSkills } from './collect-loaded-skills.ts';
 import { collectWrittenPaths } from './collect-written-paths.ts';
 import { parseSkillGateRules } from './parse-skill-gate-rules.ts';
+import { pickCommitRange } from './pick-commit-range.ts';
 import { planBashSkillGate } from './plan-bash-skill-gate.ts';
 import { planSkillGate } from './plan-skill-gate.ts';
 import { readCommitHashes } from './read-commit-hashes.ts';
@@ -462,27 +464,20 @@ async function readChangedPaths(
     return null;
   }
 
+  const range = pickCommitRange(before.head, workTree.head);
+
   const committed =
-    workTree.head === null || before.head === workTree.head
+    range === null
       ? []
-      : await readCommittedPaths(result.git, check.projectDir, before.head, workTree.head);
+      : await readCommittedPaths(result.git, check.projectDir, range.from, range.to);
 
-  const candidates = collectGatedProjectPaths(check.projectDir, rules, [
-    ...workTree.dirtyPaths,
-    ...committed,
-  ]);
-
-  const after = await readFileHashes(check.projectDir, [
-    ...new Set([...Object.keys(before.hashes), ...candidates]),
-  ]);
-
-  // A path git lists, such as one whose mode changed, can keep its content, so a path that was
-  // clean before compares with its content at the recorded HEAD.
-  const cleanBefore = candidates.filter(
-    (relativePath) => !Object.hasOwn(before.hashes, relativePath),
+  const candidates = collectBashCandidates(
+    before.hashes,
+    collectGatedProjectPaths(check.projectDir, rules, [...workTree.dirtyPaths, ...committed]),
   );
 
-  const committedBefore = await readCommitHashes(result.git, before.head, cleanBefore);
+  const after = await readFileHashes(check.projectDir, candidates.hashedPaths);
+  const atHead = await readCommitHashes(result.git, before.head, candidates.cleanBefore);
 
-  return collectChangedPaths({ ...committedBefore, ...before.hashes }, after);
+  return collectChangedPaths(before.hashes, atHead, after);
 }
