@@ -57,8 +57,8 @@ Each line links the section that explains it.
 - [Boundaries](#boundaries): a stand-in replaces a boundary, never the code inside it, and a failure
   branch runs on a real failure.
 - [Module mocks](#module-mocks): `mock.module` lives only in a preload, for two narrow cases.
-- [Matchers](#matchers): prefer a jest-extended matcher, and give a partial-match matcher a plain
-  object.
+- [Matchers](#matchers): when a jest-extended matcher checks the property, use it in place of a
+  hand-written check, and give a partial-match matcher a plain object.
 
 ## References
 
@@ -231,9 +231,10 @@ Two loops that check a set the module owns stay legal:
   `await expect(conformanceCase.run(app)).toResolve()`.
 
 Neither loop may compute its expectation with the same transformation it checks. A loop that only
-arranges, such as inserting 51 rows to cross a page limit, holds no assertion and stays legal.
-Prefer `await Promise.all(Array.from({ length: 51 }, …))` when the order of the rows does not
-matter.
+arranges, such as inserting 51 rows to cross a page limit, holds no assertion and stays legal. When
+the order of the rows does not matter, insert them with
+`await Promise.all(Array.from({ length: 51 }, …))`. When it does, insert them one at a time in the
+loop.
 
 ### Property tests
 
@@ -373,21 +374,21 @@ unique key to avoid another test's rows: isolation comes from resets, not from l
 
 ### A test that fails only in the full run
 
-A test that passes alone and fails beside others has found a cleanup gap. Bisect the test files to
-find the state it leaves behind and add that state's reset to the preload, as
-[Cleanup](./references/cleanup.md#a-test-that-fails-only-in-the-full-run) describes. Reordering the
-tests or choosing unique keys hides the gap.
+A test that passes alone and fails beside others has found a cleanup gap.
+[Cleanup](./references/cleanup.md#a-test-that-fails-only-in-the-full-run) holds the steps that find
+the gap and close it.
 
 ## Test data
 
 - Plain inputs stay inline at the call site: arguments, options bags, config values. Write the
   literal again in the next test. A module-level fixture, a baseline object shared between tests, or
   a constant that only names a literal (`const EMPTY = ''`) never appears in a test file.
-- A domain type that crosses a module boundary gets a factory, `build-mock-<type>.ts` exporting
-  `buildMock<Type>`, in the shared test utils as soon as a test needs one, and a domain concept
-  built from several records gets a composite. Both follow
-  [Factories and composites](./references/factories.md). A type private to the module under test
-  stays an inline literal.
+- A domain type that crosses a module boundary gets a tested factory in the shared test utils as
+  soon as a test needs one, and a domain concept built from several records gets a composite. A type
+  that another package owns, such as an SDK result, crosses a boundary on its first use. A type
+  private to the module under test stays an inline literal.
+  [Factories and composites](./references/factories.md) holds how to name and write a factory or a
+  composite.
 - A stand-in's data stays inline in the test: a fixed answer, a recorder (`mock()`), including one
   that parses the input it records, a no-op (`() => {}`), an answer table read by one key, or a list
   of scripted answers that the test passes to the tested answer-queue util. Any other code in a
@@ -589,10 +590,8 @@ with values, and test the I/O edge against the real boundary.
 
 ### Real applications and transport
 
-A CLI, SDK, or server-side client of a service in the same repo tests against the real application
-wiring, and a tested real network stand-in replaces interception where interception cannot reach the
-contract. [System tests](./references/system-tests.md#real-applications-and-transport) holds both
-rules.
+A client of a service that the same repo holds, and a network edge that request interception cannot
+reach, each follow [System tests](./references/system-tests.md#real-applications-and-transport).
 
 <!-- repo-sync needs ./references/frontend.md -->
 
@@ -648,7 +647,9 @@ shows a defect in the import graph: fix the import graph instead.
 
 The `@zgeoff/bun-test-extended` preload registers the jest-extended matchers, and a package's
 `augment-bun-test.ts` import gives `tsc` their types. Typecheck fails on a matcher name that does
-not exist. Prefer a matcher to a hand-written check:
+not exist. When a matcher in this table checks the property a test asserts, use it in place of a
+hand-written check such as `expect(items.every(isOpen)).toBe(true)`, because the matcher reports the
+received value on failure and the hand-written check reports only `false`:
 
 | Value             | Matchers                                                                                                          |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------- |
