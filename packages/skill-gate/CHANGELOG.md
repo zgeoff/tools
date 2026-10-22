@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.4...@zgeoff/skill-gate@0.2.5) (2026-10-22)
+
+
+### Features
+
+* **skill-gate:** gate a tool call on its skills and reference reads ([#291](https://github.com/zgeoff/tools/issues/291)) ([41013e9](https://github.com/zgeoff/tools/commit/41013e9f6bc7854c604b4b0252082c6b50fb33f7))
+
 ## [0.2.4](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.3...@zgeoff/skill-gate@0.2.4) (2026-10-22)
 
 ### Features
