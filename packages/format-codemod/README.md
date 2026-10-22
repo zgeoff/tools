@@ -92,32 +92,6 @@ format-codemod --dry path/to/file.ts         # preview diff; applies cleanly wit
 format-codemod .                             # whole repo, in place
 ```
 
-### Inputs
-
-Globs use Node's built-in `fs.glob`. A literal path is resolved as a file before the glob heuristic
-runs, so bracketed names (Next.js routes like `[slug]/page.tsx`) are read as files, not glob
-character classes. A directory expands to `**/*.{ts,tsx}` beneath it; `node_modules` and `.git` are
-never descended into, and overlapping patterns are deduped so each file is processed once. `.d.ts`
-files are skipped. The extension picks the parse dialect: `.tsx` enables JSX, everything else parses
-as plain TypeScript — so `.ts`-only syntax (`<string>value` assertions, un-comma'd generic arrows
-`<T>(a: T) => a`) parses correctly instead of being misread as JSX.
-
-### Ignoring files
-
-A `.formatignore` file in the working directory supplies ignore globs — one per line, blank lines
-and `#`-prefixed comment lines skipped:
-
-```gitignore
-# committed codegen
-src/generated/**
-dist/**
-```
-
-Each line uses the same semantics as `--ignore` (Node's `path.matchesGlob`, tried against both the
-expanded path and the path relative to the working directory). It is not a gitignore dialect: `!`
-negation and directory-anchoring rules are not supported. `--ignore` flags merge additively with the
-file's globs.
-
 ## Programmatic use
 
 ```ts
@@ -130,3 +104,8 @@ const { output, edits, parseError } = transform(source, { filename: 'component.t
 
 `filename` is optional and only picks the dialect (default `'source.ts'` — plain TypeScript, no
 JSX); nothing is read from disk.
+
+## Documentation
+
+[The format-codemod inputs doc](../../docs/architecture/format-codemod-inputs.md) describes how the
+CLI resolves its file, directory and glob arguments, and how it reads ignore globs.

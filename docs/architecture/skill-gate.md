@@ -1,0 +1,73 @@
+# Skill gate
+
+The skill gate is the Claude Code hook that
+[`@zgeoff/skill-gate`](../../packages/skill-gate/README.md) ships. It denies an edit, or a call to a
+gated tool, until the session has loaded the skills and read the references that the repo's
+[rules](../../packages/skill-gate/README.md#rules) name for it. The gate counts only the loads of
+the session that makes the call, and only those since the last compaction. It judges a Bash command
+by what the command changed in the git work tree, and it blocks after the command when a changed
+gated file needs a skill the session lacks.
+
+## Failing closed
+
+The hook runs the [entry point](../../packages/skill-gate/README.md#entry-point), a file in the repo
+that calls the package. The entry point fails closed. When the package cannot load, the entry point
+blocks each edit that a gate in the rules file matches, and its error names the load failure. It
+also blocks every edit inside the project when it cannot read the rules file or the file does not
+parse. It blocks a call to a tool that a tool gate names, and every call other than an edit or a
+Bash command when it cannot read the rules file or the file or its `tools` list does not parse. Any
+other call runs, and the hook reports the load failure as a non-blocking error.
+
+## Which loads count
+
+The gate counts the loads of the session that makes the edit or the tool call. A skill loads through
+a Skill tool call or a slash command. A reference counts once a Read tool call of its file succeeds;
+a Bash `cat` of the file does not count. A subagent's tool call carries `agent_id` beside the main
+session's `transcript_path`, and the gate reads that subagent's own transcript beside the main one:
+`<session>/subagents/agent-<agent_id>.jsonl`, or
+`<session>/subagents/workflows/<workflow_id>/agent-<agent_id>.jsonl` for a subagent that a workflow
+started. A subagent therefore loads the skills itself, and the main session's loads never count for
+it. A compaction writes a `compact_boundary` entry, and the loads and reads before it no longer
+count: after a compaction, the gate denies a gated edit or tool call until the session loads the
+skills and reads the references again, and its denial says so.
+
+## Bash commands
+
+The gate checks what a Bash command changed, not what the command says. Before the command, it
+records `HEAD` and the content of each gated file that `git status` lists as changed, staged or
+untracked. After the command, it reads `git status` again, plus the files that differ between the
+old and the new `HEAD`. A gated file that the command created, changed, deleted, renamed or
+committed counts as a change. A file that keeps its content does not: one dirty before and left
+alone, or one whose mode alone changed, compared with its content at the old `HEAD`. A command that
+moves `HEAD` another way, such as a pull or a checkout, counts each gated file it brought in.
+
+When the session that ran the command lacks a skill that a changed file needs, the hook blocks: the
+agent gets a reason that names the skills to load and asks it to review what the command changed.
+The same load check as an edit applies, with its compaction and subagent rules.
+
+Claude Code runs a `PostToolUse` hook after the command, so a block cannot undo the change. It stops
+the agent's next step and puts the reason beside the command's output, as the
+[hooks reference](https://code.claude.com/docs/en/hooks#posttooluse-decision-control) describes. A
+command that exits with an error fires `PostToolUseFailure`, which cannot block, so the hook adds
+the same reason as context.
+
+Before the command runs, the gate also reads the common forms of a shell write, such as a redirect,
+`tee`, `sed -i`, `cp`, `mv` or an inline script. When one targets a gated path, it warns and names
+the skills to load. The warning is an early notice only, and the check after the command is the one
+that blocks.
+
+The check has limits:
+
+- It needs a git work tree. Outside one, the gate gives only the early warning. When git fails
+  inside one, such as on an index it cannot read, the hook warns the user and the agent that the
+  command went unchecked.
+- A command that runs in the background returns before it writes, so the check sees no change.
+- A file that a git filter rewrites on checkout, such as a Git LFS file, never matches its content
+  at `HEAD`, so a mode change to one counts as a change.
+- Bash commands that run in parallel share one work tree, so each one's check also sees the other's
+  changes.
+- A command whose `PreToolUse` call left no record, such as one that started before the hook was
+  installed, goes unchecked.
+
+Change a gated path only with Edit, Write or MultiEdit; the denial, the warning and the block all
+say so.

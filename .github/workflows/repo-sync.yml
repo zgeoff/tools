@@ -7,7 +7,7 @@
 # pull request is open force-pushes the branch and updates the same pull
 # request. A new shared file is a manifest entry here with no change downstream.
 # A file that an earlier manifest delivered and the current one drops goes in
-# one more commit, as sync/README.md describes.
+# one more commit, as docs/architecture/repo-sync.md describes.
 #
 # Callers pin this workflow to a sync tag, such as `@sync-v1`, and the run syncs
 # the files that tag holds: both checkouts of this repository read the commit of
