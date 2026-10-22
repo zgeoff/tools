@@ -1,19 +1,24 @@
 import { statSync } from 'node:fs';
+import { mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { isRecord } from '@zgeoff/std';
-import type { BunFile } from 'bun';
+import { buildBashChangeOutput } from './build-bash-change-output.ts';
 import { buildBashSkillGateOutput } from './build-bash-skill-gate-output.ts';
 import { buildSkillGateOutput } from './build-skill-gate-output.ts';
+import { collectChangedPaths } from './collect-changed-paths.ts';
+import { collectGateSkills } from './collect-gate-skills.ts';
 import { collectLoadedSkills } from './collect-loaded-skills.ts';
 import { collectWrittenPaths } from './collect-written-paths.ts';
 import { parseSkillGateRules } from './parse-skill-gate-rules.ts';
 import { planBashSkillGate } from './plan-bash-skill-gate.ts';
 import { planSkillGate } from './plan-skill-gate.ts';
-import type { WrittenPath } from './types.ts';
+import { readDirtyPaths } from './read-dirty-paths.ts';
+import { readFileHashes } from './read-file-hashes.ts';
+import type { FileHashes, HookEvent, PostToolEvent, SkillGateRules, WrittenPath } from './types.ts';
 
-// The PreToolUse hook for Edit, Write, MultiEdit and Bash, which exits once it prints its output.
-// The repo's own .claude/skill-gate.json holds the rules; a repo without that file has no gate. A
-// subagent's loads come from its own transcript, never the main session's.
+// The hook for Edit, Write, MultiEdit and Bash, which exits once it prints its output. The repo's
+// own .claude/skill-gate.json holds the rules; a repo without that file has no gate. A subagent's
+// loads come from its own transcript, never the main session's.
 export async function runSkillGate(): Promise<never> {
   const payload: unknown = await Bun.stdin.json().catch(() => null);
 
@@ -23,16 +28,25 @@ export async function runSkillGate(): Promise<never> {
     process.exit(0);
   }
 
+  // A plain git status refreshes the index under index.lock, which fails a git command that runs
+  // beside the hook. simple-git refuses an env it is handed that holds GIT_EDITOR, so set it here.
+  process.env['GIT_OPTIONAL_LOCKS'] = '0';
+
   const projectDir = process.env['CLAUDE_PROJECT_DIR'] ?? input.cwd;
   const rulesFile = Bun.file(path.join(projectDir, '.claude', 'skill-gate.json'));
 
   const hasRules = await rulesFile.exists();
 
   if (hasRules && input.command !== null) {
-    await checkBashCommand({ hookInput: input, command: input.command, projectDir, rulesFile });
+    await checkBash({
+      hookInput: input,
+      command: input.command,
+      projectDir,
+      rulesText: await rulesFile.text(),
+    });
   }
 
-  if (input.filePath === null) {
+  if (input.filePath === null || input.event !== 'PreToolUse') {
     process.exit(0);
   }
 
@@ -74,10 +88,12 @@ export async function runSkillGate(): Promise<never> {
 
 // An Edit, Write or MultiEdit call carries `file_path`, and a Bash call carries `command`.
 interface HookInput {
+  readonly event: HookEvent;
   readonly cwd: string;
   readonly filePath: string | null;
   readonly command: string | null;
   readonly transcriptPath: string;
+  readonly toolUseID: unknown;
   readonly agentID: unknown;
 }
 
@@ -100,24 +116,119 @@ function parseHookInput(value: unknown): HookInput | null {
   }
 
   return {
+    event: pickHookEvent(value['hook_event_name']),
     cwd,
     filePath: typeof editPath === 'string' ? editPath : null,
     command: typeof command === 'string' ? command : null,
     transcriptPath,
+    toolUseID: value['tool_use_id'],
     agentID: value['agent_id'],
   };
+}
+
+// A payload without an event name is a PreToolUse call, as the hook was first registered.
+function pickHookEvent(value: unknown): HookEvent {
+  return value === 'PostToolUse' || value === 'PostToolUseFailure' ? value : 'PreToolUse';
 }
 
 interface BashCheck {
   readonly hookInput: HookInput;
   readonly command: string;
   readonly projectDir: string;
-  readonly rulesFile: BunFile;
+  readonly rulesText: string;
 }
 
-// Warns on a command that writes a gated path in the project and exits; any other command goes
-// ahead in silence. A broken rules file lets every command through, since the next edit reports it.
-async function checkBashCommand(check: BashCheck): Promise<void> {
+// A broken rules file lets every command through, since the next edit reports it.
+async function checkBash(check: BashCheck): Promise<never> {
+  const parsedRules = parseSkillGateRules(check.rulesText);
+
+  if (!parsedRules.ok) {
+    process.exit(0);
+  }
+
+  const snapshotPath = resolveSnapshotPath(check.hookInput);
+
+  if (check.hookInput.event === 'PreToolUse') {
+    if (snapshotPath !== null) {
+      await writeGatedSnapshot(snapshotPath, check.projectDir, parsedRules.rules);
+    }
+
+    await checkBashCommand(check, parsedRules.rules);
+  }
+
+  if (snapshotPath !== null && check.hookInput.event !== 'PreToolUse') {
+    await checkBashResult(check, parsedRules.rules, {
+      event: check.hookInput.event,
+      snapshotPath,
+    });
+  }
+
+  process.exit(0);
+}
+
+// Claude Code keeps a session's own files in <session>/ beside its transcript, which a git status
+// of the project never lists. Each Bash call gets its own record, so parallel calls never share one.
+function resolveSnapshotPath(hookInput: HookInput): string | null {
+  if (typeof hookInput.toolUseID !== 'string' || !/^[\w-]+$/u.test(hookInput.toolUseID)) {
+    return null;
+  }
+
+  const sessionDir = hookInput.transcriptPath.replace(/\.jsonl$/u, '');
+
+  return path.join(sessionDir, 'skill-gate', `${hookInput.toolUseID}.json`);
+}
+
+// Records the content of each gated file that is dirty before the command runs. A file outside a
+// git work tree, or a record the hook cannot write, leaves the command unchecked.
+async function writeGatedSnapshot(
+  snapshotPath: string,
+  projectDir: string,
+  rules: SkillGateRules,
+): Promise<void> {
+  const dirty = await readGatedDirtyPaths(projectDir, rules);
+
+  if (dirty === null) {
+    return;
+  }
+
+  const hashes = await readFileHashes(projectDir, dirty);
+
+  try {
+    await mkdir(path.dirname(snapshotPath), { recursive: true });
+
+    await Bun.write(snapshotPath, JSON.stringify(hashes));
+  } catch {
+    await rm(snapshotPath, { force: true });
+  }
+}
+
+async function readGatedDirtyPaths(
+  projectDir: string,
+  rules: SkillGateRules,
+): Promise<readonly string[] | null> {
+  const dirty = await readDirtyPaths(projectDir);
+
+  if (dirty === null) {
+    return null;
+  }
+
+  return [...new Set(dirty.map((entry) => toProjectPath(projectDir, entry)))].filter(
+    (relativePath) =>
+      !isOutsideProject(relativePath) && collectGateSkills(rules, relativePath).length > 0,
+  );
+}
+
+function toProjectPath(projectDir: string, absolute: string): string {
+  return path.relative(projectDir, absolute).split(path.sep).join('/');
+}
+
+function isOutsideProject(fromProject: string): boolean {
+  return fromProject === '..' || fromProject.startsWith('../') || path.isAbsolute(fromProject);
+}
+
+// Warns on a command that writes a gated path in the project; any other command goes ahead in
+// silence. The check after the command is the one that blocks.
+async function checkBashCommand(check: BashCheck, rules: SkillGateRules): Promise<void> {
   const written = collectWrittenPaths(check.command).map((entry) =>
     readWrittenPath(check.hookInput.cwd, entry),
   );
@@ -127,15 +238,7 @@ async function checkBashCommand(check: BashCheck): Promise<void> {
   );
 
   if (candidates.length === 0) {
-    process.exit(0);
-  }
-
-  const text = await check.rulesFile.text();
-
-  const parsedRules = parseSkillGateRules(text);
-
-  if (!parsedRules.ok) {
-    process.exit(0);
+    return;
   }
 
   const skills = await readAvailableSkills(path.join(check.projectDir, '.claude', 'skills'));
@@ -144,7 +247,7 @@ async function checkBashCommand(check: BashCheck): Promise<void> {
   const sessionLoads = collectLoadedSkills(sessionTranscript);
 
   const bashPlan = planBashSkillGate({
-    rules: parsedRules.rules,
+    rules,
     paths: candidates.map((entry) => ({
       path: entry,
       relativePath: toProjectPath(check.projectDir, entry),
@@ -158,8 +261,6 @@ async function checkBashCommand(check: BashCheck): Promise<void> {
       compacted: sessionLoads.compacted,
     }),
   );
-
-  process.exit(0);
 }
 
 // A `cp` or `mv` onto an existing directory writes the source's file name inside it.
@@ -173,14 +274,6 @@ function readWrittenPath(cwd: string, written: WrittenPath): string {
   const isDirectory = statSync(absolute, { throwIfNoEntry: false })?.isDirectory() === true;
 
   return isDirectory ? path.join(absolute, written.fileName) : absolute;
-}
-
-function isOutsideProject(fromProject: string): boolean {
-  return fromProject === '..' || fromProject.startsWith('../') || path.isAbsolute(fromProject);
-}
-
-function toProjectPath(projectDir: string, absolute: string): string {
-  return path.relative(projectDir, absolute).split(path.sep).join('/');
 }
 
 async function readAvailableSkills(skillsDir: string): Promise<readonly string[]> {
@@ -231,5 +324,91 @@ function resolveSessionTranscriptPath(edit: HookInput): string | null {
 function printOutput(output: object | null): void {
   if (output !== null) {
     console.log(JSON.stringify(output));
+  }
+}
+
+interface BashResult {
+  readonly event: PostToolEvent;
+  readonly snapshotPath: string;
+}
+
+// A call with no record, such as one that began before the hook was installed, goes unchecked:
+// every file dirty before it would otherwise count as its change.
+async function checkBashResult(
+  check: BashCheck,
+  rules: SkillGateRules,
+  result: BashResult,
+): Promise<void> {
+  const before = await readSnapshot(result.snapshotPath);
+
+  await rm(result.snapshotPath, { force: true });
+
+  const dirty = before === null ? null : await readGatedDirtyPaths(check.projectDir, rules);
+
+  if (before === null || dirty === null) {
+    return;
+  }
+
+  const after = await readFileHashes(check.projectDir, [
+    ...new Set([...Object.keys(before), ...dirty]),
+  ]);
+
+  const changed = collectChangedPaths(before, after);
+
+  if (changed.length === 0) {
+    return;
+  }
+
+  const skills = await readAvailableSkills(path.join(check.projectDir, '.claude', 'skills'));
+  const sessionTranscript = await readTranscript(resolveSessionTranscriptPath(check.hookInput));
+
+  const sessionLoads = collectLoadedSkills(sessionTranscript);
+
+  const changePlan = planBashSkillGate({
+    rules,
+    paths: changed.map((relativePath) => ({
+      path: path.join(check.projectDir, relativePath),
+      relativePath,
+    })),
+    loadedSkills: sessionLoads.skills,
+    availableSkills: skills,
+  });
+
+  printOutput(
+    buildBashChangeOutput(result.event, changePlan.gatedPaths, changePlan.missing, {
+      compacted: sessionLoads.compacted,
+    }),
+  );
+}
+
+async function readSnapshot(snapshotPath: string): Promise<FileHashes | null> {
+  const text = await Bun.file(snapshotPath)
+    .text()
+    .catch(() => null);
+
+  const value: unknown = text === null ? null : parseJSON(text);
+
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const hashes: Record<string, string | null> = {};
+
+  for (const [relativePath, hash] of Object.entries(value)) {
+    if (typeof hash !== 'string' && hash !== null) {
+      return null;
+    }
+
+    hashes[relativePath] = hash;
+  }
+
+  return hashes;
+}
+
+function parseJSON(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
   }
 }

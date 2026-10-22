@@ -94,3 +94,19 @@ export interface SkillGateHookOutput {
     readonly additionalContext?: string;
   };
 }
+
+// A content hash per project path, or null for a path that holds no file.
+export type FileHashes = Readonly<Record<string, string | null>>;
+
+export type PostToolEvent = 'PostToolUse' | 'PostToolUseFailure';
+
+export type HookEvent = 'PreToolUse' | PostToolEvent;
+
+export type BashChangeHookOutput =
+  | { readonly decision: 'block'; readonly reason: string }
+  | {
+      readonly hookSpecificOutput: {
+        readonly hookEventName: 'PostToolUseFailure';
+        readonly additionalContext: string;
+      };
+    };
