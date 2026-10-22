@@ -88,11 +88,12 @@ branch `audit-fix` only when the audit needs a change:
   with a comment that dates the release and the day to remove the entry. The first run on or after
   that day removes the entry and its comment; an entry without the step's comment stays.
 - An advisory that no fix reaches gets an entry in `audit-ignores.json`, which holds the package,
-  the reason, and an expiry that the job sets a fixed span ahead. The `audit` script in
-  `package.json` gets the matching `--ignore` flag.
+  the reason, and an expiry `--expiry-days` ahead, whose default
+  [`audit-fix.ts`](../../scripts/audit-fix/audit-fix.ts) sets. The `audit` script in `package.json`
+  gets the matching `--ignore` flag.
 - An expired ignore is audited again: the entry gets a new expiry while no fix reaches it, and goes
-  when the audit no longer reports the advisory. An expiry further out than the job's longest
-  allowed span counts as expired.
+  when the audit no longer reports the advisory. An expiry past the cap that `maxExpiryDays` in
+  [`plan-audit-ignores.ts`](../../scripts/audit-fix/plan-audit-ignores.ts) sets counts as expired.
 - A rerun keeps the expiries on the open `audit-fix` branch, so it builds the same tree and leaves
   the pull request's checks alone.
 
