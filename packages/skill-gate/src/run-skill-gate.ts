@@ -10,10 +10,11 @@ import { buildBashChangeOutput } from './build-bash-change-output.ts';
 import { buildBashCheckFailureOutput } from './build-bash-check-failure-output.ts';
 import { buildBashSkillGateOutput } from './build-bash-skill-gate-output.ts';
 import { buildSkillGateOutput } from './build-skill-gate-output.ts';
+import { buildToolGateOutput } from './build-tool-gate-output.ts';
 import { collectBashCandidates } from './collect-bash-candidates.ts';
 import { collectChangedPaths } from './collect-changed-paths.ts';
 import { collectGateSkills } from './collect-gate-skills.ts';
-import { collectLoadedSkills } from './collect-loaded-skills.ts';
+import { collectSessionLoads } from './collect-session-loads.ts';
 import { collectWrittenPaths } from './collect-written-paths.ts';
 import { parseSkillGateRules } from './parse-skill-gate-rules.ts';
 import { pickCommitRange } from './pick-commit-range.ts';
@@ -21,6 +22,8 @@ import { pickComparisonStep } from './pick-comparison-step.ts';
 import { pickRecordStep } from './pick-record-step.ts';
 import { planBashSkillGate } from './plan-bash-skill-gate.ts';
 import { planSkillGate } from './plan-skill-gate.ts';
+import { planToolGate } from './plan-tool-gate.ts';
+import { readAvailableReferences } from './read-available-references.ts';
 import { readCommitHashes } from './read-commit-hashes.ts';
 import { readCommittedPaths } from './read-committed-paths.ts';
 import { readFileContent } from './read-file-content.ts';
@@ -37,9 +40,9 @@ import type {
   WrittenPath,
 } from './types.ts';
 
-// The hook for Edit, Write, MultiEdit and Bash, which exits once it prints its output. The repo's
-// own .claude/skill-gate.json holds the rules; a repo without that file has no gate. A subagent's
-// loads come from its own transcript, never the main session's.
+// The hook exits once it prints its output. The repo's own .claude/skill-gate.json holds the rules;
+// a repo without that file has no gate. A subagent's loads come from its own transcript, never the
+// main session's.
 export async function runSkillGate(): Promise<never> {
   const payload: unknown = await Bun.stdin.json().catch(() => null);
 
@@ -57,6 +60,15 @@ export async function runSkillGate(): Promise<never> {
   const rulesFile = Bun.file(path.join(projectDir, '.claude', 'skill-gate.json'));
 
   const hasRules = await rulesFile.exists();
+
+  if (hasRules && input.toolName !== null && input.event === 'PreToolUse') {
+    await checkToolCall({
+      hookInput: input,
+      toolName: input.toolName,
+      projectDir,
+      rulesText: await rulesFile.text(),
+    });
+  }
 
   if (hasRules && input.command !== null) {
     await checkBash({
@@ -93,7 +105,7 @@ export async function runSkillGate(): Promise<never> {
   const availableSkills = await readAvailableSkills(path.join(projectDir, '.claude', 'skills'));
   const transcript = await readTranscript(resolveSessionTranscriptPath(input));
 
-  const loaded = collectLoadedSkills(transcript);
+  const loaded = collectSessionLoads(transcript);
 
   const plan = planSkillGate({
     rules: parsed.rules,
@@ -102,7 +114,12 @@ export async function runSkillGate(): Promise<never> {
     availableSkills,
   });
 
-  printOutput(buildSkillGateOutput(filePath, plan, { compacted: loaded.compacted }));
+  printOutput(
+    buildSkillGateOutput(filePath, plan, {
+      compacted: loaded.compacted,
+      unknownKeys: parsed.unknownKeys,
+    }),
+  );
 
   process.exit(0);
 }
@@ -110,6 +127,7 @@ export async function runSkillGate(): Promise<never> {
 // An Edit, Write or MultiEdit call carries `file_path`, and a Bash call carries `command`.
 interface HookInput {
   readonly event: HookEvent;
+  readonly toolName: string | null;
   readonly cwd: string;
   readonly filePath: string | null;
   readonly command: string | null;
@@ -127,17 +145,19 @@ function parseHookInput(value: unknown): HookInput | null {
   const transcriptPath = value['transcript_path'];
   const editPath = value['tool_input']['file_path'];
   const command = value['tool_input']['command'];
+  const toolName = value['tool_name'];
 
   if (typeof cwd !== 'string' || typeof transcriptPath !== 'string') {
     return null;
   }
 
-  if (typeof editPath !== 'string' && typeof command !== 'string') {
+  if (typeof editPath !== 'string' && typeof command !== 'string' && typeof toolName !== 'string') {
     return null;
   }
 
   return {
     event: pickHookEvent(value['hook_event_name']),
+    toolName: typeof toolName === 'string' ? toolName : null,
     cwd,
     filePath: typeof editPath === 'string' ? editPath : null,
     command: typeof command === 'string' ? command : null,
@@ -150,6 +170,121 @@ function parseHookInput(value: unknown): HookInput | null {
 // A payload without an event name is a PreToolUse call, as the hook was first registered.
 function pickHookEvent(value: unknown): HookEvent {
   return value === 'PostToolUse' || value === 'PostToolUseFailure' ? value : 'PreToolUse';
+}
+
+// The path and Bash checks report a broken rules file for these tools.
+const PATH_GATED_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'Bash']);
+
+interface ToolCallCheck {
+  readonly hookInput: HookInput;
+  readonly toolName: string;
+  readonly projectDir: string;
+  readonly rulesText: string;
+}
+
+// A call that no tool gate names returns to the path and Bash checks. A broken rules file lets a
+// gated call through with a warning, since the hook matcher names only gated tools beside those.
+async function checkToolCall(check: ToolCallCheck): Promise<void> {
+  const parsedRules = parseSkillGateRules(check.rulesText);
+
+  if (!parsedRules.ok) {
+    if (!PATH_GATED_TOOLS.has(check.toolName)) {
+      printOutput(
+        buildToolGateOutput(
+          check.toolName,
+          { missingSkills: [], missingReferences: [], unknown: [] },
+          { rulesError: parsedRules.error },
+        ),
+      );
+
+      process.exit(0);
+    }
+
+    return;
+  }
+
+  if (!parsedRules.tools.some((gate) => gate.tool === check.toolName)) {
+    return;
+  }
+
+  const skillsDir = path.join(check.projectDir, '.claude', 'skills');
+
+  const transcript = await readTranscript(resolveSessionTranscriptPath(check.hookInput));
+
+  const loads = collectSessionLoads(transcript);
+
+  const plan = planToolGate({
+    tools: parsedRules.tools,
+    toolName: check.toolName,
+    skillsDir,
+    loads,
+    availableSkills: await readAvailableSkills(skillsDir),
+    availableReferences: await readAvailableReferences(
+      readFileContent,
+      skillsDir,
+      parsedRules.tools,
+    ),
+  });
+
+  printOutput(
+    buildToolGateOutput(check.toolName, plan, {
+      compacted: loads.compacted,
+      unknownKeys: parsedRules.unknownKeys,
+    }),
+  );
+
+  process.exit(0);
+}
+
+function printOutput(output: object | null): void {
+  if (output !== null) {
+    console.log(JSON.stringify(output));
+  }
+}
+
+async function readTranscript(transcriptPath: string | null): Promise<string> {
+  if (transcriptPath === null) {
+    return '';
+  }
+
+  const transcriptFile = Bun.file(transcriptPath);
+
+  const exists = await transcriptFile.exists();
+
+  return exists ? transcriptFile.text() : '';
+}
+
+// A subagent's call carries the main session's transcript_path plus its own agent_id, and Claude
+// Code keeps its transcript at <session>/subagents/agent-<agent_id>.jsonl. An agent_id that is not
+// a plain name resolves to no transcript, so the edit is denied.
+function resolveSessionTranscriptPath(edit: HookInput): string | null {
+  if (edit.agentID === undefined) {
+    return edit.transcriptPath;
+  }
+
+  if (typeof edit.agentID !== 'string' || !/^[\w-]+$/u.test(edit.agentID)) {
+    return null;
+  }
+
+  const sessionDir = edit.transcriptPath.replace(/\.jsonl$/u, '');
+
+  return path.join(sessionDir, 'subagents', `agent-${edit.agentID}.jsonl`);
+}
+
+async function readAvailableSkills(skillsDir: string): Promise<readonly string[]> {
+  const skills: string[] = [];
+
+  const scan = new Bun.Glob('*/SKILL.md').scan({ cwd: skillsDir, followSymlinks: true });
+
+  try {
+    for await (const skillFile of scan) {
+      skills.push(path.dirname(skillFile));
+    }
+  } catch {
+    // A repo without .claude/skills has no skills, so each rule reports its skills as unknown.
+  }
+
+  return skills;
 }
 
 interface BashCheck {
@@ -290,7 +425,7 @@ async function checkBashCommand(check: BashCheck, rules: SkillGateRules): Promis
   const skills = await readAvailableSkills(path.join(check.projectDir, '.claude', 'skills'));
   const sessionTranscript = await readTranscript(resolveSessionTranscriptPath(check.hookInput));
 
-  const sessionLoads = collectLoadedSkills(sessionTranscript);
+  const sessionLoads = collectSessionLoads(sessionTranscript);
 
   const bashPlan = planBashSkillGate({
     rules,
@@ -320,57 +455,6 @@ function readWrittenPath(cwd: string, written: WrittenPath): string {
   const isDirectory = statSync(absolute, { throwIfNoEntry: false })?.isDirectory() === true;
 
   return isDirectory ? path.join(absolute, written.fileName) : absolute;
-}
-
-async function readAvailableSkills(skillsDir: string): Promise<readonly string[]> {
-  const skills: string[] = [];
-
-  const scan = new Bun.Glob('*/SKILL.md').scan({ cwd: skillsDir, followSymlinks: true });
-
-  try {
-    for await (const skillFile of scan) {
-      skills.push(path.dirname(skillFile));
-    }
-  } catch {
-    // A repo without .claude/skills has no skills, so each rule reports its skills as unknown.
-  }
-
-  return skills;
-}
-
-async function readTranscript(transcriptPath: string | null): Promise<string> {
-  if (transcriptPath === null) {
-    return '';
-  }
-
-  const transcriptFile = Bun.file(transcriptPath);
-
-  const exists = await transcriptFile.exists();
-
-  return exists ? transcriptFile.text() : '';
-}
-
-// A subagent's call carries the main session's transcript_path plus its own agent_id, and Claude
-// Code keeps its transcript at <session>/subagents/agent-<agent_id>.jsonl. An agent_id that is not
-// a plain name resolves to no transcript, so the edit is denied.
-function resolveSessionTranscriptPath(edit: HookInput): string | null {
-  if (edit.agentID === undefined) {
-    return edit.transcriptPath;
-  }
-
-  if (typeof edit.agentID !== 'string' || !/^[\w-]+$/u.test(edit.agentID)) {
-    return null;
-  }
-
-  const sessionDir = edit.transcriptPath.replace(/\.jsonl$/u, '');
-
-  return path.join(sessionDir, 'subagents', `agent-${edit.agentID}.jsonl`);
-}
-
-function printOutput(output: object | null): void {
-  if (output !== null) {
-    console.log(JSON.stringify(output));
-  }
 }
 
 interface BashResult {
@@ -446,7 +530,7 @@ async function checkChangedPaths(
   const skills = await readAvailableSkills(path.join(check.projectDir, '.claude', 'skills'));
   const sessionTranscript = await readTranscript(resolveSessionTranscriptPath(check.hookInput));
 
-  const sessionLoads = collectLoadedSkills(sessionTranscript);
+  const sessionLoads = collectSessionLoads(sessionTranscript);
 
   const changePlan = planBashSkillGate({
     rules,

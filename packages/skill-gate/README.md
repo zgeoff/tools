@@ -1,10 +1,12 @@
 # @zgeoff/skill-gate
 
 The skill gate is a Claude Code hook that denies an edit until the session has loaded every skill
-the path needs, and names the missing skills. After a Bash command, it compares `git status` with
-the status before the command, and it blocks when the command changed a gated file that the session
-lacks the skills for. The package holds no rules: each repo keeps its own in
-`.claude/skill-gate.json`, and a repo without that file has no gate.
+the path needs, and names the missing skills. It denies a call to a gated tool, such as an MCP tool,
+the same way until the session has loaded the skills and read the reference files the tool needs.
+After a Bash command, it compares `git status` with the status before the command, and it blocks
+when the command changed a gated file that the session lacks the skills for. The package holds no
+rules: each repo keeps its own in `.claude/skill-gate.json`, and a repo without that file has no
+gate.
 
 ## Install
 
@@ -23,17 +25,21 @@ and exits the process.
 
 The entry point fails closed. When the package cannot load, the entry point blocks each edit that a
 gate in the rules file matches, and its error names the load failure. It also blocks every edit
-inside the project when it cannot read the rules file or the file does not parse. Any other call
-runs, and the hook reports the load failure as a non-blocking error.
+inside the project when it cannot read the rules file or the file does not parse. It blocks a call
+to a tool that a tool gate names, and every call other than an edit or a Bash command when it cannot
+read the rules file or the file or its `tools` list does not parse. Any other call runs, and the
+hook reports the load failure as a non-blocking error.
 
-Register the entry point in `.claude/settings.json`, before a Bash command and after it:
+Register the entry point in `.claude/settings.json`, before a Bash command and after it. The
+`PreToolUse` matcher names each tool that a [tool gate](#tool-gates) names, since the hook never
+sees a call that the matcher skips. This example gates `mcp__tracker__update_ticket`:
 
 ```json
 {
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|Bash",
+        "matcher": "Edit|Write|MultiEdit|Bash|mcp__tracker__update_ticket",
         "hooks": [
           {
             "type": "command",
@@ -87,17 +93,48 @@ so write one gate per pattern.
 ```
 
 The gate skips a skill that a rule names but `.claude/skills/` lacks, and it still requires the
-rule's other skills. A rules file that does not parse denies no edit. In both cases the hook warns
-the user and the agent on every edit until the rules file is fixed.
+rule's other skills. A rules file that does not parse denies no edit and no tool call. In both cases
+the hook warns the user and the agent on every edit, and on every call to a tool that the hook
+matcher names, until the rules file is fixed.
+
+The gate skips a key it does not know, at the top level or inside a gate, and keeps the rest of the
+rules. It warns on every edit and every gated tool call, and the key itself denies nothing. A rules
+file written for a later version of the package therefore never blocks every call.
+
+### Tool gates
+
+The optional `tools` list gates a tool call by its `PreToolUse` tool name. Each gate names the
+`tool`, the `skills` the session loads, and the `references` it reads, and it needs at least one
+skill or reference. A reference is a file path under `.claude/skills/`. A tool gate never names
+`Edit`, `Write`, `MultiEdit` or `Bash`, since path gates cover those tools.
+
+```json
+{
+  "gates": [],
+  "tools": [
+    {
+      "tool": "mcp__tracker__update_ticket",
+      "skills": ["ticket-review"],
+      "references": ["ticket-review/references/reasons.md"]
+    }
+  ]
+}
+```
+
+The denial names each missing skill and each reference to read. The gate skips a skill or a
+reference that the repo lacks, and warns on each gated call until the rule is fixed.
 
 ## Which loads count
 
-The gate counts the loads of the session that makes the edit. A subagent's tool call carries
-`agent_id` beside the main session's `transcript_path`, and the gate reads that subagent's own
-transcript, `<session>/subagents/agent-<agent_id>.jsonl` beside the main one. A subagent therefore
-loads the skills itself, and the main session's loads never count for it. A compaction writes a
-`compact_boundary` entry, and the loads before it no longer count: after a compaction, the gate
-denies a gated edit until the session loads the skills again, and its denial says so.
+The gate counts the loads of the session that makes the edit or the tool call. A skill loads through
+a Skill tool call or a slash command. A reference counts once a Read tool call of its file succeeds;
+a Bash `cat` of the file does not count. A subagent's tool call carries `agent_id` beside the main
+session's `transcript_path`, and the gate reads that subagent's own transcript,
+`<session>/subagents/agent-<agent_id>.jsonl` beside the main one. A subagent therefore loads the
+skills itself, and the main session's loads never count for it. A compaction writes a
+`compact_boundary` entry, and the loads and reads before it no longer count: after a compaction, the
+gate denies a gated edit or tool call until the session loads the skills and reads the references
+again, and its denial says so.
 
 ## Bash commands
 

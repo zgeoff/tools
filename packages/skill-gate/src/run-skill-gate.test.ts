@@ -1898,3 +1898,313 @@ test('it removes the record of the dirty files once the Bash command is checked'
 
   expect(records).toStrictEqual([]);
 });
+
+test('it denies a gated tool call and names the reference the session has not read', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, '.claude/skills/ticket-review/references'), { recursive: true });
+  await writeFile(join(ctx.directory, '.claude/skills/ticket-review/SKILL.md'), '# Review\n');
+
+  await writeFile(
+    join(ctx.directory, '.claude/skills/ticket-review/references/follow-ups.md'),
+    '# Follow-ups\n',
+  );
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({
+      gates: [],
+      tools: [
+        {
+          tool: 'mcp__linear-server__save_issue',
+          skills: ['ticket-review'],
+          references: ['ticket-review/references/follow-ups.md'],
+        },
+      ],
+    }),
+  );
+
+  await writeFile(
+    join(ctx.directory, 'transcript.jsonl'),
+    [
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"ticket-review"}}]}}',
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Launching skill: ticket-review"}]}}',
+    ].join('\n'),
+  );
+
+  const result = spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'mcp__linear-server__save_issue',
+      cwd: ctx.directory,
+      transcript_path: join(ctx.directory, 'transcript.jsonl'),
+      tool_input: { title: 'Rotate the staging keys' },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason:
+        'Before calling mcp__linear-server__save_issue, read .claude/skills/ticket-review/references/follow-ups.md with the Read tool, then retry the call. .claude/skill-gate.json lists the skills and references each tool needs.',
+    },
+  });
+});
+
+test('it allows a gated tool call once the session reads the reference', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, '.claude/skills/ticket-review/references'), { recursive: true });
+
+  await writeFile(
+    join(ctx.directory, '.claude/skills/ticket-review/references/follow-ups.md'),
+    '# Follow-ups\n',
+  );
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({
+      gates: [],
+      tools: [
+        {
+          tool: 'mcp__linear-server__save_issue',
+          references: ['ticket-review/references/follow-ups.md'],
+        },
+      ],
+    }),
+  );
+
+  await writeFile(
+    join(ctx.directory, 'transcript.jsonl'),
+    [
+      `{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Read","input":{"file_path":${JSON.stringify(join(ctx.directory, '.claude/skills/ticket-review/references/follow-ups.md'))}}}]}}`,
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"# Follow-ups"}]}}',
+    ].join('\n'),
+  );
+
+  const result = spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'mcp__linear-server__save_issue',
+      cwd: ctx.directory,
+      transcript_path: join(ctx.directory, 'transcript.jsonl'),
+      tool_input: { title: 'Rotate the staging keys' },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});
+
+test('it denies a gated tool call again after a compaction voids the read', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, '.claude/skills/ticket-review/references'), { recursive: true });
+
+  await writeFile(
+    join(ctx.directory, '.claude/skills/ticket-review/references/follow-ups.md'),
+    '# Follow-ups\n',
+  );
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({
+      gates: [],
+      tools: [
+        {
+          tool: 'mcp__linear-server__save_issue',
+          references: ['ticket-review/references/follow-ups.md'],
+        },
+      ],
+    }),
+  );
+
+  await writeFile(
+    join(ctx.directory, 'transcript.jsonl'),
+    [
+      `{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Read","input":{"file_path":${JSON.stringify(join(ctx.directory, '.claude/skills/ticket-review/references/follow-ups.md'))}}}]}}`,
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"# Follow-ups"}]}}',
+      '{"type":"system","subtype":"compact_boundary","content":"Conversation compacted"}',
+    ].join('\n'),
+  );
+
+  const result = spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'mcp__linear-server__save_issue',
+      cwd: ctx.directory,
+      transcript_path: join(ctx.directory, 'transcript.jsonl'),
+      tool_input: { title: 'Rotate the staging keys' },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason:
+        'Before calling mcp__linear-server__save_issue, read .claude/skills/ticket-review/references/follow-ups.md again with the Read tool, then retry the call. This session was compacted, and a skill or reference loaded before the compaction no longer counts. .claude/skill-gate.json lists the skills and references each tool needs.',
+    },
+  });
+});
+
+test('it stays silent on a tool call that no tool gate names', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, '.claude'), { recursive: true });
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({
+      gates: [],
+      tools: [{ tool: 'mcp__linear-server__save_issue', skills: ['ticket-review'] }],
+    }),
+  );
+
+  const result = spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'mcp__linear-server__get_issue',
+      cwd: ctx.directory,
+      transcript_path: join(ctx.directory, 'transcript.jsonl'),
+      tool_input: { id: 'ENG-12' },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});
+
+test('it warns on an edit and denies nothing when the rules file holds a key it does not know', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, '.claude'), { recursive: true });
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [], commands: [{ command: 'git push', skills: ['ci-design'] }] }),
+  );
+
+  const result = spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Edit',
+      cwd: ctx.directory,
+      transcript_path: join(ctx.directory, 'transcript.jsonl'),
+      tool_input: { file_path: join(ctx.directory, 'src/a.ts') },
+    }),
+  });
+
+  const warning =
+    'skill-gate: .claude/skill-gate.json holds the key `commands`, which this version of @zgeoff/skill-gate does not know. The gate skips the key and keeps the rest of the rules; update the package or remove the key.';
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    systemMessage: warning,
+    hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: warning },
+  });
+});
+
+test('it warns on a gated tool call and denies nothing for a key it does not know inside the gate', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, '.claude/skills/ticket-review'), { recursive: true });
+  await writeFile(join(ctx.directory, '.claude/skills/ticket-review/SKILL.md'), '# Review\n');
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({
+      gates: [],
+      tools: [
+        { tool: 'mcp__linear-server__save_issue', skills: ['ticket-review'], when: 'always' },
+      ],
+    }),
+  );
+
+  await writeFile(
+    join(ctx.directory, 'transcript.jsonl'),
+    [
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"ticket-review"}}]}}',
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Launching skill: ticket-review"}]}}',
+    ].join('\n'),
+  );
+
+  const result = spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'mcp__linear-server__save_issue',
+      cwd: ctx.directory,
+      transcript_path: join(ctx.directory, 'transcript.jsonl'),
+      tool_input: { title: 'Rotate the staging keys' },
+    }),
+  });
+
+  const warning =
+    'skill-gate: .claude/skill-gate.json holds the key `tools[0].when`, which this version of @zgeoff/skill-gate does not know. The gate skips the key and keeps the rest of the rules; update the package or remove the key.';
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    systemMessage: warning,
+    hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: warning },
+  });
+});
+
+test('it warns and allows a gated tool call when its references value is a string', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, '.claude'), { recursive: true });
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({
+      gates: [],
+      tools: [
+        {
+          tool: 'mcp__linear-server__save_issue',
+          references: 'ticket-review/references/follow-ups.md',
+        },
+      ],
+    }),
+  );
+
+  const result = spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'mcp__linear-server__save_issue',
+      cwd: ctx.directory,
+      transcript_path: join(ctx.directory, 'transcript.jsonl'),
+      tool_input: { title: 'Rotate the staging keys' },
+    }),
+  });
+
+  const warning =
+    'skill-gate: .claude/skill-gate.json tool gate "mcp__linear-server__save_issue" needs `skills` and `references` arrays of non-empty strings.';
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    systemMessage: warning,
+    hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: warning },
+  });
+});

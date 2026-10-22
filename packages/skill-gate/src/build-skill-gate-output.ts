@@ -1,4 +1,5 @@
 import { formatSkillList } from './format-skill-list.ts';
+import { formatUnknownKeyWarning } from './format-unknown-key-warning.ts';
 import type { SkillGateHookOutput, SkillGateOutputContext, SkillGatePlan } from './types.ts';
 
 const RULES_PATH = '.claude/skill-gate.json';
@@ -7,9 +8,8 @@ const RULES_PATH = '.claude/skill-gate.json';
 const EDIT_TOOLS_NOTE =
   'Change a gated path only with Edit, Write or MultiEdit, never through Bash.';
 
-// Builds the PreToolUse hook output for one edit, or null when the edit goes ahead in silence. A
-// missing skill denies the edit. A broken rules file or a rule that names a skill the repo does
-// not have never denies: it warns the user and the agent, and the edit goes ahead.
+// A broken rules file, a rule that names a skill the repo does not have, or a key the rules parser
+// does not know never denies: it warns the user and the agent, and the edit goes ahead.
 export function buildSkillGateOutput(
   filePath: string,
   plan: SkillGatePlan,
@@ -19,6 +19,7 @@ export function buildSkillGateOutput(
     ...(context.rulesError === undefined
       ? []
       : [`skill-gate: ${RULES_PATH} ${context.rulesError}.`]),
+    ...(context.unknownKeys ?? []).map((key) => formatUnknownKeyWarning(key)),
     ...plan.unknown.map(
       (entry) =>
         `skill-gate: the rule "${entry.match}" in ${RULES_PATH} names the skill "${entry.skill}", but .claude/skills/${entry.skill}/SKILL.md does not exist. Fix the rule or add the skill; until then the gate skips that skill.`,

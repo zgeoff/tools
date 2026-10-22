@@ -11,8 +11,21 @@ export interface SkillGateRules {
   readonly gates: readonly SkillGate[];
 }
 
+// A gate on a tool call: `references` are files under .claude/skills/ that the session reads.
+export interface ToolGate {
+  readonly tool: string;
+  readonly skills: readonly string[];
+  readonly references: readonly string[];
+}
+
+// `unknownKeys` names each key the parser skips, such as `commands` or `tools[0].timeout`.
 export type SkillGateRulesResult =
-  | { readonly ok: true; readonly rules: SkillGateRules }
+  | {
+      readonly ok: true;
+      readonly rules: SkillGateRules;
+      readonly tools: readonly ToolGate[];
+      readonly unknownKeys: readonly string[];
+    }
   | { readonly ok: false; readonly error: string };
 
 export interface UnknownSkill {
@@ -20,8 +33,10 @@ export interface UnknownSkill {
   readonly skill: string;
 }
 
-export interface LoadedSkills {
+// `readPaths` holds each file path a successful Read call named.
+export interface SessionLoads {
   readonly skills: readonly string[];
+  readonly readPaths: readonly string[];
   readonly compacted: boolean;
 }
 
@@ -86,6 +101,28 @@ export interface WrittenPath {
 export interface SkillGateOutputContext {
   readonly compacted?: boolean;
   readonly rulesError?: string;
+  readonly unknownKeys?: readonly string[];
+}
+
+export interface ToolGateInput {
+  readonly tools: readonly ToolGate[];
+  readonly toolName: string;
+  readonly skillsDir: string;
+  readonly loads: SessionLoads;
+  readonly availableSkills: readonly string[];
+  readonly availableReferences: readonly string[];
+}
+
+export interface UnknownToolRequirement {
+  readonly tool: string;
+  readonly kind: 'skill' | 'reference';
+  readonly name: string;
+}
+
+export interface ToolGatePlan {
+  readonly missingSkills: readonly string[];
+  readonly missingReferences: readonly string[];
+  readonly unknown: readonly UnknownToolRequirement[];
 }
 
 export interface SkillGateHookOutput {
