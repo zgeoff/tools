@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
@@ -340,8 +340,27 @@ test('it prints the skip as a GitHub notice and exits 0 when run as a script in 
   });
 });
 
-test('it exits 2 when commitlint cannot load its config when run as a script', async () => {
+test('it exits 2 with the error of commitlint when commitlint refuses a config with no rules', async () => {
   const ctx = await setupTest();
+
+  // The repo's own install: the real commitlint, and a @zgeoff/commitlint-config with no rules.
+  await rm(join(ctx.directory, 'node_modules'));
+  await mkdir(join(ctx.directory, 'node_modules/.bin'), { recursive: true });
+  await mkdir(join(ctx.directory, 'node_modules/@zgeoff/commitlint-config'), { recursive: true });
+
+  const commitlint = await realpath(join(import.meta.dir, '../../node_modules/.bin/commitlint'));
+
+  await symlink(commitlint, join(ctx.directory, 'node_modules/.bin/commitlint'));
+
+  await writeFile(
+    join(ctx.directory, 'node_modules/@zgeoff/commitlint-config/package.json'),
+    JSON.stringify({ name: '@zgeoff/commitlint-config', type: 'module', exports: './index.js' }),
+  );
+
+  await writeFile(
+    join(ctx.directory, 'node_modules/@zgeoff/commitlint-config/index.js'),
+    'export default {};\n',
+  );
 
   await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
     .cwd(ctx.directory)
@@ -353,21 +372,15 @@ test('it exits 2 when commitlint cannot load its config when run as a script', a
     .cwd(ctx.directory)
     .env(ctx.env);
 
-  // A node that exits at once stands in for a commitlint that cannot start.
-  await mkdir(join(ctx.directory, 'bin'));
-
-  await writeFile(join(ctx.directory, 'bin/node'), '#!/bin/sh\necho broken >&2\nexit 3\n', {
-    mode: 0o755,
-  });
-
   const result = await $`${process.execPath} ${join(import.meta.dir, 'run-commits-check.ts')}`
     .cwd(ctx.directory)
-    .env({ ...ctx.env, PATH: `${join(ctx.directory, 'bin')}:${ctx.env.PATH}` })
+    .env(ctx.env)
     .nothrow()
     .quiet();
 
-  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
-    exitCode: 2,
-    stderr: 'commits: commitlint failed: broken\n',
-  });
+  const stderr = result.stderr.toString();
+
+  expect(result.exitCode).toBe(2);
+  expect(stderr).toStartWith('commits: commitlint failed: ');
+  expect(stderr).toInclude('Please add rules');
 });
