@@ -1,17 +1,25 @@
 import { isRecord } from '@zgeoff/std';
-import type { LoadedSkills } from './types.ts';
+import type { SessionLoads } from './types.ts';
 
-// Collects the skills a transcript loaded since its last compaction, which voids earlier loads even
-// though Claude Code re-attaches their text. A skill loads through a Skill tool call that succeeded,
-// or a slash command the user types; a subagent's transcript has no user to type one.
-export function collectLoadedSkills(transcript: string): LoadedSkills {
+// A compaction voids earlier loads and reads even though Claude Code re-attaches their text. A
+// skill loads through a Skill tool call that succeeded, or a slash command the user types; a
+// subagent's transcript has no user to type one.
+export function collectSessionLoads(transcript: string): SessionLoads {
   const entries = transcript.split('\n').map((line) => parseEntry(line));
   const lastBoundary = entries.findLastIndex((entry) => isCompactBoundary(entry));
   const current = entries.slice(lastBoundary + 1);
   const succeeded = collectSucceededToolUseIDs(current);
   const skills = current.flatMap((entry) => collectEntrySkills(entry, succeeded));
 
-  return { skills: [...new Set(skills)], compacted: lastBoundary !== -1 };
+  const readPaths = current
+    .flatMap((entry) => collectContentBlocks(entry, 'assistant'))
+    .flatMap((block) => collectReadCall(block, succeeded));
+
+  return {
+    skills: [...new Set(skills)],
+    readPaths: [...new Set(readPaths)],
+    compacted: lastBoundary !== -1,
+  };
 }
 
 function parseEntry(line: string): unknown {
@@ -94,5 +102,23 @@ function collectSkillCall(
 
   return typeof skill === 'string' && typeof id === 'string' && succeeded.includes(id)
     ? [skill]
+    : [];
+}
+
+function collectReadCall(
+  block: Readonly<Record<string, unknown>>,
+  succeeded: readonly string[],
+): readonly string[] {
+  const input = block['input'];
+  const id = block['id'];
+
+  if (block['type'] !== 'tool_use' || block['name'] !== 'Read' || !isRecord(input)) {
+    return [];
+  }
+
+  const filePath = input['file_path'];
+
+  return typeof filePath === 'string' && typeof id === 'string' && succeeded.includes(id)
+    ? [filePath]
     : [];
 }

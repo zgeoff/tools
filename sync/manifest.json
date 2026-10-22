@@ -201,7 +201,7 @@
   },
   {
     "name": "hook-skill-gate",
-    "description": "The skill-gate hook's entry point, which runs the gate from the @zgeoff/skill-gate package; the repo installs the package, keeps its rules in .claude/skill-gate.json, and registers the hook in .claude/settings.json",
+    "description": "The skill-gate hook's entry point, which runs the gate from the @zgeoff/skill-gate package; the repo installs the package, keeps its path and tool gates in .claude/skill-gate.json, and registers the hook in .claude/settings.json with a PreToolUse matcher that names each gated tool",
     "optIn": true,
     "files": [
       {

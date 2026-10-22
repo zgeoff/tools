@@ -305,3 +305,102 @@ test('it lets an edit run with the load error on stderr when the gate cannot loa
     "The skill gate cannot load: Cannot find package '@zgeoff/skill-gate'",
   );
 });
+
+test('it blocks a gated tool call and names the load failure when the repo lacks @zgeoff/skill-gate', async () => {
+  const ctx = await setupTest();
+
+  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
+
+  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await copyFile(ctx.hookPath, copiedHookPath);
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({
+      gates: [],
+      tools: [{ tool: 'mcp__tracker__update_ticket', skills: ['ticket-review'] }],
+    }),
+  );
+
+  const result = spawnSync('bun', [copiedHookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'mcp__tracker__update_ticket',
+      cwd: ctx.directory,
+      transcript_path: join(ctx.directory, 'transcript.jsonl'),
+      tool_input: { title: 'Rotate the staging keys' },
+    }),
+  });
+
+  expect(result.status).toBe(2);
+
+  expect(result.stderr).toContain(
+    "The skill gate cannot load, so it blocks this call to mcp__tracker__update_ticket: Cannot find package '@zgeoff/skill-gate'",
+  );
+});
+
+test('it lets a tool call that no tool gate names run when the gate cannot load', async () => {
+  const ctx = await setupTest();
+
+  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
+
+  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await copyFile(ctx.hookPath, copiedHookPath);
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({
+      gates: [],
+      tools: [{ tool: 'mcp__tracker__update_ticket', skills: ['ticket-review'] }],
+    }),
+  );
+
+  const result = spawnSync('bun', [copiedHookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'mcp__tracker__read_ticket',
+      cwd: ctx.directory,
+      transcript_path: join(ctx.directory, 'transcript.jsonl'),
+      tool_input: { id: 'ENG-12' },
+    }),
+  });
+
+  expect(result.status).toBe(1);
+
+  expect(result.stderr).toContain(
+    "The skill gate cannot load: Cannot find package '@zgeoff/skill-gate'",
+  );
+});
+
+test('it blocks a tool call when the gate cannot load and the tools list does not parse', async () => {
+  const ctx = await setupTest();
+
+  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
+
+  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await copyFile(ctx.hookPath, copiedHookPath);
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [], tools: [{ skills: ['ticket-review'] }] }),
+  );
+
+  const result = spawnSync('bun', [copiedHookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'mcp__tracker__read_ticket',
+      cwd: ctx.directory,
+      transcript_path: join(ctx.directory, 'transcript.jsonl'),
+      tool_input: { id: 'ENG-12' },
+    }),
+  });
+
+  expect(result.status).toBe(2);
+  expect(result.stderr).toContain("Cannot find package '@zgeoff/skill-gate'");
+});

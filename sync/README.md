@@ -77,7 +77,8 @@ manifests from this repo's history, so the workflow checks out the full history.
 Files under [`hooks/`](./hooks/) are Claude Code hooks, delivered as opt-in entries to
 `.claude/hooks/<name>/`. Their tests stay here. `hook-skill-gate` delivers the skill gate's entry
 point, a file that runs the gate from [`@zgeoff/skill-gate`](../packages/skill-gate/README.md). The
-gate denies an edit until the session has loaded every skill the path needs, and the package README
+gate denies an edit until the session has loaded every skill the path needs, and a call to a gated
+tool until the session has loaded its skills and read its reference files. The package README
 describes what it allows, blocks and warns on. The repo takes a gate fix by bumping the package, and
 the entry point changes only when the package's API does. A repo opts in with four changes, which
 repo-sync never touches:
@@ -89,7 +90,8 @@ repo-sync never touches:
    [Rules](../packages/skill-gate/README.md#rules) section shows. A repo without this file has no
    gate.
 4. Register the hook in `.claude/settings.json`, as the package README's
-   [Entry point](../packages/skill-gate/README.md#entry-point) section shows.
+   [Entry point](../packages/skill-gate/README.md#entry-point) section shows. The `PreToolUse`
+   matcher names each tool that a tool gate names.
 
 Files under [`pre-push/`](./pre-push/) are the pre-push baseline, delivered by the opt-in
 `pre-push-baseline` entry. The baseline runs its jobs one at a time, so a push fits a 2 GiB host or
