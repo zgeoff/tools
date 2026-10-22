@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
@@ -517,6 +517,116 @@ test('it passes the docs job with a notice when the repo has no docs-writing scr
   expect(output).toInclude(
     'docs: skipped, because the repo has no .claude/skills/docs-writing/scripts/check-length.sh; take the skill-docs-writing entry of repo-sync to run it',
   );
+});
+
+test('it fails the push on the docs job when the installed length script rejects a README', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+
+  await cp(
+    join(import.meta.dir, '../skills/docs-writing/scripts'),
+    join(ctx.worktree, '.claude/skills/docs-writing/scripts'),
+    { recursive: true },
+  );
+
+  // The repo has a package.json, so its README holds 130 lines at most; this one has 131, in short
+  // paragraphs with no link.
+  const paragraphs = Array.from(
+    { length: 65 },
+    (_, index) => `Step ${index + 1} greets the visitor.`,
+  );
+
+  await writeFile(
+    join(ctx.worktree, 'README.md'),
+    `${['# Greeter', ...paragraphs].join('\n\n')}\n`,
+  );
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'echo README.md',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  const failedJobs = [...output.matchAll(/^🥊\s+(?<job>\S+)/gmu)].map(
+    (failure) => failure.groups?.['job'],
+  );
+
+  expect(failedJobs).toStrictEqual(['docs']);
+  expect(output).toInclude('README.md: 131 lines, over the package README limit of 130');
+});
+
+test('it fails the push on the docs job when the installed link script finds a broken link', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+
+  await cp(
+    join(import.meta.dir, '../skills/docs-writing/scripts'),
+    join(ctx.worktree, '.claude/skills/docs-writing/scripts'),
+    { recursive: true },
+  );
+
+  await writeFile(join(ctx.worktree, 'README.md'), '# Greeter\n\nRead the [guide](./guide.md).\n');
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'echo README.md',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  const failedJobs = [...output.matchAll(/^🥊\s+(?<job>\S+)/gmu)].map(
+    (failure) => failure.groups?.['job'],
+  );
+
+  expect(failedJobs).toStrictEqual(['docs']);
+  expect(output).toInclude('guide.md');
 });
 
 test('it fails the push when a commit of the branch fails commitlint', async () => {
