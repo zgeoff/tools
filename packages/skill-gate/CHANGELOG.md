@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.4](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.3...@zgeoff/skill-gate@0.2.4) (2026-10-22)
+
+### Features
+
+- **skill-gate:** block a shell change to a gated file by its result
+  ([#287](https://github.com/zgeoff/tools/issues/287))
+  ([a58f381](https://github.com/zgeoff/tools/commit/a58f381d45f9683d731f0934277ee0ef5441cf41))
+
 ## [0.2.3](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.2...@zgeoff/skill-gate@0.2.3) (2026-10-20)
 
 ### Bug Fixes
