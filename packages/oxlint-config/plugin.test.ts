@@ -459,6 +459,60 @@ test('it flags a browser suite with no module beside it', async () => {
   expect(result.stdout).toInclude('view.<ext>');
 });
 
+test('it accepts a suite in a configured lane beside its module', async () => {
+  const result = await runLintTree(
+    {
+      'session.ts': '',
+      'session.sdk.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
+    'session.sdk.test.ts',
+    { 'zgeoff/test-beside-module': ['error', { lanes: ['sdk'] }] },
+  );
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it flags a suite in a configured lane with no module beside it', async () => {
+  const result = await runLintTree(
+    {
+      'session.sdk.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+      'other.ts': '',
+    },
+    'session.sdk.test.ts',
+    { 'zgeoff/test-beside-module': ['error', { lanes: ['sdk'] }] },
+  );
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('session.<ext>');
+});
+
+test('it treats a lane suffix as part of the name until the lane is configured', async () => {
+  const result = await runLintTree(
+    {
+      'session.ts': '',
+      'session.sdk.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
+    'session.sdk.test.ts',
+    { 'zgeoff/test-beside-module': 'error' },
+  );
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('session.sdk.<ext>');
+});
+
+test('it keeps the browser lane when more lanes are configured', async () => {
+  const result = await runLintTree(
+    {
+      'view.tsx': '',
+      'view.browser.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
+    'view.browser.test.ts',
+    { 'zgeoff/test-beside-module': ['error', { lanes: ['sdk'] }] },
+  );
+
+  expect(result.exitCode).toBe(0);
+});
+
 test('it flags a test-kind suffix test beside only the base module', async () => {
   const result = await runLintTree(
     {

@@ -173,8 +173,17 @@ first statement, so put the comment above it:
 // oxlint-disable zgeoff/test-beside-module -- tests base.json and react.json together
 ```
 
-A second test file for a module (`<name>.host.test.ts`) needs its own `<name>.host.<ext>`, so the
-rule reports it beside only `<name>.ts`.
+A lane suite, such as `<name>.browser.test.ts`, tests the same module as `<name>.test.ts` and needs
+only `<name>.<ext>`; the suffix lets the repo's test script run the suite in its own lane. The rule
+treats `browser` as a lane with no configuration. A repo adds its own lanes with the `lanes` option,
+and `browser` stays a lane beside them:
+
+```json
+{ "rules": { "zgeoff/test-beside-module": ["error", { "lanes": ["sdk"] }] } }
+```
+
+Any other suffix is part of the name. A second test file for a module (`<name>.host.test.ts`) needs
+its own `<name>.host.<ext>`, so the rule reports it beside only `<name>.ts`.
 
 ## `zgeoff/setup-test-only`
 
@@ -334,7 +343,7 @@ that refuses an import of `to` from `from`, both paths relative to the repo root
 resolution, so `to` is the path that the rule would resolve the specifier to. The rule judges each
 edge through the same function.
 
-## Notes
+## Plugins and type-aware rules
 
 - The config enables the `typescript`, `unicorn`, `oxc`, `import`, and `promise` plugins and loads
   `@stylistic/eslint-plugin` through `jsPlugins`. oxlint resolves `jsPlugins` specifiers from the
