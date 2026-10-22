@@ -168,7 +168,7 @@
     },
     "packages/skill-gate": {
       "name": "@zgeoff/skill-gate",
-      "version": "0.2.5",
+      "version": "0.2.6",
       "devDependencies": {
         "@types/bun": "catalog:",
         "@types/picomatch": "catalog:",
