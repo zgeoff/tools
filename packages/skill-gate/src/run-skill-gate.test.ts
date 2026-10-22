@@ -207,6 +207,117 @@ test('it denies a subagent edit when only the main session loaded the skills', a
   });
 });
 
+test('it allows a workflow subagent edit once the subagent loads both testing skills', async () => {
+  const ctx = await setupTest();
+
+  await Promise.all([
+    mkdir(join(ctx.directory, '.claude/skills/testing'), { recursive: true }),
+    mkdir(join(ctx.directory, '.claude/skills/project-testing'), { recursive: true }),
+    mkdir(join(ctx.directory, 'transcripts/session-1/subagents/workflows/wf_5c7e21d0-9ab'), {
+      recursive: true,
+    }),
+  ]);
+
+  await writeFile(join(ctx.directory, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(ctx.directory, '.claude/skills/project-testing/SKILL.md'),
+    '# Project testing\n',
+  );
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing', 'project-testing'] }] }),
+  );
+
+  await writeFile(
+    join(
+      ctx.directory,
+      'transcripts/session-1/subagents/workflows/wf_5c7e21d0-9ab/agent-a4d2e9f1.jsonl',
+    ),
+    [
+      '{"type":"assistant","isSidechain":true,"message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"testing"}}]}}',
+      '{"type":"user","isSidechain":true,"message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Launching skill: testing"}]}}',
+      '{"type":"assistant","isSidechain":true,"message":{"content":[{"type":"tool_use","id":"toolu_2","name":"Skill","input":{"skill":"project-testing"}}]}}',
+      '{"type":"user","isSidechain":true,"message":{"content":[{"type":"tool_result","tool_use_id":"toolu_2","content":"Launching skill: project-testing"}]}}',
+    ].join('\n'),
+  );
+
+  const result = spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      cwd: ctx.directory,
+      session_id: 'session-1',
+      transcript_path: join(ctx.directory, 'transcripts/session-1.jsonl'),
+      agent_id: 'a4d2e9f1',
+      agent_type: 'general-purpose',
+      tool_input: { file_path: join(ctx.directory, 'src/a.test.ts') },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});
+
+test('it denies a workflow subagent edit when the subagent loads one of the testing skills', async () => {
+  const ctx = await setupTest();
+
+  await Promise.all([
+    mkdir(join(ctx.directory, '.claude/skills/testing'), { recursive: true }),
+    mkdir(join(ctx.directory, '.claude/skills/project-testing'), { recursive: true }),
+    mkdir(join(ctx.directory, 'transcripts/session-1/subagents/workflows/wf_5c7e21d0-9ab'), {
+      recursive: true,
+    }),
+  ]);
+
+  await writeFile(join(ctx.directory, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(ctx.directory, '.claude/skills/project-testing/SKILL.md'),
+    '# Project testing\n',
+  );
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing', 'project-testing'] }] }),
+  );
+
+  await writeFile(
+    join(
+      ctx.directory,
+      'transcripts/session-1/subagents/workflows/wf_5c7e21d0-9ab/agent-a4d2e9f1.jsonl',
+    ),
+    [
+      '{"type":"assistant","isSidechain":true,"message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"testing"}}]}}',
+      '{"type":"user","isSidechain":true,"message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Launching skill: testing"}]}}',
+    ].join('\n'),
+  );
+
+  const result = spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      cwd: ctx.directory,
+      session_id: 'session-1',
+      transcript_path: join(ctx.directory, 'transcripts/session-1.jsonl'),
+      agent_id: 'a4d2e9f1',
+      agent_type: 'general-purpose',
+      tool_input: { file_path: join(ctx.directory, 'src/a.test.ts') },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: `Load the \`project-testing\` skill with the Skill tool before editing ${join(ctx.directory, 'src/a.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
+    },
+  });
+});
+
 test('it denies a subagent edit when the subagent has no transcript', async () => {
   const ctx = await setupTest();
 

@@ -129,12 +129,13 @@ reference that the repo lacks, and warns on each gated call until the rule is fi
 The gate counts the loads of the session that makes the edit or the tool call. A skill loads through
 a Skill tool call or a slash command. A reference counts once a Read tool call of its file succeeds;
 a Bash `cat` of the file does not count. A subagent's tool call carries `agent_id` beside the main
-session's `transcript_path`, and the gate reads that subagent's own transcript,
-`<session>/subagents/agent-<agent_id>.jsonl` beside the main one. A subagent therefore loads the
-skills itself, and the main session's loads never count for it. A compaction writes a
-`compact_boundary` entry, and the loads and reads before it no longer count: after a compaction, the
-gate denies a gated edit or tool call until the session loads the skills and reads the references
-again, and its denial says so.
+session's `transcript_path`, and the gate reads that subagent's own transcript beside the main one:
+`<session>/subagents/agent-<agent_id>.jsonl`, or
+`<session>/subagents/workflows/<workflow_id>/agent-<agent_id>.jsonl` for a subagent that a workflow
+started. A subagent therefore loads the skills itself, and the main session's loads never count for
+it. A compaction writes a `compact_boundary` entry, and the loads and reads before it no longer
+count: after a compaction, the gate denies a gated edit or tool call until the session loads the
+skills and reads the references again, and its denial says so.
 
 ## Bash commands
 

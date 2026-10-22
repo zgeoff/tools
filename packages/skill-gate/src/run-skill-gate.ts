@@ -103,7 +103,7 @@ export async function runSkillGate(): Promise<never> {
   }
 
   const availableSkills = await readAvailableSkills(path.join(projectDir, '.claude', 'skills'));
-  const transcript = await readTranscript(resolveSessionTranscriptPath(input));
+  const transcript = await readSessionTranscript(input);
 
   const loaded = collectSessionLoads(transcript);
 
@@ -209,7 +209,7 @@ async function checkToolCall(check: ToolCallCheck): Promise<void> {
 
   const skillsDir = path.join(check.projectDir, '.claude', 'skills');
 
-  const transcript = await readTranscript(resolveSessionTranscriptPath(check.hookInput));
+  const transcript = await readSessionTranscript(check.hookInput);
 
   const loads = collectSessionLoads(transcript);
 
@@ -242,11 +242,31 @@ function printOutput(output: object | null): void {
   }
 }
 
-async function readTranscript(transcriptPath: string | null): Promise<string> {
-  if (transcriptPath === null) {
+// A subagent's call carries the main session's transcript_path plus its own agent_id, and Claude
+// Code keeps its transcript in <session>/subagents/, under workflows/<workflow_id>/ when a workflow
+// started it. An agent_id that is not a plain name reads no transcript, so the edit is denied.
+async function readSessionTranscript(hookInput: HookInput): Promise<string> {
+  if (hookInput.agentID === undefined) {
+    return readTranscript(hookInput.transcriptPath);
+  }
+
+  if (typeof hookInput.agentID !== 'string' || !/^[\w-]+$/u.test(hookInput.agentID)) {
     return '';
   }
 
+  const subagentsDir = path.join(hookInput.transcriptPath.replace(/\.jsonl$/u, ''), 'subagents');
+  const transcriptName = `agent-${hookInput.agentID}.jsonl`;
+
+  const agentTranscript = await readTranscript(path.join(subagentsDir, transcriptName));
+
+  if (agentTranscript !== '') {
+    return agentTranscript;
+  }
+
+  return readWorkflowAgentTranscript(subagentsDir, transcriptName);
+}
+
+async function readTranscript(transcriptPath: string): Promise<string> {
   const transcriptFile = Bun.file(transcriptPath);
 
   const exists = await transcriptFile.exists();
@@ -254,21 +274,24 @@ async function readTranscript(transcriptPath: string | null): Promise<string> {
   return exists ? transcriptFile.text() : '';
 }
 
-// A subagent's call carries the main session's transcript_path plus its own agent_id, and Claude
-// Code keeps its transcript at <session>/subagents/agent-<agent_id>.jsonl. An agent_id that is not
-// a plain name resolves to no transcript, so the edit is denied.
-function resolveSessionTranscriptPath(edit: HookInput): string | null {
-  if (edit.agentID === undefined) {
-    return edit.transcriptPath;
+async function readWorkflowAgentTranscript(
+  subagentsDir: string,
+  transcriptName: string,
+): Promise<string> {
+  const scan = new Bun.Glob(`workflows/*/${transcriptName}`).scan({ cwd: subagentsDir });
+
+  let transcriptPath: string | null = null;
+
+  try {
+    for await (const scannedPath of scan) {
+      transcriptPath = scannedPath;
+      break;
+    }
+  } catch {
+    // Bun's glob scan throws ENOENT when its cwd is missing, as for a session with no subagents.
   }
 
-  if (typeof edit.agentID !== 'string' || !/^[\w-]+$/u.test(edit.agentID)) {
-    return null;
-  }
-
-  const sessionDir = edit.transcriptPath.replace(/\.jsonl$/u, '');
-
-  return path.join(sessionDir, 'subagents', `agent-${edit.agentID}.jsonl`);
+  return transcriptPath === null ? '' : readTranscript(path.join(subagentsDir, transcriptPath));
 }
 
 async function readAvailableSkills(skillsDir: string): Promise<readonly string[]> {
@@ -423,7 +446,7 @@ async function checkBashCommand(check: BashCheck, rules: SkillGateRules): Promis
   }
 
   const skills = await readAvailableSkills(path.join(check.projectDir, '.claude', 'skills'));
-  const sessionTranscript = await readTranscript(resolveSessionTranscriptPath(check.hookInput));
+  const sessionTranscript = await readSessionTranscript(check.hookInput);
 
   const sessionLoads = collectSessionLoads(sessionTranscript);
 
@@ -528,7 +551,7 @@ async function checkChangedPaths(
   changedPaths: readonly string[],
 ): Promise<void> {
   const skills = await readAvailableSkills(path.join(check.projectDir, '.claude', 'skills'));
-  const sessionTranscript = await readTranscript(resolveSessionTranscriptPath(check.hookInput));
+  const sessionTranscript = await readSessionTranscript(check.hookInput);
 
   const sessionLoads = collectSessionLoads(sessionTranscript);
 
