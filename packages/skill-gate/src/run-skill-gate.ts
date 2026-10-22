@@ -23,6 +23,7 @@ import { pickRecordStep } from './pick-record-step.ts';
 import { planBashSkillGate } from './plan-bash-skill-gate.ts';
 import { planSkillGate } from './plan-skill-gate.ts';
 import { planToolGate } from './plan-tool-gate.ts';
+import { readAvailableReferences } from './read-available-references.ts';
 import { readCommitHashes } from './read-commit-hashes.ts';
 import { readCommittedPaths } from './read-committed-paths.ts';
 import { readFileContent } from './read-file-content.ts';
@@ -36,7 +37,6 @@ import type {
   PostToolEvent,
   RecordedSnapshot,
   SkillGateRules,
-  ToolGate,
   WrittenPath,
 } from './types.ts';
 
@@ -219,7 +219,11 @@ async function checkToolCall(check: ToolCallCheck): Promise<void> {
     skillsDir,
     loads,
     availableSkills: await readAvailableSkills(skillsDir),
-    availableReferences: await readAvailableReferences(skillsDir, parsedRules.tools),
+    availableReferences: await readAvailableReferences(
+      readFileContent,
+      skillsDir,
+      parsedRules.tools,
+    ),
   });
 
   printOutput(
@@ -281,19 +285,6 @@ async function readAvailableSkills(skillsDir: string): Promise<readonly string[]
   }
 
   return skills;
-}
-
-async function readAvailableReferences(
-  skillsDir: string,
-  tools: readonly ToolGate[],
-): Promise<readonly string[]> {
-  const references = [...new Set(tools.flatMap((gate) => gate.references))];
-
-  const found = await Promise.all(
-    references.map((reference) => Bun.file(path.join(skillsDir, reference)).exists()),
-  );
-
-  return references.filter((_, index) => found[index] === true);
 }
 
 interface BashCheck {

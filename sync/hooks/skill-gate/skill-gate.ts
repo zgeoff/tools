@@ -37,7 +37,7 @@ async function reportLoadFailure(loadError: string): Promise<never> {
 
   const toolCall = parseToolCall(payload, process.env['CLAUDE_PROJECT_DIR']);
 
-  const isGatedTool = await probeGatedToolCall(toolCall);
+  const isGatedTool = await probeGatedToolCall(toolCall, readTextFile);
 
   if (toolCall !== null && isGatedTool) {
     console.error(
@@ -176,24 +176,33 @@ function parseToolCall(payload: unknown, projectDir: string | undefined): ToolCa
 // A rules file that cannot be read or parsed, or whose `tools` list does not parse, blocks every
 // call that reaches the hook other than an edit or a Bash command, since the hook matcher names only
 // gated tools beside those.
-async function probeGatedToolCall(toolCall: ToolCall | null): Promise<boolean> {
+async function probeGatedToolCall(toolCall: ToolCall | null, readText: ReadText): Promise<boolean> {
   if (toolCall === null || ['Edit', 'Write', 'MultiEdit', 'Bash'].includes(toolCall.toolName)) {
     return false;
   }
 
-  const rulesFile = Bun.file(path.join(toolCall.projectDir, '.claude', 'skill-gate.json'));
+  const rulesText = await readText(
+    path.join(toolCall.projectDir, '.claude', 'skill-gate.json'),
+  ).catch(() => null);
 
-  const hasRules = await rulesFile.exists();
-
-  if (!hasRules) {
+  if (rulesText === undefined) {
     return false;
   }
-
-  const rulesText = await rulesFile.text().catch(() => null);
 
   const tools = rulesText === null ? null : parseGatedTools(rulesText);
 
   return tools === null || tools.includes(toolCall.toolName);
+}
+
+// Reads a file's text, or undefined for a path that holds no file; a file it cannot read rejects.
+type ReadText = (filePath: string) => Promise<string | undefined>;
+
+async function readTextFile(filePath: string): Promise<string | undefined> {
+  const file = Bun.file(filePath);
+
+  const exists = await file.exists();
+
+  return exists ? file.text() : undefined;
 }
 
 function parseGatedTools(text: string): readonly string[] | null {
