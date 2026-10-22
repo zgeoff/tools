@@ -20,6 +20,7 @@ import { planBashSkillGate } from './plan-bash-skill-gate.ts';
 import { planSkillGate } from './plan-skill-gate.ts';
 import { readCommitHashes } from './read-commit-hashes.ts';
 import { readCommittedPaths } from './read-committed-paths.ts';
+import { readFileContent } from './read-file-content.ts';
 import { readFileHashes } from './read-file-hashes.ts';
 import { readWorkTree } from './read-work-tree.ts';
 import type {
@@ -231,6 +232,7 @@ async function readGatedSnapshot(
     }
 
     const hashes = await readFileHashes(
+      readFileContent,
       projectDir,
       collectGatedProjectPaths(projectDir, rules, workTree.dirtyPaths),
     );
@@ -476,7 +478,7 @@ async function readChangedPaths(
     collectGatedProjectPaths(check.projectDir, rules, [...workTree.dirtyPaths, ...committed]),
   );
 
-  const after = await readFileHashes(check.projectDir, candidates.hashedPaths);
+  const after = await readFileHashes(readFileContent, check.projectDir, candidates.hashedPaths);
   const atHead = await readCommitHashes(result.git, before.head, candidates.cleanBefore);
 
   return collectChangedPaths(before.hashes, atHead, after);

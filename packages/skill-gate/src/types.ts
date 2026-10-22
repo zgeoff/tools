@@ -139,3 +139,6 @@ export interface BashCandidates {
   readonly hashedPaths: readonly string[];
   readonly cleanBefore: readonly string[];
 }
+
+// Reads a file's content, or null for a path that holds no file.
+export type ReadFileContent = (filePath: string) => Promise<Uint8Array | null>;

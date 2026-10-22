@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 import { simpleGit } from 'simple-git';
 import { readCommitHashes } from './read-commit-hashes.ts';
+import { readFileContent } from './read-file-content.ts';
 import { readFileHashes } from './read-file-hashes.ts';
 
 async function setupTest() {
@@ -36,7 +37,7 @@ test('it hashes a committed path as its unchanged file and gives a path the comm
 
   const project = join(repo, 'pkg');
 
-  const fileHashes = await readFileHashes(project, ['src/a.test.ts']);
+  const fileHashes = await readFileHashes(readFileContent, project, ['src/a.test.ts']);
 
   const commitHashes = await readCommitHashes(simpleGit(project), 'HEAD', [
     'src/a.test.ts',
