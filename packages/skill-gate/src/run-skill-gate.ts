@@ -12,9 +12,16 @@ import { collectWrittenPaths } from './collect-written-paths.ts';
 import { parseSkillGateRules } from './parse-skill-gate-rules.ts';
 import { planBashSkillGate } from './plan-bash-skill-gate.ts';
 import { planSkillGate } from './plan-skill-gate.ts';
-import { readDirtyPaths } from './read-dirty-paths.ts';
+import { readCommittedPaths } from './read-committed-paths.ts';
 import { readFileHashes } from './read-file-hashes.ts';
-import type { FileHashes, HookEvent, PostToolEvent, SkillGateRules, WrittenPath } from './types.ts';
+import { readWorkTree } from './read-work-tree.ts';
+import type {
+  BashSnapshot,
+  HookEvent,
+  PostToolEvent,
+  SkillGateRules,
+  WrittenPath,
+} from './types.ts';
 
 // The hook for Edit, Write, MultiEdit and Bash, which exits once it prints its output. The repo's
 // own .claude/skill-gate.json holds the rules; a repo without that file has no gate. A subagent's
@@ -178,41 +185,41 @@ function resolveSnapshotPath(hookInput: HookInput): string | null {
   return path.join(sessionDir, 'skill-gate', `${hookInput.toolUseID}.json`);
 }
 
-// Records the content of each gated file that is dirty before the command runs. A file outside a
-// git work tree, or a record the hook cannot write, leaves the command unchecked.
+// Records HEAD and the content of each gated file that is dirty before the command runs. A project
+// outside a git work tree, or a record the hook cannot write, leaves the command unchecked.
 async function writeGatedSnapshot(
   snapshotPath: string,
   projectDir: string,
   rules: SkillGateRules,
 ): Promise<void> {
-  const dirty = await readGatedDirtyPaths(projectDir, rules);
+  const workTree = await readWorkTree(projectDir);
 
-  if (dirty === null) {
+  if (workTree === null) {
     return;
   }
 
-  const hashes = await readFileHashes(projectDir, dirty);
+  const hashes = await readFileHashes(
+    projectDir,
+    collectGatedProjectPaths(projectDir, rules, workTree.dirtyPaths),
+  );
+
+  const snapshot: BashSnapshot = { head: workTree.head, hashes };
 
   try {
     await mkdir(path.dirname(snapshotPath), { recursive: true });
 
-    await Bun.write(snapshotPath, JSON.stringify(hashes));
+    await Bun.write(snapshotPath, JSON.stringify(snapshot));
   } catch {
     await rm(snapshotPath, { force: true });
   }
 }
 
-async function readGatedDirtyPaths(
+function collectGatedProjectPaths(
   projectDir: string,
   rules: SkillGateRules,
-): Promise<readonly string[] | null> {
-  const dirty = await readDirtyPaths(projectDir);
-
-  if (dirty === null) {
-    return null;
-  }
-
-  return [...new Set(dirty.map((entry) => toProjectPath(projectDir, entry)))].filter(
+  absolutePaths: readonly string[],
+): readonly string[] {
+  return [...new Set(absolutePaths.map((entry) => toProjectPath(projectDir, entry)))].filter(
     (relativePath) =>
       !isOutsideProject(relativePath) && collectGateSkills(rules, relativePath).length > 0,
   );
@@ -333,7 +340,8 @@ interface BashResult {
 }
 
 // A call with no record, such as one that began before the hook was installed, goes unchecked:
-// every file dirty before it would otherwise count as its change.
+// every file dirty before it would otherwise count as its change. A gated path that a new commit
+// holds counts too, unless it was dirty before with the content it has now.
 async function checkBashResult(
   check: BashCheck,
   rules: SkillGateRules,
@@ -343,17 +351,27 @@ async function checkBashResult(
 
   await rm(result.snapshotPath, { force: true });
 
-  const dirty = before === null ? null : await readGatedDirtyPaths(check.projectDir, rules);
+  const workTree = before === null ? null : await readWorkTree(check.projectDir);
 
-  if (before === null || dirty === null) {
+  if (before === null || workTree === null) {
     return;
   }
 
-  const after = await readFileHashes(check.projectDir, [
-    ...new Set([...Object.keys(before), ...dirty]),
+  const committed =
+    workTree.head === null || before.head === workTree.head
+      ? []
+      : await readCommittedPaths(check.projectDir, before.head, workTree.head);
+
+  const candidates = collectGatedProjectPaths(check.projectDir, rules, [
+    ...workTree.dirtyPaths,
+    ...committed,
   ]);
 
-  const changed = collectChangedPaths(before, after);
+  const after = await readFileHashes(check.projectDir, [
+    ...new Set([...Object.keys(before.hashes), ...candidates]),
+  ]);
+
+  const changed = collectChangedPaths(before.hashes, after);
 
   if (changed.length === 0) {
     return;
@@ -381,20 +399,26 @@ async function checkBashResult(
   );
 }
 
-async function readSnapshot(snapshotPath: string): Promise<FileHashes | null> {
+async function readSnapshot(snapshotPath: string): Promise<BashSnapshot | null> {
   const text = await Bun.file(snapshotPath)
     .text()
     .catch(() => null);
 
   const value: unknown = text === null ? null : parseJSON(text);
 
-  if (!isRecord(value)) {
+  if (!isRecord(value) || !isRecord(value['hashes'])) {
+    return null;
+  }
+
+  const head = value['head'];
+
+  if (typeof head !== 'string' && head !== null) {
     return null;
   }
 
   const hashes: Record<string, string | null> = {};
 
-  for (const [relativePath, hash] of Object.entries(value)) {
+  for (const [relativePath, hash] of Object.entries(value['hashes'])) {
     if (typeof hash !== 'string' && hash !== null) {
       return null;
     }
@@ -402,7 +426,7 @@ async function readSnapshot(snapshotPath: string): Promise<FileHashes | null> {
     hashes[relativePath] = hash;
   }
 
-  return hashes;
+  return { head, hashes };
 }
 
 function parseJSON(text: string): unknown {

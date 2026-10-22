@@ -110,3 +110,14 @@ export type BashChangeHookOutput =
         readonly additionalContext: string;
       };
     };
+
+export interface WorkTree {
+  readonly head: string | null;
+  readonly dirtyPaths: readonly string[];
+}
+
+// The gated files dirty before a Bash command, and the commit HEAD named then.
+export interface BashSnapshot {
+  readonly head: string | null;
+  readonly hashes: FileHashes;
+}

@@ -102,11 +102,13 @@ denies a gated edit until the session loads the skills again, and its denial say
 ## Bash commands
 
 The gate checks what a Bash command changed, not what the command says. Before the command, it
-records the content of each gated file that `git status` lists as changed, staged or untracked.
-After the command, it reads `git status` again. A gated file that the command created, changed,
-deleted or renamed counts as a change, and a file that was dirty before and kept its content does
-not. When the session that ran the command lacks a skill that a changed file needs, the hook blocks:
-the agent gets a reason that names the skills to load and asks it to review what the command
+records `HEAD` and the content of each gated file that `git status` lists as changed, staged or
+untracked. After the command, it reads `git status` again, plus the files that differ between the
+old and the new `HEAD`. A gated file that the command created, changed, deleted, renamed or
+committed counts as a change, and a file that was dirty before and kept its content does not. A
+command that moves `HEAD` another way, such as a pull or a checkout, counts each gated file it
+brought in. When the session that ran the command lacks a skill that a changed file needs, the hook
+blocks: the agent gets a reason that names the skills to load and asks it to review what the command
 changed. The same load check as an edit applies, with its compaction and subagent rules.
 
 Claude Code runs a `PostToolUse` hook after the command, so a block cannot undo the change. It stops
