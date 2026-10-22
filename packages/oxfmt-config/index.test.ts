@@ -14,6 +14,13 @@ async function setupTest() {
 
   return {
     oxfmt: join(import.meta.dir, '../../node_modules/.bin/oxfmt'),
+
+    // Node loads oxfmt.config.ts through WebAssembly, whose trap handler reserves more address space
+    // than a `ulimit -v` cap of a few GB allows, so oxfmt fails to load the config under that cap.
+    env: {
+      ...process.env,
+      NODE_OPTIONS: `${process.env['NODE_OPTIONS'] ?? ''} --disable-wasm-trap-handler`,
+    },
     directory,
     async [Symbol.asyncDispose]() {
       await rm(directory, { recursive: true, force: true });
@@ -40,11 +47,15 @@ test('it sorts test libraries ahead of builtins, packages and relative imports',
 
   const result = Bun.spawnSync([project.oxfmt, '-c', 'oxfmt.config.ts', 'sample.test.ts'], {
     cwd: project.directory,
+    env: project.env,
   });
 
   const formatted = await readFile(join(project.directory, 'sample.test.ts'), 'utf8');
 
-  expect(result.exitCode).toBe(0);
+  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
+    exitCode: 0,
+    stderr: '',
+  });
 
   expect(formatted).toBe(
     [
@@ -70,11 +81,15 @@ test('it writes single quotes, semicolons and trailing commas', async () => {
 
   const result = Bun.spawnSync([project.oxfmt, '-c', 'oxfmt.config.ts', 'sample.ts'], {
     cwd: project.directory,
+    env: project.env,
   });
 
   const formatted = await readFile(join(project.directory, 'sample.ts'), 'utf8');
 
-  expect(result.exitCode).toBe(0);
+  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
+    exitCode: 0,
+    stderr: '',
+  });
 
   expect(formatted).toBe(
     "export const names = ['alpha', 'beta-with-a-long-name-that-wraps', 'gamma-with-another-long-name'];\n",
@@ -98,9 +113,13 @@ test('it leaves the files repo-sync delivers unformatted', async () => {
 
   const result = Bun.spawnSync([project.oxfmt, '-c', 'oxfmt.config.ts', '.'], {
     cwd: project.directory,
+    env: project.env,
   });
 
-  expect(result.exitCode).toBe(0);
+  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
+    exitCode: 0,
+    stderr: '',
+  });
 
   const agents = await readFile(join(project.directory, 'AGENTS.md'), 'utf8');
   const shared = await readFile(join(project.directory, 'agents/shared.md'), 'utf8');
