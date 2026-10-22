@@ -147,6 +147,55 @@ test('it fails the push on the shell job alone when a shell file the branch chan
   expect(failedJobs).toStrictEqual(['shell']);
 });
 
+test('it fails the push on the shell job alone when a shell file the branch changes passes shellcheck and fails shfmt', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+
+  // shellcheck accepts this script, and shfmt would space it out.
+  await writeFile(
+    join(ctx.worktree, 'cramped.sh'),
+    '#!/usr/bin/env bash\nif true;then echo "a";fi\n',
+  );
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'echo cramped.sh',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  const failedJobs = [...output.matchAll(/^🥊\s+(?<job>\S+)/gmu)].map(
+    (failure) => failure.groups?.['job'],
+  );
+
+  expect(failedJobs).toStrictEqual(['shell']);
+  expect(output).toInclude('+++ cramped.sh');
+  expect(output).not.toInclude('SC');
+});
+
 test('it passes the push when only a file the branch leaves unchanged fails the shell check', async () => {
   const ctx = await setupTest();
 
