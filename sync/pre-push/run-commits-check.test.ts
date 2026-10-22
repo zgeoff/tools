@@ -36,7 +36,12 @@ async function setupTest() {
 
   await $`git init --quiet --initial-branch=main`.cwd(directory).env(env);
 
-  return { directory, env };
+  return {
+    directory,
+    env,
+    commitlint: join(directory, 'node_modules/.bin/commitlint'),
+    config: Bun.resolveSync('@zgeoff/commitlint-config', directory),
+  };
 }
 
 test('it passes a branch whose commits are all Conventional Commits', async () => {
@@ -56,13 +61,15 @@ test('it passes a branch whose commits are all Conventional Commits', async () =
     .cwd(ctx.directory)
     .env(ctx.env);
 
-  const check = runCommitsCheck({
+  const problems = runCommitsCheck({
     cwd: ctx.directory,
     base: baseText.trim(),
     env: ctx.env,
+    commitlint: ctx.commitlint,
+    config: ctx.config,
   });
 
-  expect(check).toStrictEqual({ kind: 'checked', problems: [] });
+  expect(problems).toStrictEqual([]);
 });
 
 test('it reports each problem of a commit that is not a Conventional Commit at its hash', async () => {
@@ -84,19 +91,18 @@ test('it reports each problem of a commit that is not a Conventional Commit at i
 
   const hash = hashText.trim();
 
-  const check = runCommitsCheck({
+  const problems = runCommitsCheck({
     cwd: ctx.directory,
     base: baseText.trim(),
     env: ctx.env,
+    commitlint: ctx.commitlint,
+    config: ctx.config,
   });
 
-  expect(check).toStrictEqual({
-    kind: 'checked',
-    problems: [
-      `commit ${hash}: subject may not be empty [subject-empty]`,
-      `commit ${hash}: type may not be empty [type-empty]`,
-    ],
-  });
+  expect(problems).toStrictEqual([
+    `commit ${hash}: subject may not be empty [subject-empty]`,
+    `commit ${hash}: type may not be empty [type-empty]`,
+  ]);
 });
 
 test('it reports a commit that is not a Conventional Commit when a later commit is', async () => {
@@ -116,19 +122,18 @@ test('it reports a commit that is not a Conventional Commit when a later commit 
     .cwd(ctx.directory)
     .env(ctx.env);
 
-  const check = runCommitsCheck({
+  const problems = runCommitsCheck({
     cwd: ctx.directory,
     base: baseText.trim(),
     env: ctx.env,
+    commitlint: ctx.commitlint,
+    config: ctx.config,
   });
 
-  expect(check).toStrictEqual({
-    kind: 'checked',
-    problems: [
-      `commit ${hashText.trim()}: subject may not be empty [subject-empty]`,
-      `commit ${hashText.trim()}: type may not be empty [type-empty]`,
-    ],
-  });
+  expect(problems).toStrictEqual([
+    `commit ${hashText.trim()}: subject may not be empty [subject-empty]`,
+    `commit ${hashText.trim()}: type may not be empty [type-empty]`,
+  ]);
 });
 
 test('it lints with @zgeoff/commitlint-config, not a commitlint config in the repo', async () => {
@@ -155,20 +160,19 @@ test('it lints with @zgeoff/commitlint-config, not a commitlint config in the re
 
   const hash = hashText.trim();
 
-  const check = runCommitsCheck({
+  const problems = runCommitsCheck({
     cwd: ctx.directory,
     base: baseText.trim(),
     env: ctx.env,
+    commitlint: ctx.commitlint,
+    config: ctx.config,
   });
 
-  expect(check).toStrictEqual({
-    kind: 'checked',
-    problems: [
-      `commit ${hash}: header must be lower-case [header-case]`,
-      `commit ${hash}: subject may not be empty [subject-empty]`,
-      `commit ${hash}: type may not be empty [type-empty]`,
-    ],
-  });
+  expect(problems).toStrictEqual([
+    `commit ${hash}: header must be lower-case [header-case]`,
+    `commit ${hash}: subject may not be empty [subject-empty]`,
+    `commit ${hash}: type may not be empty [type-empty]`,
+  ]);
 });
 
 test('it reads only the commits after the base', async () => {
@@ -184,9 +188,15 @@ test('it reads only the commits after the base', async () => {
     .cwd(ctx.directory)
     .env(ctx.env);
 
-  const check = runCommitsCheck({ cwd: ctx.directory, base, env: ctx.env });
+  const problems = runCommitsCheck({
+    cwd: ctx.directory,
+    base,
+    env: ctx.env,
+    commitlint: ctx.commitlint,
+    config: ctx.config,
+  });
 
-  expect(check).toStrictEqual({ kind: 'checked', problems: [] });
+  expect(problems).toStrictEqual([]);
 });
 
 test('it leaves out a merge commit', async () => {
@@ -214,40 +224,42 @@ test('it leaves out a merge commit', async () => {
     .cwd(ctx.directory)
     .env(ctx.env);
 
-  const check = runCommitsCheck({
+  const problems = runCommitsCheck({
     cwd: ctx.directory,
     base: baseText.trim(),
     env: ctx.env,
+    commitlint: ctx.commitlint,
+    config: ctx.config,
   });
 
-  expect(check).toStrictEqual({ kind: 'checked', problems: [] });
+  expect(problems).toStrictEqual([]);
 });
 
-test('it skips with a reason when the repo installs no commitlint', async () => {
+test('it prints a skip notice and exits 0 when the repo installs no commitlint', async () => {
   const ctx = await setupTest();
 
   await rm(join(ctx.directory, 'node_modules'));
 
-  await $`git commit --quiet --allow-empty -m ${'tidy up'}`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
 
-  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+  await $`git update-ref refs/remotes/origin/main HEAD`.cwd(ctx.directory).env(ctx.env);
 
-  await $`git commit --quiet --allow-empty -m ${'tidy up again'}`.cwd(ctx.directory).env(ctx.env);
+  const result = await $`${process.execPath} ${join(import.meta.dir, 'run-commits-check.ts')}`
+    .cwd(ctx.directory)
+    .env({ ...ctx.env, PATH: dirname(Bun.which('git') ?? '') })
+    .nothrow()
+    .quiet();
 
-  const check = runCommitsCheck({
-    cwd: ctx.directory,
-    base: baseText.trim(),
-    env: { ...ctx.env, PATH: dirname(Bun.which('git') ?? '') },
-  });
-
-  expect(check).toStrictEqual({
-    kind: 'skipped',
-    reason:
-      'the repo does not install commitlint; add @commitlint/cli and @zgeoff/commitlint-config as devDependencies to run it',
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'commits: skipped, because the repo does not install commitlint; add @commitlint/cli and @zgeoff/commitlint-config as devDependencies to run it\n',
   });
 });
 
-test('it skips with a reason when the repo installs commitlint but not @zgeoff/commitlint-config', async () => {
+test('it prints a skip notice and exits 0 when the repo installs commitlint but not @zgeoff/commitlint-config', async () => {
   const ctx = await setupTest();
 
   await rm(join(ctx.directory, 'node_modules'));
@@ -258,18 +270,22 @@ test('it skips with a reason when the repo installs commitlint but not @zgeoff/c
     join(ctx.directory, 'node_modules/.bin/commitlint'),
   );
 
-  await $`git commit --quiet --allow-empty -m ${'tidy up'}`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
 
-  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+  await $`git update-ref refs/remotes/origin/main HEAD`.cwd(ctx.directory).env(ctx.env);
 
-  await $`git commit --quiet --allow-empty -m ${'tidy up again'}`.cwd(ctx.directory).env(ctx.env);
+  const result = await $`${process.execPath} ${join(import.meta.dir, 'run-commits-check.ts')}`
+    .cwd(ctx.directory)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
 
-  const check = runCommitsCheck({ cwd: ctx.directory, base: baseText.trim(), env: ctx.env });
-
-  expect(check).toStrictEqual({
-    kind: 'skipped',
-    reason:
-      'the repo does not install @zgeoff/commitlint-config; add it as a devDependency to run it',
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'commits: skipped, because the repo does not install @zgeoff/commitlint-config; add it as a devDependency to run it\n',
   });
 });
 

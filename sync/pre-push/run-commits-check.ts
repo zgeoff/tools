@@ -2,63 +2,30 @@ import { join } from 'node:path';
 import { readBranchBase } from './read-branch-base.ts';
 
 export interface CommitsCheckOptions {
-  // The repo root, whose node_modules holds commitlint and @zgeoff/commitlint-config.
   readonly cwd: string;
 
   // The commit the branch grows from; the check reads the commits after it, up to HEAD.
   readonly base: string;
 
   readonly env: Readonly<Record<string, string | undefined>>;
-}
 
-export type CommitsCheck =
-  | { readonly kind: 'skipped'; readonly reason: string }
-  | { readonly kind: 'checked'; readonly problems: readonly string[] };
+  // The paths of the commitlint program and of the @zgeoff/commitlint-config module.
+  readonly commitlint: string;
+  readonly config: string;
+}
 
 // --config replaces any commitlint config the repo keeps, so every repo that runs the check lints
 // with the same rules.
-export function runCommitsCheck(options: Readonly<CommitsCheckOptions>): CommitsCheck {
-  const commitlint = Bun.which('commitlint', {
-    PATH: `${join(options.cwd, 'node_modules/.bin')}:${options.env['PATH'] ?? ''}`,
-  });
-
-  if (commitlint === null) {
-    return {
-      kind: 'skipped',
-      reason:
-        'the repo does not install commitlint; add @commitlint/cli and @zgeoff/commitlint-config as devDependencies to run it',
-    };
-  }
-
-  const config = resolveCommitlintConfig(options.cwd);
-
-  if (config === null) {
-    return {
-      kind: 'skipped',
-      reason:
-        'the repo does not install @zgeoff/commitlint-config; add it as a devDependency to run it',
-    };
-  }
-
-  const problems = readBranchCommits(options).flatMap((commit) => {
+export function runCommitsCheck(options: Readonly<CommitsCheckOptions>): string[] {
+  return readBranchCommits(options).flatMap((commit) => {
     const result = runProgram(
       options,
-      [commitlint, '--config', config, '--color=false'],
+      [options.commitlint, '--config', options.config, '--color=false'],
       commit.message,
     );
 
     return parseCommitlintOutput(commit.hash, result);
   });
-
-  return { kind: 'checked', problems };
-}
-
-function resolveCommitlintConfig(cwd: string): string | null {
-  try {
-    return Bun.resolveSync('@zgeoff/commitlint-config', cwd);
-  } catch {
-    return null;
-  }
 }
 
 interface Commit {
@@ -143,31 +110,60 @@ function parseCommitlintOutput(hash: string, result: ProgramResult): string[] {
 }
 
 async function runCLI(): Promise<void> {
+  const cwd = process.cwd();
+
+  const commitlint = Bun.which('commitlint', {
+    PATH: `${join(cwd, 'node_modules/.bin')}:${process.env['PATH'] ?? ''}`,
+  });
+
+  if (commitlint === null) {
+    writeSkipNotice(
+      'the repo does not install commitlint; add @commitlint/cli and @zgeoff/commitlint-config as devDependencies to run it',
+    );
+
+    return;
+  }
+
+  const config = resolveCommitlintConfig(cwd);
+
+  if (config === null) {
+    writeSkipNotice(
+      'the repo does not install @zgeoff/commitlint-config; add it as a devDependency to run it',
+    );
+
+    return;
+  }
+
   try {
-    const base = await readBranchBase({ cwd: process.cwd() });
+    const base = await readBranchBase({ cwd });
 
-    const check = runCommitsCheck({ cwd: process.cwd(), base, env: process.env });
+    const problems = runCommitsCheck({ cwd, base, env: process.env, commitlint, config });
 
-    // A repo that takes this script need not install ts-pattern, so the union branches with an if.
-    if (check.kind === 'skipped') {
-      // GitHub Actions shows a line that starts with ::notice:: on the run's summary.
-      const prefix = process.env['GITHUB_ACTIONS'] === 'true' ? '::notice::' : '';
-
-      process.stdout.write(`${prefix}commits: skipped, because ${check.reason}\n`);
-
-      return;
-    }
-
-    for (const problem of check.problems) {
+    for (const problem of problems) {
       process.stdout.write(`${problem}\n`);
     }
 
-    process.exitCode = check.problems.length === 0 ? 0 : 1;
+    process.exitCode = problems.length === 0 ? 0 : 1;
   } catch (error) {
     process.stderr.write(`commits: ${error instanceof Error ? error.message : String(error)}\n`);
 
     process.exitCode = 2;
   }
+}
+
+function resolveCommitlintConfig(cwd: string): string | null {
+  try {
+    return Bun.resolveSync('@zgeoff/commitlint-config', cwd);
+  } catch {
+    return null;
+  }
+}
+
+function writeSkipNotice(reason: string): void {
+  // GitHub Actions shows a line that starts with ::notice:: on the run's summary.
+  const prefix = process.env['GITHUB_ACTIONS'] === 'true' ? '::notice::' : '';
+
+  process.stdout.write(`${prefix}commits: skipped, because ${reason}\n`);
 }
 
 if (import.meta.main) {
