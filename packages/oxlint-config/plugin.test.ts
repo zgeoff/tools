@@ -689,6 +689,30 @@ test('it accepts a test file of imports, types, setupTest and test calls', async
   expect(result.stdout).not.toInclude('setup-test-only');
 });
 
+test('it accepts a mod check file whose test comes from claude-code/testing', async () => {
+  const source =
+    "import { expect, test } from 'claude-code/testing';\n\nfunction setupTest() {\n  return { cups: 2 };\n}\n\ntest('it pours', () => {\n  const ctx = setupTest();\n\n  expect(ctx.cups).toBe(2);\n});\n";
+
+  const result = await runLintTree({ 'teapot.test.ts': source }, 'teapot.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
+
+  expect(result.stdout).not.toInclude('setup-test-only');
+});
+
+test('it flags only the second function beside setupTest in a mod check file', async () => {
+  const source =
+    "import { test } from 'claude-code/testing';\n\nfunction setupTest() {\n  return {};\n}\n\nfunction readPot() {\n  return 2;\n}\n\ntest('it pours', () => {});\n";
+
+  const result = await runLintTree({ 'teapot.test.ts': source }, 'teapot.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('Remove the module-level `readPot`');
+  expect(result.stdout).not.toInclude('Move this statement into a test or `setupTest()`');
+});
+
 test.each([
   ['a module-level const', 'const pot = { cups: 2 };\n', 'pot'],
   ['a module-level let', 'let pot = 2;\n', 'pot'],

@@ -71,7 +71,9 @@ const setupTestOnly = {
   },
 };
 
-// the local names that `test` from `bun:test` goes by, so an aliased import
+const testModules = new Set(['bun:test', 'claude-code/testing']);
+
+// the local names that `test` from a test module goes by, so an aliased import
 // such as `import { test as check }` counts; a file that imports no `test`
 // reads the global one, unless a module binding of its own takes the name
 function collectTestNames(context, program) {
@@ -79,7 +81,7 @@ function collectTestNames(context, program) {
     .filter(
       (statement) =>
         statement.type === 'ImportDeclaration' &&
-        statement.source.value === 'bun:test' &&
+        testModules.has(statement.source.value) &&
         statement.importKind !== 'type',
     )
     .flatMap((statement) => statement.specifiers)
