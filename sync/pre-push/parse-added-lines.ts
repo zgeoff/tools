@@ -41,6 +41,10 @@ export function parseAddedLines(patch: string): AddedLine[] {
       added.push({ hash, path, line, text: text.slice(1) });
 
       line += 1;
+    } else if (!inHeader && path !== null && text.startsWith(' ')) {
+      // A repo's diff.interHunkContext joins nearby hunks with the unchanged lines between them,
+      // even under -U0.
+      line += 1;
     }
   }
 

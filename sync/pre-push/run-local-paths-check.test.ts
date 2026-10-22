@@ -363,6 +363,39 @@ test('it reports the real path of a quoted file name that holds an emoji', async
   ]);
 });
 
+test('it reports the right line when the repo joins nearby hunks with diff.interHunkContext', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'greet.txt'), 'a\nb\nc\nd\ne\n');
+
+  await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: start the repo'}`.cwd(ctx.directory).env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  await $`git config diff.interHunkContext 10`.cwd(ctx.directory).env(ctx.env);
+
+  await writeFile(join(ctx.directory, 'greet.txt'), `a\nB\nc\nd\n${ctx.directory}/e\n`);
+
+  await $`git commit --quiet -am ${'feat: change the greeting'}`.cwd(ctx.directory).env(ctx.env);
+
+  const hashText = await $`git rev-parse --short HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  const findings = runLocalPathsCheck({
+    cwd: ctx.directory,
+    base: baseText.trim(),
+    env: ctx.env,
+  });
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'greet.txt',
+      line: 5,
+      message: `commit ${hashText.trim()} adds the home directory ${ctx.directory}/; remove it before you push`,
+    },
+  ]);
+});
+
 test('it prints each finding at its path and line and exits 1 when run as a script', async () => {
   const ctx = await setupTest();
 

@@ -39,6 +39,30 @@ test('it reads each added line with its commit, path and new line number', () =>
   ]);
 });
 
+test('it counts the unchanged lines that join two hunks into one', () => {
+  const patch = [
+    '\u00001a2b3c4',
+    '',
+    'diff --git a/greet.txt b/greet.txt',
+    'index 1111111..2222222 100644',
+    '--- a/greet.txt',
+    '+++ b/greet.txt',
+    '@@ -2,4 +2,4 @@',
+    '-hello',
+    '+hello there',
+    ' good day',
+    ' good night',
+    '-farewell',
+    '+farewell for now',
+    '',
+  ].join('\n');
+
+  expect(parseAddedLines(patch)).toStrictEqual([
+    { hash: '1a2b3c4', path: 'greet.txt', line: 2, text: 'hello there' },
+    { hash: '1a2b3c4', path: 'greet.txt', line: 5, text: 'farewell for now' },
+  ]);
+});
+
 test('it reads an added line that starts with ++ as content, not a header', () => {
   const patch = [
     '\u00001a2b3c4',
