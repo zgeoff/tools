@@ -48,19 +48,20 @@ test('it reads the changed paths between two commits, a rename as both paths', a
   ]);
 });
 
-test('it reads every path of the first commit when there was no commit before', async () => {
+test('it reads every path of the first commit from the repo root when there was no commit before', async () => {
   const ctx = await setupTest();
 
   const repo = join(ctx.directory, 'repo');
 
   await mkdir(join(repo, 'src'), { recursive: true });
+  await writeFile(join(repo, 'README.md'), '# Fixture\n');
   await writeFile(join(repo, 'src/a.test.ts'), "test('it pads', () => {});\n");
 
   await $`git init --quiet && git add -A && git commit --quiet -m one`.cwd(repo).env(ctx.gitEnv);
 
-  const paths = await readCommittedPaths(repo, null, 'HEAD');
+  const paths = await readCommittedPaths(join(repo, 'src'), null, 'HEAD');
 
-  expect(paths).toStrictEqual([join(repo, 'src/a.test.ts')]);
+  expect(paths).toIncludeSameMembers([join(repo, 'README.md'), join(repo, 'src/a.test.ts')]);
 });
 
 test('it reads no path for a commit git does not have', async () => {

@@ -16,7 +16,7 @@ export async function readCommittedPaths(
 
     const listArgs =
       from === null
-        ? ['ls-tree', '-r', '--name-only', '-z', to]
+        ? ['ls-tree', '-r', '--full-tree', '--name-only', '-z', to]
         : ['diff', '--name-only', '--no-renames', '-z', from, to];
 
     const names = await git.raw(listArgs);
