@@ -143,7 +143,7 @@
     },
     "packages/oxlint-config": {
       "name": "@zgeoff/oxlint-config",
-      "version": "0.6.1",
+      "version": "0.6.2",
       "dependencies": {
         "@stylistic/eslint-plugin": "catalog:",
       },
@@ -168,7 +168,7 @@
     },
     "packages/skill-gate": {
       "name": "@zgeoff/skill-gate",
-      "version": "0.2.4",
+      "version": "0.2.5",
       "devDependencies": {
         "@types/bun": "catalog:",
         "@types/picomatch": "catalog:",

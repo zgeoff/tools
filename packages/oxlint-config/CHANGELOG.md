@@ -2,10 +2,11 @@
 
 ## [0.6.2](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.6.1...@zgeoff/oxlint-config@0.6.2) (2026-10-22)
 
-
 ### Features
 
-* **oxlint-config:** accept configured test lanes in test-beside-module ([#289](https://github.com/zgeoff/tools/issues/289)) ([ed5f9af](https://github.com/zgeoff/tools/commit/ed5f9af650b47f22c1dc43d5d75b1c3374d0c9b2))
+- **oxlint-config:** accept configured test lanes in test-beside-module
+  ([#289](https://github.com/zgeoff/tools/issues/289))
+  ([ed5f9af](https://github.com/zgeoff/tools/commit/ed5f9af650b47f22c1dc43d5d75b1c3374d0c9b2))
 
 ## [0.6.1](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.6.0...@zgeoff/oxlint-config@0.6.1) (2026-10-20)
 
