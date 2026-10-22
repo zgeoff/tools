@@ -622,10 +622,6 @@ test('it skips typecheck on a commit that stages no code or config file', async 
 // Each suite that spawns git must stay safe without the baseline's env -u, so it runs here with
 // the GIT_DIR a pre-push hook in the worktree exports.
 test.each([
-  ['packages/checks/package.test.ts'],
-  ['packages/checks/src/cli.test.ts'],
-  ['packages/checks/src/run-checks.test.ts'],
-  ['packages/checks/src/run-git-show-toplevel.test.ts'],
   ['packages/oxfmt-config/index.test.ts'],
   ['sync/pre-push/read-branch-base.test.ts'],
   ['sync/pre-push/run-commits-check.test.ts'],

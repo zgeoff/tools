@@ -10,7 +10,6 @@
         "@types/bun": "catalog:",
         "@zgeoff/bun-test-extended": "workspace:*",
         "@zgeoff/bun-test-react": "workspace:*",
-        "@zgeoff/checks": "workspace:*",
         "@zgeoff/commitlint-config": "workspace:*",
         "@zgeoff/format-codemod": "workspace:*",
         "@zgeoff/oxfmt-config": "workspace:*",
@@ -68,24 +67,6 @@
       "optionalPeers": [
         "zustand",
       ],
-    },
-    "packages/checks": {
-      "name": "@zgeoff/checks",
-      "version": "0.2.4",
-      "bin": {
-        "zgeoff-check": "./dist/cli.js",
-      },
-      "dependencies": {
-        "@zgeoff/commitlint-config": "workspace:*",
-        "gunshi": "catalog:",
-        "ts-pattern": "catalog:",
-      },
-      "devDependencies": {
-        "@types/bun": "catalog:",
-        "@zgeoff/std": "workspace:*",
-        "tsrs": "catalog:",
-        "typescript": "catalog:",
-      },
     },
     "packages/commitlint-config": {
       "name": "@zgeoff/commitlint-config",
@@ -560,8 +541,6 @@
     "@zgeoff/bun-test-extended": ["@zgeoff/bun-test-extended@workspace:packages/bun-test-extended"],
 
     "@zgeoff/bun-test-react": ["@zgeoff/bun-test-react@workspace:packages/bun-test-react"],
-
-    "@zgeoff/checks": ["@zgeoff/checks@workspace:packages/checks"],
 
     "@zgeoff/commitlint-config": ["@zgeoff/commitlint-config@workspace:packages/commitlint-config"],
 
