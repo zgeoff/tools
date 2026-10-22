@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 
@@ -21,6 +21,15 @@ async function setupTest() {
   const env = {
     PATH: `${bin}:${join(import.meta.dir, '../../node_modules/.bin')}:${process.env['PATH']}`,
     HOME: directory,
+
+    // mise finds its config and tools under HOME, so under a fake HOME its node and actionlint shims
+    // fail; the real config is also global, which mise trusts without a prompt.
+    MISE_CONFIG_DIR:
+      process.env['MISE_CONFIG_DIR'] ??
+      join(process.env['XDG_CONFIG_HOME'] ?? join(homedir(), '.config'), 'mise'),
+    MISE_DATA_DIR:
+      process.env['MISE_DATA_DIR'] ??
+      join(process.env['XDG_DATA_HOME'] ?? join(homedir(), '.local/share'), 'mise'),
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_AUTHOR_NAME: 'Test',
