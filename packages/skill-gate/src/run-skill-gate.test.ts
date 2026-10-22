@@ -875,6 +875,72 @@ test('it blocks after a Bash command changes a gated file before the session loa
   });
 });
 
+test('it blocks after a Bash change by a subagent when only the main session loaded the skills', async () => {
+  const ctx = await setupTest();
+
+  const project = join(ctx.directory, 'project');
+
+  await mkdir(join(project, '.claude/skills/testing'), { recursive: true });
+  await mkdir(join(project, 'src'), { recursive: true });
+  await writeFile(join(project, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(project, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+  );
+
+  await mkdir(join(ctx.directory, 'session/subagents'), { recursive: true });
+
+  await writeFile(
+    join(ctx.directory, 'session.jsonl'),
+    [
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"testing"}}]}}',
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Launching skill: testing"}]}}',
+    ].join('\n'),
+  );
+
+  await writeFile(join(ctx.directory, 'session/subagents/agent-a7.jsonl'), '');
+
+  await $`git init --quiet`.cwd(project).env({ PATH: process.env['PATH'] });
+
+  spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: project },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      cwd: project,
+      transcript_path: join(ctx.directory, 'session.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command: 'node scripts/stamp.mjs' },
+      tool_use_id: 'toolu_bash_1',
+      agent_id: 'a7',
+    }),
+  });
+
+  await writeFile(join(project, 'src/a.test.ts'), "test('it rounds up', () => {});\n");
+
+  const result = spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: project },
+    input: JSON.stringify({
+      hook_event_name: 'PostToolUse',
+      cwd: project,
+      transcript_path: join(ctx.directory, 'session.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command: 'node scripts/stamp.mjs' },
+      tool_use_id: 'toolu_bash_1',
+      agent_id: 'a7',
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    decision: 'block',
+    reason: `skill-gate: this Bash command changed the gated path ${join(project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill with the Skill tool, then review what the command changed against it and fix what breaks a rule. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
+  });
+});
+
 test('it lets a Bash change to a gated file through once the session loads its skills', async () => {
   const ctx = await setupTest();
 
