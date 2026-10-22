@@ -173,9 +173,9 @@ function parseToolCall(payload: unknown, projectDir: string | undefined): ToolCa
   return { projectDir: projectDir ?? cwd, toolName };
 }
 
-// A rules file that cannot be read, or whose `tools` list does not parse, blocks every call that
-// reaches the hook other than an edit or a Bash command, since the hook matcher names only gated
-// tools beside those.
+// A rules file that cannot be read or parsed, or whose `tools` list does not parse, blocks every
+// call that reaches the hook other than an edit or a Bash command, since the hook matcher names only
+// gated tools beside those.
 async function probeGatedToolCall(toolCall: ToolCall | null): Promise<boolean> {
   if (toolCall === null || ['Edit', 'Write', 'MultiEdit', 'Bash'].includes(toolCall.toolName)) {
     return false;
