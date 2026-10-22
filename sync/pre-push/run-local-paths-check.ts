@@ -10,6 +10,9 @@ export interface LocalPathsCheckOptions {
 
   // The environment of the git run, whose HOME is the home directory the check looks for.
   readonly env: Readonly<Record<string, string | undefined>>;
+
+  // The machine's host name, which the check looks for as a whole word.
+  readonly host: string;
 }
 
 export interface LocalPathFinding {
@@ -26,7 +29,7 @@ export interface LocalPathFinding {
 // it.
 export function runLocalPathsCheck(options: Readonly<LocalPathsCheckOptions>): LocalPathFinding[] {
   const home = findHomePrefix(options.env['HOME']);
-  const host = findHostPattern(hostname());
+  const host = findHostPattern(options.host);
 
   if (home === null && host === null) {
     return [];
@@ -110,7 +113,12 @@ async function runCLI(): Promise<void> {
   try {
     const base = await readBranchBase({ cwd: process.cwd() });
 
-    const findings = runLocalPathsCheck({ cwd: process.cwd(), base, env: process.env });
+    const findings = runLocalPathsCheck({
+      cwd: process.cwd(),
+      base,
+      env: process.env,
+      host: hostname(),
+    });
 
     for (const finding of findings) {
       process.stdout.write(`${finding.path}:${finding.line}: ${finding.message}\n`);

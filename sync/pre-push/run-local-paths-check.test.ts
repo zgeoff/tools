@@ -1,20 +1,14 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { hostname, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import invariant from 'tiny-invariant';
 import { runLocalPathsCheck } from './run-local-paths-check.ts';
 
-// The host name is the real one, because the check reads it from the system.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'run-local-paths-check-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
-
-  const host = hostname();
-
-  invariant(host !== '' && host !== 'localhost', 'the host needs a name of its own');
 
   const env = {
     PATH: process.env['PATH'],
@@ -29,7 +23,7 @@ async function setupTest() {
 
   await $`git init --quiet`.cwd(directory).env(env);
 
-  return { directory, env, host };
+  return { directory, env };
 }
 
 test('it passes a branch whose added lines hold no local path', async () => {
@@ -53,6 +47,7 @@ test('it passes a branch whose added lines hold no local path', async () => {
     cwd: ctx.directory,
     base: baseText.trim(),
     env: ctx.env,
+    host: 'greeter-box',
   });
 
   expect(findings).toStrictEqual([]);
@@ -81,6 +76,7 @@ test('it reports an added line that holds the home directory at its path and lin
     cwd: ctx.directory,
     base: baseText.trim(),
     env: ctx.env,
+    host: 'greeter-box',
   });
 
   expect(findings).toStrictEqual([
@@ -101,7 +97,7 @@ test('it reports an added line that holds the host name as a whole word', async 
 
   const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
 
-  await writeFile(join(ctx.directory, 'greet.txt'), `built on ${ctx.host}, at noon\n`);
+  await writeFile(join(ctx.directory, 'greet.txt'), `built on greeter-box, at noon\n`);
 
   await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'feat: add the greeting'}`.cwd(ctx.directory).env(ctx.env);
@@ -112,13 +108,14 @@ test('it reports an added line that holds the host name as a whole word', async 
     cwd: ctx.directory,
     base: baseText.trim(),
     env: ctx.env,
+    host: 'greeter-box',
   });
 
   expect(findings).toStrictEqual([
     {
       path: 'greet.txt',
       line: 1,
-      message: `commit ${hashText.trim()} adds the host name ${ctx.host}; remove it before you push`,
+      message: `commit ${hashText.trim()} adds the host name greeter-box; remove it before you push`,
     },
   ]);
 });
@@ -132,7 +129,7 @@ test('it passes the host name inside a longer word', async () => {
 
   const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
 
-  await writeFile(join(ctx.directory, 'greet.txt'), `the ${ctx.host}_backup and x${ctx.host}\n`);
+  await writeFile(join(ctx.directory, 'greet.txt'), `the greeter-box_backup and xgreeter-box\n`);
 
   await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'feat: add the greeting'}`.cwd(ctx.directory).env(ctx.env);
@@ -141,6 +138,34 @@ test('it passes the host name inside a longer word', async () => {
     cwd: ctx.directory,
     base: baseText.trim(),
     env: ctx.env,
+    host: 'greeter-box',
+  });
+
+  expect(findings).toStrictEqual([]);
+});
+
+test.each([
+  ['an empty host name', ''],
+  ['the host name localhost', 'localhost'],
+])('it reads no host in a line when the machine has %s', async (_label, host) => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  await writeFile(join(ctx.directory, 'greet.txt'), 'serve on localhost, port 8080\n');
+
+  await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'feat: add the greeting'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = runLocalPathsCheck({
+    cwd: ctx.directory,
+    base: baseText.trim(),
+    env: ctx.env,
+    host,
   });
 
   expect(findings).toStrictEqual([]);
@@ -151,7 +176,7 @@ test('it reads only the lines the branch adds, not the lines it keeps or removes
 
   await writeFile(
     join(ctx.directory, 'greet.txt'),
-    `greeting: hello\ncache: ${ctx.directory}/.cache/greeting\nhost: ${ctx.host}\n`,
+    `greeting: hello\ncache: ${ctx.directory}/.cache/greeting\nhost: greeter-box\n`,
   );
 
   await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
@@ -170,6 +195,7 @@ test('it reads only the lines the branch adds, not the lines it keeps or removes
     cwd: ctx.directory,
     base: baseText.trim(),
     env: ctx.env,
+    host: 'greeter-box',
   });
 
   expect(findings).toStrictEqual([]);
@@ -199,6 +225,7 @@ test('it reports a line that a later commit of the branch removes', async () => 
     cwd: ctx.directory,
     base: baseText.trim(),
     env: ctx.env,
+    host: 'greeter-box',
   });
 
   expect(findings).toStrictEqual([
@@ -227,6 +254,7 @@ test('it reports nothing for a file that the branch only renames', async () => {
     cwd: ctx.directory,
     base: baseText.trim(),
     env: ctx.env,
+    host: 'greeter-box',
   });
 
   expect(findings).toStrictEqual([]);
@@ -250,6 +278,7 @@ test('it reads no home directory when HOME is the root folder', async () => {
     cwd: ctx.directory,
     base: baseText.trim(),
     env: { ...ctx.env, HOME: '/' },
+    host: 'greeter-box',
   });
 
   expect(findings).toStrictEqual([]);
@@ -287,6 +316,7 @@ test('it reports a line that a merge adds when it resolves a conflict', async ()
     cwd: ctx.directory,
     base: baseText.trim(),
     env: ctx.env,
+    host: 'greeter-box',
   });
 
   expect(findings).toStrictEqual([
@@ -321,6 +351,7 @@ test('it reports the real path of a file whose name git quotes', async () => {
     cwd: ctx.directory,
     base: baseText.trim(),
     env: ctx.env,
+    host: 'greeter-box',
   });
 
   expect(findings).toStrictEqual([
@@ -352,6 +383,7 @@ test('it reports the real path of a quoted file name that holds an emoji', async
     cwd: ctx.directory,
     base: baseText.trim(),
     env: ctx.env,
+    host: 'greeter-box',
   });
 
   expect(findings).toStrictEqual([
@@ -385,6 +417,7 @@ test('it reports the right line when the repo joins nearby hunks with diff.inter
     cwd: ctx.directory,
     base: baseText.trim(),
     env: ctx.env,
+    host: 'greeter-box',
   });
 
   expect(findings).toStrictEqual([
