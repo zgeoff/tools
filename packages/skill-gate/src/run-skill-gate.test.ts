@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';
-import { chmod, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -853,6 +853,60 @@ test('it blocks after a Bash command changes a gated file before the session loa
   });
 
   await writeFile(join(project, 'src/a.test.ts'), "test('it rounds up', () => {});\n");
+
+  const result = spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: project },
+    input: JSON.stringify({
+      hook_event_name: 'PostToolUse',
+      cwd: project,
+      transcript_path: join(ctx.directory, 'session.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command: 'node scripts/stamp.mjs' },
+      tool_use_id: 'toolu_bash_1',
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    decision: 'block',
+    reason: `skill-gate: this Bash command changed the gated path ${join(project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill with the Skill tool, then review what the command changed against it and fix what breaks a rule. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
+  });
+});
+
+test('it blocks after a Bash command adds a gated symlink that points nowhere', async () => {
+  const ctx = await setupTest();
+
+  const project = join(ctx.directory, 'project');
+
+  await mkdir(join(project, '.claude/skills/testing'), { recursive: true });
+  await mkdir(join(project, 'src'), { recursive: true });
+  await writeFile(join(project, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(project, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+  );
+
+  await writeFile(join(ctx.directory, 'session.jsonl'), '');
+
+  await $`git init --quiet`.cwd(project).env({ PATH: process.env['PATH'] });
+
+  spawnSync('bun', ctx.hookArgs, {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: project },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      cwd: project,
+      transcript_path: join(ctx.directory, 'session.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command: 'node scripts/stamp.mjs' },
+      tool_use_id: 'toolu_bash_1',
+    }),
+  });
+
+  await symlink('absent.ts', join(project, 'src/a.test.ts'));
 
   const result = spawnSync('bun', ctx.hookArgs, {
     encoding: 'utf8',
