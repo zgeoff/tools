@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.6](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.5...@zgeoff/skill-gate@0.2.6) (2026-10-22)
+
+### Bug Fixes
+
+- **skill-gate:** read a workflow subagent's transcript
+  ([#302](https://github.com/zgeoff/tools/issues/302))
+  ([3e10712](https://github.com/zgeoff/tools/commit/3e10712176c95d0bf66e4f462cda13291e8017ae))
+
 ## [0.2.5](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.4...@zgeoff/skill-gate@0.2.5) (2026-10-22)
 
 ### Features
