@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.3](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.6.2...@zgeoff/oxlint-config@0.6.3) (2026-10-22)
+
+
+### Bug Fixes
+
+* **oxlint-config:** accept claude-code/testing in setup-test-only ([#300](https://github.com/zgeoff/tools/issues/300)) ([9b6eac7](https://github.com/zgeoff/tools/commit/9b6eac79dd77a2ef01fafa6b1e3015a60a264e92))
+
 ## [0.6.2](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.6.1...@zgeoff/oxlint-config@0.6.2) (2026-10-22)
 
 ### Features
