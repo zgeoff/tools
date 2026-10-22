@@ -4,6 +4,7 @@ import path from 'node:path';
 import { isRecord } from '@zgeoff/std';
 import { simpleGit } from 'simple-git';
 import type { SimpleGit } from 'simple-git';
+import { bashSnapshotSchema } from './bash-snapshot-schema.ts';
 import { buildBashChangeOutput } from './build-bash-change-output.ts';
 import { buildBashSkillGateOutput } from './build-bash-skill-gate-output.ts';
 import { buildSkillGateOutput } from './build-skill-gate-output.ts';
@@ -411,28 +412,9 @@ async function readSnapshot(snapshotPath: string): Promise<BashSnapshot | null> 
     .catch(() => null);
 
   const value: unknown = text === null ? null : parseJSON(text);
+  const parsed = bashSnapshotSchema.safeParse(value);
 
-  if (!isRecord(value) || !isRecord(value['hashes'])) {
-    return null;
-  }
-
-  const head = value['head'];
-
-  if (typeof head !== 'string' && head !== null) {
-    return null;
-  }
-
-  const hashes: Record<string, string | null> = {};
-
-  for (const [relativePath, hash] of Object.entries(value['hashes'])) {
-    if (typeof hash !== 'string' && hash !== null) {
-      return null;
-    }
-
-    hashes[relativePath] = hash;
-  }
-
-  return { head, hashes };
+  return parsed.success ? parsed.data : null;
 }
 
 function parseJSON(text: string): unknown {

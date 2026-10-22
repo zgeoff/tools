@@ -1,3 +1,6 @@
+import type { z } from 'zod';
+import type { bashSnapshotSchema } from './bash-snapshot-schema.ts';
+
 export interface SkillGate {
   readonly match: string;
   readonly skills: readonly string[];
@@ -117,7 +120,4 @@ export interface WorkTree {
 }
 
 // The gated files dirty before a Bash command, and the commit HEAD named then.
-export interface BashSnapshot {
-  readonly head: string | null;
-  readonly hashes: FileHashes;
-}
+export type BashSnapshot = Readonly<z.infer<typeof bashSnapshotSchema>>;
