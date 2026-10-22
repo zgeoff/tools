@@ -16,7 +16,8 @@ The rules a task needs are not repeated here. Load the skill for the work before
 | `ci-design`     | `sync/skills/ci-design/`     | adding, changing, or reviewing a workflow, a job, or a trigger                              |
 
 Only `code-style` is installed as a skill here. For the others, read the `SKILL.md` in the source
-folder.
+folder. The shared docs check reads the installed `.claude/skills/docs-writing/scripts/`, so it
+skips here until the docs-writing skill is installed.
 
 ## Repo structure
 
