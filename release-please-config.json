@@ -45,10 +45,6 @@
     "packages/tsconfig": {
       "component": "@zgeoff/tsconfig"
     },
-    "packages/checks": {
-      "component": "@zgeoff/checks",
-      "initial-version": "0.1.0"
-    },
     "packages/skill-gate": {
       "component": "@zgeoff/skill-gate",
       "initial-version": "0.1.0"
