@@ -1,3 +1,5 @@
+import { readBranchBase } from './read-branch-base.ts';
+
 // Prints the files the branch changes since its merge base with origin's default
 // branch, one per line. lefthook's {push_files} lists all of history for a branch
 // with no upstream, so the pre-push baseline reads its file list from here.
@@ -12,26 +14,14 @@ interface ReadBranchFilesOptions {
 export async function readBranchFiles(
   options: Readonly<ReadBranchFilesOptions>,
 ): Promise<string[]> {
-  const head = await runGit(options, ['rev-parse', '--abbrev-ref', 'origin/HEAD']);
-
-  // A clone made before origin/HEAD existed has no symbolic ref.
-  const defaultBranch = head.exitCode === 0 ? head.stdout.trim() : 'origin/main';
-
-  const base = await runGit(options, ['merge-base', 'HEAD', defaultBranch]);
-
-  // Throw rather than list nothing, so a hook never checks nothing by accident.
-  if (base.exitCode !== 0) {
-    throw new Error(
-      `cannot find the base of this branch: no merge base between HEAD and ${defaultBranch} (is the remote fetched?)`,
-    );
-  }
+  const base = await readBranchBase(options);
 
   const diff = await runGit(options, [
     'diff',
     '--name-only',
     '--no-renames',
     '--diff-filter=d',
-    base.stdout.trim(),
+    base,
     'HEAD',
   ]);
 

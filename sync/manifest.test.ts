@@ -48,6 +48,8 @@ test('it runs a pre-push-baseline build that moves a files:branch script that ru
       'files:branch': 'bun scripts/read-branch-files.ts',
       'lint:files': 'oxlint --no-error-on-unmatched-pattern',
       'test:related': 'bun scripts/run-related-tests.ts',
+      'check:commits': 'bun scripts/run-commits-check.ts',
+      'check:local-paths': 'bun scripts/run-local-paths-check.ts',
     },
   });
 });
@@ -62,6 +64,8 @@ test('it runs a pre-push-baseline build that keeps a files:branch script the rep
         'files:branch': 'git diff --name-only origin/main',
         'lint:files': 'oxlint',
         'test:related': 'bun test',
+        'check:commits': 'commitlint --last',
+        'check:local-paths': 'true',
       },
     }),
   );
@@ -75,6 +79,8 @@ test('it runs a pre-push-baseline build that keeps a files:branch script the rep
       'files:branch': 'git diff --name-only origin/main',
       'lint:files': 'oxlint',
       'test:related': 'bun test',
+      'check:commits': 'commitlint --last',
+      'check:local-paths': 'true',
     },
   });
 });
@@ -97,6 +103,8 @@ test('it runs a pre-push-baseline build that adds the package scripts a repo lac
       'files:branch': 'bun scripts/read-branch-files.ts',
       'lint:files': 'oxlint --no-error-on-unmatched-pattern',
       'test:related': 'bun scripts/run-related-tests.ts',
+      'check:commits': 'bun scripts/run-commits-check.ts',
+      'check:local-paths': 'bun scripts/run-local-paths-check.ts',
     },
   });
 });
