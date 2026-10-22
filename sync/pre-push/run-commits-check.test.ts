@@ -384,3 +384,48 @@ test('it exits 2 with the error of commitlint when commitlint refuses a config w
   expect(stderr).toStartWith('commits: commitlint failed: ');
   expect(stderr).toInclude('Please add rules');
 });
+
+test('it exits 2 when commitlint crashes with exit 1 and reports no problem', async () => {
+  const ctx = await setupTest();
+
+  // The repo's own install: the real commitlint, and a @zgeoff/commitlint-config that throws.
+  await rm(join(ctx.directory, 'node_modules'));
+  await mkdir(join(ctx.directory, 'node_modules/.bin'), { recursive: true });
+  await mkdir(join(ctx.directory, 'node_modules/@zgeoff/commitlint-config'), { recursive: true });
+
+  const commitlint = await realpath(join(import.meta.dir, '../../node_modules/.bin/commitlint'));
+
+  await symlink(commitlint, join(ctx.directory, 'node_modules/.bin/commitlint'));
+
+  await writeFile(
+    join(ctx.directory, 'node_modules/@zgeoff/commitlint-config/package.json'),
+    JSON.stringify({ name: '@zgeoff/commitlint-config', type: 'module', exports: './index.js' }),
+  );
+
+  await writeFile(
+    join(ctx.directory, 'node_modules/@zgeoff/commitlint-config/index.js'),
+    "throw new Error('the greeting config cannot load');\n",
+  );
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  await $`git update-ref refs/remotes/origin/main HEAD`.cwd(ctx.directory).env(ctx.env);
+
+  await $`git commit --quiet --allow-empty -m ${'feat: add the greeting'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const result = await $`${process.execPath} ${join(import.meta.dir, 'run-commits-check.ts')}`
+    .cwd(ctx.directory)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  const stderr = result.stderr.toString();
+
+  expect(result.exitCode).toBe(2);
+  expect(stderr).toStartWith('commits: commitlint failed: ');
+  expect(stderr).toInclude('the greeting config cannot load');
+});
