@@ -10,5 +10,5 @@
   "packages/std": "0.3.0",
   "packages/kysely-bun-sqlite": "0.3.0",
   "packages/checks": "0.2.4",
-  "packages/skill-gate": "0.2.3"
+  "packages/skill-gate": "0.2.4"
 }
