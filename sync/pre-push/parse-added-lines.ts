@@ -86,12 +86,12 @@ function parseQuotedName(quoted: string): string {
 
   for (let index = 0; index < quoted.length; index += 1) {
     // A character outside the Basic Multilingual Plane, such as an emoji, spans two code units.
-    const char = String.fromCodePoint(quoted.codePointAt(index) ?? 0);
+    const character = String.fromCodePoint(quoted.codePointAt(index) ?? 0);
 
-    if (char !== '\\') {
-      bytes.push(...encoder.encode(char));
+    if (character !== '\\') {
+      bytes.push(...encoder.encode(character));
 
-      index += char.length - 1;
+      index += character.length - 1;
       continue;
     }
 
