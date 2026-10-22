@@ -436,3 +436,43 @@ test('it exits 2 when commitlint crashes with exit 1 and reports no problem', as
   expect(stderr).toStartWith('commits: commitlint failed: ');
   expect(stderr).toInclude('the greeting config cannot load');
 });
+
+test('it exits 2 when the repo installs a @zgeoff/commitlint-config that does not resolve', async () => {
+  const ctx = await setupTest();
+
+  // The repo's own install: the real commitlint, and a config whose export names no file.
+  await rm(join(ctx.directory, 'node_modules'));
+  await mkdir(join(ctx.directory, 'node_modules/.bin'), { recursive: true });
+  await mkdir(join(ctx.directory, 'node_modules/@zgeoff/commitlint-config'), { recursive: true });
+
+  await symlink(
+    join(import.meta.dir, '../../node_modules/.bin/commitlint'),
+    join(ctx.directory, 'node_modules/.bin/commitlint'),
+  );
+
+  await writeFile(
+    join(ctx.directory, 'node_modules/@zgeoff/commitlint-config/package.json'),
+    JSON.stringify({ name: '@zgeoff/commitlint-config', type: 'module', exports: './missing.js' }),
+  );
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  await $`git update-ref refs/remotes/origin/main HEAD`.cwd(ctx.directory).env(ctx.env);
+
+  const result = await $`${process.execPath} ${join(import.meta.dir, 'run-commits-check.ts')}`
+    .cwd(ctx.directory)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+  });
+
+  expect(result.stderr.toString()).toStartWith(
+    "commits: Cannot find package '@zgeoff/commitlint-config'",
+  );
+});

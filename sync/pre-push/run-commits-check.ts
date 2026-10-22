@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { readBranchBase } from './read-branch-base.ts';
 import type { ProgramResult, RunProgram } from './run-program.ts';
 import { runProgram } from './run-program.ts';
@@ -97,9 +97,7 @@ async function runCLI(): Promise<void> {
     return;
   }
 
-  const config = resolveCommitlintConfig(cwd);
-
-  if (config === null) {
+  if (!(await probeConfigInstalled(cwd))) {
     writeSkipNotice(
       'the repo does not install @zgeoff/commitlint-config; add it as a devDependency to run it',
     );
@@ -108,6 +106,10 @@ async function runCLI(): Promise<void> {
   }
 
   try {
+    // An installed package that still fails to resolve, such as one whose export names a missing
+    // file, is broken, so it throws here rather than skip.
+    const config = Bun.resolveSync('@zgeoff/commitlint-config', cwd);
+
     const base = await readBranchBase({ cwd });
 
     const problems = runCommitsCheck({
@@ -131,12 +133,22 @@ async function runCLI(): Promise<void> {
   }
 }
 
-function resolveCommitlintConfig(cwd: string): string | null {
-  try {
-    return Bun.resolveSync('@zgeoff/commitlint-config', cwd);
-  } catch {
-    return null;
-  }
+// Bun's resolver throws the same error for a package that is absent and for one it cannot read, so
+// the check looks for the package's package.json in each node_modules that resolution walks.
+async function probeConfigInstalled(cwd: string): Promise<boolean> {
+  const found = await Promise.all(
+    collectAncestorFolders(cwd).map((folder) =>
+      Bun.file(join(folder, 'node_modules/@zgeoff/commitlint-config/package.json')).exists(),
+    ),
+  );
+
+  return found.includes(true);
+}
+
+function collectAncestorFolders(folder: string): string[] {
+  const parent = dirname(folder);
+
+  return parent === folder ? [folder] : [folder, ...collectAncestorFolders(parent)];
 }
 
 function writeSkipNotice(reason: string): void {
