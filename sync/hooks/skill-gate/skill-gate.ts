@@ -203,8 +203,6 @@ async function readTextFile(filePath: string): Promise<string | undefined> {
   return isPresent ? readFile(filePath, 'utf8') : undefined;
 }
 
-// Only a path that names nothing is absent, so a path the hook cannot stat counts as present and
-// its read fails.
 async function probePath(filePath: string): Promise<boolean> {
   try {
     await stat(filePath);
