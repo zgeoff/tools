@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import { simpleGit } from 'simple-git';
 import { readCommittedPaths } from './read-committed-paths.ts';
 
 async function setupTest() {
@@ -39,7 +40,12 @@ test('it reads the changed paths between two commits, a rename as both paths', a
   await $`git mv src/old.test.ts src/moved.test.ts`.cwd(repo).env(ctx.gitEnv);
   await $`git commit --quiet -am two`.cwd(repo).env(ctx.gitEnv);
 
-  const paths = await readCommittedPaths(join(repo, 'src'), 'HEAD~1', 'HEAD');
+  const paths = await readCommittedPaths(
+    simpleGit(join(repo, 'src')),
+    join(repo, 'src'),
+    'HEAD~1',
+    'HEAD',
+  );
 
   expect(paths).toIncludeSameMembers([
     join(repo, 'src/kept.ts'),
@@ -59,7 +65,12 @@ test('it reads every path of the first commit from the repo root when there was 
 
   await $`git init --quiet && git add -A && git commit --quiet -m one`.cwd(repo).env(ctx.gitEnv);
 
-  const paths = await readCommittedPaths(join(repo, 'src'), null, 'HEAD');
+  const paths = await readCommittedPaths(
+    simpleGit(join(repo, 'src')),
+    join(repo, 'src'),
+    null,
+    'HEAD',
+  );
 
   expect(paths).toIncludeSameMembers([join(repo, 'README.md'), join(repo, 'src/a.test.ts')]);
 });
@@ -74,7 +85,7 @@ test('it reads no path for a commit git does not have', async () => {
 
   await $`git init --quiet && git add -A && git commit --quiet -m one`.cwd(repo).env(ctx.gitEnv);
 
-  const paths = await readCommittedPaths(repo, 'deadbeef', 'HEAD');
+  const paths = await readCommittedPaths(simpleGit(repo), repo, 'deadbeef', 'HEAD');
 
   expect(paths).toStrictEqual([]);
 });

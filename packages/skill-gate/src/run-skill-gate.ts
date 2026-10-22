@@ -2,6 +2,8 @@ import { statSync } from 'node:fs';
 import { mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { isRecord } from '@zgeoff/std';
+import { simpleGit } from 'simple-git';
+import type { SimpleGit } from 'simple-git';
 import { buildBashChangeOutput } from './build-bash-change-output.ts';
 import { buildBashSkillGateOutput } from './build-bash-skill-gate-output.ts';
 import { buildSkillGateOutput } from './build-skill-gate-output.ts';
@@ -154,10 +156,11 @@ async function checkBash(check: BashCheck): Promise<never> {
   }
 
   const snapshotPath = resolveSnapshotPath(check.hookInput);
+  const git = simpleGit(check.projectDir);
 
   if (check.hookInput.event === 'PreToolUse') {
     if (snapshotPath !== null) {
-      await writeGatedSnapshot(snapshotPath, check.projectDir, parsedRules.rules);
+      await writeGatedSnapshot(git, snapshotPath, check.projectDir, parsedRules.rules);
     }
 
     await checkBashCommand(check, parsedRules.rules);
@@ -165,6 +168,7 @@ async function checkBash(check: BashCheck): Promise<never> {
 
   if (snapshotPath !== null && check.hookInput.event !== 'PreToolUse') {
     await checkBashResult(check, parsedRules.rules, {
+      git,
       event: check.hookInput.event,
       snapshotPath,
     });
@@ -188,11 +192,12 @@ function resolveSnapshotPath(hookInput: HookInput): string | null {
 // Records HEAD and the content of each gated file that is dirty before the command runs. A project
 // outside a git work tree, or a record the hook cannot write, leaves the command unchecked.
 async function writeGatedSnapshot(
+  git: SimpleGit,
   snapshotPath: string,
   projectDir: string,
   rules: SkillGateRules,
 ): Promise<void> {
-  const workTree = await readWorkTree(projectDir);
+  const workTree = await readWorkTree(git, projectDir);
 
   if (workTree === null) {
     return;
@@ -335,6 +340,7 @@ function printOutput(output: object | null): void {
 }
 
 interface BashResult {
+  readonly git: SimpleGit;
   readonly event: PostToolEvent;
   readonly snapshotPath: string;
 }
@@ -351,7 +357,7 @@ async function checkBashResult(
 
   await rm(result.snapshotPath, { force: true });
 
-  const workTree = before === null ? null : await readWorkTree(check.projectDir);
+  const workTree = before === null ? null : await readWorkTree(result.git, check.projectDir);
 
   if (before === null || workTree === null) {
     return;
@@ -360,7 +366,7 @@ async function checkBashResult(
   const committed =
     workTree.head === null || before.head === workTree.head
       ? []
-      : await readCommittedPaths(check.projectDir, before.head, workTree.head);
+      : await readCommittedPaths(result.git, check.projectDir, before.head, workTree.head);
 
   const candidates = collectGatedProjectPaths(check.projectDir, rules, [
     ...workTree.dirtyPaths,

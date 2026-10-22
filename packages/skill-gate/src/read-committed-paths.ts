@@ -1,17 +1,17 @@
 import path from 'node:path';
-import { GitError, simpleGit } from 'simple-git';
+import { GitError } from 'simple-git';
+import type { SimpleGit } from 'simple-git';
 
-// Reads the absolute paths that differ between two commits, a rename as its old and new path. With
-// no first commit, it reads every path the second one holds. A comparison git cannot make reads no
-// path, as for a first commit that git has since pruned.
+// Reads, through a git client opened on the directory, the absolute paths that differ between two
+// commits, a rename as its old and new path. With no first commit, it reads every path the second
+// one holds. A comparison git cannot make reads no path.
 export async function readCommittedPaths(
+  git: SimpleGit,
   directory: string,
   from: string | null,
   to: string,
 ): Promise<readonly string[]> {
   try {
-    const git = simpleGit(directory);
-
     const toRoot = await git.revparse(['--show-cdup']);
 
     const listArgs =

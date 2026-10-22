@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import { simpleGit } from 'simple-git';
 import { readWorkTree } from './read-work-tree.ts';
 
 async function setupTest() {
@@ -39,7 +40,7 @@ test('it reads HEAD and the modified, untracked and renamed paths from the work 
   await $`git mv src/old.test.ts src/moved.test.ts`.cwd(repo).env(ctx.gitEnv);
 
   const head = await $`git rev-parse HEAD`.cwd(repo).env(ctx.gitEnv).text();
-  const workTree = await readWorkTree(join(repo, 'src'));
+  const workTree = await readWorkTree(simpleGit(join(repo, 'src')), join(repo, 'src'));
 
   expect(workTree).toStrictEqual({
     head: head.trim(),
@@ -65,14 +66,14 @@ test('it keeps the path spelling of a work tree reached through a symlink, with 
   await writeFile(join(repo, 'src/a.test.ts'), "test('it pads', () => {});\n");
   await symlink(repo, link);
 
-  const workTree = await readWorkTree(link);
+  const workTree = await readWorkTree(simpleGit(link), link);
 
   expect(workTree).toStrictEqual({ head: null, dirtyPaths: [join(link, 'src/a.test.ts')] });
 });
 
 test('it reads null outside a git work tree', async () => {
   const ctx = await setupTest();
-  const workTree = await readWorkTree(ctx.directory);
+  const workTree = await readWorkTree(simpleGit(ctx.directory), ctx.directory);
 
   expect(workTree).toBeNull();
 });

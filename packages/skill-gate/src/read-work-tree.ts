@@ -1,14 +1,13 @@
 import path from 'node:path';
-import { GitError, simpleGit } from 'simple-git';
+import { GitError } from 'simple-git';
+import type { SimpleGit } from 'simple-git';
 import type { WorkTree } from './types.ts';
 
-// Reads the commit HEAD names, null before the first commit, and the absolute paths that git
-// status lists as changed, staged or untracked, with each rename's old path too. Null outside a
-// work tree.
-export async function readWorkTree(directory: string): Promise<WorkTree | null> {
+// Reads, through a git client opened on the directory, the commit HEAD names, null before the first
+// commit, and the absolute paths git status lists as changed, staged or untracked, with each
+// rename's old path too. Null outside a work tree.
+export async function readWorkTree(git: SimpleGit, directory: string): Promise<WorkTree | null> {
   try {
-    const git = simpleGit(directory);
-
     // --show-toplevel resolves symlinks, so a project reached through one would match no path.
     const toRoot = await git.revparse(['--show-cdup']);
     const status = await git.status();
