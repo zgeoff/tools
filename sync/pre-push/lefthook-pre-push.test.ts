@@ -275,15 +275,16 @@ test('it hands every shell file the branch changes to the shell check when the b
 test('it passes the push with a notice when the machine lacks shfmt', async () => {
   const ctx = await setupTest();
 
-  // The system folders, with bun and shellcheck beside them, hold no shfmt.
-  const path = `${ctx.bin}:/usr/bin:/bin`;
-  const shellcheck = Bun.which('shellcheck');
+  // A PATH of the programs the push runs, with shellcheck and without shfmt.
+  for (const program of ['git', 'sh', 'shellcheck']) {
+    const found = Bun.which(program);
 
-  invariant(shellcheck !== null, 'install shellcheck');
-  invariant(Bun.which('shfmt', { PATH: path }) === null, 'the system folders must lack shfmt');
+    invariant(found !== null, `install ${program}`);
+
+    await symlink(found, join(ctx.bin, program));
+  }
 
   await symlink(process.execPath, join(ctx.bin, 'bun'));
-  await symlink(shellcheck, join(ctx.bin, 'shellcheck'));
   await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
   await writeFile(join(ctx.worktree, 'bad.sh'), '#!/usr/bin/env bash\necho $1\n');
 
@@ -314,7 +315,7 @@ test('it passes the push with a notice when the machine lacks shfmt', async () =
 
   const result = await $`git push origin feature`
     .cwd(ctx.worktree)
-    .env({ ...ctx.env, PATH: path })
+    .env({ ...ctx.env, PATH: ctx.bin })
     .nothrow()
     .quiet();
 
@@ -327,12 +328,14 @@ test('it passes the push with a notice when the machine lacks shfmt', async () =
 test('it passes the push with a notice when the machine lacks actionlint', async () => {
   const ctx = await setupTest();
 
-  const path = `${ctx.bin}:/usr/bin:/bin`;
+  // A PATH of the programs the push runs, without actionlint.
+  for (const program of ['git', 'sh']) {
+    const found = Bun.which(program);
 
-  invariant(
-    Bun.which('actionlint', { PATH: path }) === null,
-    'the system folders must lack actionlint',
-  );
+    invariant(found !== null, `install ${program}`);
+
+    await symlink(found, join(ctx.bin, program));
+  }
 
   await symlink(process.execPath, join(ctx.bin, 'bun'));
   await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
@@ -366,7 +369,7 @@ test('it passes the push with a notice when the machine lacks actionlint', async
 
   const result = await $`git push origin feature`
     .cwd(ctx.worktree)
-    .env({ ...ctx.env, PATH: path })
+    .env({ ...ctx.env, PATH: ctx.bin })
     .nothrow()
     .quiet();
 
