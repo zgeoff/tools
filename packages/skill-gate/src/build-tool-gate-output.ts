@@ -2,9 +2,8 @@ import { formatSkillList } from './format-skill-list.ts';
 import { formatUnknownKeyWarning } from './format-unknown-key-warning.ts';
 import type { SkillGateHookOutput, ToolGatePlan, UnknownToolRequirement } from './types.ts';
 
-// Builds the PreToolUse hook output for a gated tool call, or null when the call goes ahead in
-// silence. A missing skill or reference denies the call. A rule that names one the repo does not
-// have, or a key the rules parser does not know, never denies: it warns, and the call goes ahead.
+// A rule that names a skill or reference the repo does not have, or a key the rules parser does not
+// know, never denies: it warns, and the call goes ahead.
 export function buildToolGateOutput(
   toolName: string,
   plan: ToolGatePlan,

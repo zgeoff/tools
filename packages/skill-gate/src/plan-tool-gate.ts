@@ -1,9 +1,7 @@
 import path from 'node:path';
 import type { ToolGateInput, ToolGatePlan, UnknownToolRequirement } from './types.ts';
 
-// Plans the gate for one tool call: the skills and references that the gates on the tool name need
-// and the session has not loaded, in gate order without repeats, and each one the repo lacks. Such
-// a skill or reference never counts as missing, since no session could load it.
+// A skill or reference the repo lacks never counts as missing, since no session could load it.
 export function planToolGate(input: ToolGateInput): ToolGatePlan {
   const gates = input.tools.filter((gate) => gate.tool === input.toolName);
 
