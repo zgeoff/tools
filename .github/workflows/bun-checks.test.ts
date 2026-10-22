@@ -415,6 +415,7 @@ test('it downloads the planner, the branch check scripts and the catalog from th
       'https://raw.githubusercontent.com/acme/tools/abc123/.github/workflows/write-check-plan.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/read-branch-base.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/parse-added-lines.ts',
+      'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-program.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-commits-check.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-local-paths-check.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/package.json',
@@ -428,6 +429,7 @@ test('it downloads the planner, the branch check scripts and the catalog from th
     'read-branch-base.ts',
     'run-commits-check.ts',
     'run-local-paths-check.ts',
+    'run-program.ts',
     'tools-package.json',
     'write-check-plan.ts',
   ]);
@@ -1076,7 +1078,7 @@ test('it fails the commits check on a commit of the branch that commitlint rejec
 
   await mkdir(join(ctx.gitEnv.RUNNER_TEMP, 'check-plan'), { recursive: true });
 
-  for (const file of ['read-branch-base.ts', 'run-commits-check.ts']) {
+  for (const file of ['read-branch-base.ts', 'run-program.ts', 'run-commits-check.ts']) {
     await cp(
       join(import.meta.dir, '../../sync/pre-push', file),
       join(ctx.gitEnv.RUNNER_TEMP, 'check-plan', file),
@@ -1110,7 +1112,12 @@ test('it fails the local paths check on a line of the branch that holds the home
 
   await mkdir(join(ctx.gitEnv.RUNNER_TEMP, 'check-plan'), { recursive: true });
 
-  for (const file of ['read-branch-base.ts', 'parse-added-lines.ts', 'run-local-paths-check.ts']) {
+  for (const file of [
+    'read-branch-base.ts',
+    'parse-added-lines.ts',
+    'run-program.ts',
+    'run-local-paths-check.ts',
+  ]) {
     await cp(
       join(import.meta.dir, '../../sync/pre-push', file),
       join(ctx.gitEnv.RUNNER_TEMP, 'check-plan', file),
