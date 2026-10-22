@@ -142,3 +142,19 @@ export interface BashCandidates {
 
 // Reads a file's content, or null for a path that holds no file.
 export type ReadFileContent = (filePath: string) => Promise<Uint8Array | null>;
+
+export type RecordedSnapshot = Extract<BashSnapshot, { kind: 'recorded' }>;
+
+export type BashComparison =
+  | { readonly kind: 'no-work-tree' }
+  | { readonly kind: 'git-failed'; readonly error: string }
+  | { readonly kind: 'compared'; readonly changedPaths: readonly string[] };
+
+export type BashResultStep =
+  | { readonly kind: 'skip' }
+  | { readonly kind: 'report'; readonly error: string }
+  | { readonly kind: 'gate'; readonly changedPaths: readonly string[] };
+
+export type RecordStep =
+  | Exclude<BashResultStep, { kind: 'gate' }>
+  | { readonly kind: 'compare'; readonly recorded: RecordedSnapshot };
