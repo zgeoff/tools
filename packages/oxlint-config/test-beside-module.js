@@ -2,9 +2,7 @@ import { readdirSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, sep } from 'node:path';
 import resolveRepoRoot from './resolve-repo-root.js';
 
-// a browser suite (`<name>.browser.test.ts`) tests the same module as
-// `<name>.test.ts`, and the suffix lets a runner put it in its own lane
-const testFilePattern = /^(?<base>.+?)(?:\.browser)?\.test\.tsx?$/u;
+const testFilePattern = /^(?<base>.+)\.test\.tsx?$/u;
 
 const testBesideModule = {
   meta: {
@@ -13,9 +11,19 @@ const testBesideModule = {
       missing:
         'Move this test beside the module it tests: no `{{name}}.<ext>` sits in this directory. Whole-program suites belong in a root `e2e/` or `evals/` directory.',
     },
-    schema: [],
+    schema: [
+      {
+        type: 'object',
+        properties: {
+          lanes: { type: 'array', items: { type: 'string' } },
+        },
+        additionalProperties: false,
+      },
+    ],
   },
   create(context) {
+    const lanes = new Set(['browser', ...(context.options[0]?.lanes ?? [])]);
+
     return {
       Program() {
         const filename = context.physicalFilename;
@@ -25,7 +33,7 @@ const testBesideModule = {
           return;
         }
 
-        const name = match.groups.base;
+        const name = toModuleName(match.groups.base, lanes);
 
         if (probeModuleSibling(dirname(filename), name)) {
           return;
@@ -56,6 +64,14 @@ function isUnderExemptRoot(cwd, filename) {
   const [first] = relative(resolveRepoRoot(filename) ?? cwd, filename).split(sep);
 
   return exemptRootDirs.has(first);
+}
+
+// a lane suite (`<name>.browser.test.ts`) tests the same module as
+// `<name>.test.ts`, and the suffix lets a runner put it in its own lane
+function toModuleName(base, lanes) {
+  const dot = base.lastIndexOf('.');
+
+  return dot > 0 && lanes.has(base.slice(dot + 1)) ? base.slice(0, dot) : base;
 }
 
 // a module is `<name>.<ext>` with a single-segment extension, so a

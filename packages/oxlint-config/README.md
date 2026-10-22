@@ -173,8 +173,17 @@ first statement, so put the comment above it:
 // oxlint-disable zgeoff/test-beside-module -- tests base.json and react.json together
 ```
 
-A second test file for a module (`<name>.host.test.ts`) needs its own `<name>.host.<ext>`, so the
-rule reports it beside only `<name>.ts`.
+A lane suite, such as `<name>.browser.test.ts`, tests the same module as `<name>.test.ts` and needs
+only `<name>.<ext>`; the suffix lets the repo's test script run the suite in its own lane. The rule
+always knows the `browser` lane. A repo adds its own lanes with the `lanes` option, and the rule
+keeps `browser` beside them:
+
+```json
+{ "rules": { "zgeoff/test-beside-module": ["error", { "lanes": ["sdk"] }] } }
+```
+
+Any other suffix is part of the name. A second test file for a module (`<name>.host.test.ts`) needs
+its own `<name>.host.<ext>`, so the rule reports it beside only `<name>.ts`.
 
 ## `zgeoff/setup-test-only`
 
