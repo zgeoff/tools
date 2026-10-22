@@ -103,7 +103,7 @@ from [`@zgeoff/checks`](../packages/checks/README.md), which the repo installs i
 the branch's paths to the script's last command, and only `zgeoff-check` is sure to take them, so
 the job runs only when the script is exactly `zgeoff-check`. A repo whose `check` script is missing
 or runs anything else gets a notice in place of the job. CI keeps every whole-tree check required.
-The entry delivers three files, and its tests stay here:
+The entry delivers these files, and their tests stay here:
 
 - `.lefthook/pre-push-baseline.yml` — the lefthook jobs.
 - `scripts/read-branch-files.ts` — lists the files changed since the merge base with origin's
@@ -111,11 +111,23 @@ The entry delivers three files, and its tests stay here:
   upstream, so the baseline does not use it.
 - `scripts/run-related-tests.ts` — runs each changed file's sibling test through the repo's `test`
   script.
+- `scripts/run-commits-check.ts` — runs `commitlint` with the rules of `@zgeoff/commitlint-config`
+  on the message of each commit since that merge base, merge commits left out. A repo that does not
+  install both `@commitlint/cli` and `@zgeoff/commitlint-config` gets a notice in place of the
+  check.
+- `scripts/run-local-paths-check.ts` — fails each line that a commit since that merge base adds and
+  that holds the home directory of whoever runs it, followed by a slash, or the machine's host name
+  as a whole word. A home of `/` and the host `localhost` are left out.
+- `scripts/read-branch-base.ts` and `scripts/parse-added-lines.ts` — the modules these scripts
+  import.
 
-Its build adds the package scripts `files:branch`, `lint:files` and `test:related` when the repo
-lacks them. It changes one script the repo already has: a `files:branch` that runs the old
-`scripts/collect-branch-files.ts` moves to `scripts/read-branch-files.ts`. A repo opts in with three
-changes:
+Both check scripts exit 0 when clean or skipped, 1 with a problem, and 2 when they cannot run, such
+as in a clone without origin's default branch.
+
+Its build adds the package scripts `files:branch`, `lint:files`, `test:related`, `check:commits` and
+`check:local-paths` when the repo lacks them. It changes one script the repo already has: a
+`files:branch` that runs the old `scripts/collect-branch-files.ts` moves to
+`scripts/read-branch-files.ts`. A repo opts in with three changes:
 
 1. Add `pre-push-baseline` to `include` in `.github/workflows/repo-sync.yml`.
 2. In `lefthook.yml`, add `extends: [.lefthook/pre-push-baseline.yml]`, and delete `parallel` and
