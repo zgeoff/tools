@@ -2,6 +2,13 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "extends": ["./node_modules/@zgeoff/oxlint-config/oxlintrc.json"],
   // ignorePatterns don't propagate through extends — each consumer declares
-  // its own
-  "ignorePatterns": ["**/node_modules/**", "**/dist/**", ".worktrees/**", "**/*.json"]
+  // its own. The docs-writing skill is a symlink to sync/skills/docs-writing,
+  // whose files lint at their source.
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    ".worktrees/**",
+    "**/*.json",
+    ".claude/skills/docs-writing/**"
+  ]
 }
