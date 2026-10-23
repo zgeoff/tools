@@ -1,38 +1,48 @@
-import { expect, test } from 'bun:test';
+import { expect, onTestFinished, test } from 'bun:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { loadFormatIgnore } from './load-format-ignore.ts';
 
-test('it returns an empty list when no ignore file exists', () => {
+function setupTest() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
 
-  expect(loadFormatIgnore(directory)).toBeEmpty();
+  onTestFinished(() => {
+    fs.rmSync(directory, { recursive: true, force: true });
+  });
+
+  return { directory };
+}
+
+test('it returns an empty list when no ignore file exists', () => {
+  const ctx = setupTest();
+
+  expect(loadFormatIgnore(ctx.directory)).toBeEmpty();
 });
 
 test('it reads one glob per line', () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const ctx = setupTest();
 
-  fs.writeFileSync(path.join(directory, '.formatignore'), 'dist/**\nsrc/generated/**\n');
+  fs.writeFileSync(path.join(ctx.directory, '.formatignore'), 'dist/**\nsrc/generated/**\n');
 
-  expect(loadFormatIgnore(directory)).toStrictEqual(['dist/**', 'src/generated/**']);
+  expect(loadFormatIgnore(ctx.directory)).toStrictEqual(['dist/**', 'src/generated/**']);
 });
 
 test('it skips blank lines and comment lines', () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const ctx = setupTest();
 
   fs.writeFileSync(
-    path.join(directory, '.formatignore'),
+    path.join(ctx.directory, '.formatignore'),
     '# build output\ndist/**\n\n  \n# codegen\nsrc/generated/**\n',
   );
 
-  expect(loadFormatIgnore(directory)).toStrictEqual(['dist/**', 'src/generated/**']);
+  expect(loadFormatIgnore(ctx.directory)).toStrictEqual(['dist/**', 'src/generated/**']);
 });
 
 test('it trims surrounding whitespace including CRLF line endings', () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'format-codemod-'));
+  const ctx = setupTest();
 
-  fs.writeFileSync(path.join(directory, '.formatignore'), 'dist/**\r\n  build/**  \r\n');
+  fs.writeFileSync(path.join(ctx.directory, '.formatignore'), 'dist/**\r\n  build/**  \r\n');
 
-  expect(loadFormatIgnore(directory)).toStrictEqual(['dist/**', 'build/**']);
+  expect(loadFormatIgnore(ctx.directory)).toStrictEqual(['dist/**', 'build/**']);
 });

@@ -1,12 +1,22 @@
-import { expect, test } from 'bun:test';
+import { expect, onTestFinished, test } from 'bun:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readPackageVersion } from './read-package-version.ts';
 
-test('it reads the version field from a package manifest', () => {
+function setupTest() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'read-package-version-'));
-  const manifest = path.join(directory, 'package.json');
+
+  onTestFinished(() => {
+    fs.rmSync(directory, { recursive: true, force: true });
+  });
+
+  return { directory };
+}
+
+test('it reads the version field from a package manifest', () => {
+  const ctx = setupTest();
+  const manifest = path.join(ctx.directory, 'package.json');
 
   fs.writeFileSync(manifest, '{"name":"x","version":"1.2.3"}');
 
@@ -14,8 +24,8 @@ test('it reads the version field from a package manifest', () => {
 });
 
 test('it throws when the file is not a package manifest', () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'read-package-version-'));
-  const manifest = path.join(directory, 'package.json');
+  const ctx = setupTest();
+  const manifest = path.join(ctx.directory, 'package.json');
 
   fs.writeFileSync(manifest, '{"name":"x"}');
 
