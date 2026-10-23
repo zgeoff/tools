@@ -72,22 +72,25 @@ test('it gives the TEST_WORKERS count over the one the host would get', async ()
   expect(workers).toStrictEqual({ kind: 'count', count: 6 });
 });
 
-test.each(['0', '2.5', 'four', ''])('it refuses a TEST_WORKERS of %p', async (value) => {
-  const ctx = await setupTest();
+test.each(['0', '2.5', 'four', '', '9'.repeat(309)])(
+  'it refuses a TEST_WORKERS of %p',
+  async (value) => {
+    const ctx = await setupTest();
 
-  const workers = await readWorkerCount({
-    env: { TEST_WORKERS: value },
-    cores: 2,
-    totalMemory: 2 * 1024 ** 3,
-    procRoot: ctx.procRoot,
-    cgroupRoot: ctx.cgroupRoot,
-  });
+    const workers = await readWorkerCount({
+      env: { TEST_WORKERS: value },
+      cores: 2,
+      totalMemory: 2 * 1024 ** 3,
+      procRoot: ctx.procRoot,
+      cgroupRoot: ctx.cgroupRoot,
+    });
 
-  expect(workers).toStrictEqual({
-    kind: 'invalid',
-    message: `TEST_WORKERS is ${value}; set it to a whole number above 0`,
-  });
-});
+    expect(workers).toStrictEqual({
+      kind: 'invalid',
+      message: `TEST_WORKERS is ${value}; set it to a whole number above 0`,
+    });
+  },
+);
 
 test('it prints the count', async () => {
   const result = await $`bun ${join(import.meta.dir, 'read-worker-count.ts')}`
