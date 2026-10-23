@@ -299,6 +299,27 @@ test.each([['SIGHUP'], ['SIGINT'], ['SIGTERM']] as const)(
   },
 );
 
+test.skipIf(modesOutput === '')(
+  'it reports a peak anon memory that holds the memory the command used',
+  async () => {
+    const ctx = setupTest();
+
+    // The command holds its 96 MiB for three sample intervals, so a sample lands while it does.
+    const result =
+      await $`bash ${ctx.scriptPath} 256 ${ctx.bun} -e ${'const held = Buffer.alloc(96 * 1024 * 1024, 1); await Bun.sleep(600); console.log(held.length);'}`
+        .env(ctx.env)
+        .quiet();
+
+    const peak = /peak anon memory (?<mib>\d+) MiB/u.exec(result.stderr.toString())?.groups?.[
+      'mib'
+    ];
+
+    invariant(peak !== undefined);
+
+    expect(Number(peak)).toBeGreaterThanOrEqual(96);
+  },
+);
+
 test.skipIf(modesOutput === '')('it uses the first mode the host supports', async () => {
   const ctx = setupTest();
 
