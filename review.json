@@ -26,6 +26,7 @@
           "**/*telemetry*.ts",
           "**/*logger*.ts"
         ],
+        "references/shell.md": ["**/*.sh"],
         "references/system-tests.md": ["e2e/**", "evals/**"],
         "references/claude-code-mods.md": ["mods/**", "**/.claude-plugin/**"]
       }
