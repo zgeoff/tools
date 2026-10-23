@@ -293,3 +293,22 @@ test('it exits 1 and prints each finding when run as a script', async () => {
     'bunfig.toml: [test] timeout = 30000 raises every test above the 5 s limit; keep the default and raise a timeout only in a lane\n',
   );
 });
+
+test('it exits 2 and names the file when run as a script on a package.json that is not JSON', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'package.json'), '{ "scripts": ');
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  const result = await $`bun ${join(import.meta.dir, 'run-test-timeouts-check.ts')}`
+    .cwd(ctx.directory)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect(result.exitCode).toBe(2);
+  expect(result.stdout.toString()).toBe('');
+  expect(result.stderr.toString()).toStartWith('test-timeouts: cannot parse package.json: ');
+});
