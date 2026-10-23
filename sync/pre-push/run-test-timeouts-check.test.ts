@@ -6,7 +6,7 @@ import { $ } from 'bun';
 import { runProgram } from './run-program.ts';
 import { runTestTimeoutsCheck } from './run-test-timeouts-check.ts';
 
-async function setupTest(files: Readonly<Record<string, string>>) {
+async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'run-test-timeouts-check-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
@@ -24,22 +24,21 @@ async function setupTest(files: Readonly<Record<string, string>>) {
 
   await $`git init --quiet`.cwd(directory).env(env);
 
-  for (const [path, content] of Object.entries(files)) {
-    await mkdir(dirname(join(directory, path)), { recursive: true });
-    await writeFile(join(directory, path), content);
-  }
-
-  await $`git add --all`.cwd(directory).env(env);
-  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`.cwd(directory).env(env);
-
   return { directory, env };
 }
 
 test('it passes a repo whose scripts and bunfig keep the default timeout', async () => {
-  const ctx = await setupTest({
-    'package.json': JSON.stringify({ scripts: { test: 'bun test --timeout=5000' } }),
-    'bunfig.toml': '[test]\npreload = ["./preload.ts"]\n',
-  });
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { test: 'bun test --timeout=5000' } }),
+  );
+
+  await writeFile(join(ctx.directory, 'bunfig.toml'), '[test]\npreload = ["./preload.ts"]\n');
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
   const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
 
@@ -47,14 +46,22 @@ test('it passes a repo whose scripts and bunfig keep the default timeout', async
 });
 
 test('it reports each bun test timeout above 5 s in a package script, in both flag forms', async () => {
-  const ctx = await setupTest({
-    'packages/kettle/package.json': JSON.stringify({
+  const ctx = await setupTest();
+
+  await mkdir(dirname(join(ctx.directory, 'packages/kettle/package.json')), { recursive: true });
+
+  await writeFile(
+    join(ctx.directory, 'packages/kettle/package.json'),
+    JSON.stringify({
       scripts: {
         test: 'bun run build && bun test --timeout 20000 src',
         'test:slow': 'bun test --timeout=30_000 slow',
       },
     }),
-  });
+  );
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
   const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
 
@@ -73,11 +80,17 @@ test('it reports each bun test timeout above 5 s in a package script, in both fl
 });
 
 test('it leaves a --timeout of a command other than bun test alone', async () => {
-  const ctx = await setupTest({
-    'package.json': JSON.stringify({
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({
       scripts: { test: 'wait-on --timeout 60000 tcp:3000 && bun test' },
     }),
-  });
+  );
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
   const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
 
@@ -85,11 +98,17 @@ test('it leaves a --timeout of a command other than bun test alone', async () =>
 });
 
 test('it reports a bun test that a wrapper script runs', async () => {
-  const ctx = await setupTest({
-    'package.json': JSON.stringify({
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({
       scripts: { 'test:daemon': 'bash scripts/with-home.sh bun test --timeout 20000 e2e' },
     }),
-  });
+  );
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
   const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
 
@@ -107,7 +126,15 @@ test.each([
   ['an echo of the command', 'echo "bun test --timeout=30000"'],
   ['an escaped flag', String.raw`bun test \--timeout=30000`],
 ])('it leaves %s alone', async (_, command) => {
-  const ctx = await setupTest({ 'package.json': JSON.stringify({ scripts: { test: command } }) });
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { test: command } }),
+  );
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
   const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
 
@@ -115,8 +142,11 @@ test.each([
 });
 
 test('it exempts test:related and the built-in lane scripts', async () => {
-  const ctx = await setupTest({
-    'package.json': JSON.stringify({
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({
       scripts: {
         'test:related': 'bun test --timeout=15000',
         'test:e2e': 'bun test --timeout=60000 e2e',
@@ -125,7 +155,10 @@ test('it exempts test:related and the built-in lane scripts', async () => {
         'test:host': 'bun test --timeout=20000 .host.test.ts',
       },
     }),
-  });
+  );
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
   const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
 
@@ -133,13 +166,22 @@ test('it exempts test:related and the built-in lane scripts', async () => {
 });
 
 test('it exempts the script of a lane that the max-test-timeout lanes option declares', async () => {
-  const ctx = await setupTest({
-    '.oxlintrc.json':
-      '{\n  // the binary suites run against a built daemon\n  "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": ["binary"] }] },\n}\n',
-    'package.json': JSON.stringify({
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, '.oxlintrc.json'),
+    '{\n  // the binary suites run against a built daemon\n  "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": ["binary"] }] },\n}\n',
+  );
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({
       scripts: { 'test:binary': 'bun test --timeout 20000 e2e/daemon-*.test.ts' },
     }),
-  });
+  );
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
   const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
 
@@ -147,12 +189,22 @@ test('it exempts the script of a lane that the max-test-timeout lanes option dec
 });
 
 test('it reports a lane script that the lanes option does not declare', async () => {
-  const ctx = await setupTest({
-    '.oxlintrc.json': '{ "rules": { "zgeoff/max-test-timeout": "error" } }\n',
-    'package.json': JSON.stringify({
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, '.oxlintrc.json'),
+    '{ "rules": { "zgeoff/max-test-timeout": "error" } }\n',
+  );
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({
       scripts: { 'test:binary': 'bun test --timeout 20000 e2e/daemon-*.test.ts' },
     }),
-  });
+  );
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
   const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
 
@@ -166,7 +218,13 @@ test('it reports a lane script that the lanes option does not declare', async ()
 });
 
 test('it reports a bunfig.toml whose test timeout is above 5 s', async () => {
-  const ctx = await setupTest({ 'libs/db/bunfig.toml': '[test]\ntimeout = 30000\n' });
+  const ctx = await setupTest();
+
+  await mkdir(dirname(join(ctx.directory, 'libs/db/bunfig.toml')), { recursive: true });
+  await writeFile(join(ctx.directory, 'libs/db/bunfig.toml'), '[test]\ntimeout = 30000\n');
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
   const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
 
@@ -180,9 +238,15 @@ test('it reports a bunfig.toml whose test timeout is above 5 s', async () => {
 });
 
 test('it reads the files as HEAD holds them, not the working tree', async () => {
-  const ctx = await setupTest({
-    'package.json': JSON.stringify({ scripts: { test: 'bun test' } }),
-  });
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { test: 'bun test' } }),
+  );
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
   await writeFile(
     join(ctx.directory, 'package.json'),
@@ -195,7 +259,12 @@ test('it reads the files as HEAD holds them, not the working tree', async () => 
 });
 
 test('it throws with the path of a package.json that is not JSON', async () => {
-  const ctx = await setupTest({ 'package.json': '{ "scripts": ' });
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'package.json'), '{ "scripts": ');
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
   expect(() => runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram })).toThrow(
     'cannot parse package.json',
@@ -203,7 +272,12 @@ test('it throws with the path of a package.json that is not JSON', async () => {
 });
 
 test('it exits 1 and prints each finding when run as a script', async () => {
-  const ctx = await setupTest({ 'bunfig.toml': '[test]\ntimeout = 30000\n' });
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'bunfig.toml'), '[test]\ntimeout = 30000\n');
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
   const result = await $`bun ${join(import.meta.dir, 'run-test-timeouts-check.ts')}`
     .cwd(ctx.directory)
