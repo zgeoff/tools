@@ -51,6 +51,7 @@ test('it runs a pre-push-baseline build that moves a files:branch script that ru
       'check:commits': 'bun scripts/run-commits-check.ts',
       'check:local-paths': 'bun scripts/run-local-paths-check.ts',
       'check:test-timeouts': 'bun scripts/run-test-timeouts-check.ts',
+      'memory-capped': 'bash scripts/run-memory-capped.sh "$(bun scripts/read-memory-budget.ts)"',
     },
   });
 });
@@ -68,6 +69,7 @@ test('it runs a pre-push-baseline build that keeps a files:branch script the rep
         'check:commits': 'commitlint --last',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'memory-capped': 'exec',
       },
     }),
   );
@@ -84,6 +86,7 @@ test('it runs a pre-push-baseline build that keeps a files:branch script the rep
       'check:commits': 'commitlint --last',
       'check:local-paths': 'true',
       'check:test-timeouts': 'true',
+      'memory-capped': 'exec',
     },
   });
 });
@@ -109,6 +112,7 @@ test('it runs a pre-push-baseline build that adds the package scripts a repo lac
       'check:commits': 'bun scripts/run-commits-check.ts',
       'check:local-paths': 'bun scripts/run-local-paths-check.ts',
       'check:test-timeouts': 'bun scripts/run-test-timeouts-check.ts',
+      'memory-capped': 'bash scripts/run-memory-capped.sh "$(bun scripts/read-memory-budget.ts)"',
     },
   });
 });
