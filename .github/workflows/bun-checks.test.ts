@@ -13,6 +13,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import invariant from 'tiny-invariant';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { createStubBun } from './create-stub-bun.ts';
 import { createStubCurl } from './create-stub-curl.ts';
@@ -1072,6 +1073,8 @@ test('it fails the docs check on a README over its line limit even when every li
 
 test('it fails the workflows check with the actionlint error of a tracked workflow', async () => {
   const ctx = await setupTest();
+
+  invariant(Bun.which('actionlint') !== null, 'install actionlint');
 
   await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
     .cwd(ctx.repo)
