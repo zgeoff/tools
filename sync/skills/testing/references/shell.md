@@ -42,39 +42,22 @@ exception: it names the code and gives its reason on the same line, as in
 
 ## Example
 
-A made-up `prune-logs.sh` takes a folder and a number of days, removes each `.log` file older than
-that, and prints each name it removes:
+A made-up `tag-release.sh` takes a version and exits 2 on one that is not a version. The test shows
+the shell-specific parts: an argument with a space stays one argument, `.nothrow()` keeps the exit
+code, and `.toString()` reads the output. Its assertions follow
+[Assertions](../SKILL.md#assertions).
 
 ```ts
-import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, readdir, rm, utimes, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { expect, test } from 'bun:test';
 import { join } from 'node:path';
 import { $ } from 'bun';
 
-async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'prune-logs-'));
+test('it refuses a version with a space in it', async () => {
+  const result = await $`bash ${join(import.meta.dir, 'tag-release.sh')} ${'1.2 beta'}`
+    .nothrow()
+    .quiet();
 
-  onTestFinished(() => rm(directory, { recursive: true, force: true }));
-
-  return { directory, scriptPath: join(import.meta.dir, 'prune-logs.sh') };
-}
-
-test('it removes the logs older than the cutoff and keeps the rest', async () => {
-  const ctx = await setupTest();
-  const tenDaysAgo = new Date(Date.now() - 10 * 86_400_000);
-
-  await writeFile(join(ctx.directory, 'old.log'), 'old\n');
-  await utimes(join(ctx.directory, 'old.log'), tenDaysAgo, tenDaysAgo);
-  await writeFile(join(ctx.directory, 'new.log'), 'new\n');
-
-  const result = await $`bash ${ctx.scriptPath} ${ctx.directory} 7`.nothrow().quiet();
-
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  }).toStrictEqual({ exitCode: 0, stdout: 'removed old.log\n', stderr: '' });
-  expect(await readdir(ctx.directory)).toStrictEqual(['new.log']);
+  expect(result.exitCode).toBe(2);
+  expect(result.stderr.toString()).toBe("tag-release: '1.2 beta' is not a version\n");
 });
 ```
