@@ -19,11 +19,14 @@ async function setupTest() {
   const samplePath = join(directory, 'brew-tea.ts');
 
   const runOxlint = async (args: string[]) => {
-    const subprocess = Bun.spawn([oxlintBin, '-c', '.oxlintrc.json', ...args, 'brew-tea.ts'], {
-      cwd: directory,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
+    const subprocess = Bun.spawn(
+      [oxlintBin, '--threads=1', '-c', '.oxlintrc.json', ...args, 'brew-tea.ts'],
+      {
+        cwd: directory,
+        stdout: 'pipe',
+        stderr: 'pipe',
+      },
+    );
 
     const [exitCode, stdout] = await Promise.all([
       subprocess.exited,
