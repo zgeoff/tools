@@ -200,6 +200,16 @@
     ]
   },
   {
+    "name": "skill-pr-evidence",
+    "description": "The shared pr-evidence skill, which has an agent upload a PR screenshot to the files.geoff.cloud file drop and link it, never commit it; every repo takes it, because every agent that opens a pull request needs it",
+    "files": [
+      {
+        "source": "sync/skills/pr-evidence/SKILL.md",
+        "target": ".claude/skills/pr-evidence/SKILL.md"
+      }
+    ]
+  },
+  {
     "name": "hook-skill-gate",
     "description": "The skill-gate hook's entry point, which runs the gate from the @zgeoff/skill-gate package; the repo installs the package, keeps its path and tool gates in .claude/skill-gate.json, and registers the hook in .claude/settings.json with a PreToolUse matcher that names each gated tool",
     "optIn": true,
