@@ -39,3 +39,19 @@ the script also samples the anonymous memory, which the kernel cannot take back,
 interval. It exits with the command's status, or 1 when the kernel OOM-killed a process in the
 cgroup. In GitHub Actions, the OOM line is an error annotation. The `none` mode prints only its
 warning, before the command starts, and exits with the command's status.
+
+## The worker count
+
+A test run's memory grows in a straight line with its workers, and `bun test --parallel` with no
+count starts one worker per core, so the worker count follows the host's memory. The worker-count
+helper, delivered by the `pre-push-baseline` entry as `scripts/read-worker-count.ts`, prints
+`TEST_WORKERS` when it is set. Otherwise a host whose memory budget is under the small-host budget
+gets one worker, and any other host gets one per core, up to a cap. The memory budget is the host's
+total memory, or the tightest cgroup cap on the process and its ancestors when that is lower, and
+`scripts/read-memory-budget.ts` prints it in MiB.
+
+A repo passes the count to each tool that starts workers:
+
+- `bun test --parallel=<count>`, always with the flag, `--parallel=1` included.
+- turbo's `--concurrency`, where each package's test script runs `bun test --parallel=1`.
+- `tsc --checkers`.
