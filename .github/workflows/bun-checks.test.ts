@@ -13,6 +13,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import invariant from 'tiny-invariant';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { createStubBun } from './create-stub-bun.ts';
 import { createStubCurl } from './create-stub-curl.ts';
@@ -460,10 +461,8 @@ test('it fails the fetch and downloads nothing when the job context lacks the co
 
   const downloaded = await Bun.file(join(ctx.bin, 'curl.urls')).exists();
 
-  expect({ exitCode: result.exitCode, downloaded }).toStrictEqual({
-    exitCode: 1,
-    downloaded: false,
-  });
+  expect(result.exitCode).toBe(1);
+  expect(downloaded).toBeFalse();
 });
 
 test('it gives a caller that passes no time limit the synced caller fallback', async () => {
@@ -582,19 +581,35 @@ test('it runs a private repo as one checks job with the scan, each shared check,
   expect(workflow).toMatchObject({
     jobs: {
       checks: {
-        if: `\${{ (github.event.repository && github.event.repository.private) || (!github.event.repository && inputs.private) }}`,
-        env: { PART: 'all' },
+        env: {
+          PART: 'all',
+          PROFILE: `\${{ ((github.event.repository && github.event.repository.private) || (!github.event.repository && inputs.private)) && 'private' || 'public' }}`,
+        },
         steps: [
-          { name: 'Checkout', with: { 'fetch-depth': 0, filter: 'blob:none' } },
-          { name: 'Gitleaks', if: 'inputs.gitleaks' },
-          { name: 'Setup Node' },
-          { name: 'Setup Bun' },
-          { name: 'Install' },
-          { name: 'Fetch the check scripts' },
-          { name: 'Install the check planner' },
-          { name: 'Plan the check scripts' },
-          { name: 'Setup shfmt' },
-          { name: 'Setup actionlint', id: 'setup-actionlint' },
+          {
+            name: 'Checkout',
+            if: "env.PROFILE == 'private'",
+            with: { 'fetch-depth': 0, filter: 'blob:none' },
+          },
+          { name: 'Gitleaks', if: "env.PROFILE == 'private' && inputs.gitleaks" },
+          {
+            name: 'Setup Node',
+            if: "env.PROFILE == 'private' && inputs.node-version != ''",
+            uses: expect.stringMatching(/^actions\/setup-node@/u),
+            with: { 'node-version': `\${{ inputs.node-version }}` },
+          },
+          {
+            name: 'Setup Bun',
+            if: "env.PROFILE == 'private'",
+            uses: expect.stringMatching(/^oven-sh\/setup-bun@/u),
+            with: { 'bun-version-file': '.bun-version' },
+          },
+          { name: 'Install', if: "env.PROFILE == 'private'" },
+          { name: 'Fetch the check scripts', if: "env.PROFILE == 'private'" },
+          { name: 'Install the check planner', if: "env.PROFILE == 'private'" },
+          { name: 'Plan the check scripts', if: "env.PROFILE == 'private'" },
+          { name: 'Setup shfmt', if: "env.PROFILE == 'private'" },
+          { name: 'Setup actionlint', id: 'setup-actionlint', if: "env.PROFILE == 'private'" },
           { name: 'Check shell', if: afterSetup },
           { name: 'Check docs', if: afterSetup },
           { name: 'Check workflows', if: afterSetup },
@@ -623,10 +638,27 @@ test('it runs a private repo as one checks job with the scan, each shared check,
             name: 'Lane host',
             if: `\${{ !cancelled() && steps.setup-actionlint.outcome == 'success' && contains(steps.plan.outputs.lanes, '"host"') }}`,
           },
+          { name: 'Require every job', if: `\${{ always() && env.PROFILE == 'public' }}` },
         ],
       },
     },
   });
+});
+
+test.each([
+  'Install',
+  'Fetch the check scripts',
+  'Install the check planner',
+  'Plan the check scripts',
+  'Setup shfmt',
+  'Setup actionlint',
+])('it runs the %s step of the static job in the private checks job', async (name) => {
+  const workflow = join(import.meta.dir, 'bun-checks.yml');
+
+  const { condition: _condition, ...staticStep } = await loadWorkflowStep(workflow, 'static', name);
+  const checksStep = await loadWorkflowStep(workflow, 'checks', name);
+
+  expect(checksStep).toStrictEqual({ ...staticStep, condition: "env.PROFILE == 'private'" });
 });
 
 test('it runs the static checks, the tests and each lane once through the private job bindings', async () => {
@@ -1040,6 +1072,8 @@ test('it fails the docs check on a README over its line limit even when every li
 test('it fails the workflows check with the actionlint error of a tracked workflow', async () => {
   const ctx = await setupTest();
 
+  invariant(Bun.which('actionlint') !== null, 'install actionlint');
+
   await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
     .cwd(ctx.repo)
     .env(ctx.gitEnv);
@@ -1170,3 +1204,140 @@ test('it fails the test timeouts check on a bunfig.toml that raises the test tim
     'bunfig.toml: [test] timeout = 30000 raises every test above the 5 s limit',
   );
 });
+
+test('it reports checks in a public repo after every public job, even after a failure or a cancel', async () => {
+  const text = await readFile(join(import.meta.dir, 'bun-checks.yml'), 'utf8');
+
+  const workflow: unknown = Bun.YAML.parse(text);
+
+  expect(workflow).toMatchObject({
+    jobs: {
+      checks: {
+        needs: ['gitleaks', 'plan', 'static', 'test', 'test-lane'],
+        if: `\${{ !cancelled() || !((github.event.repository && github.event.repository.private) || (!github.event.repository && inputs.private)) }}`,
+      },
+    },
+  });
+});
+
+test('it reports one job under the checks name, so the two profiles never report checks twice', async () => {
+  const text = await readFile(join(import.meta.dir, 'bun-checks.yml'), 'utf8');
+
+  const workflow: unknown = Bun.YAML.parse(text);
+
+  const jobs =
+    typeof workflow === 'object' && workflow !== null && 'jobs' in workflow ? workflow.jobs : {};
+
+  const entries: [string, unknown][] =
+    typeof jobs === 'object' && jobs !== null ? Object.entries(jobs) : [];
+
+  const names = entries.map(([id, job]) =>
+    typeof job === 'object' && job !== null && 'name' in job && typeof job.name === 'string'
+      ? job.name
+      : id,
+  );
+
+  expect(names.filter((name) => name === 'checks')).toStrictEqual(['checks']);
+});
+
+test.each([
+  [
+    'every job passed',
+    {
+      gitleaks: 'success',
+      plan: 'success',
+      static: 'success',
+      test: 'success',
+      'test-lane': 'success',
+    },
+    0,
+    [],
+  ],
+  [
+    'the scan and the lanes skipped by design',
+    {
+      gitleaks: 'skipped',
+      plan: 'success',
+      static: 'success',
+      test: 'success',
+      'test-lane': 'skipped',
+    },
+    0,
+    [],
+  ],
+  [
+    'the static job failed',
+    {
+      gitleaks: 'success',
+      plan: 'success',
+      static: 'failure',
+      test: 'success',
+      'test-lane': 'skipped',
+    },
+    1,
+    ['::error::static: failure'],
+  ],
+  [
+    'the test job failed and a lane was cancelled',
+    {
+      gitleaks: 'success',
+      plan: 'success',
+      static: 'success',
+      test: 'failure',
+      'test-lane': 'cancelled',
+    },
+    1,
+    ['::error::test: failure', '::error::test-lane: cancelled'],
+  ],
+  [
+    'the plan failed, so the lanes skipped',
+    {
+      gitleaks: 'success',
+      plan: 'failure',
+      static: 'success',
+      test: 'success',
+      'test-lane': 'skipped',
+    },
+    1,
+    ['::error::plan: failure'],
+  ],
+  [
+    'the scan failed',
+    {
+      gitleaks: 'failure',
+      plan: 'success',
+      static: 'success',
+      test: 'success',
+      'test-lane': 'success',
+    },
+    1,
+    ['::error::gitleaks: failure'],
+  ],
+])(
+  'it ends the public checks job with the right status when %s',
+  async (_label, results, exitCode, errors) => {
+    const step = await loadWorkflowStep(
+      join(import.meta.dir, 'bun-checks.yml'),
+      'checks',
+      'Require every job',
+    );
+
+    const needs = Object.fromEntries(
+      Object.entries(results).map(([job, result]) => [job, { result, outputs: {} }]),
+    );
+
+    const result = await $`bash -c ${step.run}`
+      .env({ PATH: process.env['PATH'], NEEDS: JSON.stringify(needs) })
+      .nothrow()
+      .quiet();
+
+    const lines = result.stdout.toString().split('\n');
+
+    expect(step.env).toStrictEqual({ NEEDS: `\${{ toJSON(needs) }}` });
+
+    expect({
+      exitCode: result.exitCode,
+      errors: lines.filter((line) => line.startsWith('::error::')),
+    }).toStrictEqual({ exitCode, errors });
+  },
+);
