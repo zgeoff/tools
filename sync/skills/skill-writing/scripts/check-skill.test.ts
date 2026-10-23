@@ -80,6 +80,58 @@ test('it reads a name and description past quotes and trailing comments', async 
   expect(result.stdout).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
 });
 
+test('it fails a plain description that holds a colon and a space', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  How to run the demo service: start it, then seed it. Load it before a demo test.',
+    '---',
+  ]);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(1);
+
+  expect(result.stdout).toInclude(
+    '.claude/skills/demo/SKILL.md: description holds a colon and a space, which YAML reads as a key',
+  );
+});
+
+test('it passes a colon and a space inside a quoted or block description, on either line', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/quoted/SKILL.md', [
+    '---',
+    'name: quoted',
+    "description: 'How to run the demo service: start it, then seed it.'",
+    '---',
+  ]);
+
+  await ctx.writePage('.claude/skills/next-line/SKILL.md', [
+    '---',
+    'name: next-line',
+    'description:',
+    '  "How to run the demo service: start it, then seed it."',
+    '---',
+  ]);
+
+  await ctx.writePage('.claude/skills/block/SKILL.md', [
+    '---',
+    'name: block',
+    'description: >-',
+    '  How to run the demo service: start it, then seed it.',
+    '---',
+  ]);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('check-skill: 3 skills, 0 errors, 0 warnings\n');
+});
+
 test('it fails a description that holds only a comment', async () => {
   const ctx = await setupTest();
 
