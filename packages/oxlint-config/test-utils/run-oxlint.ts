@@ -8,7 +8,7 @@ export interface OxlintRun {
 export async function runOxlint(args: readonly string[], cwd: string): Promise<OxlintRun> {
   const oxlintBin = join(import.meta.dir, '..', '..', '..', 'node_modules', '.bin', 'oxlint');
 
-  // oxlint starts a JS plugin worker per core, so a test run with a worker per core would start one
+  // oxlint lints on a thread per core, so a test run with a worker per core would start a thread
   // per core per worker and starve the other tests; one thread changes no result.
   const subprocess = Bun.spawn([oxlintBin, '--threads=1', ...args], {
     cwd,

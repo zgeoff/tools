@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runOxlint } from './run-oxlint.ts';
@@ -31,4 +31,58 @@ test('it gives exit code 0 for a clean file', async () => {
   const run = await runOxlint(['-A', 'all', '-D', 'no-debugger', 'kettle.js'], ctx.directory);
 
   expect(run.exitCode).toBe(0);
+});
+
+test('it runs oxlint with one lint thread', async () => {
+  const ctx = await setupTest();
+
+  // The probe rule records the thread count of the oxlint process, which grows with each lint
+  // thread, so the run through the helper must match a run that asks for one thread itself.
+  const plugin =
+    "import { appendFileSync, readFileSync } from 'node:fs';\n" +
+    "const status = () => readFileSync('/proc/self/status', 'utf8');\n" +
+    'export default {\n' +
+    "  meta: { name: 'probe' },\n" +
+    '  rules: {\n' +
+    '    threads: {\n' +
+    '      create() {\n' +
+    "        appendFileSync(new URL('./threads.txt', import.meta.url), /^Threads:\\s+(\\d+)$/m.exec(status())[1]);\n" +
+    '        return {};\n' +
+    '      },\n' +
+    '    },\n' +
+    '  },\n' +
+    '};\n';
+
+  const config = JSON.stringify({
+    jsPlugins: ['./probe.mjs'],
+    rules: { 'probe/threads': 'error' },
+  });
+
+  await mkdir(join(ctx.directory, 'helper'));
+  await mkdir(join(ctx.directory, 'reference'));
+  await writeFile(join(ctx.directory, 'helper', 'probe.mjs'), plugin);
+  await writeFile(join(ctx.directory, 'reference', 'probe.mjs'), plugin);
+  await writeFile(join(ctx.directory, 'helper', '.oxlintrc.json'), config);
+  await writeFile(join(ctx.directory, 'reference', '.oxlintrc.json'), config);
+  await writeFile(join(ctx.directory, 'helper', 'kettle.js'), 'export const cups = 2;\n');
+  await writeFile(join(ctx.directory, 'reference', 'kettle.js'), 'export const cups = 2;\n');
+  await runOxlint(['-c', '.oxlintrc.json', 'kettle.js'], join(ctx.directory, 'helper'));
+
+  const reference = Bun.spawn(
+    [
+      join(import.meta.dir, '..', '..', '..', 'node_modules', '.bin', 'oxlint'),
+      '--threads=1',
+      '-c',
+      '.oxlintrc.json',
+      'kettle.js',
+    ],
+    { cwd: join(ctx.directory, 'reference'), stdout: 'ignore', stderr: 'ignore' },
+  );
+
+  await reference.exited;
+
+  const helperThreads = await readFile(join(ctx.directory, 'helper', 'threads.txt'), 'utf8');
+  const referenceThreads = await readFile(join(ctx.directory, 'reference', 'threads.txt'), 'utf8');
+
+  expect(helperThreads).toBe(referenceThreads);
 });
