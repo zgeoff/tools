@@ -1,61 +1,62 @@
 import { basename, relative, sep } from 'node:path';
-import resolveRepoRoot from './resolve-repo-root.js';
 
 const runnerNames = new Set(['test', 'it', 'describe']);
 
-const maxTestTimeout = {
-  meta: {
-    type: 'problem',
-    messages: {
-      timeout:
-        'Keep this timeout of {{timeoutMs}} ms within the 5 s limit, or move the test into a lane: a root `e2e/` suite, or a `*.browser.test.ts`, `*.docker.test.ts` or `*.host.test.ts` file.',
-    },
-    schema: [
-      {
-        type: 'object',
-        properties: {
-          lanes: { type: 'array', items: { type: 'string' } },
+export default function buildMaxTestTimeout(resolveRoot) {
+  return {
+    meta: {
+      type: 'problem',
+      messages: {
+        timeout:
+          'Keep this timeout of {{timeoutMs}} ms within the 5 s limit, or move the test into a lane: a root `e2e/` suite, or a `*.browser.test.ts`, `*.docker.test.ts` or `*.host.test.ts` file.',
+      },
+      schema: [
+        {
+          type: 'object',
+          properties: {
+            lanes: { type: 'array', items: { type: 'string' } },
+          },
+          additionalProperties: false,
         },
-        additionalProperties: false,
-      },
-    ],
-  },
-  create(context) {
-    const lanes = new Set(['browser', 'docker', 'host', ...(context.options[0]?.lanes ?? [])]);
+      ],
+    },
+    create(context) {
+      const lanes = new Set(['browser', 'docker', 'host', ...(context.options[0]?.lanes ?? [])]);
 
-    if (probeLaneFile(context, lanes)) {
-      return {};
-    }
+      const filename = context.physicalFilename;
+      const root = resolveRoot(filename) ?? context.cwd;
 
-    return {
-      CallExpression(node) {
-        // the inner call of `test.each(rows)(…)` takes the rows, not a timeout
-        if (node.parent.type === 'CallExpression' && node.parent.callee === node) {
-          return;
-        }
+      if (isLaneFile(relative(root, filename), lanes)) {
+        return {};
+      }
 
-        const name = findRunnerName(context, node.callee);
+      return {
+        CallExpression(node) {
+          // the inner call of `test.each(rows)(…)` takes the rows, not a timeout
+          if (node.parent.type === 'CallExpression' && node.parent.callee === node) {
+            return;
+          }
 
-        if (name === 'setDefaultTimeout') {
-          emitTimeouts(context, node.arguments.slice(0, 1));
-        } else if (name !== null && runnerNames.has(name)) {
-          emitTimeouts(context, node.arguments.slice(1));
-        }
-      },
-    };
-  },
-};
+          const name = findRunnerName(context, node.callee);
 
-export default maxTestTimeout;
+          if (name === 'setDefaultTimeout') {
+            emitTimeouts(context, node.arguments.slice(0, 1));
+          } else if (name !== null && runnerNames.has(name)) {
+            emitTimeouts(context, node.arguments.slice(1));
+          }
+        },
+      };
+    },
+  };
+}
 
 const laneTestPattern = /\.(?<lane>[^.]+)\.test\.tsx?$/u;
 
-// the repo root, not oxlint's working directory, so a per-package lint script
-// reads the same root `e2e/` as a run from the root
-function probeLaneFile(context, lanes) {
-  const filename = context.physicalFilename;
-  const lane = laneTestPattern.exec(basename(filename))?.groups?.lane;
-  const [first] = relative(resolveRepoRoot(filename) ?? context.cwd, filename).split(sep);
+// relative to the repo root, not oxlint's working directory, so a per-package
+// lint script reads the same root `e2e/` as a run from the root
+function isLaneFile(path, lanes) {
+  const lane = laneTestPattern.exec(basename(path))?.groups?.lane;
+  const [first] = path.split(sep);
 
   return first === 'e2e' || (lane !== undefined && lanes.has(lane));
 }
