@@ -115,6 +115,59 @@ test('it refuses a streaming query', async () => {
   );
 });
 
+test('it keeps a second acquire waiting while the first caller holds the connection', async () => {
+  const ctx = setupTest();
+
+  await ctx.driver.acquireConnection();
+
+  const second = ctx.driver.acquireConnection();
+
+  // An immediate fires only after every queued promise callback has run, so
+  // an acquire still pending here waits on the holder and nothing else.
+  await setImmediate();
+
+  expect(Bun.peek.status(second)).toBe('pending');
+});
+
+test('it hands the connection to a waiting acquire once the first caller releases it', async () => {
+  const ctx = setupTest();
+
+  const connection = await ctx.driver.acquireConnection();
+
+  const second = ctx.driver.acquireConnection();
+
+  await ctx.driver.releaseConnection(connection);
+
+  await expect(second).toResolve();
+});
+
+test('it hands the connection to waiting acquires in the order they asked', async () => {
+  const ctx = setupTest();
+
+  const connection = await ctx.driver.acquireConnection();
+
+  const order: string[] = [];
+
+  const second = (async () => {
+    const held = await ctx.driver.acquireConnection();
+
+    order.push('second');
+
+    await ctx.driver.releaseConnection(held);
+  })();
+
+  const third = (async () => {
+    await ctx.driver.acquireConnection();
+
+    order.push('third');
+  })();
+
+  await ctx.driver.releaseConnection(connection);
+  await Promise.all([second, third]);
+
+  expect(order).toStrictEqual(['second', 'third']);
+});
+
 test('it waits for the caller that holds the connection before it finishes destroying', async () => {
   const ctx = setupTest();
 
