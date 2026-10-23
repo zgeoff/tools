@@ -20,7 +20,7 @@ async function setupTest() {
   const lint = async (source: string) => {
     await writeFile(join(directory, 'sample.ts'), source);
 
-    const subprocess = Bun.spawn([oxlintBin, '-c', '.oxlintrc.json', 'sample.ts'], {
+    const subprocess = Bun.spawn([oxlintBin, '--threads=1', '-c', '.oxlintrc.json', 'sample.ts'], {
       cwd: directory,
       stdout: 'pipe',
       stderr: 'pipe',

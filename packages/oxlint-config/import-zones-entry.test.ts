@@ -174,11 +174,14 @@ test('it returns the edges that the rule reports for the same import', async () 
 
   await writeFile(join(ctx.directory, 'scripts', 'seed.ts'), 'export function seed(): void {}\n');
 
-  const subprocess = Bun.spawn([ctx.oxlintBin, '-c', '.oxlintrc.json', 'src/main.ts'], {
-    cwd: ctx.directory,
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
+  const subprocess = Bun.spawn(
+    [ctx.oxlintBin, '--threads=1', '-c', '.oxlintrc.json', 'src/main.ts'],
+    {
+      cwd: ctx.directory,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+  );
 
   const [exitCode, stdout] = await Promise.all([
     subprocess.exited,
@@ -238,11 +241,14 @@ test('it accepts every option that the types name in the rule', async () => {
   await writeFile(join(ctx.directory, '.oxlintrc.json'), JSON.stringify(config));
   await writeFile(join(ctx.directory, 'src', 'shared', 'clock.ts'), 'export const tick = 1;\n');
 
-  const subprocess = Bun.spawn([ctx.oxlintBin, '-c', '.oxlintrc.json', 'src/shared/clock.ts'], {
-    cwd: ctx.directory,
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
+  const subprocess = Bun.spawn(
+    [ctx.oxlintBin, '--threads=1', '-c', '.oxlintrc.json', 'src/shared/clock.ts'],
+    {
+      cwd: ctx.directory,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+  );
 
   const [exitCode, stderr] = await Promise.all([
     subprocess.exited,
