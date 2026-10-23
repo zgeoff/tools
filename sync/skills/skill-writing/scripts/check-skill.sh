@@ -210,10 +210,10 @@ sub pick_scalar_style {
 }
 
 # A colon followed by a space or the line end starts a mapping inside a plain YAML scalar, so a
-# loader rejects the frontmatter.
+# loader rejects the frontmatter. A space and a hash end the scalar and start a comment.
 sub has_key_colon {
   my ($text) = @_;
-  return $text =~ /:(?:\s|\z)/;
+  return ($text =~ s/\s+#.*\z//r) =~ /:(?:\s|\z)/;
 }
 
 # Returns the value of a scalar: the text inside its quotes, or plain text without a trailing comment.

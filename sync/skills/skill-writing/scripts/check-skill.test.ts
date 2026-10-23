@@ -140,6 +140,23 @@ test('it passes a colon and a space inside a quoted or block description, on eit
   expect(result.stdout).toBe('check-skill: 4 skills, 0 errors, 0 warnings\n');
 });
 
+test('it reads no colon in a comment after a plain description line', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Commands for the demo service. # usage: local',
+    '---',
+  ]);
+
+  const result = ctx.run();
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
+});
+
 test('it fails a description that holds only a comment', async () => {
   const ctx = await setupTest();
 
