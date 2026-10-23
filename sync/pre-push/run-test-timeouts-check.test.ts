@@ -124,6 +124,8 @@ test('it reports a bun test that a wrapper script runs', async () => {
 test.each([
   ['a quoted name pattern', 'bun test --test-name-pattern "--timeout=30000"'],
   ['an echo of the command', 'echo "bun test --timeout=30000"'],
+  ['an unquoted echo of the command', 'echo bun test --timeout=30000 && bun test'],
+  ['a printf of the command', "CI=1 printf '%s' bun test --timeout=30000"],
   ['an escaped flag', String.raw`bun test \--timeout=30000`],
 ])('it leaves %s alone', async (_, command) => {
   const ctx = await setupTest();

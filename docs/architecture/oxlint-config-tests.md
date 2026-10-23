@@ -99,7 +99,7 @@ shared pull-request checks. It reports:
 
 - each `--timeout` above the default, in either the `--timeout 20000` or the `--timeout=20000` form,
   among the words after `bun test` in a `package.json` script, where a quoted or escaped word is a
-  value and never a flag;
+  value and never a flag, and an `echo` or `printf` command runs no `bun test`;
 - each `bunfig.toml` whose `[test] timeout` is above the default.
 
 It exempts the `test:related` script, which runs the shared related-test runner, and each lane

@@ -116,12 +116,23 @@ function collectScriptFindings(
   });
 }
 
+const assignmentPattern = /^[A-Za-z_][A-Za-z0-9_]*=/u;
+
+// A wrapper such as `bash with-home.sh bun test` runs the words after it, and these only print them.
+const printCommands = new Set(['echo', 'printf']);
+
 // `--timeout 20000` and `--timeout=20000` both reach `bun test`, and a quoted word, such as a name
 // pattern, is a value rather than a flag.
 function collectTimeoutValues(command: string): number[] {
   const values: number[] = [];
 
   for (const words of parseShellCommands(command)) {
+    const name = words.find((word) => word.isQuoted || !assignmentPattern.test(word.text));
+
+    if (name !== undefined && !name.isQuoted && printCommands.has(name.text)) {
+      continue;
+    }
+
     const start = words.findIndex(
       (word, index) => isBareWord(word, 'bun') && isBareWord(words[index + 1], 'test'),
     );
