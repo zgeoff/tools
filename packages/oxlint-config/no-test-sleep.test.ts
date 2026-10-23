@@ -21,6 +21,14 @@ test.each([
     "import * as timers from 'node:timers/promises';\n\ntest('it brews', async () => {\n  await timers.setTimeout(50);\n});\n",
   ],
   [
+    'the sleep of the bun module',
+    "import { sleep } from 'bun';\n\ntest('it brews', async () => {\n  await sleep(50);\n});\n",
+  ],
+  [
+    'the sleepSync of a bun namespace',
+    "import * as bun from 'bun';\n\ntest('it brews', () => {\n  bun.sleepSync(50);\n});\n",
+  ],
+  [
     'a sleep in a helper whose name is not a wait helper',
     "test('it brews', async () => {\n  const pause = () => Bun.sleep(50);\n\n  await pause();\n});\n",
   ],

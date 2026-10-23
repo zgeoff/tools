@@ -74,10 +74,11 @@ a lane's work. The rule reports, in any linted file, a timeout above that defaul
 - the `timeout` of an options object in the same place;
 - the argument of `setDefaultTimeout`.
 
-The names come from `bun:test`, under their imported names when an import renames them, or are the
-globals that `bun test` defines. A name bound any other way, such as an import from another module,
-is not checked. The rule reads a number literal, arithmetic on number literals, and a `const` that
-holds one of them; it leaves any other value unreported, such as one read from the environment.
+The names come from `bun:test`, under their imported names when an import renames them or as members
+of a namespace import, or are the globals that `bun test` defines. A name bound any other way, such
+as an import from another module, is not checked. The rule reads a number literal, arithmetic on
+number literals, and a `const` that holds one of them; it leaves any other value unreported, such as
+one read from the environment.
 
 A lane file is exempt: each file under the `e2e/` directory at the repo root, which
 `zgeoff/test-beside-module` anchors the same way, and each `<name>.<lane>.test.ts` or `.test.tsx`
@@ -97,7 +98,8 @@ holds them, as the `test-timeouts` job before a push and the `Check test timeout
 shared pull-request checks. It reports:
 
 - each `--timeout` above the default, in either the `--timeout 20000` or the `--timeout=20000` form,
-  in a `bun test` command of a `package.json` script;
+  among the words after `bun test` in a `package.json` script, where a quoted or escaped word is a
+  value and never a flag;
 - each `bunfig.toml` whose `[test] timeout` is above the default.
 
 It exempts the `test:related` script, which runs the shared related-test runner, and each lane
@@ -109,7 +111,8 @@ the `lanes` option of `zgeoff/max-test-timeout` in the root `.oxlintrc.json`.
 A test waits on a condition, never a fixed delay, as the testing skill requires. In a
 `<name>.test.ts` or `<name>.test.tsx` file, lane suites included, the rule reports:
 
-- `Bun.sleep` and `Bun.sleepSync`;
+- `Bun.sleep` and `Bun.sleepSync`, and the `sleep` and `sleepSync` of the `bun` module under any
+  local name or through a namespace import;
 - the `setTimeout` of `node:timers/promises` or `timers/promises`, under any local name or through a
   namespace import;
 - a `setTimeout` or `globalThis.setTimeout` call inside the executor of a `new Promise`.

@@ -56,6 +56,20 @@ test('it reports a timeout on test under an alias of its import', async () => {
   expect(result.stdout).toInclude('zgeoff(max-test-timeout)');
 });
 
+test.each([
+  ["runner.test('it brews', () => {}, 20_000);\n"],
+  ["runner.test.skipIf(false)('it brews', () => {}, 20_000);\n"],
+  ['runner.setDefaultTimeout(20_000);\n'],
+])('it reports a timeout through a namespace import of bun:test: %s', async (body) => {
+  const source = `import * as runner from 'bun:test';\n\n${body}`;
+
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', {
+    'zgeoff/max-test-timeout': 'error',
+  });
+
+  expect(result.stdout).toInclude('zgeoff(max-test-timeout)');
+});
+
 test('it reports setDefaultTimeout in a preload that is not a test file', async () => {
   const source = "import { setDefaultTimeout } from 'bun:test';\n\nsetDefaultTimeout(30_000);\n";
 

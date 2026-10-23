@@ -3,7 +3,11 @@ import findFunctionName from './find-function-name.js';
 
 const testFilePattern = /\.test\.tsx?$/u;
 
-const timerPromiseModules = new Set(['node:timers/promises', 'timers/promises']);
+const sleepExports = new Map([
+  ['node:timers/promises', new Set(['setTimeout'])],
+  ['timers/promises', new Set(['setTimeout'])],
+  ['bun', new Set(['sleep', 'sleepSync'])],
+]);
 
 const noTestSleep = {
   meta: {
@@ -24,9 +28,11 @@ const noTestSleep = {
         emitSleep(context, node);
       },
       ImportDeclaration(node) {
-        if (timerPromiseModules.has(node.source.value)) {
+        const names = sleepExports.get(node.source.value);
+
+        if (names !== undefined) {
           for (const variable of context.sourceCode.getDeclaredVariables(node)) {
-            emitTimerPromiseReads(context, variable);
+            emitSleepReads(context, variable, names);
           }
         }
       },
@@ -72,11 +78,11 @@ function isInWaitHelper(node) {
   return false;
 }
 
-function emitTimerPromiseReads(context, variable) {
+function emitSleepReads(context, variable, names) {
   const [definition] = variable.defs;
   const isNamespace = definition.node.type === 'ImportNamespaceSpecifier';
 
-  if (!isNamespace && findImportedName(definition.node) !== 'setTimeout') {
+  if (!isNamespace && !names.has(findImportedName(definition.node))) {
     return;
   }
 
@@ -85,7 +91,7 @@ function emitTimerPromiseReads(context, variable) {
 
     if (
       !isNamespace ||
-      (node.type === 'MemberExpression' && !node.computed && node.property.name === 'setTimeout')
+      (node.type === 'MemberExpression' && !node.computed && names.has(node.property.name))
     ) {
       emitSleep(context, node);
     }

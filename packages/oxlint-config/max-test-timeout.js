@@ -62,11 +62,13 @@ function probeLaneFile(context, lanes) {
 
 function findRunnerName(context, callee) {
   let current = callee;
+  let member = null;
 
   while (current.type !== 'Identifier') {
     if (current.type === 'CallExpression') {
       current = current.callee;
     } else if (current.type === 'MemberExpression' && !current.computed) {
+      member = current;
       current = current.object;
     } else {
       return null;
@@ -82,15 +84,18 @@ function findRunnerName(context, callee) {
   const [definition] = variable.defs;
 
   if (
-    variable.defs.length === 1 &&
-    definition.type === 'ImportBinding' &&
-    definition.node.type === 'ImportSpecifier' &&
-    definition.parent.source.value === 'bun:test'
+    variable.defs.length !== 1 ||
+    definition.type !== 'ImportBinding' ||
+    definition.parent.source.value !== 'bun:test'
   ) {
-    return getImportedName(definition.node);
+    return null;
   }
 
-  return null;
+  if (definition.node.type === 'ImportNamespaceSpecifier') {
+    return member?.property.name ?? null;
+  }
+
+  return definition.node.type === 'ImportSpecifier' ? getImportedName(definition.node) : null;
 }
 
 // a name with no declaration reads the global that `bun test` defines
