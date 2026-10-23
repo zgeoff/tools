@@ -39,13 +39,15 @@ comment names, since the copy is otherwise verbatim. `workflow-bun-pr` runs
 ## Skills
 
 Files under [`skills/`](../../sync/skills/) are the shared base of a Claude skill, each delivered by
-its opt-in `skill-<name>` entry to `.claude/skills/<name>/`. The code-style base lives in this
-repo's own [`.claude/skills/code-style/`](../../.claude/skills/code-style/), because this repo's
-agents load it there and the verb-contract lint rule's test reads its role table from it. A repo
-keeps its own rules for the same area in a `project-<name>` skill beside it, which repo-sync never
-touches, and the shared skill tells the reader to load both. The entry lists every file in its skill
-folder, since the skill links its references by relative path; `scripts/check-sync-manifest.sh`
-fails on a file the entry omits. A skill's tests sit beside its scripts and stay in tools.
+its `skill-<name>` entry to `.claude/skills/<name>/`. A skill entry is opt-in, so a repo takes only
+the skills for the work it holds. One exception: `skill-pr-evidence` reaches every repo, because
+every agent that opens a pull request needs it. The code-style base lives in this repo's own
+[`.claude/skills/code-style/`](../../.claude/skills/code-style/), because this repo's agents load it
+there and the verb-contract lint rule's test reads its role table from it. A repo keeps its own
+rules for the same area in a `project-<name>` skill beside it, which repo-sync never touches, and
+the shared skill tells the reader to load both. The entry lists every file in its skill folder,
+since the skill links its references by relative path; `scripts/check-sync-manifest.sh` fails on a
+file the entry omits. A skill's tests sit beside its scripts and stay in tools.
 
 A reference that fits only some repos, such as one for a language a repo never uses, names the other
 repos in its `except`, so they never load it. Every link to it in the entry's Markdown files sits in
