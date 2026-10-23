@@ -461,10 +461,8 @@ test('it fails the fetch and downloads nothing when the job context lacks the co
 
   const downloaded = await Bun.file(join(ctx.bin, 'curl.urls')).exists();
 
-  expect({ exitCode: result.exitCode, downloaded }).toStrictEqual({
-    exitCode: 1,
-    downloaded: false,
-  });
+  expect(result.exitCode).toBe(1);
+  expect(downloaded).toBeFalse();
 });
 
 test('it gives a caller that passes no time limit the synced caller fallback', async () => {
@@ -1335,10 +1333,11 @@ test.each([
 
     const lines = result.stdout.toString().split('\n');
 
+    expect(step.env).toStrictEqual({ NEEDS: `\${{ toJSON(needs) }}` });
+
     expect({
       exitCode: result.exitCode,
       errors: lines.filter((line) => line.startsWith('::error::')),
-      bindings: step.env,
-    }).toStrictEqual({ exitCode, errors, bindings: { NEEDS: `\${{ toJSON(needs) }}` } });
+    }).toStrictEqual({ exitCode, errors });
   },
 );
