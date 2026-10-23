@@ -3,6 +3,8 @@
 import { existsSync } from 'node:fs';
 import { availableParallelism, totalmem } from 'node:os';
 import { basename, join } from 'node:path';
+import { parseArgs } from 'node:util';
+import { readOptionalText } from './read-memory-budget.ts';
 import { readWorkerCount } from './read-worker-count.ts';
 import type { WorkerCountSources } from './read-worker-count.ts';
 
@@ -77,21 +79,41 @@ type RelatedTestArgs =
   | { readonly kind: 'invalid'; readonly message: string };
 
 function parseRelatedTestArgs(args: readonly string[]): RelatedTestArgs {
-  const [first, ...rest] = args;
-  const maxFiles = /^--max-files=(?<count>.*)$/u.exec(first ?? '')?.groups?.['count'];
+  const parsed = parseCLIArgs(args);
 
-  if (maxFiles === undefined) {
-    return { kind: 'valid', maxFiles: defaultMaxTestFiles, paths: args };
+  if (parsed instanceof Error) {
+    return { kind: 'invalid', message: parsed.message };
   }
 
-  if (!/^[1-9]\d*$/u.test(maxFiles)) {
+  const maxFiles = parsed.values['max-files'];
+
+  if (maxFiles === undefined) {
+    return { kind: 'valid', maxFiles: defaultMaxTestFiles, paths: parsed.positionals };
+  }
+
+  const count = Number(maxFiles);
+
+  if (!/^[1-9]\d*$/u.test(maxFiles) || !Number.isSafeInteger(count)) {
     return {
       kind: 'invalid',
       message: `--max-files is ${maxFiles}; set it to a whole number above 0`,
     };
   }
 
-  return { kind: 'valid', maxFiles: Number(maxFiles), paths: rest };
+  return { kind: 'valid', maxFiles: count, paths: parsed.positionals };
+}
+
+// parseArgs throws on an option it does not declare, which the caller reports as a refused input.
+function parseCLIArgs(args: readonly string[]) {
+  try {
+    return parseArgs({
+      args: [...args],
+      options: { 'max-files': { type: 'string' } },
+      allowPositionals: true,
+    });
+  } catch (error) {
+    return error instanceof Error ? error : new Error(String(error));
+  }
 }
 
 type RelatedTestPlan =
@@ -158,6 +180,7 @@ if (import.meta.main) {
     totalMemory: totalmem(),
     procRoot: '/proc',
     cgroupRoot: '/sys/fs/cgroup',
+    readText: readOptionalText,
   });
 
   process.exit(exitCode);

@@ -287,15 +287,38 @@ test('#runRelatedTests skips past the cap that --max-files sets', async () => {
   });
 });
 
-test('#runRelatedTests exits 2 for a --max-files that is not a whole number above 0', async () => {
+test.each([['none'], ['0'], ['9'.repeat(30)]])(
+  '#runRelatedTests exits 2 for a --max-files of %s',
+  async (value) => {
+    const ctx = await setupTest();
+
+    const result =
+      await $`bun ${join(import.meta.dir, 'run-related-tests.ts')} --max-files=${value} src/a.ts`
+        .cwd(ctx.directory)
+        .env({ PATH: process.env['PATH'] ?? '' })
+        .nothrow()
+        .quiet();
+
+    expect({
+      exitCode: result.exitCode,
+      stdout: result.stdout.toString(),
+      stderr: result.stderr.toString(),
+    }).toStrictEqual({
+      exitCode: 2,
+      stdout: '',
+      stderr: `run-related-tests: --max-files is ${value}; set it to a whole number above 0\n`,
+    });
+  },
+);
+
+test('#runRelatedTests exits 2 for an option it does not declare', async () => {
   const ctx = await setupTest();
 
-  const result =
-    await $`bun ${join(import.meta.dir, 'run-related-tests.ts')} --max-files=none src/a.ts`
-      .cwd(ctx.directory)
-      .env({ PATH: process.env['PATH'] ?? '' })
-      .nothrow()
-      .quiet();
+  const result = await $`bun ${join(import.meta.dir, 'run-related-tests.ts')} --max-file=2 src/a.ts`
+    .cwd(ctx.directory)
+    .env({ PATH: process.env['PATH'] ?? '' })
+    .nothrow()
+    .quiet();
 
   expect({
     exitCode: result.exitCode,
@@ -304,7 +327,7 @@ test('#runRelatedTests exits 2 for a --max-files that is not a whole number abov
   }).toStrictEqual({
     exitCode: 2,
     stdout: '',
-    stderr: 'run-related-tests: --max-files is none; set it to a whole number above 0\n',
+    stderr: expect.toStartWith("run-related-tests: Unknown option '--max-file'"),
   });
 });
 
