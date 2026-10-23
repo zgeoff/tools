@@ -52,8 +52,9 @@ repos too, so an edit to one of them changes every repo that takes it.
 
 ## Commands
 
-- Run `bun test` from the repo root. The jest-extended preload lives in the root `bunfig.toml`, so a
-  run from a package folder lacks the extra matchers.
+- Run `bun run test` from the repo root, which hands `bun test` this host's worker count. The
+  jest-extended preload lives in the root `bunfig.toml`, so a run from a package folder lacks the
+  extra matchers.
 - `bun run format` fixes formatting. lefthook runs the light checks before a commit and a push, and
   CI runs the rest.
 - `bun run lint` is plain oxlint. `bun run lint:full` adds the type-aware pass and tsgolint's type

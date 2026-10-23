@@ -40,6 +40,8 @@ The entry delivers these files, and their tests stay in tools:
 - `scripts/run-test-timeouts-check.ts` — fails each `bun test --timeout` above the default timeout
   in a `package.json` script, and each `bunfig.toml` whose `[test] timeout` is above it, as
   [the test timeout check](./oxlint-config-tests.md#the-test-timeout-check) describes.
+- `scripts/read-worker-count.ts` and `scripts/read-memory-budget.ts` — print the
+  [worker count and the memory budget](./memory-caps.md#the-worker-count) of the host.
 - `scripts/read-branch-base.ts`, `scripts/parse-added-lines.ts` and `scripts/run-program.ts` — the
   modules these scripts import.
 

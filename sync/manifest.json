@@ -261,6 +261,14 @@
         "target": "scripts/run-program.ts"
       },
       {
+        "source": "sync/pre-push/read-memory-budget.ts",
+        "target": "scripts/read-memory-budget.ts"
+      },
+      {
+        "source": "sync/pre-push/read-worker-count.ts",
+        "target": "scripts/read-worker-count.ts"
+      },
+      {
         "source": "sync/pre-push/run-commits-check.ts",
         "target": "scripts/run-commits-check.ts"
       },
