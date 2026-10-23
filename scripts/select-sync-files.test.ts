@@ -17,12 +17,17 @@ test('it skips a file whose except names the repo and copies the rest', async ()
       .nothrow()
       .quiet();
 
-  expect(result.exitCode).toBe(0);
-
-  expect(result.stdout.toString()).toBe(
-    'copy\tsync/skills/demo/SKILL.md\t.claude/skills/demo/SKILL.md\t0644\n' +
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'copy\tsync/skills/demo/SKILL.md\t.claude/skills/demo/SKILL.md\t0644\n' +
       'skip\tsync/skills/demo/references/rust.md\t.claude/skills/demo/references/rust.md\t0644\n',
-  );
+    stderr: '',
+  });
 });
 
 test('it copies an excepted file to a repo the except does not name', async () => {
@@ -39,11 +44,16 @@ test('it copies an excepted file to a repo the except does not name', async () =
       .nothrow()
       .quiet();
 
-  expect(result.exitCode).toBe(0);
-
-  expect(result.stdout.toString()).toBe(
-    'copy\tsync/skills/demo/references/rust.md\t.claude/skills/demo/references/rust.md\t0644\n',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'copy\tsync/skills/demo/references/rust.md\t.claude/skills/demo/references/rust.md\t0644\n',
+    stderr: '',
+  });
 });
 
 test('it matches the repo name without regard to case', async () => {
@@ -56,6 +66,13 @@ test('it matches the repo name without regard to case', async () => {
       .nothrow()
       .quiet();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('skip\tsync/demo.md\tdemo.md\t0755\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'skip\tsync/demo.md\tdemo.md\t0755\n',
+    stderr: '',
+  });
 });

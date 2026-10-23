@@ -48,11 +48,18 @@ test('it fails when the plain repo README is over its limit', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stdout.toString()).toInclude(
-    'README.md: 61 lines, over the plain repo README limit of 60',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'README.md: 61 lines, over the plain repo README limit of 60 (target 50)\n' +
+      '\n' +
+      'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
 });
 
 test('it warns and passes when a README is over its target but within its limit', async () => {
@@ -62,11 +69,18 @@ test('it warns and passes when a README is over its target but within its limit'
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-
-  expect(result.stdout.toString()).toInclude(
-    'README.md: 55 lines, over the plain repo README target of 50',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'README.md: 55 lines, over the plain repo README target of 50 (limit 60; warning)\n' +
+      '\n' +
+      'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
 });
 
 test('it fails a package README over 130 lines beside a public package.json', async () => {
@@ -78,11 +92,18 @@ test('it fails a package README over 130 lines beside a public package.json', as
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stdout.toString()).toInclude(
-    'README.md: 131 lines, over the package README limit of 130',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'README.md: 131 lines, over the package README limit of 130 (target 120)\n' +
+      '\n' +
+      'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
 });
 
 test('it reads a README beside a private package.json as a package when --package names it', async () => {
@@ -94,11 +115,18 @@ test('it reads a README beside a private package.json as a package when --packag
 
   const result = await ctx.run('--package', 'README.md');
 
-  expect(result.exitCode).toBe(0);
-
-  expect(result.stdout.toString()).toInclude(
-    'README.md: 125 lines, over the package README target of 120',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'README.md: 125 lines, over the package README target of 120 (limit 130; warning)\n' +
+      '\n' +
+      'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
 });
 
 test('it fails a sub-package README over 70 lines', async () => {
@@ -109,11 +137,19 @@ test('it fails a sub-package README over 70 lines', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stdout.toString()).toInclude(
-    'kernel/README.md: 71 lines, over the sub-package README limit of 70',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'README.md: 10 lines (plain repo README; target 50, limit 60)\n' +
+      'kernel/README.md: 71 lines, over the sub-package README limit of 70 (target 60)\n' +
+      '\n' +
+      'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
 });
 
 test('it warns and passes when a docs file is over its cap', async () => {
@@ -124,11 +160,19 @@ test('it warns and passes when a docs file is over its cap', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-
-  expect(result.stdout.toString()).toInclude(
-    'docs/architecture/overview.md: 251 lines, over the docs cap of 250',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'README.md: 10 lines (plain repo README; target 50, limit 60)\n' +
+      'docs/architecture/overview.md: 251 lines, over the docs cap of 250 (warning: cut points, then split at a code boundary)\n' +
+      '\n' +
+      'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
 });
 
 test('it holds a runbook to a cap of 300 lines', async () => {
@@ -139,12 +183,18 @@ test('it holds a runbook to a cap of 300 lines', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).not.toInclude('docs/runbooks/operations.md');
-
-  expect(result.stdout.toString()).toInclude(
-    'docs/runbooks/releasing.md: 301 lines, over the docs cap of 300',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'docs/runbooks/releasing.md: 301 lines, over the docs cap of 300 (warning: cut points, then split at a code boundary)\n' +
+      '\n' +
+      'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
 });
 
 test('it reads docs/README.md as a doc, not as a README', async () => {
@@ -154,8 +204,15 @@ test('it reads docs/README.md as a doc, not as a README', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).not.toInclude('docs/README.md');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: '\ncheck-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
 });
 
 test('it passes when every README and doc is under its limit and cap', async () => {
@@ -166,13 +223,18 @@ test('it passes when every README and doc is under its limit and cap', async () 
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-
-  expect(result.stdout.toString()).toInclude(
-    'README.md: 50 lines (plain repo README; target 50, limit 60)',
-  );
-
-  expect(result.stdout.toString()).toInclude('check-prose: clean');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'README.md: 50 lines (plain repo README; target 50, limit 60)\n' +
+      '\n' +
+      'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
 });
 
 test('it fails when check-prose finds a violation in a doc', async () => {
@@ -185,8 +247,20 @@ test('it fails when check-prose finds a violation in a doc', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('docs/overview.md:1:The cache is load-bearing.');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'README.md: 10 lines (plain repo README; target 50, limit 60)\n' +
+      '\n' +
+      'Banned words:\n' +
+      'docs/overview.md:1:The cache is load-bearing.\n' +
+      '\n',
+    stderr: '',
+  });
 });
 
 test('it fails when check-prose finds a violation in a skill', async () => {
@@ -197,11 +271,20 @@ test('it fails when check-prose finds a violation in a skill', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stdout.toString()).toInclude(
-    '.claude/skills/demo/SKILL.md:1:The cache is load-bearing.',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'README.md: 10 lines (plain repo README; target 50, limit 60)\n' +
+      '\n' +
+      'Banned words:\n' +
+      '.claude/skills/demo/SKILL.md:1:The cache is load-bearing.\n' +
+      '\n',
+    stderr: '',
+  });
 });
 
 test('it skips a skill that git marks linguist-vendored', async () => {
@@ -213,8 +296,18 @@ test('it skips a skill that git marks linguist-vendored', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).not.toInclude('load-bearing');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'README.md: 10 lines (plain repo README; target 50, limit 60)\n' +
+      '\n' +
+      'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
 });
 
 test('it fails when the repo has check-skill and a skill fails it', async () => {
@@ -233,19 +326,36 @@ test('it fails when the repo has check-skill and a skill fails it', async () => 
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('.claude/skills/demo/SKILL.md: has no description');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'README.md: 10 lines (plain repo README; target 50, limit 60)\n' +
+      '\n' +
+      'check-prose: clean (candidates above, if any, need judgment only)\n' +
+      '\n' +
+      '.claude/skills/demo/SKILL.md: has no description\n' +
+      'check-skill: 1 skills, 1 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it rejects --package naming a missing README', async () => {
   const ctx = await setupTest();
   const result = await ctx.run('--package', 'README.md');
 
-  expect(result.exitCode).toBe(2);
-
-  expect(result.stderr.toString()).toBe(
-    'check-length: --package names README.md, which does not exist\n',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr: 'check-length: --package names README.md, which does not exist\n',
+  });
 });
 
 test('it checks a README whose path is not ASCII', async () => {
@@ -256,11 +366,19 @@ test('it checks a README whose path is not ASCII', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stdout.toString()).toInclude(
-    'café/README.md: 71 lines, over the sub-package README limit of 70',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'README.md: 10 lines (plain repo README; target 50, limit 60)\n' +
+      'café/README.md: 71 lines, over the sub-package README limit of 70 (target 60)\n' +
+      '\n' +
+      'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
 });
 
 test('it fails a value with a unit under docs/architecture but not one in code or a year', async () => {
@@ -283,13 +401,18 @@ test('it fails a value with a unit under docs/architecture but not one in code o
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stdout.toString()).toInclude(
-    'docs/architecture/overview.md:4:The reaper waits 30 s.',
-  );
-
-  expect(result.stdout.toString()).not.toInclude('overview.md:1:');
-  expect(result.stdout.toString()).not.toInclude('overview.md:2:');
-  expect(result.stdout.toString()).not.toInclude('overview.md:3:');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'README.md: 10 lines (plain repo README; target 50, limit 60)\n' +
+      '\n' +
+      'Values with units under docs/architecture (the code owns its values; code blocks are exempt):\n' +
+      'docs/architecture/overview.md:4:The reaper waits 30 s.\n' +
+      '\n',
+    stderr: '',
+  });
 });

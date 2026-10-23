@@ -49,8 +49,15 @@ test('it passes a skill with a name, a description, and short files', async () =
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-skill: 1 skills, 0 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it fails a skill with no description', async () => {
@@ -60,8 +67,17 @@ test('it fails a skill with no description', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('.claude/skills/demo/SKILL.md: has no description\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      '.claude/skills/demo/SKILL.md: has no description\n' +
+      'check-skill: 1 skills, 1 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it reads a name and description past quotes and trailing comments', async () => {
@@ -76,8 +92,15 @@ test('it reads a name and description past quotes and trailing comments', async 
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-skill: 1 skills, 0 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it fails a plain description that holds a colon and a space', async () => {
@@ -93,11 +116,17 @@ test('it fails a plain description that holds a colon and a space', async () => 
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stdout.toString()).toInclude(
-    '.claude/skills/demo/SKILL.md: description holds a colon and a space, which YAML reads as a key',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      '.claude/skills/demo/SKILL.md: description holds a colon and a space, which YAML reads as a key in a plain scalar; reword it, or quote it or write it as a block scalar (>-)\n' +
+      'check-skill: 1 skills, 1 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it passes a colon and a space inside a quoted or block description, on either line', async () => {
@@ -136,8 +165,15 @@ test('it passes a colon and a space inside a quoted or block description, on eit
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('check-skill: 4 skills, 0 errors, 0 warnings\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-skill: 4 skills, 0 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it reads no colon in a comment after a plain description line', async () => {
@@ -153,8 +189,15 @@ test('it reads no colon in a comment after a plain description line', async () =
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-skill: 1 skills, 0 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it fails a description that holds only a comment', async () => {
@@ -169,8 +212,17 @@ test('it fails a description that holds only a comment', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('.claude/skills/demo/SKILL.md: has no description\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      '.claude/skills/demo/SKILL.md: has no description\n' +
+      'check-skill: 1 skills, 1 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it fails a description that YAML reads as null', async () => {
@@ -185,8 +237,17 @@ test('it fails a description that YAML reads as null', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('.claude/skills/demo/SKILL.md: has no description\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      '.claude/skills/demo/SKILL.md: has no description\n' +
+      'check-skill: 1 skills, 1 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it reads a null followed by a folded line as text', async () => {
@@ -202,7 +263,15 @@ test('it reads a null followed by a folded line as text', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-skill: 1 skills, 0 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it reads a null with a hash and no space before it as text', async () => {
@@ -217,7 +286,15 @@ test('it reads a null with a hash and no space before it as text', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-skill: 1 skills, 0 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it fails a line anchor in a single-quoted HTML link', async () => {
@@ -235,8 +312,17 @@ test('it fails a line anchor in a single-quoted HTML link', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('link guide.md#L42 has a line anchor');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      '.claude/skills/demo/SKILL.md:7: link guide.md#L42 has a line anchor; name the target in the link text instead\n' +
+      'check-skill: 1 skills, 1 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it fails a name that differs from the folder', async () => {
@@ -252,11 +338,17 @@ test('it fails a name that differs from the folder', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stdout.toString()).toInclude(
-    '.claude/skills/widgets/SKILL.md: name demo does not match the folder widgets\n',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      '.claude/skills/widgets/SKILL.md: name demo does not match the folder widgets\n' +
+      'check-skill: 1 skills, 1 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it fails a folded description over 1,024 characters', async () => {
@@ -274,11 +366,17 @@ test('it fails a folded description over 1,024 characters', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stdout.toString()).toInclude(
-    '.claude/skills/demo/SKILL.md: description is 1099 characters, over the limit of 1024\n',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      '.claude/skills/demo/SKILL.md: description is 1099 characters, over the limit of 1024\n' +
+      'check-skill: 1 skills, 1 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it fails a link with a line anchor, but not one inside code', async () => {
@@ -301,12 +399,17 @@ test('it fails a link with a line anchor, but not one inside code', async () => 
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stdout.toString()).toBe(
-    '.claude/skills/demo/SKILL.md:7: link ../../../src/load-theme.ts#L42 has a line anchor; name the target in the link text instead\n' +
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      '.claude/skills/demo/SKILL.md:7: link ../../../src/load-theme.ts#L42 has a line anchor; name the target in the link text instead\n' +
       'check-skill: 1 skills, 1 errors, 0 warnings\n',
-  );
+    stderr: '',
+  });
 });
 
 test('it warns and passes when SKILL.md is over 500 lines', async () => {
@@ -323,11 +426,17 @@ test('it warns and passes when SKILL.md is over 500 lines', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-
-  expect(result.stdout.toString()).toInclude(
-    '.claude/skills/demo/SKILL.md: 505 lines, over 500; check that each section is one most tasks need (warning)\n',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      '.claude/skills/demo/SKILL.md: 505 lines, over 500; check that each section is one most tasks need (warning)\n' +
+      'check-skill: 1 skills, 0 errors, 1 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it warns about a reference that SKILL.md does not list under References', async () => {
@@ -354,12 +463,17 @@ test('it warns about a reference that SKILL.md does not list under References', 
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-
-  expect(result.stdout.toString()).toBe(
-    '.claude/skills/demo/references/database.md: SKILL.md does not list it under ## References; add a line naming the task that needs it (warning)\n' +
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      '.claude/skills/demo/references/database.md: SKILL.md does not list it under ## References; add a line naming the task that needs it (warning)\n' +
       'check-skill: 1 skills, 0 errors, 1 warnings\n',
-  );
+    stderr: '',
+  });
 });
 
 test('it warns about a long reference with no contents list', async () => {
@@ -380,11 +494,18 @@ test('it warns about a long reference with no contents list', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-
-  expect(result.stdout.toString()).toInclude(
-    '.claude/skills/demo/references/e2e.md: 101 lines with no contents list near the top; open with links to its headings (warning)\n',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      '.claude/skills/demo/references/e2e.md: 101 lines with no contents list near the top; open with links to its headings (warning)\n' +
+      '.claude/skills/demo/references/e2e.md: SKILL.md does not list it under ## References; add a line naming the task that needs it (warning)\n' +
+      'check-skill: 1 skills, 0 errors, 2 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it accepts a long reference that opens with a contents list', async () => {
@@ -415,8 +536,15 @@ test('it accepts a long reference that opens with a contents list', async () => 
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-skill: 1 skills, 0 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it warns about a reference that links to another reference', async () => {
@@ -435,11 +563,19 @@ test('it warns about a reference that links to another reference', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-
-  expect(result.stdout.toString()).toInclude(
-    '.claude/skills/demo/references/frontend.md:1: links to another reference (.claude/skills/demo/references/http.md); link it from SKILL.md instead (warning)\n',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      '.claude/skills/demo/references/frontend.md:1: links to another reference (.claude/skills/demo/references/http.md); link it from SKILL.md instead (warning)\n' +
+      '.claude/skills/demo/references/frontend.md: SKILL.md does not list it under ## References; add a line naming the task that needs it (warning)\n' +
+      '.claude/skills/demo/references/http.md: SKILL.md does not list it under ## References; add a line naming the task that needs it (warning)\n' +
+      'check-skill: 1 skills, 0 errors, 3 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it warns about a code-formatted path to a repo file, but not a linked one', async () => {
@@ -460,12 +596,17 @@ test('it warns about a code-formatted path to a repo file, but not a linked one'
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-
-  expect(result.stdout.toString()).toBe(
-    '.claude/skills/demo/SKILL.md:7: `src/load-theme.ts` names a file in the repo; link it instead (warning)\n' +
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      '.claude/skills/demo/SKILL.md:7: `src/load-theme.ts` names a file in the repo; link it instead (warning)\n' +
       'check-skill: 1 skills, 0 errors, 1 warnings\n',
-  );
+    stderr: '',
+  });
 });
 
 test('it reads no code-formatted path in a table row as a missing link', async () => {
@@ -487,8 +628,15 @@ test('it reads no code-formatted path in a table row as a missing link', async (
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-skill: 1 skills, 0 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it skips a skill that git marks linguist-vendored', async () => {
@@ -499,8 +647,15 @@ test('it skips a skill that git marks linguist-vendored', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('check-skill: no skills to check\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-skill: no skills to check\n',
+    stderr: '',
+  });
 });
 
 test('it skips a vendored reference inside a skill it checks', async () => {
@@ -522,8 +677,15 @@ test('it skips a vendored reference inside a skill it checks', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-skill: 1 skills, 0 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it checks only the skill folders it is given', async () => {
@@ -541,8 +703,15 @@ test('it checks only the skill folders it is given', async () => {
 
   const result = await ctx.run('.claude/skills/demo');
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-skill: 1 skills, 0 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it rejects a folder with no SKILL.md', async () => {
@@ -552,8 +721,15 @@ test('it rejects a folder with no SKILL.md', async () => {
 
   const result = await ctx.run('notes');
 
-  expect(result.exitCode).toBe(2);
-  expect(result.stderr.toString()).toBe('check-skill: notes has no SKILL.md\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr: 'check-skill: notes has no SKILL.md\n',
+  });
 });
 
 test('it reads no link inside an HTML comment', async () => {
@@ -574,8 +750,15 @@ test('it reads no link inside an HTML comment', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).not.toInclude('line anchor');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-skill: 1 skills, 0 errors, 0 warnings\n',
+    stderr: '',
+  });
 });
 
 test('it reads a link after a comment marker inside inline code', async () => {
@@ -594,6 +777,15 @@ test('it reads a link after a comment marker inside inline code', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('has a line anchor');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      '.claude/skills/demo/SKILL.md:8: link ../../../src/demo.ts#L12 has a line anchor; name the target in the link text instead\n' +
+      'check-skill: 1 skills, 1 errors, 0 warnings\n',
+    stderr: '',
+  });
 });

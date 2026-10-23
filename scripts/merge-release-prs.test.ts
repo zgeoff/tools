@@ -49,9 +49,15 @@ test('it waits for checks that have not started yet, then merges the checked hea
   const result = await ctx.runScript();
   const calls = await ctx.readCalls();
 
-  expect(result.stderr.toString()).toBe('');
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('merged release PR #145 at abc123\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'merged release PR #145 at abc123\n',
+    stderr: '',
+  });
 
   expect(
     calls.filter(
@@ -82,7 +88,15 @@ test('it waits on the head a push moved the branch to, and merges that head', as
   const result = await ctx.runScript();
   const calls = await ctx.readCalls();
 
-  expect(result.exitCode).toBe(0);
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'merged release PR #145 at new222\n',
+    stderr: '',
+  });
 
   expect(
     calls.filter(
@@ -127,7 +141,15 @@ test('it waits for the GitHub Actions checks when other apps pass first', async 
   const result = await ctx.runScript();
   const calls = await ctx.readCalls();
 
-  expect(result.exitCode).toBe(0);
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'merged release PR #145 at abc123\n',
+    stderr: '',
+  });
 
   expect(
     calls.filter(
@@ -159,7 +181,16 @@ test('it counts skipped checks and passed commit statuses as passed', async () =
   const result = await ctx.runScript();
   const calls = await ctx.readCalls();
 
-  expect(result.exitCode).toBe(0);
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'merged release PR #145 at abc123\n',
+    stderr: '',
+  });
+
   expect(calls.at(-1)).toBe(`pr merge 145 --repo zgeoff/tools --squash --match-head-commit abc123`);
 });
 
@@ -178,7 +209,16 @@ test('it retries a poll whose API call fails', async () => {
   const result = await ctx.runScript();
   const calls = await ctx.readCalls();
 
-  expect(result.exitCode).toBe(0);
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'merged release PR #145 at abc123\n',
+    stderr: 'HTTP 502\n',
+  });
+
   expect(calls.at(-1)).toBe(`pr merge 145 --repo zgeoff/tools --squash --match-head-commit abc123`);
 });
 
@@ -199,11 +239,15 @@ test.each(['FAILURE', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAIL
     const result = await ctx.runScript();
     const calls = await ctx.readCalls();
 
-    expect(result.exitCode).toBe(1);
-
-    expect(result.stderr.toString()).toBe(
-      'release PR #145 has failing checks on abc123: pr / checks\n',
-    );
+    expect({
+      exitCode: result.exitCode,
+      stdout: result.stdout.toString(),
+      stderr: result.stderr.toString(),
+    }).toStrictEqual({
+      exitCode: 1,
+      stdout: '',
+      stderr: 'release PR #145 has failing checks on abc123: pr / checks\n',
+    });
 
     expect(calls.filter((call) => call.startsWith('pr merge'))).toBeEmpty();
   },
@@ -225,11 +269,15 @@ test('it fails without a merge when a commit status fails', async () => {
   const result = await ctx.runScript();
   const calls = await ctx.readCalls();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stderr.toString()).toBe(
-    'release PR #145 has failing checks on abc123: ci/legacy\n',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr: 'release PR #145 has failing checks on abc123: ci/legacy\n',
+  });
 
   expect(calls.filter((call) => call.startsWith('pr merge'))).toBeEmpty();
 });
@@ -243,11 +291,15 @@ test('it fails without a merge when the checks do not finish before the timeout'
   const result = await ctx.runScript({ CHECKS_TIMEOUT: '0' });
   const calls = await ctx.readCalls();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stderr.toString()).toBe(
-    'release PR #145 checks on abc123 did not finish within 0s\n',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr: 'release PR #145 checks on abc123 did not finish within 0s\n',
+  });
 
   expect(calls.filter((call) => call.startsWith('pr merge'))).toBeEmpty();
 });
@@ -267,8 +319,15 @@ test('it fails when the release PR has conflicts', async () => {
 
   const result = await ctx.runScript();
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stderr.toString()).toBe('release PR #145 has conflicts\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr: 'release PR #145 has conflicts\n',
+  });
 });
 
 test('it exits cleanly when no release PR is open', async () => {
@@ -276,8 +335,15 @@ test('it exits cleanly when no release PR is open', async () => {
   const result = await ctx.runScript();
   const calls = await ctx.readCalls();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('no open release PR\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'no open release PR\n',
+    stderr: '',
+  });
 
   expect(calls).toStrictEqual([
     'pr list --repo zgeoff/tools --head release-please--branches--main --json number',

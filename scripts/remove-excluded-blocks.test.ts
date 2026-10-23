@@ -38,7 +38,16 @@ test('it removes a block that needs an excluded file and the blank line after it
 
   const stripped = await readFile(markdown, 'utf8');
 
-  expect(result.exitCode).toBe(0);
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: '',
+    stderr: '',
+  });
+
   expect(stripped).toBe('# Demo\n\nRead [HTTP](./references/http.md).\n');
 });
 
@@ -62,7 +71,16 @@ test('it keeps a block whose file the repo receives', async () => {
 
   const kept = await readFile(markdown, 'utf8');
 
-  expect(result.exitCode).toBe(0);
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: '',
+    stderr: '',
+  });
+
   expect(kept).toBe(content);
 });
 
@@ -75,11 +93,15 @@ test('it fails on a block that never closes', async () => {
 
   const result = await $`bash ${ctx.scriptPath} ${markdown}`.nothrow().quiet();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stderr.toString()).toBe(
-    `remove-excluded-blocks: ${markdown} ends inside a block\n`,
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr: `remove-excluded-blocks: ${markdown} ends inside a block\n`,
+  });
 });
 
 test('it fails on a block opened inside another block', async () => {
@@ -96,9 +118,13 @@ test('it fails on a block opened inside another block', async () => {
 
   const result = await $`bash ${ctx.scriptPath} ${markdown}`.nothrow().quiet();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stderr.toString()).toBe(
-    `remove-excluded-blocks: ${markdown}:2 opens a block inside another block\n`,
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr: `remove-excluded-blocks: ${markdown}:2 opens a block inside another block\n`,
+  });
 });

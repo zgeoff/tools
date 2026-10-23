@@ -93,9 +93,18 @@ test('it fails on a 251-word paragraph', async () => {
 
   const result = await ctx.run('guide.md');
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('Paragraphs over 250 words in a changed file');
-  expect(result.stdout.toString()).toInclude('guide.md:3:251 words');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'Paragraphs over 250 words in a changed file (split each one; lists, tables and code blocks are exempt):\n' +
+      'guide.md:3:251 words\n' +
+      '\n',
+    stderr: '',
+  });
 });
 
 test('it warns and passes on a 151-word paragraph', async () => {
@@ -105,13 +114,19 @@ test('it warns and passes on a 151-word paragraph', async () => {
 
   const result = await ctx.run('guide.md');
 
-  expect(result.exitCode).toBe(0);
-
-  expect(result.stdout.toString()).toInclude(
-    'Paragraphs over 150 words in a changed file (warning',
-  );
-
-  expect(result.stdout.toString()).toInclude('guide.md:3:151 words');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'Paragraphs over 150 words in a changed file (warning; reread each one and split it where it defends a decision):\n' +
+      'guide.md:3:151 words\n' +
+      '\n' +
+      'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
 });
 
 test('it passes a 300-word fenced code block', async () => {
@@ -124,8 +139,15 @@ test('it passes a 300-word fenced code block', async () => {
 
   const result = await ctx.run('guide.md');
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).not.toInclude('Paragraphs over');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
 });
 
 test('it passes a long list, its wrapped lines and its later paragraphs', async () => {
@@ -138,8 +160,15 @@ test('it passes a long list, its wrapped lines and its later paragraphs', async 
 
   const result = await ctx.run('guide.md');
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).not.toInclude('Paragraphs over');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
 });
 
 // Each row holds a document, its exit status and the long paragraphs reported. Later rows follow
@@ -806,14 +835,14 @@ test.each<[string, string, number, string[]]>([
 
   const result = await ctx.run('guide.md');
 
-  expect(result.exitCode).toBe(status);
-
-  expect(
-    result.stdout
+  expect({
+    exitCode: result.exitCode,
+    reported: result.stdout
       .toString()
       .split('\n')
       .filter((line) => line.endsWith(' words')),
-  ).toStrictEqual(reported);
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({ exitCode: status, reported, stderr: '' });
 });
 
 test('it keeps a separate paragraph count for each changed file', async () => {
@@ -824,8 +853,15 @@ test('it keeps a separate paragraph count for each changed file', async () => {
 
   const result = await ctx.run('first.md', 'second.md');
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).not.toInclude('Paragraphs over');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
 });
 
 test('it ends a list and an open HTML comment at the end of their file', async () => {
@@ -836,8 +872,18 @@ test('it ends a list and an open HTML comment at the end of their file', async (
 
   const result = await ctx.run('first.md', 'second.md');
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('second.md:1:251 words');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'Paragraphs over 250 words in a changed file (split each one; lists, tables and code blocks are exempt):\n' +
+      'second.md:1:251 words\n' +
+      '\n',
+    stderr: '',
+  });
 });
 
 test('it skips a file the branch leaves unchanged since its base on origin', async () => {
@@ -851,10 +897,18 @@ test('it skips a file the branch leaves unchanged since its base on origin', asy
 
   const result = await ctx.run('old.md', 'new.md');
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('new.md:1:260 words');
-  expect(result.stdout.toString()).not.toInclude('old.md');
-  expect(result.stderr.toString()).not.toInclude('no merge base');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'Paragraphs over 250 words in a changed file (split each one; lists, tables and code blocks are exempt):\n' +
+      'new.md:1:260 words\n' +
+      '\n',
+    stderr: '',
+  });
 });
 
 test('it checks uncommitted edits and says so when origin has no base', async () => {
@@ -867,13 +921,19 @@ test('it checks uncommitted edits and says so when origin has no base', async ()
 
   const result = await ctx.run('old.md', 'edited.md');
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('edited.md:1:260 words');
-  expect(result.stdout.toString()).not.toInclude('old.md');
-
-  expect(result.stderr.toString()).toInclude(
-    'no merge base with origin/main, so the paragraph check reads only uncommitted files',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'Paragraphs over 250 words in a changed file (split each one; lists, tables and code blocks are exempt):\n' +
+      'edited.md:1:260 words\n' +
+      '\n',
+    stderr:
+      'check-prose: no merge base with origin/main, so the paragraph check reads only uncommitted files\n',
+  });
 });
 
 test('it checks a staged file before the first commit', async () => {
@@ -884,8 +944,18 @@ test('it checks a staged file before the first commit', async () => {
 
   const result = await ctx.run('guide.md');
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('guide.md:1:251 words');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'Paragraphs over 250 words in a changed file (split each one; lists, tables and code blocks are exempt):\n' +
+      'guide.md:1:251 words\n' +
+      '\n',
+    stderr: '',
+  });
 });
 
 test('it fetches the base branch in a pull-request run with no origin history', async () => {
@@ -901,10 +971,18 @@ test('it fetches the base branch in a pull-request run with no origin history', 
 
   const result = await ctx.runInPullRequest('main', ['old.md', 'new.md']);
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('new.md:1:260 words');
-  expect(result.stdout.toString()).not.toInclude('old.md');
-  expect(result.stderr.toString()).not.toInclude('no merge base');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'Paragraphs over 250 words in a changed file (split each one; lists, tables and code blocks are exempt):\n' +
+      'new.md:1:260 words\n' +
+      '\n',
+    stderr: '',
+  });
 });
 
 test('it counts only the PR documents in a shallow pull-request merge checkout', async () => {
@@ -929,9 +1007,18 @@ test('it counts only the PR documents in a shallow pull-request merge checkout',
   const cloneDir = await ctx.createShallowClone(originDir, 'pull-merge');
   const result = await ctx.runInPullRequest('main', ['base.md', 'pr.md'], cloneDir);
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('pr.md:1:270 words');
-  expect(result.stdout.toString()).not.toInclude('base.md');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'Paragraphs over 250 words in a changed file (split each one; lists, tables and code blocks are exempt):\n' +
+      'pr.md:1:270 words\n' +
+      '\n',
+    stderr: '',
+  });
 });
 
 test('it checks a changed file whose name holds a space', async () => {
@@ -941,8 +1028,18 @@ test('it checks a changed file whose name holds a space', async () => {
 
   const result = await ctx.run('user guide.md');
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('user guide.md:1:251 words');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'Paragraphs over 250 words in a changed file (split each one; lists, tables and code blocks are exempt):\n' +
+      'user guide.md:1:251 words\n' +
+      '\n',
+    stderr: '',
+  });
 });
 
 test('it checks a changed file whose name holds an equals sign', async () => {
@@ -952,8 +1049,18 @@ test('it checks a changed file whose name holds an equals sign', async () => {
 
   const result = await ctx.run('mode=fast.md');
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('mode=fast.md:1:251 words');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'Paragraphs over 250 words in a changed file (split each one; lists, tables and code blocks are exempt):\n' +
+      'mode=fast.md:1:251 words\n' +
+      '\n',
+    stderr: '',
+  });
 });
 
 test('it checks a changed file whose name starts with a dash', async () => {
@@ -963,8 +1070,18 @@ test('it checks a changed file whose name starts with a dash', async () => {
 
   const result = await ctx.run('-guide.md');
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('-guide.md:1:251 words');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'Paragraphs over 250 words in a changed file (split each one; lists, tables and code blocks are exempt):\n' +
+      '-guide.md:1:251 words\n' +
+      '\n',
+    stderr: '',
+  });
 });
 
 test('it reports a unit joined to its number in files named with an equals sign, a dash or a space', async () => {
@@ -976,10 +1093,20 @@ test('it reports a unit joined to its number in files named with an equals sign,
 
   const result = await ctx.run('mode=fast.md', '-guide.md', 'user guide.md');
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('mode=fast.md:1:The cache holds 64KB.');
-  expect(result.stdout.toString()).toInclude('-guide.md:1:The cache holds 64KB.');
-  expect(result.stdout.toString()).toInclude('user guide.md:1:The cache holds 64KB.');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'Number joined to its unit ("64KB"; write "64 KB"; code blocks are exempt):\n' +
+      '-guide.md:1:The cache holds 64KB.\n' +
+      'mode=fast.md:1:The cache holds 64KB.\n' +
+      'user guide.md:1:The cache holds 64KB.\n' +
+      '\n',
+    stderr: '',
+  });
 });
 
 test('it passes a banned word in a code span or a code block', async () => {
@@ -992,8 +1119,15 @@ test('it passes a banned word in a code span or a code block', async () => {
 
   const result = await ctx.run('guide.md');
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).not.toInclude('Banned words');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
 });
 
 test('it passes a banned word in a code span that opens with a run of backticks', async () => {
@@ -1006,8 +1140,15 @@ test('it passes a banned word in a code span that opens with a run of backticks'
 
   const result = await ctx.run('guide.md');
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).not.toInclude('Banned words');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
 });
 
 test('it reports a banned word after a backtick run that nothing closes', async () => {
@@ -1017,8 +1158,15 @@ test('it reports a banned word after a backtick run that nothing closes', async 
 
   const result = await ctx.run('guide.md');
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('guide.md:3:The ``lint` check covers the seams.');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: 'Banned words:\nguide.md:3:The ``lint` check covers the seams.\n\n',
+    stderr: '',
+  });
 });
 
 test('it reports a banned word in prose beside a code span', async () => {
@@ -1028,9 +1176,15 @@ test('it reports a banned word in prose beside a code span', async () => {
 
   const result = await ctx.run('guide.md');
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('Banned words');
-  expect(result.stdout.toString()).toInclude('guide.md:3:The `lint` check covers the seams.');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: 'Banned words:\nguide.md:3:The `lint` check covers the seams.\n\n',
+    stderr: '',
+  });
 });
 
 test('it reports a banned word in a code span outside Markdown', async () => {
@@ -1040,23 +1194,54 @@ test('it reports a banned word in a code span outside Markdown', async () => {
 
   const result = await ctx.run('notes.txt');
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('notes.txt:1:Run the `lint-seams` check.');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: 'Banned words:\nnotes.txt:1:Run the `lint-seams` check.\n\n',
+    stderr: '',
+  });
 });
 
-test.each<[string, string, number]>([
-  ['an uppercase CAS', 'The store does a CAS on each write.\n', 1],
-  ['a plural CAs', 'The cluster trusts two CAs.\n', 0],
-  ['a code fence', 'Close each code fence.\n', 0],
-  ['a Surface in any case', 'The Surface grows.\n', 1],
-])('it checks %s in Markdown prose', async (_name, text, status) => {
+test.each<[string, string, number, string]>([
+  [
+    'an uppercase CAS',
+    'The store does a CAS on each write.\n',
+    1,
+    'Banned words:\nguide.md:1:The store does a CAS on each write.\n\n',
+  ],
+  [
+    'a plural CAs',
+    'The cluster trusts two CAs.\n',
+    0,
+    'check-prose: clean (candidates above, if any, need judgment only)\n',
+  ],
+  [
+    'a code fence',
+    'Close each code fence.\n',
+    0,
+    'check-prose: clean (candidates above, if any, need judgment only)\n',
+  ],
+  [
+    'a Surface in any case',
+    'The Surface grows.\n',
+    1,
+    'Banned words:\nguide.md:1:The Surface grows.\n\n',
+  ],
+])('it checks %s in Markdown prose', async (_name, text, status, stdout) => {
   const ctx = await setupTest();
 
   await ctx.writeText('guide.md', text);
 
   const result = await ctx.run('guide.md');
 
-  expect(result.exitCode).toBe(status);
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({ exitCode: status, stdout, stderr: '' });
 });
 
 test('it reads the default branch from origin/HEAD', async () => {
@@ -1071,7 +1256,16 @@ test('it reads the default branch from origin/HEAD', async () => {
 
   const result = await ctx.run('old.md', 'new.md');
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout.toString()).toInclude('new.md:1:251 words');
-  expect(result.stdout.toString()).not.toInclude('old.md');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'Paragraphs over 250 words in a changed file (split each one; lists, tables and code blocks are exempt):\n' +
+      'new.md:1:251 words\n' +
+      '\n',
+    stderr: '',
+  });
 });

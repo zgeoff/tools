@@ -34,7 +34,17 @@ test('it pins every call to a zgeoff/tools workflow to the ref', async () => {
   const repoSync = await readFile(join(ctx.directory, '.github/workflows/repo-sync.yml'), 'utf8');
   const pr = await readFile(join(ctx.directory, '.github/workflows/pr.yml'), 'utf8');
 
-  expect(result.exitCode).toBe(0);
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      `${ctx.directory}/.github/workflows/pr.yml\n` +
+      `${ctx.directory}/.github/workflows/repo-sync.yml\n`,
+    stderr: '',
+  });
 
   expect(repoSync).toBe(
     'jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@sync-v2\n',
@@ -97,7 +107,15 @@ test('it prints only the files it changed', async () => {
 
   const result = await $`bash ${ctx.scriptPath} sync-v2 ${ctx.directory}`.nothrow().quiet();
 
-  expect(result.stdout.toString()).toBe(`${ctx.directory}/.github/workflows/floating.yml\n`);
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: `${ctx.directory}/.github/workflows/floating.yml\n`,
+    stderr: '',
+  });
 });
 
 test('it leaves calls to other repositories alone', async () => {
@@ -126,7 +144,16 @@ test('it leaves a call to an owner whose name ends in zgeoff alone', async () =>
   const result = await $`bash ${ctx.scriptPath} sync-v2 ${ctx.directory}`.nothrow().quiet();
   const ci = await readFile(join(ctx.directory, '.github/workflows/ci.yml'), 'utf8');
 
-  expect(result.stdout.toString()).toBe('');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: '',
+    stderr: '',
+  });
+
   expect(ci).toBe('jobs:\n  ci:\n    uses: other-zgeoff/tools/.github/workflows/ci.yml@main\n');
 });
 
@@ -134,9 +161,13 @@ test('it rejects a ref that holds a character outside a plain git ref', async ()
   const ctx = await setupTest();
   const result = await $`bash ${ctx.scriptPath} ${'sync#v2'} ${ctx.directory}`.nothrow().quiet();
 
-  expect(result.exitCode).toBe(2);
-
-  expect(result.stderr.toString()).toBe(
-    "pin-tools-ref: 'sync#v2' is not a ref this script writes\n",
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr: "pin-tools-ref: 'sync#v2' is not a ref this script writes\n",
+  });
 });

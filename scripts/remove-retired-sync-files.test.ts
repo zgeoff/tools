@@ -65,8 +65,16 @@ test('it deletes a file an earlier manifest delivered and the current manifest d
     .nothrow()
     .quiet();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('.claude/skills/demo/scripts/check.sh\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: '.claude/skills/demo/scripts/check.sh\n',
+    stderr: '',
+  });
+
   expect(existsSync(join(ctx.caller, '.claude/skills/demo/scripts/check.sh'))).toBeFalse();
   expect(existsSync(join(ctx.caller, '.claude/skills/demo/SKILL.md'))).toBeTrue();
 });
@@ -93,8 +101,16 @@ test('it deletes a retired file that matches an older version of its source', as
     .nothrow()
     .quiet();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('.claude/skills/demo/scripts/check.sh\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: '.claude/skills/demo/scripts/check.sh\n',
+    stderr: '',
+  });
+
   expect(existsSync(join(ctx.caller, '.claude/skills/demo/scripts/check.sh'))).toBeFalse();
 });
 
@@ -123,8 +139,16 @@ test('it keeps a file the repo owns outside the synced paths', async () => {
     .nothrow()
     .quiet();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('.claude/skills/demo/scripts/check.sh\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: '.claude/skills/demo/scripts/check.sh\n',
+    stderr: '',
+  });
+
   expect(existsSync(join(ctx.caller, 'scripts/check.sh'))).toBeTrue();
 });
 
@@ -146,8 +170,16 @@ test('it keeps a file at a retired path whose content no source version matches'
     .nothrow()
     .quiet();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: '',
+    stderr: '',
+  });
+
   expect(existsSync(join(ctx.caller, 'scripts/build.sh'))).toBeTrue();
 });
 
@@ -187,8 +219,16 @@ test('it keeps a retired file whose entry is still in the manifest and did not s
     .nothrow()
     .quiet();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: '',
+    stderr: '',
+  });
+
   expect(existsSync(join(ctx.caller, '.claude/hooks/demo/helper.ts'))).toBeTrue();
 });
 
@@ -210,8 +250,16 @@ test('it keeps a retired file whose entry the skip list names', async () => {
     .nothrow()
     .quiet();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: '',
+    stderr: '',
+  });
+
   expect(existsSync(join(ctx.caller, 'scripts/build.sh'))).toBeTrue();
 });
 
@@ -234,11 +282,15 @@ test('it fails on a shallow checkout of tools', async () => {
 
   const result = await $`bash ${ctx.scriptPath} ${shallow} ${''}`.cwd(ctx.caller).nothrow().quiet();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stderr.toString()).toBe(
-    `remove-retired-sync-files: ${shallow} is a shallow clone, so it lacks the earlier manifests\n`,
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr: `remove-retired-sync-files: ${shallow} is a shallow clone, so it lacks the earlier manifests\n`,
+  });
 });
 
 test('it deletes a retired workflow whose calls the sync pinned to a tag', async () => {
@@ -267,8 +319,16 @@ test('it deletes a retired workflow whose calls the sync pinned to a tag', async
     .nothrow()
     .quiet();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('.github/workflows/lint.yml\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: '.github/workflows/lint.yml\n',
+    stderr: '',
+  });
+
   expect(existsSync(join(ctx.caller, '.github/workflows/lint.yml'))).toBeFalse();
 });
 
@@ -294,8 +354,16 @@ test('it deletes a retired Markdown copy that lost a block the repo was excepted
     .nothrow()
     .quiet();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('.claude/skills/demo/SKILL.md\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: '.claude/skills/demo/SKILL.md\n',
+    stderr: '',
+  });
+
   expect(existsSync(join(ctx.caller, '.claude/skills/demo/SKILL.md'))).toBeFalse();
 });
 
@@ -325,8 +393,16 @@ test('it keeps a retired Markdown copy whose edit sits inside a kept block', asy
     .nothrow()
     .quiet();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: '',
+    stderr: '',
+  });
+
   expect(existsSync(join(ctx.caller, '.claude/skills/demo/SKILL.md'))).toBeTrue();
 });
 
@@ -377,8 +453,16 @@ test('it deletes the edited old copy of a renamed file across the skipped tags',
       .nothrow()
       .quiet();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('scripts/list-files.ts\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'scripts/list-files.ts\n',
+    stderr: '',
+  });
+
   expect(existsSync(join(ctx.caller, 'scripts/list-files.ts'))).toBeFalse();
   expect(existsSync(join(ctx.caller, 'scripts/read-files.ts'))).toBeTrue();
 });
@@ -428,8 +512,16 @@ test('it keeps the edited old copy of a renamed file when the run did not copy t
     .nothrow()
     .quiet();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: '',
+    stderr: '',
+  });
+
   expect(existsSync(join(ctx.caller, 'scripts/list-files.ts'))).toBeTrue();
 });
 
@@ -479,7 +571,15 @@ test('it keeps the edited old copy of a renamed file when the run did not sync i
     .nothrow()
     .quiet();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: '',
+    stderr: '',
+  });
+
   expect(existsSync(join(ctx.caller, 'scripts/list-files.ts'))).toBeTrue();
 });

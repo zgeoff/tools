@@ -60,8 +60,15 @@ test('it passes when every relative link and anchor resolves', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('check-links: 2 files, every relative link resolves\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-links: 2 files, every relative link resolves\n',
+    stderr: '',
+  });
 });
 
 test('it fails on a link to a missing file', async () => {
@@ -71,11 +78,15 @@ test('it fails on a link to a missing file', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stderr.toString()).toBe(
-    'README.md:3: (docs/missing.md) docs/missing.md does not exist\n',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr: 'README.md:3: (docs/missing.md) docs/missing.md does not exist\n',
+  });
 });
 
 test('it fails on an anchor that no heading produces', async () => {
@@ -86,11 +97,15 @@ test('it fails on an anchor that no heading produces', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stderr.toString()).toBe(
-    'docs/README.md:3: (guide.md#setup) docs/guide.md has no heading #setup\n',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr: 'docs/README.md:3: (guide.md#setup) docs/guide.md has no heading #setup\n',
+  });
 });
 
 test('it fails on a link that leaves the repository', async () => {
@@ -100,11 +115,15 @@ test('it fails on a link that leaves the repository', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stderr.toString()).toBe(
-    'README.md:1: (../other/README.md) points outside the repository\n',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr: 'README.md:1: (../other/README.md) points outside the repository\n',
+  });
 });
 
 test('it skips links inside code blocks and code spans', async () => {
@@ -120,7 +139,15 @@ test('it skips links inside code blocks and code spans', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-links: 1 files, every relative link resolves\n',
+    stderr: '',
+  });
 });
 
 test('it reads only the READMEs, docs/ and skills when no path is given', async () => {
@@ -132,8 +159,15 @@ test('it reads only the READMEs, docs/ and skills when no path is given', async 
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('check-links: 2 files, every relative link resolves\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-links: 2 files, every relative link resolves\n',
+    stderr: '',
+  });
 });
 
 test('it fails on a broken link in a skill by default', async () => {
@@ -145,11 +179,16 @@ test('it fails on a broken link in a skill by default', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stderr.toString()).toBe(
-    '.claude/skills/demo/references/stand-ins.md:1: (../../../../src/build-stub.ts) src/build-stub.ts does not exist\n',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      '.claude/skills/demo/references/stand-ins.md:1: (../../../../src/build-stub.ts) src/build-stub.ts does not exist\n',
+  });
 });
 
 test('it skips a skill that git marks linguist-vendored', async () => {
@@ -160,8 +199,15 @@ test('it skips a skill that git marks linguist-vendored', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('check-links: 0 files, every relative link resolves\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-links: 0 files, every relative link resolves\n',
+    stderr: '',
+  });
 });
 
 test('it reads the paths it is given', async () => {
@@ -172,11 +218,15 @@ test('it reads the paths it is given', async () => {
 
   const result = await ctx.run('notes');
 
-  expect(result.exitCode).toBe(1);
-
-  expect(result.stderr.toString()).toBe(
-    'notes/todo.md:1: (missing.md) notes/missing.md does not exist\n',
-  );
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr: 'notes/todo.md:1: (missing.md) notes/missing.md does not exist\n',
+  });
 });
 
 test('it matches the anchors GitHub builds from code spans, emphasis and entities', async () => {
@@ -198,8 +248,15 @@ test('it matches the anchors GitHub builds from code spans, emphasis and entitie
 
   const result = await ctx.run();
 
-  expect(result.stderr.toString()).toBe('');
-  expect(result.exitCode).toBe(0);
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-links: 1 files, every relative link resolves\n',
+    stderr: '',
+  });
 });
 
 test('it skips footnotes and links inside HTML comments, and keeps parentheses in a target', async () => {
@@ -220,8 +277,15 @@ test('it skips footnotes and links inside HTML comments, and keeps parentheses i
 
   const result = await ctx.run();
 
-  expect(result.stderr.toString()).toBe('');
-  expect(result.exitCode).toBe(0);
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-links: 2 files, every relative link resolves\n',
+    stderr: '',
+  });
 });
 
 test('it skips READMEs under .claude/ by default', async () => {
@@ -233,6 +297,13 @@ test('it skips READMEs under .claude/ by default', async () => {
 
   const result = await ctx.run();
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('check-links: 0 files, every relative link resolves\n');
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-links: 0 files, every relative link resolves\n',
+    stderr: '',
+  });
 });
