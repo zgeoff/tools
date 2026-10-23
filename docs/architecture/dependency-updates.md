@@ -29,8 +29,9 @@ In zgeoff/nixie and zgeoff/noslop, every row merges after review instead. Their 
 passing, so a merge on green checks there waits for no test. The last package rule matches the two
 repos and turns automerge off. A vulnerability fix keeps the automerge that `vulnerabilityAlerts`
 forces on it, so the rule also sets `automergeType` to `pr-comment`, and Renovate posts a comment
-that no bot acts on in place of the merge. The rule comes out once each repo's sync bump to the
-tools release with the public `checks` gate has merged and its `pr / checks` runs.
+that no bot acts on in place of the merge. The rule comes out once sync-v24 is tagged, and nixie's
+and noslop's sync bumps to it have merged, with `pr / checks` running and gating on a pull request
+in each.
 
 A TanStack router release, React Start among its packages, reaches a repo as one pull request for
 its patch and minor bumps, so the router and React Start never ship at different versions. That
