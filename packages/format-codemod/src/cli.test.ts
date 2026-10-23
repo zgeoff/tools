@@ -289,3 +289,32 @@ test('it merges .formatignore globs with --ignore flags', () => {
   expect(result.status).toBe(2);
   expect(result.stderr).toInclude('no files matched');
 });
+
+test('it leaves no folder in the temp directory after the suites that make one run', () => {
+  const ctx = setupTest();
+
+  // The pattern leaves this test out of the nested run, which would otherwise run it again.
+  const result = spawnSync(
+    process.execPath,
+    [
+      'test',
+      '-t',
+      '^(?!it leaves no folder in the temp directory)',
+      './packages/format-codemod/src/cli.test.ts',
+      './packages/format-codemod/src/cli/apply-diff-mode.test.ts',
+      './packages/format-codemod/src/cli/check-file.test.ts',
+      './packages/format-codemod/src/cli/expand-inputs.test.ts',
+      './packages/format-codemod/src/cli/load-format-ignore.test.ts',
+      './packages/format-codemod/src/cli/read-package-version.test.ts',
+      './packages/format-codemod/src/cli/try-check-file.test.ts',
+    ],
+    {
+      cwd: path.join(import.meta.dir, '../../..'),
+      env: { ...process.env, TMPDIR: ctx.directory },
+      encoding: 'utf8',
+    },
+  );
+
+  expect(result.status).toBe(0);
+  expect(fs.readdirSync(ctx.directory)).toStrictEqual([]);
+});
