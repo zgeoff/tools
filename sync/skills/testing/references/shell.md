@@ -57,7 +57,14 @@ test('it refuses a version with a space in it', async () => {
     .nothrow()
     .quiet();
 
-  expect(result.exitCode).toBe(2);
-  expect(result.stderr.toString()).toBe("tag-release: '1.2 beta' is not a version\n");
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr: "tag-release: '1.2 beta' is not a version\n",
+  });
 });
 ```
