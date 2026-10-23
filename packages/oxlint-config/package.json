@@ -30,6 +30,8 @@
     "test-beside-module.js",
     "no-file-snapshot.js",
     "setup-test-only.js",
+    "max-test-timeout.js",
+    "no-test-sleep.js",
     "import-zones.js",
     "import-zones-schema.js",
     "import-zones-entry.js",

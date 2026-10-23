@@ -57,7 +57,8 @@
     "check:sync": "bash scripts/check-sync-manifest.sh",
     "files:branch": "bun sync/pre-push/read-branch-files.ts",
     "check:commits": "bun sync/pre-push/run-commits-check.ts",
-    "check:local-paths": "bun sync/pre-push/run-local-paths-check.ts"
+    "check:local-paths": "bun sync/pre-push/run-local-paths-check.ts",
+    "check:test-timeouts": "bun sync/pre-push/run-test-timeouts-check.ts"
   },
   "devDependencies": {
     "@commitlint/cli": "catalog:",

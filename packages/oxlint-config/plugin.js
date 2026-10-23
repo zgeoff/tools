@@ -1,6 +1,7 @@
 import functionVerb from './function-verb.js';
 import importZones from './import-zones.js';
 import maxConsecutiveLineComments from './max-consecutive-line-comments.js';
+import maxTestTimeout from './max-test-timeout.js';
 import moduleOrder from './module-order.js';
 import noAbbreviatedNames from './no-abbreviated-names.js';
 import noClass from './no-class.js';
@@ -9,6 +10,7 @@ import noFileSnapshot from './no-file-snapshot.js';
 import noHiddenCast from './no-hidden-cast.js';
 import noJSDoc from './no-jsdoc.js';
 import noRestrictedWords from './no-restricted-words.js';
+import noTestSleep from './no-test-sleep.js';
 import setupTestOnly from './setup-test-only.js';
 import testBesideModule from './test-beside-module.js';
 import verbContract from './verb-contract.js';
@@ -103,6 +105,8 @@ const plugin = {
     'test-beside-module': testBesideModule,
     'no-file-snapshot': noFileSnapshot,
     'setup-test-only': setupTestOnly,
+    'max-test-timeout': maxTestTimeout,
+    'no-test-sleep': noTestSleep,
     'import-zones': importZones,
   },
 };

@@ -418,6 +418,7 @@ test('it downloads the planner, the branch check scripts and the catalog from th
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-program.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-commits-check.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-local-paths-check.ts',
+      'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-test-timeouts-check.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/package.json',
       '',
     ].join('\n'),
@@ -430,6 +431,7 @@ test('it downloads the planner, the branch check scripts and the catalog from th
     'run-commits-check.ts',
     'run-local-paths-check.ts',
     'run-program.ts',
+    'run-test-timeouts-check.ts',
     'tools-package.json',
     'write-check-plan.ts',
   ]);
@@ -533,6 +535,7 @@ test('it runs a public repo as separate gitleaks, static, test and lane jobs, wi
     { name: 'Check workflows', if: afterSetup },
     { name: 'Check commits', if: afterSetup },
     { name: 'Check local paths', if: afterSetup },
+    { name: 'Check test timeouts', if: afterSetup },
   ];
 
   const steps = [
@@ -597,6 +600,7 @@ test('it runs a private repo as one checks job with the scan, each shared check,
           { name: 'Check workflows', if: afterSetup },
           { name: 'Check commits', if: afterSetup },
           { name: 'Check local paths', if: afterSetup },
+          { name: 'Check test timeouts', if: afterSetup },
           {
             name: 'Static checks',
             if: afterSetup,
@@ -1133,4 +1137,36 @@ test('it fails the local paths check on a line of the branch that holds the home
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout.toString()).toInclude(`cache.txt:1: commit `);
+});
+
+test('it fails the test timeouts check on a bunfig.toml that raises the test timeout above 5 s', async () => {
+  const ctx = await setupTest();
+
+  const step = await loadWorkflowStep(
+    join(import.meta.dir, 'bun-checks.yml'),
+    'static',
+    'Check test timeouts',
+  );
+
+  await mkdir(join(ctx.gitEnv.RUNNER_TEMP, 'check-plan'), { recursive: true });
+
+  for (const file of ['run-program.ts', 'run-test-timeouts-check.ts']) {
+    await cp(
+      join(import.meta.dir, '../../sync/pre-push', file),
+      join(ctx.gitEnv.RUNNER_TEMP, 'check-plan', file),
+    );
+  }
+
+  await writeFile(join(ctx.repo, 'bunfig.toml'), '[test]\ntimeout = 30000\n');
+
+  await $`git add bunfig.toml`.cwd(ctx.repo).env(ctx.gitEnv);
+  await $`git commit --quiet -m ${'test: raise the timeout'}`.cwd(ctx.repo).env(ctx.gitEnv);
+
+  const result = await $`bash -c ${step.run}`.cwd(ctx.repo).env(ctx.gitEnv).nothrow().quiet();
+
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout.toString()).toInclude(
+    'bunfig.toml: [test] timeout = 30000 raises every test above the 5 s limit',
+  );
 });

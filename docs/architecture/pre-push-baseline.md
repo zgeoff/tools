@@ -15,8 +15,9 @@ runs `shellcheck` and `shfmt -d`, the docs check runs the docs-writing skill's `
 a file that matches its glob. A check whose program the machine lacks prints a notice and passes,
 because CI installs the program and runs the check. The docs check prints a notice and passes in a
 repo without `.claude/skills/docs-writing/scripts/`. The commits and local-paths checks read the
-branch's commits. The baseline also runs `typecheck` before a commit that stages a code or JSON
-file, after the repo's own pre-commit jobs, so the type check sees what the fixers wrote.
+branch's commits, and the test-timeouts check reads the files that `HEAD` holds. The baseline also
+runs `typecheck` before a commit that stages a code or JSON file, after the repo's own pre-commit
+jobs, so the type check sees what the fixers wrote.
 
 ## The delivered files
 
@@ -35,16 +36,20 @@ The entry delivers these files, and their tests stay in tools:
 - `scripts/run-local-paths-check.ts` — fails each line that a commit since that merge base adds and
   that holds the home directory of whoever runs it, followed by a slash, or the machine's host name
   as a whole word. A home of `/` and the host `localhost` are left out.
+- `scripts/run-test-timeouts-check.ts` — fails each `bun test --timeout` above the default timeout
+  in a `package.json` script, and each `bunfig.toml` whose `[test] timeout` is above it, as
+  [the test timeout check](./oxlint-config-tests.md#the-test-timeout-check) describes.
 - `scripts/read-branch-base.ts`, `scripts/parse-added-lines.ts` and `scripts/run-program.ts` — the
   modules these scripts import.
 
-Both check scripts exit 0 when clean or skipped, 1 with a problem, and 2 when they cannot run, such
+The check scripts exit 0 when clean or skipped, 1 with a problem, and 2 when they cannot run, such
 as in a clone without origin's default branch.
 
 The entry's build adds the package scripts `files:branch`, `lint:files`, `test:related`,
-`check:commits` and `check:local-paths` when the repo lacks them. It changes one script the repo
-already has: a `files:branch` that runs the old `scripts/collect-branch-files.ts` moves to
-`scripts/read-branch-files.ts`. A repo opts in with three changes, which
+`check:commits`, `check:local-paths` and `check:test-timeouts` when the repo lacks them. It changes
+one script the repo already has: a `files:branch` that runs the old
+`scripts/collect-branch-files.ts` moves to `scripts/read-branch-files.ts`. A repo opts in with three
+changes, which
 [Opting in to the pre-push baseline](../runbooks/downstream-repo-setup.md#opting-in-to-the-pre-push-baseline)
 lists.
 
