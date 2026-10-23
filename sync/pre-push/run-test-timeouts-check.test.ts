@@ -126,6 +126,9 @@ test.each([
   ['an echo of the command', 'echo "bun test --timeout=30000"'],
   ['an unquoted echo of the command', 'echo bun test --timeout=30000 && bun test'],
   ['a printf of the command', "CI=1 printf '%s' bun test --timeout=30000"],
+  ['a double-quoted echo of the command', '"echo" bun test --timeout=30000 && bun test'],
+  ['a single-quoted echo of the command', "'echo' bun test --timeout=30000 && bun test"],
+  ['a single-quoted printf of the command', "'printf' '%s' bun test --timeout=30000"],
   ['an escaped flag', String.raw`bun test \--timeout=30000`],
 ])('it leaves %s alone', async (_, command) => {
   const ctx = await setupTest();
@@ -141,6 +144,28 @@ test.each([
   const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
 
   expect(findings).toStrictEqual([]);
+});
+
+test('it reports a bun test whose command words are quoted', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { test: `"bun" 'test' --timeout=30000` } }),
+  );
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'package.json',
+      message:
+        'script "test" passes --timeout=30000 to bun test, above the 5 s limit; only test:related and a lane script (test:<lane>, for e2e, browser, docker, host and each lane in the max-test-timeout lanes option) may raise it',
+    },
+  ]);
 });
 
 test('it exempts test:related and the built-in lane scripts', async () => {

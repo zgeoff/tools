@@ -122,19 +122,19 @@ const assignmentPattern = /^[A-Za-z_][A-Za-z0-9_]*=/u;
 const printCommands = new Set(['echo', 'printf']);
 
 // `--timeout 20000` and `--timeout=20000` both reach `bun test`, and a quoted word, such as a name
-// pattern, is a value rather than a flag.
+// pattern, is a value rather than a flag. A shell runs a quoted command name as the bare one.
 function collectTimeoutValues(command: string): number[] {
   const values: number[] = [];
 
   for (const words of parseShellCommands(command)) {
     const name = words.find((word) => word.isQuoted || !assignmentPattern.test(word.text));
 
-    if (name !== undefined && !name.isQuoted && printCommands.has(name.text)) {
+    if (name !== undefined && printCommands.has(name.text)) {
       continue;
     }
 
     const start = words.findIndex(
-      (word, index) => isBareWord(word, 'bun') && isBareWord(words[index + 1], 'test'),
+      (word, index) => word.text === 'bun' && words[index + 1]?.text === 'test',
     );
 
     if (start === -1) {
