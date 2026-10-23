@@ -8,7 +8,7 @@ as a `test-*.sh` file that runs cases and counts failures, never appear.
 
 ## Running the script
 
-Each test runs the script once, as the program a caller runs, and asserts what the script did:
+Each test runs the script as the program a caller runs:
 
 - Name the interpreter and the script path in the command, as in
   `` $`bash ${ctx.scriptPath} ${ref}` ``. Take the path from `import.meta.url` or `import.meta.dir`.
@@ -18,22 +18,19 @@ Each test runs the script once, as the program a caller runs, and asserts what t
 - Chain `.nothrow()`, so a nonzero exit returns its result instead of throwing, and `.quiet()`, so
   the script's output stays out of the test run's output.
 - Set the working directory with `.cwd(dir)` and the environment with `.env({ … })`. `.env()`
-  replaces the whole environment, so spread `process.env` or a clean env into it. A test never
-  changes `process.cwd()` or `process.env` for the script.
+  replaces the whole environment, so spread `process.env` or a clean env into it.
 - Feed standard input with a redirect from a `Response`:
   `` $`bash ${path} < ${Response.json(files)}` ``.
 - Run a setup command, such as `git init`, through `$` without `.nothrow()`, so a failed setup
   throws where it fails instead of surfacing as a wrong result later.
 
-The exit code, stdout, and stderr of one run are one result. `stdout` and `stderr` are buffers, so
-read them with `.toString()`. A file the script writes is read back from the test's temp tree.
+`stdout` and `stderr` are buffers, so read them with `.toString()` before a string matcher.
 
 ## Programs the script calls
 
 The script calls real programs where the test can run them: git on a temp repository, coreutils, and
 `jq`. A program the test cannot run for real, such as `gh` against GitHub, gets a stub executable in
-a folder that the test puts first on the script's `PATH`. The stub comes from a
-`create-stub-<program>.ts` util in the shared test utils with its own tests, as
+a folder that the test puts first on the script's `PATH`, from a stand-in util as
 [Test data](../SKILL.md#test-data) describes. A script that polls or waits takes its interval and
 its deadline from environment variables, and the test sets them, as
 [Time and waiting](../SKILL.md#time-and-waiting) describes for an argument.
