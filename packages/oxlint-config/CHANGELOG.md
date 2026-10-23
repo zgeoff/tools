@@ -2,10 +2,11 @@
 
 ## [0.6.4](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.6.3...@zgeoff/oxlint-config@0.6.4) (2026-10-23)
 
-
 ### Features
 
-* **oxlint-config:** refuse long test timeouts and sleeps in tests ([#308](https://github.com/zgeoff/tools/issues/308)) ([9c89ca6](https://github.com/zgeoff/tools/commit/9c89ca664c19f881ea61a49789c000d11356643a))
+- **oxlint-config:** refuse long test timeouts and sleeps in tests
+  ([#308](https://github.com/zgeoff/tools/issues/308))
+  ([9c89ca6](https://github.com/zgeoff/tools/commit/9c89ca664c19f881ea61a49789c000d11356643a))
 
 ## [0.6.3](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.6.2...@zgeoff/oxlint-config@0.6.3) (2026-10-22)
 
