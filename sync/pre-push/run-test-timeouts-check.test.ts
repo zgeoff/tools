@@ -84,6 +84,36 @@ test('it leaves a --timeout of a command other than bun test alone', async () =>
   expect(findings).toStrictEqual([]);
 });
 
+test('it reports a bun test that a wrapper script runs', async () => {
+  const ctx = await setupTest({
+    'package.json': JSON.stringify({
+      scripts: { 'test:daemon': 'bash scripts/with-home.sh bun test --timeout 20000 e2e' },
+    }),
+  });
+
+  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'package.json',
+      message:
+        'script "test:daemon" passes --timeout=20000 to bun test, above the 5 s limit; only test:related and a lane script (test:<lane>, for e2e, browser, docker, host and each lane in the max-test-timeout lanes option) may raise it',
+    },
+  ]);
+});
+
+test.each([
+  ['a quoted name pattern', 'bun test --test-name-pattern "--timeout=30000"'],
+  ['an echo of the command', 'echo "bun test --timeout=30000"'],
+  ['an escaped flag', String.raw`bun test \--timeout=30000`],
+])('it leaves %s alone', async (_, command) => {
+  const ctx = await setupTest({ 'package.json': JSON.stringify({ scripts: { test: command } }) });
+
+  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+
+  expect(findings).toStrictEqual([]);
+});
+
 test('it exempts test:related and the built-in lane scripts', async () => {
   const ctx = await setupTest({
     'package.json': JSON.stringify({

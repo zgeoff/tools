@@ -83,10 +83,6 @@ function findMember(value: unknown, key: string): unknown {
 const limitMs = 5000;
 const builtInLanes = ['e2e', 'browser', 'docker', 'host'];
 
-// `--timeout 20000` and `--timeout=20000` both reach `bun test`.
-const timeoutFlagPattern = /--timeout(?:=|\s+)(?<value>\d[\d_]*)/gu;
-const bunTestPattern = /\bbun\s+test\b/u;
-
 function collectScriptFindings(
   path: string,
   text: string,
@@ -120,20 +116,110 @@ function collectScriptFindings(
   });
 }
 
+// `--timeout 20000` and `--timeout=20000` both reach `bun test`, and a quoted word, such as a name
+// pattern, is a value rather than a flag.
 function collectTimeoutValues(command: string): number[] {
   const values: number[] = [];
 
-  for (const segment of command.split(/&&|\|\||[;|]/u)) {
-    if (!bunTestPattern.test(segment)) {
+  for (const words of parseShellCommands(command)) {
+    const start = words.findIndex(
+      (word, index) => isBareWord(word, 'bun') && isBareWord(words[index + 1], 'test'),
+    );
+
+    if (start === -1) {
       continue;
     }
 
-    for (const match of segment.matchAll(timeoutFlagPattern)) {
-      values.push(Number(match.groups?.['value']?.replaceAll('_', '')));
+    const args = words.slice(start + 2);
+
+    for (const [index, word] of args.entries()) {
+      if (isBareWord(word, '--timeout')) {
+        values.push(toTimeoutMs(args[index + 1]?.text));
+      } else if (!word.isQuoted && word.text.startsWith('--timeout=')) {
+        values.push(toTimeoutMs(word.text.slice('--timeout='.length)));
+      }
     }
   }
 
   return values;
+}
+
+interface ShellWord {
+  readonly text: string;
+
+  // Any part of the word sat inside quotes or behind a backslash.
+  readonly isQuoted: boolean;
+}
+
+// The words of each command that `&&`, `||`, `;` or `|` separates, as a POSIX shell splits them
+// outside quotes. Expansions stay as written.
+function parseShellCommands(command: string): ShellWord[][] {
+  const commands: ShellWord[][] = [];
+  let words: ShellWord[] = [];
+  let text = '';
+  let isQuoted = false;
+  let hasWord = false;
+  let quote: string | null = null;
+
+  const endWord = () => {
+    if (hasWord) {
+      words.push({ text, isQuoted });
+    }
+
+    text = '';
+    isQuoted = false;
+    hasWord = false;
+  };
+
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command.charAt(index);
+
+    if (quote !== null) {
+      if (character === quote) {
+        quote = null;
+      } else {
+        text += character;
+      }
+    } else if (character === "'" || character === '"') {
+      quote = character;
+      isQuoted = true;
+      hasWord = true;
+    } else if (character === '\\') {
+      index += 1;
+      text += command.charAt(index);
+      isQuoted = true;
+      hasWord = true;
+    } else if (/\s/u.test(character)) {
+      endWord();
+    } else if (character === ';' || character === '|' || character === '&') {
+      endWord();
+
+      commands.push(words);
+
+      words = [];
+
+      if (command.charAt(index + 1) === character) {
+        index += 1;
+      }
+    } else {
+      text += character;
+      hasWord = true;
+    }
+  }
+
+  endWord();
+
+  commands.push(words);
+
+  return commands;
+}
+
+function isBareWord(word: ShellWord | undefined, text: string): boolean {
+  return word !== undefined && !word.isQuoted && word.text === text;
+}
+
+function toTimeoutMs(value: string | undefined): number {
+  return Number(value?.replaceAll('_', ''));
 }
 
 function collectBunfigFindings(path: string, text: string): TestTimeoutFinding[] {
