@@ -145,7 +145,7 @@ sub list_references {
 # Reads the frontmatter block: a name, and a description that may fold over indented lines.
 sub check_frontmatter {
   my ($dir, $skill, @lines) = @_;
-  my ($name, $description, $in_description, $closed, $raw_description, $folded, $plain, $colon);
+  my ($name, $description, $in_description, $closed, $raw_description, $folded, $style, $colon);
 
   if (@lines && $lines[0] eq "---") {
     for my $line (@lines[1 .. $#lines]) {
@@ -155,15 +155,14 @@ sub check_frontmatter {
         $in_description = 0;
       } elsif ($line =~ /^description:\s*(.*?)\s*$/) {
         $raw_description = $1;
-        $description = $1 =~ /^[>|][+-]?$/ ? "" : unquote($1);
-        # A description that starts on the next line takes its style from that line.
-        $plain = $raw_description eq "" ? undef : $raw_description !~ /\A(?:[>|][+-]?\z|["\x27])/;
-        $colon = 1 if $plain && has_key_colon($description);
+        $style = pick_scalar_style($raw_description);
+        $description = ($style // "") eq "block" ? "" : unquote($raw_description);
+        $colon = 1 if ($style // "") eq "plain" && has_key_colon($description);
         $in_description = 1;
       } elsif ($in_description && $line =~ /^\s+(\S.*?)\s*$/) {
         $description .= ($description eq "" ? "" : " ") . $1;
-        $plain //= $1 !~ /\A["\x27]/;
-        $colon = 1 if $plain && has_key_colon($1);
+        $style //= $1 =~ /\A["\x27]/ ? "quoted" : "plain";
+        $colon = 1 if $style eq "plain" && has_key_colon($1);
         $folded = 1;
       } elsif ($line =~ /^[A-Za-z_-]+:/) {
         $in_description = 0;
@@ -197,6 +196,17 @@ sub check_frontmatter {
 
   fail($skill, "description holds a colon and a space, which YAML reads as a key in a plain scalar; reword it, or quote it or write it as a block scalar (>-)")
     if $colon;
+}
+
+# Returns block, quoted or plain for the text after a key, or undef when the text is empty or only a
+# comment, since the scalar then starts on the next line. A block header may hold an indentation
+# digit and a chomping sign in either order, then a comment.
+sub pick_scalar_style {
+  my ($text) = @_;
+  return undef if $text eq "" || $text =~ /\A#/;
+  return "block" if $text =~ /\A[|>](?:[1-9][+-]?|[+-][1-9]?)?(?:\s+#.*)?\z/;
+  return "quoted" if $text =~ /\A["\x27]/;
+  return "plain";
 }
 
 # A colon followed by a space or the line end starts a mapping inside a plain YAML scalar, so a

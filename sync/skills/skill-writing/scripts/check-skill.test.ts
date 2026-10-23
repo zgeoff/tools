@@ -126,10 +126,18 @@ test('it passes a colon and a space inside a quoted or block description, on eit
     '---',
   ]);
 
+  await ctx.writePage('.claude/skills/commented-block/SKILL.md', [
+    '---',
+    'name: commented-block',
+    'description: >2- # one paragraph',
+    '  How to run the demo service: start it, then seed it.',
+    '---',
+  ]);
+
   const result = ctx.run();
 
   expect(result.status).toBe(0);
-  expect(result.stdout).toBe('check-skill: 3 skills, 0 errors, 0 warnings\n');
+  expect(result.stdout).toBe('check-skill: 4 skills, 0 errors, 0 warnings\n');
 });
 
 test('it fails a description that holds only a comment', async () => {
