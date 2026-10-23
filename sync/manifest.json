@@ -118,6 +118,10 @@
         "target": ".claude/skills/testing/references/observability.md"
       },
       {
+        "source": "sync/skills/testing/references/shell.md",
+        "target": ".claude/skills/testing/references/shell.md"
+      },
+      {
         "source": "sync/skills/testing/references/system-tests.md",
         "target": ".claude/skills/testing/references/system-tests.md"
       }

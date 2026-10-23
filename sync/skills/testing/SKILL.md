@@ -75,6 +75,8 @@ Open a reference when the task touches its area.
   host fixes.
 - [Factories and composites](./references/factories.md): writing or changing a factory or a
   composite.
+- [Shell scripts](./references/shell.md): a shell script's test, run through Bun's `$` shell, and
+  its ShellCheck check.
 - [Cleanup](./references/cleanup.md): helpers that register cleanup, ordered cleanup, cleanup after
   the resets, and a test that fails only in the full run.
 
@@ -578,6 +580,7 @@ builds or imports is a spy, which [Infrastructure failures](#infrastructure-fail
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | Pure computation                                | Return values, with no stand-in                                                                   |
 | A CLI                                           | The real binary, spawned end to end                                                               |
+| A shell script                                  | The real script, run through Bun's `$`, as [shell scripts](./references/shell.md) describes       |
 | The filesystem                                  | A real `mkdtemp` tree per test                                                                    |
 | A database                                      | The real engine, isolated per test, as [database](./references/database.md) describes             |
 | A remote HTTP or RPC service                    | MSW handlers, as [HTTP mocking](./references/http.md) describes                                   |
