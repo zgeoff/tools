@@ -96,14 +96,16 @@ repo-sync never touches:
 Files under [`pre-push/`](./pre-push/) are the pre-push baseline, delivered by the opt-in
 `pre-push-baseline` entry. The baseline runs its jobs one at a time, so a push fits a 2 GiB host or
 a machine shared by parallel agents. It runs `format:check` and `typecheck` over the whole tree, and
-plain `oxlint`, the repo's `check` script and the sibling tests over the files the branch changes.
-It also runs `typecheck` before a commit that stages a code or JSON file, after the repo's own
-pre-commit jobs, so the type check sees what the fixers wrote. The `check` script is `zgeoff-check`
-from [`@zgeoff/checks`](../packages/checks/README.md), which the repo installs itself. bun appends
-the branch's paths to the script's last command, and only `zgeoff-check` is sure to take them, so
-the job runs only when the script is exactly `zgeoff-check`. A repo whose `check` script is missing
-or runs anything else gets a notice in place of the job. CI keeps every whole-tree check required.
-The entry delivers these files, and their tests stay here:
+plain `oxlint`, the shell, docs and workflows checks and the sibling tests over the files the branch
+changes. The shell check runs `shellcheck` and `shfmt -d`, the docs check runs the docs-writing
+skill's `check-length.sh` and `check-links.sh`, and the workflows check runs `actionlint`. Each runs
+only when the branch changes a file that matches its glob. A check whose program the machine lacks
+prints a notice and passes, because CI installs the program and runs the check. The docs check
+prints a notice and passes in a repo without `.claude/skills/docs-writing/scripts/`. The commits and
+local-paths checks read the branch's commits. It also runs `typecheck` before a commit that stages a
+code or JSON file, after the repo's own pre-commit jobs, so the type check sees what the fixers
+wrote. CI keeps every whole-tree check required. The entry delivers these files, and their tests
+stay here:
 
 - `.lefthook/pre-push-baseline.yml` — the lefthook jobs.
 - `scripts/read-branch-files.ts` — lists the files changed since the merge base with origin's
@@ -141,8 +143,9 @@ The file list comes from the checked-out branch. `git push origin <other-branch>
 the checked-out branch's files, not the pushed branch's, and CI catches what the hook skips.
 
 A repo changes what a baseline job runs through the package script that the job calls, such as
-`typecheck`. The one exception is `check`, which runs only `zgeoff-check`. A job of the same name in
-`lefthook.yml` does not override it, because lefthook merges the extended file over the repo's own.
+`typecheck`. The shell, docs and workflows checks call their programs directly, so a repo cannot
+change them. A job of the same name in `lefthook.yml` does not override a baseline job, because
+lefthook merges the extended file over the repo's own.
 
 The sync branch is force-pushed on every run, so a commit a person adds to it is lost on the next
 run. Edit the source here instead. An entry that fails, through a workflow conflict or its build, is

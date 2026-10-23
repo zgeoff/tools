@@ -1,9 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import invariant from 'tiny-invariant';
 
 // A main checkout with a pushable upstream and a linked worktree on its own branch. Every git call
 // gets a clean environment, so a GIT_DIR this test inherits from a real hook cannot reach the repo
@@ -17,9 +18,8 @@ async function setupTest() {
 
   await mkdir(bin);
 
-  // The workspace's node_modules/.bin holds the commitlint that zgeoff-check's commits check runs.
   const env = {
-    PATH: `${bin}:${join(import.meta.dir, '../../node_modules/.bin')}:${process.env['PATH']}`,
+    PATH: `${bin}:${process.env['PATH']}`,
     HOME: directory,
 
     // mise finds its config and tools under HOME, so under a fake HOME its node and actionlint shims
@@ -76,10 +76,11 @@ test('it leaves the main checkout non-bare when the test job runs in a pre-push 
       scripts: {
         'format:check': 'true',
         'lint:files': 'true',
-        check: 'true',
         typecheck: 'true',
         'files:branch': 'echo fixture.ts',
         'test:related': 'git init --quiet sandbox && true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
       },
     }),
   );
@@ -102,86 +103,7 @@ test('it leaves the main checkout non-bare when the test job runs in a pre-push 
   expect(existsSync(join(ctx.worktree, 'sandbox/.git'))).toBeTrue();
 });
 
-test('it passes the push with a notice when the repo has no check script', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
-  await writeFile(join(ctx.worktree, 'fixture.sh'), 'echo $1\n');
-
-  await writeFile(
-    join(ctx.worktree, 'package.json'),
-    JSON.stringify({
-      scripts: {
-        'format:check': 'true',
-        'lint:files': 'true',
-        typecheck: 'true',
-        'files:branch': 'echo fixture.sh',
-        'test:related': 'true',
-      },
-    }),
-  );
-
-  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
-  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
-
-  await writeFile(
-    join(ctx.main, '.git/hooks/pre-push'),
-    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
-  );
-
-  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
-
-  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
-
-  expect(result.exitCode).toBe(0);
-
-  expect(`${result.stdout.toString()}${result.stderr.toString()}`).toInclude(
-    'check: skipped, because package.json has no check script; add "check": "zgeoff-check" to run it',
-  );
-});
-
-test('it passes the push with a notice that names the check script when it is not zgeoff-check', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
-  await writeFile(join(ctx.worktree, 'fixture.sh'), 'echo $1\n');
-
-  // An aggregate whose last command fails on the paths the job would append, so the push passes
-  // only when the job skips the script.
-  await writeFile(
-    join(ctx.worktree, 'package.json'),
-    JSON.stringify({
-      scripts: {
-        'format:check': 'true',
-        'lint:files': 'true',
-        check: 'bun run typecheck && test $# -eq 0',
-        typecheck: 'true',
-        'files:branch': 'echo fixture.sh',
-        'test:related': 'true',
-      },
-    }),
-  );
-
-  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
-  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
-
-  await writeFile(
-    join(ctx.main, '.git/hooks/pre-push'),
-    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
-  );
-
-  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
-
-  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
-
-  expect(result.exitCode).toBe(0);
-
-  expect(`${result.stdout.toString()}${result.stderr.toString()}`).toInclude(
-    'check: skipped, because the check script is "bun run typecheck && test $# -eq 0", not "zgeoff-check"',
-  );
-});
-
-test('it fails the push when zgeoff-check finds a problem in a file the branch changes', async () => {
+test('it fails the push on the shell job alone when a shell file the branch changes fails shellcheck', async () => {
   const ctx = await setupTest();
 
   await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
@@ -193,20 +115,14 @@ test('it fails the push when zgeoff-check finds a problem in a file the branch c
       scripts: {
         'format:check': 'true',
         'lint:files': 'true',
-        check: 'zgeoff-check',
         typecheck: 'true',
         'files:branch': 'echo bad.sh',
         'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
       },
     }),
   );
-
-  await writeFile(
-    join(ctx.bin, 'zgeoff-check'),
-    `#!/bin/sh\nexec ${process.execPath} ${join(import.meta.dir, '../../packages/checks/src/cli.ts')} "$@"\n`,
-  );
-
-  await chmod(join(ctx.bin, 'zgeoff-check'), 0o755);
 
   await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
   await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
@@ -220,21 +136,27 @@ test('it fails the push when zgeoff-check finds a problem in a file the branch c
 
   const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
 
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
   expect(result.exitCode).not.toBe(0);
-});
 
-test("it fails the push when this repo's source check finds a problem in a file the branch changes", async () => {
-  const ctx = await setupTest();
-
-  // This repo's own lefthook.yml, with its extends pointed at the baseline from the fixture.
-  const config = await readFile(join(import.meta.dir, '../../lefthook.yml'), 'utf8');
-
-  await writeFile(
-    join(ctx.worktree, 'lefthook.yml'),
-    config.replace('sync/pre-push/lefthook-pre-push.yml', ctx.baseline),
+  const failedJobs = [...output.matchAll(/^🥊\s+(?<job>\S+)/gmu)].map(
+    (failure) => failure.groups?.['job'],
   );
 
-  await writeFile(join(ctx.worktree, 'bad.sh'), '#!/usr/bin/env bash\necho $1\n');
+  expect(failedJobs).toStrictEqual(['shell']);
+});
+
+test('it fails the push on the shell job alone when a shell file the branch changes passes shellcheck and fails shfmt', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+
+  // shellcheck accepts this script, and shfmt would space it out.
+  await writeFile(
+    join(ctx.worktree, 'cramped.sh'),
+    '#!/usr/bin/env bash\nif true;then echo "a";fi\n',
+  );
 
   await writeFile(
     join(ctx.worktree, 'package.json'),
@@ -242,10 +164,11 @@ test("it fails the push when this repo's source check finds a problem in a file 
       scripts: {
         'format:check': 'true',
         'lint:files': 'true',
-        check: `bun ${join(import.meta.dir, '../../packages/checks/src/cli.ts')}`,
         typecheck: 'true',
-        'files:branch': 'echo bad.sh',
+        'files:branch': 'echo cramped.sh',
         'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
       },
     }),
   );
@@ -262,10 +185,18 @@ test("it fails the push when this repo's source check finds a problem in a file 
 
   const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
 
-  expect(result.exitCode).not.toBe(0);
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  const failedJobs = [...output.matchAll(/^🥊\s+(?<job>\S+)/gmu)].map(
+    (failure) => failure.groups?.['job'],
+  );
+
+  expect(failedJobs).toStrictEqual(['shell']);
+  expect(output).toInclude('+++ cramped.sh');
+  expect(output).not.toInclude('SC');
 });
 
-test('it passes the push when only a file the branch leaves unchanged fails zgeoff-check', async () => {
+test('it passes the push when only a file the branch leaves unchanged fails the shell check', async () => {
   const ctx = await setupTest();
 
   await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
@@ -281,20 +212,14 @@ test('it passes the push when only a file the branch leaves unchanged fails zgeo
       scripts: {
         'format:check': 'true',
         'lint:files': 'true',
-        check: 'zgeoff-check',
         typecheck: 'true',
         'files:branch': 'echo clean.sh',
         'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
       },
     }),
   );
-
-  await writeFile(
-    join(ctx.bin, 'zgeoff-check'),
-    `#!/bin/sh\nexec ${process.execPath} ${join(import.meta.dir, '../../packages/checks/src/cli.ts')} "$@"\n`,
-  );
-
-  await chmod(join(ctx.bin, 'zgeoff-check'), 0o755);
 
   await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
   await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
@@ -316,7 +241,7 @@ test('it passes the push when the branch changes a clean file whose name starts 
 
   await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
 
-  // Passed bare, -helpers.sh would read as an unknown option and stop the run with exit 2.
+  // Passed bare, -helpers.sh would read as an option to shellcheck and shfmt.
   await writeFile(join(ctx.worktree, '-helpers.sh'), '#!/usr/bin/env bash\necho "hello"\n');
 
   await writeFile(
@@ -325,20 +250,14 @@ test('it passes the push when the branch changes a clean file whose name starts 
       scripts: {
         'format:check': 'true',
         'lint:files': 'true',
-        check: 'zgeoff-check',
         typecheck: 'true',
         'files:branch': String.raw`printf '%s\n' -helpers.sh`,
         'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
       },
     }),
   );
-
-  await writeFile(
-    join(ctx.bin, 'zgeoff-check'),
-    `#!/bin/sh\nexec ${process.execPath} ${join(import.meta.dir, '../../packages/checks/src/cli.ts')} "$@"\n`,
-  );
-
-  await chmod(join(ctx.bin, 'zgeoff-check'), 0o755);
 
   await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
   await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
@@ -355,26 +274,16 @@ test('it passes the push when the branch changes a clean file whose name starts 
   expect(result.exitCode).toBe(0);
 });
 
-test('it forwards every file the branch changes to zgeoff-check when the branch changes several', async () => {
+test('it hands every shell file the branch changes to the shell check when the branch changes several', async () => {
   const ctx = await setupTest();
 
   await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
 
   await Promise.all(
     ['first.sh', 'second.sh', 'third.sh'].map((file) =>
-      writeFile(join(ctx.worktree, file), '#!/usr/bin/env bash\necho "hello"\n'),
+      writeFile(join(ctx.worktree, file), '#!/usr/bin/env bash\necho $1\n'),
     ),
   );
-
-  // The stand-in zgeoff-check writes each argument it gets on its own line.
-  await writeFile(
-    join(ctx.bin, 'zgeoff-check'),
-    String.raw`#!/bin/sh
-printf '%s\n' "$@" > forwarded.txt
-`,
-  );
-
-  await chmod(join(ctx.bin, 'zgeoff-check'), 0o755);
 
   await writeFile(
     join(ctx.worktree, 'package.json'),
@@ -382,10 +291,11 @@ printf '%s\n' "$@" > forwarded.txt
       scripts: {
         'format:check': 'true',
         'lint:files': 'true',
-        check: 'zgeoff-check',
         typecheck: 'true',
         'files:branch': String.raw`printf '%s\n' first.sh second.sh third.sh`,
         'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
       },
     }),
   );
@@ -400,11 +310,404 @@ printf '%s\n' "$@" > forwarded.txt
 
   await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
 
-  await $`git push --quiet origin feature`.cwd(ctx.worktree).env(ctx.env).quiet();
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
 
-  const forwarded = await readFile(join(ctx.worktree, 'forwarded.txt'), 'utf8');
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
 
-  expect(forwarded).toBe('./first.sh\n./second.sh\n./third.sh\n');
+  expect(output).toIncludeMultiple([
+    'In first.sh line 2',
+    'In second.sh line 2',
+    'In third.sh line 2',
+  ]);
+});
+
+test('it passes the push with a notice when the machine lacks shfmt', async () => {
+  const ctx = await setupTest();
+
+  // A PATH of the programs the push runs, with shellcheck and without shfmt.
+  for (const program of ['git', 'sh', 'shellcheck']) {
+    const found = Bun.which(program);
+
+    invariant(found !== null, `install ${program}`);
+
+    await symlink(found, join(ctx.bin, program));
+  }
+
+  await symlink(process.execPath, join(ctx.bin, 'bun'));
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.worktree, 'bad.sh'), '#!/usr/bin/env bash\necho $1\n');
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'echo bad.sh',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`
+    .cwd(ctx.worktree)
+    .env({ ...ctx.env, PATH: ctx.bin })
+    .nothrow()
+    .quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).toBe(0);
+  expect(output).toInclude('shell: skipped, because shfmt is not on the PATH; CI runs the check');
+});
+
+test('it passes the push with a notice when the machine lacks actionlint', async () => {
+  const ctx = await setupTest();
+
+  // A PATH of the programs the push runs, without actionlint.
+  for (const program of ['git', 'sh']) {
+    const found = Bun.which(program);
+
+    invariant(found !== null, `install ${program}`);
+
+    await symlink(found, join(ctx.bin, program));
+  }
+
+  await symlink(process.execPath, join(ctx.bin, 'bun'));
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await mkdir(join(ctx.worktree, '.github/workflows'), { recursive: true });
+  await writeFile(join(ctx.worktree, '.github/workflows/greet.yml'), 'on: push\njobs: {}\n');
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'echo .github/workflows/greet.yml',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`
+    .cwd(ctx.worktree)
+    .env({ ...ctx.env, PATH: ctx.bin })
+    .nothrow()
+    .quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).toBe(0);
+
+  expect(output).toInclude(
+    'workflows: skipped, because actionlint is not on the PATH; CI runs the check',
+  );
+});
+
+test('it fails the push when actionlint rejects a workflow the branch changes', async () => {
+  const ctx = await setupTest();
+
+  invariant(Bun.which('actionlint', { PATH: ctx.env.PATH }) !== null, 'install actionlint');
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await mkdir(join(ctx.worktree, '.github/workflows'), { recursive: true });
+
+  await writeFile(
+    join(ctx.worktree, '.github/workflows/greet.yml'),
+    'on: push\njobs:\n  greet:\n    needs: build\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n',
+  );
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'echo .github/workflows/greet.yml',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).not.toBe(0);
+  expect(output).toInclude('job "greet" needs job "build" which does not exist');
+});
+
+test('it passes the docs job with a notice when the repo has no docs-writing scripts', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.worktree, 'README.md'), '# Greeter\n');
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'echo README.md',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).toBe(0);
+
+  expect(output).toInclude(
+    'docs: skipped, because the repo has no .claude/skills/docs-writing/scripts/check-length.sh; take the skill-docs-writing entry of repo-sync to run it',
+  );
+});
+
+test('it fails the push on the docs job when the installed length script rejects a README', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+
+  await cp(
+    join(import.meta.dir, '../skills/docs-writing/scripts'),
+    join(ctx.worktree, '.claude/skills/docs-writing/scripts'),
+    { recursive: true },
+  );
+
+  // The repo has a package.json, so its README holds 130 lines at most; this one has 131, in short
+  // paragraphs with no link.
+  const paragraphs = Array.from(
+    { length: 65 },
+    (_, index) => `Step ${index + 1} greets the visitor.`,
+  );
+
+  await writeFile(
+    join(ctx.worktree, 'README.md'),
+    `${['# Greeter', ...paragraphs].join('\n\n')}\n`,
+  );
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'echo README.md',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  const failedJobs = [...output.matchAll(/^🥊\s+(?<job>\S+)/gmu)].map(
+    (failure) => failure.groups?.['job'],
+  );
+
+  expect(failedJobs).toStrictEqual(['docs']);
+  expect(output).toInclude('README.md: 131 lines, over the package README limit of 130');
+});
+
+test('it fails the push on the docs job when the installed link script finds a broken link', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+
+  await cp(
+    join(import.meta.dir, '../skills/docs-writing/scripts'),
+    join(ctx.worktree, '.claude/skills/docs-writing/scripts'),
+    { recursive: true },
+  );
+
+  await writeFile(join(ctx.worktree, 'README.md'), '# Greeter\n\nRead the [guide](./guide.md).\n');
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'echo README.md',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  const failedJobs = [...output.matchAll(/^🥊\s+(?<job>\S+)/gmu)].map(
+    (failure) => failure.groups?.['job'],
+  );
+
+  expect(failedJobs).toStrictEqual(['docs']);
+  expect(output).toInclude('guide.md');
+});
+
+test('it fails the push when a commit of the branch fails commitlint', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.worktree, '.gitignore'), 'node_modules\n');
+
+  // The workspace's install holds the commitlint and @zgeoff/commitlint-config that the check reads.
+  await symlink(join(import.meta.dir, '../../node_modules'), join(ctx.worktree, 'node_modules'));
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'true',
+        'test:related': 'true',
+        'check:commits': `bun ${join(import.meta.dir, 'run-commits-check.ts')}`,
+        'check:local-paths': 'true',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'tidy up'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).not.toBe(0);
+  expect(output).toInclude('subject may not be empty [subject-empty]');
+});
+
+test('it fails the push when a commit of the branch adds the home directory', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.worktree, 'cache.txt'), `cache: ${ctx.env.HOME}/.cache\n`);
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'echo cache.txt',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': `bun ${join(import.meta.dir, 'run-local-paths-check.ts')}`,
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).not.toBe(0);
+  expect(output).toInclude(`cache.txt:1: commit `);
 });
 
 test("it fails the commit when typecheck fails, after the repo's own pre-commit job runs", async () => {
@@ -486,6 +789,9 @@ test.each([
   ['packages/checks/src/run-checks.test.ts'],
   ['packages/checks/src/run-git-show-toplevel.test.ts'],
   ['packages/oxfmt-config/index.test.ts'],
+  ['sync/pre-push/read-branch-base.test.ts'],
+  ['sync/pre-push/run-commits-check.test.ts'],
+  ['sync/pre-push/run-local-paths-check.test.ts'],
   ['sync/skills/docs-writing/scripts/check-length.test.ts'],
   ['sync/skills/docs-writing/scripts/check-links.test.ts'],
   ['sync/skills/skill-writing/scripts/check-skill.test.ts'],
