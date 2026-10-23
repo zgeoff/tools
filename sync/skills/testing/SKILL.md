@@ -276,7 +276,7 @@ never appear in a test file.
   tests of its own. A file with nothing to wire has no `setupTest()`. One exception: a
   collection-time skip gate may keep its awaited probe, and named gates derived from it, at module
   level. Only `skipIf` reads them, each repeated condition is named once, and a comment gives the
-  reason: Bun 1.4.2's `skipIf` takes a boolean and has no in-body skip.
+  reason: Bun's `skipIf` takes a boolean and has no in-body skip.
 - `setupTest()` may return a closure that only calls production helpers on the runtime it built,
   such as `createImpDir(name)`. A closure with a branch, a loop, or state of its own is a helper,
   and it moves to the shared test utils.
