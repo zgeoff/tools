@@ -242,6 +242,63 @@ test.skipIf(!modesOutput.includes('cgroupfs'))(
   },
 );
 
+test.each([['SIGHUP'], ['SIGINT'], ['SIGTERM']] as const)(
+  'it hands a %s it gets to the command as the same signal',
+  async (signal) => {
+    const ctx = setupTest();
+    const name = signal.slice('SIG'.length);
+
+    const run = Bun.spawn(
+      [
+        'bash',
+        ctx.scriptPath,
+        '128',
+        ctx.bun,
+        '-e',
+        `process.on('${signal}', () => { console.log('got ${name}'); process.exit(0); }); console.log('ready'); setInterval(() => {}, 1000);`,
+      ],
+      { env: ctx.env, stdout: 'pipe', stderr: 'pipe' },
+    );
+
+    onTestFinished(() => {
+      run.kill('SIGKILL');
+    });
+
+    const reader = run.stdout.getReader();
+
+    const decoder = new TextDecoder();
+
+    let output = '';
+
+    // The command prints ready once its handler is set, so a signal after that line reaches it. A bash
+    // command would defer its trap until a blocking read returns.
+    while (!output.includes('ready\n')) {
+      const chunk = await reader.read();
+
+      invariant(!chunk.done);
+
+      output += decoder.decode(chunk.value);
+    }
+
+    run.kill(signal);
+
+    let chunk = await reader.read();
+
+    while (!chunk.done) {
+      output += decoder.decode(chunk.value);
+
+      chunk = await reader.read();
+    }
+
+    const exitCode = await run.exited;
+
+    expect({ exitCode, stdout: output }).toStrictEqual({
+      exitCode: 0,
+      stdout: `ready\ngot ${name}\n`,
+    });
+  },
+);
+
 test.skipIf(modesOutput === '')('it uses the first mode the host supports', async () => {
   const ctx = setupTest();
 
