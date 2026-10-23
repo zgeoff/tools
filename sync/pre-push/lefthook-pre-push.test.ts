@@ -82,6 +82,7 @@ test('it leaves the main checkout non-bare when the test job runs in a pre-push 
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'memory-capped': 'exec',
       },
     }),
   );
@@ -122,6 +123,7 @@ test('it fails the push on the shell job alone when a shell file the branch chan
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'memory-capped': 'exec',
       },
     }),
   );
@@ -172,6 +174,7 @@ test('it fails the push on the shell job alone when a shell file the branch chan
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'memory-capped': 'exec',
       },
     }),
   );
@@ -221,6 +224,7 @@ test('it passes the push when only a file the branch leaves unchanged fails the 
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'memory-capped': 'exec',
       },
     }),
   );
@@ -260,6 +264,7 @@ test('it passes the push when the branch changes a clean file whose name starts 
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'memory-capped': 'exec',
       },
     }),
   );
@@ -302,6 +307,7 @@ test('it hands every shell file the branch changes to the shell check when the b
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'memory-capped': 'exec',
       },
     }),
   );
@@ -355,6 +361,7 @@ test('it passes the push with a notice when the machine lacks shfmt', async () =
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'memory-capped': 'exec',
       },
     }),
   );
@@ -410,6 +417,7 @@ test('it passes the push with a notice when the machine lacks actionlint', async
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'memory-capped': 'exec',
       },
     }),
   );
@@ -464,6 +472,7 @@ test('it fails the push when actionlint rejects a workflow the branch changes', 
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'memory-capped': 'exec',
       },
     }),
   );
@@ -504,6 +513,7 @@ test('it passes the docs job with a notice when the repo has no docs-writing scr
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'memory-capped': 'exec',
       },
     }),
   );
@@ -564,6 +574,7 @@ test('it fails the push on the docs job when the installed length script rejects
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'memory-capped': 'exec',
       },
     }),
   );
@@ -615,6 +626,7 @@ test('it fails the push on the docs job when the installed link script finds a b
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'memory-capped': 'exec',
       },
     }),
   );
@@ -662,6 +674,7 @@ test('it fails the push when a commit of the branch fails commitlint', async () 
         'check:commits': `bun ${join(import.meta.dir, 'run-commits-check.ts')}`,
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'memory-capped': 'exec',
       },
     }),
   );
@@ -702,6 +715,7 @@ test('it fails the push when a commit of the branch adds the home directory', as
         'check:commits': 'true',
         'check:local-paths': `bun ${join(import.meta.dir, 'run-local-paths-check.ts')}`,
         'check:test-timeouts': 'true',
+        'memory-capped': 'exec',
       },
     }),
   );
@@ -742,6 +756,7 @@ test('it fails the push when a bunfig.toml raises the test timeout above 5 s', a
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': `bun ${join(import.meta.dir, 'run-test-timeouts-check.ts')}`,
+        'memory-capped': 'exec',
       },
     }),
   );
@@ -780,7 +795,9 @@ test("it fails the commit when typecheck fails, after the repo's own pre-commit 
 
   await writeFile(
     join(ctx.worktree, 'package.json'),
-    JSON.stringify({ scripts: { typecheck: 'echo typecheck >> ran.txt && exit 1' } }),
+    JSON.stringify({
+      scripts: { 'memory-capped': 'exec', typecheck: 'echo typecheck >> ran.txt && exit 1' },
+    }),
   );
 
   await writeFile(
@@ -813,7 +830,7 @@ test('it skips typecheck on a commit that stages no code or config file', async 
 
   await writeFile(
     join(ctx.worktree, 'package.json'),
-    JSON.stringify({ scripts: { typecheck: 'exit 1' } }),
+    JSON.stringify({ scripts: { 'memory-capped': 'exec', typecheck: 'exit 1' } }),
   );
 
   await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
@@ -883,3 +900,226 @@ test.each([
   // oxlint-disable-next-line zgeoff/max-test-timeout -- each row runs a whole suite in a nested bun test
   30_000,
 );
+
+test('it skips the test job with the CI notice when the branch has more than 50 related test files', async () => {
+  const ctx = await setupTest();
+
+  const tests = Array.from({ length: 51 }, (_, index) => `src/t${index}.test.ts`);
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await mkdir(join(ctx.worktree, 'src'));
+
+  // Each test fails, so a run of any of them fails the push.
+  await Promise.all(
+    tests.map((path) =>
+      writeFile(
+        join(ctx.worktree, path),
+        "import { expect, test } from 'bun:test';\n\ntest('it fails on purpose', () => {\n  expect(1).toBe(2);\n});\n",
+      ),
+    ),
+  );
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'git diff --name-only main...HEAD',
+        test: 'bun test',
+        'test:related': `bun ${join(import.meta.dir, 'run-related-tests.ts')}`,
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
+        'memory-capped': `bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024`,
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`
+    .cwd(ctx.worktree)
+    .env({ ...ctx.env, TEST_WORKERS: '2' })
+    .nothrow()
+    .quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).toBe(0);
+
+  expect(output).toInclude(
+    'run-related-tests: skipped, because the branch has 51 related unit test files, over the cap of 50; CI runs the full suite',
+  );
+});
+
+test('it runs the related tests under the memory cap when the branch has 50 or fewer', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await mkdir(join(ctx.worktree, 'src'));
+  await writeFile(join(ctx.worktree, 'src/cart.ts'), 'export {};\n');
+
+  await writeFile(
+    join(ctx.worktree, 'src/cart.test.ts'),
+    "import { expect, test } from 'bun:test';\n\ntest('it fails on purpose', () => {\n  expect(1).toBe(2);\n});\n",
+  );
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'git diff --name-only main...HEAD',
+        test: 'bun test',
+        'test:related': `bun ${join(import.meta.dir, 'run-related-tests.ts')}`,
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
+        'memory-capped': `bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024`,
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`
+    .cwd(ctx.worktree)
+    .env({ ...ctx.env, TEST_WORKERS: '2' })
+    .nothrow()
+    .quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).not.toBe(0);
+  expect(output).toInclude('(fail) it fails on purpose');
+
+  expect(output).toMatch(
+    /^run-memory-capped: [a-z-]+, memory.max 1024 MiB|^run-memory-capped: this host has no systemd scope/mu,
+  );
+});
+
+test('it runs no tests in the hook when the branch changes only lane files', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await mkdir(join(ctx.worktree, 'src'));
+  await mkdir(join(ctx.worktree, 'e2e'));
+
+  // Each lane test fails, so a run of any of them fails the push.
+  await writeFile(
+    join(ctx.worktree, 'e2e/checkout.test.ts'),
+    "import { expect, test } from 'bun:test';\n\ntest('it fails on purpose', () => {\n  expect(1).toBe(2);\n});\n",
+  );
+
+  await writeFile(
+    join(ctx.worktree, 'src/view.browser.test.ts'),
+    "import { expect, test } from 'bun:test';\n\ntest('it fails on purpose', () => {\n  expect(1).toBe(2);\n});\n",
+  );
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'git diff --name-only main...HEAD',
+        test: 'bun test',
+        'test:related': `bun ${join(import.meta.dir, 'run-related-tests.ts')}`,
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
+        'memory-capped': `bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024`,
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`
+    .cwd(ctx.worktree)
+    .env({ ...ctx.env, TEST_WORKERS: '2' })
+    .nothrow()
+    .quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).toBe(0);
+  expect(output).toInclude('run-related-tests: no related tests');
+});
+
+test('it passes the slow-host timeout to the tests when the host gets 1 worker', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await mkdir(join(ctx.worktree, 'src'));
+  await writeFile(join(ctx.worktree, 'src/cart.test.ts'), '');
+
+  // The test script prints the arguments the hook gives it.
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'git diff --name-only main...HEAD',
+        test: 'echo test-args',
+        'test:related': `bun ${join(import.meta.dir, 'run-related-tests.ts')}`,
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
+        'memory-capped': `bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024`,
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`
+    .cwd(ctx.worktree)
+    .env({ ...ctx.env, TEST_WORKERS: '1' })
+    .nothrow()
+    .quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).toBe(0);
+  expect(output).toInclude('test-args --parallel=1 --timeout=15000 ./src/cart.test.ts');
+});

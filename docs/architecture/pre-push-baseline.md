@@ -20,6 +20,26 @@ branch's commits, and the test-timeouts check reads the files that `HEAD` holds.
 runs `typecheck` before a commit that stages a code or JSON file, after the repo's own pre-commit
 jobs, so the type check sees what the fixers wrote.
 
+Each job that calls a package script runs it through the `memory-capped` script, which the entry's
+build points at the [memory-cap script](./memory-caps.md) with the host's memory budget as the cap.
+A job that outgrows the host then fails alone, and every job prints its peak memory.
+
+## The related tests
+
+The test job runs unit tests only. It leaves out the lane files, which need a browser, a container
+or the host and run in their own CI job: a file under an `e2e/` folder, and a `.browser`, `.docker`
+or `.host` file. It skips, and passes with a notice that CI runs the full suite, in two cases:
+
+- The branch changes a shared test input, a file under a `test-utils/` folder or a `bunfig.toml`,
+  which reaches tests beyond the siblings of the files it changes.
+- The branch has more related unit test files than the cap. A repo sets its own cap with
+  `--max-files=<count>` in its `test:related` script.
+
+The job passes `bun test` the [worker count](./memory-caps.md#the-worker-count) as `--parallel`.
+With one worker it also raises the per-test timeout, because a host with one worker runs each file
+slower than CI does. The runner holds that timeout as one constant, the only place a run may raise
+the timeout.
+
 ## The delivered files
 
 The entry delivers these files, and their tests stay in tools:
@@ -28,8 +48,8 @@ The entry delivers these files, and their tests stay in tools:
 - `scripts/read-branch-files.ts` — lists the files changed since the merge base with origin's
   default branch. lefthook's `{push_files}` lists every file in history for a branch with no
   upstream, so the baseline does not use it.
-- `scripts/run-related-tests.ts` — runs each changed file's sibling test through the repo's `test`
-  script.
+- `scripts/run-related-tests.ts` — runs each changed file's sibling unit test through the repo's
+  `test` script, as [The related tests](#the-related-tests) describes.
 - `scripts/run-commits-check.ts` — runs `commitlint` with the rules of `@zgeoff/commitlint-config`
   on the message of each commit since that merge base, merge commits left out. A repo that does not
   install both `@commitlint/cli` and `@zgeoff/commitlint-config` gets a notice in place of the
@@ -49,8 +69,8 @@ The check scripts exit 0 when clean or skipped, 1 with a problem, and 2 when the
 as in a clone without origin's default branch.
 
 The entry's build adds the package scripts `files:branch`, `lint:files`, `test:related`,
-`check:commits`, `check:local-paths` and `check:test-timeouts` when the repo lacks them. It changes
-one script the repo already has: a `files:branch` that runs the old
+`check:commits`, `check:local-paths`, `check:test-timeouts` and `memory-capped` when the repo lacks
+them. It changes one script the repo already has: a `files:branch` that runs the old
 `scripts/collect-branch-files.ts` moves to `scripts/read-branch-files.ts`. A repo opts in with three
 changes, which
 [Opting in to the pre-push baseline](../runbooks/downstream-repo-setup.md#opting-in-to-the-pre-push-baseline)
