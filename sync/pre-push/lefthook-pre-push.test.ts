@@ -6,6 +6,10 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 
+// Bun's skipIf takes a boolean at collection time. A host without actionlint skips the test that
+// needs it, as the hook skips the check there; CI installs actionlint, so a CI run without it fails.
+const canRunActionlint = Bun.which('actionlint') !== null || process.env['CI'] === 'true';
+
 // A main checkout with a pushable upstream and a linked worktree on its own branch. Every git call
 // gets a clean environment, so a GIT_DIR this test inherits from a real hook cannot reach the repo
 // it runs in.
@@ -447,53 +451,60 @@ test('it passes the push with a notice when the machine lacks actionlint', async
   );
 });
 
-test('it fails the push when actionlint rejects a workflow the branch changes', async () => {
-  const ctx = await setupTest();
+test.skipIf(!canRunActionlint)(
+  'it fails the push when actionlint rejects a workflow the branch changes',
+  async () => {
+    const ctx = await setupTest();
 
-  invariant(Bun.which('actionlint', { PATH: ctx.env.PATH }) !== null, 'install actionlint');
+    invariant(Bun.which('actionlint', { PATH: ctx.env.PATH }) !== null, 'install actionlint');
 
-  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
-  await mkdir(join(ctx.worktree, '.github/workflows'), { recursive: true });
+    await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+    await mkdir(join(ctx.worktree, '.github/workflows'), { recursive: true });
 
-  await writeFile(
-    join(ctx.worktree, '.github/workflows/greet.yml'),
-    'on: push\njobs:\n  greet:\n    needs: build\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n',
-  );
+    await writeFile(
+      join(ctx.worktree, '.github/workflows/greet.yml'),
+      'on: push\njobs:\n  greet:\n    needs: build\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n',
+    );
 
-  await writeFile(
-    join(ctx.worktree, 'package.json'),
-    JSON.stringify({
-      scripts: {
-        'format:check': 'true',
-        'lint:files': 'true',
-        typecheck: 'true',
-        'files:branch': 'echo .github/workflows/greet.yml',
-        'test:related': 'true',
-        'check:commits': 'true',
-        'check:local-paths': 'true',
-        'check:test-timeouts': 'true',
-        'memory-capped': 'exec',
-      },
-    }),
-  );
+    await writeFile(
+      join(ctx.worktree, 'package.json'),
+      JSON.stringify({
+        scripts: {
+          'format:check': 'true',
+          'lint:files': 'true',
+          typecheck: 'true',
+          'files:branch': 'echo .github/workflows/greet.yml',
+          'test:related': 'true',
+          'check:commits': 'true',
+          'check:local-paths': 'true',
+          'check:test-timeouts': 'true',
+          'memory-capped': 'exec',
+        },
+      }),
+    );
 
-  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
-  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+    await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+    await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
 
-  await writeFile(
-    join(ctx.main, '.git/hooks/pre-push'),
-    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
-  );
+    await writeFile(
+      join(ctx.main, '.git/hooks/pre-push'),
+      `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+    );
 
-  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+    await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
 
-  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+    const result = await $`git push origin feature`
+      .cwd(ctx.worktree)
+      .env(ctx.env)
+      .nothrow()
+      .quiet();
 
-  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+    const output = `${result.stdout.toString()}${result.stderr.toString()}`;
 
-  expect(result.exitCode).not.toBe(0);
-  expect(output).toInclude('job "greet" needs job "build" which does not exist');
-});
+    expect(result.exitCode).not.toBe(0);
+    expect(output).toInclude('job "greet" needs job "build" which does not exist');
+  },
+);
 
 test('it passes the docs job with a notice when the repo has no docs-writing scripts', async () => {
   const ctx = await setupTest();

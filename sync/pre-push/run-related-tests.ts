@@ -8,7 +8,7 @@ import type { WorkerCountSources } from './read-worker-count.ts';
 
 // The one place a run raises bun's default test timeout: a host with one worker runs each file
 // slower than CI, and a test that passes there must not fail the push.
-export const slowHostTestTimeoutMs = 15_000;
+const slowHostTestTimeoutMs = 15_000;
 const defaultMaxTestFiles = 50;
 
 export async function runRelatedTests(
