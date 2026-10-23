@@ -6,6 +6,8 @@
     "verb-contract.test.ts",
     "module-order.test.ts",
     "import-zones-entry.test.ts",
+    "max-test-timeout.test.ts",
+    "no-test-sleep.test.ts",
     "test-utils"
   ]
 }

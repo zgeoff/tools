@@ -1,10 +1,11 @@
 # oxlint-config test-file rules
 
-Three rules of the `zgeoff/*` plugin in `@zgeoff/oxlint-config` check test files.
+Five rules of the `zgeoff/*` plugin in `@zgeoff/oxlint-config` check test files.
 `zgeoff/test-beside-module` keeps each test file beside the module it tests,
-`zgeoff/setup-test-only` keeps a test file's module level to `setupTest()` and its tests, and
-`zgeoff/no-file-snapshot` bans file snapshots. The [config overview](./oxlint-config.md) covers the
-rest of the config.
+`zgeoff/setup-test-only` keeps a test file's module level to `setupTest()` and its tests,
+`zgeoff/no-file-snapshot` bans file snapshots, `zgeoff/max-test-timeout` keeps each test outside a
+lane to the default timeout, and `zgeoff/no-test-sleep` bans a fixed delay in a test file. The
+[config overview](./oxlint-config.md) covers the rest of the config.
 
 ## `zgeoff/test-beside-module`
 
@@ -62,3 +63,62 @@ Snapshots are inline only, so the golden value sits in the test that pins it. Th
 linted file that has a `__snapshots__/<file name>.snap` beside it, at the first statement, so a
 file-level disable comment covers it. oxlint never visits a `.snap` file, so a snapshot file whose
 test file is gone is not reported.
+
+## `zgeoff/max-test-timeout`
+
+A test outside a lane keeps the default timeout of `bun test`, because a test that needs longer does
+a lane's work. The rule reports, in any linted file, a timeout above that default:
+
+- a number argument after the name of a `test`, `it` or `describe` call, or of a chain of their
+  modifiers, such as `test.skipIf(gate).each(rows)(…)`;
+- the `timeout` of an options object in the same place;
+- the argument of `setDefaultTimeout`.
+
+The names come from `bun:test`, under their imported names when an import renames them or as members
+of a namespace import, or are the globals that `bun test` defines. A name bound any other way, such
+as an import from another module, is not checked. The rule reads a number literal, arithmetic on
+number literals, and a `const` that holds one of them; it leaves any other value unreported, such as
+one read from the environment.
+
+A lane file is exempt: each file under the `e2e/` directory at the repo root, which
+`zgeoff/test-beside-module` anchors the same way, and each `<name>.<lane>.test.ts` or `.test.tsx`
+file whose lane is `browser`, `docker`, `host` or one that the `lanes` option declares. A declared
+lane is also the name of a `test:<lane>` script that the test timeout check exempts:
+
+```json
+{ "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": ["binary"] }] } }
+```
+
+### The test timeout check
+
+oxlint lints only JavaScript and TypeScript files, so it cannot read a `package.json` script or a
+`bunfig.toml`. The pre-push baseline's
+[`run-test-timeouts-check.ts`](../../sync/pre-push/run-test-timeouts-check.ts) reads them as `HEAD`
+holds them, as the `test-timeouts` job before a push and the `Check test timeouts` step of the
+shared pull-request checks. It reports:
+
+- each `--timeout` above the default, in either the `--timeout 20000` or the `--timeout=20000` form,
+  among the words after `bun test` in a `package.json` script, where a quoted or escaped word is a
+  value and never a flag, and a command named `echo` or `printf`, quoted or bare, runs no
+  `bun test`;
+- each `bunfig.toml` whose `[test] timeout` is above the default.
+
+It exempts the `test:related` script, which runs the shared related-test runner, and each lane
+script: `test:e2e`, `test:browser`, `test:docker`, `test:host`, and `test:<lane>` for each lane in
+the `lanes` option of `zgeoff/max-test-timeout` in the root `.oxlintrc.json`.
+
+## `zgeoff/no-test-sleep`
+
+A test waits on a condition, never a fixed delay, as the testing skill requires. In a
+`<name>.test.ts` or `<name>.test.tsx` file, lane suites included, the rule reports:
+
+- `Bun.sleep` and `Bun.sleepSync`;
+- the `sleep` and `sleepSync` of the `bun` module, and the `setTimeout` of `node:timers/promises` or
+  `timers/promises`, under any local name or read through a namespace or default import;
+- a `setTimeout` or `globalThis.setTimeout` call inside the executor of a `new Promise`.
+
+A sleep inside a wait helper passes. A wait helper is a function whose name starts with `waitFor` or
+`waitUntil`, followed by the end of the name or a capital letter, such as `waitForExit` or
+`waitUntilIdle`. Its name comes from its declaration, or from the variable, the object key or the
+method that holds it. A sleep inside a function that the helper holds passes too, so a helper may
+poll its condition in a loop with a short sleep between reads. `waitForward` is not a wait helper.

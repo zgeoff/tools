@@ -50,6 +50,7 @@ test('it runs a pre-push-baseline build that moves a files:branch script that ru
       'test:related': 'bun scripts/run-related-tests.ts',
       'check:commits': 'bun scripts/run-commits-check.ts',
       'check:local-paths': 'bun scripts/run-local-paths-check.ts',
+      'check:test-timeouts': 'bun scripts/run-test-timeouts-check.ts',
     },
   });
 });
@@ -66,6 +67,7 @@ test('it runs a pre-push-baseline build that keeps a files:branch script the rep
         'test:related': 'bun test',
         'check:commits': 'commitlint --last',
         'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
       },
     }),
   );
@@ -81,6 +83,7 @@ test('it runs a pre-push-baseline build that keeps a files:branch script the rep
       'test:related': 'bun test',
       'check:commits': 'commitlint --last',
       'check:local-paths': 'true',
+      'check:test-timeouts': 'true',
     },
   });
 });
@@ -105,6 +108,7 @@ test('it runs a pre-push-baseline build that adds the package scripts a repo lac
       'test:related': 'bun scripts/run-related-tests.ts',
       'check:commits': 'bun scripts/run-commits-check.ts',
       'check:local-paths': 'bun scripts/run-local-paths-check.ts',
+      'check:test-timeouts': 'bun scripts/run-test-timeouts-check.ts',
     },
   });
 });

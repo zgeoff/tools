@@ -29,7 +29,7 @@ const testBesideModule = {
         const filename = context.physicalFilename;
         const match = testFilePattern.exec(basename(filename));
 
-        if (match === null || isUnderExemptRoot(context.cwd, filename)) {
+        if (match === null || probeUnderExemptRoot(context.cwd, filename)) {
           return;
         }
 
@@ -60,7 +60,7 @@ const exemptRootDirs = new Set(['e2e', 'evals']);
 
 // the repo root, not oxlint's working directory, so a per-package lint
 // script neither exempts a package's own e2e/ nor flags the root one
-function isUnderExemptRoot(cwd, filename) {
+function probeUnderExemptRoot(cwd, filename) {
   const [first] = relative(resolveRepoRoot(filename) ?? cwd, filename).split(sep);
 
   return exemptRootDirs.has(first);

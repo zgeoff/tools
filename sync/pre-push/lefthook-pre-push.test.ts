@@ -81,6 +81,7 @@ test('it leaves the main checkout non-bare when the test job runs in a pre-push 
         'test:related': 'git init --quiet sandbox && true',
         'check:commits': 'true',
         'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
       },
     }),
   );
@@ -120,6 +121,7 @@ test('it fails the push on the shell job alone when a shell file the branch chan
         'test:related': 'true',
         'check:commits': 'true',
         'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
       },
     }),
   );
@@ -169,6 +171,7 @@ test('it fails the push on the shell job alone when a shell file the branch chan
         'test:related': 'true',
         'check:commits': 'true',
         'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
       },
     }),
   );
@@ -217,6 +220,7 @@ test('it passes the push when only a file the branch leaves unchanged fails the 
         'test:related': 'true',
         'check:commits': 'true',
         'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
       },
     }),
   );
@@ -255,6 +259,7 @@ test('it passes the push when the branch changes a clean file whose name starts 
         'test:related': 'true',
         'check:commits': 'true',
         'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
       },
     }),
   );
@@ -296,6 +301,7 @@ test('it hands every shell file the branch changes to the shell check when the b
         'test:related': 'true',
         'check:commits': 'true',
         'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
       },
     }),
   );
@@ -348,6 +354,7 @@ test('it passes the push with a notice when the machine lacks shfmt', async () =
         'test:related': 'true',
         'check:commits': 'true',
         'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
       },
     }),
   );
@@ -402,6 +409,7 @@ test('it passes the push with a notice when the machine lacks actionlint', async
         'test:related': 'true',
         'check:commits': 'true',
         'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
       },
     }),
   );
@@ -455,6 +463,7 @@ test('it fails the push when actionlint rejects a workflow the branch changes', 
         'test:related': 'true',
         'check:commits': 'true',
         'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
       },
     }),
   );
@@ -494,6 +503,7 @@ test('it passes the docs job with a notice when the repo has no docs-writing scr
         'test:related': 'true',
         'check:commits': 'true',
         'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
       },
     }),
   );
@@ -553,6 +563,7 @@ test('it fails the push on the docs job when the installed length script rejects
         'test:related': 'true',
         'check:commits': 'true',
         'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
       },
     }),
   );
@@ -603,6 +614,7 @@ test('it fails the push on the docs job when the installed link script finds a b
         'test:related': 'true',
         'check:commits': 'true',
         'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
       },
     }),
   );
@@ -649,6 +661,7 @@ test('it fails the push when a commit of the branch fails commitlint', async () 
         'test:related': 'true',
         'check:commits': `bun ${join(import.meta.dir, 'run-commits-check.ts')}`,
         'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
       },
     }),
   );
@@ -688,6 +701,7 @@ test('it fails the push when a commit of the branch adds the home directory', as
         'test:related': 'true',
         'check:commits': 'true',
         'check:local-paths': `bun ${join(import.meta.dir, 'run-local-paths-check.ts')}`,
+        'check:test-timeouts': 'true',
       },
     }),
   );
@@ -708,6 +722,49 @@ test('it fails the push when a commit of the branch adds the home directory', as
 
   expect(result.exitCode).not.toBe(0);
   expect(output).toInclude(`cache.txt:1: commit `);
+});
+
+test('it fails the push when a bunfig.toml raises the test timeout above 5 s', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.worktree, 'bunfig.toml'), '[test]\ntimeout = 30000\n');
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'echo bunfig.toml',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+        'check:test-timeouts': `bun ${join(import.meta.dir, 'run-test-timeouts-check.ts')}`,
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).not.toBe(0);
+
+  expect(output).toInclude(
+    'bunfig.toml: [test] timeout = 30000 raises every test above the 5 s limit',
+  );
 });
 
 test("it fails the commit when typecheck fails, after the repo's own pre-commit job runs", async () => {
@@ -788,6 +845,7 @@ test.each([
   ['sync/pre-push/read-branch-base.test.ts'],
   ['sync/pre-push/run-commits-check.test.ts'],
   ['sync/pre-push/run-local-paths-check.test.ts'],
+  ['sync/pre-push/run-test-timeouts-check.test.ts'],
   ['sync/skills/docs-writing/scripts/check-length.test.ts'],
   ['sync/skills/docs-writing/scripts/check-links.test.ts'],
   ['sync/skills/skill-writing/scripts/check-skill.test.ts'],
@@ -822,5 +880,6 @@ test.each([
     expect(result.stderr.toString()).toMatch(/^ [1-9]\d* pass\n 0 fail$/mu);
     expect(result.exitCode).toBe(0);
   },
+  // oxlint-disable-next-line zgeoff/max-test-timeout -- each row runs a whole suite in a nested bun test
   30_000,
 );

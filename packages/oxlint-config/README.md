@@ -67,8 +67,9 @@ The plugin is addressable on its own at `@zgeoff/oxlint-config/plugin` for confi
   [the comment rules](../../docs/architecture/oxlint-config.md#zgeoffno-jsdoc-and-zgeoffmax-consecutive-line-comments).
 - Code style: function verbs, verb contracts, module order, abbreviated names and classes. See
   [code-style rules](../../docs/architecture/oxlint-config-code-style.md).
-- Test files: a test sits beside its module, holds only `setupTest()` and its tests, and uses inline
-  snapshots. See [test-file rules](../../docs/architecture/oxlint-config-tests.md).
+- Test files: a test sits beside its module, holds only `setupTest()` and its tests, uses inline
+  snapshots, keeps the 5 s timeout outside a lane, and waits on a condition, never a sleep. See
+  [test-file rules](../../docs/architecture/oxlint-config-tests.md).
 - Import boundaries: `zgeoff/import-zones` fails an import that crosses a declared zone boundary.
   See [import zones](../../docs/architecture/oxlint-config-import-zones.md).
 

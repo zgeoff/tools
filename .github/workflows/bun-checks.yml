@@ -150,7 +150,7 @@ jobs:
           for file in plan-check-scripts.ts write-check-plan.ts; do
             curl -fsSL -o "$RUNNER_TEMP/check-plan/$file" "$base/.github/workflows/$file"
           done
-          for file in read-branch-base.ts parse-added-lines.ts run-program.ts run-commits-check.ts run-local-paths-check.ts; do
+          for file in read-branch-base.ts parse-added-lines.ts run-program.ts run-commits-check.ts run-local-paths-check.ts run-test-timeouts-check.ts; do
             curl -fsSL -o "$RUNNER_TEMP/check-plan/$file" "$base/sync/pre-push/$file"
           done
           curl -fsSL -o "$RUNNER_TEMP/check-plan/tools-package.json" "$base/package.json"
@@ -301,6 +301,11 @@ jobs:
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
         run: bun "$RUNNER_TEMP/check-plan/run-local-paths-check.ts"
 
+      - &check-test-timeouts
+        name: Check test timeouts
+        if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
+        run: bun "$RUNNER_TEMP/check-plan/run-test-timeouts-check.ts"
+
       - &run-scripts
         name: Run the check scripts
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
@@ -409,6 +414,7 @@ jobs:
       - *check-workflows
       - *check-commits
       - *check-local-paths
+      - *check-test-timeouts
 
       - name: Static checks
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
