@@ -998,7 +998,9 @@ test('it runs the related tests under the memory cap when the branch has 50 or f
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
-        'memory-capped': `bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024`,
+
+        // The cap script runs each job, after a line in capped.txt that names the job's command.
+        'memory-capped': `bash -c 'echo "$*" >> capped.txt; exec bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024 "$@"' memory-capped`,
       },
     }),
   );
@@ -1024,9 +1026,9 @@ test('it runs the related tests under the memory cap when the branch has 50 or f
   expect(result.exitCode).not.toBe(0);
   expect(output).toInclude('(fail) it fails on purpose');
 
-  expect(output).toMatch(
-    /^run-memory-capped: [a-z-]+, memory.max 1024 MiB|^run-memory-capped: this host has no systemd scope/mu,
-  );
+  const capped = await readFile(join(ctx.worktree, 'capped.txt'), 'utf8');
+
+  expect(capped.split('\n')).toContainEqual(expect.stringMatching(/^bun run test:related /u));
 });
 
 test('it runs no tests in the hook when the branch changes only lane files', async () => {
