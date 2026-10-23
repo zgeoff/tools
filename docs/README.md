@@ -9,6 +9,8 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 - [Sync tags](./architecture/sync-tags.md): why a repo syncs at a tag, never at `main`.
 - [The pre-push baseline](./architecture/pre-push-baseline.md): what the baseline runs and the files
   it delivers.
+- [Memory caps](./architecture/memory-caps.md): the script that runs a command inside a cgroup
+  memory cap, and its modes.
 - [Dependency updates](./architecture/dependency-updates.md): the Renovate preset, the self-hosted
   Renovate run, and the audit-fix workflow.
 - [The Socket config](./architecture/socket-config.md): how the `socket` entry limits Socket's

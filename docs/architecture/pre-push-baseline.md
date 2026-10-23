@@ -2,9 +2,10 @@
 
 The pre-push baseline is the set of lefthook jobs that a downstream repo runs before a push. Files
 under [`sync/pre-push/`](../../sync/pre-push/) are the baseline, delivered by the opt-in
-`pre-push-baseline` entry, and this repo's own `lefthook.yml` extends it too. The baseline runs its
-jobs one at a time, so a push fits a host with little memory or a machine shared by parallel agents.
-CI keeps every whole-tree check required.
+`pre-push-baseline` entry, except the [memory-cap script](./memory-caps.md), which every repo takes,
+and this repo's own `lefthook.yml` extends it too. The baseline runs its jobs one at a time, so a
+push fits a host with little memory or a machine shared by parallel agents. CI keeps every
+whole-tree check required.
 
 ## What the baseline runs
 

@@ -15,8 +15,8 @@ holds and how a run delivers, updates and retires the files.
   in this repo.
 - [`skills/`](./skills/) — the shared base of each Claude skill, with its scripts' tests.
 - [`hooks/`](./hooks/) — Claude Code hooks, such as the skill gate's entry point, with their tests.
-- [`pre-push/`](./pre-push/) — the [pre-push baseline](../docs/architecture/pre-push-baseline.md),
-  with its tests.
+- [`pre-push/`](./pre-push/) — the [pre-push baseline](../docs/architecture/pre-push-baseline.md)
+  and the [memory-cap script](../docs/architecture/memory-caps.md), with their tests.
 
 ## Documentation
 
@@ -25,6 +25,8 @@ holds and how a run delivers, updates and retires the files.
 - [The pre-push baseline](../docs/architecture/pre-push-baseline.md): what the baseline runs and the
   files it delivers.
 - [Sync tags](../docs/architecture/sync-tags.md): why a repo syncs at a tag, never at `main`.
+- [Memory caps](../docs/architecture/memory-caps.md): the script that runs a command inside a cgroup
+  memory cap, and its modes.
 - [Dependency updates](../docs/architecture/dependency-updates.md): the Renovate preset, the
   self-hosted Renovate run, and the audit-fix workflow.
 - [The Socket config](../docs/architecture/socket-config.md): how the `socket` entry limits Socket's
