@@ -1,9 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { spawnSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { $ } from 'bun';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'pin-tools-ref-'));
@@ -30,14 +30,11 @@ test('it pins every call to a zgeoff/tools workflow to the ref', async () => {
     'jobs:\n  pr:\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@sync-v1 # shared checks\n',
   );
 
-  const result = spawnSync('bash', [ctx.scriptPath, 'sync-v2', ctx.directory], {
-    encoding: 'utf8',
-  });
-
+  const result = await $`bash ${ctx.scriptPath} sync-v2 ${ctx.directory}`.nothrow().quiet();
   const repoSync = await readFile(join(ctx.directory, '.github/workflows/repo-sync.yml'), 'utf8');
   const pr = await readFile(join(ctx.directory, '.github/workflows/pr.yml'), 'utf8');
 
-  expect(result.status).toBe(0);
+  expect(result.exitCode).toBe(0);
 
   expect(repoSync).toBe(
     'jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@sync-v2\n',
@@ -59,7 +56,7 @@ test.each([
     `jobs:\n  pr:\n    uses: ${quote}zgeoff/tools/.github/workflows/bun-checks.yml@main${quote}\n`,
   );
 
-  spawnSync('bash', [ctx.scriptPath, 'sync-v2', ctx.directory], { encoding: 'utf8' });
+  await $`bash ${ctx.scriptPath} sync-v2 ${ctx.directory}`.nothrow().quiet();
 
   const pr = await readFile(join(ctx.directory, '.github/workflows/pr.yml'), 'utf8');
 
@@ -76,7 +73,7 @@ test('it keeps the closing brace of a flow-style call', async () => {
     'jobs:\n  sync: {uses: zgeoff/tools/.github/workflows/repo-sync.yml@sync-v1}\n',
   );
 
-  spawnSync('bash', [ctx.scriptPath, 'sync-v2', ctx.directory], { encoding: 'utf8' });
+  await $`bash ${ctx.scriptPath} sync-v2 ${ctx.directory}`.nothrow().quiet();
 
   const repoSync = await readFile(join(ctx.directory, '.github/workflows/repo-sync.yml'), 'utf8');
 
@@ -98,11 +95,9 @@ test('it prints only the files it changed', async () => {
     'jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@main\n',
   );
 
-  const result = spawnSync('bash', [ctx.scriptPath, 'sync-v2', ctx.directory], {
-    encoding: 'utf8',
-  });
+  const result = await $`bash ${ctx.scriptPath} sync-v2 ${ctx.directory}`.nothrow().quiet();
 
-  expect(result.stdout).toBe(`${ctx.directory}/.github/workflows/floating.yml\n`);
+  expect(result.stdout.toString()).toBe(`${ctx.directory}/.github/workflows/floating.yml\n`);
 });
 
 test('it leaves calls to other repositories alone', async () => {
@@ -113,7 +108,7 @@ test('it leaves calls to other repositories alone', async () => {
     'jobs:\n  ci:\n    uses: other-org/tools/.github/workflows/ci.yml@main\n',
   );
 
-  spawnSync('bash', [ctx.scriptPath, 'sync-v2', ctx.directory], { encoding: 'utf8' });
+  await $`bash ${ctx.scriptPath} sync-v2 ${ctx.directory}`.nothrow().quiet();
 
   const ci = await readFile(join(ctx.directory, '.github/workflows/ci.yml'), 'utf8');
 
@@ -128,23 +123,20 @@ test('it leaves a call to an owner whose name ends in zgeoff alone', async () =>
     'jobs:\n  ci:\n    uses: other-zgeoff/tools/.github/workflows/ci.yml@main\n',
   );
 
-  const result = spawnSync('bash', [ctx.scriptPath, 'sync-v2', ctx.directory], {
-    encoding: 'utf8',
-  });
-
+  const result = await $`bash ${ctx.scriptPath} sync-v2 ${ctx.directory}`.nothrow().quiet();
   const ci = await readFile(join(ctx.directory, '.github/workflows/ci.yml'), 'utf8');
 
-  expect(result.stdout).toBe('');
+  expect(result.stdout.toString()).toBe('');
   expect(ci).toBe('jobs:\n  ci:\n    uses: other-zgeoff/tools/.github/workflows/ci.yml@main\n');
 });
 
 test('it rejects a ref that holds a character outside a plain git ref', async () => {
   const ctx = await setupTest();
+  const result = await $`bash ${ctx.scriptPath} ${'sync#v2'} ${ctx.directory}`.nothrow().quiet();
 
-  const result = spawnSync('bash', [ctx.scriptPath, 'sync#v2', ctx.directory], {
-    encoding: 'utf8',
-  });
+  expect(result.exitCode).toBe(2);
 
-  expect(result.status).toBe(2);
-  expect(result.stderr).toBe("pin-tools-ref: 'sync#v2' is not a ref this script writes\n");
+  expect(result.stderr.toString()).toBe(
+    "pin-tools-ref: 'sync#v2' is not a ref this script writes\n",
+  );
 });

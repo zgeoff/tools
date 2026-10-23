@@ -1,10 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { $ } from 'bun';
 import { createGitCommit } from '../test-utils/create-git-commit.ts';
 import { readGitEnv } from '../test-utils/read-git-env.ts';
 import { runGit } from '../test-utils/run-git.ts';
@@ -60,13 +60,13 @@ test('it deletes a file an earlier manifest delivered and the current manifest d
     '.claude/skills/demo/scripts/check.sh': 'echo check\n',
   });
 
-  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, 'skill-demo'], {
-    cwd: ctx.caller,
-    encoding: 'utf8',
-  });
+  const result = await $`bash ${ctx.scriptPath} ${ctx.tools} skill-demo`
+    .cwd(ctx.caller)
+    .nothrow()
+    .quiet();
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).toBe('.claude/skills/demo/scripts/check.sh\n');
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('.claude/skills/demo/scripts/check.sh\n');
   expect(existsSync(join(ctx.caller, '.claude/skills/demo/scripts/check.sh'))).toBeFalse();
   expect(existsSync(join(ctx.caller, '.claude/skills/demo/SKILL.md'))).toBeTrue();
 });
@@ -88,13 +88,13 @@ test('it deletes a retired file that matches an older version of its source', as
   await createGitCommit(ctx.tools, ctx.env, { 'sync/manifest.json': '[]' });
   await writeTreeFiles(ctx.caller, { '.claude/skills/demo/scripts/check.sh': 'echo first\n' });
 
-  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, ''], {
-    cwd: ctx.caller,
-    encoding: 'utf8',
-  });
+  const result = await $`bash ${ctx.scriptPath} ${ctx.tools} ${''}`
+    .cwd(ctx.caller)
+    .nothrow()
+    .quiet();
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).toBe('.claude/skills/demo/scripts/check.sh\n');
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('.claude/skills/demo/scripts/check.sh\n');
   expect(existsSync(join(ctx.caller, '.claude/skills/demo/scripts/check.sh'))).toBeFalse();
 });
 
@@ -118,13 +118,13 @@ test('it keeps a file the repo owns outside the synced paths', async () => {
     'scripts/check.sh': 'echo check\n',
   });
 
-  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, ''], {
-    cwd: ctx.caller,
-    encoding: 'utf8',
-  });
+  const result = await $`bash ${ctx.scriptPath} ${ctx.tools} ${''}`
+    .cwd(ctx.caller)
+    .nothrow()
+    .quiet();
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).toBe('.claude/skills/demo/scripts/check.sh\n');
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('.claude/skills/demo/scripts/check.sh\n');
   expect(existsSync(join(ctx.caller, 'scripts/check.sh'))).toBeTrue();
 });
 
@@ -141,13 +141,13 @@ test('it keeps a file at a retired path whose content no source version matches'
   await createGitCommit(ctx.tools, ctx.env, { 'sync/manifest.json': '[]' });
   await writeTreeFiles(ctx.caller, { 'scripts/build.sh': 'echo own\n' });
 
-  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, ''], {
-    cwd: ctx.caller,
-    encoding: 'utf8',
-  });
+  const result = await $`bash ${ctx.scriptPath} ${ctx.tools} ${''}`
+    .cwd(ctx.caller)
+    .nothrow()
+    .quiet();
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).toBe('');
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('');
   expect(existsSync(join(ctx.caller, 'scripts/build.sh'))).toBeTrue();
 });
 
@@ -182,13 +182,13 @@ test('it keeps a retired file whose entry is still in the manifest and did not s
     '.claude/hooks/demo/helper.ts': 'export {};\n',
   });
 
-  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, 'socket'], {
-    cwd: ctx.caller,
-    encoding: 'utf8',
-  });
+  const result = await $`bash ${ctx.scriptPath} ${ctx.tools} socket`
+    .cwd(ctx.caller)
+    .nothrow()
+    .quiet();
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).toBe('');
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('');
   expect(existsSync(join(ctx.caller, '.claude/hooks/demo/helper.ts'))).toBeTrue();
 });
 
@@ -205,13 +205,13 @@ test('it keeps a retired file whose entry the skip list names', async () => {
   await createGitCommit(ctx.tools, ctx.env, { 'sync/manifest.json': '[]' });
   await writeTreeFiles(ctx.caller, { 'scripts/build.sh': 'echo shared\n' });
 
-  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, '', 'socket, build'], {
-    cwd: ctx.caller,
-    encoding: 'utf8',
-  });
+  const result = await $`bash ${ctx.scriptPath} ${ctx.tools} ${''} ${'socket, build'}`
+    .cwd(ctx.caller)
+    .nothrow()
+    .quiet();
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).toBe('');
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('');
   expect(existsSync(join(ctx.caller, 'scripts/build.sh'))).toBeTrue();
 });
 
@@ -232,14 +232,11 @@ test('it fails on a shallow checkout of tools', async () => {
     shallow,
   ]);
 
-  const result = spawnSync('bash', [ctx.scriptPath, shallow, ''], {
-    cwd: ctx.caller,
-    encoding: 'utf8',
-  });
+  const result = await $`bash ${ctx.scriptPath} ${shallow} ${''}`.cwd(ctx.caller).nothrow().quiet();
 
-  expect(result.status).toBe(1);
+  expect(result.exitCode).toBe(1);
 
-  expect(result.stderr).toBe(
+  expect(result.stderr.toString()).toBe(
     `remove-retired-sync-files: ${shallow} is a shallow clone, so it lacks the earlier manifests\n`,
   );
 });
@@ -265,13 +262,13 @@ test('it deletes a retired workflow whose calls the sync pinned to a tag', async
       'jobs:\n  lint:\n    uses: zgeoff/tools/.github/workflows/lint.yml@sync-v7\n',
   });
 
-  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, ''], {
-    cwd: ctx.caller,
-    encoding: 'utf8',
-  });
+  const result = await $`bash ${ctx.scriptPath} ${ctx.tools} ${''}`
+    .cwd(ctx.caller)
+    .nothrow()
+    .quiet();
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).toBe('.github/workflows/lint.yml\n');
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('.github/workflows/lint.yml\n');
   expect(existsSync(join(ctx.caller, '.github/workflows/lint.yml'))).toBeFalse();
 });
 
@@ -292,13 +289,13 @@ test('it deletes a retired Markdown copy that lost a block the repo was excepted
   await createGitCommit(ctx.tools, ctx.env, { 'sync/manifest.json': '[]' });
   await writeTreeFiles(ctx.caller, { '.claude/skills/demo/SKILL.md': '# Demo\n\nThe end.\n' });
 
-  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, ''], {
-    cwd: ctx.caller,
-    encoding: 'utf8',
-  });
+  const result = await $`bash ${ctx.scriptPath} ${ctx.tools} ${''}`
+    .cwd(ctx.caller)
+    .nothrow()
+    .quiet();
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).toBe('.claude/skills/demo/SKILL.md\n');
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('.claude/skills/demo/SKILL.md\n');
   expect(existsSync(join(ctx.caller, '.claude/skills/demo/SKILL.md'))).toBeFalse();
 });
 
@@ -323,13 +320,13 @@ test('it keeps a retired Markdown copy whose edit sits inside a kept block', asy
       '# Demo\n\n<!-- repo-sync needs ./go.md -->\n\nRead [Go](./go.md) before the repo notes.\n\n<!-- repo-sync end -->\n\nThe end.\n',
   });
 
-  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, ''], {
-    cwd: ctx.caller,
-    encoding: 'utf8',
-  });
+  const result = await $`bash ${ctx.scriptPath} ${ctx.tools} ${''}`
+    .cwd(ctx.caller)
+    .nothrow()
+    .quiet();
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).toBe('');
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('');
   expect(existsSync(join(ctx.caller, '.claude/skills/demo/SKILL.md'))).toBeTrue();
 });
 
@@ -374,14 +371,14 @@ test('it deletes the edited old copy of a renamed file across the skipped tags',
       'const first = 1;\nconst second = 2;\nconst third = 3;\nconst fourth = 4;\nconst fifth = 5;\nconst sixth = 6;\n',
   });
 
-  const result = spawnSync(
-    'bash',
-    [ctx.scriptPath, ctx.tools, 'pre-push-demo', '', 'scripts/read-files.ts'],
-    { cwd: ctx.caller, encoding: 'utf8' },
-  );
+  const result =
+    await $`bash ${ctx.scriptPath} ${ctx.tools} pre-push-demo ${''} scripts/read-files.ts`
+      .cwd(ctx.caller)
+      .nothrow()
+      .quiet();
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).toBe('scripts/list-files.ts\n');
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('scripts/list-files.ts\n');
   expect(existsSync(join(ctx.caller, 'scripts/list-files.ts'))).toBeFalse();
   expect(existsSync(join(ctx.caller, 'scripts/read-files.ts'))).toBeTrue();
 });
@@ -426,13 +423,13 @@ test('it keeps the edited old copy of a renamed file when the run did not copy t
     'scripts/read-files.ts': 'const own = 1;\n',
   });
 
-  const result = spawnSync('bash', [ctx.scriptPath, ctx.tools, 'pre-push-demo', '', ''], {
-    cwd: ctx.caller,
-    encoding: 'utf8',
-  });
+  const result = await $`bash ${ctx.scriptPath} ${ctx.tools} pre-push-demo ${''} ${''}`
+    .cwd(ctx.caller)
+    .nothrow()
+    .quiet();
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).toBe('');
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('');
   expect(existsSync(join(ctx.caller, 'scripts/list-files.ts'))).toBeTrue();
 });
 
@@ -477,13 +474,12 @@ test('it keeps the edited old copy of a renamed file when the run did not sync i
       'const first = 1;\nconst second = 2;\nconst third = 3;\nconst fourth = 4;\nconst fifth = 5;\nconst sixth = 6;\n',
   });
 
-  const result = spawnSync(
-    'bash',
-    [ctx.scriptPath, ctx.tools, 'socket', '', 'scripts/read-files.ts'],
-    { cwd: ctx.caller, encoding: 'utf8' },
-  );
+  const result = await $`bash ${ctx.scriptPath} ${ctx.tools} socket ${''} scripts/read-files.ts`
+    .cwd(ctx.caller)
+    .nothrow()
+    .quiet();
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).toBe('');
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('');
   expect(existsSync(join(ctx.caller, 'scripts/list-files.ts'))).toBeTrue();
 });

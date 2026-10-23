@@ -1,9 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { spawnSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { $ } from 'bun';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'remove-excluded-blocks-'));
@@ -31,15 +31,14 @@ test('it removes a block that needs an excluded file and the blank line after it
       'Read [HTTP](./references/http.md).\n',
   );
 
-  const result = spawnSync(
-    'bash',
-    [ctx.scriptPath, markdown, join(ctx.directory, 'skill/references/rust.md')],
-    { encoding: 'utf8' },
-  );
+  const result =
+    await $`bash ${ctx.scriptPath} ${markdown} ${join(ctx.directory, 'skill/references/rust.md')}`
+      .nothrow()
+      .quiet();
 
   const stripped = await readFile(markdown, 'utf8');
 
-  expect(result.status).toBe(0);
+  expect(result.exitCode).toBe(0);
   expect(stripped).toBe('# Demo\n\nRead [HTTP](./references/http.md).\n');
 });
 
@@ -56,15 +55,14 @@ test('it keeps a block whose file the repo receives', async () => {
 
   await writeFile(markdown, content);
 
-  const result = spawnSync(
-    'bash',
-    [ctx.scriptPath, markdown, join(ctx.directory, 'skill/references/rust.md')],
-    { encoding: 'utf8' },
-  );
+  const result =
+    await $`bash ${ctx.scriptPath} ${markdown} ${join(ctx.directory, 'skill/references/rust.md')}`
+      .nothrow()
+      .quiet();
 
   const kept = await readFile(markdown, 'utf8');
 
-  expect(result.status).toBe(0);
+  expect(result.exitCode).toBe(0);
   expect(kept).toBe(content);
 });
 
@@ -75,10 +73,13 @@ test('it fails on a block that never closes', async () => {
 
   await writeFile(markdown, '<!-- repo-sync needs ./references/rust.md -->\n\nRust.\n');
 
-  const result = spawnSync('bash', [ctx.scriptPath, markdown], { encoding: 'utf8' });
+  const result = await $`bash ${ctx.scriptPath} ${markdown}`.nothrow().quiet();
 
-  expect(result.status).toBe(1);
-  expect(result.stderr).toBe(`remove-excluded-blocks: ${markdown} ends inside a block\n`);
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stderr.toString()).toBe(
+    `remove-excluded-blocks: ${markdown} ends inside a block\n`,
+  );
 });
 
 test('it fails on a block opened inside another block', async () => {
@@ -93,11 +94,11 @@ test('it fails on a block opened inside another block', async () => {
       '<!-- repo-sync end -->\n',
   );
 
-  const result = spawnSync('bash', [ctx.scriptPath, markdown], { encoding: 'utf8' });
+  const result = await $`bash ${ctx.scriptPath} ${markdown}`.nothrow().quiet();
 
-  expect(result.status).toBe(1);
+  expect(result.exitCode).toBe(1);
 
-  expect(result.stderr).toBe(
+  expect(result.stderr.toString()).toBe(
     `remove-excluded-blocks: ${markdown}:2 opens a block inside another block\n`,
   );
 });

@@ -1,9 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { spawnSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { $ } from 'bun';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'check-length-'));
@@ -19,7 +19,7 @@ async function setupTest() {
     GIT_CONFIG_NOSYSTEM: '1',
   };
 
-  spawnSync('git', ['init', '-q'], { cwd: directory, env });
+  await $`git init -q`.cwd(directory).env(env).quiet();
 
   const scriptPath = fileURLToPath(new URL('check-length.sh', import.meta.url));
 
@@ -36,7 +36,7 @@ async function setupTest() {
   };
 
   const run = (...args: readonly string[]) =>
-    spawnSync('bash', [scriptPath, ...args], { cwd: directory, env, encoding: 'utf8' });
+    $`bash ${scriptPath} ${args}`.cwd(directory).env(env).nothrow().quiet();
 
   return { directory, writeLines, writeText, run };
 }
@@ -46,10 +46,13 @@ test('it fails when the plain repo README is over its limit', async () => {
 
   await ctx.writeLines('README.md', 61);
 
-  const result = ctx.run();
+  const result = await ctx.run();
 
-  expect(result.status).toBe(1);
-  expect(result.stdout).toInclude('README.md: 61 lines, over the plain repo README limit of 60');
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout.toString()).toInclude(
+    'README.md: 61 lines, over the plain repo README limit of 60',
+  );
 });
 
 test('it warns and passes when a README is over its target but within its limit', async () => {
@@ -57,10 +60,13 @@ test('it warns and passes when a README is over its target but within its limit'
 
   await ctx.writeLines('README.md', 55);
 
-  const result = ctx.run();
+  const result = await ctx.run();
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).toInclude('README.md: 55 lines, over the plain repo README target of 50');
+  expect(result.exitCode).toBe(0);
+
+  expect(result.stdout.toString()).toInclude(
+    'README.md: 55 lines, over the plain repo README target of 50',
+  );
 });
 
 test('it fails a package README over 130 lines beside a public package.json', async () => {
@@ -70,10 +76,13 @@ test('it fails a package README over 130 lines beside a public package.json', as
 
   await ctx.writeLines('README.md', 131);
 
-  const result = ctx.run();
+  const result = await ctx.run();
 
-  expect(result.status).toBe(1);
-  expect(result.stdout).toInclude('README.md: 131 lines, over the package README limit of 130');
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout.toString()).toInclude(
+    'README.md: 131 lines, over the package README limit of 130',
+  );
 });
 
 test('it reads a README beside a private package.json as a package when --package names it', async () => {
@@ -83,10 +92,13 @@ test('it reads a README beside a private package.json as a package when --packag
 
   await ctx.writeLines('README.md', 125);
 
-  const result = ctx.run('--package', 'README.md');
+  const result = await ctx.run('--package', 'README.md');
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).toInclude('README.md: 125 lines, over the package README target of 120');
+  expect(result.exitCode).toBe(0);
+
+  expect(result.stdout.toString()).toInclude(
+    'README.md: 125 lines, over the package README target of 120',
+  );
 });
 
 test('it fails a sub-package README over 70 lines', async () => {
@@ -95,11 +107,11 @@ test('it fails a sub-package README over 70 lines', async () => {
   await ctx.writeLines('README.md', 10);
   await ctx.writeLines('kernel/README.md', 71);
 
-  const result = ctx.run();
+  const result = await ctx.run();
 
-  expect(result.status).toBe(1);
+  expect(result.exitCode).toBe(1);
 
-  expect(result.stdout).toInclude(
+  expect(result.stdout.toString()).toInclude(
     'kernel/README.md: 71 lines, over the sub-package README limit of 70',
   );
 });
@@ -110,11 +122,11 @@ test('it warns and passes when a docs file is over its cap', async () => {
   await ctx.writeLines('README.md', 10);
   await ctx.writeLines('docs/architecture/overview.md', 251);
 
-  const result = ctx.run();
+  const result = await ctx.run();
 
-  expect(result.status).toBe(0);
+  expect(result.exitCode).toBe(0);
 
-  expect(result.stdout).toInclude(
+  expect(result.stdout.toString()).toInclude(
     'docs/architecture/overview.md: 251 lines, over the docs cap of 250',
   );
 });
@@ -125,12 +137,12 @@ test('it holds a runbook to a cap of 300 lines', async () => {
   await ctx.writeLines('docs/runbooks/operations.md', 300);
   await ctx.writeLines('docs/runbooks/releasing.md', 301);
 
-  const result = ctx.run();
+  const result = await ctx.run();
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).not.toInclude('docs/runbooks/operations.md');
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).not.toInclude('docs/runbooks/operations.md');
 
-  expect(result.stdout).toInclude(
+  expect(result.stdout.toString()).toInclude(
     'docs/runbooks/releasing.md: 301 lines, over the docs cap of 300',
   );
 });
@@ -140,10 +152,10 @@ test('it reads docs/README.md as a doc, not as a README', async () => {
 
   await ctx.writeLines('docs/README.md', 100);
 
-  const result = ctx.run();
+  const result = await ctx.run();
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).not.toInclude('docs/README.md');
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).not.toInclude('docs/README.md');
 });
 
 test('it passes when every README and doc is under its limit and cap', async () => {
@@ -152,11 +164,15 @@ test('it passes when every README and doc is under its limit and cap', async () 
   await ctx.writeLines('README.md', 50);
   await ctx.writeLines('docs/guides/setup.md', 250);
 
-  const result = ctx.run();
+  const result = await ctx.run();
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).toInclude('README.md: 50 lines (plain repo README; target 50, limit 60)');
-  expect(result.stdout).toInclude('check-prose: clean');
+  expect(result.exitCode).toBe(0);
+
+  expect(result.stdout.toString()).toInclude(
+    'README.md: 50 lines (plain repo README; target 50, limit 60)',
+  );
+
+  expect(result.stdout.toString()).toInclude('check-prose: clean');
 });
 
 test('it fails when check-prose finds a violation in a doc', async () => {
@@ -167,10 +183,10 @@ test('it fails when check-prose finds a violation in a doc', async () => {
   await mkdir(join(ctx.directory, 'docs'), { recursive: true });
   await writeFile(join(ctx.directory, 'docs/overview.md'), 'The cache is load-bearing.\n');
 
-  const result = ctx.run();
+  const result = await ctx.run();
 
-  expect(result.status).toBe(1);
-  expect(result.stdout).toInclude('docs/overview.md:1:The cache is load-bearing.');
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout.toString()).toInclude('docs/overview.md:1:The cache is load-bearing.');
 });
 
 test('it fails when check-prose finds a violation in a skill', async () => {
@@ -179,10 +195,13 @@ test('it fails when check-prose finds a violation in a skill', async () => {
   await ctx.writeLines('README.md', 10);
   await ctx.writeText('.claude/skills/demo/SKILL.md', 'The cache is load-bearing.\n');
 
-  const result = ctx.run();
+  const result = await ctx.run();
 
-  expect(result.status).toBe(1);
-  expect(result.stdout).toInclude('.claude/skills/demo/SKILL.md:1:The cache is load-bearing.');
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout.toString()).toInclude(
+    '.claude/skills/demo/SKILL.md:1:The cache is load-bearing.',
+  );
 });
 
 test('it skips a skill that git marks linguist-vendored', async () => {
@@ -192,10 +211,10 @@ test('it skips a skill that git marks linguist-vendored', async () => {
   await ctx.writeText('.gitattributes', '.claude/skills/vendor-db/** linguist-vendored\n');
   await ctx.writeText('.claude/skills/vendor-db/SKILL.md', 'The cache is load-bearing.\n');
 
-  const result = ctx.run();
+  const result = await ctx.run();
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).not.toInclude('load-bearing');
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).not.toInclude('load-bearing');
 });
 
 test('it fails when the repo has check-skill and a skill fails it', async () => {
@@ -212,19 +231,21 @@ test('it fails when the repo has check-skill and a skill fails it', async () => 
   await ctx.writeText('.claude/skills/skill-writing/scripts/check-skill.sh', source);
   await ctx.writeText('.claude/skills/demo/SKILL.md', '---\nname: demo\n---\n');
 
-  const result = ctx.run();
+  const result = await ctx.run();
 
-  expect(result.status).toBe(1);
-  expect(result.stdout).toInclude('.claude/skills/demo/SKILL.md: has no description');
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout.toString()).toInclude('.claude/skills/demo/SKILL.md: has no description');
 });
 
 test('it rejects --package naming a missing README', async () => {
   const ctx = await setupTest();
+  const result = await ctx.run('--package', 'README.md');
 
-  const result = ctx.run('--package', 'README.md');
+  expect(result.exitCode).toBe(2);
 
-  expect(result.status).toBe(2);
-  expect(result.stderr).toBe('check-length: --package names README.md, which does not exist\n');
+  expect(result.stderr.toString()).toBe(
+    'check-length: --package names README.md, which does not exist\n',
+  );
 });
 
 test('it checks a README whose path is not ASCII', async () => {
@@ -233,11 +254,11 @@ test('it checks a README whose path is not ASCII', async () => {
   await ctx.writeLines('README.md', 10);
   await ctx.writeLines('café/README.md', 71);
 
-  const result = ctx.run();
+  const result = await ctx.run();
 
-  expect(result.status).toBe(1);
+  expect(result.exitCode).toBe(1);
 
-  expect(result.stdout).toInclude(
+  expect(result.stdout.toString()).toInclude(
     'café/README.md: 71 lines, over the sub-package README limit of 70',
   );
 });
@@ -260,11 +281,15 @@ test('it fails a value with a unit under docs/architecture but not one in code o
     ].join('\n'),
   );
 
-  const result = ctx.run();
+  const result = await ctx.run();
 
-  expect(result.status).toBe(1);
-  expect(result.stdout).toInclude('docs/architecture/overview.md:4:The reaper waits 30 s.');
-  expect(result.stdout).not.toInclude('overview.md:1:');
-  expect(result.stdout).not.toInclude('overview.md:2:');
-  expect(result.stdout).not.toInclude('overview.md:3:');
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout.toString()).toInclude(
+    'docs/architecture/overview.md:4:The reaper waits 30 s.',
+  );
+
+  expect(result.stdout.toString()).not.toInclude('overview.md:1:');
+  expect(result.stdout.toString()).not.toInclude('overview.md:2:');
+  expect(result.stdout.toString()).not.toInclude('overview.md:3:');
 });
