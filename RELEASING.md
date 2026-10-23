@@ -6,7 +6,7 @@ publish step in `.github/workflows/main.yml`. No npm tokens live in CI. Decision
 [#8](https://github.com/zgeoff/tools/issues/8).
 
 The shared files under `sync/` ship by hand-pushed `sync-vN` tags instead, which
-[sync tags](./sync/README.md#sync-tags) describes.
+[sync tags](./docs/architecture/sync-tags.md) describes.
 
 ## Flow
 

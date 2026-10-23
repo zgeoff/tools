@@ -1,5 +1,6 @@
 // The audit-fix step's entry point, which the audit-fix workflow runs in the
-// caller's checkout; sync/README.md describes what it changes.
+// caller's checkout; docs/architecture/dependency-updates.md describes what it
+// changes.
 import { existsSync } from 'node:fs';
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
