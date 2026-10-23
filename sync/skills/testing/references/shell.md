@@ -8,7 +8,7 @@ as a `test-*.sh` file that runs cases and counts failures, never appear.
 
 ## Running the script
 
-Each test runs the script as the program a caller runs:
+A test calls the script through `$` this way:
 
 - Name the interpreter and the script path in the command, as in
   `` $`bash ${ctx.scriptPath} ${ref}` ``. Take the path from `import.meta.url` or `import.meta.dir`.
@@ -28,20 +28,17 @@ Each test runs the script as the program a caller runs:
 
 ## Programs the script calls
 
-The script calls real programs where the test can run them: git on a temp repository, coreutils, and
-`jq`. A program the test cannot run for real, such as `gh` against GitHub, gets a stub executable in
-a folder that the test puts first on the script's `PATH`, from a stand-in util as
-[Test data](../SKILL.md#test-data) describes. A script that polls or waits takes its interval and
-its deadline from environment variables, and the test sets them, as
-[Time and waiting](../SKILL.md#time-and-waiting) describes for an argument.
+A program the script calls that the test cannot run, such as `gh` against GitHub, gets a stub
+executable in a folder that the test puts first on the script's `PATH`. A script takes the time
+argument that [Time and waiting](../SKILL.md#time-and-waiting) asks for as an environment variable,
+such as its poll interval, and the test sets it.
 
 ## ShellCheck
 
 CI runs ShellCheck over every `.sh` file that git tracks, and the pre-push baseline runs it over the
 `.sh` files that a branch changes. Fix a finding in the script. A disable directive is the
 exception: it names the code and gives its reason on the same line, as in
-`# shellcheck disable=SC2053 # the pattern is a glob on purpose`. A test checks behaviour, so it
-never repeats what ShellCheck catches, such as an unquoted expansion.
+`# shellcheck disable=SC2053 # the pattern is a glob on purpose`.
 
 ## Example
 
