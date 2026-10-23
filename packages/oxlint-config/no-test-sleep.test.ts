@@ -21,6 +21,10 @@ test.each([
     "import * as timers from 'node:timers/promises';\n\ntest('it brews', async () => {\n  await timers.setTimeout(50);\n});\n",
   ],
   [
+    'the setTimeout of a timers/promises default import',
+    "import timers from 'node:timers/promises';\n\ntest('it brews', async () => {\n  await timers.setTimeout(50);\n});\n",
+  ],
+  [
     'the sleep of the bun module',
     "import { sleep } from 'bun';\n\ntest('it brews', async () => {\n  await sleep(50);\n});\n",
   ],

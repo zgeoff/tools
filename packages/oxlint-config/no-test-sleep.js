@@ -80,9 +80,11 @@ function isInWaitHelper(node) {
 
 function emitSleepReads(context, variable, names) {
   const [definition] = variable.defs;
-  const isNamespace = definition.node.type === 'ImportNamespaceSpecifier';
 
-  if (!isNamespace && !names.has(findImportedName(definition.node))) {
+  // a default import of these modules is the same object as their namespace
+  const isNamespace = definition.node.type !== 'ImportSpecifier';
+
+  if (!isNamespace && !names.has(getImportedName(definition.node))) {
     return;
   }
 
@@ -98,11 +100,7 @@ function emitSleepReads(context, variable, names) {
   }
 }
 
-function findImportedName(specifier) {
-  if (specifier.type !== 'ImportSpecifier') {
-    return null;
-  }
-
+function getImportedName(specifier) {
   return specifier.imported.type === 'Identifier'
     ? specifier.imported.name
     : specifier.imported.value;

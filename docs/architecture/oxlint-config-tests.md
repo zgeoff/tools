@@ -111,10 +111,9 @@ the `lanes` option of `zgeoff/max-test-timeout` in the root `.oxlintrc.json`.
 A test waits on a condition, never a fixed delay, as the testing skill requires. In a
 `<name>.test.ts` or `<name>.test.tsx` file, lane suites included, the rule reports:
 
-- `Bun.sleep` and `Bun.sleepSync`, and the `sleep` and `sleepSync` of the `bun` module under any
-  local name or through a namespace import;
-- the `setTimeout` of `node:timers/promises` or `timers/promises`, under any local name or through a
-  namespace import;
+- `Bun.sleep` and `Bun.sleepSync`;
+- the `sleep` and `sleepSync` of the `bun` module, and the `setTimeout` of `node:timers/promises` or
+  `timers/promises`, under any local name or read through a namespace or default import;
 - a `setTimeout` or `globalThis.setTimeout` call inside the executor of a `new Promise`.
 
 A sleep inside a wait helper passes. A wait helper is a function whose name starts with `waitFor` or
