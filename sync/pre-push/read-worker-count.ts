@@ -1,5 +1,5 @@
 import { availableParallelism, totalmem } from 'node:os';
-import { readMemoryBudget } from './read-memory-budget.ts';
+import { readMemoryBudget, readOptionalText } from './read-memory-budget.ts';
 import type { MemoryBudgetSources } from './read-memory-budget.ts';
 
 export interface WorkerCountSources extends MemoryBudgetSources {
@@ -47,6 +47,7 @@ if (import.meta.main) {
     totalMemory: totalmem(),
     procRoot: '/proc',
     cgroupRoot: '/sys/fs/cgroup',
+    readText: readOptionalText,
   });
 
   if (workers.kind === 'invalid') {

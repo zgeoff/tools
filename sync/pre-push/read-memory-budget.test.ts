@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
-import { readMemoryBudget } from './read-memory-budget.ts';
+import { readMemoryBudget, readOptionalText } from './read-memory-budget.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'read-memory-budget-'));
@@ -27,6 +27,7 @@ test('it reads the total memory when no cgroup caps the process', async () => {
     totalMemory: 16 * 1024 ** 3,
     procRoot: ctx.procRoot,
     cgroupRoot: ctx.cgroupRoot,
+    readText: readOptionalText,
   });
 
   expect(budget).toBe(16 * 1024 ** 3);
@@ -45,6 +46,7 @@ test('it reads the tightest cap among the cgroup and its ancestors', async () =>
     totalMemory: 16 * 1024 ** 3,
     procRoot: ctx.procRoot,
     cgroupRoot: ctx.cgroupRoot,
+    readText: readOptionalText,
   });
 
   expect(budget).toBe(3 * 1024 ** 3);
@@ -62,6 +64,7 @@ test('it reads the total memory when every cgroup cap is above it', async () => 
     totalMemory: 2 * 1024 ** 3,
     procRoot: ctx.procRoot,
     cgroupRoot: ctx.cgroupRoot,
+    readText: readOptionalText,
   });
 
   expect(budget).toBe(2 * 1024 ** 3);
@@ -78,6 +81,7 @@ test('it reads the total memory on a host with cgroup v1 alone', async () => {
     totalMemory: 8 * 1024 ** 3,
     procRoot: ctx.procRoot,
     cgroupRoot: ctx.cgroupRoot,
+    readText: readOptionalText,
   });
 
   expect(budget).toBe(8 * 1024 ** 3);
@@ -90,6 +94,7 @@ test('it reads the total memory on a host with no procfs', async () => {
     totalMemory: 8 * 1024 ** 3,
     procRoot: ctx.procRoot,
     cgroupRoot: ctx.cgroupRoot,
+    readText: readOptionalText,
   });
 
   expect(budget).toBe(8 * 1024 ** 3);

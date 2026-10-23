@@ -5,6 +5,7 @@ export interface MemoryBudgetSources {
   readonly totalMemory: number;
   readonly procRoot: string;
   readonly cgroupRoot: string;
+  readonly readText: (path: string) => Promise<string | undefined>;
 }
 
 export async function readMemoryBudget(sources: Readonly<MemoryBudgetSources>): Promise<number> {
@@ -14,16 +15,12 @@ export async function readMemoryBudget(sources: Readonly<MemoryBudgetSources>): 
 }
 
 async function readCgroupCaps(sources: Readonly<MemoryBudgetSources>): Promise<number[]> {
-  const membershipFile = Bun.file(join(sources.procRoot, 'self', 'cgroup'));
-
-  const hasProcfs = await membershipFile.exists();
+  const membership = await sources.readText(join(sources.procRoot, 'self', 'cgroup'));
 
   // macOS has no procfs.
-  if (!hasProcfs) {
+  if (membership === undefined) {
     return [];
   }
-
-  const membership = await membershipFile.text();
 
   const own = /^0::(?<path>\/.*)$/mu.exec(membership)?.groups?.['path'];
 
@@ -34,7 +31,7 @@ async function readCgroupCaps(sources: Readonly<MemoryBudgetSources>): Promise<n
 
   const caps = await Promise.all(
     collectAncestorPaths(own).map((path) =>
-      readCgroupCap(join(sources.cgroupRoot, path, 'memory.max')),
+      readCgroupCap(sources, join(sources.cgroupRoot, path, 'memory.max')),
     ),
   );
 
@@ -48,20 +45,23 @@ function collectAncestorPaths(path: string): string[] {
 }
 
 // The root cgroup has no memory.max, and a cgroup with no cap holds max.
-async function readCgroupCap(path: string): Promise<number | undefined> {
+async function readCgroupCap(
+  sources: Readonly<MemoryBudgetSources>,
+  path: string,
+): Promise<number | undefined> {
+  const text = await sources.readText(path);
+
+  const value = text?.trim();
+
+  return value === undefined || value === 'max' ? undefined : Number(value);
+}
+
+export async function readOptionalText(path: string): Promise<string | undefined> {
   const file = Bun.file(path);
 
   const exists = await file.exists();
 
-  if (!exists) {
-    return undefined;
-  }
-
-  const text = await file.text();
-
-  const value = text.trim();
-
-  return value === 'max' ? undefined : Number(value);
+  return exists ? file.text() : undefined;
 }
 
 if (import.meta.main) {
@@ -69,6 +69,7 @@ if (import.meta.main) {
     totalMemory: totalmem(),
     procRoot: '/proc',
     cgroupRoot: '/sys/fs/cgroup',
+    readText: readOptionalText,
   });
 
   process.stdout.write(`${Math.floor(budget / 1024 / 1024)}\n`);
