@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "The shared Renovate preset for zgeoff Bun repos, which a repo takes with extends: github>zgeoff/tools. sync/README.md describes each rule.",
+  "description": "The shared Renovate preset for zgeoff Bun repos, which a repo takes with extends: github>zgeoff/tools. docs/architecture/dependency-updates.md describes each rule.",
   "extends": ["config:recommended", ":semanticCommits", ":timezone(Etc/UTC)"],
   "labels": ["dependencies"],
   "commitMessageTopic": "{{depName}}",
@@ -120,6 +120,13 @@
       "schedule": ["at any time"],
       "groupName": null,
       "automerge": true
+    },
+    {
+      "description": "Nothing merges by itself in nixie or noslop while their required pr / checks check skips on every pull request, because GitHub counts a skipped required check as passing. The rule sits last, so it overrides every automerge rule, lock-file maintenance included. A vulnerability fix keeps the automerge that vulnerabilityAlerts forces on it, so the pr-comment type turns that merge into a comment that no bot acts on. Remove this rule once sync-v24 is tagged, and nixie's and noslop's sync bumps to it have merged, with pr / checks running and gating on a pull request in each.",
+      "matchRepositories": ["zgeoff/nixie", "zgeoff/noslop"],
+      "automerge": false,
+      "automergeType": "pr-comment",
+      "automergeComment": "Renovate does not merge this pull request: it waits for a review while this repo's pr / checks check skips."
     }
   ]
 }
