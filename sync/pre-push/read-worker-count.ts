@@ -1,5 +1,5 @@
 import { availableParallelism, totalmem } from 'node:os';
-import { readMemoryBudget } from './read-memory-budget.ts';
+import { readMemoryBudget, readOptionalText } from './read-memory-budget.ts';
 import type { MemoryBudgetSources } from './read-memory-budget.ts';
 
 export interface WorkerCountSources extends MemoryBudgetSources {
@@ -22,8 +22,10 @@ export async function readWorkerCount(sources: Readonly<WorkerCountSources>): Pr
   const override = sources.env['TEST_WORKERS'];
 
   if (override !== undefined) {
-    return /^[1-9]\d*$/u.test(override)
-      ? { kind: 'count', count: Number(override) }
+    const count = Number(override);
+
+    return /^[1-9]\d*$/u.test(override) && Number.isSafeInteger(count)
+      ? { kind: 'count', count }
       : {
           kind: 'invalid',
           message: `TEST_WORKERS is ${override}; set it to a whole number above 0`,
@@ -45,6 +47,7 @@ if (import.meta.main) {
     totalMemory: totalmem(),
     procRoot: '/proc',
     cgroupRoot: '/sys/fs/cgroup',
+    readText: readOptionalText,
   });
 
   if (workers.kind === 'invalid') {

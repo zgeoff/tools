@@ -59,6 +59,14 @@ to_mib() {
   fi
 }
 
+forward_signal() {
+  if [ -n "$command_pid" ]; then
+    kill -s "$1" "$command_pid" 2> /dev/null || true
+  else
+    pending_signal=$1
+  fi
+}
+
 # Runs the command in the cgroup that holds this shell, as <user> when one is
 # given, and sets status to the exit status this script ends with.
 run_and_report() {
@@ -96,6 +104,16 @@ run_and_report() {
   sampler=$!
   read -r _ <&"$sample_fd"
 
+  # A signal to this shell goes on to the command as the same signal, so the
+  # report and the cleanup still run once the command ends. The traps go in
+  # before the command starts, and a signal that comes first waits for it.
+  command_pid=''
+  pending_signal=''
+  local signal
+  for signal in TERM INT HUP; do
+    # shellcheck disable=SC2064 # each trap holds its own signal's name
+    trap "forward_signal $signal" "$signal"
+  done
   (
     if [ "$protected" = true ]; then
       echo 0 > /proc/self/oom_score_adj
@@ -105,14 +123,14 @@ run_and_report() {
     fi
     exec "$@"
   ) <&0 &
-  local command_pid=$!
-  # A signal to this shell goes on to the command, so the report and the
-  # cleanup still run once the command ends; a wait that the signal cuts
-  # short runs again until the kernel reaps the command.
-  trap 'kill -s TERM "$command_pid" 2> /dev/null' TERM INT HUP
+  command_pid=$!
+  if [ -n "$pending_signal" ]; then
+    kill -s "$pending_signal" "$command_pid" 2> /dev/null || true
+  fi
   # bash prints the whole source of a job that a signal kills on its own
   # stderr, which only a background job's wait can silence. The <&0 keeps
-  # stdin, which bash points at /dev/null for a background job.
+  # stdin, which bash points at /dev/null for a background job. A wait that
+  # a signal cuts short runs again until the kernel reaps the command.
   while :; do
     status=0
     wait "$command_pid" 2> /dev/null || status=$?

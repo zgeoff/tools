@@ -4,7 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
-import { readMemoryBudget } from './read-memory-budget.ts';
+import { readMemoryBudget, readOptionalText } from './read-memory-budget.ts';
+
+// Bun's skipIf takes a boolean at collection time, so the cap modes this host supports are probed
+// once here; the CLI test needs a mode that caps its process.
+const capModes = await $`bash ${join(import.meta.dir, 'run-memory-capped.sh')} --modes`.text();
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'read-memory-budget-'));
@@ -27,6 +31,7 @@ test('it reads the total memory when no cgroup caps the process', async () => {
     totalMemory: 16 * 1024 ** 3,
     procRoot: ctx.procRoot,
     cgroupRoot: ctx.cgroupRoot,
+    readText: readOptionalText,
   });
 
   expect(budget).toBe(16 * 1024 ** 3);
@@ -45,6 +50,7 @@ test('it reads the tightest cap among the cgroup and its ancestors', async () =>
     totalMemory: 16 * 1024 ** 3,
     procRoot: ctx.procRoot,
     cgroupRoot: ctx.cgroupRoot,
+    readText: readOptionalText,
   });
 
   expect(budget).toBe(3 * 1024 ** 3);
@@ -62,6 +68,7 @@ test('it reads the total memory when every cgroup cap is above it', async () => 
     totalMemory: 2 * 1024 ** 3,
     procRoot: ctx.procRoot,
     cgroupRoot: ctx.cgroupRoot,
+    readText: readOptionalText,
   });
 
   expect(budget).toBe(2 * 1024 ** 3);
@@ -78,6 +85,7 @@ test('it reads the total memory on a host with cgroup v1 alone', async () => {
     totalMemory: 8 * 1024 ** 3,
     procRoot: ctx.procRoot,
     cgroupRoot: ctx.cgroupRoot,
+    readText: readOptionalText,
   });
 
   expect(budget).toBe(8 * 1024 ** 3);
@@ -90,13 +98,18 @@ test('it reads the total memory on a host with no procfs', async () => {
     totalMemory: 8 * 1024 ** 3,
     procRoot: ctx.procRoot,
     cgroupRoot: ctx.cgroupRoot,
+    readText: readOptionalText,
   });
 
   expect(budget).toBe(8 * 1024 ** 3);
 });
 
-test('it prints the budget of this host in MiB', async () => {
-  const result = await $`bun ${join(import.meta.dir, 'read-memory-budget.ts')}`.quiet();
+test.skipIf(capModes === '')(
+  'it prints the budget in MiB, which a cgroup cap on the process sets',
+  async () => {
+    const result =
+      await $`bash ${join(import.meta.dir, 'run-memory-capped.sh')} 512 bun ${join(import.meta.dir, 'read-memory-budget.ts')}`.quiet();
 
-  expect(result.stdout.toString()).toMatch(/^[1-9]\d*\n$/u);
-});
+    expect(result.stdout.toString()).toBe('512\n');
+  },
+);

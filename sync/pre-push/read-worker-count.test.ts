@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import { readOptionalText } from './read-memory-budget.ts';
 import { readWorkerCount } from './read-worker-count.ts';
 
 async function setupTest() {
@@ -34,6 +35,7 @@ test.each([
     totalMemory,
     procRoot: ctx.procRoot,
     cgroupRoot: ctx.cgroupRoot,
+    readText: readOptionalText,
   });
 
   expect(workers).toStrictEqual({ kind: 'count', count: expected });
@@ -53,6 +55,7 @@ test('it gives 1 worker on a large host whose cgroup caps it under 4 GiB', async
     totalMemory: 30e9,
     procRoot: ctx.procRoot,
     cgroupRoot: ctx.cgroupRoot,
+    readText: readOptionalText,
   });
 
   expect(workers).toStrictEqual({ kind: 'count', count: 1 });
@@ -67,27 +70,32 @@ test('it gives the TEST_WORKERS count over the one the host would get', async ()
     totalMemory: 2 * 1024 ** 3,
     procRoot: ctx.procRoot,
     cgroupRoot: ctx.cgroupRoot,
+    readText: readOptionalText,
   });
 
   expect(workers).toStrictEqual({ kind: 'count', count: 6 });
 });
 
-test.each(['0', '2.5', 'four', ''])('it refuses a TEST_WORKERS of %p', async (value) => {
-  const ctx = await setupTest();
+test.each(['0', '2.5', 'four', '', '9'.repeat(309)])(
+  'it refuses a TEST_WORKERS of %p',
+  async (value) => {
+    const ctx = await setupTest();
 
-  const workers = await readWorkerCount({
-    env: { TEST_WORKERS: value },
-    cores: 2,
-    totalMemory: 2 * 1024 ** 3,
-    procRoot: ctx.procRoot,
-    cgroupRoot: ctx.cgroupRoot,
-  });
+    const workers = await readWorkerCount({
+      env: { TEST_WORKERS: value },
+      cores: 2,
+      totalMemory: 2 * 1024 ** 3,
+      procRoot: ctx.procRoot,
+      cgroupRoot: ctx.cgroupRoot,
+      readText: readOptionalText,
+    });
 
-  expect(workers).toStrictEqual({
-    kind: 'invalid',
-    message: `TEST_WORKERS is ${value}; set it to a whole number above 0`,
-  });
-});
+    expect(workers).toStrictEqual({
+      kind: 'invalid',
+      message: `TEST_WORKERS is ${value}; set it to a whole number above 0`,
+    });
+  },
+);
 
 test('it prints the count', async () => {
   const result = await $`bun ${join(import.meta.dir, 'read-worker-count.ts')}`
