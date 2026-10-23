@@ -32,9 +32,10 @@ into it.
 
 ## What a run reports
 
-After the command ends, the script prints three lines on stderr: the cap and the swap cap it set,
-the peak anonymous memory and `memory.peak`, and the count of OOM kills in the cgroup. `memory.peak`
-counts the page cache, which the kernel takes back under the cap, so the script also samples the
-anonymous memory, which the kernel cannot take back, at a short interval. It exits with the
-command's status, or 1 when the kernel OOM-killed a process in the cgroup. In GitHub Actions, the
-OOM line is an error annotation.
+In a mode that applies a cap, the script prints three lines on stderr after the command ends: the
+cap and the swap cap it set, the peak anonymous memory and `memory.peak`, and the count of OOM kills
+in the cgroup. `memory.peak` counts the page cache, which the kernel takes back under the cap, so
+the script also samples the anonymous memory, which the kernel cannot take back, at a short
+interval. It exits with the command's status, or 1 when the kernel OOM-killed a process in the
+cgroup. In GitHub Actions, the OOM line is an error annotation. The `none` mode prints only its
+warning, before the command starts, and exits with the command's status.
