@@ -1,16 +1,26 @@
-import { expect, test } from 'bun:test';
+import { expect, onTestFinished, test } from 'bun:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { checkFile } from './check-file.ts';
 
-test('it reports ok with nothing to print for a compliant file', () => {
+function setupTest() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'check-file-'));
-  const file = path.join(directory, 'clean.ts');
+
+  onTestFinished(() => {
+    fs.rmSync(directory, { recursive: true, force: true });
+  });
+
+  return { directory };
+}
+
+test('it reports ok with nothing to print for a compliant file', () => {
+  const ctx = setupTest();
+  const file = path.join(ctx.directory, 'clean.ts');
 
   fs.writeFileSync(file, 'const a = 1;\n\nuse(a);\n');
 
-  expect(checkFile(file, 'check')).toEqual({
+  expect(checkFile(file, 'check')).toStrictEqual({
     outcome: 'ok',
     bytes: 22,
     parsed: true,
@@ -20,8 +30,8 @@ test('it reports ok with nothing to print for a compliant file', () => {
 });
 
 test('it rewrites the file and reports the write in write mode', () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'check-file-'));
-  const file = path.join(directory, 'unpadded.ts');
+  const ctx = setupTest();
+  const file = path.join(ctx.directory, 'unpadded.ts');
 
   fs.writeFileSync(file, 'const a = 1;\nuse(a);\n');
 
@@ -32,8 +42,8 @@ test('it rewrites the file and reports the write in write mode', () => {
 });
 
 test('it reports the diff without touching the file in check mode', () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'check-file-'));
-  const file = path.join(directory, 'unpadded.ts');
+  const ctx = setupTest();
+  const file = path.join(ctx.directory, 'unpadded.ts');
 
   fs.writeFileSync(file, 'const a = 1;\nuse(a);\n');
 
@@ -44,8 +54,8 @@ test('it reports the diff without touching the file in check mode', () => {
 });
 
 test('it returns the unified diff as stdout payload in dry mode', () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'check-file-'));
-  const file = path.join(directory, 'unpadded.ts');
+  const ctx = setupTest();
+  const file = path.join(ctx.directory, 'unpadded.ts');
 
   fs.writeFileSync(file, 'const a = 1;\nuse(a);\n');
 
@@ -56,8 +66,8 @@ test('it returns the unified diff as stdout payload in dry mode', () => {
 });
 
 test('it reports failed with a parse-error message for a broken file', () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'check-file-'));
-  const file = path.join(directory, 'broken.ts');
+  const ctx = setupTest();
+  const file = path.join(ctx.directory, 'broken.ts');
 
   fs.writeFileSync(file, 'const = (((\n');
 
@@ -69,8 +79,8 @@ test('it reports failed with a parse-error message for a broken file', () => {
 });
 
 test('it measures bytes, not UTF-16 code units', () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'check-file-'));
-  const file = path.join(directory, 'unicode.ts');
+  const ctx = setupTest();
+  const file = path.join(ctx.directory, 'unicode.ts');
 
   fs.writeFileSync(file, "const emoji = '🎉';\n");
 
