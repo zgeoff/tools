@@ -4,7 +4,7 @@
 # test-<lane> jobs in a public repo, and one checks job in a private one. Three
 # optional repo variables change them: BUN_CHECK_SCRIPTS, a space-separated
 # list of package scripts that replaces the standard list (audit deadcode
-# format:check lint check typecheck test, then each lane script),
+# format:check lint typecheck test, then each lane script),
 # NODE_VERSION, which sets up Node next to Bun, and BUN_CHECK_TIMEOUT_MINUTES,
 # the time limit of each job that runs scripts (20 when unset).
 name: PR

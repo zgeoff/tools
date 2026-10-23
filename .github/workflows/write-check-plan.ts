@@ -36,10 +36,6 @@ process.exitCode = await match(plan)
     return 1;
   })
   .with({ kind: 'planned' }, async (planned) => {
-    if (planned.notice !== null) {
-      console.log(`::notice::${planned.notice}`);
-    }
-
     // Spaces around each list let a later step match one whole name.
     await appendFile(
       outputPath,

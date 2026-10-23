@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test';
 import { planCheckScripts } from './plan-check-scripts.ts';
 
-test('it plans check in the standard list when the repo defines the script', () => {
+test('it leaves check out of the standard list when the repo defines the script', () => {
   const plan = planCheckScripts({
-    scripts: '',
+    scripts: '  ',
     defined: ['audit', 'check', 'deadcode', 'format:check', 'lint', 'test', 'typecheck'],
     part: 'all',
     lane: '',
@@ -11,26 +11,6 @@ test('it plans check in the standard list when the repo defines the script', () 
 
   expect(plan).toStrictEqual({
     kind: 'planned',
-    notice: null,
-    scripts: ['audit', 'deadcode', 'format:check', 'lint', 'check', 'typecheck', 'test'],
-    static: ['audit', 'deadcode', 'format:check', 'lint', 'check', 'typecheck'],
-    test: ['test'],
-    lanes: [],
-  });
-});
-
-test('it leaves check out of the standard list with a notice when the repo has no check script', () => {
-  const plan = planCheckScripts({
-    scripts: '  ',
-    defined: ['audit', 'deadcode', 'format:check', 'lint', 'test', 'typecheck'],
-    part: 'all',
-    lane: '',
-  });
-
-  expect(plan).toStrictEqual({
-    kind: 'planned',
-    notice:
-      'check skipped, because package.json has no check script; add "check": "zgeoff-check" to run it.',
     scripts: ['audit', 'deadcode', 'format:check', 'lint', 'typecheck', 'test'],
     static: ['audit', 'deadcode', 'format:check', 'lint', 'typecheck'],
     test: ['test'],
@@ -43,7 +23,6 @@ test('it adds each lane script the repo defines to the standard list', () => {
     scripts: '',
     defined: [
       'audit',
-      'check',
       'deadcode',
       'format:check',
       'lint',
@@ -58,19 +37,17 @@ test('it adds each lane script the repo defines to the standard list', () => {
 
   expect(plan).toStrictEqual({
     kind: 'planned',
-    notice: null,
     scripts: [
       'audit',
       'deadcode',
       'format:check',
       'lint',
-      'check',
       'typecheck',
       'test',
       'test:browser',
       'test:host',
     ],
-    static: ['audit', 'deadcode', 'format:check', 'lint', 'check', 'typecheck'],
+    static: ['audit', 'deadcode', 'format:check', 'lint', 'typecheck'],
     test: ['test'],
     lanes: ['browser', 'host'],
   });
@@ -86,7 +63,6 @@ test('it sorts the listed scripts into static checks, tests and lanes', () => {
 
   expect(plan).toStrictEqual({
     kind: 'planned',
-    notice: null,
     scripts: ['lint', 'check', 'test', 'test:slow', 'test:e2e'],
     static: ['lint', 'check'],
     test: ['test', 'test:slow'],

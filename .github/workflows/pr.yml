@@ -15,9 +15,9 @@ jobs:
       pull-requests: write
     uses: ./.github/workflows/bun-checks.yml
     with:
-      scripts: check:sync format:check lint:full typecheck test test:workflows check
-      # The @zgeoff/checks tests run shfmt and actionlint, in the test job,
-      # which does not run the check script.
+      scripts: check:sync format:check lint:full typecheck test test:workflows
+      # The tests of the check steps and of @zgeoff/checks run shfmt and
+      # actionlint, in the test job, which runs no check step.
       setup-shfmt: true
       setup-actionlint: true
 
