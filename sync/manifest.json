@@ -221,6 +221,17 @@
     ]
   },
   {
+    "name": "memory-cap",
+    "description": "The script that runs a command inside a cgroup memory cap with no swap, and prints the run's peak memory and OOM kills; every repo takes it, so CI and the pre-push hooks can run under it",
+    "files": [
+      {
+        "source": "sync/pre-push/run-memory-capped.sh",
+        "target": "scripts/run-memory-capped.sh",
+        "mode": "0755"
+      }
+    ]
+  },
+  {
     "name": "pre-push-baseline",
     "description": "The light pre-push baseline: lefthook jobs that check only what the branch changes and run one at a time, a pre-commit typecheck, the scripts they call, the package scripts files:branch, lint:files, test:related, check:commits, check:local-paths and check:test-timeouts where the repo lacks them, and a move of a files:branch script left on the old script path",
     "optIn": true,
