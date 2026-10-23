@@ -28,6 +28,9 @@ preload = [
 
 Leave out the `zustand` preload in a repo without zustand.
 
+The preload registers happy-dom with its default settings, so a test document fetches no external
+stylesheet and loads no iframe page.
+
 ## Why each piece is there
 
 - happy-dom replaces the fetch globals with its own, and Bun's `ReadableStream.pipeTo` and `fetch`
