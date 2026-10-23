@@ -242,6 +242,84 @@ test.skipIf(!modesOutput.includes('cgroupfs'))(
   },
 );
 
+test.each([['SIGHUP'], ['SIGINT'], ['SIGTERM']] as const)(
+  'it hands a %s it gets to the command as the same signal',
+  async (signal) => {
+    const ctx = setupTest();
+    const name = signal.slice('SIG'.length);
+
+    const run = Bun.spawn(
+      [
+        'bash',
+        ctx.scriptPath,
+        '128',
+        ctx.bun,
+        '-e',
+        `process.on('${signal}', () => { console.log('got ${name}'); process.exit(0); }); console.log('ready'); setInterval(() => {}, 1000);`,
+      ],
+      { env: ctx.env, stdout: 'pipe', stderr: 'pipe' },
+    );
+
+    onTestFinished(() => {
+      run.kill('SIGKILL');
+    });
+
+    const reader = run.stdout.getReader();
+
+    const decoder = new TextDecoder();
+
+    let output = '';
+
+    // The command prints ready once its handler is set, so a signal after that line reaches it. A bash
+    // command would defer its trap until a blocking read returns.
+    while (!output.includes('ready\n')) {
+      const chunk = await reader.read();
+
+      invariant(!chunk.done);
+
+      output += decoder.decode(chunk.value);
+    }
+
+    run.kill(signal);
+
+    let chunk = await reader.read();
+
+    while (!chunk.done) {
+      output += decoder.decode(chunk.value);
+
+      chunk = await reader.read();
+    }
+
+    const exitCode = await run.exited;
+
+    expect({ exitCode, stdout: output }).toStrictEqual({
+      exitCode: 0,
+      stdout: `ready\ngot ${name}\n`,
+    });
+  },
+);
+
+test.skipIf(modesOutput === '')(
+  'it reports a peak anon memory that holds the memory the command used',
+  async () => {
+    const ctx = setupTest();
+
+    // The command holds its 96 MiB for three sample intervals, so a sample lands while it does.
+    const result =
+      await $`bash ${ctx.scriptPath} 256 ${ctx.bun} -e ${'const held = Buffer.alloc(96 * 1024 * 1024, 1); await Bun.sleep(600); console.log(held.length);'}`
+        .env(ctx.env)
+        .quiet();
+
+    const peak = /peak anon memory (?<mib>\d+) MiB/u.exec(result.stderr.toString())?.groups?.[
+      'mib'
+    ];
+
+    invariant(peak !== undefined);
+
+    expect(Number(peak)).toBeGreaterThanOrEqual(96);
+  },
+);
+
 test.skipIf(modesOutput === '')('it uses the first mode the host supports', async () => {
   const ctx = setupTest();
 
