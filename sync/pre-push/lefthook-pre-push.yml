@@ -69,14 +69,14 @@ pre-push:
         status=0
         for script in check-length.sh check-links.sh; do
           if ! bash "$scripts/$script"; then
-            echo "docs: $script failed; the lines it printed above name each file and what is wrong"
+            echo "docs: $script failed; its output above holds each failing file and its fault"
             status=1
           fi
         done
         exit "$status"
-    # GitHub runs no workflow from a subfolder of .github/workflows. The
-    # ignore and its expiry date match the Check workflows step of
-    # bun-checks.yml in zgeoff/tools, which gives the reason.
+    # GitHub runs no workflow from a subfolder of .github/workflows. actionlint
+    # 1.7.12 rejects the concurrency queue key that GitHub documents, until
+    # rhysd/actionlint#654 ships; the ignore lapses on the same date as in CI.
     - name: workflows
       files: bun run --silent files:branch
       glob: '.github/workflows/*.{yml,yaml}'
