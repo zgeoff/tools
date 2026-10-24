@@ -38,6 +38,12 @@ server started at import and closed in `afterAll` is then gone after each worker
 test process has one MSW server, and each package adds its handlers to it, as
 [HTTP mocking](./references/http.md#the-server-and-its-lifecycle) describes.
 
+A resource that each worker builds once and keeps across its files, such as a database cloned from
+the per-run template, is created on first use and kept for the life of the process. No `afterAll`
+drops it, because that hook can run after every file.
+[Database testing](./references/database.md#postgres-isolation) describes the clone and the sweep
+that removes the clones of older runs.
+
 The CI unit run passes `--randomize`, so Bun runs the files, and the tests in each file, in a random
 order and prints the `--seed=<seed>` it used. A leak that a fixed order hides then fails CI. A
 failure under `--randomize` is a leak between tests or files. Reproduce it by passing the printed
