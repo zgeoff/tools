@@ -75,7 +75,7 @@ the real mechanism. Configure startup-only settings in an isolated child process
 control that proves an unprotected operation crosses the deadline; a nominal timeout value alone
 does not prove expiry. Keep default configuration coverage separate. Wait out the real default only
 when the runtime cannot expose a shorter faithful deadline. That case stays in the unit run with the
-disable comment that [A test over its ceiling](../SKILL.md#a-test-over-its-ceiling) describes.
+disable comment that [A test over its limit](../SKILL.md#a-test-over-its-limit) describes.
 
 When a third-party library owns a timer, runs it internally, and takes only a duration in its
 config, pass the shortest duration the library accepts and wait on the observable event, never with
@@ -120,7 +120,7 @@ runs browser suites in their own serial lane after the parallel run, so the brow
 idle CPU. A cold browser start on a CPU that the parallel pool saturates can outlast the test
 timeout, and a raised timeout only hides that cost.
 
-- A browser suite keeps within the browser lane's ceiling, which [Lanes](../SKILL.md#lanes) states.
+- A browser suite keeps within the browser lane's limit, which [Lanes](../SKILL.md#lanes) states.
   When it needs more, the suite is doing an end-to-end journey's work, and the journey belongs in
   `e2e/`.
 - Every other test stays out of a browser suite, so the parallel run keeps its speed.
@@ -184,9 +184,9 @@ safe after partial failure, interruption, and explicit shutdown.
 
 ## Rust lanes
 
-A Rust crate runs the [lanes](../SKILL.md#lanes) through cargo-nextest, with the same ceilings. A
-test path prefix names the lane, such as `e2e::` or `host::`, the way a directory or a file suffix
-does for Bun. The repo's `.config/nextest.toml` holds the lanes, in this made-up example:
+A Rust crate runs the [lanes](../SKILL.md#lanes) through cargo-nextest, with the same limits. A test
+path prefix names the lane, such as `e2e::` or `host::`, the way a directory or a file suffix does
+for Bun. The repo's `.config/nextest.toml` holds the lanes, in this made-up example:
 
 ```toml
 [profile.default]
@@ -201,12 +201,12 @@ filter = "test(/^e2e::/)"
 slow-timeout = { period = "15s", terminate-after = 1 }
 ```
 
-- The default profile is the unit run. Its `slow-timeout` ends a test at the 5 s ceiling, and its
+- The default profile is the unit run. Its `slow-timeout` ends a test at the 5 s limit, and its
   `default-filter` leaves out every lane prefix.
 - Each lane has one profile, which inherits from `default`. It sets its own `default-filter` to the
-  lane prefix, and an override sets the lane's ceiling. The lane's CI step runs
+  lane prefix, and an override sets the lane's limit. The lane's CI step runs
   `cargo nextest run --profile <lane>`.
-- A test over its ceiling gets its own override, with a comment that gives the measured time and the
+- A test over its limit gets its own override, with a comment that gives the measured time and the
   ticket. It goes before the lane's override, because nextest applies the first override that
   matches.
 - `#[ignore]` never marks a lane test. An ignored test runs in no profile unless a flag asks for it,

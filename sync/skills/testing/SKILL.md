@@ -5,9 +5,9 @@ description:
   with onTestFinished cleanup, inline data and tested factories, strict assertions and inline
   snapshots, controlled time, condition waits, real filesystems and transports, and the narrow cases
   for module mocks, plus the fix for each kind of slow test and the lanes with their per-test
-  timeout ceilings. References cover real databases, HTTP mocking with MSW, observability, and
-  Claude Code mod checks, and, in a repo that uses them, React and TanStack clients and native Go
-  and NixOS conventions. Load when designing, writing, or reviewing tests.
+  timeout limits. References cover real databases, HTTP mocking with MSW, observability, and Claude
+  Code mod checks, and, in a repo that uses them, React and TanStack clients and native Go and NixOS
+  conventions. Load when designing, writing, or reviewing tests.
 ---
 
 # Testing
@@ -177,8 +177,8 @@ These decide a case that the rules below leave open.
 
 A test finishes in under 5 s on CI. A slow test costs every later run its full time, and a raised
 timeout or a sleep hides that cost without removing it. `zgeoff/max-test-timeout` refuses a timeout
-above the ceiling of the file's lane, and `zgeoff/no-test-sleep` refuses a fixed sleep. When a test
-is slow, find its cause in this table and make the change it names. Never raise the timeout first.
+above the limit of the file's lane, and `zgeoff/no-test-sleep` refuses a fixed sleep. When a test is
+slow, find its cause in this table and make the change it names. Never raise the timeout first.
 
 | The test                                                                                    | The cause                           | The fix                                                                                                                                                                                                                                                                           |
 | ------------------------------------------------------------------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -196,7 +196,7 @@ is slow, find its cause in this table and make the change it names. Never raise 
 - `<package>/src/<file>.test.ts` holds the unit suite of one source file.
 - `integration/` holds one flow across several packages, in one process, with per-run fixtures and
   stand-ins. It is a place, not a lane: it runs in the unit run under every unit rule, with the 5 s
-  ceiling, `--parallel`, and no raised timeout.
+  limit, `--parallel`, and no raised timeout.
 - `e2e/` holds the tests that drive the built product from outside, through its bundle or binary,
   its CLI, HTTP, or a socket. It holds two kinds of test: the process itself (start-up, signals,
   exit codes, crash recovery), and one happy-path journey per main user flow. A flow's variants,
@@ -220,46 +220,49 @@ live API, or for a test of the process itself.
 ### Lanes
 
 A lane runs the tests that need one real system. Each lane has its own `test:<lane>` script, its own
-CI step, and a per-test ceiling, which the script's `--timeout` sets and `zgeoff/max-test-timeout`
+CI step, and a per-test limit, which the script's `--timeout` sets and `zgeoff/max-test-timeout`
 checks in each lane file. The unit run leaves the lane files out by pattern.
 
-| Lane      | Where                                  | Ceiling | The real system                                                                     |
-| --------- | -------------------------------------- | ------- | ----------------------------------------------------------------------------------- |
-| unit      | every other test file                  | 5 s     | none: code in process, per-run fixtures, and stand-ins                              |
-| e2e       | `e2e/` at the repo root or an app root | 15 s    | the built product, driven from outside                                              |
-| browser   | `<name>.browser.test.ts`               | 10 s    | a real browser                                                                      |
-| docker    | `<name>.docker.test.ts`                | 15 s    | a container engine                                                                  |
-| host      | `<name>.host.test.ts`                  | 15 s    | the host kernel, root, or the network stack                                         |
-| agent-sdk | `<name>.agent-sdk.test.ts`             | 5 s     | the Claude Agent SDK subprocess against a scripted model, never the live API        |
-| evals     | `evals/` at the repo root              | 120 s   | a live external API; the lane runs nightly and on dispatch, never on a pull request |
+| Lane      | Where                                  | Limit | The real system                                                                     |
+| --------- | -------------------------------------- | ----- | ----------------------------------------------------------------------------------- |
+| unit      | every other test file                  | 5 s   | none: code in process, per-run fixtures, and stand-ins                              |
+| e2e       | `e2e/` at the repo root or an app root | 15 s  | the built product, driven from outside                                              |
+| browser   | `<name>.browser.test.ts`               | 10 s  | a real browser                                                                      |
+| docker    | `<name>.docker.test.ts`                | 15 s  | a container engine                                                                  |
+| host      | `<name>.host.test.ts`                  | 15 s  | the host kernel, root, or the network stack                                         |
+| agent-sdk | `<name>.agent-sdk.test.ts`             | 5 s   | the Claude Agent SDK subprocess against a scripted model, never the live API        |
+| evals     | `evals/` at the repo root              | 120 s | a live external API; the lane runs nightly and on dispatch, never on a pull request |
 
 - A suffix names one real system, never a speed. A repo prefers a specific suffix to the generic
   `.host`, such as a made-up `.kvm` for a test that boots a VM.
 - A repo adds a project lane only for a real system that this section allows. Its project-testing
-  skill lists the lane with its real system, its ceiling, and the measured p95 and maximum test
-  time, and its root oxlint config declares the lane and its ceiling in the `lanes` option of
+  skill lists the lane with its real system, its limit, and the measured p95 and maximum test time,
+  and its root oxlint config declares the lane and its limit in the `lanes` option of
   `zgeoff/max-test-timeout`.
 - A test that is slow only because of a runtime timer stays in the unit run, with the disable
-  comment that [A test over its ceiling](#a-test-over-its-ceiling) describes.
+  comment that [A test over its limit](#a-test-over-its-limit) describes.
 - A lane holds no test that is only slow. Before a test moves to a lane, check that no other row of
   the cause table fits it.
 
 A Rust crate runs the same lanes through cargo-nextest, as
 [Rust lanes](./references/system-tests.md#rust-lanes) describes.
 
-### A test over its ceiling
+### A test over its limit
 
-A test that cannot finish within its lane's ceiling carries a disable comment that gives the
-measured time and the ticket that tracks its fix, in this made-up example:
+A test that cannot finish within its lane's limit carries a disable comment that gives the measured
+time and the ticket that tracks its fix, in this made-up example:
 
 ```ts
 // oxlint-disable-next-line zgeoff/max-test-timeout -- 48 s on CI, OPS-212
-test('it restores a volume from its oldest snapshot', async () => {
+test('it restores a volume from its oldest snapshot', { timeout: 60_000 }, async () => {
   // …
-}, 60_000);
+});
 ```
 
-The ceiling never rises to cover one test. The test timeout check fails a disable of
+The rule reports the timeout value, so the comment sits on the line before it, and an options object
+before the callback keeps the value on the first line of the test.
+
+The limit never rises to cover one test. The test timeout check fails a disable of
 `zgeoff/max-test-timeout` that names no ticket after `--`.
 
 ## Structure and naming
