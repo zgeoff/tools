@@ -478,6 +478,52 @@ test('it passes a blobless clone whose unpushed merge holds blobs the server lac
   expect(findings).toStrictEqual([]);
 });
 
+test('it throws the fetch error when a blobless clone cannot reach its origin for merge blobs', async () => {
+  const ctx = await setupTest();
+
+  const origin = join(ctx.directory, 'origin');
+  const clone = join(ctx.directory, 'clone');
+
+  await $`git init --quiet ${origin}`.env(ctx.env);
+  await $`git config uploadpack.allowFilter true`.cwd(origin).env(ctx.env);
+
+  await writeFile(join(origin, 'greet.txt'), 'greeting: hello\n');
+
+  await $`git add greet.txt`.cwd(origin).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: start the repo'}`.cwd(origin).env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(origin).env(ctx.env).text();
+
+  await $`git switch --quiet -c side`.cwd(origin).env(ctx.env);
+
+  await writeFile(join(origin, 'farewell.txt'), 'farewell: goodbye\n');
+
+  await $`git add farewell.txt`.cwd(origin).env(ctx.env);
+  await $`git commit --quiet -m ${'feat: say goodbye'}`.cwd(origin).env(ctx.env);
+  await $`git switch --quiet -`.cwd(origin).env(ctx.env);
+  await $`git merge --quiet --no-ff --no-edit side`.cwd(origin).env(ctx.env);
+
+  await $`git clone --quiet --no-checkout --filter=blob:none ${`file://${origin}`} ${clone}`.env(
+    ctx.env,
+  );
+
+  await $`git remote set-url origin ${`file://${join(ctx.directory, 'no-such-origin')}`}`
+    .cwd(clone)
+    .env(ctx.env);
+
+  expect(() =>
+    runLocalPathsCheck({
+      cwd: clone,
+      runProgram,
+      base: baseText.trim(),
+      env: ctx.env,
+      host: 'greeter-box',
+    }),
+  ).toThrow(
+    /^git -c fetch\.negotiationAlgorithm=noop fetch --quiet --no-tags --no-write-fetch-head --filter=blob:none --stdin origin failed: fatal: '[^']*no-such-origin' does not appear to be a git repository/u,
+  );
+});
+
 test('it reports the real path of a file whose name git quotes', async () => {
   const ctx = await setupTest();
 
