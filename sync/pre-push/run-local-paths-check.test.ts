@@ -1,9 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { createHash } from 'node:crypto';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import { buildTextWithBlobPrefix } from '../../test-utils/build-text-with-blob-prefix.ts';
 import { runLocalPathsCheck } from './run-local-paths-check.ts';
 import { runProgram } from './run-program.ts';
 
@@ -385,16 +385,7 @@ test('it reports a line that a conflict-resolving merge adds in a blobless clone
 
   // git's loose-object cache lists each 2-hex folder once, so a later merge that looks up a blob
   // in the conflict blob's folder hides that blob from the prefetch, which asks the server for it.
-  let farewell = '';
-
-  for (let count = 0; farewell === ''; count += 1) {
-    const text = `farewell: goodbye ${count}\n`;
-    const blob = createHash('sha1').update(`blob ${text.length}\0${text}`).digest('hex');
-
-    if (blob.slice(0, 2) === conflictBlob.slice(0, 2)) {
-      farewell = text;
-    }
-  }
+  const farewell = buildTextWithBlobPrefix('farewell: goodbye', conflictBlob.slice(0, 2));
 
   await $`git switch --quiet -c notes`.cwd(origin).env(ctx.env);
 
