@@ -184,11 +184,11 @@ test('it holds a README beside a public package.json outside packages/ to the fo
   });
 });
 
-test('it holds a spike README under docs/design to the folder limit, not the docs cap', async () => {
+test('it holds a spike README under docs/design to the folder limit and its results.md to no cap', async () => {
   const ctx = await setupTest();
 
   await ctx.writeLines('docs/design/sync/spikes/cold-start/README.md', 71);
-  await ctx.writeLines('docs/design/sync/spikes/cold-start/results.md', 200);
+  await ctx.writeLines('docs/design/sync/spikes/cold-start/results.md', 251);
 
   const result = await ctx.run();
 

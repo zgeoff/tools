@@ -69,5 +69,6 @@ The README holds these sections, in this order:
 6. `## Untested`: 1 to 2 lines, with a link to the `## Untested` section of `results.md`.
 
 A spike that only reads sources, with no code, leaves out `Run it`. No other file in a spike is
-named `README.md`, because `check-length.sh` holds every README to a README limit. `results.md` has
-no line cap, and `check-prose.sh` and `check-links.sh` read it wherever the spike sits.
+named `README.md`, because `check-length.sh` holds every README to a README limit. `results.md` and
+the spike's other files have no line cap, even under `docs/design/`, and `check-prose.sh` and
+`check-links.sh` read `results.md` wherever the spike sits.

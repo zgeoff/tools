@@ -673,10 +673,9 @@ test('it fails the push on the docs job when the installed length script rejects
     { recursive: true },
   );
 
-  // The repo has a package.json, so its README holds 130 lines at most; this one has 131, in short
-  // paragraphs with no link.
+  // The root README holds 100 lines at most; this one has 101, in short paragraphs with no link.
   const paragraphs = Array.from(
-    { length: 65 },
+    { length: 50 },
     (_, index) => `Step ${index + 1} greets the visitor.`,
   );
 
@@ -721,7 +720,7 @@ test('it fails the push on the docs job when the installed length script rejects
   );
 
   expect(failedJobs).toStrictEqual(['docs']);
-  expect(output).toInclude('README.md: 131 lines, over the package README limit of 130');
+  expect(output).toInclude('README.md: 101 lines, over the front page README limit of 100');
   expect(output).toInclude('docs: check-length.sh failed');
 });
 

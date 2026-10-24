@@ -59,6 +59,7 @@ readmes=0
 over_limit=0
 prose_paths=()
 spike_readmes='docs/design/**/spikes/*/README.md'
+spike_files='docs/design/**/spikes/**'
 
 # docs/README.md is the docs index, so the docs cap governs it, not a README limit. A spike README
 # under docs/design/ is a README.
@@ -86,9 +87,10 @@ done < <({
   fi
 } | sort)
 
-docs=$(list_files ':(glob)docs/**/*.md' ":(exclude,glob)$spike_readmes")
+# A spike's README takes a README limit, and its other files have no cap.
+docs=$(list_files ':(glob)docs/**/*.md' ":(exclude,glob)$spike_files")
 
-if [ -n "$docs" ]; then
+if [ -n "$(list_files ':(glob)docs/**/*.md')" ]; then
   prose_paths+=(':(glob)docs/**/*.md')
 fi
 
