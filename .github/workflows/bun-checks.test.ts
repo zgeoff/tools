@@ -1282,7 +1282,7 @@ test('it fails the test timeouts check on a bunfig.toml that raises the test tim
   expect(result.exitCode).toBe(1);
 
   expect(result.stdout.toString()).toInclude(
-    'bunfig.toml: [test] timeout = 30000 raises every test above the 5 s limit',
+    'bunfig.toml: [test] timeout = 30000 raises every test above the 5000 ms limit of the unit lane',
   );
 });
 

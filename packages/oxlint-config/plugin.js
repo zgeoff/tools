@@ -14,6 +14,7 @@ import noTestSleep from './no-test-sleep.js';
 import resolveRepoRoot from './resolve-repo-root.js';
 import setupTestOnly from './setup-test-only.js';
 import testBesideModule from './test-beside-module.js';
+import testTimeoutExceptionTicket from './test-timeout-exception-ticket.js';
 import verbContract from './verb-contract.js';
 
 const plugin = {
@@ -107,6 +108,7 @@ const plugin = {
     'no-file-snapshot': noFileSnapshot,
     'setup-test-only': setupTestOnly,
     'max-test-timeout': buildMaxTestTimeout(resolveRepoRoot),
+    'test-timeout-exception-ticket': testTimeoutExceptionTicket,
     'no-test-sleep': noTestSleep,
     'import-zones': importZones,
   },

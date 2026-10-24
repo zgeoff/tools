@@ -1,6 +1,8 @@
 import { readdirSync, statSync } from 'node:fs';
-import { basename, dirname, join, relative, sep } from 'node:path';
+import { basename, dirname, join } from 'node:path';
+import buildLaneLimits from './build-lane-limits.js';
 import resolveRepoRoot from './resolve-repo-root.js';
+import resolveSuiteDirectory from './resolve-suite-directory.js';
 
 const testFilePattern = /^(?<base>.+)\.test\.tsx?$/u;
 
@@ -9,27 +11,35 @@ const testBesideModule = {
     type: 'problem',
     messages: {
       missing:
-        'Move this test beside the module it tests: no `{{name}}.<ext>` sits in this directory. Whole-program suites belong in a root `e2e/` or `evals/` directory.',
+        'Move this test beside the module it tests: no `{{name}}.<ext>` sits in this directory. A flow across several packages belongs in `integration/`, and a test that drives the built product in `e2e/`, at the repo root or an app root.',
     },
     schema: [
       {
         type: 'object',
         properties: {
-          lanes: { type: 'array', items: { type: 'string' } },
+          lanes: {
+            anyOf: [
+              { type: 'array', items: { type: 'string' } },
+              { type: 'object', additionalProperties: { type: 'integer', minimum: 0 } },
+            ],
+          },
         },
         additionalProperties: false,
       },
     ],
   },
   create(context) {
-    const lanes = new Set(['browser', ...(context.options[0]?.lanes ?? [])]);
+    const lanes = buildLaneLimits(context.options[0]?.lanes);
 
     return {
       Program() {
         const filename = context.physicalFilename;
         const match = testFilePattern.exec(basename(filename));
 
-        if (match === null || probeUnderExemptRoot(context.cwd, filename)) {
+        if (
+          match === null ||
+          resolveSuiteDirectory(resolveRepoRoot(filename) ?? context.cwd, filename) !== null
+        ) {
           return;
         }
 
@@ -54,17 +64,6 @@ const testBesideModule = {
 };
 
 export default testBesideModule;
-
-// suites that run the whole program have no single module to sit beside
-const exemptRootDirs = new Set(['e2e', 'evals']);
-
-// the repo root, not oxlint's working directory, so a per-package lint
-// script neither exempts a package's own e2e/ nor flags the root one
-function probeUnderExemptRoot(cwd, filename) {
-  const [first] = relative(resolveRepoRoot(filename) ?? cwd, filename).split(sep);
-
-  return exemptRootDirs.has(first);
-}
 
 function toModuleName(base, lanes) {
   const dot = base.lastIndexOf('.');

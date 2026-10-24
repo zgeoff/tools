@@ -517,15 +517,45 @@ test('it flags a test-kind suffix test beside only the base module', async () =>
   const result = await runLintTree(
     {
       'egress-ruleset.ts': '',
-      'egress-ruleset.host.test.ts':
+      'egress-ruleset.replay.test.ts':
         "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
     },
-    'egress-ruleset.host.test.ts',
+    'egress-ruleset.replay.test.ts',
     { 'zgeoff/test-beside-module': 'error' },
   );
 
   expect(result.exitCode).toBe(1);
-  expect(result.stdout).toInclude('egress-ruleset.host.<ext>');
+  expect(result.stdout).toInclude('egress-ruleset.replay.<ext>');
+});
+
+test.each(['docker', 'host', 'agent-sdk'])(
+  'it accepts a suite in the standard %s lane beside its module',
+  async (lane) => {
+    const result = await runLintTree(
+      {
+        'session.ts': '',
+        [`session.${lane}.test.ts`]:
+          "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+      },
+      `session.${lane}.test.ts`,
+      { 'zgeoff/test-beside-module': 'error' },
+    );
+
+    expect(result.exitCode).toBe(0);
+  },
+);
+
+test('it accepts a suite in a lane that the object form of the lanes option declares', async () => {
+  const result = await runLintTree(
+    {
+      'session.ts': '',
+      'session.kvm.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
+    'session.kvm.test.ts',
+    { 'zgeoff/test-beside-module': ['error', { lanes: { kvm: 60_000 } }] },
+  );
+
+  expect(result.exitCode).toBe(0);
 });
 
 test('it exempts tests under a root e2e/ or evals/ directory', async () => {
@@ -548,7 +578,27 @@ test('it exempts tests under a root e2e/ or evals/ directory', async () => {
   expect(evals.exitCode).toBe(0);
 });
 
-test('it flags tests under test-utils/ or a nested e2e/ directory', async () => {
+test.each([
+  ['a root integration/ directory', 'integration/checkout.test.ts'],
+  ['an app root e2e/ directory', 'packages/cli/e2e/run.test.ts'],
+  ['an app root integration/ directory', 'packages/cli/integration/run.test.ts'],
+  ['an app root evals/ directory', 'packages/cli/evals/run.test.ts'],
+  ['a package whose directory ends in -e2e', 'apps/cli-e2e/src/run.test.ts'],
+])('it exempts a test under %s', async (_, path) => {
+  const result = await runLintTree(
+    {
+      'packages/cli/package.json': '{}',
+      'apps/cli-e2e/package.json': '{}',
+      [path]: "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
+    path,
+    { 'zgeoff/test-beside-module': 'error' },
+  );
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it flags tests under test-utils/ or an e2e/ directory outside an app root', async () => {
   const testUtils = await runLintTree(
     {
       'test-utils/fixtures.test.ts':

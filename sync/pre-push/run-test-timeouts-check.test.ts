@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
@@ -69,12 +69,12 @@ test('it reports each bun test timeout above 5 s in a package script, in both fl
     {
       path: 'packages/kettle/package.json',
       message:
-        'script "test" passes --timeout=20000 to bun test, above the 5 s limit; only test:related and a lane script (test:<lane>, for e2e, browser, docker, host and each lane in the max-test-timeout lanes option) may raise it',
+        'script "test" passes --timeout=20000 to bun test, above the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it',
     },
     {
       path: 'packages/kettle/package.json',
       message:
-        'script "test:slow" passes --timeout=30000 to bun test, above the 5 s limit; only test:related and a lane script (test:<lane>, for e2e, browser, docker, host and each lane in the max-test-timeout lanes option) may raise it',
+        'script "test:slow" passes --timeout=30000 to bun test, above the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it',
     },
   ]);
 });
@@ -116,7 +116,7 @@ test('it reports a bun test that a wrapper script runs', async () => {
     {
       path: 'package.json',
       message:
-        'script "test:daemon" passes --timeout=20000 to bun test, above the 5 s limit; only test:related and a lane script (test:<lane>, for e2e, browser, docker, host and each lane in the max-test-timeout lanes option) may raise it',
+        'script "test:daemon" passes --timeout=20000 to bun test, above the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it',
     },
   ]);
 });
@@ -163,25 +163,17 @@ test('it reports a bun test whose command words are quoted', async () => {
     {
       path: 'package.json',
       message:
-        'script "test" passes --timeout=30000 to bun test, above the 5 s limit; only test:related and a lane script (test:<lane>, for e2e, browser, docker, host and each lane in the max-test-timeout lanes option) may raise it',
+        'script "test" passes --timeout=30000 to bun test, above the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it',
     },
   ]);
 });
 
-test('it exempts test:related and the built-in lane scripts', async () => {
+test('it exempts test:related', async () => {
   const ctx = await setupTest();
 
   await writeFile(
     join(ctx.directory, 'package.json'),
-    JSON.stringify({
-      scripts: {
-        'test:related': 'bun test --timeout=15000',
-        'test:e2e': 'bun test --timeout=60000 e2e',
-        'test:browser': 'bun test --timeout=20000 .browser.test.ts',
-        'test:docker': 'bun test --timeout=20000 .docker.test.ts',
-        'test:host': 'bun test --timeout=20000 .host.test.ts',
-      },
-    }),
+    JSON.stringify({ scripts: { 'test:related': 'bun test --timeout=15000' } }),
   );
 
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
@@ -192,7 +184,7 @@ test('it exempts test:related and the built-in lane scripts', async () => {
   expect(findings).toStrictEqual([]);
 });
 
-test('it exempts the script of a lane that the max-test-timeout lanes option declares', async () => {
+test('it gives a lane in the array form of the lanes option a 15 s limit', async () => {
   const ctx = await setupTest();
 
   await writeFile(
@@ -203,7 +195,10 @@ test('it exempts the script of a lane that the max-test-timeout lanes option dec
   await writeFile(
     join(ctx.directory, 'package.json'),
     JSON.stringify({
-      scripts: { 'test:binary': 'bun test --timeout 20000 e2e/daemon-*.test.ts' },
+      scripts: {
+        'test:binary': 'bun test --timeout 15000 e2e/daemon-*.test.ts',
+        'test:binary:slow': 'bun test --timeout 15001 e2e/daemon-*.test.ts',
+      },
     }),
   );
 
@@ -212,7 +207,82 @@ test('it exempts the script of a lane that the max-test-timeout lanes option dec
 
   const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
 
-  expect(findings).toStrictEqual([]);
+  expect(findings).toStrictEqual([
+    {
+      path: 'package.json',
+      message:
+        'script "test:binary:slow" passes --timeout=15001 to bun test, above the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it',
+    },
+  ]);
+});
+
+test('it reads the limit of a lane that the object form of the lanes option declares', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, '.oxlintrc.json'),
+    '{ "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": { "kvm": 60000, "e2e": 30000 } }] } }\n',
+  );
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'test:kvm': 'bun test --timeout=60000 .kvm.test.ts',
+        'test:e2e': 'bun test --timeout=30001 e2e',
+      },
+    }),
+  );
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'package.json',
+      message:
+        'script "test:e2e" passes --timeout=30001 to bun test, above the 30000 ms limit of the e2e lane; find its cause in the "Slow tests" section of the testing skill and fix it',
+    },
+  ]);
+});
+
+test('it holds the same lane limits as the Lanes table in the shared testing skill', async () => {
+  const ctx = await setupTest();
+
+  const markdown = await readFile(
+    join(import.meta.dir, '..', 'skills', 'testing', 'SKILL.md'),
+    'utf8',
+  );
+
+  const rows = [
+    ...markdown.matchAll(/^\| (?<lane>[a-z0-9-]+) +\| [^|]+\| (?<seconds>\d+) s +\|/gmu),
+  ].map((match) => ({
+    script: match.groups?.['lane'] === 'unit' ? 'test' : `test:${match.groups?.['lane']}`,
+    limitMs: Number(match.groups?.['seconds']) * 1000,
+  }));
+
+  const scripts = rows.flatMap((row): [string, string][] => [
+    [row.script, `bun test --timeout=${row.limitMs}`],
+    [`${row.script}:over`, `bun test --timeout=${row.limitMs + 1}`],
+  ]);
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: Object.fromEntries(scripts) }),
+  );
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+
+  expect(rows.length).toBe(7);
+
+  expect(findings.map((finding) => finding.message.split(' ')[1])).toIncludeSameMembers(
+    rows.map((row) => `"${row.script}:over"`),
+  );
 });
 
 test('it reports a lane script that the lanes option does not declare', async () => {
@@ -239,7 +309,7 @@ test('it reports a lane script that the lanes option does not declare', async ()
     {
       path: 'package.json',
       message:
-        'script "test:binary" passes --timeout=20000 to bun test, above the 5 s limit; only test:related and a lane script (test:<lane>, for e2e, browser, docker, host and each lane in the max-test-timeout lanes option) may raise it',
+        'script "test:binary" passes --timeout=20000 to bun test, above the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it',
     },
   ]);
 });
@@ -259,7 +329,184 @@ test('it reports a bunfig.toml whose test timeout is above 5 s', async () => {
     {
       path: 'libs/db/bunfig.toml',
       message:
-        '[test] timeout = 30000 raises every test above the 5 s limit; keep the default and raise a timeout only in a lane',
+        '[test] timeout = 30000 raises every test above the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it',
+    },
+  ]);
+});
+
+test('it reads a bunfig.toml in an e2e/ directory against the e2e limit', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, 'apps/web/e2e'), { recursive: true });
+  await writeFile(join(ctx.directory, 'apps/web/package.json'), '{}');
+  await writeFile(join(ctx.directory, 'apps/web/e2e/bunfig.toml'), '[test]\ntimeout = 15000\n');
+  await mkdir(join(ctx.directory, 'apps/web-e2e'), { recursive: true });
+  await writeFile(join(ctx.directory, 'apps/web-e2e/package.json'), '{}');
+  await writeFile(join(ctx.directory, 'apps/web-e2e/bunfig.toml'), '[test]\ntimeout = 20000\n');
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'apps/web-e2e/bunfig.toml',
+      message:
+        '[test] timeout = 20000 raises every test above the 15000 ms limit of the e2e lane; find its cause in the "Slow tests" section of the testing skill and fix it',
+    },
+  ]);
+});
+
+test('it reads a bunfig.toml in an evals/ directory against the unit limit', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, 'evals'), { recursive: true });
+  await writeFile(join(ctx.directory, 'evals/bunfig.toml'), '[test]\ntimeout = 6000\n');
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'evals/bunfig.toml',
+      message:
+        '[test] timeout = 6000 raises every test above the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it',
+    },
+  ]);
+});
+
+test('it reports an oxlint config that turns a timeout rule off or down to a warning without a ticket', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, '.oxlintrc.json'),
+    [
+      '{',
+      '  "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": { "kvm": 60000 } }] },',
+      '  "overrides": [',
+      '    {',
+      '      "files": ["legacy/**"],',
+      '      "rules": {',
+      '        "zgeoff/max-test-timeout": "off",',
+      '        "zgeoff/test-timeout-exception-ticket": ["warn"],',
+      '        // the restore suite waits on a real snapshot: 48 s on CI, OPS-212',
+      '        "zgeoff/no-test-sleep": "off",',
+      '      },',
+      '    },',
+      '    {',
+      '      "files": ["restore/**"],',
+      '      // the restore suite waits on a real snapshot: 48 s on CI, OPS-212',
+      '      "rules": { "zgeoff/max-test-timeout": "off" },',
+      '    },',
+      '  ],',
+      '}',
+      '',
+    ].join('\n'),
+  );
+
+  await mkdir(join(ctx.directory, 'packages/kettle'), { recursive: true });
+
+  await writeFile(
+    join(ctx.directory, 'packages/kettle/.oxlintrc.json'),
+    [
+      '{',
+      '  // "zgeoff/max-test-timeout": "off",',
+      '  "rules": { "zgeoff/max-test-timeout": "error", "zgeoff/test-timeout-exception-ticket": 0 },',
+      '}',
+      '',
+    ].join('\n'),
+  );
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+
+  expect(findings).toStrictEqual([
+    {
+      path: '.oxlintrc.json',
+      message:
+        'line 7 turns zgeoff/max-test-timeout off or down to a warning; give the setting a comment that names the ticket that tracks the fix, or "floor:" and the evidence that the time cannot move, as the "Slow tests" section of the testing skill describes',
+    },
+    {
+      path: '.oxlintrc.json',
+      message:
+        'line 8 turns zgeoff/test-timeout-exception-ticket off or down to a warning; give the setting a comment that names the ticket that tracks the fix, or "floor:" and the evidence that the time cannot move, as the "Slow tests" section of the testing skill describes',
+    },
+    {
+      path: 'packages/kettle/.oxlintrc.json',
+      message:
+        'line 3 turns zgeoff/test-timeout-exception-ticket off or down to a warning; give the setting a comment that names the ticket that tracks the fix, or "floor:" and the evidence that the time cannot move, as the "Slow tests" section of the testing skill describes',
+    },
+  ]);
+});
+
+test('it accepts a setting whose override names a ticket or a floor in its own comment', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, '.oxlintrc.json'),
+    [
+      '{',
+      '  "overrides": [',
+      '    // the restore suite waits on a real snapshot: 48 s on CI, OPS-212',
+      '    {',
+      '      "files": ["restore/**"],',
+      '      "rules": { "zgeoff/max-test-timeout": "off" },',
+      '    },',
+      '    {',
+      '      "files": ["legacy/**"],',
+      '      "rules": {',
+      '        "zgeoff/no-test-sleep": "off", // OPS-212',
+      '        "zgeoff/max-test-timeout": "warn",',
+      '      },',
+      '    },',
+      '    {',
+      '      "files": ["boot/**"],',
+      '      // each test boots two VMs: 48 s on CI; floor: two VM boots plus a restore',
+      '      "rules": { "zgeoff/max-test-timeout": "off" },',
+      '    },',
+      '    {',
+      '      "files": ["mount/**"],',
+      '      // floor:',
+      '      "rules": { "zgeoff/max-test-timeout": "off" },',
+      '    },',
+      '    {',
+      '      "files": ["snapshot/**"],',
+      '      /* floor:',
+      '       *',
+      '       */',
+      '      "rules": { "zgeoff/max-test-timeout": "off" },',
+      '    },',
+      '  ],',
+      '}',
+      '',
+    ].join('\n'),
+  );
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+
+  expect(findings).toStrictEqual([
+    {
+      path: '.oxlintrc.json',
+      message:
+        'line 12 turns zgeoff/max-test-timeout off or down to a warning; give the setting a comment that names the ticket that tracks the fix, or "floor:" and the evidence that the time cannot move, as the "Slow tests" section of the testing skill describes',
+    },
+    {
+      path: '.oxlintrc.json',
+      message:
+        'line 23 turns zgeoff/max-test-timeout off or down to a warning; give the setting a comment that names the ticket that tracks the fix, or "floor:" and the evidence that the time cannot move, as the "Slow tests" section of the testing skill describes',
+    },
+    {
+      path: '.oxlintrc.json',
+      message:
+        'line 30 turns zgeoff/max-test-timeout off or down to a warning; give the setting a comment that names the ticket that tracks the fix, or "floor:" and the evidence that the time cannot move, as the "Slow tests" section of the testing skill describes',
     },
   ]);
 });
@@ -315,7 +562,7 @@ test('it exits 1 and prints each finding when run as a script', async () => {
   expect(result.exitCode).toBe(1);
 
   expect(result.stdout.toString()).toBe(
-    'bunfig.toml: [test] timeout = 30000 raises every test above the 5 s limit; keep the default and raise a timeout only in a lane\n',
+    'bunfig.toml: [test] timeout = 30000 raises every test above the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it\n',
   );
 });
 
