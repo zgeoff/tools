@@ -3,7 +3,7 @@
 # check-prose.sh over the same files and every skill's Markdown. A README over its limit fails the
 # run; a README over its target and a docs/ file over its cap print a warning and never fail it.
 # When the repo has the skill-writing skill, it then runs that skill's check-skill.sh, and it fails
-# when that fails.
+# when that fails. Its last line counts the READMEs and those over their limit.
 # Usage (from the repo root): check-length.sh [--package <readme>]...
 # A README is a package README when it sits beside a package.json that is not private, or when
 # --package names it. Any other README is the plain repo README at the root, or a sub-package
@@ -65,17 +65,21 @@ pick_readme_kind() {
 }
 
 fail=0
+readmes=0
+over_limit=0
 prose_paths=()
 
 # docs/README.md is the docs index, so the docs cap governs it, not a README limit.
 while IFS= read -r readme; do
   prose_paths+=("$readme")
+  readmes=$((readmes + 1))
   read -r target limit name <<< "$(pick_readme_kind "$readme")"
   lines=$(count_lines "$readme")
 
   if [ "$lines" -gt "$limit" ]; then
     fail=1
-    echo "$readme: $lines lines, over the $name README limit of $limit (target $target)"
+    over_limit=$((over_limit + 1))
+    echo "$readme: $lines lines, over the $name README limit of $limit (target $target; error)"
   elif [ "$lines" -gt "$target" ]; then
     echo "$readme: $lines lines, over the $name README target of $target (limit $limit; warning)"
   else
@@ -121,4 +125,6 @@ for check_skill in .claude/skills/skill-writing/scripts/check-skill.sh \
   fi
 done
 
+echo
+echo "check-length: $readmes READMEs, $over_limit over the line limit"
 exit "$fail"

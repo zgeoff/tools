@@ -67,10 +67,16 @@ pre-push:
           exit 0
         fi
         status=0
-        bash "$scripts/check-length.sh" || status=1
-        bash "$scripts/check-links.sh" || status=1
+        for script in check-length.sh check-links.sh; do
+          if ! bash "$scripts/$script"; then
+            echo "docs: $script failed; the lines it printed above name each file and what is wrong"
+            status=1
+          fi
+        done
         exit "$status"
-    # GitHub runs no workflow from a subfolder of .github/workflows.
+    # GitHub runs no workflow from a subfolder of .github/workflows. The
+    # ignore and its expiry date match the Check workflows step of
+    # bun-checks.yml in zgeoff/tools, which gives the reason.
     - name: workflows
       files: bun run --silent files:branch
       glob: '.github/workflows/*.{yml,yaml}'
@@ -79,7 +85,11 @@ pre-push:
           echo "workflows: skipped, because actionlint is not on the PATH; CI runs the check"
           exit 0
         fi
-        actionlint -- {files}
+        if [ "$(date -u +%Y%m%d)" -lt 20270122 ]; then
+          actionlint -ignore 'unexpected key "queue" for "concurrency" section' -- {files}
+        else
+          actionlint -- {files}
+        fi
     - name: commits
       run: bun run --silent memory-capped bun run --silent check:commits
     - name: local-paths

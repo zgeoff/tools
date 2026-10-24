@@ -499,6 +499,119 @@ test.skipIf(!canRunActionlint)(
   },
 );
 
+test.skipIf(!canRunActionlint)(
+  'it passes the push on the concurrency queue key of a workflow before the ignore expires',
+  async () => {
+    const ctx = await setupTest();
+
+    invariant(Bun.which('actionlint', { PATH: ctx.env.PATH }) !== null, 'install actionlint');
+
+    // The job reads the day from date, so a stub on PATH sets it.
+    await writeFile(join(ctx.bin, 'date'), '#!/bin/sh\necho 20270121\n');
+    await chmod(join(ctx.bin, 'date'), 0o755);
+    await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+    await mkdir(join(ctx.worktree, '.github/workflows'), { recursive: true });
+
+    await writeFile(
+      join(ctx.worktree, '.github/workflows/publish.yml'),
+      'on: push\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    concurrency:\n      group: publish\n      cancel-in-progress: false\n      queue: max\n    steps:\n      - run: echo hi\n',
+    );
+
+    await writeFile(
+      join(ctx.worktree, 'package.json'),
+      JSON.stringify({
+        scripts: {
+          'format:check': 'true',
+          'lint:files': 'true',
+          typecheck: 'true',
+          'files:branch': 'echo .github/workflows/publish.yml',
+          'test:related': 'true',
+          'check:commits': 'true',
+          'check:local-paths': 'true',
+          'check:test-timeouts': 'true',
+          'memory-capped': 'exec',
+        },
+      }),
+    );
+
+    await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+    await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+    await writeFile(
+      join(ctx.main, '.git/hooks/pre-push'),
+      `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+    );
+
+    await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+    const result = await $`git push origin feature`
+      .cwd(ctx.worktree)
+      .env(ctx.env)
+      .nothrow()
+      .quiet();
+
+    expect(result.exitCode).toBe(0);
+  },
+);
+
+test.skipIf(!canRunActionlint)(
+  'it fails the push on the concurrency queue key of a workflow once the ignore expires',
+  async () => {
+    const ctx = await setupTest();
+
+    invariant(Bun.which('actionlint', { PATH: ctx.env.PATH }) !== null, 'install actionlint');
+
+    // The job reads the day from date, so a stub on PATH sets it.
+    await writeFile(join(ctx.bin, 'date'), '#!/bin/sh\necho 20270122\n');
+    await chmod(join(ctx.bin, 'date'), 0o755);
+    await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+    await mkdir(join(ctx.worktree, '.github/workflows'), { recursive: true });
+
+    await writeFile(
+      join(ctx.worktree, '.github/workflows/publish.yml'),
+      'on: push\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    concurrency:\n      group: publish\n      cancel-in-progress: false\n      queue: max\n    steps:\n      - run: echo hi\n',
+    );
+
+    await writeFile(
+      join(ctx.worktree, 'package.json'),
+      JSON.stringify({
+        scripts: {
+          'format:check': 'true',
+          'lint:files': 'true',
+          typecheck: 'true',
+          'files:branch': 'echo .github/workflows/publish.yml',
+          'test:related': 'true',
+          'check:commits': 'true',
+          'check:local-paths': 'true',
+          'check:test-timeouts': 'true',
+          'memory-capped': 'exec',
+        },
+      }),
+    );
+
+    await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+    await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+    await writeFile(
+      join(ctx.main, '.git/hooks/pre-push'),
+      `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+    );
+
+    await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+    const result = await $`git push origin feature`
+      .cwd(ctx.worktree)
+      .env(ctx.env)
+      .nothrow()
+      .quiet();
+
+    const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+    expect(result.exitCode).not.toBe(0);
+    expect(output).toInclude('unexpected key "queue" for "concurrency" section');
+  },
+);
+
 test('it passes the docs job with a notice when the repo has no docs-writing scripts', async () => {
   const ctx = await setupTest();
 
@@ -603,6 +716,7 @@ test('it fails the push on the docs job when the installed length script rejects
 
   expect(failedJobs).toStrictEqual(['docs']);
   expect(output).toInclude('README.md: 131 lines, over the package README limit of 130');
+  expect(output).toInclude('docs: check-length.sh failed');
 });
 
 test('it fails the push on the docs job when the installed link script finds a broken link', async () => {

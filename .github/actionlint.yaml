@@ -1,6 +1,7 @@
-# actionlint 1.7.12 lacks two GitHub features that these workflows use: the
-# job.workflow_* properties (rhysd/actionlint#757) and the queue key of
-# concurrency (rhysd/actionlint#746, closed as not planned).
+# actionlint 1.7.12 does not know the job.workflow_* properties
+# (rhysd/actionlint#757) or the queue key of concurrency. The Check workflows
+# step of bun-checks.yml gives the queue ignore's reason and expiry; it repeats
+# here so that a plain actionlint run in this repo passes too.
 paths:
   .github/workflows/*.{yml,yaml}:
     ignore:

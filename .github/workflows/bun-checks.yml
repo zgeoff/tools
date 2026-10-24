@@ -286,14 +286,32 @@ jobs:
             exit 0
           fi
           status=0
-          bash "$scripts/check-length.sh" || status=1
-          bash "$scripts/check-links.sh" || status=1
+          for script in check-length.sh check-links.sh; do
+            if ! bash "$scripts/$script"; then
+              echo "::error::docs: $script failed; the lines it printed above name each file and what is wrong"
+              status=1
+            fi
+          done
           exit "$status"
 
+      # actionlint 1.7.12 rejects the queue key of concurrency, which GitHub
+      # documents; rhysd/actionlint#654 adds it. The ignore lapses on its expiry
+      # date, and the check then reports the key again until ACTIONLINT_VERSION
+      # moves to a release with the fix. The workflows job of the pre-push
+      # baseline carries the same ignore and date.
       - &check-workflows
         name: Check workflows
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: actionlint
+        env:
+          QUEUE_IGNORE_EXPIRES: '20270122'
+        run: |
+          set -euo pipefail
+          if [ "$(date -u +%Y%m%d)" -lt "$QUEUE_IGNORE_EXPIRES" ]; then
+            actionlint -ignore 'unexpected key "queue" for "concurrency" section'
+          else
+            echo "::warning::workflows: the ignore of the concurrency queue key expired on $QUEUE_IGNORE_EXPIRES; move ACTIONLINT_VERSION to a release with rhysd/actionlint#654"
+            actionlint
+          fi
 
       - &check-commits
         name: Check commits
