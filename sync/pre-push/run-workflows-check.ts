@@ -208,19 +208,22 @@ function findRunFault(run: string): string | undefined {
     : undefined;
 }
 
+type ShellContext = "'" | '"' | '$(' | '(' | '`';
+
 interface ShellWord {
   readonly text: string;
   readonly isQuoted: boolean;
   readonly isOperator: boolean;
 }
 
-// A quote or a backslash makes the character after it a literal, as a shell reads it, so
-// `echo "a;b"` holds one command. A `&` alone is left as a word, because `2>&1` uses it.
+// A shell reads a quoted character or one after a backslash as a literal, so `echo "a;b"` holds one
+// command. A command substitution runs its contents as commands, inside double quotes too. A `&`
+// alone stays part of a word, because `2>&1` uses it.
 function parseShellWords(command: string): ShellWord[] {
   const words: ShellWord[] = [];
+  const contexts: ShellContext[] = [];
   let text = '';
   let isQuoted = false;
-  let quote: string | null = null;
 
   const endWord = (): void => {
     if (text !== '' || isQuoted) {
@@ -234,24 +237,44 @@ function parseShellWords(command: string): ShellWord[] {
   for (let index = 0; index < command.length; index += 1) {
     const character = command.charAt(index);
     const next = command.charAt(index + 1);
+    const context = contexts.at(-1);
 
-    if (quote !== null) {
-      if (character === quote) {
-        quote = null;
-      } else if (quote === '"' && character === '\\') {
-        index += 1;
-        text += next;
+    if (context === "'") {
+      if (character === "'") {
+        contexts.pop();
       } else {
         text += character;
       }
-    } else if (character === "'" || character === '"') {
-      quote = character;
-      isQuoted = true;
+    } else if (context === '"' && character === '"') {
+      contexts.pop();
     } else if (character === '\\') {
       index += 1;
       text += next;
-      isQuoted = true;
-    } else if (character === '#' && text === '' && !isQuoted) {
+      isQuoted ||= context === undefined;
+    } else if (character === '$' && next === '(') {
+      contexts.push('$(');
+
+      text += '$(';
+      index += 1;
+    } else if (character === '`' && context === '`') {
+      contexts.pop();
+    } else if (character === '`') {
+      contexts.push('`');
+    } else if (context === '"') {
+      text += character;
+    } else if (character === "'" || character === '"') {
+      contexts.push(character);
+
+      isQuoted ||= context === undefined;
+    } else if (character === '(' && (context === '$(' || context === '(')) {
+      contexts.push('(');
+
+      text += character;
+    } else if (character === ')' && (context === '$(' || context === '(')) {
+      contexts.pop();
+
+      text += character;
+    } else if (character === '#' && text === '' && !isQuoted && context === undefined) {
       break;
     } else if (/\s/u.test(character)) {
       endWord();
