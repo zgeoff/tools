@@ -4,20 +4,24 @@ description:
   Testing rules for zgeoff repos — the three package regimes, flat behavioural tests, a setupTest
   with onTestFinished cleanup, inline data and tested factories, strict assertions and inline
   snapshots, controlled time, condition waits, real filesystems and transports, and the narrow cases
-  for module mocks. References cover real databases, HTTP mocking with MSW, observability, and
+  for module mocks, plus the fix for each kind of slow test and the lanes with their per-test
+  timeout ceilings. References cover real databases, HTTP mocking with MSW, observability, and
   Claude Code mod checks, and, in a repo that uses them, React and TanStack clients and native Go
   and NixOS conventions. Load when designing, writing, or reviewing tests.
 ---
 
 # Testing
 
-`bun test` loads every test file into one process, so state that one file leaves behind is state the
-next file sees. The repo's [`bunfig.toml`](../../../bunfig.toml) preload owns that process: it
-registers the matchers, the mock server lifecycle, and every reset that returns shared state to a
-clean baseline after each test. Per-test resources register cleanup with `onTestFinished` where they
-are acquired. A test exercises real behaviour through real code, and it reaches for a stand-in only
-at a boundary the test cannot cross. When existing tests break these rules, you align them while you
-work on the code they cover.
+Without `--parallel`, `bun test` runs every test file in one process with one global object, so
+state that one file leaves behind is state the next file sees. `--parallel` spreads the files over
+worker processes and implies `--isolate`, which gives each file a fresh global object, module
+registry, and environment. Files in one worker still share the filesystem, the ports, and any
+process a test started. The repo's [`bunfig.toml`](../../../bunfig.toml) preload sets up each global
+object: it registers the matchers, the mock server lifecycle, and every reset that returns shared
+state to a clean baseline after each test. Per-test resources register cleanup with `onTestFinished`
+where they are acquired. A test exercises real behaviour through real code, and it reaches for a
+stand-in only at a boundary the test cannot cross. When existing tests break these rules, you align
+them while you work on the code they cover.
 
 Never write a test only to satisfy a lint or layout rule. Change the rule's config instead, with a
 one-line reason. A repo that adopts a shared lint rule, such as `zgeoff/import-zones`, never tests
@@ -28,6 +32,8 @@ checks behaviour.
 
 Each line links the section that explains it.
 
+- [Slow tests](#slow-tests): a test finishes in under 5 s; fix the cause the table names, never the
+  timeout, and a lane holds only a test whose real system is the contract.
 - [Regimes](#regimes): the furthest edge a package's code reaches picks its regime and the reference
   to open.
 - [Principles](#principles): visible beats concise, every test stands alone, each changed behaviour
@@ -151,7 +157,7 @@ These decide a case that the rules below leave open.
 - **Visible beats concise.** A reader understands a test from its body alone. Repeated literals cost
   a few lines; setup the reader cannot see costs a wrong conclusion.
 - **Every test stands alone.** A test passes when run by itself, in any order, and beside every
-  other test in the process.
+  other test in the run.
 - **Behaviour is the contract.** A test pins what the unit does for its callers. A refactor that
   keeps that behaviour, such as a renamed private helper or a reworked loop, leaves every test
   green.
@@ -166,6 +172,95 @@ These decide a case that the rules below leave open.
   with its own tests, because a broken helper fails silently in every suite that uses it.
 - **The assertion is the test.** A test checks exactly what its assertions check. One loose
   assertion lets a broken unit pass.
+
+## Slow tests
+
+A test finishes in under 5 s on CI. A slow test costs every later run its full time, and a raised
+timeout or a sleep hides that cost without removing it. `zgeoff/max-test-timeout` refuses a timeout
+above the ceiling of the file's lane, and `zgeoff/no-test-sleep` refuses a fixed sleep. When a test
+is slow, find its cause in this table and make the change it names. Never raise the timeout first.
+
+| The test                                                                                    | The cause                           | The fix                                                                                                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| starts the app, a server or a CLI to call it                                                | a real process start                | Call the code in the test process: its handler, an in-memory RPC link, or an injected transport. Start a real process only in `e2e/`, from the bundle built once per run, for the jobs [Where a test lives](#where-a-test-lives) names.                                           |
+| waits for a deadline, an idle limit or a retry delay                                        | a real timer or deadline            | Make the deadline an option of the code that owns it, pass a short one, and wait on the event that the deadline causes. A runtime or kernel timer gets the shortest faithful value, as [Native timers](./references/system-tests.md#native-timers-and-scenario-delays) describes. |
+| sleeps to let something settle                                                              | no signal to wait on                | Wait on a condition with the repo's `waitFor` helper. When the code offers nothing to wait on, add an event, a log marker or a state flag.                                                                                                                                        |
+| proves that something does not happen                                                       | it waits out a timeout              | Wait for a later event that shows the thing did not happen.                                                                                                                                                                                                                       |
+| migrates a database or builds a bundle                                                      | a shared fixture build              | Use a per-run template: built once per run under a file lock, keyed by a hash of its inputs, and copied per test. A per-process memo is wrong under `--parallel`, because each file gets a fresh module registry and builds again.                                                |
+| drives a program the repo starts, such as a guest, a worker or a VM manager                 | a real process start                | Use the program's stateful stand-in from the repo's project-testing skill. When none exists, write one, as [Stateful stand-ins](./references/system-tests.md#stateful-stand-ins) describes.                                                                                       |
+| needs the real system, and the real system is the contract                                  | a VM, the kernel, a browser, an API | Put it in a [lane](#lanes). Its directory or file suffix names the lane.                                                                                                                                                                                                          |
+| runs a linter or checker binary over text the code builds, such as a generated shell script | a real process start                | It is not a test. Export the text and check it in a static check script that runs in the CI static job and before a push.                                                                                                                                                         |
+
+### Where a test lives
+
+- `<package>/src/<file>.test.ts` holds the unit suite of one source file.
+- `integration/` holds one flow across several packages, in one process, with per-run fixtures and
+  stand-ins. It is a place, not a lane: it runs in the unit run under every unit rule, with the 5 s
+  ceiling, `--parallel`, and no raised timeout.
+- `e2e/` holds the tests that drive the built product from outside, through its bundle or binary,
+  its CLI, HTTP, or a socket. It holds two kinds of test: the process itself (start-up, signals,
+  exit codes, crash recovery), and one happy-path journey per main user flow. A flow's variants,
+  such as its edge cases, error branches, and denials, run in process. A test that imports a package
+  belongs in `integration/`.
+- An app root may hold its own `integration/` and `e2e/`. A lane's harness lives outside the lane
+  directory, in a package with its own unit tests.
+- A static check of config or of generated text is a script, not a test.
+
+To place a test, ask where its failure points. A failure that points at the wiring belongs in
+`e2e/`, and one that points at the logic belongs in the unit run.
+
+### Per-run fixtures and lanes
+
+A real system that starts fast and isolates per test is a per-run fixture in the unit run, not a
+lane. An in-memory store, a database template copied per test, and a stand-in daemon that starts in
+milliseconds are per-run fixtures. A lane exists only for a real system that the unit run cannot
+host, such as a VM, the kernel or root, a browser, a container image, the Agent SDK subprocess, or a
+live API, or for a test of the process itself.
+
+### Lanes
+
+A lane runs the tests that need one real system. Each lane has its own `test:<lane>` script, its own
+CI step, and a per-test ceiling, which the script's `--timeout` sets and `zgeoff/max-test-timeout`
+checks in each lane file. The unit run leaves the lane files out by pattern.
+
+| Lane      | Where                                  | Ceiling | The real system                                                                     |
+| --------- | -------------------------------------- | ------- | ----------------------------------------------------------------------------------- |
+| unit      | every other test file                  | 5 s     | none: code in process, per-run fixtures, and stand-ins                              |
+| e2e       | `e2e/` at the repo root or an app root | 15 s    | the built product, driven from outside                                              |
+| browser   | `<name>.browser.test.ts`               | 10 s    | a real browser                                                                      |
+| docker    | `<name>.docker.test.ts`                | 15 s    | a container engine                                                                  |
+| host      | `<name>.host.test.ts`                  | 15 s    | the host kernel, root, or the network stack                                         |
+| agent-sdk | `<name>.agent-sdk.test.ts`             | 5 s     | the Claude Agent SDK subprocess against a scripted model, never the live API        |
+| evals     | `evals/` at the repo root              | 120 s   | a live external API; the lane runs nightly and on dispatch, never on a pull request |
+
+- A suffix names one real system, never a speed. A repo prefers a specific suffix to the generic
+  `.host`, such as a made-up `.kvm` for a test that boots a VM.
+- A repo adds a project lane only for a real system that this section allows. Its project-testing
+  skill lists the lane with its real system, its ceiling, and the measured p95 and maximum test
+  time, and its root oxlint config declares the lane and its ceiling in the `lanes` option of
+  `zgeoff/max-test-timeout`.
+- A test that is slow only because of a runtime timer stays in the unit run, with the disable
+  comment that [A test over its ceiling](#a-test-over-its-ceiling) describes.
+- A lane holds no test that is only slow. Before a test moves to a lane, check that no other row of
+  the cause table fits it.
+
+A Rust crate runs the same lanes through cargo-nextest, as
+[Rust lanes](./references/system-tests.md#rust-lanes) describes.
+
+### A test over its ceiling
+
+A test that cannot finish within its lane's ceiling carries a disable comment that gives the
+measured time and the ticket that tracks its fix, in this made-up example:
+
+```ts
+// oxlint-disable-next-line zgeoff/max-test-timeout -- 48 s on CI, OPS-212
+test('it restores a volume from its oldest snapshot', async () => {
+  // …
+}, 60_000);
+```
+
+The ceiling never rises to cover one test. The test timeout check fails a disable of
+`zgeoff/max-test-timeout` that names no ticket after `--`.
 
 ## Structure and naming
 
@@ -190,10 +285,10 @@ These decide a case that the rules below leave open.
   `test()` for each case.
 - Tests sit beside the module they test (`parse-entry.ts` and `parse-entry.test.ts`), and a test of
   a program's entry module, such as `cli.ts`, sits beside that module too, so `src/` stays a mirror
-  with one test file per module. Two root directories are the exceptions: `e2e/` holds the
-  end-to-end suites that run the whole program, and `evals/` holds the
-  [evaluation suites](./references/system-tests.md#evaluation-suites). The repo has no other
-  `test/`, `tests/`, or `__tests__` directory.
+  with one test file per module. Three directories are the exceptions: `integration/` and `e2e/` at
+  the repo root or an app root, and `evals/` at the repo root, which
+  [Where a test lives](#where-a-test-lives) describes. The repo has no other `test/`, `tests/`, or
+  `__tests__` directory.
 - A test that drives a real browser goes in `<module>.browser.test.ts` beside its module, which the
   repo runs in a serial lane, as [Browser suites](./references/system-tests.md#browser-suites)
   describes.
@@ -210,10 +305,11 @@ test.each([
 
 ### End-to-end suites
 
-An end-to-end suite splits by user journey, one file per journey, and a journey test may chain
-dependent act-and-assert phases. Its harness, resets, and command checks follow
-[System tests](./references/system-tests.md#end-to-end-suites), and so does an evaluation suite in
-`evals/`.
+An end-to-end suite holds tests of the process itself and one journey per main user flow, as
+[Where a test lives](#where-a-test-lives) describes. It splits by user journey, one file per
+journey, and a journey test may chain dependent act-and-assert phases. Its harness, resets, and
+command checks follow [System tests](./references/system-tests.md#end-to-end-suites), and so does an
+evaluation suite in `evals/`.
 
 ### Loops
 
@@ -634,9 +730,9 @@ injected boundary.
 
 ### Module mocks
 
-`mock.module` never appears in a test file. In one process, a module mock in one file applies to
-every file that loads after it. Two kinds of module mock are legal, and each lives in a preload
-module named `register-<module>-mock.ts`:
+`mock.module` never appears in a test file. A run without `--isolate` keeps one module registry per
+process, so a module mock in one file applies to every file that loads after it. Two kinds of module
+mock are legal, and each lives in a preload module named `register-<module>-mock.ts`:
 
 - **A stand-in for what the test runtime cannot host**, such as a WebGL scene, a `SharedWorker`, or
   a framework's ambient server context. It reads from a stub store, and one exported setter is the
