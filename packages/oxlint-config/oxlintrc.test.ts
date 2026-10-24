@@ -245,9 +245,8 @@ test.each([
   expect(run.stdout).not.toInclude('eslint(id-length)');
 });
 
-// each abbreviation the shipped config denies and the text its report gives,
-// as rows rather than keys so the names pass the rule; an entry added to or
-// removed from the config without these rows fails
+// the abbreviations sit in rows rather than object keys, so this file passes
+// the rule
 test('it denies exactly the listed abbreviations', async () => {
   const text = await Bun.file(join(import.meta.dir, 'oxlintrc.json')).text();
 

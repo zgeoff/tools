@@ -6,11 +6,8 @@ export interface WorkflowStepsOptions {
   readonly cwd: string;
   readonly env: Readonly<Record<string, string | undefined>>;
 
-  // The value of each expression the steps read that no earlier step outputs, such as
-  // `github.repository`.
   readonly expressions: Readonly<Record<string, string>>;
 
-  // The file each step writes its outputs to, as GITHUB_OUTPUT.
   readonly outputPath: string;
 }
 

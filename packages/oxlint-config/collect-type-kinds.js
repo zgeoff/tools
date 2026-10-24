@@ -1,6 +1,3 @@
-// the kind of each member of a declared type, read without type information:
-// a union splits into its members, a reference follows the file's own type
-// aliases, and `resolvePromise` reads a promise as the value it resolves to
 export default function collectTypeKinds(
   type,
   localTypes,
@@ -45,8 +42,6 @@ function isReadonlyOperator(type) {
   return type.type === 'TSTypeOperator' && type.operator === 'readonly';
 }
 
-// a type whose members the rule can see and that never holds null; any other
-// shape, such as an indexed access or a conditional type, is open
 const valueTypes = new Set([
   'TSStringKeyword',
   'TSNumberKeyword',

@@ -50,8 +50,6 @@ const noHiddenCast = {
   },
 };
 
-// the name an identifier or a member access ends in, `sql` for both `sql` and
-// `db.sql`, or null for a computed member that is not a string literal
 function findName(node) {
   if (node.type === 'Identifier') {
     return node.name;

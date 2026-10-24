@@ -1,9 +1,6 @@
 import path from 'node:path';
 import type { SimpleGit } from 'simple-git';
 
-// Reads, through a git client opened on the directory, the absolute paths that differ between two
-// commits, a rename as its old and new path. With no first commit, it reads every path the second
-// one holds. A comparison git cannot make rejects with a GitError.
 export async function readCommittedPaths(
   git: SimpleGit,
   directory: string,

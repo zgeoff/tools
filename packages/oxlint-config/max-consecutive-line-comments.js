@@ -39,9 +39,6 @@ const maxConsecutiveLineComments = {
 
 export default maxConsecutiveLineComments;
 
-// a run is prose line comments on consecutive lines; whatever else occupies
-// a line between two of them (code, a blank, a directive, a block comment)
-// breaks adjacency and so ends the run
 function collectRuns(text, comments) {
   const runs = [];
 
@@ -58,8 +55,6 @@ function collectRuns(text, comments) {
   return runs;
 }
 
-// tool directives are not prose: they neither count toward a run nor join
-// the prose on either side of them into one
 const directivePattern =
   /^\s*(?:oxlint-|eslint-|@ts-|prettier-|oxfmt-|biome-ignore|#region|#endregion|\/\s*<)/u;
 

@@ -1,11 +1,10 @@
 import { lstat, readlink } from 'node:fs/promises';
 
-// Reads a file's bytes, or a symlink's link text, which is what git stores for one, so a dangling
-// link still has content. Null for a path that holds neither.
 export async function readFileContent(filePath: string): Promise<Uint8Array | null> {
   try {
     const stats = await lstat(filePath);
 
+    // git stores a symlink as its link text, so a dangling link still has content to hash.
     if (stats.isSymbolicLink()) {
       const target = await readlink(filePath);
 

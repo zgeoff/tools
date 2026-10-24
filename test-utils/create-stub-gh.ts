@@ -8,9 +8,6 @@ export interface StubGH {
   readCalls: () => Promise<string[]>;
 }
 
-// Stands in for the GitHub API that merge-release-prs.sh calls: the nth call to an endpoint
-// answers with line n of its response file, or the last line, and a body of "error" fails the
-// call. calls.log records each call's arguments, less the GraphQL query.
 const script = `#!/usr/bin/env bash
 dir=$(dirname "$0")
 call="$*"

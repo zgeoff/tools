@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 
-// A repo folder for the plan step to run in, and the step's command line.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'write-check-plan-'));
 

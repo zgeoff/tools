@@ -1,5 +1,3 @@
-// The skill gate's entry point, which repo-sync delivers from zgeoff/tools. The gate lives in
-// @zgeoff/skill-gate, which the repo installs at its root.
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -57,7 +55,7 @@ interface Edit {
   readonly filePath: string;
 }
 
-// Only an Edit, Write or MultiEdit call carries `file_path`; a Bash call goes unchecked here.
+// Only an Edit, Write or MultiEdit call carries `file_path`.
 function parseEdit(payload: unknown, projectDir: string | undefined): Edit | null {
   if (!isRecord(payload) || !isRecord(payload['tool_input'])) {
     return null;
@@ -172,9 +170,8 @@ function parseToolCall(payload: unknown, projectDir: string | undefined): ToolCa
   return { projectDir: projectDir ?? cwd, toolName };
 }
 
-// A rules file that cannot be read or parsed, or whose `tools` list does not parse, blocks every
-// call that reaches the hook other than an edit or a Bash command, since the hook matcher names only
-// gated tools beside those.
+// The hook matcher names only gated tools beside edits and Bash, so any other call that reaches
+// the hook counts as gated when the rules file cannot be read or parsed.
 async function probeGatedToolCall(toolCall: ToolCall | null, readText: ReadText): Promise<boolean> {
   if (toolCall === null || ['Edit', 'Write', 'MultiEdit', 'Bash'].includes(toolCall.toolName)) {
     return false;
@@ -193,7 +190,6 @@ async function probeGatedToolCall(toolCall: ToolCall | null, readText: ReadText)
   return tools === null || tools.includes(toolCall.toolName);
 }
 
-// Reads a file's text, or undefined for a path that holds no file; a file it cannot read rejects.
 type ReadText = (filePath: string) => Promise<string | undefined>;
 
 // Bun.file(...).exists() is false for a folder, so the hook stats the path instead.

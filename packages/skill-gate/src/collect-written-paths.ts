@@ -2,15 +2,10 @@ import path from 'node:path';
 import { parseShellCommands } from './parse-shell-commands.ts';
 import type { ShellCommand, ShellWord, WrittenPath } from './types.ts';
 
-// Collects the paths a Bash command writes through a redirect, `tee`, `sed -i`, `perl -i`, `cp`,
-// `mv`, `bash -c` or an inline script. A path built from a variable or a glob is left out, and a
-// command that does not parse writes nothing: the gate guides an agent and is not a sandbox.
 export function collectWrittenPaths(command: string): readonly WrittenPath[] {
   return collectTextPaths(command, '');
 }
 
-// `directory` is the working directory relative to the command's start, or null after a
-// `cd` the parser cannot follow, which leaves only absolute paths.
 function collectTextPaths(text: string, directory: string | null): WrittenPath[] {
   const commands = parseShellCommands(text) ?? [];
   const paths: WrittenPath[] = [];
@@ -73,7 +68,6 @@ function resolveWordPath(word: ShellWord | undefined, directory: string | null):
 
 const ASSIGNMENT = /^[A-Za-z_]\w*=/u;
 
-// Each wrapper names the options that take the next argument as their value, such as `sudo -u`.
 const WRAPPER_VALUE_OPTIONS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   ['sudo', new Set(['-u', '-g', '-C', '-D', '-p', '-r', '-t', '-T', '-U'])],
   ['env', new Set(['-u', '-C', '-S', '--unset', '--chdir', '--split-string'])],
@@ -85,7 +79,6 @@ const WRAPPER_VALUE_OPTIONS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
   ['nohup', new Set<string>()],
 ]);
 
-// Drops the variable assignments and wrappers such as `sudo` or `env` in front of the program.
 function getProgramWords(words: readonly ShellWord[]): readonly ShellWord[] {
   let index = 0;
 
@@ -162,9 +155,6 @@ function collectProgramPaths(
   return [];
 }
 
-// Collects the files that `sed -i` or `perl -i` rewrites: every operand after the script, or every
-// operand when an `-e` or `-f` flag gives the script. Without `-i` (or `--in-place`), it writes
-// nothing.
 function collectInPlacePaths(
   args: readonly ShellWord[],
   scriptFlags: ReadonlySet<string>,
@@ -208,9 +198,8 @@ function collectInPlacePaths(
   return hasScriptFlag ? operands : operands.slice(1);
 }
 
-// Reads a bundle of short flags such as `-ni` or `-pi.bak`. An `i` takes the rest of the bundle as
-// its backup suffix. A script flag takes the rest as its value, or the next argument when it ends
-// the bundle.
+// sed and perl read the rest of a short-flag bundle after `i` as a backup suffix, and after a
+// script flag as its value, or the next argument when the flag ends the bundle.
 function parseShortFlags(
   bundle: string,
   scriptFlags: ReadonlySet<string>,
@@ -250,8 +239,6 @@ function collectPerlPaths(
 
 const INLINE_FLAGS = new Set(['-c', '-e', '-E', '--eval', '-p', '--print', 'eval']);
 
-// Finds the code an interpreter runs from its arguments, as in `python3 -c`, `node -e` or
-// `deno eval`, or from a here document when it reads its script from stdin.
 function findInlineScript(args: readonly ShellWord[], stdin: string | null): string | null {
   const flagIndex = args.findIndex((arg) => INLINE_FLAGS.has(arg.text));
   const code = flagIndex === -1 ? undefined : args[flagIndex + 1];
@@ -265,7 +252,6 @@ function findInlineScript(args: readonly ShellWord[], stdin: string | null): str
   return readsStdin ? stdin : null;
 }
 
-// Each pattern names the quoted path that a common file-writing call in a script takes.
 const SCRIPT_WRITE_PATTERNS = [
   /\b(?:writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream)\(\s*(?<quote>['"`])(?<path>[^'"`]+)\k<quote>/gu,
   /\bBun\.write\(\s*(?<quote>['"`])(?<path>[^'"`]+)\k<quote>/gu,
@@ -297,8 +283,6 @@ function collectScriptPaths(
   );
 }
 
-// Collects the spans of a script's string literals and comments, so a write call that only appears
-// in text, such as `print("open('a.ts', 'w')")`, is not read as code.
 function collectScriptTextRanges(
   script: string,
   commentStart: string,
@@ -352,9 +336,6 @@ function collectOperands(args: readonly ShellWord[]): readonly ShellWord[] {
   return args.filter((arg) => !arg.text.startsWith('-'));
 }
 
-// Collects where `cp` or `mv` writes: into the `-t` directory, into the destination when several
-// sources or a trailing slash make it a directory, and otherwise onto the destination, or into it
-// when it turns out to be a directory.
 function collectCopyPaths(args: readonly ShellWord[], directory: string | null): WrittenPath[] {
   const operands: ShellWord[] = [];
   let targetDir: ShellWord | undefined;
@@ -416,8 +397,6 @@ function collectIntoDirPaths(
   );
 }
 
-// Finds the script a shell runs: the operand after `-c`, or the here document when the shell has
-// no script file.
 function findShellScript(args: readonly ShellWord[], stdin: string | null): string | null {
   const hasCommandFlag = args.some((arg) => /^-[A-Za-z]*c[A-Za-z]*$/u.test(arg.text));
   const [script] = collectOperands(args);

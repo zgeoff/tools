@@ -1,6 +1,5 @@
 // a custom error stays a class, since `instanceof` checks and stack traces
-// need one: its superclass is `Error` or another name that ends in `Error`,
-// bare or as a member such as `errors.BrewError`
+// need one
 const noClass = {
   meta: {
     type: 'problem',

@@ -19,9 +19,6 @@ import { createStubBun } from './create-stub-bun.ts';
 import { createStubCurl } from './create-stub-curl.ts';
 import { loadWorkflowStep } from './load-workflow-step.ts';
 
-// The checks job's steps, the planner where the fetch step puts it, and a PATH whose bun stand-in
-// records each script, so each step runs for real without the scripts. The plan step runs the real
-// bun. A test that downloads puts its own curl stand-in in bin.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'bun-checks-'));
 
@@ -38,7 +35,6 @@ async function setupTest() {
     await cp(join(import.meta.dir, file), join(directory, 'check-plan', file));
   }
 
-  // The install step's node_modules, from this repo's install.
   await symlink(
     join(import.meta.dir, '../../node_modules'),
     join(directory, 'check-plan/node_modules'),
@@ -49,7 +45,6 @@ async function setupTest() {
   const setupActionlint = await loadWorkflowStep(workflow, 'static', 'Setup actionlint');
   const run = await loadWorkflowStep(workflow, 'static', 'Run the check scripts');
 
-  // The checkout that a named check step runs in.
   const repo = join(directory, 'repo');
   const gitEnv = { ...readGitEnv(directory), RUNNER_TEMP: join(directory, 'runner') };
 
@@ -353,8 +348,6 @@ test('it installs actionlint for a test job when the caller sets the setup-actio
   const text = await readFile(join(import.meta.dir, 'bun-checks.yml'), 'utf8');
 
   const workflow: unknown = Bun.YAML.parse(text);
-
-  // The caller's input, under the expression the step uses to read it.
   const inputs: Record<string, string> = { [`\${{ inputs.setup-actionlint }}`]: 'true' };
 
   await $`bash -c ${ctx.setupActionlint.run}`

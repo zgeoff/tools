@@ -4,8 +4,6 @@ import type { BashChangeHookOutput, PostToolEvent } from './types.ts';
 
 const RULES_PATH = '.claude/skill-gate.json';
 
-// Builds the hook output after a Bash command that changed gated paths, or null when the session
-// has every skill they need. A failed command cannot be blocked, so it gets the reason as context.
 export function buildBashChangeOutput(
   event: PostToolEvent,
   changedPaths: readonly string[],
@@ -31,6 +29,7 @@ export function buildBashChangeOutput(
 
   const reason = `skill-gate: this Bash command ${subject} before the session loaded the skills it needs. ${load} Change a gated path only with Edit, Write or MultiEdit, never through Bash. ${RULES_PATH} lists the skills each path needs.`;
 
+  // Claude Code cannot block a failed command, so a failure gets the reason as context.
   return match(event)
     .returnType<BashChangeHookOutput>()
     .with('PostToolUse', () => ({ decision: 'block', reason }))

@@ -2,9 +2,6 @@ import path from 'node:path';
 import type { SimpleGit } from 'simple-git';
 import type { WorkTree } from './types.ts';
 
-// Reads, through a git client opened on the directory, the commit HEAD names, null before the first
-// commit, and the absolute paths git status lists as changed, staged or untracked, with each
-// rename's old path too. Null outside a work tree; any other git failure rejects with a GitError.
 export async function readWorkTree(git: SimpleGit, directory: string): Promise<WorkTree | null> {
   const isWorkTree = await git.checkIsRepo();
 

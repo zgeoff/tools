@@ -81,9 +81,6 @@ const importZones = {
 
 export default importZones;
 
-// Judges each import against named zones: path globs relative to the repo
-// root, which may overlap. A file belongs to every zone its path matches.
-
 function loadFileState(context) {
   const options = getZoneOptions(context.options[0] ?? {});
   const filename = context.physicalFilename;
@@ -108,8 +105,8 @@ function toRootPath(root, path) {
 }
 
 function checkUnzoned(file, program) {
-  // anchor on the first statement, as test-beside-module does, so a disable
-  // comment at the top of the file covers the report
+  // anchor on the first statement, not offset 0, so a disable comment at the
+  // top of the file covers the report
   const start = program.body[0]?.loc.start ?? { line: 1, column: 0 };
 
   for (const entry of collectEntries(file, file.options.unzoned)) {
@@ -127,7 +124,6 @@ function collectEntries(file, entries) {
   return entries.filter((entry) => isEntryApplying(entry, file.path, file.zones));
 }
 
-// `at` is `{ node }` or `{ loc }`
 function emitReport(file, entry, report) {
   const reason = entry.reason === undefined ? '' : ` — ${entry.reason}`;
 
@@ -142,7 +138,6 @@ function formatZones(names) {
   return names.length === 0 ? 'no zone' : names.join(', ');
 }
 
-// `imported` is `{ node, source, typeOnly }`, one per import of any form
 function checkImport(file, imported) {
   const specifier = findStaticSpecifier(imported.source);
 
@@ -172,7 +167,6 @@ function checkImport(file, imported) {
   }
 }
 
-// a string literal, or a template literal with nothing interpolated
 function findStaticSpecifier(node) {
   if (node?.type === 'Literal' && typeof node.value === 'string') {
     return node.value;
@@ -239,7 +233,6 @@ function isPrefixMatch(prefix, specifier) {
   return prefix === 'node:' && isBuiltin(specifier);
 }
 
-// collectRefusingEdges judges an edge the same way, through isEdgeRefusing
 function checkEdge(file, imported, target) {
   const edgeImport = {
     from: file.path,
@@ -294,7 +287,6 @@ function checkGlobalCall(file, node) {
 
 const globalObjects = new Set(['globalThis', 'self', 'window']);
 
-// a call of the global itself, so a local binding of the same name passes
 function findGlobalCallName(file, node, names) {
   const callee = node.callee;
   let name = null;

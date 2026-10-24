@@ -2,7 +2,6 @@ import { isRecord } from '../../packages/std/src/is-record.ts';
 import { severities } from './types.ts';
 import type { Advisory, AuditReport, Severity } from './types.ts';
 
-// Checks the shape of `bun audit --json` output and keeps the fields the step uses.
 export function parseAuditReport(value: unknown): AuditReport {
   if (!isRecord(value)) {
     throw new TypeError('bun audit --json printed no object');

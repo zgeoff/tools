@@ -1,9 +1,6 @@
 import { match } from 'ts-pattern';
 import type { ShellCommand, ShellRedirect, ShellWord } from './types.ts';
 
-// Parses a Bash command line into its simple commands, or null on an unclosed quote. A word with a
-// parameter, a substitution or an unquoted glob is not literal, so no caller reads it as a path. A
-// here document's body becomes the command's stdin.
 export function parseShellCommands(text: string): readonly ShellCommand[] | null {
   const tokens = splitShellTokens(text);
 
@@ -233,7 +230,6 @@ function parseDoubleQuoted(
   return null;
 }
 
-// Finds where a `$name`, `${…}`, `$(…)` or backtick expansion that starts at `index` ends.
 function findExpansionEnd(text: string, index: number): number | null {
   if (text.charAt(index) === '`') {
     const close = text.indexOf('`', index + 1);
@@ -252,7 +248,6 @@ function findExpansionEnd(text: string, index: number): number | null {
   return index + 1 + (name?.[0].length ?? 0);
 }
 
-// Finds the end of the bracket group that opens at `index`, past nested groups and quoted text.
 function findGroupEnd(text: string, index: number): number | null {
   let depth = 0;
   let cursor = index;
@@ -319,21 +314,16 @@ interface CommandDraft {
 
 const LIST_ENDS = new Set(['&', ';', ';;', '\n']);
 
-// A subshell's opening counts toward the next command's `enters`, and its closing toward the last
-// command's `leaves`. A pipe side and a list sent to the background run in their own subshell too,
-// so a caller can restore the state they changed, such as the directory.
 function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellCommand[] {
   const commands: CommandDraft[] = [];
   const heredocOwners: CommandDraft[] = [];
   let draft = buildCommandDraft();
   let operator: string | null = null;
   let pipedIn = false;
-
-  // The index of the first command in the current list, one entry for each open subshell.
   const listStarts = [0];
 
-  // Closes the draft at a separator. A command on either side of a pipe enters and leaves one more
-  // subshell, and so does the whole list before `&`, such as `cd docs && make &`.
+  // A command on either side of a pipe runs in its own subshell, and so does the whole list before
+  // `&`, such as `cd docs && make &`.
   const collectDraft = (separator: string | null): void => {
     const pipedOut = separator === '|' || separator === '|&';
 

@@ -36,8 +36,8 @@ test('it gives exit code 0 for a clean file', async () => {
 test('it runs oxlint with one lint thread', async () => {
   const ctx = await setupTest();
 
-  // The probe rule records the thread count of the oxlint process, which grows with each lint
-  // thread, so the run through the helper must match a run that asks for one thread itself.
+  // oxlint's thread count grows with each lint thread, so the helper's run must
+  // match a run that asks for one thread itself
   const plugin =
     "import { appendFileSync, readFileSync } from 'node:fs';\n" +
     "const status = () => readFileSync('/proc/self/status', 'utf8');\n" +

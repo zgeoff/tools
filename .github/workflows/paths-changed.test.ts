@@ -6,8 +6,6 @@ import { $ } from 'bun';
 import { loadWorkflowStep } from './load-workflow-step.ts';
 import { writeRepoFiles } from './write-repo-files.ts';
 
-// A repo whose HEAD merges a branch into the base, as the checkout of a pull request's merge commit
-// holds it, and the match step read from the workflow, so each test runs the step for real.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'paths-changed-'));
 
@@ -53,7 +51,6 @@ async function setupTest() {
       .quiet();
   };
 
-  // The caller's event and inputs, resolved through the step's own env bindings.
   const runMatch = async (event: string, patterns: string) => {
     await writeFile(output, '');
 

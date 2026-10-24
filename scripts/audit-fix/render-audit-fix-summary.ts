@@ -6,8 +6,6 @@ interface AuditFixSummaryInput {
   readonly fixes: readonly FixedPackage[];
   readonly excludes: readonly ReleaseAgeExclude[];
 
-  // Packages whose audit-fix exclude the run dropped, because the release aged
-  // past the gate.
   readonly expiredExcludes: readonly string[];
   readonly added: readonly IgnoreChange[];
   readonly renewed: readonly IgnoreChange[];
@@ -15,13 +13,9 @@ interface AuditFixSummaryInput {
 }
 
 interface AuditFixSummary {
-  // A Conventional Commit subject, used as the commit message and PR title;
-  // empty when nothing changed.
   readonly title: string;
   readonly body: string;
 
-  // True when the change adds or renews an ignore. The workflow labels such a
-  // pull request audit-ignore and never merges it by itself.
   readonly needsReview: boolean;
 }
 

@@ -1,10 +1,9 @@
 import { match } from 'ts-pattern';
 import type { BashSnapshot, RecordStep } from './types.ts';
 
-// Picks what follows the record of a Bash command. A call with no record, such as one that began
-// before the hook was installed, goes unchecked: every file dirty before it would otherwise count
-// as its change.
 export function pickRecordStep(record: BashSnapshot | null): RecordStep {
+  // A call that began before the hook was installed has no record, and every file dirty before it
+  // would otherwise count as its change.
   if (record === null) {
     return { kind: 'skip' };
   }

@@ -1,5 +1,4 @@
-// Parses the last line of bun's output that starts with a brace; a lifecycle
-// script or a version banner can print before the JSON.
+// A lifecycle script or a version banner can print before bun's JSON.
 export function parseJSONLine(stdout: string): unknown {
   const line = stdout
     .split('\n')

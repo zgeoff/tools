@@ -1,5 +1,4 @@
 export interface AddedLine {
-  // The short hash of the commit that adds the line.
   readonly hash: string;
 
   // Relative to the repo root.
@@ -11,8 +10,8 @@ export interface AddedLine {
   readonly text: string;
 }
 
-// Turns `git log -p -U0 --format=%x00%h` output into the lines each commit adds. Each commit starts
-// with a NUL and its hash, which no line of a patch can start with.
+// The patch is `git log -p -U0 --format=%x00%h` output: each commit starts with a NUL and its hash,
+// which no line of a patch can start with.
 export function parseAddedLines(patch: string): AddedLine[] {
   const hunkHeader = /^@@ -\d+(?:,\d+)? \+(?<start>\d+)(?:,\d+)? @@/u;
   const added: AddedLine[] = [];

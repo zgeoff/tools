@@ -429,8 +429,6 @@ test('it leaves a leading-semicolon ASI statement intact instead of orphaning th
   const source = `function f() {\n  const v = "1"\n  ;(store as Stub).set(v)\n  return v\n}\n`;
   const output = transform(source).output;
 
-  // the const and the `;(expr)` share a line via the leading semicolon, so that
-  // pair must stay untouched; the blank before `return` is still added
   expect(output).toInclude('  const v = "1"\n  ;(store as Stub).set(v)');
   expect(output).toInclude('(store as Stub).set(v)\n\n  return v');
 });

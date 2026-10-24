@@ -55,7 +55,6 @@ function buildEntry(entry) {
   };
 }
 
-// `src/*` keeps an import inside the importer's own `src/<name>/` directory
 function makeWithinMatcher(glob) {
   const depth = glob.split('/').length;
   const match = makeGlobMatcher([glob]);

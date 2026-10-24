@@ -1,5 +1,3 @@
-// Rewrites a package.json `audit` script so its --ignore flags are exactly the
-// given advisory IDs, sorted, after the script's other arguments.
 export function buildAuditScript(script: string, ignoreIDs: readonly string[]): string {
   const tokens = script.trim().split(/\s+/u);
   const kept: string[] = [];
@@ -8,7 +6,6 @@ export function buildAuditScript(script: string, ignoreIDs: readonly string[]): 
     const token = tokens[index];
 
     if (token === '--ignore') {
-      // The next token is the flag's value.
       index += 1;
     } else if (token !== undefined && !token.startsWith('--ignore=')) {
       kept.push(token);

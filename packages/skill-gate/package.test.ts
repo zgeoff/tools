@@ -5,9 +5,6 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 
-// The package packed and installed from its tarball alone into a fresh project, with the entry
-// point a repo carries at .claude/hooks/skill-gate/skill-gate.ts. Every build and pack writes under
-// the test's own folder, never the shared dist, so overlapping runs cannot race.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'skill-gate-package-'));
 
@@ -25,8 +22,8 @@ async function setupTest() {
     mkdir(join(project, '.claude/hooks/skill-gate'), { recursive: true }),
   ]);
 
-  // The source pack runs no build; it gives the published manifest. The bundle and the
-  // declarations then build into the unpacked copy, as the publish's prepare does.
+  // prepare's build writes the shared dist, which an overlapping run would race, so the pack skips
+  // it and the bundle builds into the unpacked copy instead.
   await $`bun pm pack --ignore-scripts --destination ${directory}`
     .cwd(import.meta.dir)
     .env(env)

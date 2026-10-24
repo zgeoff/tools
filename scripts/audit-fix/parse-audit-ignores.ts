@@ -1,7 +1,6 @@
 import { isRecord } from '../../packages/std/src/is-record.ts';
 import type { AuditIgnores } from './types.ts';
 
-// Checks the shape of audit-ignores.json.
 export function parseAuditIgnores(value: unknown): AuditIgnores {
   if (!isRecord(value)) {
     throw new TypeError('audit-ignores.json holds no object');

@@ -28,8 +28,6 @@ interface Position {
   readonly y: number;
 }
 
-// Myers' diff: each round of edit depth records, per diagonal, the furthest x
-// it reaches; the trace of rounds then backtracks into the operations
 type FurthestX = Map<number, number>;
 
 function backtrack(lines: LinePair, trace: readonly FurthestX[]): DiffOp[] {

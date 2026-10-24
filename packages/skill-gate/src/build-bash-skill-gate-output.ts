@@ -3,8 +3,6 @@ import type { SkillGateHookOutput } from './types.ts';
 
 const RULES_PATH = '.claude/skill-gate.json';
 
-// Builds the PreToolUse hook output for a Bash command, or null when it writes no gated path. The
-// command still runs: the hook only reminds the agent, because a shell parser misses some writes.
 export function buildBashSkillGateOutput(
   gatedPaths: readonly string[],
   missing: readonly string[],

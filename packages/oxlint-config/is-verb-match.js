@@ -1,5 +1,5 @@
-// a name starts with a verb when the verb ends at a camelCase boundary; a
-// digit also ends it, since acronyms like 2FA start camelCase segments
+// a digit ends a verb too, since an acronym such as 2FA starts a camelCase
+// segment
 export default function isVerbMatch(name, verb) {
   return name === verb || (name.startsWith(verb) && /[A-Z0-9]/u.test(name.charAt(verb.length)));
 }

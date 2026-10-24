@@ -54,7 +54,6 @@ test('it returns null when the statements share a physical line', () => {
 });
 
 test('it returns null when the gap holds anything besides whitespace and comments', () => {
-  // a fabricated gap that swallows a stray token — must never be resized
   const source = 'const a = 1; @ \nuse(a);\n';
 
   const edit = planGapEdit({

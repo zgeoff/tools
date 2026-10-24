@@ -1,8 +1,6 @@
 import { statSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 
-// the matchers that write `__snapshots__/<test file>.snap`; their inline
-// counterparts keep the golden value in the test itself
 const fileMatchers = ['toMatchSnapshot', 'toThrowErrorMatchingSnapshot'];
 
 const noFileSnapshot = {

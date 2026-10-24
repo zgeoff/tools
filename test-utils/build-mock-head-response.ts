@@ -10,8 +10,7 @@ export interface MockStatus {
   state: string;
 }
 
-// The body GitHub returns for merge-release-prs.sh's query: the branch head, and its status
-// rollup, which is null until the first check registers.
+// GitHub returns a null status rollup until the first check registers.
 export function buildMockHeadResponse(
   oid: string,
   checks: readonly MockCheck[],

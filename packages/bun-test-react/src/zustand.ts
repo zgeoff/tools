@@ -6,8 +6,8 @@ import { storeResets } from './store-resets.ts';
 // `createStore` here covers stores from `create`, from `zustand`, and from `zustand/vanilla`.
 const actualVanilla = await import('zustand/vanilla');
 
-// Captured before mock.module swaps the live binding; calling actualVanilla.createStore from inside
-// the wrapper would recurse.
+// Captured before mock.module swaps the live binding; a read of the binding inside the wrapper
+// gets the wrapper back and recurses.
 const actualCreateStore = actualVanilla.createStore;
 
 type Mutators = [StoreMutatorIdentifier, unknown][];

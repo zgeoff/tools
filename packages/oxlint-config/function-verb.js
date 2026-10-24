@@ -41,8 +41,6 @@ const functionVerb = {
 
 export default functionVerb;
 
-// the role table's template prefixes (`with<X>`, `handle<Event>`, …): each is
-// only valid with a suffix, and a bare `handle` is the vague banned verb
 const suffixRequiredVerbs = new Set(['to', 'with', 'make', 'use', 'on']);
 
 function planReport(name, exemptNames) {
@@ -70,8 +68,6 @@ function planReport(name, exemptNames) {
   };
 }
 
-// banned verb → the role-table verb to use instead; null means the verb is
-// too vague to map and the name should say what the function does
 const bannedVerbs = new Map([
   ['process', null],
   ['manage', null],

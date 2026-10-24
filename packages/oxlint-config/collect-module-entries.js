@@ -1,6 +1,3 @@
-// one entry per top-level statement, linked to the entries it references;
-// `kind` is 'import', 'function' for a function declaration, 'supporting'
-// for a const, type alias, interface or enum, and 'other' for the rest
 export default function collectModuleEntries(context, program) {
   const overloaded = new Set();
   const entries = program.body.map((statement, index) => {
@@ -55,7 +52,6 @@ function pickKind(statement, declaration) {
     return { kind: 'function', name: 'default', nameNode: statement, ...links };
   }
 
-  // a default export of an expression, such as an object, binds no name
   if (statement.type === 'ExportDefaultDeclaration' && declaration.type !== 'FunctionDeclaration') {
     return { kind: 'other', name: 'default', nameNode: statement, ...links };
   }
@@ -71,8 +67,6 @@ function pickKind(statement, declaration) {
   return { kind, name: name.name, nameNode: name, ...links };
 }
 
-// the name a declaration binds: a function, a const with one plain binding,
-// a type alias, an interface or an enum
 function findDeclarationName(declaration) {
   if (
     declaration.type === 'FunctionDeclaration' ||
@@ -104,9 +98,6 @@ function isExportOnly(statement) {
   );
 }
 
-// fills each entry's `uses` and `users` from the file's top-level scope, and
-// its `references`: each identifier that names it, the entry that holds it,
-// and whether it runs as the module loads
 function linkReferences(context, program, entries) {
   const programScope = context.sourceCode.getScope(program);
   const scope = programScope.childScopes.find((child) => child.type === 'module') ?? programScope;
@@ -141,9 +132,8 @@ function linkReferences(context, program, entries) {
   }
 }
 
-// a reference runs as the module loads unless a function body wraps it; a
-// function with a call above it, such as a `.map` callback or the function in
-// `(() => value).call()`, may run at once, so it wraps nothing
+// a function under a call, such as a `.map` callback or the function in
+// `(() => value).call()`, may run at once, so it defers nothing
 function isLoadTime(identifier) {
   const ancestors = [];
 
@@ -174,9 +164,6 @@ function isInvocation(node) {
   );
 }
 
-// an entry is live when code that runs as the module loads may call into it;
-// a load-time reference outside an export list makes its target live, and a
-// live entry makes everything it references live
 function markLiveEntries(entries) {
   const live = new Set();
   const pending = [];

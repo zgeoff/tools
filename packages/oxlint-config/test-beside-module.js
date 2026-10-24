@@ -66,17 +66,12 @@ function probeUnderExemptRoot(cwd, filename) {
   return exemptRootDirs.has(first);
 }
 
-// a lane suite (`<name>.browser.test.ts`) tests the same module as
-// `<name>.test.ts`, and the suffix lets a runner put it in its own lane
 function toModuleName(base, lanes) {
   const dot = base.lastIndexOf('.');
 
   return dot > 0 && lanes.has(base.slice(dot + 1)) ? base.slice(0, dot) : base;
 }
 
-// a module is `<name>.<ext>` with a single-segment extension, so a
-// declaration file never stands in for one, and neither does another test
-// (`foo.test.ts` beside `foo.test.test.ts`)
 function probeModuleSibling(directory, name) {
   return readdirSync(directory).some((entry) => {
     const dot = entry.lastIndexOf('.');

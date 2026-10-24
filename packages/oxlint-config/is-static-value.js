@@ -34,9 +34,6 @@ const checks = {
     value.arguments.every((argument) => isStaticArgument(argument, names)),
 };
 
-// a value that runs no code and reads nothing that load-time code can change,
-// so it is the same wherever it sits; an import stands only where its value
-// is copied, such as an array element, and never where it is read through
 export default function isStaticValue(node, names, canCopyImport = true) {
   const value = unwrapExpression(node);
   const check = checks[value.type];
@@ -52,7 +49,6 @@ const wrapperTypes = new Set([
   'ParenthesizedExpression',
 ]);
 
-// a type assertion or parentheses leave the value as it is
 function unwrapExpression(node) {
   let current = node;
 

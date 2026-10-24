@@ -1,6 +1,5 @@
-// The bun-checks plan step: reads the repo's script names and the job's part, plans the check
-// scripts, and writes the plan to the step outputs. The caller's runner downloads this file and
-// the planner, and installs ts-pattern beside them at the version tools pins.
+// The caller's runner downloads this file and the planner, and installs ts-pattern beside them at
+// the version tools pins.
 import { appendFile, readFile } from 'node:fs/promises';
 import { match } from 'ts-pattern';
 import type { CheckPart } from './plan-check-scripts.ts';

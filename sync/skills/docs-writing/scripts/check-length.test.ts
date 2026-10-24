@@ -10,8 +10,8 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  // A clean environment: a pre-push hook in a linked worktree exports GIT_DIR, which would point
-  // git init and the script's git calls at the real repository.
+  // A pre-push hook in a linked worktree exports GIT_DIR, which would point git init and the
+  // script's git calls at the real repository.
   const env = {
     PATH: process.env['PATH'],
     HOME: directory,

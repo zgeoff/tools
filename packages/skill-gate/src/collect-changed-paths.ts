@@ -1,8 +1,5 @@
 import type { FileHashes } from './types.ts';
 
-// Collects the paths whose content after a Bash command differs from before it. The record holds
-// the paths dirty before; any other path had its content at HEAD, and a path missing from both
-// held no file.
 export function collectChangedPaths(
   recorded: FileHashes,
   atHead: FileHashes,
