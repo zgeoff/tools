@@ -459,7 +459,7 @@ function isIOImport(source, target) {
   return bunIOMembers.has(imported);
 }
 
-// a package names its functions by its own conventions, not by these verbs
+// a package names its functions by its own conventions, not by the code-style role table's verbs
 function isOwnCallee(callee, frameNode) {
   if (callee.rootName === 'this') {
     return true;
