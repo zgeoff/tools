@@ -2,9 +2,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import resolveRepoRoot from './resolve-repo-root.js';
 
-// the one file per repo that carries the report, so a repo with an override
-// sees it once per run rather than on every file, and an editor's language
-// server keeps it on that file across edits
+// a report on one file per repo shows once per run, and an editor's
+// language server keeps it on that file across edits
 const anchorFiles = new Map();
 
 const noCommentRuleOverride = {
@@ -45,8 +44,6 @@ export default noCommentRuleOverride;
 
 const configPattern = /^\.oxlintrc(?:\.[\w-]+)?\.jsonc?$/u;
 
-// every repo runs the comment rules and the type-assertion rules exactly as
-// this config ships them, each named here without its plugin prefix
 const lockedRules = [
   'no-jsdoc',
   'max-consecutive-line-comments',
@@ -54,9 +51,8 @@ const lockedRules = [
   'no-hidden-cast',
 ];
 
-// a rule key under any plugin prefix or none, since oxlint also reads
-// `@typescript-eslint/consistent-type-assertions` and the bare name, as
-// opposed to the same text inside a comment or a string value
+// oxlint reads a rule under any plugin prefix, such as
+// `@typescript-eslint/consistent-type-assertions`, or under its bare name
 const keyPatterns = lockedRules.map(
   (rule) => new RegExp(`"(?<key>(?:[^"/\\s]+/)?${rule})"\\s*:`, 'gu'),
 );

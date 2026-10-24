@@ -1,6 +1,3 @@
-// The audit-fix step's entry point, which the audit-fix workflow runs in the
-// caller's checkout; docs/architecture/dependency-updates.md describes what it
-// changes.
 import { existsSync } from 'node:fs';
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
@@ -68,8 +65,6 @@ export async function runAuditFix(argv: readonly string[]): Promise<void> {
   const latest = buildDateAfter(today, 90);
   const unmanagedIDs = parsedScript.ignoreIDs.filter((id) => !(id in ignores));
 
-  // An expired ignore, or one set past the 90-day cap, is left out, so the fix
-  // tries the advisory again.
   const activeIDs = Object.entries(ignores)
     .filter(([, ignore]) => ignore.expires > today && ignore.expires <= latest)
     .map(([id]) => id);
@@ -102,9 +97,6 @@ export async function runAuditFix(argv: readonly string[]): Promise<void> {
   });
 
   const nextIDs = [...Object.keys(ignorePlan.ignores), ...unmanagedIDs];
-
-  // The script keeps its spelling while its ignores stay the same, so a run
-  // with nothing to fix leaves package.json alone.
   const isScriptChanged = !hasSameIDs(parsedScript.ignoreIDs, nextIDs);
   const nextScript = isScriptChanged ? buildAuditScript(script, nextIDs) : script;
 
@@ -114,7 +106,6 @@ export async function runAuditFix(argv: readonly string[]): Promise<void> {
     await writeAuditScript(nextScript);
   }
 
-  // The audit script now ignores what the fix left, so it must pass.
   await runBun(nextScript.split(' ').slice(1), { check: true });
 
   const summary = renderAuditFixSummary({
@@ -162,8 +153,7 @@ async function loadAuditIgnores(path: string): Promise<AuditIgnores> {
 }
 
 interface RunBunOptions {
-  // Throw when bun exits non-zero. `bun audit` exits 1 while advisories remain,
-  // which the JSON runs expect.
+  // `bun audit` exits 1 while advisories remain, which the JSON runs expect.
   readonly check?: boolean;
 }
 
@@ -180,8 +170,6 @@ async function runBun(args: readonly string[], options: RunBunOptions = {}): Pro
   return stdout;
 }
 
-// `before` is the audit from before the fix, which still lists the advisories
-// each fix patches.
 function readReleaseAgeExcludes(
   plan: FixPlan,
   before: AuditReport,
@@ -210,7 +198,6 @@ async function readPublishDate(name: string, version: string, today: string): Pr
   const response = await fetch(`https://registry.npmjs.org/${name.replace('/', '%2f')}`);
 
   if (!response.ok) {
-    // Without the date, today is the latest the release can be from.
     return today;
   }
 
@@ -222,8 +209,6 @@ async function readPublishDate(name: string, version: string, today: string): Pr
   return typeof published === 'string' ? published.slice(0, 10) : today;
 }
 
-// Drops each audit-fix exclude whose release aged past the gate, then adds the
-// new ones; returns the dropped package names.
 async function updateReleaseAgeExcludes(
   excludes: readonly ReleaseAgeExclude[],
   today: string,
@@ -243,7 +228,6 @@ async function updateReleaseAgeExcludes(
     await writeFile('bunfig.toml', next);
   }
 
-  // A package dropped and added again in one run keeps its exclude.
   return pruned.removed.filter((name) => !excludes.some((exclude) => exclude.name === name));
 }
 
@@ -264,11 +248,10 @@ async function writeAuditIgnores(ignores: AuditIgnores): Promise<void> {
   await writeFile(ignoresPath, `${JSON.stringify(ignores, null, 2)}\n`);
 }
 
-// Replaces the audit script's value in place, so the rest of package.json
-// keeps its formatting; a package.json with no audit script gets one.
 async function writeAuditScript(script: string): Promise<void> {
   const packageJSON = await readFile('package.json', 'utf8');
 
+  // A JSON round trip would reformat the rest of package.json, so the value is replaced in place.
   const entry = /(?<key>"audit"\s*:\s*)"(?:[^"\\]|\\.)*"/u;
 
   if (entry.test(packageJSON)) {

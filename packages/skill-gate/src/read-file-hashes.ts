@@ -2,8 +2,6 @@ import path from 'node:path';
 import { toContentHash } from './to-content-hash.ts';
 import type { FileHashes, ReadFileContent } from './types.ts';
 
-// Reads, through the given content reader, a hash of each project path's content, or null for a
-// path that holds no content.
 export async function readFileHashes(
   readContent: ReadFileContent,
   projectDir: string,

@@ -2,8 +2,6 @@ import { basename } from 'node:path';
 
 const testFilePattern = /\.test\.tsx?$/u;
 
-// the statements a test file holds besides its tests and `setupTest()`:
-// imports and type-only declarations, which run nothing at module level
 const allowedStatementTypes = new Set([
   'ImportDeclaration',
   'TSTypeAliasDeclaration',
@@ -73,9 +71,6 @@ const setupTestOnly = {
 
 const testModules = new Set(['bun:test', 'claude-code/testing']);
 
-// the local names that `test` from a test module goes by, so an aliased import
-// such as `import { test as check }` counts; a file that imports no `test`
-// reads the global one, unless a module binding of its own takes the name
 function collectTestNames(context, program) {
   const names = program.body
     .filter(
@@ -106,8 +101,7 @@ function getImportedName(specifier) {
     : specifier.imported.value;
 }
 
-// every import form and every module-level declaration defines a binding in
-// the module scope, which ESM nests under the global one
+// ESM puts module-level bindings in a module scope nested under the global one
 function hasModuleBinding(context, program, name) {
   const scope = context.sourceCode.getScope(program);
   const scopes = [scope, ...scope.childScopes.filter((child) => child.type === 'module')];
@@ -123,11 +117,8 @@ function isTestCall(statement, testNames) {
   );
 }
 
-// the members a `test` call may chain: `test.each(rows)(…)`,
-// `test.skipIf(gate)(…)`, `test.if(gate)(…)`, and chains of them
 const testModifiers = new Set(['each', 'skipIf', 'if']);
 
-// `test` itself or a chain of its modifiers, such as `test.skipIf(gate).each(rows)`
 function isTestRunner(node, testNames) {
   let current = node;
 
@@ -171,9 +162,6 @@ function findDeclaredName(context, statement, declarators) {
   return statement.id?.name;
 }
 
-// a gate is a declarator whose every binding is read, only in a `skipIf(...)`
-// argument or another gate's initializer; the set grows out from the `skipIf`
-// reads, so consts that only read each other never join it
 function collectSkipGates(context, constants, testNames) {
   const gates = new Set();
   let changed = true;
@@ -195,8 +183,6 @@ function collectSkipGates(context, constants, testNames) {
 function isSkipGate(context, declarator, gates, testNames) {
   const variables = context.sourceCode.getDeclaredVariables(declarator);
 
-  // a declarator that binds nothing, such as `const {} = registerHooks()`, is
-  // a module-level call, not a gate
   return (
     variables.length > 0 &&
     variables.every((variable) => {
@@ -222,8 +208,8 @@ const functionTypes = new Set([
   'ArrowFunctionExpression',
 ]);
 
-// a read counts only at collection time, so no function may enclose it: a
-// `skipIf` inside `setupTest()` or a test runs later
+// bun test reads a `skipIf` gate as it collects tests, so a read inside a
+// function, which runs later, does not count
 function isInSkipIfArgument(identifier, testNames) {
   let child = identifier;
   let isSkipIfArgument = false;

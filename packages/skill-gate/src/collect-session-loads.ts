@@ -1,11 +1,10 @@
 import { isRecord } from '@zgeoff/std';
 import type { SessionLoads } from './types.ts';
 
-// A compaction voids earlier loads and reads even though Claude Code re-attaches their text. A
-// skill loads through a Skill tool call that succeeded, or a slash command the user types; a
-// subagent's transcript has no user to type one.
 export function collectSessionLoads(transcript: string): SessionLoads {
   const entries = transcript.split('\n').map((line) => parseEntry(line));
+
+  // A compaction voids earlier loads and reads even though Claude Code re-attaches their text.
   const lastBoundary = entries.findLastIndex((entry) => isCompactBoundary(entry));
   const current = entries.slice(lastBoundary + 1);
   const succeeded = collectSucceededToolUseIDs(current);

@@ -1,5 +1,3 @@
-// Runs the repo's test script over the unit tests beside the given files: a test file runs itself,
-// and a source file runs its sibling test file.
 import { existsSync } from 'node:fs';
 import { availableParallelism, totalmem } from 'node:os';
 import { basename, join } from 'node:path';
@@ -8,8 +6,8 @@ import { readOptionalText } from './read-memory-budget.ts';
 import { readWorkerCount } from './read-worker-count.ts';
 import type { WorkerCountSources } from './read-worker-count.ts';
 
-// The one place a run raises bun's default test timeout: a host with one worker runs each file
-// slower than CI, and a test that passes there must not fail the push.
+// A host with one worker runs each file slower than CI, and a test that passes there must not fail
+// the push.
 const slowHostTestTimeoutMs = 15_000;
 const defaultMaxTestFiles = 50;
 

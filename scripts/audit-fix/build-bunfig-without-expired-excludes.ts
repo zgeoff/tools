@@ -1,15 +1,12 @@
 interface BunfigWithoutExpiredExcludes {
   readonly bunfig: string;
 
-  // The packages whose exclude the step dropped.
   readonly removed: readonly string[];
 }
 
 const excludeComment =
   /^# (?<name>\S+) \S+ \(published [^)]*\) ages past the gate ~(?<date>\d{4}-\d{2}-\d{2}) — remove then \(audit-fix\)\n/gmu;
 
-// Drops each exclude the audit-fix step added, with its dated comment, once the
-// release has aged past the gate. An entry with no audit-fix comment stays.
 export function buildBunfigWithoutExpiredExcludes(
   bunfig: string,
   today: string,
@@ -54,7 +51,6 @@ function buildBunfigWithoutNames(bunfig: string, names: readonly string[]): stri
   for (const name of names) {
     const quoted = `"${name}"`;
 
-    // Only the value and its comma go, so another entry on the same row stays.
     list = list.includes('\n')
       ? list
           .split('\n')
@@ -66,7 +62,6 @@ function buildBunfigWithoutNames(bunfig: string, names: readonly string[]): stri
       : list.replace(new RegExp(`\\s*${RegExp.escape(quoted)}\\s*,?`, 'u'), '');
   }
 
-  // A one-line list that lost its last entry keeps no dangling comma.
   if (!list.includes('\n')) {
     list = list.replace(/,\s*$/u, '');
   }

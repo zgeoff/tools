@@ -1,8 +1,7 @@
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-// the nearest ancestor holding `.git` (a directory, or a worktree's file), or
-// null outside a repository
+// `.git` is a file, not a directory, in a git worktree
 export default function resolveRepoRoot(filename) {
   let directory = dirname(filename);
 

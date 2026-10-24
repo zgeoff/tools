@@ -1,8 +1,7 @@
 import isStaticValue from './is-static-value.js';
 
-// one fix that moves every safe declaration the reports name, since oxlint
-// fixes a file in one pass; `moved` holds the reported entries it moves, and
-// `fix` is null when nothing can move
+// oxlint applies one fix pass to a file, so one fix moves every safe
+// declaration the reports name
 export default function buildModuleOrderFix(context, layout) {
   const names = collectNames(context);
   const reported = new Set(layout.reports.map((report) => report.entry));
@@ -38,8 +37,6 @@ export default function buildModuleOrderFix(context, layout) {
   };
 }
 
-// every name the file binds at its top level, so that a value can tell an
-// import or a global from a local
 function collectNames(context) {
   const programScope = context.sourceCode.getScope(context.sourceCode.ast);
   const scope = programScope.childScopes.find((child) => child.type === 'module') ?? programScope;
@@ -55,8 +52,6 @@ function collectNames(context) {
   return { imports, locals };
 }
 
-// a type always moves safely; a const moves only when every use sits in a
-// function body that runs after the module loads, and its value is static
 function isSafeToMove(entry, names) {
   const type = entry.declaration.type;
 
@@ -77,9 +72,7 @@ function isSafeToMove(entry, names) {
   return isUsedAfterLoad && isStaticValue(entry.declaration.declarations[0].init, names);
 }
 
-// the unreported consts and types whose home is the helper, which sit above
-// it and move with it when they move safely; a function declaration is
-// hoisted, so the helper itself always moves
+// a function declaration is hoisted, so the helper itself always moves
 function collectStack(helper, layout, context) {
   return layout.entries.filter(
     (entry) =>
@@ -90,9 +83,6 @@ function collectStack(helper, layout, context) {
   );
 }
 
-// each moving helper, with its stack, goes directly after the entry before it
-// in the main order; then each moving const or type goes directly above the
-// first entry in its home's block that uses it
 function buildOrder(layout, moves) {
   const moving = new Set([
     ...moves.helpers.flatMap((helper) => [...moves.stacks.get(helper), helper]),
@@ -138,8 +128,6 @@ function buildOrder(layout, moves) {
   return order;
 }
 
-// the position directly after `previous`, past an `export default` that
-// names it
 function findInsertAfter(order, previous) {
   const at = order.indexOf(previous) + 1;
   const next = order[at];
@@ -178,8 +166,6 @@ function isTerminated(text, entry) {
   );
 }
 
-// the range from the first entry that moves to the last, and its new text;
-// an entry keeps the blank lines before it while the entry before it stays
 function renderOrder(context, entries, order) {
   const text = context.sourceCode.text;
   const chunks = collectChunks(context, entries);
@@ -205,9 +191,6 @@ function renderOrder(context, entries, order) {
   return [[chunks[first].start, chunks[last].end], parts.join('')];
 }
 
-// each statement's text, with the comments on the lines above it and a
-// comment that ends its last line; the first statement leaves a file header
-// that a blank line parts from it, such as a disable directive, in place
 function collectChunks(context, entries) {
   const text = context.sourceCode.text;
   const comments = context.sourceCode.getAllComments();
@@ -239,8 +222,6 @@ function collectChunks(context, entries) {
   });
 }
 
-// the start of the run of comments directly above `start`, with no blank
-// line inside it
 function findAdjacentCommentsStart(text, comments, start) {
   let current = start;
 

@@ -2,9 +2,6 @@ import collectTypeKinds from './collect-type-kinds.js';
 import findFunctionName from './find-function-name.js';
 import isVerbMatch from './is-verb-match.js';
 
-// each named function is a frame; I/O inside an unnamed callback counts
-// against the nearest named function around it, since that name makes the
-// promise, while a return counts only for the function it returns from
 const verbContract = {
   meta: {
     type: 'problem',
@@ -35,7 +32,6 @@ const verbContract = {
       }
     };
 
-    // a bare `return` returns undefined as `return undefined` does
     const markReturn = (argument) => {
       const frame = frames.at(-1);
 
@@ -49,7 +45,6 @@ const verbContract = {
 
       frames.push({ node, name, ioReason: null, returnsNullish: false });
 
-      // an unnamed async callback counts only through what it awaits
       if (node.async && name !== null) {
         markIO('is async');
       }
@@ -116,7 +111,6 @@ function isNullishLiteral(node) {
   );
 }
 
-// the role table's verbs that promise no I/O
 const pureVerbs = [
   'is',
   'has',
@@ -135,8 +129,6 @@ const pureVerbs = [
 
 const predicateVerbs = ['is', 'has', 'can', 'should', 'probe'];
 
-// the role table's verbs that may do I/O, and common free verbs that name a
-// change to the world; a call to a function named with one is I/O
 const effectfulVerbs = [
   'probe',
   'read',
@@ -167,9 +159,6 @@ const effectfulVerbs = [
   'restart',
 ];
 
-// a function returning a success flag, such as `removeFile` or `tryLock`,
-// rightly returns a boolean without a predicate verb, and a framework prefix
-// such as a React hook's `use` wins over the predicate verbs
 const flagVerbs = [...effectfulVerbs, 'try', 'use', 'on', 'handle'];
 
 function checkFrame(context, frame) {
@@ -348,9 +337,6 @@ function findBinding(context, node, name) {
   return null;
 }
 
-// the source a call reaches: its root binding and the member taken straight
-// off the root, as `spawn` in `Bun.spawn(...)`, followed through each local
-// alias such as `const read = fs.readFileSync` or `const { spawn } = Bun`
 function resolveCallTarget(context, node, callee) {
   const rootName = findRootName(callee);
   let current = {
@@ -382,7 +368,6 @@ function resolveCallTarget(context, node, callee) {
   return current;
 }
 
-// the member read straight off a chain's root: `$` in `bun.$.cwd('a')`
 function findRootMemberName(node) {
   let current = node;
   let memberName = null;
@@ -409,7 +394,6 @@ function findAliasDeclarator(binding) {
     : null;
 }
 
-// the key a destructured binding takes, as `spawn` in `const { spawn: run } = Bun`
 function findPatternKey(pattern, name) {
   if (pattern.type !== 'ObjectPattern') {
     return null;
@@ -437,8 +421,6 @@ function findImportSource(variable) {
   return definition.type === 'ImportBinding' ? definition.parent.source.value : null;
 }
 
-// Bun's shell: the `$` export of `bun` under any import form or alias, or
-// `Bun.$`; a parameter or local named `$` is some other function
 function isShellTarget(target) {
   if (isBunGlobal(target)) {
     return target.memberName === '$';
@@ -477,9 +459,7 @@ function isIOImport(source, target) {
   return bunIOMembers.has(imported);
 }
 
-// a callee declared in the file or imported by a relative or aliased path; a
-// package keeps its own naming, and a method on a value the function makes
-// itself, such as `date.setUTCDate`, changes only that value
+// a package names its functions by its own conventions, not by the code-style role table's verbs
 function isOwnCallee(callee, frameNode) {
   if (callee.rootName === 'this') {
     return true;
@@ -544,7 +524,6 @@ function isEnvRead(context, node) {
   );
 }
 
-// the global itself, so a local binding of the same name passes
 function isGlobalName(context, node, name) {
   return (
     node !== undefined &&

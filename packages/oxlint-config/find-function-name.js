@@ -1,6 +1,3 @@
-// a declaration's own name, the variable or key a function is assigned to,
-// or else a function expression's own name; getters, setters, computed and
-// quoted keys name nothing
 export default function findFunctionName(node) {
   if (node.type === 'FunctionDeclaration') {
     return node.id;

@@ -2,8 +2,8 @@ import { join } from 'node:path';
 
 export type GitEnv = Readonly<Record<string, string | undefined>>;
 
-// A clean environment: a pre-push hook in a linked worktree exports GIT_DIR, which would point a
-// test's git calls at the real repository.
+// A pre-push hook in a linked worktree exports GIT_DIR, which would point a test's git calls at
+// the real repository.
 export function readGitEnv(home: string, outerEnv: GitEnv = process.env): GitEnv {
   return {
     PATH: outerEnv['PATH'],

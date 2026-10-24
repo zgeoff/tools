@@ -2,10 +2,8 @@ export interface ReleaseAgeExclude {
   readonly name: string;
   readonly version: string;
 
-  // ISO date of the release.
   readonly publishedOn: string;
 
-  // ISO date on which the release ages past the gate.
   readonly agesPastGateOn: string;
   readonly advisories: readonly string[];
 }
@@ -13,8 +11,6 @@ export interface ReleaseAgeExclude {
 const excludesLine = /^minimumReleaseAgeExcludes\s*=\s*\[/mu;
 const gateLine = /^minimumReleaseAge\s*=.*$/mu;
 
-// Adds each package to minimumReleaseAgeExcludes with a dated comment that says
-// when to remove it, so `bun install` accepts a fix younger than the gate.
 export function buildBunfigWithExcludes(
   bunfig: string,
   excludes: readonly ReleaseAgeExclude[],
@@ -65,10 +61,8 @@ function renderExcludeComment(exclude: ReleaseAgeExclude): string {
   return `# ${exclude.name} ${exclude.version} (published ${exclude.publishedOn}, patches ${exclude.advisories.join(' + ')}) ages past the gate ~${exclude.agesPastGateOn} — remove then (audit-fix)`;
 }
 
-// Adds names before the list's closing bracket, so the entries and comments
-// already in it stay as they are. A list on one line stays on one line.
 function buildListWithNames(listUpToBracket: string, names: readonly string[]): string {
-  // The comma goes straight after the last entry, before any comment on its line.
+  // A comma after a `#` on the last entry's line would sit inside the TOML comment.
   const lastQuote = listUpToBracket.lastIndexOf('"');
   const isEmpty = lastQuote === -1;
   const rest = listUpToBracket.slice(lastQuote + 1);

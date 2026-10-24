@@ -1,7 +1,5 @@
 import type { BashCheckFailureHookOutput, PostToolEvent } from './types.ts';
 
-// Builds the hook output after a Bash command that the gate could not check, for the user and the
-// agent alike.
 export function buildBashCheckFailureOutput(
   event: PostToolEvent,
   error: string,

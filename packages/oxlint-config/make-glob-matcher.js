@@ -1,5 +1,3 @@
-// supports `**`, `*`, `?` and one level of `{a,b}`; every other character is
-// literal. Paths and globs use `/`.
 export default function makeGlobMatcher(globs) {
   const patterns = globs.map((glob) => toGlobRegExp(glob));
 

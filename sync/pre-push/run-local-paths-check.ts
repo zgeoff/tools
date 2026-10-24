@@ -7,13 +7,10 @@ import { runProgram } from './run-program.ts';
 export interface LocalPathsCheckOptions {
   readonly cwd: string;
 
-  // The commit the branch grows from; the check reads the commits after it, up to HEAD.
   readonly base: string;
 
-  // The environment of the git run, whose HOME is the home directory the check looks for.
   readonly env: Readonly<Record<string, string | undefined>>;
 
-  // The machine's host name, which the check looks for as a whole word.
   readonly host: string;
 
   readonly runProgram: RunProgram;

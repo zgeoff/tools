@@ -4,7 +4,6 @@ export interface ProgramOptions {
   // The whole environment of the program; it inherits nothing from this process.
   readonly env: Readonly<Record<string, string | undefined>>;
 
-  // Left out, the program reads no input.
   readonly stdin?: string;
 }
 

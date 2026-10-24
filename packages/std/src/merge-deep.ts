@@ -1,6 +1,5 @@
 import { types } from 'node:util';
 
-// A value the merge replaces whole rather than merging key by key.
 type WholeValue =
   | readonly unknown[]
   | ((...args: never[]) => unknown)

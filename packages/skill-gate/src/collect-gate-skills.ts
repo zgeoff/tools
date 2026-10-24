@@ -1,8 +1,6 @@
 import picomatch from 'picomatch';
 import type { SkillGateRules } from './types.ts';
 
-// Collects the skills that every gate matching a path names, in gate order and with repeats. A
-// path that holds an ignore segment matches no gate.
 export function collectGateSkills(rules: SkillGateRules, relativePath: string): readonly string[] {
   if (rules.ignore.some((segment) => relativePath.includes(segment))) {
     return [];

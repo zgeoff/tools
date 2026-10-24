@@ -9,8 +9,6 @@ import type {
 
 const RULES_PATH = '.claude/skill-gate.json';
 
-// A broken rules file, a rule that names a skill or reference the repo does not have, or a key the
-// rules parser does not know never denies: it warns, and the call goes ahead.
 export function buildToolGateOutput(
   toolName: string,
   plan: ToolGatePlan,

@@ -10,9 +10,8 @@ import invariant from 'tiny-invariant';
 // needs it, as the hook skips the check there; CI installs actionlint, so a CI run without it fails.
 const canRunActionlint = Bun.which('actionlint') !== null || process.env['CI'] === 'true';
 
-// A main checkout with a pushable upstream and a linked worktree on its own branch. Every git call
-// gets a clean environment, so a GIT_DIR this test inherits from a real hook cannot reach the repo
-// it runs in.
+// Every git call gets a clean environment, so a GIT_DIR this test inherits from a real hook cannot
+// reach the repo it runs in.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'lefthook-pre-push-'));
 
@@ -68,9 +67,6 @@ async function setupTest() {
 test('it leaves the main checkout non-bare when the test job runs in a pre-push from a worktree', async () => {
   const ctx = await setupTest();
 
-  // lefthook runs the real baseline over a branch that changes one file. The other jobs pass, and
-  // the related tests stand in as a test that runs a plain git init in a fresh folder with the
-  // environment the hook gives it; the trailing true swallows the file name.
   await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
   await writeFile(join(ctx.worktree, 'fixture.ts'), 'export {};\n');
 
@@ -82,6 +78,8 @@ test('it leaves the main checkout non-bare when the test job runs in a pre-push 
         'lint:files': 'true',
         typecheck: 'true',
         'files:branch': 'echo fixture.ts',
+
+        // The trailing true swallows the file name the hook appends.
         'test:related': 'git init --quiet sandbox && true',
         'check:commits': 'true',
         'check:local-paths': 'true',
@@ -210,9 +208,6 @@ test('it passes the push when only a file the branch leaves unchanged fails the 
   const ctx = await setupTest();
 
   await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
-
-  // bad.sh fails the shell check, and the branch's file list names only clean.sh, so the job
-  // passes only when it checks the listed files rather than every tracked one.
   await writeFile(join(ctx.worktree, 'bad.sh'), '#!/usr/bin/env bash\necho $1\n');
   await writeFile(join(ctx.worktree, 'clean.sh'), '#!/usr/bin/env bash\necho "hello"\n');
 
@@ -340,7 +335,6 @@ test('it hands every shell file the branch changes to the shell check when the b
 test('it passes the push with a notice when the machine lacks shfmt', async () => {
   const ctx = await setupTest();
 
-  // A PATH of the programs the push runs, with shellcheck and without shfmt.
   for (const program of ['git', 'sh', 'shellcheck']) {
     const found = Bun.which(program);
 
@@ -395,7 +389,6 @@ test('it passes the push with a notice when the machine lacks shfmt', async () =
 test('it passes the push with a notice when the machine lacks actionlint', async () => {
   const ctx = await setupTest();
 
-  // A PATH of the programs the push runs, without actionlint.
   for (const program of ['git', 'sh']) {
     const found = Bun.which(program);
 
@@ -669,8 +662,6 @@ test('it fails the push when a commit of the branch fails commitlint', async () 
 
   await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
   await writeFile(join(ctx.worktree, '.gitignore'), 'node_modules\n');
-
-  // The workspace's install holds the commitlint and @zgeoff/commitlint-config that the check reads.
   await symlink(join(import.meta.dir, '../../node_modules'), join(ctx.worktree, 'node_modules'));
 
   await writeFile(
@@ -796,7 +787,6 @@ test('it fails the push when a bunfig.toml raises the test timeout above 5 s', a
 test("it fails the commit when typecheck fails, after the repo's own pre-commit job runs", async () => {
   const ctx = await setupTest();
 
-  // The repo's own job and typecheck each record that they ran, so the file shows their order.
   await writeFile(
     join(ctx.worktree, 'lefthook.yml'),
     `extends:\n  - ${ctx.baseline}\npre-commit:\n  jobs:\n    - name: fixer\n      run: echo fixer >> ran.txt\n`,
@@ -835,8 +825,6 @@ test("it fails the commit when typecheck fails, after the repo's own pre-commit 
 test('it skips typecheck on a commit that stages no code or config file', async () => {
   const ctx = await setupTest();
 
-  // The repo's lefthook.yml and package.json are committed first, so the commit under test stages
-  // only the page.
   await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
 
   await writeFile(
@@ -920,7 +908,6 @@ test('it skips the test job with the CI notice when the branch has more than 50 
   await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
   await mkdir(join(ctx.worktree, 'src'));
 
-  // Each test fails, so a run of any of them fails the push.
   await Promise.all(
     tests.map((path) =>
       writeFile(
@@ -999,7 +986,6 @@ test('it runs the related tests under the memory cap when the branch has 50 or f
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
 
-        // The cap script runs each job, after a line in capped.txt that names the job's command.
         'memory-capped': `bash -c 'echo "$*" >> capped.txt; exec bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024 "$@"' memory-capped`,
       },
     }),
@@ -1038,7 +1024,6 @@ test('it runs no tests in the hook when the branch changes only lane files', asy
   await mkdir(join(ctx.worktree, 'src'));
   await mkdir(join(ctx.worktree, 'e2e'));
 
-  // Each lane test fails, so a run of any of them fails the push.
   await writeFile(
     join(ctx.worktree, 'e2e/checkout.test.ts'),
     "import { expect, test } from 'bun:test';\n\ntest('it fails on purpose', () => {\n  expect(1).toBe(2);\n});\n",
@@ -1096,7 +1081,6 @@ test('it passes the slow-host timeout to the tests when the host gets 1 worker',
   await mkdir(join(ctx.worktree, 'src'));
   await writeFile(join(ctx.worktree, 'src/cart.test.ts'), '');
 
-  // The test script prints the arguments the hook gives it.
   await writeFile(
     join(ctx.worktree, 'package.json'),
     JSON.stringify({

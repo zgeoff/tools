@@ -1,5 +1,3 @@
-// each `names` key is a short name and its value the text that replaces it;
-// the rule matches a whole name, so `timeoutMs` passes when `ms` is listed
 const noAbbreviatedNames = {
   meta: {
     type: 'suggestion',
@@ -46,9 +44,6 @@ const noAbbreviatedNames = {
       }
     };
 
-    // a computed key names its property as a plain key does when it is a
-    // string written in place, as in `{ ['src']: 1 }`; a computed identifier
-    // reads a variable, whose declaration is checked where it is made
     const checkMemberName = (node, name) => {
       if (!node.computed || name.type !== 'Identifier') {
         checkName(name);
@@ -65,8 +60,6 @@ const noAbbreviatedNames = {
       }
     };
 
-    // a write to a member names that property, whether the member stands
-    // alone or sits inside a destructuring target
     const checkAssignmentTarget = (node) => {
       for (const member of collectTargetMembers(node)) {
         checkMemberName(member, member.property);
@@ -79,8 +72,6 @@ const noAbbreviatedNames = {
       }
     };
 
-    // function-verb checks only a plain function or method name, so a quoted
-    // method, a signature or a declared function would pass both rules
     const checkFunction = (node) => {
       checkName(node.id);
       checkParams(node);
@@ -94,7 +85,6 @@ const noAbbreviatedNames = {
       FunctionExpression: checkFunction,
       ArrowFunctionExpression: checkParams,
 
-      // a signature without a body names its parameters as an implementation does
       TSDeclareFunction: checkFunction,
       TSEmptyBodyFunctionExpression: checkParams,
       TSFunctionType: checkParams,
@@ -117,19 +107,16 @@ const noAbbreviatedNames = {
       MethodDefinition: checkKey,
       TSAbstractMethodDefinition: checkKey,
 
-      // a class, an enum and a namespace are values at run time; a quoted
-      // module name is a path, not a value name
       'ClassDeclaration, ClassExpression, TSEnumDeclaration'(node) {
         checkName(node.id);
       },
       TSModuleDeclaration(node) {
+        // `declare module 'name'` quotes a module path, not a value name
         if (node.id.type === 'Identifier') {
           checkName(node.id);
         }
       },
 
-      // an import's local binding is a value name in this module, whatever the
-      // exporting module calls it; a type-only import names a type, not a value
       'ImportSpecifier, ImportDefaultSpecifier, ImportNamespaceSpecifier'(node) {
         if (!isTypeOnlyImport(node)) {
           checkName(node.local);
@@ -149,7 +136,6 @@ const noAbbreviatedNames = {
         checkName(node.id);
       },
 
-      // an export alias is the name every importing module reads the value by
       ExportSpecifier(node) {
         if (!isTypeOnlyExport(node)) {
           checkName(node.exported);
@@ -169,9 +155,6 @@ const noAbbreviatedNames = {
   },
 };
 
-// the name a key or binding spells out in the source: an identifier, a
-// string, or a template with no substitutions; a key built at run time has
-// no static name, so the result is null
 function findStaticName(node) {
   if (node?.type === 'Identifier' || node?.type === 'PrivateIdentifier') {
     return node.name;
@@ -188,8 +171,6 @@ function findStaticName(node) {
   return null;
 }
 
-// the names a binding pattern declares: a destructured key's alias, not the
-// key, since the key belongs to the object being read
 function collectPatternIdentifiers(node) {
   if (node === null || node === undefined) {
     return [];
@@ -226,8 +207,6 @@ function collectPatternIdentifiers(node) {
   return [];
 }
 
-// the members an assignment target writes; a bare identifier in the target
-// writes a variable declared elsewhere, and its declaration is checked there
 function collectTargetMembers(node) {
   if (node === null || node === undefined) {
     return [];

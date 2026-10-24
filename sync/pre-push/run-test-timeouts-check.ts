@@ -50,8 +50,6 @@ function runGit(options: Readonly<TestTimeoutsCheckOptions>, args: readonly stri
   return result.stdout;
 }
 
-// The lanes option of the repo's own max-test-timeout rule names its extra lanes, each the suffix of
-// a `<name>.<lane>.test.ts` file and the name of a `test:<lane>` script.
 function parseLanes(text: string): string[] {
   const config = parseText(oxlintConfigPath, text, (input) => Bun.JSONC.parse(input));
   const setting = findMember(findMember(config, 'rules'), 'zgeoff/max-test-timeout');
@@ -162,8 +160,6 @@ interface ShellWord {
   readonly isQuoted: boolean;
 }
 
-// The words of each command that `&&`, `||`, `;` or `|` separates, as a POSIX shell splits them
-// outside quotes. Expansions stay as written.
 function parseShellCommands(command: string): ShellWord[][] {
   const commands: ShellWord[][] = [];
   let words: ShellWord[] = [];

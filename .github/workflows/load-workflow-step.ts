@@ -3,17 +3,13 @@ import { readFile } from 'node:fs/promises';
 export interface WorkflowStep {
   readonly id: string | null;
 
-  // The step's `if`, as the workflow writes it.
   readonly condition: string | null;
 
-  // The step's env, with each value as the workflow writes it, expressions included.
   readonly env: Readonly<Record<string, string>>;
 
   readonly run: string;
 }
 
-// Reads and parses a workflow file and returns one step of one job, so a test can run the step's
-// shell for real and resolve its env from the workflow's own bindings.
 export async function loadWorkflowStep(
   path: string,
   job: string,

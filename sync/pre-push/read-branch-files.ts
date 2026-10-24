@@ -1,9 +1,5 @@
 import { readBranchBase } from './read-branch-base.ts';
 
-// Prints the files the branch changes since its merge base with origin's default
-// branch, one per line. lefthook's {push_files} lists all of history for a branch
-// with no upstream, so the pre-push baseline reads its file list from here.
-
 interface ReadBranchFilesOptions {
   readonly cwd: string;
 
@@ -11,6 +7,8 @@ interface ReadBranchFilesOptions {
   readonly env?: Readonly<Record<string, string | undefined>>;
 }
 
+// lefthook's {push_files} lists all of history for a branch with no upstream, so the pre-push
+// baseline reads its file list from here.
 export async function readBranchFiles(
   options: Readonly<ReadBranchFilesOptions>,
 ): Promise<string[]> {

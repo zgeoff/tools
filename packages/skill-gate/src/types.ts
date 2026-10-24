@@ -11,14 +11,12 @@ export interface SkillGateRules {
   readonly gates: readonly SkillGate[];
 }
 
-// A gate on a tool call: `references` are files under .claude/skills/ that the session reads.
 export interface ToolGate {
   readonly tool: string;
   readonly skills: readonly string[];
   readonly references: readonly string[];
 }
 
-// `unknownKeys` names each key the parser skips, such as `commands` or `tools[0].timeout`.
 export type SkillGateRulesResult =
   | {
       readonly ok: true;
@@ -33,7 +31,6 @@ export interface UnknownSkill {
   readonly skill: string;
 }
 
-// `readPaths` holds each file path a successful Read call named.
 export interface SessionLoads {
   readonly skills: readonly string[];
   readonly readPaths: readonly string[];
@@ -47,7 +44,6 @@ export interface SkillGateInput {
   readonly availableSkills: readonly string[];
 }
 
-// A path a Bash command writes inside the project: absolute, and relative to the project root.
 export interface ProjectPath {
   readonly path: string;
   readonly relativePath: string;
@@ -80,8 +76,6 @@ export interface ShellRedirect {
   readonly target: ShellWord;
 }
 
-// `enters` counts the subshells that open just before the command, and `leaves` the ones that
-// close just after it.
 export interface ShellCommand {
   readonly words: readonly ShellWord[];
   readonly redirects: readonly ShellRedirect[];
@@ -90,9 +84,6 @@ export interface ShellCommand {
   readonly leaves: number;
 }
 
-// A path a Bash command writes, relative to the command's working directory unless absolute. With
-// a `fileName`, as for `cp a.ts dest`, the write lands at `path/fileName` when `path` is a
-// directory, and at `path` otherwise.
 export interface WrittenPath {
   readonly path: string;
   readonly fileName?: string;
@@ -135,7 +126,6 @@ export interface SkillGateHookOutput {
   };
 }
 
-// A content hash per project path, or null for a path that holds no file.
 export type FileHashes = Readonly<Record<string, string | null>>;
 
 export type PostToolEvent = 'PostToolUse' | 'PostToolUseFailure';
@@ -156,7 +146,6 @@ export interface WorkTree {
   readonly dirtyPaths: readonly string[];
 }
 
-// The gated files dirty before a Bash command and the commit HEAD named then, or git's error.
 export type BashSnapshot = Readonly<z.infer<typeof bashSnapshotSchema>>;
 
 export interface BashCheckFailureHookOutput {
@@ -177,7 +166,6 @@ export interface BashCandidates {
   readonly cleanBefore: readonly string[];
 }
 
-// Reads a file's content, or null for a path that holds no file.
 export type ReadFileContent = (filePath: string) => Promise<Uint8Array | null>;
 
 export type RecordedSnapshot = Extract<BashSnapshot, { kind: 'recorded' }>;

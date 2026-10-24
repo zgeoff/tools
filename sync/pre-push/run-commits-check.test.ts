@@ -6,8 +6,6 @@ import { $ } from 'bun';
 import { runCommitsCheck } from './run-commits-check.ts';
 import { runProgram } from './run-program.ts';
 
-// A repo in a temp folder whose node_modules is the workspace's, so the check finds the real
-// commitlint and @zgeoff/commitlint-config there, as it does in a repo that installs both.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'run-commits-check-'));
 
@@ -350,7 +348,6 @@ test('it prints the skip as a GitHub notice and exits 0 when run as a script in 
 test('it exits 2 with the error of commitlint when commitlint refuses a config with no rules', async () => {
   const ctx = await setupTest();
 
-  // The repo's own install: the real commitlint, and a @zgeoff/commitlint-config with no rules.
   await rm(join(ctx.directory, 'node_modules'));
   await mkdir(join(ctx.directory, 'node_modules/.bin'), { recursive: true });
   await mkdir(join(ctx.directory, 'node_modules/@zgeoff/commitlint-config'), { recursive: true });
@@ -395,7 +392,6 @@ test('it exits 2 with the error of commitlint when commitlint refuses a config w
 test('it exits 2 when commitlint crashes with exit 1 and reports no problem', async () => {
   const ctx = await setupTest();
 
-  // The repo's own install: the real commitlint, and a @zgeoff/commitlint-config that throws.
   await rm(join(ctx.directory, 'node_modules'));
   await mkdir(join(ctx.directory, 'node_modules/.bin'), { recursive: true });
   await mkdir(join(ctx.directory, 'node_modules/@zgeoff/commitlint-config'), { recursive: true });
@@ -459,7 +455,6 @@ test('it throws the git log error when the base is not a commit', async () => {
 test('it exits 2 when the repo installs a @zgeoff/commitlint-config that does not resolve', async () => {
   const ctx = await setupTest();
 
-  // The repo's own install: the real commitlint, and a config whose export names no file.
   await rm(join(ctx.directory, 'node_modules'));
   await mkdir(join(ctx.directory, 'node_modules/.bin'), { recursive: true });
   await mkdir(join(ctx.directory, 'node_modules/@zgeoff/commitlint-config'), { recursive: true });

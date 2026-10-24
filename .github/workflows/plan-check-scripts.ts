@@ -3,15 +3,12 @@
 export type CheckPart = 'all' | 'static' | 'test' | 'lane';
 
 export interface CheckPlanRequest {
-  // The caller's space-separated list; empty or whitespace means the standard list.
   readonly scripts: string;
 
-  // The script names the repo's package.json defines.
   readonly defined: readonly string[];
 
   readonly part: CheckPart;
 
-  // The lane a lane job runs; the other parts ignore it.
   readonly lane: string;
 }
 
@@ -58,8 +55,6 @@ export function planCheckScripts(request: CheckPlanRequest): CheckPlan {
 
 const laneNames = ['e2e', 'browser', 'docker', 'host'];
 
-// The standard list runs each lane only when the repo defines its script, so a repo turns a lane on
-// by adding it.
 function buildStandardList(defined: ReadonlySet<string>): string[] {
   const optional = (name: string) => (defined.has(name) ? [name] : []);
 

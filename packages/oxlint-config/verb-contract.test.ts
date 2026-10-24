@@ -848,7 +848,6 @@ test('it holds the same no-I/O verbs as the role table in the shared skill', asy
     (match) => match.groups?.['verb'] ?? '',
   );
 
-  // every verb either side names, so a verb only the rule holds is linted too
   const candidates = new Set([...tableVerbs.map((entry) => entry.verb), ...ruleVerbs]);
 
   const source = [...candidates]

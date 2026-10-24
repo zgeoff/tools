@@ -4,12 +4,9 @@ import type { SkillGateHookOutput, SkillGateOutputContext, SkillGatePlan } from 
 
 const RULES_PATH = '.claude/skill-gate.json';
 
-// A gated path changes only through these tools; the gate warns on a Bash write and blocks an edit.
 const EDIT_TOOLS_NOTE =
   'Change a gated path only with Edit, Write or MultiEdit, never through Bash.';
 
-// A broken rules file, a rule that names a skill the repo does not have, or a key the rules parser
-// does not know never denies: it warns the user and the agent, and the edit goes ahead.
 export function buildSkillGateOutput(
   filePath: string,
   plan: SkillGatePlan,

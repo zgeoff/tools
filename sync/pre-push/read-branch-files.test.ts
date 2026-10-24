@@ -7,8 +7,6 @@ import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { runGit } from '../../test-utils/run-git.ts';
 import { readBranchFiles } from './read-branch-files.ts';
 
-// A bare upstream and a clone of it whose main holds one pushed commit, so
-// every test starts from a repository whose history predates the branch.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'read-branch-files-'));
 

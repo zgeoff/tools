@@ -6,8 +6,6 @@ interface AuditScript {
   readonly auditLevel: Severity | null;
 }
 
-// Reads the --ignore and --audit-level flags of a package.json `audit` script,
-// in both the `--flag=value` and the `--flag value` forms.
 export function parseAuditScript(script: string): AuditScript {
   const tokens = script.trim().split(/\s+/u);
   const ignoreIDs: string[] = [];

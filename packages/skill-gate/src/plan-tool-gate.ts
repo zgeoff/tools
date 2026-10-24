@@ -1,7 +1,6 @@
 import path from 'node:path';
 import type { ToolGateInput, ToolGatePlan, UnknownToolRequirement } from './types.ts';
 
-// A skill or reference the repo lacks never counts as missing, since no session could load it.
 export function planToolGate(input: ToolGateInput): ToolGatePlan {
   const gates = input.tools.filter((gate) => gate.tool === input.toolName);
 

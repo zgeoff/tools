@@ -1,8 +1,7 @@
 import type { CustomMatcher } from 'bun:test';
 
-// Every jest-extended matcher except `pass`/`fail` (unimplemented upstream).
-// Listed explicitly because jest-extended's CustomMatchers carries a string
-// index signature that makes `keyof` useless.
+// Listed by hand: jest-extended's CustomMatchers carries a string index signature that makes
+// `keyof` useless, and jest-extended leaves `pass` and `fail` unimplemented.
 export type JestExtendedMatcherName =
   | 'toBeAfter'
   | 'toBeAfterOrEqualTo'

@@ -1,8 +1,6 @@
 import { isRecord } from '@zgeoff/std';
 import type { SkillGate, SkillGateRulesResult, ToolGate } from './types.ts';
 
-// `match` globs the path relative to the project root. A key the parser does not know is skipped,
-// not refused, so a rules file written for a later version of the package still gates.
 export function parseSkillGateRules(text: string): SkillGateRulesResult {
   const value = parseJSON(text);
 
@@ -60,6 +58,8 @@ function parseRulesRecord(value: Readonly<Record<string, unknown>>): SkillGateRu
     ok: true,
     rules: { ignore, gates: parsedGates.filter((gate) => typeof gate !== 'string') },
     tools: parsedTools.filter((gate) => typeof gate !== 'string'),
+
+    // A refused unknown key would break a rules file written for a later version of the package.
     unknownKeys: [
       ...collectUnknownKeys(value, RULES_KEYS, ''),
       ...gates.flatMap((gate, index) =>

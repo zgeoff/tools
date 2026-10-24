@@ -2,8 +2,6 @@ import type { SimpleGit } from 'simple-git';
 import { toContentHash } from './to-content-hash.ts';
 import type { FileHashes } from './types.ts';
 
-// Reads, through a git client opened on the project, a hash of each project path's content in a
-// commit, or null for a path the commit does not hold. Without a commit, no path has content.
 export async function readCommitHashes(
   git: SimpleGit,
   commit: string | null,

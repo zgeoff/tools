@@ -2,9 +2,6 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { isBuiltin } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 
-// `module` for a package or builtin, `file` with the absolute path, or
-// `missing`. The own name, which `self` marks, resolves through `exports`, `#`
-// names through `imports`, and a workspace name to a path in its folder.
 export default function resolveImportTarget(filename, specifier, settings) {
   if (isPathSpecifier(specifier)) {
     return toTarget(resolveImportedFile(filename, toFileSpecifier(specifier), settings.extensions));
@@ -201,8 +198,6 @@ function toMappedTarget(manifest, mapped) {
     : { kind: 'file', path: resolve(manifest.directory, mapped) };
 }
 
-// the edges judge the package folder joined with the subpath, such as
-// `packages/store/testing`, so the exports map's keys matter and not its targets
 function resolveWorkspaceTarget(workspaces, specifier) {
   const workspace = workspaces.find((candidate) => isPackageSpecifier(candidate.name, specifier));
 

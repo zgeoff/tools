@@ -1,7 +1,6 @@
 import { isRecord } from '../../packages/std/src/is-record.ts';
 import type { BlockedPackage, FixPlan, FixedPackage, UnfixablePackage } from './types.ts';
 
-// Checks the shape of `bun audit fix --json` output and keeps the fields the step uses.
 export function parseFixPlan(value: unknown): FixPlan {
   if (!isRecord(value)) {
     throw new TypeError('bun audit fix --json printed no object');

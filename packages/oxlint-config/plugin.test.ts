@@ -1125,9 +1125,8 @@ test('it reports nothing when the config names no words', async () => {
   expect(result.exitCode).toBe(0);
 });
 
-// every form that binds a name, with NAME where the name goes; each row runs
-// once with `src`, which the rule reports, and once with `source`, which it
-// accepts; the rule's names sit in rows rather than keys, so they pass it
+// the rule's names sit in rows rather than object keys, so this file passes
+// the rule
 test.each([
   ['a variable', 'export const NAME = 1;\n'],
   ['a loop variable', 'for (const NAME of [1]) {\n  globalThis.value = NAME;\n}\n'],
@@ -1258,7 +1257,6 @@ test.each([
   expect(result.stdout).toInclude('Rename `src` to `source`');
 });
 
-// a private name reports with its `#`, so these rows take their own message
 test.each([
   ['a private field', 'export class Paths {\n  #NAME = 1;\n}\n'],
   ['a private getter', 'export class Paths {\n  get #NAME(): number {\n    return 1;\n  }\n}\n'],
@@ -2620,8 +2618,6 @@ test('it resolves # imports and export patterns through the package manifest', a
   expect(result.stdout).toInclude('parser: oxc-parser is allowed only in no zone');
 });
 
-// app/ and store/ under packages/, with the store's manifest and source; the
-// edges judge the path a workspace import maps to
 test.each([
   ['the root entry', { '.': './src/index.ts' }, '@demo/store', 'packages/store (store)'],
   [

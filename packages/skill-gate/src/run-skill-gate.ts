@@ -40,9 +40,6 @@ import type {
   WrittenPath,
 } from './types.ts';
 
-// The hook exits once it prints its output. The repo's own .claude/skill-gate.json holds the rules;
-// a repo without that file has no gate. A subagent's loads come from its own transcript, never the
-// main session's.
 export async function runSkillGate(): Promise<never> {
   const payload: unknown = await Bun.stdin.json().catch(() => null);
 
@@ -124,7 +121,6 @@ export async function runSkillGate(): Promise<never> {
   process.exit(0);
 }
 
-// An Edit, Write or MultiEdit call carries `file_path`, and a Bash call carries `command`.
 interface HookInput {
   readonly event: HookEvent;
   readonly toolName: string | null;
@@ -167,12 +163,10 @@ function parseHookInput(value: unknown): HookInput | null {
   };
 }
 
-// A payload without an event name is a PreToolUse call, as the hook was first registered.
 function pickHookEvent(value: unknown): HookEvent {
   return value === 'PostToolUse' || value === 'PostToolUseFailure' ? value : 'PreToolUse';
 }
 
-// The path and Bash checks report a broken rules file for these tools.
 const PATH_GATED_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'Bash']);
 
 interface ToolCallCheck {
@@ -182,12 +176,12 @@ interface ToolCallCheck {
   readonly rulesText: string;
 }
 
-// A call that no tool gate names returns to the path and Bash checks. A broken rules file lets a
-// gated call through with a warning, since the hook matcher names only gated tools beside those.
 async function checkToolCall(check: ToolCallCheck): Promise<void> {
   const parsedRules = parseSkillGateRules(check.rulesText);
 
   if (!parsedRules.ok) {
+    // The hook matcher names only gated tools beside the path-gated ones, so a broken rules file
+    // warns on each such call and lets it through.
     if (!PATH_GATED_TOOLS.has(check.toolName)) {
       printOutput(
         buildToolGateOutput(
@@ -244,7 +238,7 @@ function printOutput(output: object | null): void {
 
 // A subagent's call carries the main session's transcript_path plus its own agent_id, and Claude
 // Code keeps its transcript in <session>/subagents/, under workflows/<workflow_id>/ when a workflow
-// started it. An agent_id that is not a plain name reads no transcript, so the edit is denied.
+// started it.
 async function readSessionTranscript(hookInput: HookInput): Promise<string> {
   if (hookInput.agentID === undefined) {
     return readTranscript(hookInput.transcriptPath);
@@ -304,7 +298,7 @@ async function readAvailableSkills(skillsDir: string): Promise<readonly string[]
       skills.push(path.dirname(skillFile));
     }
   } catch {
-    // A repo without .claude/skills has no skills, so each rule reports its skills as unknown.
+    // Bun's glob scan throws when .claude/skills is missing, and such a repo has no skills.
   }
 
   return skills;
@@ -317,7 +311,6 @@ interface BashCheck {
   readonly rulesText: string;
 }
 
-// A broken rules file lets every command through, since the next edit reports it.
 async function checkBash(check: BashCheck): Promise<never> {
   const parsedRules = parseSkillGateRules(check.rulesText);
 
@@ -348,7 +341,7 @@ async function checkBash(check: BashCheck): Promise<never> {
 }
 
 // Claude Code keeps a session's own files in <session>/ beside its transcript, which a git status
-// of the project never lists. Each Bash call gets its own record, so parallel calls never share one.
+// of the project never lists.
 function resolveSnapshotPath(hookInput: HookInput): string | null {
   if (typeof hookInput.toolUseID !== 'string' || !/^[\w-]+$/u.test(hookInput.toolUseID)) {
     return null;
@@ -359,8 +352,6 @@ function resolveSnapshotPath(hookInput: HookInput): string | null {
   return path.join(sessionDir, 'skill-gate', `${hookInput.toolUseID}.json`);
 }
 
-// Records HEAD and the content of each gated file that is dirty before the command runs. A project
-// outside a git work tree, or a record the hook cannot write, leaves the command unchecked.
 async function writeGatedSnapshot(
   git: SimpleGit,
   snapshotPath: string,
@@ -382,7 +373,6 @@ async function writeGatedSnapshot(
   }
 }
 
-// A git failure becomes a failed record, which the check after the command reports.
 async function readGatedSnapshot(
   git: SimpleGit,
   projectDir: string,
@@ -430,8 +420,6 @@ function isOutsideProject(fromProject: string): boolean {
   return fromProject === '..' || fromProject.startsWith('../') || path.isAbsolute(fromProject);
 }
 
-// Warns on a command that writes a gated path in the project; any other command goes ahead in
-// silence. The check after the command is the one that blocks.
 async function checkBashCommand(check: BashCheck, rules: SkillGateRules): Promise<void> {
   const written = collectWrittenPaths(check.command).map((entry) =>
     readWrittenPath(check.hookInput.cwd, entry),

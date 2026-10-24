@@ -2,8 +2,6 @@ import { basename } from 'node:path';
 import buildModuleOrderFix from './build-module-order-fix.js';
 import collectModuleEntries from './collect-module-entries.js';
 
-// the code-style module order: the primary export, then its private helpers
-// depth-first, with each const, type or enum directly above its first use
 const moduleOrder = {
   meta: {
     type: 'suggestion',
@@ -73,9 +71,6 @@ function checkModule(context, program) {
   }
 }
 
-// the default export, else the export the file is named for, else the only
-// value the file exports; `export default name` names the declaration of
-// `name`, and a default export of any other expression is the statement
 function findPrimaryExport(entries, filename) {
   const defaultEntry = entries.find((entry) => entry.exportKind === 'default') ?? null;
   const defaultName =
@@ -98,7 +93,6 @@ function findPrimaryExport(entries, filename) {
   return named ?? only;
 }
 
-// `parseCLIArgs` becomes `parse-cli-args`, as the code-style file names read
 function toKebabCase(name) {
   return name
     .replaceAll(/(?<before>[a-z\d])(?<after>[A-Z])/gu, '$<before>-$<after>')
@@ -106,9 +100,6 @@ function toKebabCase(name) {
     .toLowerCase();
 }
 
-// the primary export, then each private helper it reaches, depth-first in the
-// order each one is first referenced; a const or type passes its references
-// through, so a helper that only a const names still has a place
 function collectMainOrder(primary) {
   const order = [primary];
   const seen = new Set([primary]);
@@ -139,8 +130,6 @@ function isHelper(entry) {
   return entry.kind === 'function' && entry.exportKind === null;
 }
 
-// the main-order entry each const or type belongs above: the earliest one
-// that uses it, directly or through another const or type
 function buildHomes(entries, ranks) {
   const homes = new Map();
   const visiting = new Set();
@@ -179,17 +168,12 @@ function buildHomes(entries, ranks) {
   return homes;
 }
 
-// the users of `entry` in its home's block: the home itself and each const
-// or type with the same home
 function collectBlockUsers(entry, homes) {
   const home = homes.get(entry);
 
   return [...entry.users].filter((user) => user === home || homes.get(user) === home);
 }
 
-// a helper above the primary export, and a helper below it that breaks the
-// depth-first order; the longest run already in order stays, so each report
-// names one helper to move
 function collectHelperReports(layout) {
   const primary = layout.primary;
   const reports = [];
@@ -218,7 +202,6 @@ function collectHelperReports(layout) {
   return reports;
 }
 
-// the positions of one longest increasing run in `values`
 function collectLongestRun(values) {
   const lengths = values.map(() => 1);
   const previous = values.map(() => -1);
@@ -243,9 +226,6 @@ function collectLongestRun(values) {
   return kept;
 }
 
-// a const or type sits above every use in its home's block, with no helper
-// that stays between it and its home; a const that a live function reads
-// stays unchecked, since below the primary export it could be read unset
 function collectDeclarationReports(layout, helperReports) {
   const homes = layout.homes;
   const moving = new Set(helperReports.map((report) => report.entry));
@@ -255,6 +235,8 @@ function collectDeclarationReports(layout, helperReports) {
   for (const entry of layout.entries) {
     const home = homes.get(entry) ?? null;
 
+    // load-time code can call a live function before a const below the primary
+    // export is set, so a const that a live function reads stays unchecked
     if (home === null || (hasValue(entry) && isReadByLiveFunction(entry))) {
       continue;
     }
@@ -278,7 +260,6 @@ function collectDeclarationReports(layout, helperReports) {
   return reports;
 }
 
-// a type has no value to read unset, so it is always checked
 function hasValue(entry) {
   const type = entry.declaration.type;
 

@@ -13,7 +13,6 @@ export async function readBranchBase(options: Readonly<ReadBranchBaseOptions>): 
 
   const base = await runGit(options, ['merge-base', 'HEAD', defaultBranch]);
 
-  // Throw rather than return nothing, so a check never reads an empty branch by accident.
   if (base.exitCode !== 0) {
     throw new Error(
       `cannot find the base of this branch: no merge base between HEAD and ${defaultBranch} (is the remote fetched?)`,

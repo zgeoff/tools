@@ -10,8 +10,8 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  // A clean environment: a pre-push hook in a linked worktree exports GIT_DIR, which would point
-  // git init and the script's git calls at the real repository.
+  // A pre-push hook in a linked worktree exports GIT_DIR, which would point git init and the
+  // script's git calls at the real repository.
   const env = {
     PATH: process.env['PATH'],
     HOME: directory,
@@ -38,8 +38,6 @@ async function setupTest() {
   const run = (...args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`.cwd(directory).env(env).nothrow().quiet();
 
-  // Runs the script as a GitHub Actions pull-request run against a base branch on origin, in the
-  // test repository or in a clone of it.
   const runInPullRequest = (baseRef: string, args: readonly string[], cwd = directory) =>
     $`bash ${scriptPath} ${args}`
       .cwd(cwd)
@@ -59,7 +57,7 @@ async function setupTest() {
     return originDir;
   };
 
-  // Clones one branch of origin with no history, as actions/checkout does for a pull request.
+  // actions/checkout clones one branch with no history for a pull request.
   const createShallowClone = async (originDir: string, branch: string) => {
     const cloneDir = await mkdtemp(join(tmpdir(), 'check-prose-clone-'));
 
@@ -171,8 +169,6 @@ test('it passes a long list, its wrapped lines and its later paragraphs', async 
   });
 });
 
-// Each row holds a document, its exit status and the long paragraphs reported. Later rows follow
-// the spec sections, one per block rule and edge.
 test.each<[string, string, number, string[]]>([
   ['a 250-word paragraph', `${'word '.repeat(250)}\n`, 0, ['guide.md:1:250 words']],
   ['a 150-word paragraph', `${'word '.repeat(150)}\n`, 0, []],

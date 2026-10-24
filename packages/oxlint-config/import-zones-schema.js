@@ -1,4 +1,3 @@
-// the options of zgeoff/import-zones; oxlint rejects a config that breaks it
 const stringList = { type: 'array', items: { type: 'string' } };
 
 const importZonesSchema = {

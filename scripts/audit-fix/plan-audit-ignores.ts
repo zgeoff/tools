@@ -3,26 +3,19 @@ import { severities } from './types.ts';
 import type { AuditIgnore, AuditIgnores, AuditReport, FixPlan, Severity } from './types.ts';
 
 interface PlanAuditIgnoresInput {
-  // The audit after `bun audit fix` ran, so it holds only what the fix left.
   readonly report: AuditReport;
   readonly ignores: AuditIgnores;
 
-  // --ignore flags in the audit script that audit-ignores.json does not hold.
-  // The step leaves them alone.
   readonly unmanagedIDs: readonly string[];
   readonly plan: FixPlan;
   readonly auditLevel: Severity | null;
   readonly today: string;
   readonly expiryDays: number;
 
-  // The ignores on the open fix branch. A new or renewed ignore takes its
-  // expiry from there, so a rerun builds the same tree and leaves the pull
-  // request's checks alone.
+  // A rerun that builds the same tree leaves the pull request's checks alone.
   readonly pending: AuditIgnores;
 }
 
-// The furthest an ignore may reach. An entry set further out, by hand or by a
-// bad edit, counts as expired, so it comes back for review.
 const maxExpiryDays = 90;
 
 export interface IgnoreChange extends AuditIgnore {
@@ -35,13 +28,9 @@ interface AuditIgnoresPlan {
   readonly added: readonly IgnoreChange[];
   readonly renewed: readonly IgnoreChange[];
 
-  // Advisory IDs whose ignore the step drops, because the audit no longer
-  // reports the advisory.
   readonly removed: readonly string[];
 }
 
-// Decides the audit-ignores.json entries after a fix. A new or renewed ignore
-// needs a person's review, so the workflow never merges one by itself.
 export function planAuditIgnores(input: PlanAuditIgnoresInput): AuditIgnoresPlan {
   const remaining = collectRemainingAdvisories(input.report, input.auditLevel);
   const latest = buildDateAfter(input.today, maxExpiryDays);

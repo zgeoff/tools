@@ -11,8 +11,6 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  // The hook process runs the gate as a repo's entry point does: it imports runSkillGate and awaits
-  // it, so each test sees the exit code and the output a repo sees.
   const indexPath = fileURLToPath(new URL('index.ts', import.meta.url));
 
   const hookArgs = [

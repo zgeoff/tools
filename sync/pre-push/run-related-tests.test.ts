@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 import { resolveRelatedTests } from './run-related-tests.ts';
 
-// A temp directory standing in for a repo root, with an empty src/.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'run-related-tests-'));
 

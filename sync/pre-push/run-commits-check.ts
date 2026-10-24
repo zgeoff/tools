@@ -6,12 +6,10 @@ import { runProgram } from './run-program.ts';
 export interface CommitsCheckOptions {
   readonly cwd: string;
 
-  // The commit the branch grows from; the check reads the commits after it, up to HEAD.
   readonly base: string;
 
   readonly env: Readonly<Record<string, string | undefined>>;
 
-  // The paths of the commitlint program and of the @zgeoff/commitlint-config module.
   readonly commitlint: string;
   readonly config: string;
 

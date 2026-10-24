@@ -48,8 +48,6 @@ const noRestrictedWords = {
   },
 };
 
-// a letter, digit or underscore on either side makes the match part of a
-// longer word (`impl`, `simple`), so only those characters bound it
 function buildWordPattern(words) {
   const alternatives = words.map((word) =>
     word.replaceAll(/[$()*+.?[\\\]^{|}]/gu, String.raw`\$&`),
