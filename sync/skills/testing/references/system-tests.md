@@ -36,14 +36,18 @@ in module tests; keep binary journeys that check the assembled program.
 An evaluation suite in `evals/` checks production code against a committed corpus or report: it
 replays a corpus of recorded traffic through the production path, or checks a committed evaluation
 report against the code. It tests a corpus, not one module, so it has no module to sit beside.
+`evals/` is a place, not a lane, so the suite runs in the unit run on every pull request, under the
+5 s limit.
 
 - The input is the committed corpus or report file, read through one tested loader. The cases are
   never restated as inline literals.
-- Helpers live in the shared test utils, outside `evals/`, with tests of their own. A stand-in
-  replaces only what a recording cannot reproduce, such as the disk or the forge, and the suite
-  injects it into the production path.
+- Helpers live in a package outside `evals/`, with tests of their own. A stand-in replaces only what
+  a recording cannot reproduce, such as the disk or the forge, and the suite injects it into the
+  production path.
 - A deliberate mismatch between the report and the code fails the suite. A suite that passes on a
   stale report checks nothing.
+- A test that calls a live model is not a replay. It takes the `.model-api` suffix and runs in that
+  lane, as [Lanes](../SKILL.md#lanes) describes.
 - Every other rule in the testing skill applies to an evaluation suite.
 
 ## Property tests

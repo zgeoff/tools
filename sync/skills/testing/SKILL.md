@@ -202,8 +202,12 @@ slow, find its cause in this table and make the change it names. Never raise the
   exit codes, crash recovery), and one happy-path journey per main user flow. A flow's variants,
   such as its edge cases, error branches, and denials, run in process. A test that imports a package
   belongs in `integration/`.
-- An app root may hold its own `integration/` and `e2e/`. A lane's harness lives outside the lane
-  directory, in a package with its own unit tests.
+- `evals/` holds the [evaluation suites](./references/system-tests.md#evaluation-suites), which
+  replay a committed corpus or report through the production path. Like `integration/`, it is a
+  place, not a lane: it runs in the unit run on every pull request, under every unit rule. Its
+  helpers live in a package outside `evals/`, with their own unit tests.
+- An app root may hold its own `integration/`, `evals/` and `e2e/`. A lane's harness lives outside
+  the lane directory, in a package with its own unit tests.
 - A static check of config or of generated text is a script, not a test.
 
 To place a test, ask where its failure points. A failure that points at the wiring belongs in
@@ -223,16 +227,21 @@ A lane runs the tests that need one real system. Each lane has its own `test:<la
 CI step, and a per-test limit, which the script's `--timeout` sets and `zgeoff/max-test-timeout`
 checks in each lane file. The unit run leaves the lane files out by pattern.
 
-| Lane      | Where                                  | Limit | The real system                                                                     |
-| --------- | -------------------------------------- | ----- | ----------------------------------------------------------------------------------- |
-| unit      | every other test file                  | 5 s   | none: code in process, per-run fixtures, and stand-ins                              |
-| e2e       | `e2e/` at the repo root or an app root | 15 s  | the built product, driven from outside                                              |
-| browser   | `<name>.browser.test.ts`               | 10 s  | a real browser                                                                      |
-| docker    | `<name>.docker.test.ts`                | 15 s  | a container engine                                                                  |
-| host      | `<name>.host.test.ts`                  | 15 s  | the host kernel, root, or the network stack                                         |
-| agent-sdk | `<name>.agent-sdk.test.ts`             | 5 s   | the Claude Agent SDK subprocess against a scripted model, never the live API        |
-| evals     | `evals/` at the repo root              | 120 s | a live external API; the lane runs nightly and on dispatch, never on a pull request |
+| Lane      | Where                                  | Limit | The real system                                                              |
+| --------- | -------------------------------------- | ----- | ---------------------------------------------------------------------------- |
+| unit      | every other test file                  | 5 s   | none: code in process, per-run fixtures, and stand-ins                       |
+| e2e       | `e2e/` at the repo root or an app root | 15 s  | the built product, driven from outside                                       |
+| browser   | `<name>.browser.test.ts`               | 10 s  | a real browser                                                               |
+| docker    | `<name>.docker.test.ts`                | 15 s  | a container engine                                                           |
+| host      | `<name>.host.test.ts`                  | 15 s  | the host kernel, root, or the network stack                                  |
+| agent-sdk | `<name>.agent-sdk.test.ts`             | 5 s   | the Claude Agent SDK subprocess against a scripted model, never the live API |
+| model-api | `<name>.model-api.test.ts`             | 120 s | a live model API                                                             |
 
+- The `model-api` lane runs nightly, on dispatch, and on a pull request that bumps the Agent SDK
+  when the pull request carries the opt-in label, never on every pull request. A test that calls a
+  live model takes the suffix wherever it lives, in `evals/` too.
+- A test that calls a live API other than a model gets its own project lane, with a suffix that
+  names that API.
 - A suffix names one real system, never a speed. A repo prefers a specific suffix to the generic
   `.host`, such as a made-up `.kvm` for a test that boots a VM.
 - A repo adds a project lane only for a real system that this section allows. Its project-testing
@@ -290,10 +299,9 @@ that setting names a ticket.
   `test()` for each case.
 - Tests sit beside the module they test (`parse-entry.ts` and `parse-entry.test.ts`), and a test of
   a program's entry module, such as `cli.ts`, sits beside that module too, so `src/` stays a mirror
-  with one test file per module. Three directories are the exceptions: `integration/` and `e2e/` at
-  the repo root or an app root, and `evals/` at the repo root, which
-  [Where a test lives](#where-a-test-lives) describes. The repo has no other `test/`, `tests/`, or
-  `__tests__` directory.
+  with one test file per module. Three directories are the exceptions: `integration/`, `evals/` and
+  `e2e/` at the repo root or an app root, which [Where a test lives](#where-a-test-lives) describes.
+  The repo has no other `test/`, `tests/`, or `__tests__` directory.
 - A test that drives a real browser goes in `<module>.browser.test.ts` beside its module, which the
   repo runs in a serial lane, as [Browser suites](./references/system-tests.md#browser-suites)
   describes.
@@ -313,8 +321,7 @@ test.each([
 An end-to-end suite holds tests of the process itself and one journey per main user flow, as
 [Where a test lives](#where-a-test-lives) describes. It splits by user journey, one file per
 journey, and a journey test may chain dependent act-and-assert phases. Its harness, resets, and
-command checks follow [System tests](./references/system-tests.md#end-to-end-suites), and so does an
-evaluation suite in `evals/`.
+command checks follow [System tests](./references/system-tests.md#end-to-end-suites).
 
 ### Loops
 
