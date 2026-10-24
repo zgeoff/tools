@@ -29,6 +29,12 @@ where they are acquired. A test exercises real behaviour through real code, and 
 stand-in only at a boundary the test cannot cross. When existing tests break these rules, you align
 them while you work on the code they cover.
 
+The CI unit run passes `--randomize`, so Bun runs the files, and the tests in each file, in a random
+order and prints the `--seed=<seed>` it used. A leak that a fixed order hides then fails CI. A
+failure under `--randomize` is a leak between tests or files. Reproduce it by passing the printed
+`--seed=<seed>`, which runs the same order again, and fix the leak at its cause, never by pinning
+the order.
+
 Never write a test only to satisfy a lint or layout rule. Change the rule's config instead, with a
 one-line reason. A repo that adopts a shared lint rule, such as `zgeoff/import-zones`, never tests
 that the rule or its zones fire: the rule is tested once, in its own package. Never cut a test that
