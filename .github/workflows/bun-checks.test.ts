@@ -1050,8 +1050,8 @@ test('it fails the docs check on a README over its line limit even when every li
     { recursive: true },
   );
 
-  // A plain repo README holds 60 lines at most, and this one has 61 and no link.
-  const lines = Array.from({ length: 60 }, (_, index) => `Step ${index + 1} greets the visitor.`);
+  // The root README holds 100 lines at most, and this one has 101 and no link.
+  const lines = Array.from({ length: 100 }, (_, index) => `Step ${index + 1} greets the visitor.`);
 
   await writeFile(join(ctx.repo, 'README.md'), `# Greeter\n${lines.join('\n')}\n`);
 
@@ -1063,7 +1063,7 @@ test('it fails the docs check on a README over its line limit even when every li
 
   const output = `${result.stdout.toString()}${result.stderr.toString()}`;
 
-  expect(output).toInclude('README.md: 61 lines, over the plain repo README limit of 60');
+  expect(output).toInclude('README.md: 101 lines, over the front page README limit of 100');
   expect(output).toInclude('::error::docs: check-length.sh failed');
 });
 
