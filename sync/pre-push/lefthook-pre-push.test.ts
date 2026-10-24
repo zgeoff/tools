@@ -567,6 +567,12 @@ test.skipIf(!canRunActionlint)(
     await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
     await mkdir(join(ctx.worktree, '.github/workflows'), { recursive: true });
 
+    // This repo's own actionlint config sits beside the workflow, so the expiry holds in tools too.
+    await cp(
+      join(import.meta.dir, '../../.github/actionlint.yaml'),
+      join(ctx.worktree, '.github/actionlint.yaml'),
+    );
+
     await writeFile(
       join(ctx.worktree, '.github/workflows/publish.yml'),
       'on: push\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    concurrency:\n      group: publish\n      cancel-in-progress: false\n      queue: max\n    steps:\n      - run: echo hi\n',

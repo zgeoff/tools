@@ -1154,6 +1154,9 @@ test('it fails the workflows check on a concurrency queue key once the ignore ex
   await chmod(join(clock, 'date'), 0o755);
   await mkdir(join(ctx.repo, '.github/workflows'), { recursive: true });
 
+  // This repo's own actionlint config sits beside the workflow, so the expiry holds in tools too.
+  await cp(join(import.meta.dir, '../actionlint.yaml'), join(ctx.repo, '.github/actionlint.yaml'));
+
   await writeFile(
     join(ctx.repo, '.github/workflows/publish.yml'),
     'on: push\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    concurrency:\n      group: publish\n      cancel-in-progress: false\n      queue: max\n    steps:\n      - run: echo hi\n',

@@ -1,9 +1,8 @@
 # actionlint 1.7.12 does not know the job.workflow_* properties
-# (rhysd/actionlint#757) or the queue key of concurrency. The Check workflows
-# step of bun-checks.yml gives the queue ignore's reason and expiry; it repeats
-# here so that a plain actionlint run in this repo passes too.
+# (rhysd/actionlint#757). The workflows check in CI and in the pre-push
+# baseline ignores the queue key of concurrency until an expiry date, so this
+# config leaves that key to them.
 paths:
   .github/workflows/*.{yml,yaml}:
     ignore:
       - 'property "workflow_(sha|ref)" is not defined in object type \{check_run_id: '
-      - 'unexpected key "queue" for "concurrency" section'
