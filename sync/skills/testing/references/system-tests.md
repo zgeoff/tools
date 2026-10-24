@@ -120,9 +120,17 @@ runs browser suites in their own serial lane after the parallel run, so the brow
 idle CPU. A cold browser start on a CPU that the parallel pool saturates can outlast the test
 timeout, and a raised timeout only hides that cost.
 
-- A browser suite keeps within the browser lane's limit, which [Lanes](../SKILL.md#lanes) states.
-  When it needs more, the suite is doing an end-to-end journey's work, and the journey belongs in
-  `e2e/`.
+- A browser test keeps within the browser lane's 10 s limit, which [Lanes](../SKILL.md#lanes)
+  states.
+- When it runs longer, find the cause in the [Slow tests](../SKILL.md#slow-tests) table and fix
+  that. The usual causes are a dev server or a build per test, which becomes a per-run fixture; a
+  fixed wait, which becomes a wait for the element or the event; and a test that drives a whole user
+  flow, which becomes a test of one component or page.
+- A user journey through the browser belongs in `e2e/` because it is a journey of the built product,
+  not because of its time, and it keeps within that lane's limit too.
+- A test that cannot fit carries the disable comment that
+  [A test over its limit](../SKILL.md#a-test-over-its-limit) describes, with its measured time and
+  its ticket.
 - Every other test stays out of a browser suite, so the parallel run keeps its speed.
 
 ## Stateful stand-ins

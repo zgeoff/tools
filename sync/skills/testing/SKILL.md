@@ -262,8 +262,10 @@ test('it restores a volume from its oldest snapshot', { timeout: 60_000 }, async
 The rule reports the timeout value, so the comment sits on the line before it, and an options object
 before the callback keeps the value on the first line of the test.
 
-The limit never rises to cover one test. The test timeout check fails a disable of
-`zgeoff/max-test-timeout` that names no ticket after `--`.
+The limit never rises to cover one test. `zgeoff/test-timeout-exception-ticket` fails a disable of
+`zgeoff/max-test-timeout` that names no ticket after `--`, in any of its forms, and the test timeout
+check fails an oxlint config that turns either rule off or down to a warning, unless a comment on
+that setting names a ticket.
 
 ## Structure and naming
 
