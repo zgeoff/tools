@@ -120,8 +120,8 @@ behavior keeps MSW where it applies.
 
 A test that drives a real browser, such as Chrome through `Bun.WebView` or Playwright, lives in a
 browser suite named `<module>.browser.test.ts` beside the module it tests. The repo's test script
-runs browser suites in their own serial lane after the parallel run, so the browser starts on an
-idle CPU. A cold browser start on a CPU that the parallel pool saturates can outlast the test
+runs browser suites in their own serial lane after the unit run, so the browser starts on an idle
+CPU. A cold browser start on a CPU that the unit run's workers saturate can outlast the test
 timeout, and a raised timeout only hides that cost.
 
 - A browser test keeps within the browser lane's 10 s limit, which [Lanes](../SKILL.md#lanes)
@@ -135,7 +135,7 @@ timeout, and a raised timeout only hides that cost.
 - A test that cannot fit carries the disable comment that
   [A test over its limit](../SKILL.md#a-test-over-its-limit) describes, with its measured time and
   its ticket or its floor.
-- Every other test stays out of a browser suite, so the parallel run keeps its speed.
+- Every other test stays out of a browser suite, so the unit run keeps its speed.
 
 ## Stateful stand-ins
 

@@ -12,13 +12,19 @@ description:
 
 # Testing
 
-Without `--parallel`, `bun test` runs every test file in one process with one global object, so
-state that one file leaves behind is state the next file sees. `--parallel` spreads the files over
-worker processes and implies `--isolate`, which gives each file a fresh global object, module
-registry, and environment. Files in one worker still share the filesystem, the ports, and any
-process a test started. The repo's [`bunfig.toml`](../../../bunfig.toml) preload sets up each global
-object: it registers the matchers, the mock server lifecycle, and every reset that returns shared
-state to a clean baseline after each test. Per-test resources register cleanup with `onTestFinished`
+Plain `bun test` runs every test file in one process with one global object. `--parallel=N` spreads
+the files over N worker processes, and it isolates each file unless the run passes `--no-isolate`.
+Isolation gives each file a fresh global object and module registry, so it evaluates the preload and
+every import again for each file, and `--isolate` alone does the same in one process. Isolation also
+closes the servers, sockets, and subprocesses that a file leaves open, while every file still shares
+the filesystem. `--parallel=1` is not plain `bun test`: in one measured web app it ran 6 times
+slower, and the cost of isolation ranged from that to none across the repos measured.
+
+The repo's [`bunfig.toml`](../../../bunfig.toml) preload registers the matchers, the mock server
+lifecycle, and every reset that returns shared state to a clean baseline after each test. Those
+resets keep each file independent in either mode. Isolation hides a leak between files and never
+fixes one. Each repo chooses its mode by measurement, sets it in its test script, and records the
+numbers in its project-testing skill. Per-test resources register cleanup with `onTestFinished`
 where they are acquired. A test exercises real behaviour through real code, and it reaches for a
 stand-in only at a boundary the test cannot cross. When existing tests break these rules, you align
 them while you work on the code they cover.
@@ -186,7 +192,7 @@ slow, find its cause in this table and make the change it names. Never raise the
 | waits for a deadline, an idle limit or a retry delay                                        | a real timer or deadline            | Make the deadline an option of the code that owns it, pass a short one, and wait on the event that the deadline causes. A runtime or kernel timer gets the shortest faithful value, as [Native timers](./references/system-tests.md#native-timers-and-scenario-delays) describes. |
 | sleeps to let something settle                                                              | no signal to wait on                | Wait on a condition with the repo's `waitFor` helper. When the code offers nothing to wait on, add an event, a log marker or a state flag.                                                                                                                                        |
 | proves that something does not happen                                                       | it waits out a timeout              | Wait for a later event that shows the thing did not happen.                                                                                                                                                                                                                       |
-| migrates a database or builds a bundle                                                      | a shared fixture build              | Use a per-run template: built once per run under a file lock, keyed by a hash of its inputs, and copied per test. A per-process memo is wrong under `--parallel`, because each file gets a fresh module registry and builds again.                                                |
+| migrates a database or builds a bundle                                                      | a shared fixture build              | Use a per-run template: built once per run under a file lock, keyed by a hash of its inputs, and copied per test. A per-process memo is wrong with several workers: each worker builds it again, and the builds race on one output folder.                                        |
 | drives a program the repo starts, such as a guest, a worker or a VM manager                 | a real process start                | Use the program's stateful stand-in from the repo's project-testing skill. When none exists, write one, as [Stateful stand-ins](./references/system-tests.md#stateful-stand-ins) describes.                                                                                       |
 | needs the real system, and the real system is the contract                                  | a VM, the kernel, a browser, an API | Put it in a [lane](#lanes). Its directory or file suffix names the lane.                                                                                                                                                                                                          |
 | runs a linter or checker binary over text the code builds, such as a generated shell script | a real process start                | It is not a test. Export the text and check it in a static check script that runs in the CI static job and before a push.                                                                                                                                                         |
@@ -196,7 +202,7 @@ slow, find its cause in this table and make the change it names. Never raise the
 - `<package>/src/<file>.test.ts` holds the unit suite of one source file.
 - `integration/` holds one flow across several packages, in one process, with per-run fixtures and
   stand-ins. It is a place, not a lane: it runs in the unit run under every unit rule, with the 5 s
-  limit, `--parallel`, and no raised timeout.
+  limit and no raised timeout.
 - `e2e/` holds the tests that drive the built product from outside, through its bundle or binary,
   its CLI, HTTP, or a socket. It holds two kinds of test: the process itself (start-up, signals,
   exit codes, crash recovery), and one happy-path journey per main user flow. A flow's variants,
