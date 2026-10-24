@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { createHash } from 'node:crypto';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -324,6 +325,99 @@ test('it reports a line that a merge adds when it resolves a conflict', async ()
 
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
+    runProgram,
+    base: baseText.trim(),
+    env: ctx.env,
+    host: 'greeter-box',
+  });
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'greet.txt',
+      line: 1,
+      message: `commit ${hashText.trim()} adds the home directory ${ctx.directory}/; remove it before you push`,
+    },
+  ]);
+});
+
+test('it reports a line that a conflict-resolving merge adds in a blobless clone', async () => {
+  const ctx = await setupTest();
+
+  const origin = join(ctx.directory, 'origin');
+  const clone = join(ctx.directory, 'clone');
+
+  await $`git init --quiet ${origin}`.env(ctx.env);
+  await $`git config uploadpack.allowFilter true`.cwd(origin).env(ctx.env);
+  await $`git config core.abbrev 12`.cwd(origin).env(ctx.env);
+
+  await writeFile(join(origin, 'greet.txt'), 'greeting: hello\n');
+
+  await $`git add greet.txt`.cwd(origin).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: start the repo'}`.cwd(origin).env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(origin).env(ctx.env).text();
+
+  await $`git switch --quiet -c side`.cwd(origin).env(ctx.env);
+
+  await writeFile(join(origin, 'greet.txt'), 'greeting: good day\n');
+
+  await $`git commit --quiet -am ${'feat: greet by day'}`.cwd(origin).env(ctx.env);
+  await $`git switch --quiet -`.cwd(origin).env(ctx.env);
+
+  await writeFile(join(origin, 'greet.txt'), 'greeting: good evening\n');
+
+  await $`git commit --quiet -am ${'feat: greet by evening'}`.cwd(origin).env(ctx.env);
+  await $`git merge --quiet side`.cwd(origin).env(ctx.env).nothrow().quiet();
+
+  await writeFile(join(origin, 'greet.txt'), `greeting: ${ctx.directory}/.cache/greeting\n`);
+
+  await $`git commit --quiet -am ${'Merge the greetings'}`.cwd(origin).env(ctx.env);
+
+  const hashText = await $`git rev-parse --short HEAD`.cwd(origin).env(ctx.env).text();
+
+  const remergeText = await $`git show --diff-merges=remerge --full-index --format= HEAD`
+    .cwd(origin)
+    .env(ctx.env)
+    .text();
+
+  const conflictBlob =
+    /^index (?<blob>[0-9a-f]{40})\.\./mu.exec(remergeText)?.groups?.['blob'] ?? '';
+
+  // git's loose-object cache lists each 2-hex folder once, so a later merge that looks up a blob
+  // in the conflict blob's folder hides that blob from the prefetch, which asks the server for it.
+  let farewell = '';
+
+  for (let count = 0; farewell === ''; count += 1) {
+    const text = `farewell: goodbye ${count}\n`;
+    const blob = createHash('sha1').update(`blob ${text.length}\0${text}`).digest('hex');
+
+    if (blob.slice(0, 2) === conflictBlob.slice(0, 2)) {
+      farewell = text;
+    }
+  }
+
+  await $`git switch --quiet -c notes`.cwd(origin).env(ctx.env);
+
+  await writeFile(join(origin, 'notes.txt'), 'note: be kind\n');
+
+  await $`git add notes.txt`.cwd(origin).env(ctx.env);
+  await $`git commit --quiet -m ${'docs: add a note'}`.cwd(origin).env(ctx.env);
+  await $`git switch --quiet -`.cwd(origin).env(ctx.env);
+  await $`git merge --quiet --no-ff --no-commit notes`.cwd(origin).env(ctx.env);
+
+  await writeFile(join(origin, 'farewell.txt'), farewell);
+
+  await $`git add farewell.txt`.cwd(origin).env(ctx.env);
+  await $`git commit --quiet -m ${'Merge the notes'}`.cwd(origin).env(ctx.env);
+
+  await $`git clone --quiet --no-checkout --filter=blob:none ${`file://${origin}`} ${clone}`.env(
+    ctx.env,
+  );
+
+  await $`git config core.abbrev 12`.cwd(clone).env(ctx.env);
+
+  const findings = runLocalPathsCheck({
+    cwd: clone,
     runProgram,
     base: baseText.trim(),
     env: ctx.env,
