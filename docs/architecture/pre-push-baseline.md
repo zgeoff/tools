@@ -12,15 +12,18 @@ whole-tree check required.
 The baseline runs `format:check` and `typecheck` over the whole tree, and plain `oxlint`, the shell,
 docs and workflows checks and the sibling tests over the files the branch changes. The shell check
 runs `shellcheck` and `shfmt -d`, the docs check runs the docs-writing skill's `check-length.sh` and
-`check-links.sh` and names each one that fails, and the workflows check runs `actionlint`. The
-workflows check ignores the `queue` key of `concurrency`, which actionlint does not know yet, until
-the expiry date that the Check workflows step of `bun-checks.yml` gives with its reason. Each runs
+`check-links.sh` and names each one that fails, and the workflows check runs `actionlint`. Each runs
 only when the branch changes a file that matches its glob. A check whose program the machine lacks
 prints a notice and passes, because CI installs the program and runs the check. The docs check
 prints a notice and passes in a repo without `.claude/skills/docs-writing/scripts/`. The commits and
 local-paths checks read the branch's commits, and the test-timeouts check reads the files that
 `HEAD` holds. The baseline also runs `typecheck` before a commit that stages a code or JSON file,
 after the repo's own pre-commit jobs, so the type check sees what the fixers wrote.
+
+The workflows check ignores one actionlint error, on the `queue` key of `concurrency`: GitHub
+documents the key, and the pinned actionlint rejects it. The ignore lapses on an expiry date that
+the hook shares with the workflows check in CI. After that date the check reports the key again,
+until an actionlint release that knows the key replaces the ignore.
 
 Each job that calls a package script runs it through the `memory-capped` script, which the entry's
 build points at the [memory-cap script](./memory-caps.md) with the host's memory budget as the cap.
