@@ -77,6 +77,8 @@ Open a reference when the task touches its area.
   composite.
 - [Shell scripts](./references/shell.md): a shell script's test, run through Bun's `$` shell, and
   its ShellCheck check.
+- [Workflows](./references/workflows.md): a GitHub Actions step's logic, tested through its script,
+  and the repo fact test, the one test that reads a workflow.
 - [Cleanup](./references/cleanup.md): helpers that register cleanup, ordered cleanup, cleanup after
   the resets, and a test that fails only in the full run.
 
