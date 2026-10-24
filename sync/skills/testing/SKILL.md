@@ -17,17 +17,18 @@ the files over N worker processes, and it isolates each file unless the run pass
 Isolation gives each file a fresh global object and module registry, so it evaluates the preload and
 every import again for each file, and `--isolate` alone does the same in one process. Isolation also
 closes the servers, sockets, and subprocesses that a file leaves open, while every file still shares
-the filesystem. `--parallel=1` is not plain `bun test`: in one measured web app it ran 6 times
-slower, and the cost of isolation ranged from that to none across the repos measured.
+the filesystem. `--parallel=1` is not plain `bun test`, because it isolates each file. Isolation can
+make a suite several times slower, or cost it nothing, so a repo measures both modes before it
+chooses one.
 
 The repo's [`bunfig.toml`](../../../bunfig.toml) preload registers the matchers, the mock server
 lifecycle, and every reset that returns shared state to a clean baseline after each test. Those
 resets keep each file independent in either mode. Isolation hides a leak between files and never
-fixes one. Each repo chooses its mode by measurement, sets it in its test script, and records the
-numbers in its project-testing skill. Per-test resources register cleanup with `onTestFinished`
-where they are acquired. A test exercises real behaviour through real code, and it reaches for a
-stand-in only at a boundary the test cannot cross. When existing tests break these rules, you align
-them while you work on the code they cover.
+fixes one. Each repo states its mode in its test script and in its project-testing skill, and the
+pull request that sets the mode holds the measurements. Per-test resources register cleanup with
+`onTestFinished` where they are acquired. A test exercises real behaviour through real code, and it
+reaches for a stand-in only at a boundary the test cannot cross. When existing tests break these
+rules, you align them while you work on the code they cover.
 
 The preload starts each shared resource, such as the MSW server, in `beforeAll` and stops it in
 `afterAll`, never at import, so the start and the stop pair up in every mode. Plain `bun test` runs
@@ -273,9 +274,9 @@ checks in each lane file. The unit run leaves the lane files out by pattern.
 - A suffix names one real system, never a speed. A repo prefers a specific suffix to the generic
   `.host`, such as a made-up `.kvm` for a test that boots a VM.
 - A repo adds a project lane only for a real system that this section allows. Its project-testing
-  skill lists the lane with its real system, its limit, and the measured p95 and maximum test time,
-  and its root oxlint config declares the lane and its limit in the `lanes` option of
-  `zgeoff/max-test-timeout` and of `zgeoff/test-beside-module`.
+  skill lists the lane with its real system and its limit, and its root oxlint config declares the
+  lane and its limit in the `lanes` option of `zgeoff/max-test-timeout` and of
+  `zgeoff/test-beside-module`. The pull request that adds the lane holds its measured test times.
 - A test that is slow only because of a runtime timer stays in the unit run, with the disable
   comment that [A test over its limit](#a-test-over-its-limit) describes.
 - A lane holds no test that is only slow. Before a test moves to a lane, check that no other row of
