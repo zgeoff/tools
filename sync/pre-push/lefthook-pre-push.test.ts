@@ -1016,8 +1016,6 @@ test.each([
     expect(result.stderr.toString()).toMatch(/^ [1-9]\d* pass\n 0 fail$/mu);
     expect(result.exitCode).toBe(0);
   },
-  // oxlint-disable-next-line zgeoff/max-test-timeout -- 3.9 s locally per row, GEO-1765; each row runs a whole suite in a nested bun test
-  30_000,
 );
 
 test('it skips the test job with the CI notice when the branch has more than 50 related test files', async () => {
