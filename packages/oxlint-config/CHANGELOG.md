@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.7.0](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.6.4...@zgeoff/oxlint-config@0.7.0) (2026-10-24)
+
+### ⚠ BREAKING CHANGES
+
+- **oxlint-config:** lane files that the rule skipped are now checked against their lane's limit,
+  and the lint rule zgeoff/test-timeout-exception-ticket is on as an error. To migrate: a lanes
+  array still works and gives each listed lane the 15 s default; list a raised limit in the lanes
+  map, such as { "lanes": { "kvm": 60000 } }; evals/ is no longer a lane, so a test there that calls
+  a live model takes the .model-api suffix and the test:evals script becomes test:model-api; add the
+  measured time and a ticket, or floor: with its evidence, after -- on each disable of
+  zgeoff/max-test-timeout; and give any config setting that turns either rule off or to warn a
+  comment that names a ticket or a floor:.
+
+### Features
+
+- **oxlint-config:** check each lane file against its lane's limit
+  ([#327](https://github.com/zgeoff/tools/issues/327))
+  ([f346095](https://github.com/zgeoff/tools/commit/f3460953b00b3f8f48d44474264616828f114154))
+
 ## [0.6.4](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.6.3...@zgeoff/oxlint-config@0.6.4) (2026-10-23)
 
 ### Features
