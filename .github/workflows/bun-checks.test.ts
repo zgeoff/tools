@@ -1022,8 +1022,11 @@ test('it fails the docs check on a broken link even when every doc is within its
 
   const result = await $`bash -c ${step.run}`.cwd(ctx.repo).env(ctx.gitEnv).nothrow().quiet();
 
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
   expect(result.exitCode).toBe(1);
-  expect(`${result.stdout.toString()}${result.stderr.toString()}`).toInclude('guide.md');
+  expect(output).toInclude('guide.md');
+  expect(output).toInclude('::error::docs: check-links.sh failed');
 });
 
 test('it fails the docs check on a README over its line limit even when every link resolves', async () => {

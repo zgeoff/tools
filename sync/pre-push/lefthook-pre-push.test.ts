@@ -775,6 +775,7 @@ test('it fails the push on the docs job when the installed link script finds a b
 
   expect(failedJobs).toStrictEqual(['docs']);
   expect(output).toInclude('guide.md');
+  expect(output).toInclude('docs: check-links.sh failed');
 });
 
 test('it fails the push when a commit of the branch fails commitlint', async () => {
