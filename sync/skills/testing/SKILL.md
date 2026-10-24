@@ -39,10 +39,11 @@ test process has one MSW server, and each package adds its handlers to it, as
 [HTTP mocking](./references/http.md#the-server-and-its-lifecycle) describes.
 
 A resource that each worker builds once and keeps across its files, such as a database cloned from
-the per-run template, is created on first use and kept for the life of the process. No `afterAll`
-drops it, because that hook can run after every file.
-[Database testing](./references/database.md#postgres-isolation) describes the clone and the sweep
-that removes the clones of older runs.
+the per-run template, is named after the worker's process. The util opens it when it exists and
+creates it when it does not, so every file in the process finds the same one in either mode, and a
+module variable only caches the handle. No `afterAll` drops it in any mode, because that hook can
+run after every file. [Database testing](./references/database.md#postgres-isolation) describes the
+clone and the sweep that removes it.
 
 The CI unit run passes `--randomize`, so Bun runs the files, and the tests in each file, in a random
 order and prints the `--seed=<seed>` it used. A leak that a fixed order hides then fails CI. A
