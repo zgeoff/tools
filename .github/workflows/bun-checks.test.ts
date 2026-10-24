@@ -1,5 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import {
+  chmod,
   cp,
   mkdir,
   mkdtemp,
@@ -1021,8 +1022,11 @@ test('it fails the docs check on a broken link even when every doc is within its
 
   const result = await $`bash -c ${step.run}`.cwd(ctx.repo).env(ctx.gitEnv).nothrow().quiet();
 
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
   expect(result.exitCode).toBe(1);
-  expect(`${result.stdout.toString()}${result.stderr.toString()}`).toInclude('guide.md');
+  expect(output).toInclude('guide.md');
+  expect(output).toInclude('::error::docs: check-links.sh failed');
 });
 
 test('it fails the docs check on a README over its line limit even when every link resolves', async () => {
@@ -1057,9 +1061,10 @@ test('it fails the docs check on a README over its line limit even when every li
 
   expect(result.exitCode).toBe(1);
 
-  expect(`${result.stdout.toString()}${result.stderr.toString()}`).toInclude(
-    'README.md: 61 lines, over the plain repo README limit of 60',
-  );
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(output).toInclude('README.md: 61 lines, over the plain repo README limit of 60');
+  expect(output).toInclude('::error::docs: check-length.sh failed');
 });
 
 test('it fails the workflows check with the actionlint error of a tracked workflow', async () => {
@@ -1086,10 +1091,93 @@ test('it fails the workflows check with the actionlint error of a tracked workfl
     'on: push\njobs:\n  greet:\n    needs: build\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n',
   );
 
-  const result = await $`bash -c ${step.run}`.cwd(ctx.repo).env(ctx.gitEnv).nothrow().quiet();
+  const result = await $`bash -c ${step.run}`
+    .cwd(ctx.repo)
+    .env({ ...ctx.gitEnv, ...step.env })
+    .nothrow()
+    .quiet();
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout.toString()).toInclude('job "greet" needs job "build" which does not exist');
+});
+
+test('it passes the workflows check on a concurrency queue key before the ignore expires', async () => {
+  const ctx = await setupTest();
+
+  invariant(Bun.which('actionlint') !== null, 'install actionlint');
+
+  const step = await loadWorkflowStep(
+    join(import.meta.dir, 'bun-checks.yml'),
+    'static',
+    'Check workflows',
+  );
+
+  // The step reads the day from date, so a stub on PATH sets it.
+  const clock = join(ctx.directory, 'clock');
+
+  await mkdir(clock);
+  await writeFile(join(clock, 'date'), '#!/bin/sh\necho 20270121\n');
+  await chmod(join(clock, 'date'), 0o755);
+  await mkdir(join(ctx.repo, '.github/workflows'), { recursive: true });
+
+  await writeFile(
+    join(ctx.repo, '.github/workflows/publish.yml'),
+    'on: push\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    concurrency:\n      group: publish\n      cancel-in-progress: false\n      queue: max\n    steps:\n      - run: echo hi\n',
+  );
+
+  const result = await $`bash -c ${step.run}`
+    .cwd(ctx.repo)
+    .env({ ...ctx.gitEnv, ...step.env, PATH: `${clock}:${process.env['PATH']}` })
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+});
+
+test('it fails the workflows check on a concurrency queue key once the ignore expires', async () => {
+  const ctx = await setupTest();
+
+  invariant(Bun.which('actionlint') !== null, 'install actionlint');
+
+  const step = await loadWorkflowStep(
+    join(import.meta.dir, 'bun-checks.yml'),
+    'static',
+    'Check workflows',
+  );
+
+  // The step reads the day from date, so a stub on PATH sets it.
+  const clock = join(ctx.directory, 'clock');
+
+  await mkdir(clock);
+  await writeFile(join(clock, 'date'), '#!/bin/sh\necho 20270122\n');
+  await chmod(join(clock, 'date'), 0o755);
+  await mkdir(join(ctx.repo, '.github/workflows'), { recursive: true });
+
+  // This repo's own actionlint config sits beside the workflow, so the expiry holds in tools too.
+  await cp(join(import.meta.dir, '../actionlint.yaml'), join(ctx.repo, '.github/actionlint.yaml'));
+
+  await writeFile(
+    join(ctx.repo, '.github/workflows/publish.yml'),
+    'on: push\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    concurrency:\n      group: publish\n      cancel-in-progress: false\n      queue: max\n    steps:\n      - run: echo hi\n',
+  );
+
+  const result = await $`bash -c ${step.run}`
+    .cwd(ctx.repo)
+    .env({ ...ctx.gitEnv, ...step.env, PATH: `${clock}:${process.env['PATH']}` })
+    .nothrow()
+    .quiet();
+
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout.toString()).toInclude(
+    '::warning::workflows: the ignore of the concurrency queue key expired on 20270122',
+  );
+
+  expect(result.stdout.toString()).toInclude('unexpected key "queue" for "concurrency" section');
 });
 
 test('it fails the commits check on a commit of the branch that commitlint rejects', async () => {

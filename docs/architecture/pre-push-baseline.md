@@ -20,6 +20,11 @@ branch's commits, and the test-timeouts check reads the files that `HEAD` holds.
 runs `typecheck` before a commit that stages a code or JSON file, after the repo's own pre-commit
 jobs, so the type check sees what the fixers wrote.
 
+The workflows check ignores one actionlint error, on the `queue` key of `concurrency`: GitHub
+documents the key, and the pinned actionlint rejects it. The ignore lapses on an expiry date that
+the hook shares with the workflows check in CI. After that date the check reports the key again,
+until an actionlint release that knows the key replaces the ignore.
+
 Each job that calls a package script runs it through the `memory-capped` script, which the entry's
 build points at the [memory-cap script](./memory-caps.md) with the host's memory budget as the cap.
 A job that outgrows the host then fails alone, and every job prints its peak memory.
