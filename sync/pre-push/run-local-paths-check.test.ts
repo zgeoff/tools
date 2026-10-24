@@ -433,6 +433,51 @@ test('it reports a line that a conflict-resolving merge adds in a blobless clone
   ]);
 });
 
+test('it passes a blobless clone whose unpushed merge holds blobs the server lacks', async () => {
+  const ctx = await setupTest();
+
+  const origin = join(ctx.directory, 'origin');
+  const clone = join(ctx.directory, 'clone');
+
+  await $`git init --quiet ${origin}`.env(ctx.env);
+  await $`git config uploadpack.allowFilter true`.cwd(origin).env(ctx.env);
+
+  await writeFile(join(origin, 'greet.txt'), 'greeting: hello\n');
+  await writeFile(join(origin, 'farewell.txt'), 'farewell: goodbye\n');
+
+  await $`git add greet.txt farewell.txt`.cwd(origin).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: start the repo'}`.cwd(origin).env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(origin).env(ctx.env).text();
+
+  await $`git switch --quiet -c side`.cwd(origin).env(ctx.env);
+
+  await writeFile(join(origin, 'farewell.txt'), 'farewell: see you\n');
+
+  await $`git commit --quiet -am ${'feat: say see you'}`.cwd(origin).env(ctx.env);
+  await $`git switch --quiet -`.cwd(origin).env(ctx.env);
+
+  await writeFile(join(origin, 'greet.txt'), 'greeting: good evening\n');
+
+  await $`git commit --quiet -am ${'feat: greet by evening'}`.cwd(origin).env(ctx.env);
+  await $`git clone --quiet --filter=blob:none ${`file://${origin}`} ${clone}`.env(ctx.env);
+
+  await writeFile(join(clone, 'greet.txt'), 'greeting: good night\n');
+
+  await $`git commit --quiet -am ${'feat: greet by night'}`.cwd(clone).env(ctx.env);
+  await $`git merge --quiet --no-edit origin/side`.cwd(clone).env(ctx.env);
+
+  const findings = runLocalPathsCheck({
+    cwd: clone,
+    runProgram,
+    base: baseText.trim(),
+    env: ctx.env,
+    host: 'greeter-box',
+  });
+
+  expect(findings).toStrictEqual([]);
+});
+
 test('it reports the real path of a file whose name git quotes', async () => {
   const ctx = await setupTest();
 

@@ -142,16 +142,31 @@ function runMergeBlobsFetch(options: Readonly<LocalPathsCheckOptions>): void {
     );
   });
 
+  const commits = new Set(pairs.flatMap((pair) => pair.trim().split(' ')));
+
+  // A blob ID on the command line makes git 2.43's rev-list die when the blob is missing, so the
+  // listing starts from the commits instead.
+  const listing = runGit(
+    options,
+    ['rev-list', '--objects', '--missing=print', '--no-walk', '--stdin'],
+    [...commits].map((commit) => `${commit}\n`).join(''),
+  );
+
+  const missing = new Set(
+    splitLines(listing)
+      .filter((line) => line.startsWith('?'))
+      .map((line) => line.slice(1)),
+  );
+
+  // The server refuses the whole fetch when it asks for a blob that only this clone holds.
   const blobs = collectBlobIds(
     runGit(options, ['diff-tree', '-r', '--no-abbrev', '--stdin'], pairs.join('')),
-  );
+  ).filter((blob) => missing.has(blob));
 
   if (blobs.length === 0) {
     return;
   }
 
-  // git fetch asks the server nothing when the clone holds every blob, so a later run costs no
-  // round trip.
   runGit(
     options,
     [
