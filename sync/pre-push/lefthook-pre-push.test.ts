@@ -900,7 +900,7 @@ test('it fails the push when a bunfig.toml raises the test timeout above 5 s', a
   expect(result.exitCode).not.toBe(0);
 
   expect(output).toInclude(
-    'bunfig.toml: [test] timeout = 30000 raises every test above the 5 s limit',
+    'bunfig.toml: [test] timeout = 30000 raises every test above the 5000 ms limit of the unit lane',
   );
 });
 
@@ -1016,8 +1016,6 @@ test.each([
     expect(result.stderr.toString()).toMatch(/^ [1-9]\d* pass\n 0 fail$/mu);
     expect(result.exitCode).toBe(0);
   },
-  // oxlint-disable-next-line zgeoff/max-test-timeout -- each row runs a whole suite in a nested bun test
-  30_000,
 );
 
 test('it skips the test job with the CI notice when the branch has more than 50 related test files', async () => {

@@ -7,6 +7,7 @@
     "module-order.test.ts",
     "import-zones-entry.test.ts",
     "max-test-timeout.test.ts",
+    "test-timeout-exception-ticket.test.ts",
     "no-test-sleep.test.ts",
     "test-utils"
   ]

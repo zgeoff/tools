@@ -38,6 +38,7 @@
     "zgeoff/no-file-snapshot": "error",
     "zgeoff/setup-test-only": "error",
     "zgeoff/max-test-timeout": "error",
+    "zgeoff/test-timeout-exception-ticket": "error",
     "zgeoff/no-test-sleep": "error",
 
     // name a value for what it holds, in full words: one letter only for a

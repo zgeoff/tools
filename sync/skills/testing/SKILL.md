@@ -275,7 +275,7 @@ checks in each lane file. The unit run leaves the lane files out by pattern.
 - A repo adds a project lane only for a real system that this section allows. Its project-testing
   skill lists the lane with its real system, its limit, and the measured p95 and maximum test time,
   and its root oxlint config declares the lane and its limit in the `lanes` option of
-  `zgeoff/max-test-timeout`.
+  `zgeoff/max-test-timeout` and of `zgeoff/test-beside-module`.
 - A test that is slow only because of a runtime timer stays in the unit run, with the disable
   comment that [A test over its limit](#a-test-over-its-limit) describes.
 - A lane holds no test that is only slow. Before a test moves to a lane, check that no other row of

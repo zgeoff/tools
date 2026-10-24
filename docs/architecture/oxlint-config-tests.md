@@ -1,20 +1,22 @@
 # oxlint-config test-file rules
 
-Five rules of the `zgeoff/*` plugin in `@zgeoff/oxlint-config` check test files.
+Six rules of the `zgeoff/*` plugin in `@zgeoff/oxlint-config` check test files.
 `zgeoff/test-beside-module` keeps each test file beside the module it tests,
 `zgeoff/setup-test-only` keeps a test file's module level to `setupTest()` and its tests,
-`zgeoff/no-file-snapshot` bans file snapshots, `zgeoff/max-test-timeout` keeps each test outside a
-lane to the default timeout, and `zgeoff/no-test-sleep` bans a fixed delay in a test file. The
+`zgeoff/no-file-snapshot` bans file snapshots, `zgeoff/max-test-timeout` keeps each test within the
+time limit of its lane, `zgeoff/test-timeout-exception-ticket` makes each disable of that rule name
+a ticket or a floor, and `zgeoff/no-test-sleep` bans a fixed delay in a test file. The
 [config overview](./oxlint-config.md) covers the rest of the config.
 
 ## `zgeoff/test-beside-module`
 
 A `<name>.test.ts` or `<name>.test.tsx` file needs a non-test file `<name>.<ext>` in the same
 directory — `.ts`, `.tsx`, `.sh`, `.json`, or any other single extension, so `install.test.ts` may
-test `install.sh`. Files under an `e2e/` or `evals/` directory at the repo root (the nearest
-ancestor holding `.git`, else oxlint's working directory) are exempt; no other directory is. Exempt
-any other test with a file-level disable comment that states the reason. The rule reports at the
-first statement, so put the comment above it:
+test `install.sh`. The suite directories are exempt, and no other directory is: `e2e/`,
+`integration/` and `evals/` at the repo root (the nearest ancestor holding `.git`, else oxlint's
+working directory) or in an app root (a directory that holds a `package.json`), and every package
+whose directory name ends in `-e2e`. Exempt any other test with a file-level disable comment that
+states the reason. The rule reports at the first statement, so put the comment above it:
 
 ```ts
 // oxlint-disable zgeoff/test-beside-module -- tests base.json and react.json together
@@ -22,11 +24,12 @@ first statement, so put the comment above it:
 
 A lane suite, such as `<name>.browser.test.ts`, tests the same module as `<name>.test.ts` and needs
 only `<name>.<ext>`; the suffix lets the repo's test script run the suite in its own lane. The rule
-treats `browser` as a lane with no configuration. A repo adds its own lanes with the `lanes` option,
-and `browser` stays a lane beside them:
+treats the standard lanes of `zgeoff/max-test-timeout` as lanes with no configuration. A repo adds
+its own lanes with the `lanes` option, in either of that rule's forms, and the standard lanes stay
+beside them:
 
 ```json
-{ "rules": { "zgeoff/test-beside-module": ["error", { "lanes": ["sdk"] }] } }
+{ "rules": { "zgeoff/test-beside-module": ["error", { "lanes": { "kvm": 60000 } }] } }
 ```
 
 Any other suffix is part of the name. A second test file for a module (`<name>.host.test.ts`) needs
@@ -66,8 +69,10 @@ test file is gone is not reported.
 
 ## `zgeoff/max-test-timeout`
 
-A test outside a lane keeps the default timeout of `bun test`, because a test that needs longer does
-a lane's work. The rule reports, in any linted file, a timeout above that default:
+Each lane has a per-test time limit, and a test in the unit run keeps the default timeout of
+`bun test`. A test that needs longer hides a cost that the testing skill's
+[Slow tests](../../sync/skills/testing/SKILL.md#slow-tests) table names a fix for, so the rule
+reports, in any linted file, a timeout above the limit of the file's lane:
 
 - a number argument after the name of a `test`, `it` or `describe` call, or of a chain of their
   modifiers, such as `test.skipIf(gate).each(rows)(…)`;
@@ -80,14 +85,26 @@ as an import from another module, is not checked. The rule reads a number litera
 number literals, and a `const` that holds one of them; it leaves any other value unreported, such as
 one read from the environment.
 
-A lane file is exempt: each file under the `e2e/` directory at the repo root, which
-`zgeoff/test-beside-module` anchors the same way, and each `<name>.<lane>.test.ts` or `.test.tsx`
-file whose lane is `browser`, `docker`, `host` or one that the `lanes` option declares. A declared
-lane is also the name of a `test:<lane>` script that the test timeout check exempts:
+The file's lane comes from its suffix first, then its directory, because the default run leaves a
+suffixed file out wherever it sits. A `<name>.<lane>.test.ts` or `.test.tsx` file is in its lane
+when the lane is a standard one or one that the `lanes` option declares. Any other file under an
+`e2e/` directory or a `-e2e` package that `zgeoff/test-beside-module` exempts is in the `e2e` lane,
+and every other file is in the unit run, `integration/` and `evals/` included. The standard lanes
+and their limits are the ones in the skill's [Lanes](../../sync/skills/testing/SKILL.md#lanes)
+table, which a test of the rule pins. The `lanes` option maps a lane to its limit in milliseconds,
+and an entry adds a project lane or changes the limit of a standard one:
 
 ```json
-{ "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": ["binary"] }] } }
+{ "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": { "kvm": 60000 } }] } }
 ```
+
+The option also takes a list of lane names. Each listed lane that is not standard gets the limit of
+the `e2e` lane, so a config that lists lane names keeps passing lint until it states each limit.
+
+A test over its lane's limit carries a disable comment whose reason gives the measured time and
+either a ticket or `floor:` with the evidence that the time cannot move, as the skill's
+[A test over its limit](../../sync/skills/testing/SKILL.md#a-test-over-its-limit) shows. oxlint
+honours the comment with its reason, and `zgeoff/test-timeout-exception-ticket` reads the reason.
 
 ### The test timeout check
 
@@ -97,15 +114,31 @@ oxlint lints only JavaScript and TypeScript files, so it cannot read a `package.
 holds them, as the `test-timeouts` job before a push and the `Check test timeouts` step of the
 shared pull-request checks. It reports:
 
-- each `--timeout` above the default, in either the `--timeout 20000` or the `--timeout=20000` form,
-  among the words after `bun test` in a `package.json` script, where a quoted or escaped word is a
-  value and never a flag, and a command named `echo` or `printf`, quoted or bare, runs no
-  `bun test`;
-- each `bunfig.toml` whose `[test] timeout` is above the default.
+- each `--timeout` above the script's limit, in either the `--timeout 20000` or the
+  `--timeout=20000` form, among the words after `bun test` in a `package.json` script, where a
+  quoted or escaped word is a value and never a flag, and a command named `echo` or `printf`, quoted
+  or bare, runs no `bun test`;
+- each `bunfig.toml` whose `[test] timeout` is above the limit of its directory's lane;
+- each setting in an oxlint config, at any depth of the tree, that turns `zgeoff/max-test-timeout`
+  or `zgeoff/test-timeout-exception-ticket` off or down to a warning, unless a comment on its line,
+  directly above it, or directly above its override names a ticket or a `floor:`. Such a setting
+  escapes the limits as a disable comment does.
 
-It exempts the `test:related` script, which runs the shared related-test runner, and each lane
-script: `test:e2e`, `test:browser`, `test:docker`, `test:host`, and `test:<lane>` for each lane in
-the `lanes` option of `zgeoff/max-test-timeout` in the root `.oxlintrc.json`.
+A `test:<lane>` script gets the limit of its lane, and every other script gets the unit limit. The
+check exempts the `test:related` script, which runs the shared related-test runner. It reads the
+lanes from the `lanes` option of `zgeoff/max-test-timeout` in the root `.oxlintrc.json`, with the
+same standard lanes as the rule. The check keeps its own copy of the standard limits, because the
+shared pull-request checks download it without the oxlint config package, and a test pins both
+copies to the skill's table.
+
+## `zgeoff/test-timeout-exception-ticket`
+
+The rule reports each comment that disables `zgeoff/max-test-timeout`, in any of the
+`oxlint-disable` or `eslint-disable` forms, whose reason after `--` holds neither a ticket ID such
+as `OPS-212` nor `floor:` followed by text. It reads the comments that oxlint's parser finds, so a
+directive-shaped string or template in a test fixture is not a comment. It is a rule of its own
+because a disable of `zgeoff/max-test-timeout` would suppress a report under that rule's name on the
+lines the disable covers.
 
 ## `zgeoff/no-test-sleep`
 
