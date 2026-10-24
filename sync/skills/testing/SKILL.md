@@ -262,14 +262,19 @@ A test that cannot finish within its lane's limit carries a disable comment that
 time and the ticket that tracks its fix, in this made-up example:
 
 ```ts
-// oxlint-disable-next-line zgeoff/max-test-timeout -- 48 s on CI, OPS-212
-test('it restores a volume from its oldest snapshot', { timeout: 60_000 }, async () => {
-  // …
-});
+test(
+  'it restores a volume from its oldest snapshot',
+  async () => {
+    // …
+  },
+  // oxlint-disable-next-line zgeoff/max-test-timeout -- 48 s on CI, OPS-212
+  { timeout: 60_000 },
+);
 ```
 
-The rule reports the timeout value, so the comment sits on the line before it, and an options object
-before the callback keeps the value on the first line of the test.
+The rule reports the timeout value, so the comment sits on the line before the options object. The
+options object follows the callback, because Bun's types accept no other order. The formatter puts
+each argument on its own line, so the comment stays next to the object.
 
 The limit never rises to cover one test. `zgeoff/test-timeout-exception-ticket` fails a disable of
 `zgeoff/max-test-timeout` that names no ticket after `--`, in any of its forms, and the test timeout
