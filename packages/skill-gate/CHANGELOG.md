@@ -2,10 +2,11 @@
 
 ## [0.2.7](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.6...@zgeoff/skill-gate@0.2.7) (2026-10-24)
 
-
 ### Features
 
-* **docs-writing:** set readme limits by path and add the spike shape ([#329](https://github.com/zgeoff/tools/issues/329)) ([cdc7a21](https://github.com/zgeoff/tools/commit/cdc7a2191fb5bb3ae0ce7317a3a57abb3dc00365))
+- **docs-writing:** set readme limits by path and add the spike shape
+  ([#329](https://github.com/zgeoff/tools/issues/329))
+  ([cdc7a21](https://github.com/zgeoff/tools/commit/cdc7a2191fb5bb3ae0ce7317a3a57abb3dc00365))
 
 ## [0.2.6](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.5...@zgeoff/skill-gate@0.2.6) (2026-10-22)
 

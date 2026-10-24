@@ -2,10 +2,11 @@
 
 ## [0.3.2](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.3.1...@zgeoff/format-codemod@0.3.2) (2026-10-24)
 
-
 ### Features
 
-* **docs-writing:** set readme limits by path and add the spike shape ([#329](https://github.com/zgeoff/tools/issues/329)) ([cdc7a21](https://github.com/zgeoff/tools/commit/cdc7a2191fb5bb3ae0ce7317a3a57abb3dc00365))
+- **docs-writing:** set readme limits by path and add the spike shape
+  ([#329](https://github.com/zgeoff/tools/issues/329))
+  ([cdc7a21](https://github.com/zgeoff/tools/commit/cdc7a2191fb5bb3ae0ce7317a3a57abb3dc00365))
 
 ## [0.3.1](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.3.0...@zgeoff/format-codemod@0.3.1) (2026-10-20)
 
