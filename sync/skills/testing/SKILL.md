@@ -29,6 +29,15 @@ where they are acquired. A test exercises real behaviour through real code, and 
 stand-in only at a boundary the test cannot cross. When existing tests break these rules, you align
 them while you work on the code they cover.
 
+The preload starts each shared resource, such as the MSW server, in `beforeAll` and stops it in
+`afterAll`, never at import, so the start and the stop pair up in every mode. Plain `bun test` runs
+the preload's `beforeAll` and `afterAll` once per run, and so does `--parallel=1 --no-isolate`. An
+isolated run imports the preload and runs both hooks once per file. With `--parallel=N --no-isolate`
+and two or more workers, each worker imports the preload once but runs both hooks once per file. A
+server started at import and closed in `afterAll` is then gone after each worker's first file. A
+test process has one MSW server, and each package adds its handlers to it, as
+[HTTP mocking](./references/http.md#the-server-and-its-lifecycle) describes.
+
 The CI unit run passes `--randomize`, so Bun runs the files, and the tests in each file, in a random
 order and prints the `--seed=<seed>` it used. A leak that a fixed order hides then fails CI. A
 failure under `--randomize` is a leak between tests or files. Reproduce it by passing the printed
