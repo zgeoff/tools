@@ -258,8 +258,16 @@ A Rust crate runs the same lanes through cargo-nextest, as
 
 ### A test over its limit
 
-A test that cannot finish within its lane's limit carries a disable comment that gives the measured
-time and the ticket that tracks its fix, in this made-up example:
+A test whose cause the [Slow tests](#slow-tests) table can fix gets that fix in the pull request
+that meets it, never a ticket. A test that still cannot finish within its lane's limit carries a
+disable comment that gives the measured time and one of two reasons:
+
+- the ticket that tracks the fix, when the fix cannot land in this pull request, such as a fix in
+  another repo;
+- `floor:` and the measured evidence that the time cannot move, such as
+  `48 s on CI; floor: two VM boots plus a restic restore`.
+
+The ticket form, in this made-up example:
 
 ```ts
 test(
@@ -277,9 +285,9 @@ options object follows the callback, because Bun's types accept no other order. 
 each argument on its own line, so the comment stays next to the object.
 
 The limit never rises to cover one test. `zgeoff/test-timeout-exception-ticket` fails a disable of
-`zgeoff/max-test-timeout` that names no ticket after `--`, in any of its forms, and the test timeout
-check fails an oxlint config that turns either rule off or down to a warning, unless a comment on
-that setting names a ticket.
+`zgeoff/max-test-timeout` whose reason after `--` holds neither a ticket nor `floor:` with text, in
+any of its forms. The test timeout check fails an oxlint config that turns either rule off or down
+to a warning, unless a comment on that setting holds a ticket or a `floor:`.
 
 ## Structure and naming
 

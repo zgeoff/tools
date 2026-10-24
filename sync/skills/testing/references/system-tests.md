@@ -134,7 +134,7 @@ timeout, and a raised timeout only hides that cost.
   not because of its time, and it keeps within that lane's limit too.
 - A test that cannot fit carries the disable comment that
   [A test over its limit](../SKILL.md#a-test-over-its-limit) describes, with its measured time and
-  its ticket.
+  its ticket or its floor.
 - Every other test stays out of a browser suite, so the parallel run keeps its speed.
 
 ## Stateful stand-ins
@@ -219,7 +219,7 @@ slow-timeout = { period = "15s", terminate-after = 1 }
   lane prefix, and an override sets the lane's limit. The lane's CI step runs
   `cargo nextest run --profile <lane>`.
 - A test over its limit gets its own override, with a comment that gives the measured time and the
-  ticket. It goes before the lane's override, because nextest applies the first override that
-  matches.
+  ticket or the floor. It goes before the lane's override, because nextest applies the first
+  override that matches.
 - `#[ignore]` never marks a lane test. An ignored test runs in no profile unless a flag asks for it,
   so a lane hidden behind it stops running unseen.
