@@ -150,7 +150,7 @@ test('it skips links inside code blocks and code spans', async () => {
   });
 });
 
-test('it reads only the READMEs, docs/ and skills when no path is given', async () => {
+test('it reads only the READMEs, results.md files, docs/ and skills when no path is given', async () => {
   const ctx = await setupTest();
 
   await ctx.writePage('README.md', ['# Demo']);
@@ -188,6 +188,26 @@ test('it fails on a broken link in a skill by default', async () => {
     stdout: '',
     stderr:
       '.claude/skills/demo/references/stand-ins.md:1: (../../../../src/build-stub.ts) src/build-stub.ts does not exist\n',
+  });
+});
+
+test('it fails on a broken link in a spike results.md by default', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('research/cold-start/README.md', ['See [the results](results.md).']);
+  await ctx.writePage('research/cold-start/results.md', ['See [the run log](runs/first.md).']);
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      'research/cold-start/results.md:1: (runs/first.md) research/cold-start/runs/first.md does not exist\n',
   });
 });
 

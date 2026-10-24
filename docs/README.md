@@ -23,8 +23,15 @@ The docs of tools: how its shared files and packages work, and the steps a contr
   [test-file rules](./architecture/oxlint-config-tests.md).
 - [std typed helpers](./architecture/std-typed-helpers.md): the helpers in `@zgeoff/std` that each
   hold the one type assertion their job needs.
+- [format-codemod rules](./architecture/format-codemod-rules.md): the blank lines the codemod adds
+  and removes between statements.
 - [format-codemod inputs](./architecture/format-codemod-inputs.md): how the CLI turns its arguments
   into the files it formats.
+
+## Guides
+
+- [Writing skill-gate rules](./guides/skill-gate-rules.md): path gates, tool gates, and the mistakes
+  in a rules file that the gate tolerates.
 
 ## Runbooks
 
