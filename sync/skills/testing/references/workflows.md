@@ -9,10 +9,7 @@ logic and the workflow files get tested.
 
 A step's script is ordinary code, and every rule in [SKILL.md](../SKILL.md) applies to its test. The
 test sits beside the script and calls it with the inputs that the step passes through `env:` and its
-arguments. A program that the script calls and that the test cannot run, such as `gh` against
-GitHub, gets a stand-in at that edge, as [Boundaries](../SKILL.md#boundaries) describes. A step that
-runs only on release, on deploy or on failure gets the same tests, so its logic runs on every pull
-request.
+arguments.
 
 ## Repo fact tests
 
@@ -20,7 +17,7 @@ A repo fact test is the only test that reads a workflow file. It checks the work
 that the repo owns elsewhere, such as a CI matrix against the list of suites that a script defines,
 so the two cannot drift. It parses the file with `Bun.YAML.parse` and checks the values with plain
 assertions. A rule that holds for every repo, such as a job's timeout or a cancel setting, belongs
-in the workflow lint, which tools tests once, and a repo never tests it again.
+in the workflow lint, and a repo never tests a shared lint rule, as [SKILL.md](../SKILL.md) states.
 
 A made-up repo keeps its end-to-end suites in `e2e/suites.ts` and runs one matrix job per suite:
 
