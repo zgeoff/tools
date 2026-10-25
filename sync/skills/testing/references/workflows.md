@@ -7,9 +7,8 @@ logic and the workflow files get tested.
 
 ## Test the step through its script
 
-A step's script is ordinary code, and every rule in [SKILL.md](../SKILL.md) applies to its test. The
-test sits beside the script and calls it with the inputs that the step passes through `env:` and its
-arguments.
+Call the script with the values that the step passes through `env:` and its arguments, so the test
+runs the logic on the inputs a real run gives it.
 
 ## Repo fact tests
 
