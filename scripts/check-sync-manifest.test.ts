@@ -652,6 +652,52 @@ test('it fails when the files field of an entry is not a list', async () => {
   });
 });
 
+test.each([
+  {
+    field: 'name',
+    entry: {
+      name: 7,
+      description: 'The demo file',
+      files: [{ source: 'demo.md', target: 'demo.md' }],
+    },
+  },
+  {
+    field: 'source',
+    entry: {
+      name: 'demo',
+      description: 'The demo file',
+      files: [{ source: 7, target: 'demo.md' }],
+    },
+  },
+  {
+    field: 'target',
+    entry: {
+      name: 'demo',
+      description: 'The demo file',
+      files: [{ source: 'demo.md', target: 7 }],
+    },
+  },
+])('it fails when an entry has a $field that is not a string', async (testCase) => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, 'sync'));
+  await writeFile(join(ctx.directory, 'demo.md'), '# Demo\n');
+  await writeFile(join(ctx.directory, 'sync/manifest.json'), JSON.stringify([testCase.entry]));
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      'check-sync-manifest: sync/manifest.json is not a list of entries, each with a string name and a files list of string sources and targets\n',
+  });
+});
+
 test('it passes when the scripts field declares each script the build writes, with its value', async () => {
   const ctx = await setupTest();
 
