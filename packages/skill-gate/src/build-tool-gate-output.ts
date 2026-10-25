@@ -1,5 +1,7 @@
 import { formatSkillList } from './format-skill-list.ts';
 import { formatUnknownKeyWarning } from './format-unknown-key-warning.ts';
+import type { Harness } from './harness.ts';
+import { pickHarnessWording } from './pick-harness-wording.ts';
 import type {
   SkillGateHookOutput,
   SkillGateOutputContext,
@@ -25,7 +27,7 @@ export function buildToolGateOutput(
   const warning = warnings.length === 0 ? undefined : warnings.join('\n');
 
   if (plan.missingSkills.length > 0 || plan.missingReferences.length > 0) {
-    const reason = buildDenyReason(toolName, plan, context.compacted === true);
+    const reason = buildDenyReason(toolName, plan, context.compacted === true, context.harness);
 
     return {
       ...(warning === undefined ? {} : { systemMessage: warning }),
@@ -53,16 +55,22 @@ function formatUnknownWarning(entry: UnknownToolRequirement): string {
     : `skill-gate: the tool gate "${entry.tool}" in ${RULES_PATH} names the reference "${entry.name}", but .claude/skills/${entry.name} does not exist. Fix the rule or add the file; until then the gate skips that reference.`;
 }
 
-function buildDenyReason(toolName: string, plan: ToolGatePlan, compacted: boolean): string {
+function buildDenyReason(
+  toolName: string,
+  plan: ToolGatePlan,
+  compacted: boolean,
+  harness: Harness | undefined,
+): string {
+  const wording = pickHarnessWording(harness);
   const again = compacted ? ' again' : '';
 
   const steps = [
     ...(plan.missingSkills.length === 0
       ? []
-      : [`load the ${formatSkillList(plan.missingSkills)}${again} with the Skill tool`]),
+      : [`load the ${formatSkillList(plan.missingSkills)}${again} ${wording.loadSkill}`]),
     ...(plan.missingReferences.length === 0
       ? []
-      : [`read ${formatReferenceList(plan.missingReferences)}${again} with the Read tool`]),
+      : [`read ${formatReferenceList(plan.missingReferences)}${again} ${wording.readFile}`]),
   ].join(' and ');
 
   const compaction = compacted

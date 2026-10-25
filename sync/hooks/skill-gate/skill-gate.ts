@@ -1,14 +1,43 @@
+import { execFile } from 'node:child_process';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { promisify } from 'node:util';
 
 // Claude Code runs the call when a PreToolUse hook exits with any status but 2, so a static import
 // that fails would let a gated edit through. This file therefore imports only Node builtins.
+const harness = parseHarness(process.argv.slice(2));
+
 const runGate = await import('@zgeoff/skill-gate').then(
   (gate) => gate.runSkillGate,
-  (error: unknown) => () => reportLoadFailure(formatError(error)),
+  (error: unknown) => () => reportLoadFailure(formatError(error), harness),
 );
 
-await runGate();
+await runGate(harness);
+
+const execFileAsync = promisify(execFile);
+
+type Harness = 'claude-code' | 'codex';
+
+// The hook command picks the harness: `--harness codex` for Codex, and none for Claude Code.
+function parseHarness(args: readonly string[]): Harness {
+  const flag = args.indexOf('--harness');
+
+  if (flag === -1) {
+    return 'claude-code';
+  }
+
+  const value = args[flag + 1];
+
+  if (value === 'codex' || value === 'claude-code') {
+    return value;
+  }
+
+  console.error(
+    `The skill gate does not know the harness ${String(value)}. Use codex or claude-code.`,
+  );
+
+  process.exit(1);
+}
 
 // Bun rejects a failed import with a ResolveMessage, which is not an Error.
 function formatError(error: unknown): string {
@@ -19,22 +48,23 @@ function formatError(error: unknown): string {
   return String(error);
 }
 
-async function reportLoadFailure(loadError: string): Promise<never> {
+async function reportLoadFailure(loadError: string, failedHarness: Harness): Promise<never> {
   const payload: unknown = await Bun.stdin.json().catch(() => null);
+  const projectDir = await readProjectDir(payload);
 
-  const edit = parseEdit(payload, process.env['CLAUDE_PROJECT_DIR']);
+  const edit = parseEdit(payload, projectDir, failedHarness);
 
-  const isGated = await probeGatedEdit(edit);
+  const gatedPaths = await readGatedEdits(edit);
 
-  if (edit !== null && isGated) {
+  if (gatedPaths.length > 0) {
     console.error(
-      `The skill gate cannot load, so it blocks this edit to ${edit.filePath}: ${loadError}. Run \`bun install\` at the repo root, then retry the edit.`,
+      `The skill gate cannot load, so it blocks this edit to ${gatedPaths.join(', ')}: ${loadError}. Run \`bun install\` at the repo root, then retry the edit.`,
     );
 
     process.exit(2);
   }
 
-  const toolCall = parseToolCall(payload, process.env['CLAUDE_PROJECT_DIR']);
+  const toolCall = parseToolCall(payload, projectDir);
 
   const isGatedTool = await probeGatedToolCall(toolCall, readTextFile);
 
@@ -52,37 +82,64 @@ async function reportLoadFailure(loadError: string): Promise<never> {
 
 interface Edit {
   readonly projectDir: string;
-  readonly filePath: string;
+  readonly filePaths: readonly string[];
 }
 
-// Only an Edit, Write or MultiEdit call carries `file_path`.
-function parseEdit(payload: unknown, projectDir: string | undefined): Edit | null {
+// Claude Code's Edit, Write and MultiEdit calls carry `file_path`. Codex's apply_patch call carries
+// a patch whose header lines name each path it changes.
+function parseEdit(payload: unknown, projectDir: string | undefined, edited: Harness): Edit | null {
   if (!isRecord(payload) || !isRecord(payload['tool_input'])) {
     return null;
   }
 
   const cwd = payload['cwd'];
-  const filePath = payload['tool_input']['file_path'];
 
-  if (typeof cwd !== 'string' || typeof filePath !== 'string') {
+  if (typeof cwd !== 'string') {
     return null;
   }
 
+  const paths =
+    edited === 'codex'
+      ? parsePatchPaths(payload['tool_name'], payload['tool_input']['command'])
+      : [payload['tool_input']['file_path']].filter((entry) => typeof entry === 'string');
+
   return {
     projectDir: projectDir ?? cwd,
-    filePath: path.resolve(cwd, filePath),
+    filePaths: paths.map((entry) => path.resolve(cwd, entry)),
   };
 }
 
-async function probeGatedEdit(edit: Edit | null): Promise<boolean> {
-  if (edit === null) {
-    return false;
+const PATCH_HEADER = /^\*\*\* (?:Add File|Update File|Delete File|Move to): (?<path>.+)$/u;
+
+function parsePatchPaths(toolName: unknown, patch: unknown): readonly string[] {
+  if (toolName !== 'apply_patch' || typeof patch !== 'string') {
+    return [];
   }
 
-  const relativePath = path.relative(edit.projectDir, edit.filePath).split(path.sep).join('/');
+  return patch
+    .split('\n')
+    .flatMap((line) => PATCH_HEADER.exec(line.replace(/\r$/u, ''))?.groups?.['path']?.trim() ?? []);
+}
 
-  if (relativePath === '..' || relativePath.startsWith('../') || path.isAbsolute(relativePath)) {
-    return false;
+// The gated paths among those the edit changes. A rules file that cannot be read or parsed gates
+// every path inside the project.
+async function readGatedEdits(edit: Edit | null): Promise<readonly string[]> {
+  if (edit === null) {
+    return [];
+  }
+
+  const inside = edit.filePaths.filter((filePath) => {
+    const relativePath = path.relative(edit.projectDir, filePath).split(path.sep).join('/');
+
+    return !(
+      relativePath === '..' ||
+      relativePath.startsWith('../') ||
+      path.isAbsolute(relativePath)
+    );
+  });
+
+  if (inside.length === 0) {
+    return [];
   }
 
   const rulesText = await readTextFile(
@@ -94,10 +151,14 @@ async function probeGatedEdit(edit: Edit | null): Promise<boolean> {
   });
 
   if (rulesText === undefined) {
-    return false;
+    return [];
   }
 
-  return rulesText === null || isGatedPath(rulesText, relativePath);
+  return inside.filter(
+    (filePath) =>
+      rulesText === null ||
+      isGatedPath(rulesText, path.relative(edit.projectDir, filePath).split(path.sep).join('/')),
+  );
 }
 
 function isGatedPath(rulesText: string, relativePath: string): boolean {
@@ -155,6 +216,32 @@ interface ToolCall {
   readonly toolName: string;
 }
 
+// CLAUDE_PROJECT_DIR is Claude Code's. Codex sets none, so the project is the git top level of the
+// payload's working directory, or that directory itself outside a repo.
+async function readProjectDir(payload: unknown): Promise<string | undefined> {
+  const fromEnv = process.env['CLAUDE_PROJECT_DIR'];
+
+  if (fromEnv !== undefined && fromEnv !== '') {
+    return fromEnv;
+  }
+
+  const cwd = isRecord(payload) ? payload['cwd'] : undefined;
+
+  if (typeof cwd !== 'string') {
+    return undefined;
+  }
+
+  try {
+    const output = await execFileAsync('git', ['rev-parse', '--show-toplevel'], { cwd });
+
+    const topLevel = output.stdout.trim();
+
+    return topLevel === '' ? undefined : topLevel;
+  } catch {
+    return undefined;
+  }
+}
+
 function parseToolCall(payload: unknown, projectDir: string | undefined): ToolCall | null {
   if (!isRecord(payload)) {
     return null;
@@ -173,7 +260,10 @@ function parseToolCall(payload: unknown, projectDir: string | undefined): ToolCa
 // The hook matcher names only gated tools beside edits and Bash, so any other call that reaches
 // the hook counts as gated when the rules file cannot be read or parsed.
 async function probeGatedToolCall(toolCall: ToolCall | null, readText: ReadText): Promise<boolean> {
-  if (toolCall === null || ['Edit', 'Write', 'MultiEdit', 'Bash'].includes(toolCall.toolName)) {
+  if (
+    toolCall === null ||
+    ['Edit', 'Write', 'MultiEdit', 'Bash', 'apply_patch'].includes(toolCall.toolName)
+  ) {
     return false;
   }
 
