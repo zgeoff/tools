@@ -181,7 +181,7 @@ test.each([
   ).rejects.toThrow(message);
 });
 
-test('it rejects a condition other than an equality with a quoted text', async () => {
+test('it rejects a condition other than comparisons with a quoted text', async () => {
   const ctx = await setupTest();
 
   await writeFile(

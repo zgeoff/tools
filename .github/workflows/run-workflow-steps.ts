@@ -1,5 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { $ } from 'bun';
+import { isConditionMet } from './is-condition-met.ts';
 import { loadWorkflowStep } from './load-workflow-step.ts';
 
 export interface WorkflowStepsOptions {
@@ -52,26 +53,6 @@ export async function runWorkflowSteps(
   return 0;
 }
 
-function isConditionMet(condition: string, values: ReadonlyMap<string, string>): boolean {
-  const comparison = /^(?<expression>[\w.-]+) == '(?<expected>[^']*)'$/u.exec(condition);
-
-  if (comparison?.groups === undefined) {
-    throw new Error(`unsupported condition: ${condition}`);
-  }
-
-  return getValue(comparison.groups['expression'] ?? '', values) === comparison.groups['expected'];
-}
-
-function getValue(expression: string, values: ReadonlyMap<string, string>): string {
-  const value = values.get(expression);
-
-  if (value === undefined) {
-    throw new Error(`no value for ${expression}`);
-  }
-
-  return value;
-}
-
 function resolveValue(value: string, values: ReadonlyMap<string, string>): string {
   const expression = /^\$\{\{ (?<name>[\w.-]+) \}\}$/u.exec(value)?.groups?.['name'];
 
@@ -81,6 +62,16 @@ function resolveValue(value: string, values: ReadonlyMap<string, string>): strin
 
   if (value.includes('${{')) {
     throw new Error(`unsupported expression: ${value}`);
+  }
+
+  return value;
+}
+
+function getValue(expression: string, values: ReadonlyMap<string, string>): string {
+  const value = values.get(expression);
+
+  if (value === undefined) {
+    throw new Error(`no value for ${expression}`);
   }
 
   return value;

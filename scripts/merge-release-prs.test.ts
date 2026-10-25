@@ -290,6 +290,10 @@ test('it fails without a merge when a commit status fails', async () => {
   });
 
   expect(calls.filter((call) => call.startsWith('pr merge'))).toBeEmpty();
+
+  const output = await ctx.readOutput();
+
+  expect(output).toBe('');
 });
 
 test('it fails without a merge when the checks do not finish before the timeout', async () => {
