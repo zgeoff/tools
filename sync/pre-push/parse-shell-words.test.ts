@@ -20,6 +20,10 @@ test.each([
   ['echo $(( 1 | 2 )) | wc -c', ['|']],
   ['echo "$(( $(git log | wc -l) + 1 ))"', ['|']],
   ['bun run lint # then; test', []],
+  ['echo ready\nbun run lint', ['\n']],
+  ['echo "ready\nset"', []],
+  ["echo 'ready\nset'", []],
+  ['echo ready \\\nset', []],
 ])('it finds the operators %p holds, as %p', (command, operators) => {
   const words = parseShellWords(command);
 

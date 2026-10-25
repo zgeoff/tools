@@ -25,9 +25,9 @@ function splitCommands(words: readonly ShellWord[]): ShellWord[][] {
   return commands;
 }
 
-// A command substitution runs a command that the parser does not split out, and a name held in a
-// variable is known only when the step runs.
-const unreadablePattern = /\$\((?!\()|`/u;
+// A command substitution runs a command that the parser does not split out, a heredoc body holds
+// lines that are data, and a name held in a variable is known only when the step runs.
+const unreadablePattern = /\$\((?!\()|`|(?<!<)<<(?!<)/u;
 
 function collectRunTargets(command: readonly ShellWord[]): string[] | undefined {
   const start = command.findIndex((word) => !word.isAssignment);

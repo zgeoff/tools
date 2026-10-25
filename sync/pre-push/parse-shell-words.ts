@@ -129,6 +129,10 @@ function pickCodeAction(context: ShellContext, cursor: ShellCursor): ShellAction
     return { kind: 'comment' };
   }
 
+  if (character === '\n') {
+    return { kind: 'operator', text: '\n' };
+  }
+
   if (/\s/u.test(character)) {
     return { kind: 'break' };
   }
@@ -240,9 +244,14 @@ function advanceParser(state: ParserState, action: ShellAction, isTopLevel: bool
       return 1;
     })
     .with({ kind: 'escape' }, () => {
-      state.isPlain = false;
-      state.text += state.command.charAt(state.index + 1);
-      state.isQuoted ||= isTopLevel;
+      const escaped = state.command.charAt(state.index + 1);
+
+      // A backslash before a newline joins the two lines into one.
+      if (escaped !== '\n') {
+        state.isPlain = false;
+        state.text += escaped;
+        state.isQuoted ||= isTopLevel;
+      }
 
       return 2;
     })

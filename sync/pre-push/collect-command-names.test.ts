@@ -9,6 +9,9 @@ test.each([
   ['QEMU="1" bash scripts/open-kvm.sh', ['bash', 'scripts/open-kvm.sh']],
   ['FORCE=1', []],
   ['echo one; scripts/open-kvm.sh', ['echo', 'scripts/open-kvm.sh']],
+  ['echo ready\nscripts/open-kvm.sh', ['echo', 'scripts/open-kvm.sh']],
+  ['echo ready \\\nscripts/open-kvm.sh', ['echo']],
+  ['cat <<< scripts/open-kvm.sh', ['cat']],
   ['echo $(( 1 + 2 ))', ['echo']],
   ['bash', ['bash']],
   ['bash scripts/open-kvm.sh', ['bash', 'scripts/open-kvm.sh']],
@@ -42,6 +45,7 @@ test.each([
 test.each([
   ['echo "$(scripts/ci/check-kvm.sh)"'],
   ['echo `scripts/ci/check-kvm.sh`'],
+  ['cat <<EOF\nscripts/open-kvm.sh\nEOF'],
   ['"$TOOL" scripts/open-kvm.sh'],
   ['bash --rcfile .bashrc scripts/open-kvm.sh'],
   ['bash -c'],
