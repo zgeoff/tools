@@ -14,8 +14,6 @@ const runGate = await import('@zgeoff/skill-gate').then(
 
 await runGate(harness);
 
-const execFileAsync = promisify(execFile);
-
 type Harness = 'claude-code' | 'codex';
 
 // The hook command picks the harness: `--harness codex` for Codex, and none for Claude Code.
@@ -109,16 +107,17 @@ function parseEdit(payload: unknown, projectDir: string | undefined, edited: Har
   };
 }
 
-const PATCH_HEADER = /^\*\*\* (?:Add File|Update File|Delete File|Move to): (?<path>.+)$/u;
-
 function parsePatchPaths(toolName: unknown, patch: unknown): readonly string[] {
   if (toolName !== 'apply_patch' || typeof patch !== 'string') {
     return [];
   }
 
+  // The module-level code above awaits the gate before any const below it runs, so the pattern lives here.
+  const header = /^\*\*\* (?:Add File|Update File|Delete File|Move to): (?<path>.+)$/u;
+
   return patch
     .split('\n')
-    .flatMap((line) => PATCH_HEADER.exec(line.replace(/\r$/u, ''))?.groups?.['path']?.trim() ?? []);
+    .flatMap((line) => header.exec(line.replace(/\r$/u, ''))?.groups?.['path']?.trim() ?? []);
 }
 
 // The gated paths among those the edit changes. A rules file that cannot be read or parsed gates
@@ -232,6 +231,8 @@ async function readProjectDir(payload: unknown): Promise<string | undefined> {
   }
 
   try {
+    const execFileAsync = promisify(execFile);
+
     const output = await execFileAsync('git', ['rev-parse', '--show-toplevel'], { cwd });
 
     const topLevel = output.stdout.trim();

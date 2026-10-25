@@ -400,3 +400,114 @@ test('it blocks a tool call when the gate cannot load and the tools list does no
   expect(result.status).toBe(2);
   expect(result.stderr).toContain("Cannot find package '@zgeoff/skill-gate'");
 });
+
+test('it denies a gated apply_patch edit through the entry point when given --harness codex', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, '.claude/skills/docs-writing'), { recursive: true });
+  await writeFile(join(ctx.directory, '.claude/skills/docs-writing/SKILL.md'), '# Docs writing\n');
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
+  );
+
+  const result = spawnSync('bun', [ctx.hookPath, '--harness', 'codex'], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      session_id: 'session-1',
+      transcript_path: join(ctx.directory, 'rollout.jsonl'),
+      cwd: ctx.directory,
+      tool_name: 'apply_patch',
+      tool_use_id: 'call-1',
+      tool_input: { command: '*** Begin Patch\n*** Add File: guide.md\n+# Guide\n*** End Patch' },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout).hookSpecificOutput.permissionDecisionReason).toContain(
+    `${join(ctx.directory, 'guide.md')} needs the \`docs-writing\` skill`,
+  );
+});
+
+test('it blocks a gated apply_patch edit when the gate cannot load and the harness is codex', async () => {
+  const ctx = await setupTest();
+
+  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
+
+  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await copyFile(ctx.hookPath, copiedHookPath);
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
+  );
+
+  const result = spawnSync('bun', [copiedHookPath, '--harness', 'codex'], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      cwd: join(ctx.directory, 'docs'),
+      tool_name: 'apply_patch',
+      tool_input: {
+        command:
+          '*** Begin Patch\n*** Add File: src/a.ts\n+x\n*** Update File: guide.md\n@@\n-a\n+b\n*** End Patch',
+      },
+    }),
+  });
+
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
+
+  expect(result.stderr).toContain(
+    `The skill gate cannot load, so it blocks this edit to ${join(ctx.directory, 'docs/guide.md')}: Cannot find package '@zgeoff/skill-gate'`,
+  );
+});
+
+test('it finds the project from the git top level when the gate cannot load and CLAUDE_PROJECT_DIR is unset', async () => {
+  const ctx = await setupTest();
+
+  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
+
+  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await mkdir(join(ctx.directory, 'docs'), { recursive: true });
+  await copyFile(ctx.hookPath, copiedHookPath);
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
+  );
+
+  spawnSync('git', ['init', '--quiet'], { cwd: ctx.directory });
+
+  const result = spawnSync('bun', [copiedHookPath, '--harness', 'codex'], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'] },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      cwd: join(ctx.directory, 'docs'),
+      tool_name: 'apply_patch',
+      tool_input: { command: '*** Begin Patch\n*** Add File: ../README.md\n+x\n*** End Patch' },
+    }),
+  });
+
+  expect(result.status).toBe(2);
+  expect(result.stderr).toContain('so it blocks this edit to');
+});
+
+test('it refuses a harness it does not know', async () => {
+  const ctx = await setupTest();
+
+  const result = spawnSync('bun', [ctx.hookPath, '--harness', 'cursor'], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'] },
+    input: '{}',
+  });
+
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain('does not know the harness cursor');
+});
