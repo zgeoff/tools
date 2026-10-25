@@ -21,12 +21,10 @@ in the workflow lint, and a repo never tests a shared lint rule, as [SKILL.md](.
 A made-up repo keeps its end-to-end suites in `e2e/suites.ts` and runs one matrix job per suite:
 
 ```ts
-import { expect, test } from 'bun:test';
-import { join } from 'node:path';
 import { suites } from '../e2e/suites.ts';
 
 test('it runs one e2e matrix job for each suite the e2e runner defines', async () => {
-  const text = await Bun.file(join(import.meta.dir, '../.github/workflows/ci.yml')).text();
+  const text = await Bun.file(new URL('../.github/workflows/ci.yml', import.meta.url)).text();
   const workflow: unknown = Bun.YAML.parse(text);
 
   expect(workflow).toMatchObject({
