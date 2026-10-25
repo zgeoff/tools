@@ -221,6 +221,45 @@ test('it reports a checks workflow that never cancels, and a group that holds a 
   ]);
 });
 
+test('it passes a checks workflow whose every job sets its own cancelling group', async () => {
+  const ctx = await setupTest();
+
+  await ctx.commitFiles({
+    '.github/workflows/checks.yml': [
+      'on:',
+      '  pull_request:',
+      'jobs:',
+      '  lint:',
+      '    runs-on: ubuntu-latest',
+      '    timeout-minutes: 5',
+      '    concurrency:',
+      `      group: lint-\${{ github.ref }}`,
+      '      cancel-in-progress: true',
+      '    steps:',
+      '      - run: bun run lint',
+      '  types:',
+      '    runs-on: ubuntu-latest',
+      '    timeout-minutes: 5',
+      '    concurrency:',
+      `      group: types-\${{ github.ref }}`,
+      '      cancel-in-progress: true',
+      '    steps:',
+      '      - run: bun run typecheck',
+      '',
+    ].join('\n'),
+  });
+
+  const findings = runWorkflowsCheck({
+    cwd: ctx.directory,
+    env: ctx.env,
+    paths: [],
+    profile: undefined,
+    runProgram,
+  });
+
+  expect(findings).toStrictEqual([]);
+});
+
 test('it reports a release or deploy job that a newer run can cancel', async () => {
   const ctx = await setupTest();
 
