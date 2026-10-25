@@ -1,4 +1,5 @@
 import { parseArgs } from 'node:util';
+import { collectCommandNames } from './collect-command-names.ts';
 import { parseShellWords } from './parse-shell-words.ts';
 import type { RunProgram } from './run-program.ts';
 import { runProgram } from './run-program.ts';
@@ -259,10 +260,10 @@ function findHeavyReason(job: Job): string | undefined {
   const command = collectSteps(job)
     .map((step) => findMember(step, 'run'))
     .filter((run): run is string => typeof run === 'string')
-    .flatMap((run) => parseShellWords(run))
-    .find((word) => !word.isOperator && kvmSetupCommands.has(word.text));
+    .flatMap((run) => collectCommandNames(parseShellWords(run)))
+    .find((name) => kvmSetupCommands.has(name));
 
-  return command === undefined ? undefined : `enables KVM through ${command.text}`;
+  return command === undefined ? undefined : `enables KVM through ${command}`;
 }
 
 // Any runner but a GitHub-hosted Ubuntu one counts as heavy: macOS, Windows, self-hosted, or a

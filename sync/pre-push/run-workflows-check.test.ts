@@ -391,6 +391,46 @@ test.each([['private' as const], [undefined]])(
   },
 );
 
+test('it counts a KVM setup command only where the shell runs it', async () => {
+  const ctx = await setupTest();
+
+  await ctx.commitFiles({
+    '.github/workflows/checks.yml': [
+      'on: [pull_request_target]',
+      'jobs:',
+      '  mention:',
+      '    runs-on: ubuntu-24.04',
+      '    timeout-minutes: 5',
+      '    steps:',
+      '      - run: echo scripts/ci/check-kvm.sh',
+      '      - run: bun run --silent lint ci:open-kvm',
+      '  shell:',
+      '    runs-on: ubuntu-24.04',
+      '    timeout-minutes: 5',
+      '    steps:',
+      '      - run: QEMU=1 bash scripts/open-kvm.sh',
+      '',
+    ].join('\n'),
+  });
+
+  const findings = runWorkflowsCheck({
+    cwd: ctx.directory,
+    env: ctx.env,
+    paths: [],
+    profile: 'private',
+    runProgram,
+  });
+
+  expect(findings).toStrictEqual([
+    {
+      path: '.github/workflows/checks.yml',
+      line: 9,
+      message:
+        'job shell is a heavy check, because it enables KVM through scripts/open-kvm.sh, in a workflow that runs on pull_request_target; a private repo runs a heavy check nightly or on dispatch, never on each pull request',
+    },
+  ]);
+});
+
 test('it leaves a heavy check alone in a public run', async () => {
   const ctx = await setupTest();
 

@@ -155,7 +155,7 @@ jobs:
           for file in plan-check-scripts.ts write-check-plan.ts; do
             curl -fsSL -o "$RUNNER_TEMP/check-plan/$file" "$base/.github/workflows/$file"
           done
-          for file in read-branch-base.ts parse-added-lines.ts run-program.ts run-commits-check.ts run-local-paths-check.ts run-test-timeouts-check.ts run-workflows-check.ts parse-shell-words.ts; do
+          for file in read-branch-base.ts parse-added-lines.ts run-program.ts run-commits-check.ts run-local-paths-check.ts run-test-timeouts-check.ts run-workflows-check.ts parse-shell-words.ts collect-command-names.ts; do
             curl -fsSL -o "$RUNNER_TEMP/check-plan/$file" "$base/sync/pre-push/$file"
           done
           curl -fsSL -o "$RUNNER_TEMP/check-plan/tools-package.json" "$base/package.json"

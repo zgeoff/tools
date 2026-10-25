@@ -416,12 +416,14 @@ test('it downloads the planner, the branch check scripts and the catalog from th
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-test-timeouts-check.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-workflows-check.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/parse-shell-words.ts',
+      'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/collect-command-names.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/package.json',
       '',
     ].join('\n'),
   );
 
   expect(files.toSorted()).toStrictEqual([
+    'collect-command-names.ts',
     'parse-added-lines.ts',
     'parse-shell-words.ts',
     'plan-check-scripts.ts',
