@@ -408,7 +408,22 @@ test('it passes when an excepted Markdown file links another file the same repo 
   });
 });
 
-test('it fails when a build writes a script key that the scripts field does not declare', async () => {
+test.each([
+  {
+    part: 'key that the scripts field does not declare',
+    scripts: { 'check:spelling': 'cspell .' },
+    written: '{"check:spelling": "cspell .", "check:links": "lychee ."}',
+    problem:
+      'has a build that writes script "check:links" as "lychee .", which its scripts field does not declare',
+  },
+  {
+    part: 'value that the scripts field does not declare',
+    scripts: { 'check:spelling': 'cspell .' },
+    written: '{"check:spelling": "cspell --no-progress ."}',
+    problem:
+      'declares script "check:spelling" as "cspell .", but its build writes "cspell --no-progress ."',
+  },
+])('it fails when a build writes a script $part', async (testCase) => {
   const ctx = await setupTest();
 
   await mkdir(join(ctx.directory, 'sync'));
@@ -420,8 +435,8 @@ test('it fails when a build writes a script key that the scripts field does not 
         name: 'demo',
         description: 'The demo scripts',
         files: [],
-        scripts: { 'check:spelling': 'cspell .' },
-        build: `jq '.scripts = {"check:spelling": "cspell .", "check:links": "lychee ."}' package.json > package.json.tmp; mv package.json.tmp package.json`,
+        scripts: testCase.scripts,
+        build: `jq '.scripts = ${testCase.written}' package.json > package.json.tmp; mv package.json.tmp package.json`,
       },
     ]),
   );
@@ -435,40 +450,7 @@ test('it fails when a build writes a script key that the scripts field does not 
   }).toStrictEqual({
     exitCode: 1,
     stdout: '',
-    stderr:
-      'check-sync-manifest: entry \'demo\' has a build that writes script "check:links" as "lychee .", which its scripts field does not declare\n',
-  });
-});
-
-test('it fails when a build writes a script value that the scripts field does not declare', async () => {
-  const ctx = await setupTest();
-
-  await mkdir(join(ctx.directory, 'sync'));
-
-  await writeFile(
-    join(ctx.directory, 'sync/manifest.json'),
-    JSON.stringify([
-      {
-        name: 'demo',
-        description: 'The demo scripts',
-        files: [],
-        scripts: { 'check:spelling': 'cspell .' },
-        build: `jq '.scripts = {"check:spelling": "cspell --no-progress ."}' package.json > package.json.tmp; mv package.json.tmp package.json`,
-      },
-    ]),
-  );
-
-  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
-
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  }).toStrictEqual({
-    exitCode: 1,
-    stdout: '',
-    stderr:
-      'check-sync-manifest: entry \'demo\' declares script "check:spelling" as "cspell .", but its build writes "cspell --no-progress ."\n',
+    stderr: `check-sync-manifest: entry 'demo' ${testCase.problem}\n`,
   });
 });
 
@@ -566,67 +548,39 @@ test('it fails when the scripts field holds a value that is not a string', async
   });
 });
 
-test('it fails when a build leaves a scripts field that is not an object of strings', async () => {
-  const ctx = await setupTest();
+test.each([{ value: 'true' }, { value: 'false' }])(
+  'it fails when a build leaves a scripts field of $value',
+  async (testCase) => {
+    const ctx = await setupTest();
 
-  await mkdir(join(ctx.directory, 'sync'));
+    await mkdir(join(ctx.directory, 'sync'));
 
-  await writeFile(
-    join(ctx.directory, 'sync/manifest.json'),
-    JSON.stringify([
-      {
-        name: 'demo',
-        description: 'The demo scripts',
-        files: [],
-        build: `jq '.scripts = true' package.json > package.json.tmp; mv package.json.tmp package.json`,
-      },
-    ]),
-  );
+    await writeFile(
+      join(ctx.directory, 'sync/manifest.json'),
+      JSON.stringify([
+        {
+          name: 'demo',
+          description: 'The demo scripts',
+          files: [],
+          build: `jq '.scripts = ${testCase.value}' package.json > package.json.tmp; mv package.json.tmp package.json`,
+        },
+      ]),
+    );
 
-  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+    const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
 
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  }).toStrictEqual({
-    exitCode: 1,
-    stdout: '',
-    stderr:
-      "check-sync-manifest: entry 'demo' has a build that leaves package.json without a scripts object of strings\n",
-  });
-});
-
-test('it fails when a build leaves a false scripts field', async () => {
-  const ctx = await setupTest();
-
-  await mkdir(join(ctx.directory, 'sync'));
-
-  await writeFile(
-    join(ctx.directory, 'sync/manifest.json'),
-    JSON.stringify([
-      {
-        name: 'demo',
-        description: 'The demo scripts',
-        files: [],
-        build: `jq '.scripts = false' package.json > package.json.tmp; mv package.json.tmp package.json`,
-      },
-    ]),
-  );
-
-  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
-
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  }).toStrictEqual({
-    exitCode: 1,
-    stdout: '',
-    stderr:
-      "check-sync-manifest: entry 'demo' has a build that leaves package.json without a scripts object of strings\n",
-  });
-});
+    expect({
+      exitCode: result.exitCode,
+      stdout: result.stdout.toString(),
+      stderr: result.stderr.toString(),
+    }).toStrictEqual({
+      exitCode: 1,
+      stdout: '',
+      stderr:
+        "check-sync-manifest: entry 'demo' has a build that leaves package.json without a scripts object of strings\n",
+    });
+  },
+);
 
 test('it fails when a build fails on an empty package.json', async () => {
   const ctx = await setupTest();
