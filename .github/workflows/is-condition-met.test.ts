@@ -33,11 +33,29 @@ test.each([
   },
 );
 
+test('it keeps a quoted value whole when the value holds &&', () => {
+  const values = new Map([
+    ['steps.pick.outputs.text', 'alpha && beta'],
+    ['steps.pick.outputs.size', 'large'],
+  ]);
+
+  const met = isConditionMet(
+    "steps.pick.outputs.text == 'alpha && beta' && steps.pick.outputs.size == 'large'",
+    values,
+  );
+
+  expect(met).toBeTrue();
+});
+
 test.each([
   ['always()', 'unsupported condition: always()'],
   [
     "steps.pick.outputs.color == 'blue' || steps.pick.outputs.size == 'large'",
     "unsupported condition: steps.pick.outputs.color == 'blue' || steps.pick.outputs.size == 'large'",
+  ],
+  [
+    "steps.pick.outputs.color == 'blue' && ",
+    "unsupported condition: steps.pick.outputs.color == 'blue' && ",
   ],
   ["steps.pick.outputs.shade == 'dark'", 'no value for steps.pick.outputs.shade'],
 ])('it rejects %s', (condition, message) => {
