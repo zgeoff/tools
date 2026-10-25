@@ -566,6 +566,37 @@ test('it fails when the scripts field holds a value that is not a string', async
   });
 });
 
+test('it fails when a build leaves a scripts field that is not an object of strings', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, 'sync'));
+
+  await writeFile(
+    join(ctx.directory, 'sync/manifest.json'),
+    JSON.stringify([
+      {
+        name: 'demo',
+        description: 'The demo scripts',
+        files: [],
+        build: `jq '.scripts = true' package.json > package.json.tmp; mv package.json.tmp package.json`,
+      },
+    ]),
+  );
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      "check-sync-manifest: entry 'demo' has a build that leaves package.json without a scripts object of strings\n",
+  });
+});
+
 test('it fails when a build fails on an empty package.json', async () => {
   const ctx = await setupTest();
 

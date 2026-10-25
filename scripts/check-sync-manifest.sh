@@ -61,13 +61,13 @@ while IFS= read -r name; do
   fi
 
   written='{}'
-  if [ -f "$workdir/package.json" ]; then
-    written=$(jq -c '.scripts // {}' "$workdir/package.json")
+  if [ -f "$workdir/package.json" ] && ! written=$(jq -ce '.scripts // {}
+    | select(type == "object" and all(.[]; type == "string"))' "$workdir/package.json" 2> /dev/null); then
+    report "entry '$name' has a build that leaves package.json without a scripts object of strings"
+    continue
   fi
 
-  while IFS= read -r problem; do
-    report "entry '$name' $problem"
-  done < <(jq -r --arg name "$name" --argjson written "$written" '.[] | select(.name == $name)
+  problems=$(jq -r --arg name "$name" --argjson written "$written" '.[] | select(.name == $name)
     | (.scripts // {}) as $declared
     | ($written | to_entries[] | select(.key as $k | $declared | has($k) | not)
       | "has a build that writes script \(.key | tojson) as \(.value | tojson), which its scripts field does not declare"),
@@ -75,6 +75,12 @@ while IFS= read -r name; do
       | "declares script \(.key | tojson) as \($declared[.key] | tojson), but its build writes \(.value | tojson)"),
       ($declared | to_entries[] | select(.key as $k | $written | has($k) | not)
       | "declares script \(.key | tojson), which its build never writes")' "$manifest")
+
+  if [ -n "$problems" ]; then
+    while IFS= read -r problem; do
+      report "entry '$name' $problem"
+    done <<< "$problems"
+  fi
 done < <(jq -r '.[] | select((.build | type) == "string" or has("scripts"))
   | select((.scripts // {}) | type == "object" and all(.[]; type == "string")) | .name' "$manifest")
 
