@@ -44,7 +44,7 @@ async function setupTest() {
   // The workflows check runs the workflow lint from where the fetch step puts it.
   await mkdir(join(directory, 'runner/check-plan'), { recursive: true });
 
-  for (const file of ['run-workflows-check.ts', 'run-program.ts']) {
+  for (const file of ['run-workflows-check.ts', 'parse-shell-words.ts', 'run-program.ts']) {
     await cp(
       join(import.meta.dir, '../../sync/pre-push', file),
       join(directory, 'runner/check-plan', file),
@@ -425,6 +425,7 @@ test('it downloads the planner, the branch check scripts and the catalog from th
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-local-paths-check.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-test-timeouts-check.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-workflows-check.ts',
+      'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/parse-shell-words.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/package.json',
       '',
     ].join('\n'),
@@ -432,6 +433,7 @@ test('it downloads the planner, the branch check scripts and the catalog from th
 
   expect(files.toSorted()).toStrictEqual([
     'parse-added-lines.ts',
+    'parse-shell-words.ts',
     'plan-check-scripts.ts',
     'read-branch-base.ts',
     'run-commits-check.ts',
