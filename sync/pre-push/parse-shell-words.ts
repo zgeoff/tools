@@ -1,4 +1,4 @@
-type ShellContext = "'" | '"' | '$(' | '(' | '`';
+type ShellContext = "'" | '"' | '$(' | '(' | '`' | '$((' | 'arithmetic(';
 
 export interface ShellWord {
   readonly text: string;
@@ -6,9 +6,9 @@ export interface ShellWord {
   readonly isOperator: boolean;
 }
 
-// A shell reads a quoted character or one after a backslash as a literal, so `echo "a;b"` holds one
-// command. A command substitution runs its contents as commands, inside double quotes too. A `&`
-// next to `>` or `<` is a redirection, such as `2>&1` or `&>log`, and stays part of a word.
+// A quoted or escaped character is a literal, so `echo "a;b"` holds one command. A command
+// substitution runs its contents, even in double quotes; an arithmetic expansion reads `|` and `&&`
+// as operators on numbers. A `&` beside `>` or `<` is a redirection, such as `2>&1` or `&>log`.
 export function parseShellWords(command: string): ShellWord[] {
   const words: ShellWord[] = [];
   const contexts: ShellContext[] = [];
@@ -37,10 +37,28 @@ export function parseShellWords(command: string): ShellWord[] {
       }
     } else if (context === '"' && character === '"') {
       contexts.pop();
+    } else if (context === '$((' || context === 'arithmetic(') {
+      if (character === '(') {
+        contexts.push('arithmetic(');
+      } else if (character === ')' && context === 'arithmetic(') {
+        contexts.pop();
+      } else if (character === ')' && next === ')') {
+        contexts.pop();
+
+        text += character;
+        index += 1;
+      }
+
+      text += character;
     } else if (character === '\\') {
       index += 1;
       text += next;
       isQuoted ||= context === undefined;
+    } else if (character === '$' && next === '(' && command.charAt(index + 2) === '(') {
+      contexts.push('$((');
+
+      text += '$((';
+      index += 2;
     } else if (character === '$' && next === '(') {
       contexts.push('$(');
 

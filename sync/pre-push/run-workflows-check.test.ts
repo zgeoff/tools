@@ -46,7 +46,7 @@ test('it passes workflows that follow every rule', async () => {
       '        env:',
       `          TARGET: \${{ github.base_ref }}`,
       '        run: |',
-      '          bun run lint "$TARGET" 2>&1 &>lint.log >&2 \'a;b|c\' "d && e" "$(date \'+%F; %T\')"',
+      '          bun run lint "$TARGET" 2>&1 &>lint.log >&2 \'a;b|c\' "d && e" "$(date \'+%F; %T\')" "$(( (1 | 2) && 3 ))"',
       '  shared:',
       '    uses: ./.github/workflows/shared.yml',
       '',
