@@ -4,6 +4,9 @@ export interface ShellWord {
   readonly text: string;
   readonly isQuoted: boolean;
   readonly isOperator: boolean;
+
+  // An unquoted NAME= prefix makes the word a variable assignment, whatever quotes its value holds.
+  readonly isAssignment: boolean;
 }
 
 type ShellContext =
@@ -24,6 +27,10 @@ interface ParserState {
   text: string;
   isQuoted: boolean;
   isAfterRedirect: boolean;
+
+  // The word's text before its first quote, escape or expansion.
+  plainText: string;
+  isPlain: boolean;
 }
 
 // The parser keeps a stack of the quotes, substitutions and expansions it is inside, and each
@@ -37,6 +44,8 @@ export function parseShellWords(command: string): ShellWord[] {
     text: '',
     isQuoted: false,
     isAfterRedirect: false,
+    plainText: '',
+    isPlain: true,
   };
 
   while (state.index < command.length) {
@@ -226,16 +235,20 @@ function advanceParser(state: ParserState, action: ShellAction, isTopLevel: bool
   state.index += match(action)
     .with({ kind: 'text' }, { kind: 'redirect' }, (step) => {
       state.text += step.text;
+      state.plainText += state.isPlain ? step.text : '';
 
       return 1;
     })
     .with({ kind: 'escape' }, () => {
+      state.isPlain = false;
       state.text += state.command.charAt(state.index + 1);
       state.isQuoted ||= isTopLevel;
 
       return 2;
     })
     .with({ kind: 'open' }, (step) => {
+      state.isPlain = false;
+
       state.contexts.push(step.context);
 
       state.text += step.text;
@@ -258,7 +271,7 @@ function advanceParser(state: ParserState, action: ShellAction, isTopLevel: bool
     .with({ kind: 'operator' }, (step) => {
       endWord(state);
 
-      state.words.push({ text: step.text, isQuoted: false, isOperator: true });
+      state.words.push({ text: step.text, isQuoted: false, isOperator: true, isAssignment: false });
 
       return step.text.length;
     })
@@ -270,11 +283,20 @@ function isQuoteContext(context: ShellContext): boolean {
   return context === 'single-quote' || context === 'double-quote';
 }
 
+const assignmentPattern = /^[A-Za-z_]\w*=/u;
+
 function endWord(state: ParserState): void {
   if (state.text !== '' || state.isQuoted) {
-    state.words.push({ text: state.text, isQuoted: state.isQuoted, isOperator: false });
+    state.words.push({
+      text: state.text,
+      isQuoted: state.isQuoted,
+      isOperator: false,
+      isAssignment: assignmentPattern.test(state.plainText),
+    });
   }
 
   state.text = '';
   state.isQuoted = false;
+  state.plainText = '';
+  state.isPlain = true;
 }

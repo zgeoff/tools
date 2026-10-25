@@ -23,7 +23,7 @@ function splitCommands(words: readonly ShellWord[]): ShellWord[][] {
 const shells = new Set(['bash', 'sh']);
 
 function collectRunTargets(command: readonly ShellWord[]): string[] {
-  const start = command.findIndex((word) => !isAssignment(word));
+  const start = command.findIndex((word) => !word.isAssignment);
   const words = start === -1 ? [] : command.slice(start).map((word) => word.text);
   const [name, ...rest] = words;
   const operands = rest.filter((word) => !word.startsWith('-'));
@@ -37,10 +37,4 @@ function collectRunTargets(command: readonly ShellWord[]): string[] {
   }
 
   return name === 'bun' && operands[0] === 'run' ? [name, ...operands.slice(1, 2)] : [name];
-}
-
-const assignmentPattern = /^[A-Za-z_]\w*=/u;
-
-function isAssignment(word: ShellWord): boolean {
-  return !word.isQuoted && assignmentPattern.test(word.text);
 }

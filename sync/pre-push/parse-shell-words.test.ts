@@ -27,10 +27,16 @@ test.each([
 });
 
 test.each([
-  ['if true', { text: 'if', isQuoted: false, isOperator: false }],
-  [`'if' true`, { text: 'if', isQuoted: true, isOperator: false }],
-  [String.raw`\if true`, { text: 'if', isQuoted: true, isOperator: false }],
-  ['"" true', { text: '', isQuoted: true, isOperator: false }],
+  ['if true', { text: 'if', isQuoted: false, isOperator: false, isAssignment: false }],
+  [`'if' true`, { text: 'if', isQuoted: true, isOperator: false, isAssignment: false }],
+  [String.raw`\if true`, { text: 'if', isQuoted: true, isOperator: false, isAssignment: false }],
+  ['"" true', { text: '', isQuoted: true, isOperator: false, isAssignment: false }],
+  ['QEMU="1" bash', { text: 'QEMU=1', isQuoted: true, isOperator: false, isAssignment: true }],
+  ['"QEMU=1" bash', { text: 'QEMU=1', isQuoted: true, isOperator: false, isAssignment: false }],
+  [
+    String.raw`QEMU\=1 bash`,
+    { text: 'QEMU=1', isQuoted: true, isOperator: false, isAssignment: false },
+  ],
 ])('it reads the first word of %p as %p', (command, first) => {
   const [word] = parseShellWords(command);
 

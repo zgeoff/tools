@@ -409,7 +409,7 @@ test('it counts a KVM setup command only where the shell runs it', async () => {
       '    runs-on: ubuntu-24.04',
       '    timeout-minutes: 5',
       '    steps:',
-      '      - run: QEMU=1 bash scripts/open-kvm.sh',
+      '      - run: QEMU="1" bash scripts/open-kvm.sh',
       '',
     ].join('\n'),
   });
