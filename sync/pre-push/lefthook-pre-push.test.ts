@@ -1038,21 +1038,28 @@ test('it skips typecheck on a commit that stages no code or config file', async 
   expect(result.exitCode).toBe(0);
 });
 
-// Each suite that spawns git must stay safe without the baseline's env -u, so it runs here with
-// the GIT_DIR a pre-push hook in the worktree exports.
+// Each suite that spawns git must stay safe without the baseline's env -u, so the tests in it whose
+// code under test runs git run here with the GIT_DIR a pre-push hook in the worktree exports. The
+// filter keeps each nested run inside the per-test timeout.
 test.each([
-  ['packages/oxfmt-config/index.test.ts'],
-  ['sync/pre-push/read-branch-base.test.ts'],
-  ['sync/pre-push/run-commits-check.test.ts'],
-  ['sync/pre-push/run-local-paths-check.test.ts'],
-  ['sync/pre-push/run-test-timeouts-check.test.ts'],
-  ['sync/pre-push/run-workflows-check.test.ts'],
-  ['sync/skills/docs-writing/scripts/check-length.test.ts'],
-  ['sync/skills/docs-writing/scripts/check-links.test.ts'],
-  ['sync/skills/skill-writing/scripts/check-skill.test.ts'],
+  ['packages/oxfmt-config/index.test.ts', 'repo-sync delivers'],
+  ['sync/pre-push/read-branch-base.test.ts', 'merge base'],
+  [
+    'sync/pre-push/run-commits-check.test.ts',
+    'reads only the commits after the base|leaves out a merge commit',
+  ],
+  [
+    'sync/pre-push/run-local-paths-check.test.ts',
+    'reads only the lines the branch adds|a later commit of the branch removes',
+  ],
+  ['sync/pre-push/run-test-timeouts-check.test.ts', 'as HEAD holds them'],
+  ['sync/pre-push/run-workflows-check.test.ts', 'as HEAD holds it|no commit'],
+  ['sync/skills/docs-writing/scripts/check-length.test.ts', 'linguist-vendored'],
+  ['sync/skills/docs-writing/scripts/check-links.test.ts', 'linguist-vendored'],
+  ['sync/skills/skill-writing/scripts/check-skill.test.ts', 'linguist-vendored'],
 ])(
-  'it passes %s and leaves the main checkout config and branch unchanged under a worktree GIT_DIR',
-  async (suite) => {
+  'it passes the git tests of %s that match %p and leaves the main checkout config and branch unchanged under a worktree GIT_DIR',
+  async (suite, pattern) => {
     const ctx = await setupTest();
 
     // A local exclude for every page, so a script whose git reads this repo instead of its own
@@ -1063,7 +1070,7 @@ test.each([
     const head = await $`git rev-parse feature`.cwd(ctx.main).env(ctx.env).text();
 
     // The real HOME, so a tool on PATH that reads it, such as a version manager's node shim, runs.
-    const result = await $`bun test ./${suite}`
+    const result = await $`bun test ./${suite} -t ${pattern}`
       .cwd(join(import.meta.dir, '../..'))
       .env({
         ...ctx.env,
@@ -1078,7 +1085,7 @@ test.each([
 
     expect(configAfter).toBe(config);
     expect(headAfter).toBe(head);
-    expect(result.stderr.toString()).toMatch(/^ [1-9]\d* pass\n 0 fail$/mu);
+    expect(result.stderr.toString()).toMatch(/^ [1-9]\d* pass\n \d+ filtered out\n 0 fail$/mu);
     expect(result.exitCode).toBe(0);
   },
 );
