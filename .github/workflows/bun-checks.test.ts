@@ -41,16 +41,6 @@ async function setupTest() {
     join(directory, 'check-plan/node_modules'),
   );
 
-  // The workflows check runs the workflow lint from where the fetch step puts it.
-  await mkdir(join(directory, 'runner/check-plan'), { recursive: true });
-
-  for (const file of ['run-workflows-check.ts', 'parse-shell-words.ts', 'run-program.ts']) {
-    await cp(
-      join(import.meta.dir, '../../sync/pre-push', file),
-      join(directory, 'runner/check-plan', file),
-    );
-  }
-
   const plan = await loadWorkflowStep(workflow, 'static', 'Plan the check scripts');
   const setupShfmt = await loadWorkflowStep(workflow, 'static', 'Setup shfmt');
   const setupActionlint = await loadWorkflowStep(workflow, 'static', 'Setup actionlint');
@@ -540,6 +530,7 @@ test('it runs a public repo as separate gitleaks, static, test and lane jobs, wi
     { name: 'Check shell', if: afterSetup },
     { name: 'Check docs', if: afterSetup },
     { name: 'Check workflows', if: afterSetup },
+    { name: 'Lint workflows', if: afterSetup },
     { name: 'Check commits', if: afterSetup },
     { name: 'Check local paths', if: afterSetup },
     { name: 'Check test timeouts', if: afterSetup },
@@ -621,6 +612,7 @@ test('it runs a private repo as one checks job with the scan, each shared check,
           { name: 'Check shell', if: afterSetup },
           { name: 'Check docs', if: afterSetup },
           { name: 'Check workflows', if: afterSetup },
+          { name: 'Lint workflows', if: afterSetup },
           { name: 'Check commits', if: afterSetup },
           { name: 'Check local paths', if: afterSetup },
           { name: 'Check test timeouts', if: afterSetup },
@@ -1136,11 +1128,8 @@ test('it passes the workflows check on a concurrency queue key before the ignore
 
   await writeFile(
     join(ctx.repo, '.github/workflows/publish.yml'),
-    'on: workflow_dispatch\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    concurrency:\n      group: publish\n      cancel-in-progress: false\n      queue: max\n    steps:\n      - run: echo hi\n',
+    'on: push\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    concurrency:\n      group: publish\n      cancel-in-progress: false\n      queue: max\n    steps:\n      - run: echo hi\n',
   );
-
-  await $`git add --all`.cwd(ctx.repo).env(ctx.gitEnv);
-  await $`git commit --quiet -m ${'chore: add the workflow'}`.cwd(ctx.repo).env(ctx.gitEnv);
 
   const result = await $`bash -c ${step.run}`
     .cwd(ctx.repo)
@@ -1179,11 +1168,8 @@ test('it fails the workflows check on a concurrency queue key once the ignore ex
 
   await writeFile(
     join(ctx.repo, '.github/workflows/publish.yml'),
-    'on: workflow_dispatch\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    concurrency:\n      group: publish\n      cancel-in-progress: false\n      queue: max\n    steps:\n      - run: echo hi\n',
+    'on: push\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    concurrency:\n      group: publish\n      cancel-in-progress: false\n      queue: max\n    steps:\n      - run: echo hi\n',
   );
-
-  await $`git add --all`.cwd(ctx.repo).env(ctx.gitEnv);
-  await $`git commit --quiet -m ${'chore: add the workflow'}`.cwd(ctx.repo).env(ctx.gitEnv);
 
   const result = await $`bash -c ${step.run}`
     .cwd(ctx.repo)
@@ -1198,44 +1184,6 @@ test('it fails the workflows check on a concurrency queue key once the ignore ex
   );
 
   expect(result.stdout.toString()).toInclude('unexpected key "queue" for "concurrency" section');
-});
-
-test('it warns on each workflow lint finding and passes the workflows check', async () => {
-  const ctx = await setupTest();
-
-  invariant(Bun.which('actionlint') !== null, 'install actionlint');
-
-  const step = await loadWorkflowStep(
-    join(import.meta.dir, 'bun-checks.yml'),
-    'static',
-    'Check workflows',
-  );
-
-  await mkdir(join(ctx.repo, '.github/workflows'), { recursive: true });
-
-  await writeFile(
-    join(ctx.repo, '.github/workflows/greet.yml'),
-    'on: workflow_dispatch\njobs:\n  greet:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi && echo there\n',
-  );
-
-  await $`git add --all`.cwd(ctx.repo).env(ctx.gitEnv);
-  await $`git commit --quiet -m ${'chore: add the workflow'}`.cwd(ctx.repo).env(ctx.gitEnv);
-
-  const result = await $`bash -c ${step.run}`
-    .cwd(ctx.repo)
-    .env({ ...ctx.gitEnv, ...step.env, GITHUB_ACTIONS: 'true' })
-    .nothrow()
-    .quiet();
-
-  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
-    exitCode: 0,
-    stdout: [
-      '::warning file=.github/workflows/greet.yml,line=3::job greet, step 1: the run chains commands with `&&`; a run holds one command on one line, and anything more goes in a script',
-      '::warning file=.github/workflows/greet.yml,line=3::job greet sets no timeout-minutes',
-      'workflows: 2 warnings; the workflow lint warns and does not fail yet',
-      '',
-    ].join('\n'),
-  });
 });
 
 test('it fails the commits check on a commit of the branch that commitlint rejects', async () => {

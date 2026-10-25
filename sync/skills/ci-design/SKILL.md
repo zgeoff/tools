@@ -157,10 +157,10 @@ Logic in a script runs in the script's tests on every pull request, as the testi
 ### The workflow lint
 
 The workflow lint checks the `run:` rule and the rules in this skill that a parser can check
-exactly. The `Check workflows` step of `bun-checks.yml` runs it after actionlint over the repo's
-workflows and the workflow callers that zgeoff/tools delivers. The pre-push baseline runs it over
-the workflow files a branch changes. It reports each fault as a warning and passes, so a repo that
-Renovate moves to a new sync tag keeps a green run while it clears the warnings.
+exactly. The `Lint workflows` step of `bun-checks.yml` runs it after the actionlint step over the
+repo's workflows and the workflow callers that zgeoff/tools delivers. The pre-push baseline runs it
+over the workflow files a branch changes. It reports each fault as a warning and passes, so a repo
+that Renovate moves to a new sync tag keeps a green run while it clears the warnings.
 
 | Rule                                    | The lint warns on                                                                                                     |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |

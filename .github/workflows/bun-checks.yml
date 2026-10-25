@@ -12,8 +12,9 @@
 # was cancelled, because GitHub counts a skipped required check as a pass.
 #
 # The static job, and the checks job in a private repo, run the shared checks
-# as named steps beside the scripts: shell, docs, workflows, commits and local
-# paths. A check that needs a tool the repo lacks prints a notice and passes.
+# as named steps beside the scripts: shell, docs, workflows, the workflow lint,
+# commits, local paths and test timeouts. A check that needs a tool the repo
+# lacks prints a notice and passes.
 #
 # `scripts` is a space-separated list of package.json script names. Empty means
 # the standard list: audit deadcode format:check lint typecheck test, then each
@@ -296,28 +297,31 @@ jobs:
 
       # actionlint 1.7.12 rejects the concurrency queue key that GitHub documents,
       # until rhysd/actionlint#654 ships. The ignore lapses on its expiry date, and
-      # the pre-push workflows job holds the same ignore and date. The workflow
-      # lint runs after actionlint, even when actionlint fails, and reads the
-      # profile, because one of its rules covers a private repo alone.
+      # the pre-push workflows job holds the same ignore and date.
       - &check-workflows
         name: Check workflows
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
         env:
           QUEUE_IGNORE_EXPIRES: '20270122'
+        run: |
+          set -euo pipefail
+          if [ "$(date -u +%Y%m%d)" -lt "$QUEUE_IGNORE_EXPIRES" ]; then
+            actionlint -ignore 'unexpected key "queue" for "concurrency" section'
+          else
+            echo "::warning::workflows: the ignore of the concurrency queue key expired on $QUEUE_IGNORE_EXPIRES; move ACTIONLINT_VERSION to a release with rhysd/actionlint#654"
+            actionlint
+          fi
+
+      # The workflow lint reads the profile, because one of its rules covers a
+      # private repo alone.
+      - &lint-workflows
+        name: Lint workflows
+        if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
+        env:
           CHECKS_PROFILE:
             ${{ ((github.event.repository && github.event.repository.private) ||
             (!github.event.repository && inputs.private)) && 'private' || 'public' }}
-        run: |
-          set -euo pipefail
-          status=0
-          if [ "$(date -u +%Y%m%d)" -lt "$QUEUE_IGNORE_EXPIRES" ]; then
-            actionlint -ignore 'unexpected key "queue" for "concurrency" section' || status=1
-          else
-            echo "::warning::workflows: the ignore of the concurrency queue key expired on $QUEUE_IGNORE_EXPIRES; move ACTIONLINT_VERSION to a release with rhysd/actionlint#654"
-            actionlint || status=1
-          fi
-          bun "$RUNNER_TEMP/check-plan/run-workflows-check.ts" || status=1
-          exit "$status"
+        run: bun "$RUNNER_TEMP/check-plan/run-workflows-check.ts"
 
       - &check-commits
         name: Check commits
@@ -487,6 +491,7 @@ jobs:
       - *check-shell
       - *check-docs
       - *check-workflows
+      - *lint-workflows
       - *check-commits
       - *check-local-paths
       - *check-test-timeouts
