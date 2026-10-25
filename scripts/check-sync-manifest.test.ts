@@ -423,6 +423,13 @@ test.each([
     problem:
       'declares script "check:spelling" as "cspell .", but its build writes "cspell --no-progress ."',
   },
+  {
+    part: 'key for an entry with no scripts field',
+    scripts: undefined,
+    written: '{"check:spelling": "cspell ."}',
+    problem:
+      'has a build that writes script "check:spelling" as "cspell .", which its scripts field does not declare',
+  },
 ])('it fails when a build writes a script $part', async (testCase) => {
   const ctx = await setupTest();
 
