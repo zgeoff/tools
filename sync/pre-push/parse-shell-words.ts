@@ -14,6 +14,7 @@ export function parseShellWords(command: string): ShellWord[] {
   const contexts: ShellContext[] = [];
   let text = '';
   let isQuoted = false;
+  let isAfterRedirect = false;
 
   const endWord = (): void => {
     if (text !== '' || isQuoted) {
@@ -28,6 +29,9 @@ export function parseShellWords(command: string): ShellWord[] {
     const character = command.charAt(index);
     const next = command.charAt(index + 1);
     const context = contexts.at(-1);
+    const isRedirectAmpersand = isAfterRedirect || next === '>';
+
+    isAfterRedirect = false;
 
     if (context === "'") {
       if (character === "'") {
@@ -86,7 +90,11 @@ export function parseShellWords(command: string): ShellWord[] {
       break;
     } else if (/\s/u.test(character)) {
       endWord();
-    } else if (character === ';' || character === '|' || isSeparatorAmpersand(command, index)) {
+    } else if (
+      character === ';' ||
+      character === '|' ||
+      (character === '&' && !isRedirectAmpersand)
+    ) {
       endWord();
 
       const isDouble = character !== ';' && next === character;
@@ -100,21 +108,11 @@ export function parseShellWords(command: string): ShellWord[] {
       index += isDouble ? 1 : 0;
     } else {
       text += character;
+      isAfterRedirect = character === '>' || character === '<';
     }
   }
 
   endWord();
 
   return words;
-}
-
-function isSeparatorAmpersand(command: string, index: number): boolean {
-  const previous = command.charAt(index - 1);
-
-  return (
-    command.charAt(index) === '&' &&
-    command.charAt(index + 1) !== '>' &&
-    previous !== '>' &&
-    previous !== '<'
-  );
 }

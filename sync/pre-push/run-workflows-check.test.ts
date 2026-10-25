@@ -94,6 +94,7 @@ test.each([
   ['bun install && bun run lint', 'chains commands with `&&`'],
   ['bun run lint || true', 'chains commands with `||`'],
   ['bun run lint & bun run test', 'chains commands with `&`'],
+  [String.raw`bun run lint \>& bun run test`, 'chains commands with `&`'],
   ['cd packages; bun run lint', 'chains commands with `;`'],
   ['bun run lint | tee lint.log', 'chains commands with `|`'],
   ['echo "$(bun install && bun run lint)"', 'chains commands with `&&`'],
