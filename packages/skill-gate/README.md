@@ -147,8 +147,10 @@ keeps its own ledger of what each session loaded. Three events write it:
   skill's text into the context with no tool call, so the prompt hook is the only place the gate
   sees it.
 - `PostCompact` clears the ledger's skills and reads, as a `compact_boundary` entry does in a Claude
-  Code transcript. A skill loaded by `$<name>` before a compaction counts only after it loads again;
-  the gate clears it because it cannot confirm that Codex keeps the text.
+  Code transcript. A skill loaded before a compaction counts only after it loads again. In a check
+  with Codex CLI 0.162.0, the model quoted the last sentence of a `$<name>` skill after an automatic
+  compaction, so that text may survive in the context or in the compaction summary. The gate clears
+  the skill anyway, because a hook cannot tell a kept skill from a summarized one.
 
 The ledger is a JSON file named for the session id, in the gate's `skill-gate` folder beside the
 session's rollout file, where the Bash snapshots also live. A session with no rollout file keeps it
