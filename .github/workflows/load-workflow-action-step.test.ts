@@ -85,7 +85,7 @@ test.each([
     ].join('\n'),
   );
 
-  await expect(loadWorkflowActionStep(ctx.workflow, 'build', name)).rejects.toThrow(message);
+  expect(loadWorkflowActionStep(ctx.workflow, 'build', name)).rejects.toThrow(message);
 });
 
 test('it rejects a job with no steps', async () => {
@@ -93,7 +93,7 @@ test('it rejects a job with no steps', async () => {
 
   await writeFile(ctx.workflow, ['jobs:', '  build:', '    runs-on: ubuntu-latest', ''].join('\n'));
 
-  await expect(loadWorkflowActionStep(ctx.workflow, 'build', 'Brew')).rejects.toThrow(
+  expect(loadWorkflowActionStep(ctx.workflow, 'build', 'Brew')).rejects.toThrow(
     'the build job has no steps',
   );
 });
