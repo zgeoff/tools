@@ -23,6 +23,10 @@ An entry holds:
 - `build` (optional) — a bash command the workflow runs in the downstream checkout after the copy,
   for a file that is generated from a copied one. The runner has bash, git and jq, and nothing from
   the downstream repo's toolchain is installed, so the command uses those only.
+- `scripts` (needed when the `build` writes `package.json` scripts) — each script key the `build`
+  writes, with the value it writes, so a check of a sync pull request can hold its `package.json`
+  change to those lines. `scripts/check-sync-manifest.sh` runs each `build` on an empty
+  `package.json` and fails when the scripts it writes there differ from this field.
 
 A target under `.github/workflows/` needs the line `repo-sync delivers this file from zgeoff/tools`
 in its source. Without it, the workflow never overwrites a workflow file the repo wrote itself.
