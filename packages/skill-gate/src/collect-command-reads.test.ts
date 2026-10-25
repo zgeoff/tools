@@ -37,6 +37,23 @@ test('it counts a read after a command that cannot fail but not one that may nev
   ).toStrictEqual([]);
 });
 
+test('it resolves a read against the directory a cd moved to, and restores it after a subshell', () => {
+  expect(
+    collectCommandReads(
+      'cd src && cat ../.claude/skills/testing/SKILL.md; (cd docs && cat a.md); cat b.md',
+      '/repo',
+    ),
+  ).toStrictEqual([
+    '/repo/.claude/skills/testing/SKILL.md',
+    '/repo/src/docs/a.md',
+    '/repo/src/b.md',
+  ]);
+});
+
+test('it counts no read after a cd to a directory it cannot resolve', () => {
+  expect(collectCommandReads('cd "$DIR" && cat a.md', '/repo')).toStrictEqual([]);
+});
+
 test('it keeps a guard set outside a subshell active past a separator inside it', () => {
   expect(collectCommandReads('false && (echo skipped; cat a.md); true', '/repo')).toStrictEqual([]);
 
