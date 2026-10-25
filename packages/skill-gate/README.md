@@ -1,12 +1,12 @@
 # @zgeoff/skill-gate
 
-The skill gate is a Claude Code hook that denies an edit until the session has loaded every skill
-the path needs, and names the missing skills. It denies a call to a gated tool, such as an MCP tool,
-the same way until the session has loaded the skills and read the reference files the tool needs.
-After a Bash command, it compares `git status` with the status before the command, and it blocks
-when the command changed a gated file that the session lacks the skills for. The package holds no
-rules: each repo keeps its own in `.claude/skill-gate.json`, and a repo without that file has no
-gate.
+The skill gate is a Claude Code and Codex CLI hook that denies an edit until the session has loaded
+every skill the path needs, and names the missing skills. It denies a call to a gated tool, such as
+an MCP tool, the same way until the session has loaded the skills and read the reference files the
+tool needs. After a Bash command, it compares `git status` with the status before the command, and
+it blocks when the command changed a gated file that the session lacks the skills for. The package
+holds no rules: each repo keeps its own in `.claude/skill-gate.json`, and a repo without that file
+has no gate.
 
 ## Install
 
@@ -66,6 +66,14 @@ the matcher skips. This example gates `mcp__tracker__update_ticket`:
   }
 }
 ```
+
+## Codex
+
+The same entry point runs as a Codex hook when its command passes `--harness codex`, and it gates
+`apply_patch` edits, gated tools and Bash commands as it does under Claude Code. Codex has no Skill
+tool, so the gate keeps a ledger of what each session loaded.
+[Gating Codex edits](../../docs/guides/skill-gate-codex.md) holds the `.codex/hooks.json` example,
+the trust step and the ledger rules.
 
 ## Rules
 

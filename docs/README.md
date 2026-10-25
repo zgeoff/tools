@@ -32,6 +32,8 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 
 - [Writing skill-gate rules](./guides/skill-gate-rules.md): path gates, tool gates, and the mistakes
   in a rules file that the gate tolerates.
+- [Gating Codex edits](./guides/skill-gate-codex.md): register the skill gate as a Codex hook, and
+  how the gate counts loads there.
 
 ## Runbooks
 

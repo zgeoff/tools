@@ -215,7 +215,7 @@
   },
   {
     "name": "hook-skill-gate",
-    "description": "The skill-gate hook's entry point, which runs the gate from the @zgeoff/skill-gate package; the repo installs the package, keeps its path and tool gates in .claude/skill-gate.json, and registers the hook in .claude/settings.json with a PreToolUse matcher that names each gated tool",
+    "description": "The skill-gate hook's entry point, which runs the gate from the @zgeoff/skill-gate package for Claude Code and Codex; the repo installs the package, keeps its path and tool gates in .claude/skill-gate.json, registers the hook in .claude/settings.json with a PreToolUse matcher that names each gated tool, and for Codex registers it in .codex/hooks.json with --harness codex and trusts the hook definitions",
     "optIn": true,
     "files": [
       {

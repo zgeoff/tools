@@ -22,7 +22,8 @@ baseline need changes in the repo beyond the `include` line, which repo-sync nev
 
 ## Opting in to the skill gate
 
-A repo opts in to the `hook-skill-gate` entry with four changes, which repo-sync never touches:
+A repo opts in to the `hook-skill-gate` entry with four changes, plus a fifth for a repo that uses
+Codex. Repo-sync touches none of them:
 
 1. Add `hook-skill-gate` to `include` in `.github/workflows/repo-sync.yml`.
 2. Run `bun add -d @zgeoff/skill-gate` at the repo root. Without the package, the entry point fails
@@ -33,6 +34,10 @@ A repo opts in to the `hook-skill-gate` entry with four changes, which repo-sync
 4. Register the hook in `.claude/settings.json`, as the package README's
    [Entry point](../../packages/skill-gate/README.md#entry-point) section shows. The `PreToolUse`
    matcher names each tool that a tool gate names.
+5. For a repo that also uses Codex, register the hook in `.codex/hooks.json` with `--harness codex`,
+   as the package README's [Codex](../../packages/skill-gate/README.md#codex) section shows, then
+   trust the hook definitions in the Codex CLI with `/hooks`. Codex reads skills from
+   `.agents/skills`, so link it to `.claude/skills`.
 
 ## Opting in to the pre-push baseline
 
