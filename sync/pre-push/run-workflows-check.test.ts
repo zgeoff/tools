@@ -512,6 +512,48 @@ test('it reads the workflow callers, skips a subfolder, and reads only the paths
   ]);
 });
 
+test('it reads each workflow as HEAD holds it, not as the working tree holds it', async () => {
+  const ctx = await setupTest();
+
+  await ctx.commitFiles({
+    '.github/workflows/tidy.yml': [
+      'on: workflow_dispatch',
+      'jobs:',
+      '  tidy:',
+      '    runs-on: ubuntu-latest',
+      '    steps:',
+      '      - run: bun run tidy',
+      '',
+    ].join('\n'),
+  });
+
+  await Bun.write(
+    join(ctx.directory, '.github/workflows/tidy.yml'),
+    [
+      'on: workflow_dispatch',
+      'jobs:',
+      '  tidy:',
+      '    runs-on: ubuntu-latest',
+      '    timeout-minutes: 5',
+      '    steps:',
+      '      - run: bun run tidy',
+      '',
+    ].join('\n'),
+  );
+
+  const findings = runWorkflowsCheck({
+    cwd: ctx.directory,
+    env: ctx.env,
+    paths: [],
+    profile: undefined,
+    runProgram,
+  });
+
+  expect(findings).toStrictEqual([
+    { path: '.github/workflows/tidy.yml', line: 3, message: 'job tidy sets no timeout-minutes' },
+  ]);
+});
+
 test('it reports a workflow it cannot parse', async () => {
   const ctx = await setupTest();
 
