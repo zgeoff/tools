@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rename } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import type { SessionLoads } from './types.ts';
@@ -44,7 +44,12 @@ export async function writeLoadLedger(
   try {
     await mkdir(path.dirname(ledgerPath), { recursive: true });
 
-    await Bun.write(ledgerPath, JSON.stringify(ledger));
+    // A reader outside the lock must never see a half-written file, which it would read as empty.
+    const tempPath = `${ledgerPath}.${process.pid}.tmp`;
+
+    await Bun.write(tempPath, JSON.stringify(ledger));
+
+    await rename(tempPath, ledgerPath);
   } catch {
     // A ledger that cannot be written leaves the session's loads uncounted, and the gate then
     // denies the edit and names the skills to load again.

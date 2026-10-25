@@ -4,7 +4,7 @@ import { collectCommandReads } from './collect-command-reads.ts';
 test('it resolves the files that each reader in a pipeline or list opens', () => {
   expect(
     collectCommandReads(
-      'cat a.md && head -n 5 /abs/b.md | less; sed -n 1,9p c.md; nl d.md; tail -20 e.md; bat f.md',
+      'cat a.md; head -n 5 /abs/b.md | less; sed -n 1,9p c.md; nl d.md; tail -20 e.md; bat f.md',
       '/repo',
     ),
   ).toStrictEqual([
@@ -26,5 +26,13 @@ test('it counts a file read through an input redirect', () => {
 test('it counts neither a sed that rewrites nor a program that is not a reader', () => {
   expect(
     collectCommandReads('sed -i s/a/b/ a.md; grep x b.md; echo $(cat c.md)', '/repo'),
+  ).toStrictEqual([]);
+});
+
+test('it counts a read after a command that cannot fail but not one that may never run', () => {
+  expect(collectCommandReads('cd /repo && cat a.md', '/repo')).toStrictEqual(['/repo/a.md']);
+
+  expect(
+    collectCommandReads('false && cat a.md; test -f x || cat b.md; grep y z && cat c.md', '/repo'),
   ).toStrictEqual([]);
 });

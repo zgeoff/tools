@@ -78,7 +78,7 @@ async function setupTest() {
     return { directory, project, runHook, patch, bash };
   };
 
-  return { directory, hookArgs, prepareCodexProject };
+  return { directory, hookArgs, codexHookArgs, prepareCodexProject };
 }
 
 test('it denies a test file edit until the session loads both testing skills', async () => {
@@ -2654,7 +2654,7 @@ test('it denies a gated MCP tool call until the skill loads and a reference is r
   ctx.runHook(
     ctx.bash(
       'PostToolUse',
-      'cat .agents/skills/testing/SKILL.md && head -50 .agents/skills/testing/references/rounding.md',
+      'cat .agents/skills/testing/SKILL.md ; head -50 .agents/skills/testing/references/rounding.md',
     ),
   );
 
@@ -2662,4 +2662,68 @@ test('it denies a gated MCP tool call until the skill loads and a reference is r
 
   expect(allowed.status).toBe(0);
   expect(allowed.stdout).toBe('');
+});
+
+test('it does not count a skill read that a failing guard keeps from running', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  ctx.runHook(ctx.bash('PostToolUse', 'false && cat .agents/skills/testing/SKILL.md'));
+  ctx.runHook(ctx.bash('PostToolUse', 'test -f nothing || cat .agents/skills/testing/SKILL.md'));
+
+  const result = ctx.runHook(ctx.patch('*** Add File: src/b.test.ts', '+test'));
+
+  expect(JSON.parse(result.stdout).hookSpecificOutput.permissionDecision).toBe('deny');
+});
+
+test('it counts a skill read that follows a directory change', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  ctx.runHook(ctx.bash('PostToolUse', 'cd . && cat .agents/skills/testing/SKILL.md'));
+
+  const result = ctx.runHook(ctx.patch('*** Add File: src/b.test.ts', '+test'));
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});
+
+test('it keeps every skill read when many hooks record at once', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  const names = Array.from({ length: 12 }, (_, index) => `skill-${index}`);
+
+  for (const name of names) {
+    await mkdir(join(ctx.project, '.agents/skills', name), { recursive: true });
+    await writeFile(join(ctx.project, '.agents/skills', name, 'SKILL.md'), `# ${name}\n`);
+  }
+
+  await writeFile(
+    join(ctx.project, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: names }] }),
+  );
+
+  const runRead = async (name: string) => {
+    const payload = JSON.stringify({
+      session_id: 'session-1',
+      transcript_path: join(ctx.directory, 'rollout-1.jsonl'),
+      ...ctx.bash('PostToolUse', `cat .agents/skills/${name}/SKILL.md`),
+    });
+
+    const hook = Bun.spawn(['bun', ...base.codexHookArgs], {
+      env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.project },
+      stdin: new TextEncoder().encode(payload),
+      stdout: 'ignore',
+    });
+
+    await hook.exited;
+  };
+
+  await Promise.all(names.map((name) => runRead(name)));
+
+  const result = ctx.runHook(ctx.patch('*** Add File: src/b.test.ts', '+test'));
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
 });

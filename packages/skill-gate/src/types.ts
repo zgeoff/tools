@@ -83,6 +83,14 @@ export interface ShellCommand {
   readonly stdin: string | null;
   readonly enters: number;
   readonly leaves: number;
+  readonly guard?: ShellGuard | null;
+}
+
+// What decides whether a command runs: the commands before it in an `&&` or `||` chain, and
+// whether a `||` sits between.
+export interface ShellGuard {
+  readonly viaOr: boolean;
+  readonly before: readonly (readonly ShellWord[])[];
 }
 
 export interface WrittenPath {

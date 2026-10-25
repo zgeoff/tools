@@ -1,22 +1,40 @@
 import path from 'node:path';
 import { parseShellCommands } from './parse-shell-commands.ts';
-import type { ShellCommand } from './types.ts';
+import type { ShellCommand, ShellWord } from './types.ts';
 
 // The files that a shell command reads with a reader that shows the whole file or a slice of it,
 // as absolute paths. `sed` counts only as `sed -n`, which prints a slice instead of rewriting.
 export function collectCommandReads(command: string, cwd: string): readonly string[] {
-  const commands = parseShellCommands(command) ?? [];
+  const commands = parseShellCommands(command, { withGuards: true }) ?? [];
 
   return [
     ...new Set(
-      commands.flatMap((entry) => collectReaderPaths(entry).map((word) => path.resolve(cwd, word))),
+      commands
+        .filter((entry) => isSureToRun(entry))
+        .flatMap((entry) => collectReaderPaths(entry).map((word) => path.resolve(cwd, word))),
     ),
   ];
 }
 
-const READERS = new Set(['cat', 'head', 'tail', 'sed', 'nl', 'less', 'bat']);
+// A command after `||`, or after an `&&` command that may fail, may never run, and a skill it
+// reads is then not loaded. Only commands that cannot fail count as sure.
+function isSureToRun(command: ShellCommand): boolean {
+  const guard = command.guard ?? null;
+
+  return guard === null || (!guard.viaOr && guard.before.every((words) => isSureToSucceed(words)));
+}
+
+const SURE_PROGRAMS = new Set(['cd', 'pushd', 'true', ':', 'export']);
 
 const ASSIGNMENT = /^[A-Za-z_]\w*=/u;
+
+function isSureToSucceed(words: readonly ShellWord[]): boolean {
+  const firstWord = words.find((word) => !ASSIGNMENT.test(word.text));
+
+  return firstWord !== undefined && firstWord.literal && SURE_PROGRAMS.has(firstWord.text);
+}
+
+const READERS = new Set(['cat', 'head', 'tail', 'sed', 'nl', 'less', 'bat']);
 
 function collectReaderPaths(command: ShellCommand): readonly string[] {
   const firstWord = command.words.findIndex((word) => !ASSIGNMENT.test(word.text));

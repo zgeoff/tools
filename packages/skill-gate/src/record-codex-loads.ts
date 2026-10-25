@@ -8,15 +8,16 @@ import { addLoads, readLoadLedger, voidLoads, writeLoadLedger } from './load-led
 import { parseSkillGateRules } from './parse-skill-gate-rules.ts';
 import { readAvailableSkills } from './read-available-skills.ts';
 import { resolveLedgerPath } from './resolve-state-dir.ts';
-import type { HookInput, LifecycleInput } from './types.ts';
+import type { HookInput, LifecycleInput, SessionLoads } from './types.ts';
+import { withLedgerLock } from './with-ledger-lock.ts';
 
 export async function recordLifecycle(input: LifecycleInput, projectDir: string): Promise<void> {
   const ledgerPath = resolveLedgerPath(input);
 
-  const ledger = await readLoadLedger(ledgerPath);
-
   await match(input.event)
-    .with('PostCompact', () => writeLoadLedger(ledgerPath, voidLoads()))
+    .with('PostCompact', () =>
+      withLedgerLock(ledgerPath, () => writeLoadLedger(ledgerPath, voidLoads())),
+    )
     .with('UserPromptSubmit', async () => {
       const mentioned = collectPromptSkills(input.prompt ?? '');
 
@@ -32,7 +33,7 @@ export async function recordLifecycle(input: LifecycleInput, projectDir: string)
       const skills = mentioned.filter((skill) => present.has(skill));
 
       if (skills.length > 0) {
-        await writeLoadLedger(ledgerPath, addLoads(ledger, { skills, readPaths: [] }));
+        await addLedgerLoads(ledgerPath, { skills, readPaths: [] });
       }
     })
     .exhaustive();
@@ -59,9 +60,16 @@ export async function recordCommandReads(
     return;
   }
 
-  const ledgerPath = resolveLedgerPath(input);
+  await addLedgerLoads(resolveLedgerPath(input), reads);
+}
 
-  const ledger = await readLoadLedger(ledgerPath);
+async function addLedgerLoads(
+  ledgerPath: string | null,
+  loads: Pick<SessionLoads, 'skills' | 'readPaths'>,
+): Promise<void> {
+  await withLedgerLock(ledgerPath, async () => {
+    const ledger = await readLoadLedger(ledgerPath);
 
-  await writeLoadLedger(ledgerPath, addLoads(ledger, reads));
+    await writeLoadLedger(ledgerPath, addLoads(ledger, loads));
+  });
 }
