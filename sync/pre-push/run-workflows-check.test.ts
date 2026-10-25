@@ -631,3 +631,24 @@ test('it refuses an option it does not know, and exits 2 before it reads a workf
     ].join('\n'),
   });
 });
+
+test('it reports the git error and exits 2 when HEAD has no commit', async () => {
+  const ctx = await setupTest();
+
+  const result = await $`bun ${join(import.meta.dir, 'run-workflows-check.ts')}`
+    .cwd(ctx.directory)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr:
+      'workflows: git ls-tree -r -z --name-only HEAD failed: fatal: Not a valid object name HEAD\n',
+  });
+});
