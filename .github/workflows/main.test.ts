@@ -23,6 +23,12 @@ test('it publishes a release that the merge run tagged from a run at the tag', a
   const ctx = await setupTest();
   const resolve = await loadWorkflowStep(ctx.workflow, 'release', 'Resolve release commit');
 
+  const dispatch = await loadWorkflowStep(
+    ctx.workflow,
+    'release',
+    'Dispatch publish at the release tag',
+  );
+
   // The outputs of the tag step after it tags the release PR that this run
   // merged: the merge made commit merge222, and the run started at old111.
   const tagOutputs = {
@@ -61,7 +67,43 @@ test('it publishes a release that the merge run tagged from a run at the tag', a
       '\n',
     ),
   );
+
+  const resolves = isConditionMet(
+    resolve.condition ?? '',
+    new Map([
+      ['steps.release.outputs.releases_created', 'false'],
+      ['steps.tag.outputs.releases_created', 'true'],
+    ]),
+  );
+
+  const dispatches = isConditionMet(
+    dispatch.condition ?? '',
+    new Map([['steps.release-commit.outputs.here', 'false']]),
+  );
+
+  expect({ resolves, dispatches }).toStrictEqual({ resolves: true, dispatches: true });
 });
+
+test.each([
+  { release: 'true', tag: '', resolves: true },
+  { release: 'false', tag: 'true', resolves: true },
+  { release: 'false', tag: '', resolves: false },
+])(
+  'it resolves the release commit only after a release, with release-please $release and the tag step $tag',
+  async (row) => {
+    const ctx = await setupTest();
+    const resolve = await loadWorkflowStep(ctx.workflow, 'release', 'Resolve release commit');
+
+    const values = new Map([
+      ['steps.release.outputs.releases_created', row.release],
+      ['steps.tag.outputs.releases_created', row.tag],
+    ]);
+
+    const result = isConditionMet(resolve.condition ?? '', values);
+
+    expect(result).toBe(row.resolves);
+  },
+);
 
 test.each([
   {

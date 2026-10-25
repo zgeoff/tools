@@ -33,14 +33,37 @@ test.each([
   },
 );
 
-test('it keeps a quoted value whole when the value holds &&', () => {
+test.each([
+  ['blue', 'small', 'light', true],
+  ['red', 'large', 'dark', true],
+  ['red', 'large', 'light', false],
+  ['blue', 'large', 'light', true],
+])(
+  'it meets a condition of alternatives joined by || when one holds, with %s, %s and %s as %p',
+  (color, size, shade, expected) => {
+    const values = new Map([
+      ['steps.pick.outputs.color', color],
+      ['steps.pick.outputs.size', size],
+      ['steps.pick.outputs.shade', shade],
+    ]);
+
+    const met = isConditionMet(
+      "steps.pick.outputs.color == 'blue' || steps.pick.outputs.size == 'large' && steps.pick.outputs.shade == 'dark'",
+      values,
+    );
+
+    expect(met).toBe(expected);
+  },
+);
+
+test('it keeps a quoted value whole when the value holds && or ||', () => {
   const values = new Map([
-    ['steps.pick.outputs.text', 'alpha && beta'],
+    ['steps.pick.outputs.text', 'alpha && beta || gamma'],
     ['steps.pick.outputs.size', 'large'],
   ]);
 
   const met = isConditionMet(
-    "steps.pick.outputs.text == 'alpha && beta' && steps.pick.outputs.size == 'large'",
+    "steps.pick.outputs.text == 'alpha && beta || gamma' && steps.pick.outputs.size == 'large'",
     values,
   );
 
@@ -49,10 +72,6 @@ test('it keeps a quoted value whole when the value holds &&', () => {
 
 test.each([
   ['always()', 'unsupported condition: always()'],
-  [
-    "steps.pick.outputs.color == 'blue' || steps.pick.outputs.size == 'large'",
-    "unsupported condition: steps.pick.outputs.color == 'blue' || steps.pick.outputs.size == 'large'",
-  ],
   [
     "steps.pick.outputs.color == 'blue' && ",
     "unsupported condition: steps.pick.outputs.color == 'blue' && ",

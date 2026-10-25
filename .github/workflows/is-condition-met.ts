@@ -1,5 +1,7 @@
 export function isConditionMet(condition: string, values: ReadonlyMap<string, string>): boolean {
-  return parseComparisons(condition).every((comparison) => isComparisonMet(comparison, values));
+  return parseAlternatives(condition).some((alternative) =>
+    alternative.every((comparison) => isComparisonMet(comparison, values)),
+  );
 }
 
 interface Comparison {
@@ -10,11 +12,13 @@ interface Comparison {
   readonly expected: string;
 }
 
-// Reads the comparisons one at a time from the start, so a ` && ` inside a
-// quoted value stays part of that value.
-function parseComparisons(condition: string): Comparison[] {
+// Reads the comparisons one at a time from the start, so a ` && ` or ` || `
+// inside a quoted value stays part of that value. `&&` binds tighter than
+// `||`, as in GitHub's expressions.
+function parseAlternatives(condition: string): Comparison[][] {
   const comparisonPattern = /(?<expression>[\w.-]+) (?<operator>==|!=) '(?<expected>[^']*)'/uy;
-  const comparisons: Comparison[] = [];
+  const alternatives: Comparison[][] = [];
+  let comparisons: Comparison[] = [];
   let index = 0;
 
   while (true) {
@@ -35,10 +39,14 @@ function parseComparisons(condition: string): Comparison[] {
     index = comparisonPattern.lastIndex;
 
     if (index === condition.length) {
-      return comparisons;
+      return [...alternatives, comparisons];
     }
 
-    if (!condition.startsWith(' && ', index)) {
+    if (condition.startsWith(' || ', index)) {
+      alternatives.push(comparisons);
+
+      comparisons = [];
+    } else if (!condition.startsWith(' && ', index)) {
       throw new Error(`unsupported condition: ${condition}`);
     }
 
