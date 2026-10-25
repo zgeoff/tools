@@ -36,6 +36,8 @@ export function runLocalPathsCheck(options: Readonly<LocalPathsCheckOptions>): L
     return [];
   }
 
+  runMergeBlobsFetch(options);
+
   const result = options.runProgram(
     [
       'git',
@@ -103,6 +105,134 @@ function findHostPattern(name: string): { name: string; pattern: RegExp } | null
 
   return { name, pattern: new RegExp(`(?<![A-Za-z0-9_])${escaped}(?![A-Za-z0-9_])`, 'u') };
 }
+
+// A blobless clone fetches a merge's missing blobs during the log, in one batch with the
+// conflict-marked blob that the log builds in a temporary folder, and the server refuses the whole
+// batch. Fetching the blobs first leaves the log nothing to ask for.
+function runMergeBlobsFetch(options: Readonly<LocalPathsCheckOptions>): void {
+  const promisor = options.runProgram(
+    ['git', 'config', '--type=bool', '--get', 'remote.origin.promisor'],
+    { cwd: options.cwd, env: options.env },
+  );
+
+  if (promisor.stdout.trim() !== 'true') {
+    return;
+  }
+
+  const merges = splitLines(
+    runGit(options, ['rev-list', '--merges', '--parents', `${options.base}..HEAD`]),
+  );
+
+  if (merges.length === 0) {
+    return;
+  }
+
+  const pairs = merges.flatMap((merge) => {
+    const commits = merge.split(' ');
+    const argv = ['git', 'merge-base', '--all', ...commits.slice(1)];
+    const bases = options.runProgram(argv, { cwd: options.cwd, env: options.env });
+
+    // `git merge-base` exits 1 when the parents share no commit.
+    if (bases.exitCode !== 0 && bases.exitCode !== 1) {
+      throw new Error(`${argv.join(' ')} failed: ${bases.stderr.trim()}`);
+    }
+
+    return splitLines(bases.stdout).flatMap((base) =>
+      commits.map((commit) => `${base} ${commit}\n`),
+    );
+  });
+
+  const commits = new Set(pairs.flatMap((pair) => pair.trim().split(' ')));
+
+  // A blob ID on the command line makes git 2.43's rev-list die when the blob is missing, so the
+  // listing starts from the commits instead.
+  const listing = runGit(
+    options,
+    ['rev-list', '--objects', '--missing=print', '--no-walk', '--stdin'],
+    [...commits].map((commit) => `${commit}\n`).join(''),
+  );
+
+  const missing = new Set(
+    splitLines(listing)
+      .filter((line) => line.startsWith('?'))
+      .map((line) => line.slice(1)),
+  );
+
+  // The server refuses the whole fetch when it asks for a blob that only this clone holds.
+  const blobs = collectBlobIds(
+    runGit(options, ['diff-tree', '-r', '--no-abbrev', '--stdin'], pairs.join('')),
+  ).filter((blob) => missing.has(blob));
+
+  if (blobs.length === 0) {
+    return;
+  }
+
+  runGit(
+    options,
+    [
+      '-c',
+      'fetch.negotiationAlgorithm=noop',
+      'fetch',
+      '--quiet',
+      '--no-tags',
+      '--no-write-fetch-head',
+      '--filter=blob:none',
+      '--stdin',
+      'origin',
+    ],
+    blobs.map((blob) => `${blob}\n`).join(''),
+  );
+}
+
+function splitLines(text: string): string[] {
+  return text.split('\n').filter((line) => line !== '');
+}
+
+function runGit(
+  options: Readonly<LocalPathsCheckOptions>,
+  args: readonly string[],
+  stdin?: string,
+): string {
+  const argv = ['git', ...args];
+
+  const result = options.runProgram(argv, {
+    cwd: options.cwd,
+    env: options.env,
+    ...(stdin === undefined ? {} : { stdin }),
+  });
+
+  if (result.exitCode !== 0) {
+    throw new Error(`${argv.join(' ')} failed: ${result.stderr.trim()}`);
+  }
+
+  return result.stdout;
+}
+
+// Each raw line reads `:<old mode> <new mode> <old id> <new id> <status>\t<path>`.
+function collectBlobIds(rawDiff: string): string[] {
+  const blobs = new Set<string>();
+
+  for (const line of rawDiff.split('\n')) {
+    if (!line.startsWith(':')) {
+      continue;
+    }
+
+    const [oldMode, newMode, oldBlob, newBlob] = line.slice(1).split(' ');
+
+    for (const [mode, blob] of [
+      [oldMode, oldBlob],
+      [newMode, newBlob],
+    ]) {
+      if (mode !== undefined && blob !== undefined && BLOB_MODES.has(mode)) {
+        blobs.add(blob);
+      }
+    }
+  }
+
+  return [...blobs];
+}
+
+const BLOB_MODES = new Set(['100644', '100755', '120000']);
 
 async function runCLI(): Promise<void> {
   try {

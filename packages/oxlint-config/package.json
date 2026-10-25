@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/oxlint-config",
-  "version": "0.6.4",
+  "version": "0.7.0",
   "description": "Shareable oxlint config: strict categories, house-style rules, and a custom JS plugin",
   "license": "MIT",
   "repository": {
@@ -31,6 +31,9 @@
     "no-file-snapshot.js",
     "setup-test-only.js",
     "max-test-timeout.js",
+    "test-timeout-exception-ticket.js",
+    "build-lane-limits.js",
+    "resolve-suite-directory.js",
     "no-test-sleep.js",
     "import-zones.js",
     "import-zones-schema.js",

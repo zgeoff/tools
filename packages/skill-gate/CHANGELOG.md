@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.8](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.7...@zgeoff/skill-gate@0.2.8) (2026-10-25)
+
+### Features
+
+- **skill-gate:** gate codex edits and tool calls
+  ([#334](https://github.com/zgeoff/tools/issues/334))
+  ([9021438](https://github.com/zgeoff/tools/commit/9021438245948172449ec9ed063656aa7872cb65))
+
+## [0.2.7](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.6...@zgeoff/skill-gate@0.2.7) (2026-10-24)
+
+### Features
+
+- **docs-writing:** set readme limits by path and add the spike shape
+  ([#329](https://github.com/zgeoff/tools/issues/329))
+  ([cdc7a21](https://github.com/zgeoff/tools/commit/cdc7a2191fb5bb3ae0ce7317a3a57abb3dc00365))
+
 ## [0.2.6](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.5...@zgeoff/skill-gate@0.2.6) (2026-10-22)
 
 ### Bug Fixes

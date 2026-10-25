@@ -1,10 +1,27 @@
 import { match } from 'ts-pattern';
-import type { ShellCommand, ShellRedirect, ShellWord } from './types.ts';
+import type { ShellCommand, ShellGuard, ShellRedirect, ShellWord } from './types.ts';
 
-export function parseShellCommands(text: string): readonly ShellCommand[] | null {
+export function parseShellCommands(
+  text: string,
+  options: { readonly withGuards?: boolean } = {},
+): readonly ShellCommand[] | null {
   const tokens = splitShellTokens(text);
 
-  return tokens === null ? null : buildShellCommands(tokens);
+  if (tokens === null) {
+    return null;
+  }
+
+  const commands = buildShellCommands(tokens);
+
+  return options.withGuards === true
+    ? commands
+    : commands.map((command) => ({
+        words: command.words,
+        redirects: command.redirects,
+        stdin: command.stdin,
+        enters: command.enters,
+        leaves: command.leaves,
+      }));
 }
 
 type ShellToken =
@@ -304,12 +321,18 @@ function buildOperatorToken(operator: string): ShellToken {
     : { kind: 'redirect', operator };
 }
 
+interface GuardState {
+  chain: ShellWord[][];
+  viaOr: boolean;
+}
+
 interface CommandDraft {
   words: ShellWord[];
   redirects: ShellRedirect[];
   stdin: string | null;
   enters: number;
   leaves: number;
+  guard: ShellGuard | null;
 }
 
 const LIST_ENDS = new Set(['&', ';', ';;', '\n']);
@@ -321,6 +344,12 @@ function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellComman
   let operator: string | null = null;
   let pipedIn = false;
   const listStarts = [0];
+  let chain: ShellWord[][] = [];
+  let viaOr = false;
+
+  // The guard a group inherits from outside it, which a separator inside the group must not clear.
+  let inherited: GuardState = { chain: [], viaOr: false };
+  const outerStates: { chain: ShellWord[][]; viaOr: boolean; inherited: GuardState }[] = [];
 
   // A command on either side of a pipe runs in its own subshell, and so does the whole list before
   // `&`, such as `cd docs && make &`.
@@ -332,10 +361,22 @@ function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellComman
 
       draft.enters += piped ? 1 : 0;
       draft.leaves += piped ? 1 : 0;
+      draft.guard = chain.length > 0 || viaOr ? { viaOr, before: [...chain] } : null;
+
+      if (separator === '&&' || separator === '||') {
+        chain.push(draft.words);
+
+        viaOr ||= separator === '||';
+      }
 
       commands.push(draft);
 
       draft = buildCommandDraft();
+    }
+
+    if (separator !== null && LIST_ENDS.has(separator)) {
+      chain = [...inherited.chain];
+      viaOr = inherited.viaOr;
     }
 
     operator = null;
@@ -369,8 +410,17 @@ function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellComman
           draft.enters += 1;
 
           listStarts.push(commands.length);
+          outerStates.push({ chain, viaOr, inherited });
+
+          inherited = { chain: [...chain], viaOr };
         } else {
           listStarts.pop();
+
+          const outer = outerStates.pop();
+
+          if (outer !== undefined) {
+            ({ chain, viaOr, inherited } = outer);
+          }
 
           if (last !== undefined) {
             last.leaves += 1;
@@ -415,5 +465,5 @@ function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellComman
 }
 
 function buildCommandDraft(): CommandDraft {
-  return { words: [], redirects: [], stdin: null, enters: 0, leaves: 0 };
+  return { words: [], redirects: [], stdin: null, enters: 0, leaves: 0, guard: null };
 }

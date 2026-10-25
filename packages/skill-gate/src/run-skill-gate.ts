@@ -1,7 +1,6 @@
 import { statSync } from 'node:fs';
 import { mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { isRecord } from '@zgeoff/std';
 import { GitError, simpleGit } from 'simple-git';
 import type { SimpleGit } from 'simple-git';
 import { match } from 'ts-pattern';
@@ -9,13 +8,14 @@ import { bashSnapshotSchema } from './bash-snapshot-schema.ts';
 import { buildBashChangeOutput } from './build-bash-change-output.ts';
 import { buildBashCheckFailureOutput } from './build-bash-check-failure-output.ts';
 import { buildBashSkillGateOutput } from './build-bash-skill-gate-output.ts';
-import { buildSkillGateOutput } from './build-skill-gate-output.ts';
+import { buildEditOutput } from './build-edit-output.ts';
 import { buildToolGateOutput } from './build-tool-gate-output.ts';
 import { collectBashCandidates } from './collect-bash-candidates.ts';
 import { collectChangedPaths } from './collect-changed-paths.ts';
 import { collectGateSkills } from './collect-gate-skills.ts';
-import { collectSessionLoads } from './collect-session-loads.ts';
 import { collectWrittenPaths } from './collect-written-paths.ts';
+import type { Harness } from './harness.ts';
+import { parseHookInput } from './parse-hook-input.ts';
 import { parseSkillGateRules } from './parse-skill-gate-rules.ts';
 import { pickCommitRange } from './pick-commit-range.ts';
 import { pickComparisonStep } from './pick-comparison-step.ts';
@@ -24,28 +24,33 @@ import { planBashSkillGate } from './plan-bash-skill-gate.ts';
 import { planSkillGate } from './plan-skill-gate.ts';
 import { planToolGate } from './plan-tool-gate.ts';
 import { readAvailableReferences } from './read-available-references.ts';
+import { readAvailableSkills } from './read-available-skills.ts';
 import { readCommitHashes } from './read-commit-hashes.ts';
 import { readCommittedPaths } from './read-committed-paths.ts';
 import { readFileContent } from './read-file-content.ts';
 import { readFileHashes } from './read-file-hashes.ts';
+import { readProjectDir } from './read-project-dir.ts';
+import { readSessionLoads } from './read-session-loads.ts';
 import { readWorkTree } from './read-work-tree.ts';
+import { recordCommandReads, recordLifecycle } from './record-codex-loads.ts';
+import { resolveStateDir } from './resolve-state-dir.ts';
 import type {
   BashComparison,
   BashResultStep,
   BashSnapshot,
-  HookEvent,
+  HookInput,
   PostToolEvent,
   RecordedSnapshot,
   SkillGateRules,
   WrittenPath,
 } from './types.ts';
 
-export async function runSkillGate(): Promise<never> {
+export async function runSkillGate(harness: Harness = 'claude-code'): Promise<never> {
   const payload: unknown = await Bun.stdin.json().catch(() => null);
 
-  const input = parseHookInput(payload);
+  const parsedInput = parseHookInput(harness, payload);
 
-  if (input === null) {
+  if (parsedInput === null) {
     process.exit(0);
   }
 
@@ -53,10 +58,21 @@ export async function runSkillGate(): Promise<never> {
   // beside the hook. simple-git refuses an env it is handed that holds GIT_EDITOR, so set it here.
   process.env['GIT_OPTIONAL_LOCKS'] = '0';
 
-  const projectDir = process.env['CLAUDE_PROJECT_DIR'] ?? input.cwd;
+  const projectDir = await readProjectDir(parsedInput.cwd);
+
   const rulesFile = Bun.file(path.join(projectDir, '.claude', 'skill-gate.json'));
 
   const hasRules = await rulesFile.exists();
+
+  if (parsedInput.kind === 'lifecycle') {
+    if (hasRules) {
+      await recordLifecycle(parsedInput, projectDir);
+    }
+
+    process.exit(0);
+  }
+
+  const input = parsedInput;
 
   if (hasRules && input.toolName !== null && input.event === 'PreToolUse') {
     await checkToolCall({
@@ -68,22 +84,25 @@ export async function runSkillGate(): Promise<never> {
   }
 
   if (hasRules && input.command !== null) {
-    await checkBash({
-      hookInput: input,
-      command: input.command,
-      projectDir,
-      rulesText: await rulesFile.text(),
-    });
+    const rulesText = await rulesFile.text();
+
+    if (input.harness === 'codex' && input.event === 'PostToolUse') {
+      await recordCommandReads(input, input.command, projectDir, rulesText);
+    }
+
+    await checkBash({ hookInput: input, command: input.command, projectDir, rulesText });
   }
 
-  if (input.filePath === null || input.event !== 'PreToolUse') {
+  if (input.editPaths.length === 0 || input.event !== 'PreToolUse') {
     process.exit(0);
   }
 
-  const filePath = path.resolve(input.cwd, input.filePath);
-  const relativePath = toProjectPath(projectDir, filePath);
+  const edits = input.editPaths
+    .map((editPath) => path.resolve(input.cwd, editPath))
+    .map((filePath) => ({ filePath, relativePath: toProjectPath(projectDir, filePath) }))
+    .filter((edit) => !isOutsideProject(edit.relativePath));
 
-  if (!hasRules || isOutsideProject(relativePath)) {
+  if (!hasRules || edits.length === 0) {
     process.exit(0);
   }
 
@@ -92,27 +111,29 @@ export async function runSkillGate(): Promise<never> {
   const parsed = parseSkillGateRules(rulesText);
 
   if (!parsed.ok) {
-    printOutput(
-      buildSkillGateOutput(filePath, { missing: [], unknown: [] }, { rulesError: parsed.error }),
-    );
+    const emptyPlan = { missing: [], unknown: [] };
+    const unchecked = edits.map((edit) => ({ filePath: edit.filePath, plan: emptyPlan }));
+
+    printOutput(buildEditOutput(input.harness, unchecked, { rulesError: parsed.error }));
 
     process.exit(0);
   }
 
   const availableSkills = await readAvailableSkills(path.join(projectDir, '.claude', 'skills'));
-  const transcript = await readSessionTranscript(input);
+  const loaded = await readSessionLoads(input);
 
-  const loaded = collectSessionLoads(transcript);
-
-  const plan = planSkillGate({
-    rules: parsed.rules,
-    relativePath,
-    loadedSkills: loaded.skills,
-    availableSkills,
-  });
+  const entries = edits.map((edit) => ({
+    filePath: edit.filePath,
+    plan: planSkillGate({
+      rules: parsed.rules,
+      relativePath: edit.relativePath,
+      loadedSkills: loaded.skills,
+      availableSkills,
+    }),
+  }));
 
   printOutput(
-    buildSkillGateOutput(filePath, plan, {
+    buildEditOutput(input.harness, entries, {
       compacted: loaded.compacted,
       unknownKeys: parsed.unknownKeys,
     }),
@@ -121,53 +142,7 @@ export async function runSkillGate(): Promise<never> {
   process.exit(0);
 }
 
-interface HookInput {
-  readonly event: HookEvent;
-  readonly toolName: string | null;
-  readonly cwd: string;
-  readonly filePath: string | null;
-  readonly command: string | null;
-  readonly transcriptPath: string;
-  readonly toolUseID: unknown;
-  readonly agentID: unknown;
-}
-
-function parseHookInput(value: unknown): HookInput | null {
-  if (!isRecord(value) || !isRecord(value['tool_input'])) {
-    return null;
-  }
-
-  const cwd = value['cwd'];
-  const transcriptPath = value['transcript_path'];
-  const editPath = value['tool_input']['file_path'];
-  const command = value['tool_input']['command'];
-  const toolName = value['tool_name'];
-
-  if (typeof cwd !== 'string' || typeof transcriptPath !== 'string') {
-    return null;
-  }
-
-  if (typeof editPath !== 'string' && typeof command !== 'string' && typeof toolName !== 'string') {
-    return null;
-  }
-
-  return {
-    event: pickHookEvent(value['hook_event_name']),
-    toolName: typeof toolName === 'string' ? toolName : null,
-    cwd,
-    filePath: typeof editPath === 'string' ? editPath : null,
-    command: typeof command === 'string' ? command : null,
-    transcriptPath,
-    toolUseID: value['tool_use_id'],
-    agentID: value['agent_id'],
-  };
-}
-
-function pickHookEvent(value: unknown): HookEvent {
-  return value === 'PostToolUse' || value === 'PostToolUseFailure' ? value : 'PreToolUse';
-}
-
-const PATH_GATED_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'Bash']);
+const PATH_GATED_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'Bash', 'apply_patch']);
 
 interface ToolCallCheck {
   readonly hookInput: HookInput;
@@ -203,9 +178,7 @@ async function checkToolCall(check: ToolCallCheck): Promise<void> {
 
   const skillsDir = path.join(check.projectDir, '.claude', 'skills');
 
-  const transcript = await readSessionTranscript(check.hookInput);
-
-  const loads = collectSessionLoads(transcript);
+  const loads = await readSessionLoads(check.hookInput);
 
   const plan = planToolGate({
     tools: parsedRules.tools,
@@ -222,6 +195,7 @@ async function checkToolCall(check: ToolCallCheck): Promise<void> {
 
   printOutput(
     buildToolGateOutput(check.toolName, plan, {
+      harness: check.hookInput.harness,
       compacted: loads.compacted,
       unknownKeys: parsedRules.unknownKeys,
     }),
@@ -234,74 +208,6 @@ function printOutput(output: object | null): void {
   if (output !== null) {
     console.log(JSON.stringify(output));
   }
-}
-
-// A subagent's call carries the main session's transcript_path plus its own agent_id, and Claude
-// Code keeps its transcript in <session>/subagents/, under workflows/<workflow_id>/ when a workflow
-// started it.
-async function readSessionTranscript(hookInput: HookInput): Promise<string> {
-  if (hookInput.agentID === undefined) {
-    return readTranscript(hookInput.transcriptPath);
-  }
-
-  if (typeof hookInput.agentID !== 'string' || !/^[\w-]+$/u.test(hookInput.agentID)) {
-    return '';
-  }
-
-  const subagentsDir = path.join(hookInput.transcriptPath.replace(/\.jsonl$/u, ''), 'subagents');
-  const transcriptName = `agent-${hookInput.agentID}.jsonl`;
-
-  const agentTranscript = await readTranscript(path.join(subagentsDir, transcriptName));
-
-  if (agentTranscript !== '') {
-    return agentTranscript;
-  }
-
-  return readWorkflowAgentTranscript(subagentsDir, transcriptName);
-}
-
-async function readTranscript(transcriptPath: string): Promise<string> {
-  const transcriptFile = Bun.file(transcriptPath);
-
-  const exists = await transcriptFile.exists();
-
-  return exists ? transcriptFile.text() : '';
-}
-
-async function readWorkflowAgentTranscript(
-  subagentsDir: string,
-  transcriptName: string,
-): Promise<string> {
-  const scan = new Bun.Glob(`workflows/*/${transcriptName}`).scan({ cwd: subagentsDir });
-
-  let transcriptPath: string | null = null;
-
-  try {
-    for await (const scannedPath of scan) {
-      transcriptPath = scannedPath;
-      break;
-    }
-  } catch {
-    // Bun's glob scan throws ENOENT when its cwd is missing, as for a session with no subagents.
-  }
-
-  return transcriptPath === null ? '' : readTranscript(path.join(subagentsDir, transcriptPath));
-}
-
-async function readAvailableSkills(skillsDir: string): Promise<readonly string[]> {
-  const skills: string[] = [];
-
-  const scan = new Bun.Glob('*/SKILL.md').scan({ cwd: skillsDir, followSymlinks: true });
-
-  try {
-    for await (const skillFile of scan) {
-      skills.push(path.dirname(skillFile));
-    }
-  } catch {
-    // Bun's glob scan throws when .claude/skills is missing, and such a repo has no skills.
-  }
-
-  return skills;
 }
 
 interface BashCheck {
@@ -340,16 +246,14 @@ async function checkBash(check: BashCheck): Promise<never> {
   process.exit(0);
 }
 
-// Claude Code keeps a session's own files in <session>/ beside its transcript, which a git status
-// of the project never lists.
 function resolveSnapshotPath(hookInput: HookInput): string | null {
   if (typeof hookInput.toolUseID !== 'string' || !/^[\w-]+$/u.test(hookInput.toolUseID)) {
     return null;
   }
 
-  const sessionDir = hookInput.transcriptPath.replace(/\.jsonl$/u, '');
+  const stateDir = resolveStateDir(hookInput);
 
-  return path.join(sessionDir, 'skill-gate', `${hookInput.toolUseID}.json`);
+  return stateDir === null ? null : path.join(stateDir, `${hookInput.toolUseID}.json`);
 }
 
 async function writeGatedSnapshot(
@@ -434,9 +338,7 @@ async function checkBashCommand(check: BashCheck, rules: SkillGateRules): Promis
   }
 
   const skills = await readAvailableSkills(path.join(check.projectDir, '.claude', 'skills'));
-  const sessionTranscript = await readSessionTranscript(check.hookInput);
-
-  const sessionLoads = collectSessionLoads(sessionTranscript);
+  const sessionLoads = await readSessionLoads(check.hookInput);
 
   const bashPlan = planBashSkillGate({
     rules,
@@ -450,6 +352,7 @@ async function checkBashCommand(check: BashCheck, rules: SkillGateRules): Promis
 
   printOutput(
     buildBashSkillGateOutput(bashPlan.gatedPaths, bashPlan.missing, {
+      harness: check.hookInput.harness,
       compacted: sessionLoads.compacted,
     }),
   );
@@ -539,9 +442,7 @@ async function checkChangedPaths(
   changedPaths: readonly string[],
 ): Promise<void> {
   const skills = await readAvailableSkills(path.join(check.projectDir, '.claude', 'skills'));
-  const sessionTranscript = await readSessionTranscript(check.hookInput);
-
-  const sessionLoads = collectSessionLoads(sessionTranscript);
+  const sessionLoads = await readSessionLoads(check.hookInput);
 
   const changePlan = planBashSkillGate({
     rules,
@@ -555,6 +456,7 @@ async function checkChangedPaths(
 
   printOutput(
     buildBashChangeOutput(result.event, changePlan.gatedPaths, changePlan.missing, {
+      harness: check.hookInput.harness,
       compacted: sessionLoads.compacted,
     }),
   );

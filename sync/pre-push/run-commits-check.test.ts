@@ -1,8 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
+import { buildStubCommitlint } from '../../test-utils/build-stub-commitlint.ts';
 import { runCommitsCheck } from './run-commits-check.ts';
 import { runProgram } from './run-program.ts';
 
@@ -60,9 +61,14 @@ test('it passes a branch whose commits are all Conventional Commits', async () =
     .cwd(ctx.directory)
     .env(ctx.env);
 
+  const stub = buildStubCommitlint(ctx.commitlint, [
+    { exitCode: 0, stdout: '', stderr: '' },
+    { exitCode: 0, stdout: '', stderr: '' },
+  ]);
+
   const problems = runCommitsCheck({
     cwd: ctx.directory,
-    runProgram,
+    runProgram: stub.runProgram,
     base: baseText.trim(),
     env: ctx.env,
     commitlint: ctx.commitlint,
@@ -91,9 +97,19 @@ test('it reports each problem of a commit that is not a Conventional Commit at i
 
   const hash = hashText.trim();
 
+  const stub = buildStubCommitlint(ctx.commitlint, [
+    {
+      exitCode: 1,
+      stdout:
+        '⧗   --- input ---\ntidy up\n✖   subject may not be empty [subject-empty]\n✖   type may not be empty [type-empty]\n\n✖   found 2 problems, 0 warnings\n',
+      stderr: '',
+    },
+    { exitCode: 0, stdout: '', stderr: '' },
+  ]);
+
   const problems = runCommitsCheck({
     cwd: ctx.directory,
-    runProgram,
+    runProgram: stub.runProgram,
     base: baseText.trim(),
     env: ctx.env,
     commitlint: ctx.commitlint,
@@ -123,9 +139,19 @@ test('it reports a commit that is not a Conventional Commit when a later commit 
     .cwd(ctx.directory)
     .env(ctx.env);
 
+  const stub = buildStubCommitlint(ctx.commitlint, [
+    { exitCode: 0, stdout: '', stderr: '' },
+    {
+      exitCode: 1,
+      stdout:
+        '⧗   --- input ---\ntidy up\n✖   subject may not be empty [subject-empty]\n✖   type may not be empty [type-empty]\n\n✖   found 2 problems, 0 warnings\n',
+      stderr: '',
+    },
+  ]);
+
   const problems = runCommitsCheck({
     cwd: ctx.directory,
-    runProgram,
+    runProgram: stub.runProgram,
     base: baseText.trim(),
     env: ctx.env,
     commitlint: ctx.commitlint,
@@ -191,9 +217,11 @@ test('it reads only the commits after the base', async () => {
     .cwd(ctx.directory)
     .env(ctx.env);
 
+  const stub = buildStubCommitlint(ctx.commitlint, [{ exitCode: 0, stdout: '', stderr: '' }]);
+
   const problems = runCommitsCheck({
     cwd: ctx.directory,
-    runProgram,
+    runProgram: stub.runProgram,
     base,
     env: ctx.env,
     commitlint: ctx.commitlint,
@@ -201,6 +229,7 @@ test('it reads only the commits after the base', async () => {
   });
 
   expect(problems).toStrictEqual([]);
+  expect(stub.readMessages()).toStrictEqual(['feat: add the greeting\n']);
 });
 
 test('it leaves out a merge commit', async () => {
@@ -228,9 +257,14 @@ test('it leaves out a merge commit', async () => {
     .cwd(ctx.directory)
     .env(ctx.env);
 
+  const stub = buildStubCommitlint(ctx.commitlint, [
+    { exitCode: 0, stdout: '', stderr: '' },
+    { exitCode: 0, stdout: '', stderr: '' },
+  ]);
+
   const problems = runCommitsCheck({
     cwd: ctx.directory,
-    runProgram,
+    runProgram: stub.runProgram,
     base: baseText.trim(),
     env: ctx.env,
     commitlint: ctx.commitlint,
@@ -238,6 +272,11 @@ test('it leaves out a merge commit', async () => {
   });
 
   expect(problems).toStrictEqual([]);
+
+  expect(stub.readMessages()).toStrictEqual([
+    'feat: add the main greeting\n',
+    'feat: add the side greeting\n',
+  ]);
 });
 
 test('it prints a skip notice and exits 0 when the repo installs no commitlint', async () => {
@@ -345,94 +384,6 @@ test('it prints the skip as a GitHub notice and exits 0 when run as a script in 
   });
 });
 
-test('it exits 2 with the error of commitlint when commitlint refuses a config with no rules', async () => {
-  const ctx = await setupTest();
-
-  await rm(join(ctx.directory, 'node_modules'));
-  await mkdir(join(ctx.directory, 'node_modules/.bin'), { recursive: true });
-  await mkdir(join(ctx.directory, 'node_modules/@zgeoff/commitlint-config'), { recursive: true });
-
-  const commitlint = await realpath(join(import.meta.dir, '../../node_modules/.bin/commitlint'));
-
-  await symlink(commitlint, join(ctx.directory, 'node_modules/.bin/commitlint'));
-
-  await writeFile(
-    join(ctx.directory, 'node_modules/@zgeoff/commitlint-config/package.json'),
-    JSON.stringify({ name: '@zgeoff/commitlint-config', type: 'module', exports: './index.js' }),
-  );
-
-  await writeFile(
-    join(ctx.directory, 'node_modules/@zgeoff/commitlint-config/index.js'),
-    'export default {};\n',
-  );
-
-  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
-    .cwd(ctx.directory)
-    .env(ctx.env);
-
-  await $`git update-ref refs/remotes/origin/main HEAD`.cwd(ctx.directory).env(ctx.env);
-
-  await $`git commit --quiet --allow-empty -m ${'feat: add the greeting'}`
-    .cwd(ctx.directory)
-    .env(ctx.env);
-
-  const result = await $`${process.execPath} ${join(import.meta.dir, 'run-commits-check.ts')}`
-    .cwd(ctx.directory)
-    .env(ctx.env)
-    .nothrow()
-    .quiet();
-
-  const stderr = result.stderr.toString();
-
-  expect(result.exitCode).toBe(2);
-  expect(stderr).toStartWith('commits: commitlint failed: ');
-  expect(stderr).toInclude('Please add rules');
-});
-
-test('it exits 2 when commitlint crashes with exit 1 and reports no problem', async () => {
-  const ctx = await setupTest();
-
-  await rm(join(ctx.directory, 'node_modules'));
-  await mkdir(join(ctx.directory, 'node_modules/.bin'), { recursive: true });
-  await mkdir(join(ctx.directory, 'node_modules/@zgeoff/commitlint-config'), { recursive: true });
-
-  const commitlint = await realpath(join(import.meta.dir, '../../node_modules/.bin/commitlint'));
-
-  await symlink(commitlint, join(ctx.directory, 'node_modules/.bin/commitlint'));
-
-  await writeFile(
-    join(ctx.directory, 'node_modules/@zgeoff/commitlint-config/package.json'),
-    JSON.stringify({ name: '@zgeoff/commitlint-config', type: 'module', exports: './index.js' }),
-  );
-
-  await writeFile(
-    join(ctx.directory, 'node_modules/@zgeoff/commitlint-config/index.js'),
-    "throw new Error('the greeting config cannot load');\n",
-  );
-
-  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
-    .cwd(ctx.directory)
-    .env(ctx.env);
-
-  await $`git update-ref refs/remotes/origin/main HEAD`.cwd(ctx.directory).env(ctx.env);
-
-  await $`git commit --quiet --allow-empty -m ${'feat: add the greeting'}`
-    .cwd(ctx.directory)
-    .env(ctx.env);
-
-  const result = await $`${process.execPath} ${join(import.meta.dir, 'run-commits-check.ts')}`
-    .cwd(ctx.directory)
-    .env(ctx.env)
-    .nothrow()
-    .quiet();
-
-  const stderr = result.stderr.toString();
-
-  expect(result.exitCode).toBe(2);
-  expect(stderr).toStartWith('commits: commitlint failed: ');
-  expect(stderr).toInclude('the greeting config cannot load');
-});
-
 test('it throws the git log error when the base is not a commit', async () => {
   const ctx = await setupTest();
 
@@ -450,6 +401,68 @@ test('it throws the git log error when the base is not a commit', async () => {
       config: ctx.config,
     }),
   ).toThrow(/^git log failed: fatal: ambiguous argument 'no-such-greeting\.\.HEAD'/u);
+});
+
+test('it throws the error of commitlint when commitlint exits with a code above 1', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  await $`git commit --quiet --allow-empty -m ${'feat: add the greeting'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const stub = buildStubCommitlint(ctx.commitlint, [
+    {
+      exitCode: 9,
+      stdout: '✖   Please add rules to your `commitlint.config.js` [empty-rules]\n',
+      stderr: '',
+    },
+  ]);
+
+  expect(() =>
+    runCommitsCheck({
+      cwd: ctx.directory,
+      runProgram: stub.runProgram,
+      base: baseText.trim(),
+      env: ctx.env,
+      commitlint: ctx.commitlint,
+      config: ctx.config,
+    }),
+  ).toThrow(/^commitlint failed: ✖ {3}Please add rules/u);
+});
+
+test('it throws the error of commitlint when commitlint exits 1 and reports no problem', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  await $`git commit --quiet --allow-empty -m ${'feat: add the greeting'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const stub = buildStubCommitlint(ctx.commitlint, [
+    { exitCode: 1, stdout: '', stderr: 'Error: the greeting config cannot load\n' },
+  ]);
+
+  expect(() =>
+    runCommitsCheck({
+      cwd: ctx.directory,
+      runProgram: stub.runProgram,
+      base: baseText.trim(),
+      env: ctx.env,
+      commitlint: ctx.commitlint,
+      config: ctx.config,
+    }),
+  ).toThrow('commitlint failed: Error: the greeting config cannot load');
 });
 
 test('it exits 2 when the repo installs a @zgeoff/commitlint-config that does not resolve', async () => {

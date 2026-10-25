@@ -732,10 +732,9 @@ test('it fails the push on the docs job when the installed length script rejects
     { recursive: true },
   );
 
-  // The repo has a package.json, so its README holds 130 lines at most; this one has 131, in short
-  // paragraphs with no link.
+  // The root README holds 100 lines at most; this one has 101, in short paragraphs with no link.
   const paragraphs = Array.from(
-    { length: 65 },
+    { length: 50 },
     (_, index) => `Step ${index + 1} greets the visitor.`,
   );
 
@@ -781,7 +780,7 @@ test('it fails the push on the docs job when the installed length script rejects
   );
 
   expect(failedJobs).toStrictEqual(['docs']);
-  expect(output).toInclude('README.md: 131 lines, over the package README limit of 130');
+  expect(output).toInclude('README.md: 101 lines, over the front page README limit of 100');
   expect(output).toInclude('docs: check-length.sh failed');
 });
 
@@ -965,7 +964,7 @@ test('it fails the push when a bunfig.toml raises the test timeout above 5 s', a
   expect(result.exitCode).not.toBe(0);
 
   expect(output).toInclude(
-    'bunfig.toml: [test] timeout = 30000 raises every test above the 5 s limit',
+    'bunfig.toml: [test] timeout = 30000 raises every test above the 5000 ms limit of the unit lane',
   );
 });
 
@@ -1082,8 +1081,6 @@ test.each([
     expect(result.stderr.toString()).toMatch(/^ [1-9]\d* pass\n 0 fail$/mu);
     expect(result.exitCode).toBe(0);
   },
-  // oxlint-disable-next-line zgeoff/max-test-timeout -- each row runs a whole suite in a nested bun test
-  30_000,
 );
 
 test('it skips the test job with the CI notice when the branch has more than 50 related test files', async () => {

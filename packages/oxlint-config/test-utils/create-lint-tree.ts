@@ -16,6 +16,12 @@ export async function createLintTree(files: FileTree, rules: RuleSettings): Prom
 
   await writeFile(join(directory, '.oxlintrc.json'), JSON.stringify(config));
 
+  // the rules find the repo root by the nearest `.git`, and one in a directory above the temp
+  // directory would otherwise become the root
+  if (!Object.keys(files).some((path) => path === '.git' || path.startsWith('.git/'))) {
+    await mkdir(join(directory, '.git'));
+  }
+
   await Promise.all(
     Object.entries(files).map(async ([path, content]: readonly [string, string]) => {
       await mkdir(dirname(join(directory, path)), { recursive: true });

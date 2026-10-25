@@ -196,7 +196,7 @@ jobs:
       - &setup-node
         name: Setup Node
         if: inputs.node-version != ''
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: &node-version
           node-version: ${{ inputs.node-version }}
 
@@ -444,7 +444,7 @@ jobs:
 
       - name: Setup Node
         if: env.PROFILE == 'private' && inputs.node-version != ''
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: *node-version
 
       - name: Setup Bun

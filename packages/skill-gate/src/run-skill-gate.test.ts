@@ -18,7 +18,67 @@ async function setupTest() {
     `const { runSkillGate } = await import(${JSON.stringify(indexPath)}); await runSkillGate();`,
   ];
 
-  return { directory, hookArgs };
+  const codexHookArgs = [
+    '--eval',
+    `const { runSkillGate } = await import(${JSON.stringify(indexPath)}); await runSkillGate('codex');`,
+  ];
+
+  // A repo that Codex works in keeps its skills in .agents/skills and links .claude/skills to them.
+  const prepareCodexProject = async () => {
+    const project = join(directory, 'project');
+
+    await mkdir(join(project, '.agents/skills/testing'), { recursive: true });
+    await mkdir(join(project, 'src'), { recursive: true });
+    await writeFile(join(project, '.agents/skills/testing/SKILL.md'), '# Testing\n');
+    await mkdir(join(project, '.claude'), { recursive: true });
+
+    await writeFile(
+      join(project, '.claude/skill-gate.json'),
+      JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+    );
+
+    // Codex finds repo skills in .agents/skills, which a repo links to .claude/skills.
+    await symlink('../.agents/skills', join(project, '.claude/skills'));
+
+    await $`git init --quiet`.cwd(project).env({ PATH: process.env['PATH'] });
+
+    const runHook = (
+      event: Readonly<Record<string, unknown>>,
+      env?: Readonly<Record<string, string>>,
+    ) =>
+      spawnSync('bun', codexHookArgs, {
+        encoding: 'utf8',
+        env: { PATH: process.env['PATH'], ...(env ?? { CLAUDE_PROJECT_DIR: project }) },
+        input: JSON.stringify({
+          session_id: 'session-1',
+          transcript_path: join(directory, 'rollout-1.jsonl'),
+          cwd: project,
+          turn_id: 'turn-1',
+          model: 'gpt-test',
+          ...event,
+        }),
+      });
+
+    const patch = (...headers: readonly string[]) => ({
+      cwd: project,
+      hook_event_name: 'PreToolUse',
+      tool_name: 'apply_patch',
+      tool_use_id: 'call-1',
+      tool_input: { command: ['*** Begin Patch', ...headers, '*** End Patch'].join('\n') },
+    });
+
+    const bash = (event: 'PreToolUse' | 'PostToolUse', command: string, toolUseID = 'call-1') => ({
+      cwd: project,
+      hook_event_name: event,
+      tool_name: 'Bash',
+      tool_use_id: toolUseID,
+      tool_input: { command },
+    });
+
+    return { directory, project, runHook, patch, bash };
+  };
+
+  return { directory, hookArgs, codexHookArgs, prepareCodexProject };
 }
 
 test('it denies a test file edit until the session loads both testing skills', async () => {
@@ -2318,4 +2378,372 @@ test('it warns and allows a gated tool call when its references value is a strin
     systemMessage: warning,
     hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: warning },
   });
+});
+
+test('it denies an apply_patch edit of a gated file until a cat loads the skill', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  const gatedPatch = ctx.patch('*** Update File: src/a.test.ts', '@@', '-old', '+new');
+  const denied = ctx.runHook(gatedPatch);
+
+  expect(denied.status).toBe(0);
+
+  expect(JSON.parse(denied.stdout)).toStrictEqual({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: `This patch changes a gated path before the session loaded the skills it needs: ${join(ctx.project, 'src/a.test.ts')} needs the \`testing\` skill. Load each missing skill by reading its SKILL.md with cat, for example \`cat .agents/skills/<name>/SKILL.md\`, then retry the patch. Change a gated path only with apply_patch, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
+    },
+  });
+
+  const read = ctx.runHook(ctx.bash('PostToolUse', 'cat .agents/skills/testing/SKILL.md'));
+
+  expect(read.status).toBe(0);
+  expect(read.stdout).toBe('');
+
+  const allowed = ctx.runHook(gatedPatch);
+
+  expect(allowed.status).toBe(0);
+  expect(allowed.stdout).toBe('');
+});
+
+test('it counts a skill read by sed -n from a subfolder with a relative path', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  ctx.runHook({
+    ...ctx.bash('PostToolUse', 'sed -n 1,40p ../.claude/skills/testing/SKILL.md'),
+    cwd: join(ctx.project, 'src'),
+  });
+
+  const result = ctx.runHook(ctx.patch('*** Add File: src/b.test.ts', '+test'));
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});
+
+test('it does not count a read by a command that is not a reader', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  ctx.runHook(ctx.bash('PostToolUse', 'sed -i s/a/b/ .agents/skills/testing/SKILL.md'));
+  ctx.runHook(ctx.bash('PostToolUse', 'cat .agents/skills/missing/SKILL.md'));
+
+  const result = ctx.runHook(ctx.patch('*** Add File: src/b.test.ts', '+test'));
+
+  expect(JSON.parse(result.stdout)).toMatchObject({
+    hookSpecificOutput: { permissionDecision: 'deny' },
+  });
+});
+
+test('it allows an edit once the prompt names the skill as $testing', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  const prompt = ctx.runHook({
+    hook_event_name: 'UserPromptSubmit',
+    prompt: 'Use $testing and $nothing-here to cover the rounding.',
+  });
+
+  expect(prompt.status).toBe(0);
+  expect(prompt.stdout).toBe('');
+
+  const result = ctx.runHook(ctx.patch('*** Update File: src/a.test.ts', '@@', '-old', '+new'));
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});
+
+test('it denies an edit again after a compaction voids the loaded skill', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  ctx.runHook({ hook_event_name: 'UserPromptSubmit', prompt: 'Use $testing.' });
+
+  const compact = ctx.runHook({ hook_event_name: 'PostCompact', trigger: 'auto' });
+
+  expect(compact.status).toBe(0);
+
+  const result = ctx.runHook(ctx.patch('*** Update File: src/a.test.ts', '@@', '-old', '+new'));
+
+  expect(JSON.parse(result.stdout)).toMatchObject({
+    hookSpecificOutput: {
+      permissionDecisionReason: expect.stringContaining('Load each missing skill again by reading'),
+    },
+  });
+
+  expect(JSON.parse(result.stdout)).toMatchObject({
+    hookSpecificOutput: {
+      permissionDecisionReason: expect.stringContaining('This session was compacted'),
+    },
+  });
+});
+
+test('it gates the destination of a Move to header', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  const result = ctx.runHook(
+    ctx.patch('*** Update File: src/old.ts', '*** Move to: src/new.test.ts', '@@', '-a', '+b'),
+  );
+
+  expect(JSON.parse(result.stdout)).toMatchObject({
+    hookSpecificOutput: {
+      permissionDecisionReason: expect.stringContaining(
+        `${join(ctx.project, 'src/new.test.ts')} needs the \`testing\` skill`,
+      ),
+    },
+  });
+});
+
+test('it names every gated path in a patch that changes several', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  await writeFile(
+    join(ctx.project, '.claude/skill-gate.json'),
+    JSON.stringify({
+      gates: [
+        { match: '**/*.test.ts', skills: ['testing'] },
+        { match: '**/*.md', skills: ['testing'] },
+      ],
+    }),
+  );
+
+  const result = ctx.runHook(
+    ctx.patch(
+      '*** Add File: src/a.test.ts',
+      '+x',
+      '*** Delete File: notes.md',
+      '*** Add File: src/b.ts',
+      '+y',
+    ),
+  );
+
+  const output = JSON.stringify(JSON.parse(result.stdout));
+
+  expect(output).toContain(`${join(ctx.project, 'src/a.test.ts')} needs the \`testing\` skill`);
+  expect(output).toContain(`${join(ctx.project, 'notes.md')} needs the \`testing\` skill`);
+  expect(output).not.toContain('src/b.ts');
+});
+
+test('it allows a patch to a file outside the project', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  const result = ctx.runHook(ctx.patch('*** Add File: /tmp/elsewhere/a.test.ts', '+x'));
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});
+
+test('it blocks after a Bash command writes a gated file before the session loads the skill', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  ctx.runHook(ctx.bash('PreToolUse', 'node scripts/stamp.mjs'));
+
+  await writeFile(join(ctx.project, 'src/a.test.ts'), "test('it rounds', () => {});\n");
+
+  const result = ctx.runHook(ctx.bash('PostToolUse', 'node scripts/stamp.mjs'));
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toStrictEqual({
+    decision: 'block',
+    reason: `skill-gate: this Bash command changed the gated path ${join(ctx.project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill by reading its SKILL.md with cat, for example \`cat .agents/skills/<name>/SKILL.md\`, then review what the command changed against it and fix what breaks a rule. Change a gated path only with apply_patch, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
+  });
+});
+
+test('it lets a Bash change through once a cat loaded the skill', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  ctx.runHook(ctx.bash('PostToolUse', 'cat .agents/skills/testing/SKILL.md', 'call-0'));
+  ctx.runHook(ctx.bash('PreToolUse', 'node scripts/stamp.mjs'));
+
+  await writeFile(join(ctx.project, 'src/a.test.ts'), "test('it rounds', () => {});\n");
+
+  const result = ctx.runHook(ctx.bash('PostToolUse', 'node scripts/stamp.mjs'));
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});
+
+test('it ignores a snapshot that an earlier command left because no PostToolUse event followed', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  ctx.runHook(ctx.bash('PreToolUse', 'sleep 100', 'call-interrupted'));
+  ctx.runHook(ctx.bash('PreToolUse', 'echo hello', 'call-2'));
+
+  const result = ctx.runHook(ctx.bash('PostToolUse', 'echo hello', 'call-2'));
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});
+
+test('it finds the project from the git top level when CLAUDE_PROJECT_DIR is unset', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  const sessionID = `no-rollout-${Date.now()}`;
+
+  onTestFinished(() =>
+    rm(join(tmpdir(), 'skill-gate', sessionID), { recursive: true, force: true }),
+  );
+
+  const patchEvent = {
+    ...ctx.patch('*** Update File: a.test.ts', '@@', '-old', '+new'),
+    cwd: join(ctx.project, 'src'),
+    session_id: sessionID,
+    transcript_path: null,
+  };
+
+  const denied = ctx.runHook(patchEvent, {});
+
+  expect(JSON.parse(denied.stdout)).toMatchObject({
+    hookSpecificOutput: {
+      permissionDecisionReason: expect.stringContaining(
+        `${join(ctx.project, 'src/a.test.ts')} needs the \`testing\` skill`,
+      ),
+    },
+  });
+
+  ctx.runHook(
+    {
+      ...ctx.bash('PostToolUse', 'cat ../.agents/skills/testing/SKILL.md'),
+      cwd: join(ctx.project, 'src'),
+      session_id: sessionID,
+      transcript_path: null,
+    },
+    {},
+  );
+
+  const allowed = ctx.runHook(patchEvent, {});
+
+  expect(allowed.status).toBe(0);
+  expect(allowed.stdout).toBe('');
+});
+
+test('it denies a gated MCP tool call until the skill loads and a reference is read', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  await mkdir(join(ctx.project, '.agents/skills/testing/references'), { recursive: true });
+
+  await writeFile(
+    join(ctx.project, '.agents/skills/testing/references/rounding.md'),
+    '# Rounding\n',
+  );
+
+  await writeFile(
+    join(ctx.project, '.claude/skill-gate.json'),
+    JSON.stringify({
+      gates: [],
+      tools: [
+        {
+          tool: 'mcp__tracker__update_ticket',
+          skills: ['testing'],
+          references: ['testing/references/rounding.md'],
+        },
+      ],
+    }),
+  );
+
+  const call = {
+    hook_event_name: 'PreToolUse',
+    tool_name: 'mcp__tracker__update_ticket',
+    tool_use_id: 'call-9',
+    tool_input: { title: 'Rotate the keys' },
+  };
+
+  const denied = ctx.runHook(call);
+
+  expect(JSON.parse(denied.stdout)).toMatchObject({
+    hookSpecificOutput: {
+      permissionDecisionReason: expect.stringContaining(
+        'load the `testing` skill by reading its SKILL.md with cat',
+      ),
+    },
+  });
+
+  ctx.runHook(
+    ctx.bash(
+      'PostToolUse',
+      'cat .agents/skills/testing/SKILL.md ; head -50 .agents/skills/testing/references/rounding.md',
+    ),
+  );
+
+  const allowed = ctx.runHook(call);
+
+  expect(allowed.status).toBe(0);
+  expect(allowed.stdout).toBe('');
+});
+
+test('it does not count a skill read that a failing guard keeps from running', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  ctx.runHook(ctx.bash('PostToolUse', 'false && cat .agents/skills/testing/SKILL.md'));
+  ctx.runHook(ctx.bash('PostToolUse', 'test -f nothing || cat .agents/skills/testing/SKILL.md'));
+
+  const result = ctx.runHook(ctx.patch('*** Add File: src/b.test.ts', '+test'));
+
+  expect(JSON.parse(result.stdout)).toMatchObject({
+    hookSpecificOutput: { permissionDecision: 'deny' },
+  });
+});
+
+test('it counts a skill read that follows a directory change', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  ctx.runHook(ctx.bash('PostToolUse', 'cd . && cat .agents/skills/testing/SKILL.md'));
+
+  const result = ctx.runHook(ctx.patch('*** Add File: src/b.test.ts', '+test'));
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});
+
+test('it keeps every skill read when many hooks record at once', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  const names = Array.from({ length: 12 }, (_, index) => `skill-${index}`);
+
+  for (const name of names) {
+    await mkdir(join(ctx.project, '.agents/skills', name), { recursive: true });
+    await writeFile(join(ctx.project, '.agents/skills', name, 'SKILL.md'), `# ${name}\n`);
+  }
+
+  await writeFile(
+    join(ctx.project, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: names }] }),
+  );
+
+  const runRead = async (name: string) => {
+    const payload = JSON.stringify({
+      session_id: 'session-1',
+      transcript_path: join(ctx.directory, 'rollout-1.jsonl'),
+      ...ctx.bash('PostToolUse', `cat .agents/skills/${name}/SKILL.md`),
+    });
+
+    const hook = Bun.spawn(['bun', ...base.codexHookArgs], {
+      env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.project },
+      stdin: new TextEncoder().encode(payload),
+      stdout: 'ignore',
+    });
+
+    await hook.exited;
+  };
+
+  await Promise.all(names.map((name) => runRead(name)));
+
+  const result = ctx.runHook(ctx.patch('*** Add File: src/b.test.ts', '+test'));
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
 });

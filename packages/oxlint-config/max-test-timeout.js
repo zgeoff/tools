@@ -1,6 +1,10 @@
-import { basename, relative, sep } from 'node:path';
+import { basename } from 'node:path';
+import buildLaneLimits from './build-lane-limits.js';
+import resolveSuiteDirectory from './resolve-suite-directory.js';
 
 const runnerNames = new Set(['test', 'it', 'describe']);
+
+const unitLimitMs = 5000;
 
 export default function buildMaxTestTimeout(resolveRoot) {
   return {
@@ -8,27 +12,32 @@ export default function buildMaxTestTimeout(resolveRoot) {
       type: 'problem',
       messages: {
         timeout:
-          'Keep this timeout of {{timeoutMs}} ms within the 5 s limit, or move the test into a lane: a root `e2e/` suite, or a `*.browser.test.ts`, `*.docker.test.ts` or `*.host.test.ts` file.',
+          'This timeout of {{timeoutMs}} ms is above the {{limitMs}} ms limit of the {{lane}} lane. Find its cause in the "Slow tests" section of the testing skill and fix it; a raised timeout only hides the cost.',
       },
       schema: [
         {
           type: 'object',
           properties: {
-            lanes: { type: 'array', items: { type: 'string' } },
+            lanes: {
+              anyOf: [
+                { type: 'array', items: { type: 'string' } },
+                { type: 'object', additionalProperties: { type: 'integer', minimum: 0 } },
+              ],
+            },
           },
           additionalProperties: false,
         },
       ],
     },
     create(context) {
-      const lanes = new Set(['browser', 'docker', 'host', ...(context.options[0]?.lanes ?? [])]);
+      const limits = buildLaneLimits(context.options[0]?.lanes);
 
       const filename = context.physicalFilename;
-      const root = resolveRoot(filename) ?? context.cwd;
-
-      if (isLaneFile(relative(root, filename), lanes)) {
-        return {};
-      }
+      const lane = resolveLane(resolveRoot(filename) ?? context.cwd, filename, limits);
+      const limit = {
+        lane: lane ?? 'unit',
+        limitMs: lane === null ? unitLimitMs : limits.get(lane),
+      };
 
       return {
         CallExpression(node) {
@@ -40,9 +49,9 @@ export default function buildMaxTestTimeout(resolveRoot) {
           const name = findRunnerName(context, node.callee);
 
           if (name === 'setDefaultTimeout') {
-            emitTimeouts(context, node.arguments.slice(0, 1));
+            emitTimeouts(context, node.arguments.slice(0, 1), limit);
           } else if (name !== null && runnerNames.has(name)) {
-            emitTimeouts(context, node.arguments.slice(1));
+            emitTimeouts(context, node.arguments.slice(1), limit);
           }
         },
       };
@@ -52,13 +61,17 @@ export default function buildMaxTestTimeout(resolveRoot) {
 
 const laneTestPattern = /\.(?<lane>[^.]+)\.test\.tsx?$/u;
 
-// relative to the repo root, not oxlint's working directory, so a per-package
-// lint script reads the same root `e2e/` as a run from the root
-function isLaneFile(path, lanes) {
-  const lane = laneTestPattern.exec(basename(path))?.groups?.lane;
-  const [first] = path.split(sep);
+// a lane suffix wins over the directory, because the default run leaves a suffixed file out and its
+// lane's script runs it; the directory is relative to the repo root, not oxlint's working
+// directory, so a per-package lint script reads the same root `e2e/` as a run from the root
+function resolveLane(root, filename, limits) {
+  const lane = laneTestPattern.exec(basename(filename))?.groups?.lane;
 
-  return first === 'e2e' || (lane !== undefined && lanes.has(lane));
+  if (lane !== undefined && limits.has(lane)) {
+    return lane;
+  }
+
+  return resolveSuiteDirectory(root, filename) === 'e2e' ? 'e2e' : null;
 }
 
 function findRunnerName(context, callee) {
@@ -118,15 +131,13 @@ function getImportedName(specifier) {
     : specifier.imported.value;
 }
 
-const limitMs = 5000;
-
-function emitTimeouts(context, args) {
+function emitTimeouts(context, args, limit) {
   for (const argument of args) {
     const value = argument.type === 'ObjectExpression' ? findTimeoutValue(argument) : argument;
     const timeoutMs = value === undefined ? null : findNumber(context, value, new Set());
 
-    if (timeoutMs !== null && timeoutMs > limitMs) {
-      context.report({ node: value, messageId: 'timeout', data: { timeoutMs } });
+    if (timeoutMs !== null && timeoutMs > limit.limitMs) {
+      context.report({ node: value, messageId: 'timeout', data: { timeoutMs, ...limit } });
     }
   }
 }

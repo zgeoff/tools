@@ -163,11 +163,12 @@ test('it types runSkillGate from the shipped declarations for a TypeScript consu
     join(ctx.project, 'consumer.ts'),
     [
       "import { runSkillGate } from '@zgeoff/skill-gate';",
+      "import type { Harness } from '@zgeoff/skill-gate';",
       '',
       'type IsEqual<A, B> =',
       '  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;',
       '',
-      'export const isRunSkillGateTyped: IsEqual<typeof runSkillGate, () => Promise<never>> = true;',
+      'export const isRunSkillGateTyped: IsEqual<typeof runSkillGate, (harness?: Harness) => Promise<never>> = true;',
       '',
     ].join('\n'),
   );

@@ -1,4 +1,4 @@
-import { basename } from 'node:path';
+import { basename, dirname, posix } from 'node:path';
 import type { RunProgram } from './run-program.ts';
 import { runProgram } from './run-program.ts';
 
@@ -23,19 +23,34 @@ export function runTestTimeoutsCheck(
 
   const lanes = paths.includes(oxlintConfigPath)
     ? parseLanes(runGit(options, ['show', `HEAD:${oxlintConfigPath}`]))
-    : [];
+    : undefined;
+
+  const limits = buildLaneLimits(lanes);
+
+  const appRoots = new Set(
+    paths.filter((path) => basename(path) === 'package.json').map((path) => dirname(path)),
+  );
 
   return paths
-    .filter((path) => checkedFiles.has(basename(path)))
+    .filter((path) => checkedFiles.has(basename(path)) || configPattern.test(basename(path)))
     .flatMap((path) => {
       const text = runGit(options, ['show', `HEAD:${path}`]);
 
+      if (configPattern.test(basename(path))) {
+        return collectConfigFindings(path, text);
+      }
+
       return basename(path) === 'package.json'
-        ? collectScriptFindings(path, text, lanes)
-        : collectBunfigFindings(path, text);
+        ? collectScriptFindings(path, text, limits)
+        : collectBunfigFindings(
+            path,
+            text,
+            pickLaneLimit(limits, findDirectoryLane(path, appRoots)),
+          );
     });
 }
 
+const configPattern = /^\.?oxlintrc(?:\.[\w-]+)?\.jsonc?$/u;
 const oxlintConfigPath = '.oxlintrc.json';
 
 const checkedFiles = new Set(['package.json', 'bunfig.toml']);
@@ -50,16 +65,26 @@ function runGit(options: Readonly<TestTimeoutsCheckOptions>, args: readonly stri
   return result.stdout;
 }
 
-function parseLanes(text: string): string[] {
+function parseLanes(text: string): unknown {
   const config = parseText(oxlintConfigPath, text, (input) => Bun.JSONC.parse(input));
   const setting = findMember(findMember(config, 'rules'), 'zgeoff/max-test-timeout');
   const ruleOptions: unknown = Array.isArray(setting) ? setting[1] : undefined;
-  const lanes = findMember(ruleOptions, 'lanes');
 
-  return Array.isArray(lanes)
-    ? lanes.filter((lane): lane is string => typeof lane === 'string')
-    : [];
+  return findMember(ruleOptions, 'lanes');
 }
+
+// The limits match the max-test-timeout rule in @zgeoff/oxlint-config, which CI cannot import: the
+// workflow downloads this file and the modules it imports one by one.
+const standardLaneLimits: readonly (readonly [string, number])[] = [
+  ['browser', 10_000],
+  ['e2e', 15_000],
+  ['docker', 15_000],
+  ['host', 15_000],
+  ['agent-sdk', 5000],
+  ['model-api', 120_000],
+];
+
+const listedLaneLimitMs = 15_000;
 
 function parseText(path: string, text: string, parse: (input: string) => unknown): unknown {
   try {
@@ -78,13 +103,202 @@ function findMember(value: unknown, key: string): unknown {
     : undefined;
 }
 
-const limitMs = 5000;
-const builtInLanes = ['e2e', 'browser', 'docker', 'host'];
+function buildLaneLimits(lanes: unknown): ReadonlyMap<string, number> {
+  const limits = new Map(standardLaneLimits);
+
+  if (Array.isArray(lanes)) {
+    for (const lane of lanes) {
+      if (typeof lane === 'string' && !limits.has(lane)) {
+        limits.set(lane, listedLaneLimitMs);
+      }
+    }
+  } else if (typeof lanes === 'object' && lanes !== null) {
+    for (const [lane, limitMs] of Object.entries(lanes)) {
+      if (typeof limitMs === 'number') {
+        limits.set(lane, limitMs);
+      }
+    }
+  }
+
+  return limits;
+}
+
+// A setting that turns a timeout rule off or down to a warning escapes the limits as a disable
+// comment does, so it needs the same ticket, in a comment on its line or the lines above it.
+function collectConfigFindings(path: string, text: string): TestTimeoutFinding[] {
+  const tokens = parseJSONCTokens(path, text);
+  const values = tokens.filter((token) => token.kind !== 'comment');
+  const comments = tokens.filter((token) => token.kind === 'comment');
+
+  const valueLines = new Set(values.map((token) => token.line));
+
+  const overrides = collectOverrideLines(values);
+
+  return values.flatMap((token, index) => {
+    const rule =
+      token.kind === 'string' ? guardedRules.find((name) => name === token.text) : undefined;
+
+    if (rule === undefined || values[index + 1]?.text !== ':') {
+      return [];
+    }
+
+    const first = values[index + 2];
+    const severity = first?.text === '[' ? values[index + 3] : first;
+
+    if (severity === undefined || !weakSeverities.has(severity.text)) {
+      return [];
+    }
+
+    const override = overrides.get(index);
+
+    const notes = comments.filter(
+      (comment) =>
+        (comment.line >= token.line && comment.line <= severity.line) ||
+        isCommentAbove(comment, token.line, valueLines) ||
+        (override !== undefined &&
+          (comment.line === override || isCommentAbove(comment, override, valueLines))),
+    );
+
+    if (
+      notes.some((comment) => ticketPattern.test(comment.text) || floorPattern.test(comment.text))
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        path,
+        message: `line ${token.line} turns ${rule} off or down to a warning; give the setting a comment that names the ticket that tracks the fix, or "floor:" and the evidence that the time cannot move, as the "Slow tests" section of the testing skill describes`,
+      },
+    ];
+  });
+}
+
+const weakSeverities = new Set(['off', 'warn', 'allow', '0', '1']);
+
+interface JSONCToken {
+  readonly kind: 'string' | 'comment' | 'other';
+
+  // A string's or a comment's content, or the token's own text.
+  readonly text: string;
+
+  // The 1-based lines the token starts and ends on.
+  readonly line: number;
+  readonly endLine: number;
+}
+
+function parseJSONCTokens(path: string, text: string): JSONCToken[] {
+  const tokens: JSONCToken[] = [];
+  let line = 1;
+  let index = 0;
+
+  const advance = (end: number): number => {
+    const start = line;
+
+    for (let at = index; at < end; at += 1) {
+      if (text.charAt(at) === '\n') {
+        line += 1;
+      }
+    }
+
+    index = end;
+
+    return start;
+  };
+
+  while (index < text.length) {
+    const character = text.charAt(index);
+    const next = text.charAt(index + 1);
+
+    if (/\s/u.test(character)) {
+      advance(index + 1);
+    } else if (character === '/' && (next === '/' || next === '*')) {
+      const close = next === '/' ? text.indexOf('\n', index) : text.indexOf('*/', index + 2);
+      const end = close === -1 ? text.length : close;
+      const body = text.slice(index + 2, end);
+      const after = next === '/' || close === -1 ? end : end + 2;
+      const start = advance(after);
+
+      tokens.push({ kind: 'comment', text: body, line: start, endLine: line });
+    } else if (character === '"') {
+      const end = getStringEnd(path, text, index);
+      const body = parseText(path, text.slice(index, end), (input) => JSON.parse(input));
+      const start = advance(end);
+
+      tokens.push({ kind: 'string', text: String(body), line: start, endLine: line });
+    } else {
+      const word = /^[\w.+-]+/u.exec(text.slice(index))?.[0] ?? character;
+      const start = advance(index + word.length);
+
+      tokens.push({ kind: 'other', text: word, line: start, endLine: line });
+    }
+  }
+
+  return tokens;
+}
+
+function getStringEnd(path: string, text: string, start: number): number {
+  for (let index = start + 1; index < text.length; index += 1) {
+    const character = text.charAt(index);
+
+    if (character === '\\') {
+      index += 1;
+    } else if (character === '"') {
+      return index + 1;
+    }
+  }
+
+  throw new Error(`cannot parse ${path}: a string never closes`);
+}
+
+function collectOverrideLines(values: readonly JSONCToken[]): ReadonlyMap<number, number> {
+  const lines = new Map<number, number>();
+
+  const open: number[] = [];
+
+  for (const [index, token] of values.entries()) {
+    if (token.text === '{') {
+      open.push(index);
+    } else if (token.text === '}') {
+      open.pop();
+    }
+
+    const override = open.length >= 3 ? values[open[1] ?? 0] : undefined;
+
+    if (override !== undefined) {
+      lines.set(index, override.line);
+    }
+  }
+
+  return lines;
+}
+
+// a comment above the setting counts while no other value sits between them
+function isCommentAbove(
+  comment: JSONCToken,
+  line: number,
+  valueLines: ReadonlySet<number>,
+): boolean {
+  if (comment.endLine >= line) {
+    return false;
+  }
+
+  for (let between = comment.endLine + 1; between < line; between += 1) {
+    if (valueLines.has(between)) {
+      return false;
+    }
+  }
+
+  return !valueLines.has(comment.line);
+}
+
+const unitLimitMs = 5000;
+const slowTestsHint = 'find its cause in the "Slow tests" section of the testing skill and fix it';
 
 function collectScriptFindings(
   path: string,
   text: string,
-  lanes: readonly string[],
+  limits: ReadonlyMap<string, number>,
 ): TestTimeoutFinding[] {
   const scripts = findMember(
     parseText(path, text, (input) => JSON.parse(input)),
@@ -95,23 +309,34 @@ function collectScriptFindings(
     return [];
   }
 
-  const exempt = new Set([
-    'test:related',
-    ...[...builtInLanes, ...lanes].map((lane) => `test:${lane}`),
-  ]);
-
   return Object.entries(scripts).flatMap(([name, command]: readonly [string, unknown]) => {
-    if (typeof command !== 'string' || exempt.has(name)) {
+    if (typeof command !== 'string' || name === 'test:related') {
       return [];
     }
 
+    const lane = name.startsWith('test:') ? name.slice('test:'.length) : null;
+    const limit = pickLaneLimit(limits, lane);
+
     return collectTimeoutValues(command)
-      .filter((timeoutMs) => timeoutMs > limitMs)
+      .filter((timeoutMs) => timeoutMs > limit.limitMs)
       .map((timeoutMs) => ({
         path,
-        message: `script "${name}" passes --timeout=${timeoutMs} to bun test, above the 5 s limit; only test:related and a lane script (test:<lane>, for e2e, browser, docker, host and each lane in the max-test-timeout lanes option) may raise it`,
+        message: `script "${name}" passes --timeout=${timeoutMs} to bun test, above the ${limit.limitMs} ms limit of the ${limit.lane} lane; ${slowTestsHint}`,
       }));
   });
+}
+
+interface LaneLimit {
+  readonly lane: string;
+  readonly limitMs: number;
+}
+
+function pickLaneLimit(limits: ReadonlyMap<string, number>, lane: string | null): LaneLimit {
+  const limitMs = lane === null ? undefined : limits.get(lane);
+
+  return lane === null || limitMs === undefined
+    ? { lane: 'unit', limitMs: unitLimitMs }
+    : { lane, limitMs };
 }
 
 const assignmentPattern = /^[A-Za-z_][A-Za-z0-9_]*=/u;
@@ -229,7 +454,7 @@ function toTimeoutMs(value: string | undefined): number {
   return Number(value?.replaceAll('_', ''));
 }
 
-function collectBunfigFindings(path: string, text: string): TestTimeoutFinding[] {
+function collectBunfigFindings(path: string, text: string, limit: LaneLimit): TestTimeoutFinding[] {
   const timeoutMs = findMember(
     findMember(
       parseText(path, text, (input) => Bun.TOML.parse(input)),
@@ -238,17 +463,42 @@ function collectBunfigFindings(path: string, text: string): TestTimeoutFinding[]
     'timeout',
   );
 
-  if (typeof timeoutMs !== 'number' || timeoutMs <= limitMs) {
+  if (typeof timeoutMs !== 'number' || timeoutMs <= limit.limitMs) {
     return [];
   }
 
   return [
     {
       path,
-      message: `[test] timeout = ${timeoutMs} raises every test above the 5 s limit; keep the default and raise a timeout only in a lane`,
+      message: `[test] timeout = ${timeoutMs} raises every test above the ${limit.limitMs} ms limit of the ${limit.lane} lane; ${slowTestsHint}`,
     },
   ];
 }
+
+// git lists paths with forward slashes on every platform
+function findDirectoryLane(path: string, appRoots: ReadonlySet<string>): string | null {
+  const directories = posix.dirname(path).split('/');
+
+  for (const [index, name] of directories.entries()) {
+    const parent = index === 0 ? '.' : directories.slice(0, index).join('/');
+
+    if (name === 'e2e' && (parent === '.' || appRoots.has(parent))) {
+      return 'e2e';
+    }
+
+    if (name.endsWith('-e2e') && appRoots.has(directories.slice(0, index + 1).join('/'))) {
+      return 'e2e';
+    }
+  }
+
+  return null;
+}
+
+const guardedRules = ['zgeoff/max-test-timeout', 'zgeoff/test-timeout-exception-ticket'];
+const ticketPattern = /\b[A-Z][A-Z0-9]*-\d+\b/u;
+
+// a block comment's continuation stars are no evidence
+const floorPattern = /\bfloor:[\s*]*[^\s*]/u;
 
 function runCLI(): void {
   try {

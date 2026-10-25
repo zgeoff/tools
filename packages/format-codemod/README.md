@@ -1,94 +1,22 @@
 # @zgeoff/format-codemod
 
 Machine-owned vertical spacing for TypeScript. Every gap between adjacent statements is normalized
-to exactly one blank line where a rule below requires one, and zero where none does — a superset of
-ESLint's `padding-line-between-statements` and `@stylistic/lines-between-class-members`, run as a
+to exactly one blank line where a spacing rule requires one, and zero where none does — a superset
+of ESLint's `padding-line-between-statements` and `@stylistic/lines-between-class-members`, run as a
 text-splice codemod. Each file is parsed once with [oxc-parser](https://oxc.rs) (native) and edited
 by positional whitespace splices — no type-aware analysis — so a pass is fast enough for a
 pre-commit hook or a `format` pipeline. Runs are idempotent: a pass over compliant code is a no-op.
 
-Three kinds of gap are left alone:
-
-- A gap holding any comment is never collapsed, only grown — prose between statements marks
-  intentional grouping the rules can't see.
-- The interior of an import block is never touched — it belongs to the import sorter. The boundary
-  after the last import is still padded.
-- Two statements sharing a physical line (a leading-semicolon `;(expr)` guard) are skipped — a
-  blank-only edit can't separate them without orphaning a token.
-
-## Rules
-
-**Padded on both sides** — the statement is its own paragraph:
-
-- a control-flow block: `if`, `for`, `for…in`, `for…of`, `while`, `switch`, `try`
-- any statement that spans multiple lines
-- a type alias or interface declaration — runs of them are padded apart, not glued. This is the one
-  rule that looks through `export`: `export type X = …` pads like `type X = …`.
-
-**Padded on one side:**
-
-- before every `return`
-- after a `function` or `class` declaration
-- after a directive prologue (`'use strict'`, `'use client'`); runs of directives stay glued
-- after the last import of a block
-
-**Kind boundaries** — statements classify into kinds; a run of one kind sits flush, and the boundary
-between two kinds takes a blank line:
-
-- `const`/`let`/`var` declarations
-- `using`/`await using` declarations
-- bare calls and method calls — two distinct kinds, split by the first call in reading order:
-  `use(x).report()` opens with a bare function, `fs.writeFileSync(…)` opens with a member, and a
-  member call chained onto a bare call's result is still a bare call
-- `expect` assertions — a statement whose first call in reading order is `expect` or an `expect.*`
-  helper (`expect(x).toBe(y)`, `expect.assertions(1)`) is its own kind, so a run of assertions stays
-  glued while the boundary with any acting statement is padded
-- assignments and increments
-
-Two axes overlay the kinds and pad their own boundaries:
-
-- instantiation — a statement headed by `new` (`new X(…)`, `new X(…).method()`) is separated from
-  any non-instantiation statement; `new` in argument position doesn't count, and runs of
-  instantiations stay glued
-- awaitedness — an awaited statement (`await using`, or an `await` in the head of the statement's
-  value chain: `await f()`, `const x = await f()`) is separated from non-awaited ones; an `await` in
-  argument position (`use(await f())`) or under a non-chain head (`flag ? await f() : g()`) doesn't
-  count, and runs of awaited statements stay glued
-
-**Class members** — one blank line between members.
-
-Only bare declarations match the declaration rules: `export const`, `export function`, and
-`export class` are not declarations to the classifier (type aliases and interfaces are the one
-exception, above).
-
-Comment positions come from the parser, not lexical scanning, so comment-lookalike text can't
-mislead the classification. A trailing same-line comment stays attached to the statement before it —
-the blank line goes after the comment; a comment on its own line attaches to the statement after it
-— the blank line goes before. The next statement's indentation is preserved.
-
 ## CLI
 
-```bash
-format-codemod [options] <file|dir|glob> ...
-
-  --check            exit 1 if any file would change; do not write
-  --dry              print unified diff to stdout; do not write
-  --bench            print parse stats as JSON to stderr
-  --quiet            only print files that would change
-  --ignore <glob>    skip files matching the glob (repeatable)
-  --version
-  --help
-```
-
-Flags are strict: an unknown flag is a usage error, never a silent no-op — the default mode writes
-files, so a typo'd `--check` must not fall through to a rewrite. Exit codes: `0` clean, `1` files
-would change (`--check`), `2` usage error or one or more files failed (parse error, unreadable,
-unwritable).
+`format-codemod --help` lists the flags and exit codes. An unknown flag is a usage error, never a
+silent no-op, because the default mode writes files and a mistyped `--check` must not fall through
+to a rewrite.
 
 ```bash
 format-codemod 'src/**/*.{ts,tsx}'           # rewrite in place
 format-codemod --check 'src/**/*.{ts,tsx}'   # CI gate
-format-codemod --dry path/to/file.ts         # preview diff; applies cleanly with patch(1)
+format-codemod --dry path/to/file.ts         # preview diff, which patch(1) applies
 format-codemod .                             # whole repo, in place
 ```
 
@@ -107,5 +35,7 @@ JSX); nothing is read from disk.
 
 ## Documentation
 
-[The format-codemod inputs doc](../../docs/architecture/format-codemod-inputs.md) describes how the
-CLI resolves its file, directory and glob arguments, and how it reads ignore globs.
+- [The format-codemod rules doc](../../docs/architecture/format-codemod-rules.md) lists the spacing
+  rules and the gaps the codemod leaves alone.
+- [The format-codemod inputs doc](../../docs/architecture/format-codemod-inputs.md) describes how
+  the CLI resolves its file, directory and glob arguments, and how it reads ignore globs.

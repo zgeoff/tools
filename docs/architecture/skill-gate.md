@@ -1,6 +1,6 @@
 # Skill gate
 
-The skill gate is the Claude Code hook that
+The skill gate is the Claude Code and Codex CLI hook that
 [`@zgeoff/skill-gate`](../../packages/skill-gate/README.md) ships. It denies an edit, or a call to a
 gated tool, until the session has loaded the skills and read the references that the repo's
 [rules](../../packages/skill-gate/README.md#rules) name for it. The gate counts only the loads of
@@ -30,6 +30,16 @@ started. A subagent therefore loads the skills itself, and the main session's lo
 it. A compaction writes a `compact_boundary` entry, and the loads and reads before it no longer
 count: after a compaction, the gate denies a gated edit or tool call until the session loads the
 skills and reads the references again, and its denial says so.
+
+## Codex
+
+Under `--harness codex` the gate reads the Codex payload and counts loads from its own ledger,
+because Codex has no Skill tool or Read tool and its transcript format is unstable for hooks. The
+[package README](../../packages/skill-gate/README.md#codex) lists the events that write the ledger.
+An edit arrives as an `apply_patch` call, and the gate gates each path its headers name, so a patch
+is denied when any one path lacks skills. The entry point fails closed for `apply_patch` as it does
+for an `Edit`. Everything else, such as the rules, the Bash check and the tool gates, works as under
+Claude Code.
 
 ## Bash commands
 
@@ -69,5 +79,5 @@ The check has limits:
 - A command whose `PreToolUse` call left no record, such as one that started before the hook was
   installed, goes unchecked.
 
-Change a gated path only with Edit, Write or MultiEdit; the denial, the warning and the block all
-say so.
+Change a gated path only with Edit, Write or MultiEdit, or `apply_patch` under Codex; the denial,
+the warning and the block all say so.

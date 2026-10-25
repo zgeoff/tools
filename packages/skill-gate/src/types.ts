@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import type { bashSnapshotSchema } from './bash-snapshot-schema.ts';
+import type { Harness } from './harness.ts';
 
 export interface SkillGate {
   readonly match: string;
@@ -82,6 +83,14 @@ export interface ShellCommand {
   readonly stdin: string | null;
   readonly enters: number;
   readonly leaves: number;
+  readonly guard?: ShellGuard | null;
+}
+
+// What decides whether a command runs: the commands before it in an `&&` or `||` chain, and
+// whether a `||` sits between.
+export interface ShellGuard {
+  readonly viaOr: boolean;
+  readonly before: readonly (readonly ShellWord[])[];
 }
 
 export interface WrittenPath {
@@ -90,6 +99,7 @@ export interface WrittenPath {
 }
 
 export interface SkillGateOutputContext {
+  readonly harness?: Harness;
   readonly compacted?: boolean;
   readonly rulesError?: string;
   readonly unknownKeys?: readonly string[];
@@ -183,3 +193,43 @@ export type BashResultStep =
 export type RecordStep =
   | Exclude<BashResultStep, { kind: 'gate' }>
   | { readonly kind: 'compare'; readonly recorded: RecordedSnapshot };
+
+export interface HarnessWording {
+  readonly loadSkill: string;
+  readonly readFile: string;
+  readonly editTools: string;
+}
+
+export interface HookInput {
+  readonly kind: 'tool';
+  readonly harness: Harness;
+  readonly event: HookEvent;
+  readonly toolName: string | null;
+  readonly cwd: string;
+  readonly editPaths: readonly string[];
+  readonly command: string | null;
+  readonly transcriptPath: string | null;
+  readonly sessionID: string | null;
+  readonly toolUseID: unknown;
+  readonly agentID: unknown;
+}
+
+// Codex fires these events with no tool call. UserPromptSubmit carries the prompt.
+export interface LifecycleInput {
+  readonly kind: 'lifecycle';
+  readonly event: 'UserPromptSubmit' | 'PostCompact';
+  readonly cwd: string;
+  readonly transcriptPath: string | null;
+  readonly sessionID: string | null;
+  readonly prompt: string | null;
+}
+
+export interface SessionState {
+  readonly transcriptPath: string | null;
+  readonly sessionID: string | null;
+}
+
+export interface EditEntry {
+  readonly filePath: string;
+  readonly plan: SkillGatePlan;
+}
