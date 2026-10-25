@@ -36,3 +36,13 @@ test('it counts a read after a command that cannot fail but not one that may nev
     collectCommandReads('false && cat a.md; test -f x || cat b.md; grep y z && cat c.md', '/repo'),
   ).toStrictEqual([]);
 });
+
+test('it keeps a guard set outside a subshell active past a separator inside it', () => {
+  expect(collectCommandReads('false && (echo skipped; cat a.md); true', '/repo')).toStrictEqual([]);
+
+  expect(collectCommandReads('cd /repo && (echo ok; cat a.md)', '/repo')).toStrictEqual([
+    '/repo/a.md',
+  ]);
+
+  expect(collectCommandReads('false && (echo x); cat b.md', '/repo')).toStrictEqual(['/repo/b.md']);
+});

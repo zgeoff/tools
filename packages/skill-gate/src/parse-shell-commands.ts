@@ -321,6 +321,11 @@ function buildOperatorToken(operator: string): ShellToken {
     : { kind: 'redirect', operator };
 }
 
+interface GuardState {
+  chain: ShellWord[][];
+  viaOr: boolean;
+}
+
 interface CommandDraft {
   words: ShellWord[];
   redirects: ShellRedirect[];
@@ -341,6 +346,10 @@ function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellComman
   const listStarts = [0];
   let chain: ShellWord[][] = [];
   let viaOr = false;
+
+  // The guard a group inherits from outside it, which a separator inside the group must not clear.
+  let inherited: GuardState = { chain: [], viaOr: false };
+  const outerStates: { chain: ShellWord[][]; viaOr: boolean; inherited: GuardState }[] = [];
 
   // A command on either side of a pipe runs in its own subshell, and so does the whole list before
   // `&`, such as `cd docs && make &`.
@@ -366,8 +375,8 @@ function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellComman
     }
 
     if (separator !== null && LIST_ENDS.has(separator)) {
-      chain = [];
-      viaOr = false;
+      chain = [...inherited.chain];
+      viaOr = inherited.viaOr;
     }
 
     operator = null;
@@ -401,8 +410,17 @@ function buildShellCommands(tokens: readonly ShellToken[]): readonly ShellComman
           draft.enters += 1;
 
           listStarts.push(commands.length);
+          outerStates.push({ chain, viaOr, inherited });
+
+          inherited = { chain: [...chain], viaOr };
         } else {
           listStarts.pop();
+
+          const outer = outerStates.pop();
+
+          if (outer !== undefined) {
+            ({ chain, viaOr, inherited } = outer);
+          }
 
           if (last !== undefined) {
             last.leaves += 1;
