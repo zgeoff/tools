@@ -428,9 +428,13 @@ test('it denies a gated apply_patch edit through the entry point when given --ha
 
   expect(result.status).toBe(0);
 
-  expect(JSON.parse(result.stdout).hookSpecificOutput.permissionDecisionReason).toContain(
-    `${join(ctx.directory, 'guide.md')} needs the \`docs-writing\` skill`,
-  );
+  expect(JSON.parse(result.stdout)).toMatchObject({
+    hookSpecificOutput: {
+      permissionDecisionReason: expect.stringContaining(
+        `${join(ctx.directory, 'guide.md')} needs the \`docs-writing\` skill`,
+      ),
+    },
+  });
 });
 
 test('it blocks a gated apply_patch edit when the gate cannot load and the harness is codex', async () => {

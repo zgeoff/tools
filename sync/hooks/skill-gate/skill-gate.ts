@@ -1,7 +1,5 @@
-import { execFile } from 'node:child_process';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
-import { promisify } from 'node:util';
 
 // Claude Code runs the call when a PreToolUse hook exits with any status but 2, so a static import
 // that fails would let a gated edit through. This file therefore imports only Node builtins.
@@ -34,7 +32,7 @@ function parseHarness(args: readonly string[]): Harness {
     `The skill gate does not know the harness ${String(value)}. Use codex or claude-code.`,
   );
 
-  process.exit(1);
+  return process.exit(1);
 }
 
 // Bun rejects a failed import with a ResolveMessage, which is not an Error.
@@ -231,11 +229,19 @@ async function readProjectDir(payload: unknown): Promise<string | undefined> {
   }
 
   try {
-    const execFileAsync = promisify(execFile);
+    const child = Bun.spawn(['git', 'rev-parse', '--show-toplevel'], {
+      cwd,
+      stdout: 'pipe',
+      stderr: 'ignore',
+    });
 
-    const output = await execFileAsync('git', ['rev-parse', '--show-toplevel'], { cwd });
+    const [output, exitCode] = await Promise.all([new Response(child.stdout).text(), child.exited]);
 
-    const topLevel = output.stdout.trim();
+    if (exitCode !== 0) {
+      return undefined;
+    }
+
+    const topLevel = output.trim();
 
     return topLevel === '' ? undefined : topLevel;
   } catch {

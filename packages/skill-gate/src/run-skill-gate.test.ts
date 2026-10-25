@@ -2432,7 +2432,9 @@ test('it does not count a read by a command that is not a reader', async () => {
 
   const result = ctx.runHook(ctx.patch('*** Add File: src/b.test.ts', '+test'));
 
-  expect(JSON.parse(result.stdout).hookSpecificOutput.permissionDecision).toBe('deny');
+  expect(JSON.parse(result.stdout)).toMatchObject({
+    hookSpecificOutput: { permissionDecision: 'deny' },
+  });
 });
 
 test('it allows an edit once the prompt names the skill as $testing', async () => {
@@ -2465,13 +2467,17 @@ test('it denies an edit again after a compaction voids the loaded skill', async 
 
   const result = ctx.runHook(ctx.patch('*** Update File: src/a.test.ts', '@@', '-old', '+new'));
 
-  expect(JSON.parse(result.stdout).hookSpecificOutput.permissionDecisionReason).toContain(
-    'Load each missing skill again by reading',
-  );
+  expect(JSON.parse(result.stdout)).toMatchObject({
+    hookSpecificOutput: {
+      permissionDecisionReason: expect.stringContaining('Load each missing skill again by reading'),
+    },
+  });
 
-  expect(JSON.parse(result.stdout).hookSpecificOutput.permissionDecisionReason).toContain(
-    'This session was compacted',
-  );
+  expect(JSON.parse(result.stdout)).toMatchObject({
+    hookSpecificOutput: {
+      permissionDecisionReason: expect.stringContaining('This session was compacted'),
+    },
+  });
 });
 
 test('it gates the destination of a Move to header', async () => {
@@ -2482,9 +2488,13 @@ test('it gates the destination of a Move to header', async () => {
     ctx.patch('*** Update File: src/old.ts', '*** Move to: src/new.test.ts', '@@', '-a', '+b'),
   );
 
-  expect(JSON.parse(result.stdout).hookSpecificOutput.permissionDecisionReason).toContain(
-    `${join(ctx.project, 'src/new.test.ts')} needs the \`testing\` skill`,
-  );
+  expect(JSON.parse(result.stdout)).toMatchObject({
+    hookSpecificOutput: {
+      permissionDecisionReason: expect.stringContaining(
+        `${join(ctx.project, 'src/new.test.ts')} needs the \`testing\` skill`,
+      ),
+    },
+  });
 });
 
 test('it names every gated path in a patch that changes several', async () => {
@@ -2511,11 +2521,11 @@ test('it names every gated path in a patch that changes several', async () => {
     ),
   );
 
-  const reason = JSON.parse(result.stdout).hookSpecificOutput.permissionDecisionReason;
+  const output = JSON.stringify(JSON.parse(result.stdout));
 
-  expect(reason).toContain(`${join(ctx.project, 'src/a.test.ts')} needs the \`testing\` skill`);
-  expect(reason).toContain(`${join(ctx.project, 'notes.md')} needs the \`testing\` skill`);
-  expect(reason).not.toContain('src/b.ts');
+  expect(output).toContain(`${join(ctx.project, 'src/a.test.ts')} needs the \`testing\` skill`);
+  expect(output).toContain(`${join(ctx.project, 'notes.md')} needs the \`testing\` skill`);
+  expect(output).not.toContain('src/b.ts');
 });
 
 test('it allows a patch to a file outside the project', async () => {
@@ -2593,9 +2603,13 @@ test('it finds the project from the git top level when CLAUDE_PROJECT_DIR is uns
 
   const denied = ctx.runHook(patchEvent, {});
 
-  expect(JSON.parse(denied.stdout).hookSpecificOutput.permissionDecisionReason).toContain(
-    `${join(ctx.project, 'src/a.test.ts')} needs the \`testing\` skill`,
-  );
+  expect(JSON.parse(denied.stdout)).toMatchObject({
+    hookSpecificOutput: {
+      permissionDecisionReason: expect.stringContaining(
+        `${join(ctx.project, 'src/a.test.ts')} needs the \`testing\` skill`,
+      ),
+    },
+  });
 
   ctx.runHook(
     {
@@ -2647,9 +2661,13 @@ test('it denies a gated MCP tool call until the skill loads and a reference is r
 
   const denied = ctx.runHook(call);
 
-  expect(JSON.parse(denied.stdout).hookSpecificOutput.permissionDecisionReason).toContain(
-    'load the `testing` skill by reading its SKILL.md with cat',
-  );
+  expect(JSON.parse(denied.stdout)).toMatchObject({
+    hookSpecificOutput: {
+      permissionDecisionReason: expect.stringContaining(
+        'load the `testing` skill by reading its SKILL.md with cat',
+      ),
+    },
+  });
 
   ctx.runHook(
     ctx.bash(
@@ -2673,7 +2691,9 @@ test('it does not count a skill read that a failing guard keeps from running', a
 
   const result = ctx.runHook(ctx.patch('*** Add File: src/b.test.ts', '+test'));
 
-  expect(JSON.parse(result.stdout).hookSpecificOutput.permissionDecision).toBe('deny');
+  expect(JSON.parse(result.stdout)).toMatchObject({
+    hookSpecificOutput: { permissionDecision: 'deny' },
+  });
 });
 
 test('it counts a skill read that follows a directory change', async () => {
