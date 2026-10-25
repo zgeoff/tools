@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Checks sync/manifest.json against the rules the repo-sync workflow assumes:
 # unique entry names, a source file for every item, the repo-sync marker on
-# every source whose target is a workflow, a string `build` when present, an
+# every source whose target is a workflow, a string `build` when present, a
+# `scripts` field that matches the package.json scripts the build writes, an
 # `except` that lists owner/repo names, no link to an excepted file outside a
 # block that needs it, and every file under sync/skills/<name>/ listed by the
 # entry that ships that skill, except the tests, which stay here.
@@ -17,6 +18,16 @@ report() {
   errors=1
 }
 
+# A loop fed by a process substitution ignores the exit status of the jq that
+# feeds it, so a manifest that breaks those queries would pass unchecked.
+if ! jq -e 'type == "array" and all(.[]; type == "object" and (.name | type) == "string"
+  and (.files | type) == "array"
+  and all(.files[]; type == "object" and (.source | type) == "string" and (.target | type) == "string"))' \
+  "$manifest" > /dev/null; then
+  report "$manifest is not a list of entries, each with a string name and a files list of string sources and targets"
+  exit "$errors"
+fi
+
 duplicates=$(jq -r '[.[].name] | group_by(.) | map(select(length > 1) | .[0]) | .[]' "$manifest")
 
 for name in $duplicates; do
@@ -26,6 +37,52 @@ done
 while IFS=$'\t' read -r name kind; do
   report "entry '$name' has a build of type $kind, not string"
 done < <(jq -r '.[] | select(has("build") and (.build | type) != "string") | [.name, (.build | type)] | @tsv' "$manifest")
+
+while IFS= read -r name; do
+  report "entry '$name' has a scripts field that is not an object of strings"
+done < <(jq -r '.[] | select(has("scripts"))
+  | select((.scripts | type) != "object" or any(.scripts[]; type != "string")) | .name' "$manifest")
+
+scripts_dir=$(dirname "$0")
+staging=$(mktemp -d)
+trap 'rm -rf "$staging"' EXIT
+
+# A sync pull request's package.json change may hold only the script lines the
+# entry declares, so each build runs on an empty package.json, and the scripts
+# it writes there must match the entry's scripts field key for key.
+while IFS= read -r name; do
+  workdir=$(mktemp -d "$staging/build-XXXXXX")
+  echo '{}' > "$workdir/package.json"
+  build=$(jq -r --arg name "$name" '.[] | select(.name == $name) | .build // ""' "$manifest")
+
+  if ! problem=$(cd "$workdir" && bash -euo pipefail -c "$build" 2>&1); then
+    report "entry '$name' has a build that fails on an empty package.json: $problem"
+    continue
+  fi
+
+  written='{}'
+  if [ -f "$workdir/package.json" ] && ! written=$(jq -ce 'if has("scripts") then .scripts else {} end
+    | select(type == "object" and all(.[]; type == "string"))' "$workdir/package.json" 2> /dev/null); then
+    report "entry '$name' has a build that leaves package.json without a scripts object of strings"
+    continue
+  fi
+
+  problems=$(jq -r --arg name "$name" --argjson written "$written" '.[] | select(.name == $name)
+    | (if has("scripts") then .scripts else {} end) as $declared
+    | ($written | to_entries[] | select(.key as $k | $declared | has($k) | not)
+      | "has a build that writes script \(.key | tojson) as \(.value | tojson), which its scripts field does not declare"),
+      ($written | to_entries[] | select(.key as $k | $declared | has($k) and .[$k] != $written[$k])
+      | "declares script \(.key | tojson) as \($declared[.key] | tojson), but its build writes \(.value | tojson)"),
+      ($declared | to_entries[] | select(.key as $k | $written | has($k) | not)
+      | "declares script \(.key | tojson), which its build never writes")' "$manifest")
+
+  if [ -n "$problems" ]; then
+    while IFS= read -r problem; do
+      report "entry '$name' $problem"
+    done <<< "$problems"
+  fi
+done < <(jq -r '.[] | select((.build | type) == "string" or has("scripts"))
+  | select((has("scripts") | not) or (.scripts | type == "object" and all(.[]; type == "string"))) | .name' "$manifest")
 
 while IFS=$'\t' read -r name source target; do
   if [ ! -f "$source" ]; then
@@ -50,9 +107,6 @@ done < <(jq -r '.[] | .name as $n | .files[] | select(has("except"))
 # outside its block would arrive as a dead link, so each Markdown source the
 # repo receives is stripped as the sync strips it for that repo, and must then
 # link none of that repo's excepted files.
-scripts_dir=$(dirname "$0")
-staging=$(mktemp -d)
-trap 'rm -rf "$staging"' EXIT
 
 while IFS=$'\t' read -r name repo; do
   root="$staging/$name/$repo"
