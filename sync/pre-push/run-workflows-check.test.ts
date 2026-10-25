@@ -1,8 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { $ } from 'bun';
+import { createGitCommit } from '../../test-utils/create-git-commit.ts';
+import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { runProgram } from './run-program.ts';
 import { runWorkflowsCheck } from './run-workflows-check.ts';
 
@@ -11,28 +13,12 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const env = {
-    PATH: process.env['PATH'],
-    HOME: directory,
-    GIT_CONFIG_GLOBAL: '/dev/null',
-    GIT_CONFIG_NOSYSTEM: '1',
-    GIT_AUTHOR_NAME: 'Test Author',
-    GIT_AUTHOR_EMAIL: 'author@example.com',
-    GIT_COMMITTER_NAME: 'Test Author',
-    GIT_COMMITTER_EMAIL: 'author@example.com',
-  };
+  const env = readGitEnv(directory);
 
   await $`git init --quiet`.cwd(directory).env(env);
 
-  const commitFiles = async (files: Readonly<Record<string, string>>): Promise<void> => {
-    for (const [path, text] of Object.entries(files)) {
-      await mkdir(dirname(join(directory, path)), { recursive: true });
-      await writeFile(join(directory, path), text);
-    }
-
-    await $`git add --all`.cwd(directory).env(env);
-    await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(directory).env(env);
-  };
+  const commitFiles = (files: Readonly<Record<string, string>>): Promise<void> =>
+    createGitCommit(directory, env, files);
 
   return { directory, env, commitFiles };
 }
