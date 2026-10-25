@@ -1,5 +1,3 @@
-import { readFile } from 'node:fs/promises';
-
 export interface WorkflowActionStep {
   readonly condition: string | null;
 
@@ -8,18 +6,16 @@ export interface WorkflowActionStep {
   readonly inputs: Readonly<Record<string, string>>;
 }
 
-export async function loadWorkflowActionStep(
-  path: string,
+export function parseWorkflowActionStep(
+  text: string,
   job: string,
   step: string,
-): Promise<WorkflowActionStep> {
-  const text = await readFile(path, 'utf8');
-
+): WorkflowActionStep {
   const workflow: unknown = Bun.YAML.parse(text);
   const steps = findField(findField(findField(workflow, 'jobs'), job), 'steps');
 
   if (!Array.isArray(steps)) {
-    throw new TypeError(`${path}: the ${job} job has no steps`);
+    throw new TypeError(`the ${job} job has no steps`);
   }
 
   const list: unknown[] = steps;
@@ -27,7 +23,7 @@ export async function loadWorkflowActionStep(
   const uses = findField(found, 'uses');
 
   if (typeof uses !== 'string') {
-    throw new TypeError(`${path}: the ${job} job has no step named ${step} that uses an action`);
+    throw new TypeError(`the ${job} job has no step named ${step} that uses an action`);
   }
 
   const condition = findField(found, 'if');

@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { isConditionMet } from './is-condition-met.ts';
-import { loadWorkflowActionStep } from './load-workflow-action-step.ts';
 import { loadWorkflowStep } from './load-workflow-step.ts';
+import { parseWorkflowActionStep } from './parse-workflow-action-step.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'main-'));
@@ -123,7 +123,9 @@ test.each([
   },
 ])('it $verb the merge for $run', async (row) => {
   const ctx = await setupTest();
-  const tag = await loadWorkflowActionStep(ctx.workflow, 'release', 'Tag the merged release');
+  const text = await readFile(ctx.workflow, 'utf8');
+
+  const tag = parseWorkflowActionStep(text, 'release', 'Tag the merged release');
 
   const values = new Map([
     ['steps.merge.outputs.merged', row.merged],
@@ -137,8 +139,10 @@ test.each([
 
 test('it tags the merge with the pinned release-please action and opens no release PR', async () => {
   const ctx = await setupTest();
-  const release = await loadWorkflowActionStep(ctx.workflow, 'release', 'Run release-please');
-  const tag = await loadWorkflowActionStep(ctx.workflow, 'release', 'Tag the merged release');
+  const text = await readFile(ctx.workflow, 'utf8');
+
+  const release = parseWorkflowActionStep(text, 'release', 'Run release-please');
+  const tag = parseWorkflowActionStep(text, 'release', 'Tag the merged release');
 
   expect({ uses: tag.uses, inputs: tag.inputs }).toStrictEqual({
     uses: release.uses,
