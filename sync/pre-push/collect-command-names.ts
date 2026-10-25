@@ -45,7 +45,7 @@ function collectRunTargets(command: readonly ShellWord[]): string[] {
 // with -c that operand is a command string. -o takes the option name after it.
 function collectShellTargets(args: readonly string[]): string[] {
   const optionEnd = args.findIndex(
-    (arg, index) => !isShellOption(arg) && !isOptionName(args, index),
+    (argument, index) => !isShellOption(argument) && !isOptionName(args, index),
   );
 
   const options = optionEnd === -1 ? args : args.slice(0, optionEnd);
@@ -60,8 +60,8 @@ function collectShellTargets(args: readonly string[]): string[] {
     : [operand];
 }
 
-function isShellOption(arg: string): boolean {
-  return arg.startsWith('-') || arg.startsWith('+');
+function isShellOption(argument: string): boolean {
+  return argument.startsWith('-') || argument.startsWith('+');
 }
 
 function isOptionName(args: readonly string[], index: number): boolean {
