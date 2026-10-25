@@ -63,3 +63,5 @@ repos too, so an edit to one of them changes every repo that takes it.
   `lint:full`, and when the two type checks disagree, `tsc` is right.
 - `bun run check:sync` checks `sync/manifest.json` against the rules repo-sync assumes. Run it after
   you change the manifest or a file an entry lists. CI runs it, and the pre-push hook does not.
+- `bun run check:release-workflow` checks the tag step of the release job in `main.yml`. CI and the
+  pre-push hook run it.

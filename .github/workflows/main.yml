@@ -51,6 +51,7 @@ jobs:
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/actionlint-bin" actionlint
           echo "$RUNNER_TEMP/actionlint-bin" >> "$GITHUB_PATH"
       - run: bun run check:sync
+      - run: bun run check:release-workflow
       - run: bun run format:check
       - run: bun run lint:full
       - run: bun run typecheck

@@ -137,22 +137,6 @@ test.each([
   expect(result).toBe(row.met);
 });
 
-test('it tags the merge with the pinned release-please action and opens no release PR', async () => {
-  const ctx = await setupTest();
-  const text = await readFile(ctx.workflow, 'utf8');
-
-  const release = parseWorkflowActionStep(text, 'release', 'Run release-please');
-  const tag = parseWorkflowActionStep(text, 'release', 'Tag the merged release');
-
-  expect({ uses: tag.uses, inputs: tag.inputs }).toStrictEqual({
-    uses: release.uses,
-    inputs: {
-      token: `\${{ steps.app-token.outputs.token }}`,
-      'skip-github-pull-request': 'true',
-    },
-  });
-});
-
 test('it publishes in the run itself when release-please tagged its own commit', async () => {
   const ctx = await setupTest();
   const resolve = await loadWorkflowStep(ctx.workflow, 'release', 'Resolve release commit');
