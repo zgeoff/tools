@@ -260,7 +260,7 @@ function findHeavyReason(job: Job): string | undefined {
   const command = collectSteps(job)
     .map((step) => findMember(step, 'run'))
     .filter((run): run is string => typeof run === 'string')
-    .flatMap((run) => collectCommandNames(parseShellWords(run)))
+    .flatMap((run) => collectCommandNames(parseShellWords(run)) ?? [])
     .find((name) => kvmSetupCommands.has(name));
 
   return command === undefined ? undefined : `enables KVM through ${command}`;

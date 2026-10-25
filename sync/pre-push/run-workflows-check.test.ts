@@ -445,6 +445,8 @@ test('it counts a KVM setup command only where the shell runs it', async () => {
       '      - run: echo scripts/ci/check-kvm.sh',
       '      - run: bun run --silent lint ci:open-kvm',
       '      - run: bash -s scripts/open-kvm.sh',
+      '      - run: bun run --cwd ci:open-kvm lint',
+      '      - run: echo "$(scripts/ci/check-kvm.sh)"',
       '      - run: bash -o pipefail scripts/release.sh scripts/open-kvm.sh',
       '  shell:',
       '    runs-on: ubuntu-24.04',
@@ -471,13 +473,13 @@ test('it counts a KVM setup command only where the shell runs it', async () => {
   expect(findings).toStrictEqual([
     {
       path: '.github/workflows/checks.yml',
-      line: 11,
+      line: 13,
       message:
         'job shell is a heavy check, because it enables KVM through scripts/open-kvm.sh, in a workflow that runs on pull_request_target; a private repo runs a heavy check nightly or on dispatch, never on each pull request',
     },
     {
       path: '.github/workflows/checks.yml',
-      line: 16,
+      line: 18,
       message:
         'job command-string is a heavy check, because it enables KVM through scripts/ci/check-kvm.sh, in a workflow that runs on pull_request_target; a private repo runs a heavy check nightly or on dispatch, never on each pull request',
     },

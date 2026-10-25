@@ -183,8 +183,10 @@ The lint reads three terms by these definitions:
   label: a macOS, Windows or self-hosted label, or a runner group. A job whose step runs a KVM setup
   command is heavy too, because it runs on an Ubuntu label. The fleet has no shared KVM setup step,
   so the lint lists each repo's own command, and a new one needs a change to the lint in
-  zgeoff/tools. A `runs-on` that holds an expression is never heavy, because GitHub resolves it only
-  when the job runs.
+  zgeoff/tools. The lint reads a step's commands through a fixed set of shell and Bun forms, and a
+  step outside them, such as one that runs a command substitution, counts as no KVM setup. A
+  `runs-on` that holds an expression is never heavy, because GitHub resolves it only when the job
+  runs.
 
 The heavy-check rule binds a private repo alone. In CI the lint reads the run's profile and skips
 the rule in a public repo. The pre-push baseline cannot see the profile, so the hook warns in every

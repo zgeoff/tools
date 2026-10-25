@@ -113,8 +113,8 @@ function pickCodeAction(context: ShellContext, cursor: ShellCursor): ShellAction
 
   if (character === '`') {
     return context === 'backtick'
-      ? { kind: 'close', text: '' }
-      : { kind: 'open', context: 'backtick', text: '' };
+      ? { kind: 'close', text: '`' }
+      : { kind: 'open', context: 'backtick', text: '`' };
   }
 
   if (character === '(' && isNested) {
@@ -198,7 +198,7 @@ function pickDoubleQuotedAction(cursor: ShellCursor): ShellAction {
   }
 
   if (cursor.character === '`') {
-    return { kind: 'open', context: 'backtick', text: '' };
+    return { kind: 'open', context: 'backtick', text: '`' };
   }
 
   return cursor.character === '"'
