@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { $ } from 'bun';
@@ -15,6 +15,9 @@ async function setupTest() {
   const gh = await createStubGH(directory);
 
   const scriptPath = fileURLToPath(new URL('merge-release-prs.sh', import.meta.url));
+  const outputPath = join(directory, 'output');
+
+  await writeFile(outputPath, '');
 
   const runScript = (env: Record<string, string> = {}) =>
     $`bash ${scriptPath} zgeoff/tools`
@@ -22,12 +25,15 @@ async function setupTest() {
         ...process.env,
         PATH: `${directory}:${process.env['PATH']}`,
         POLL_INTERVAL: '0',
+        GITHUB_OUTPUT: outputPath,
         ...env,
       })
       .nothrow()
       .quiet();
 
-  return { writeResponses: gh.writeResponses, runScript, readCalls: gh.readCalls };
+  const readOutput = () => readFile(outputPath, 'utf8');
+
+  return { writeResponses: gh.writeResponses, runScript, readCalls: gh.readCalls, readOutput };
 }
 
 test('it waits for checks that have not started yet, then merges the checked head', async () => {
@@ -68,6 +74,10 @@ test('it waits for checks that have not started yet, then merges the checked hea
   ).toHaveLength(4);
 
   expect(calls.at(-1)).toBe(`pr merge 145 --repo zgeoff/tools --squash --match-head-commit abc123`);
+
+  const output = await ctx.readOutput();
+
+  expect(output).toBe('merged=true\n');
 });
 
 test('it waits on the head a push moved the branch to, and merges that head', async () => {
@@ -328,6 +338,10 @@ test('it fails when the release PR has conflicts', async () => {
     stdout: '',
     stderr: 'release PR #145 has conflicts\n',
   });
+
+  const output = await ctx.readOutput();
+
+  expect(output).toBe('');
 });
 
 test('it exits cleanly when no release PR is open', async () => {
@@ -348,4 +362,8 @@ test('it exits cleanly when no release PR is open', async () => {
   expect(calls).toStrictEqual([
     'pr list --repo zgeoff/tools --head release-please--branches--main --json number',
   ]);
+
+  const output = await ctx.readOutput();
+
+  expect(output).toBe('');
 });

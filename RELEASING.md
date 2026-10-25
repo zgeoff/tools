@@ -16,9 +16,13 @@ The shared files under `sync/` ship by hand-pushed `sync-vN` tags instead, which
    `bun.lock` on the PR branch (versions are recorded there too) and auto-merges the PR once every
    check on its head passes. `scripts/merge-release-prs.sh` waits up to 15 minutes for those checks
    to start and finish, and fails the run when one fails.
-3. The merge triggers `main.yml` again: release-please tags `@zgeoff/<pkg>@X.Y.Z`, creates the
-   GitHub release, and the publish step runs `bun pm pack` (resolves `catalog:`/`workspace:` to
-   exact versions — never pack with npm) then `npm publish <tarball> --provenance` under OIDC.
+3. Right after the merge, the same run calls release-please again, which tags `@zgeoff/<pkg>@X.Y.Z`
+   on the merge commit and creates the GitHub release. The App token has no Workflows permission, so
+   GitHub refuses it the tag once a workflow change lands on `main` after the merge commit; tagging
+   at once leaves that change seconds to land, not the length of a checks run.
+4. The run dispatches `main.yml` at the tag. The publish step of that run runs `bun pm pack`
+   (resolves `catalog:`/`workspace:` to exact versions — never pack with npm) then
+   `npm publish <tarball> --provenance` under OIDC.
 
 Packages with `"private": true` are versioned but skipped by the publish step. Internal `workspace:`
 dependents of a released package get a patch bump automatically (`node-workspace` plugin).
@@ -60,6 +64,12 @@ Once that's saved, CI publishes all future versions with no tokens.
 - Release PR open but nothing published: the App isn't configured (or its token step failed) — the
   PR won't auto-merge, and merging it by hand from the GitHub UI works fine and triggers the publish
   run.
+- A merged release PR stays untagged, and release-please fails with
+  `Resource not accessible by integration`: a workflow change landed on `main` between the release
+  PR's merge and its tag. Every later run targets the same merge commit and fails the same way.
+  Label the merged release PR `autorelease: tagged` in place of `autorelease: pending`. The next
+  releasable commit then opens a release PR for the versions after the untagged ones, which never
+  publish.
 - `npm publish` 404/403 on a package's first CI release: trusted publisher not configured for that
   package, or the first manual publish never happened.
 - Publish fails with `the release tagged <x> but <path>/package.json holds <y>`: the publish step

@@ -6,9 +6,12 @@
 # can still name the old head, whose checks already passed. A head with no
 # checks yet counts as pending, because GitHub starts them a few seconds after
 # the push. The merge names the checked commit, so a later push can't slip in.
+# After a merge, it writes merged=true to $GITHUB_OUTPUT, so the release job
+# can tag the merge in the same run.
 # Usage: merge-release-prs.sh <owner/repo>
 # Env: CHECKS_TIMEOUT, the seconds to wait for the checks (default 900);
-#      POLL_INTERVAL, the seconds between polls (default 10).
+#      POLL_INTERVAL, the seconds between polls (default 10);
+#      GITHUB_OUTPUT, the step's output file (unset: no output).
 set -euo pipefail
 
 if [ $# -ne 1 ]; then
@@ -111,6 +114,7 @@ for _ in $(seq 1 12); do
   if [ "$state" = "MERGEABLE" ] &&
     gh pr merge "$pr" --repo "$repo" --squash --match-head-commit "$sha"; then
     echo "merged release PR #$pr at $sha"
+    echo "merged=true" >> "${GITHUB_OUTPUT:-/dev/null}"
     exit 0
   fi
   sleep "$((interval < 5 ? interval : 5))"

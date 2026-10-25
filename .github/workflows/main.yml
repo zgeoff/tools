@@ -82,16 +82,17 @@ jobs:
       # A release takes two runs of this job:
       # - Run 1, after a releasable commit lands on main: release-please
       #   opens or updates the release PR (version bumps + changelogs), the
-      #   sync step makes that PR pass the checks job, and auto-merge merges
-      #   it.
-      # - Run 2, triggered by that merge: release-please turns the merged
-      #   bumps into tags + GitHub releases, and the publish step ships each
-      #   released package to npm via OIDC.
+      #   sync step makes that PR pass the checks job, auto-merge merges it,
+      #   and release-please turns the merged bumps into tags + GitHub
+      #   releases.
+      # - Run 2, dispatched at the tag: the publish step ships each released
+      #   package to npm via OIDC.
       #
       # The App token exists because GITHUB_TOKEN events don't trigger
-      # workflows — a GITHUB_TOKEN merge of the release PR would never start
-      # run 2. With no App configured (see RELEASING.md), release PRs are
-      # left open to merge by hand and the chain continues from there.
+      # workflows — a GITHUB_TOKEN commit to the release PR would get no
+      # checks. With no App configured (see RELEASING.md), release PRs are
+      # left open to merge by hand, and the run that the merge starts tags
+      # the release.
       - name: Mint GitHub App token
         id: app-token
         if: github.event_name == 'push' && vars.RELEASE_APP_ID != ''
@@ -153,10 +154,27 @@ jobs:
       # sync commit just pushed, and fails only when one fails or none
       # finish in time.
       - name: Auto-merge release PRs
+        id: merge
         if: github.event_name == 'push' && steps.app-token.outputs.token != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: bash .merge-release-prs/scripts/merge-release-prs.sh "$GITHUB_REPOSITORY"
+
+      # Tags the release PR this run just merged, while its merge commit is
+      # still main's head. The App token has no Workflows permission, and
+      # GitHub refuses it a tag on a commit whose workflow files differ from
+      # main's head. Left to the run that the merge starts, the tag waits for
+      # the checks job, and a workflow change that merges meanwhile blocks it.
+      # A run whose first release-please call tagged a release already leaves
+      # this merge to the next run, because the steps below resolve one
+      # release commit per run.
+      - name: Tag the merged release
+        id: tag
+        if: steps.merge.outputs.merged == 'true' && steps.release.outputs.releases_created != 'true'
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          skip-github-pull-request: true
 
       # release-please reads main through the API, not this run's commit. A
       # run that waits in the release queue can start after an earlier run
@@ -166,13 +184,19 @@ jobs:
       # provenance names GITHUB_SHA as the source commit, and the signing
       # certificate binds the run's own commit. So this run publishes only
       # when it is the tagged commit; otherwise it dispatches a publish run
-      # at the tag, whose github.sha is the tagged commit.
+      # at the tag, whose github.sha is the tagged commit. A release that the
+      # tag step created is never this run's commit, because the merge made
+      # a new one.
       # toJSON never fails, so the outputs are safe to read in env.
       - name: Resolve release commit
         id: release-commit
-        if: steps.release.outputs.releases_created == 'true'
+        if:
+          steps.release.outputs.releases_created == 'true' || steps.tag.outputs.releases_created ==
+          'true'
         env:
-          RELEASE_OUTPUTS: ${{ toJSON(steps.release.outputs) }}
+          RELEASE_OUTPUTS:
+            ${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) ||
+            toJSON(steps.release.outputs) }}
         run: |
           shas=$(printf '%s' "$RELEASE_OUTPUTS" \
             | jq -r '. as $out | $out.paths_released | fromjson | map($out[. + "--sha"]) | unique | .[]')
@@ -184,6 +208,7 @@ jobs:
             | jq -r '. as $out | $out.paths_released | fromjson | $out[.[0] + "--tag_name"]')
           {
             echo "tag=$tag"
+            printf 'paths=%s\n' "$(printf '%s' "$RELEASE_OUTPUTS" | jq -c '.paths_released | fromjson')"
             if [ "$shas" = "$GITHUB_SHA" ]; then echo "here=true"; else echo "here=false"; fi
           } >> "$GITHUB_OUTPUT"
       # A GITHUB_TOKEN workflow_dispatch starts a run, unlike its pushes. The
@@ -193,7 +218,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release-commit.outputs.tag }}
-          PATHS_RELEASED: ${{ steps.release.outputs.paths_released }}
+          PATHS_RELEASED: ${{ steps.release-commit.outputs.paths }}
         run: |
           echo "$TAG is not this run's commit ($GITHUB_SHA); publishing from a run at the tag"
           gh workflow run main.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f republish_paths="$PATHS_RELEASED"
