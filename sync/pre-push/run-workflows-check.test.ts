@@ -607,3 +607,27 @@ test('it prints each finding as a warning annotation in Actions, and exits 0', a
     ].join('\n'),
   });
 });
+
+test('it refuses an option it does not know, and exits 2 before it reads a workflow', async () => {
+  const ctx = await setupTest();
+
+  const result = await $`bun ${join(import.meta.dir, 'run-workflows-check.ts')} --unknown`
+    .cwd(ctx.directory)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr: [
+      `workflows: Unknown option '--unknown'. To specify a positional argument starting with a '-', place it at the end of the command after '--', as in '-- "--unknown"`,
+      'usage: run-workflows-check.ts [path...]',
+      '',
+    ].join('\n'),
+  });
+});

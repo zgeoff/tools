@@ -1,3 +1,4 @@
+import { parseArgs } from 'node:util';
 import { parseShellWords } from './parse-shell-words.ts';
 import type { RunProgram } from './run-program.ts';
 import { runProgram } from './run-program.ts';
@@ -470,11 +471,21 @@ function collectWorkflowRunFindings(context: WorkflowContext): WorkflowFinding[]
 }
 
 function runCLI(): void {
+  const paths = parseCLIPaths(process.argv.slice(2));
+
+  if (paths instanceof Error) {
+    process.stderr.write(`workflows: ${paths.message}\nusage: run-workflows-check.ts [path...]\n`);
+
+    process.exitCode = 2;
+
+    return;
+  }
+
   try {
     const findings = runWorkflowsCheck({
       cwd: process.cwd(),
       env: process.env,
-      paths: process.argv.slice(2),
+      paths,
       profile: parseChecksProfile(process.env['CHECKS_PROFILE']),
       runProgram,
     });
@@ -494,6 +505,15 @@ function runCLI(): void {
     process.stderr.write(`workflows: ${error instanceof Error ? error.message : String(error)}\n`);
 
     process.exitCode = 2;
+  }
+}
+
+function parseCLIPaths(args: readonly string[]): string[] | Error {
+  try {
+    return parseArgs({ args: [...args], options: {}, allowPositionals: true, strict: true })
+      .positionals;
+  } catch (error) {
+    return error instanceof Error ? error : new Error(String(error));
   }
 }
 
