@@ -27,7 +27,7 @@ interface ParserState {
   index: number;
   text: string;
   isQuoted: boolean;
-  isAfterRedirect: boolean;
+  redirect: string;
 
   // The word's text before its first quote, escape or expansion.
   plainText: string;
@@ -44,7 +44,7 @@ export function parseShellWords(command: string): ShellWord[] {
     index: 0,
     text: '',
     isQuoted: false,
-    isAfterRedirect: false,
+    redirect: '',
     plainText: '',
     isPlain: true,
   };
@@ -56,7 +56,7 @@ export function parseShellWords(command: string): ShellWord[] {
       character: command.charAt(state.index),
       ahead: command.slice(state.index + 1, state.index + 3),
       isWordStart: state.text === '' && !state.isQuoted,
-      isAfterRedirect: state.isAfterRedirect,
+      redirect: state.redirect,
     });
 
     advanceParser(state, action, context === 'plain');
@@ -71,7 +71,9 @@ interface ShellCursor {
   readonly character: string;
   readonly ahead: string;
   readonly isWordStart: boolean;
-  readonly isAfterRedirect: boolean;
+
+  // The unescaped `>` or `<` just before the character, or empty.
+  readonly redirect: string;
 }
 
 type ShellAction =
@@ -164,7 +166,8 @@ function pickOpening(cursor: ShellCursor): ShellAction | undefined {
   return undefined;
 }
 
-// A `&` after an unescaped `>` or `<`, or before `>`, is a redirection such as `2>&1` or `&>log`.
+// A redirection keeps its `|` and `&` in the word: `>|`, `>&`, `<&`, `&>` and `&>>`. `>>` and `<>`
+// hold no operator character.
 function pickOperator(cursor: ShellCursor): ShellAction | undefined {
   const character = cursor.character;
   const ahead = cursor.ahead;
@@ -173,7 +176,7 @@ function pickOperator(cursor: ShellCursor): ShellAction | undefined {
     return { kind: 'operator', text: ';' };
   }
 
-  if (character === '|') {
+  if (character === '|' && cursor.redirect !== '>') {
     return { kind: 'operator', text: ahead.startsWith('|') ? '||' : '|' };
   }
 
@@ -181,7 +184,7 @@ function pickOperator(cursor: ShellCursor): ShellAction | undefined {
     return { kind: 'operator', text: '&&' };
   }
 
-  if (character === '&' && !cursor.isAfterRedirect && !ahead.startsWith('>')) {
+  if (character === '&' && cursor.redirect === '' && !ahead.startsWith('>')) {
     return { kind: 'operator', text: '&' };
   }
 
@@ -262,7 +265,7 @@ function pickParameterAction(cursor: ShellCursor): ShellAction {
 }
 
 function advanceParser(state: ParserState, action: ShellAction, isTopLevel: boolean): void {
-  state.isAfterRedirect = action.kind === 'redirect';
+  state.redirect = action.kind === 'redirect' ? action.text : '';
 
   state.index += match(action)
     .with({ kind: 'text' }, { kind: 'redirect' }, (step) => {
