@@ -296,14 +296,20 @@ test('it fails without a merge when a commit status fails', async () => {
   expect(output).toBe('');
 });
 
-test('it turns on auto-merge and exits cleanly when required checks outlast the wait', async () => {
+test('it turns on auto-merge and exits cleanly when only required checks outlast the wait', async () => {
   const ctx = await setupTest();
 
   await ctx.writeResponses('prs', [[{ number: 145 }]]);
   await ctx.writeResponses('mergeable', [{ isDraft: false, labels: [], baseRefName: 'main' }]);
 
   await ctx.writeResponses('rules', [
-    [{ type: 'pull_request' }, { type: 'required_status_checks' }],
+    [
+      { type: 'pull_request' },
+      {
+        type: 'required_status_checks',
+        parameters: { required_status_checks: [{ context: 'pr / checks' }] },
+      },
+    ],
   ]);
 
   await ctx.writeResponses('heads', [
@@ -333,7 +339,7 @@ test('it turns on auto-merge and exits cleanly when required checks outlast the 
   ]);
 });
 
-test('it leaves the release PR open without auto-merge when no ruleset requires checks', async () => {
+test('it leaves the release PR open without auto-merge when no ruleset requires a check', async () => {
   const ctx = await setupTest();
 
   await ctx.writeResponses('prs', [[{ number: 145 }]]);
@@ -358,8 +364,45 @@ test('it leaves the release PR open without auto-merge when no ruleset requires 
   }).toStrictEqual({
     exitCode: 0,
     stdout:
-      'release PR #145 checks on abc123 did not finish within 0s; no ruleset requires checks on main, so the next push to main merges it\n',
+      'release PR #145 checks on abc123 did not finish within 0s; a ruleset on main does not require every pending check, so the next push to main merges it\n',
     output: '',
+    merges: [],
+  });
+});
+
+test('it leaves the release PR open without auto-merge while a check the ruleset does not require runs', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeResponses('prs', [[{ number: 145 }]]);
+  await ctx.writeResponses('mergeable', [{ isDraft: false, labels: [], baseRefName: 'main' }]);
+
+  await ctx.writeResponses('rules', [
+    [
+      {
+        type: 'required_status_checks',
+        parameters: { required_status_checks: [{ context: 'pr / checks' }] },
+      },
+    ],
+  ]);
+
+  await ctx.writeResponses('heads', [
+    buildMockHeadResponse('abc123', [
+      { name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { name: 'pr / e2e', status: 'IN_PROGRESS', conclusion: null },
+    ]),
+  ]);
+
+  const result = await ctx.runScript({ CHECKS_TIMEOUT: '0' });
+  const calls = await ctx.readCalls();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    merges: calls.filter((call) => call.startsWith('pr merge')),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'release PR #145 checks on abc123 did not finish within 0s; a ruleset on main does not require every pending check, so the next push to main merges it\n',
     merges: [],
   });
 });

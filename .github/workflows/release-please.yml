@@ -42,7 +42,7 @@ on:
       checks-timeout-minutes:
         description:
           The minutes to wait for the release PR's checks; when they run longer, the job leaves the
-          PR open, with auto-merge on when a ruleset requires checks
+          PR open, with auto-merge on when a ruleset requires every check still running
         type: number
         required: false
         default: 15

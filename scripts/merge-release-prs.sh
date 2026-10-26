@@ -70,7 +70,7 @@ query='query($owner: String!, $name: String!, $ref: String!) {
     }
   }
 }'
-# Prints the head commit, then one line per check: pass, pending, or
+# Prints the head commit, then one line per check: pass, pending:<name>, or
 # fail:<name>, plus an "actions" line per GitHub Actions check. A head with no
 # checks yet has a null rollup and prints no lines.
 filter='.data.repository.ref.target
@@ -78,10 +78,10 @@ filter='.data.repository.ref.target
     (.statusCheckRollup.contexts.nodes // [] | .[]
       | if .__typename == "CheckRun" then
           (if .checkSuite.app.slug == "github-actions" then "actions" else empty end),
-          if .status != "COMPLETED" then "pending"
+          if .status != "COMPLETED" then "pending:" + .name
           elif (.conclusion | IN("SUCCESS", "NEUTRAL", "SKIPPED")) then "pass"
           else "fail:" + .name end
-        elif (.state | IN("PENDING", "EXPECTED")) then "pending"
+        elif (.state | IN("PENDING", "EXPECTED")) then "pending:" + .context
         elif .state == "SUCCESS" then "pass"
         else "fail:" + .context end)'
 
@@ -98,7 +98,7 @@ while :; do
     states=${head#"$sha"}
     states=${states#$'\n'}
   else
-    states=pending
+    states=pending:
   fi
   failed=$(sed -n 's/^fail://p' <<< "$states" | awk 'NR > 1 { printf ", " } { printf "%s", $0 }')
   if [ -n "$failed" ]; then
@@ -107,13 +107,14 @@ while :; do
   fi
   # Other apps' checks, such as a review bot's status, can pass before
   # GitHub Actions creates this repo's own checks, so wait for those too.
-  if grep -qx actions <<< "$states" && ! grep -qx pending <<< "$states"; then
+  if grep -qx actions <<< "$states" && ! grep -q '^pending:' <<< "$states"; then
     break
   fi
   # Checks that outlast the wait leave the PR open, and the run stays green.
   # Auto-merge waits only for the checks a ruleset requires, so it turns on
-  # only when the base branch's rules require some; otherwise it would merge
-  # at once, and the next push to main runs this wait again.
+  # only when GitHub Actions has created its checks and the base branch's
+  # rules require every pending one; otherwise GitHub could merge before a
+  # check passes, and the next push to main runs this wait again.
   if [ "$SECONDS" -ge "$deadline" ]; then
     view=$(gh pr view "$pr" --repo "$repo" --json isDraft,labels,baseRefName)
     hold=$(jq -r "$hold_filter" <<< "$view")
@@ -123,9 +124,13 @@ while :; do
     fi
     base=$(jq -r .baseRefName <<< "$view")
     required=$(gh api "repos/$repo/rules/branches/$base" |
-      jq '[.[] | select(.type == "required_status_checks")] | length')
-    if [ "$required" -eq 0 ]; then
-      echo "release PR #$pr checks on $sha did not finish within ${timeout}s; no ruleset requires checks on $base, so the next push to $base merges it"
+      jq -r '.[] | select(.type == "required_status_checks")
+        | .parameters.required_status_checks[]?.context')
+    unrequired=$(sed -n 's/^pending://p' <<< "$states" |
+      awk -v required="$required" 'BEGIN { split(required, names, "\n"); for (i in names) known[names[i]] = 1 }
+        !($0 in known) { print $0 == "" ? "(unknown)" : $0 }')
+    if ! grep -qx actions <<< "$states" || [ -n "$unrequired" ]; then
+      echo "release PR #$pr checks on $sha did not finish within ${timeout}s; a ruleset on $base does not require every pending check, so the next push to $base merges it"
       exit 0
     fi
     echo "release PR #$pr checks on $sha did not finish within ${timeout}s; turning on auto-merge"
