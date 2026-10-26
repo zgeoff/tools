@@ -59,6 +59,7 @@
     "check:commits": "bun sync/pre-push/run-commits-check.ts",
     "check:local-paths": "bun sync/pre-push/run-local-paths-check.ts",
     "check:test-timeouts": "bun sync/pre-push/run-test-timeouts-check.ts",
+    "check:workflows": "bun sync/pre-push/run-workflows-check.ts",
     "memory-capped": "bash sync/pre-push/run-memory-capped.sh \"$(bun sync/pre-push/read-memory-budget.ts)\""
   },
   "devDependencies": {
