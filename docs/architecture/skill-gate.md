@@ -11,12 +11,14 @@ gated file needs a skill the session lacks.
 ## Failing closed
 
 The hook runs the [entry point](../../packages/skill-gate/README.md#entry-point), a file in the repo
-that calls the package. The entry point fails closed. When the package cannot load, the entry point
-blocks each edit that a gate in the rules file matches, and its error names the load failure. It
-also blocks every edit inside the project when it cannot read the rules file or the file does not
-parse. It blocks a call to a tool that a tool gate names, and every call other than an edit or a
-Bash command when it cannot read the rules file or the file or its `tools` list does not parse. Any
-other call runs, and the hook reports the load failure as a non-blocking error.
+that calls the package. The entry point fails closed. The hook command turns off Bun's auto-install,
+so a checkout with no `node_modules` cannot load the package either, and Bun never fetches it from
+npm. When the package cannot load, the entry point blocks each edit that a gate in the rules file
+matches, and its error names the load failure. It also blocks every edit inside the project when it
+cannot read the rules file or the file does not parse. It blocks a call to a tool that a tool gate
+names, and every call other than an edit or a Bash command when it cannot read the rules file or the
+file or its `tools` list does not parse. Any other call runs, and the hook reports the load failure
+as a non-blocking error.
 
 ## Which loads count
 

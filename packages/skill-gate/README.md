@@ -23,9 +23,11 @@ The hook runs a file in the repo that calls the package's `runSkillGate`, at
 file from zgeoff/tools. `runSkillGate` reads the hook payload from stdin, prints the hook output,
 and exits the process.
 
-Register the entry point in `.claude/settings.json`, before a Bash command and after it. The
-`PreToolUse` matcher names each tool that a tool gate names, since the hook never sees a call that
-the matcher skips. This example gates `mcp__tracker__update_ticket`:
+Register the entry point in `.claude/settings.json`, before a Bash command and after it. The command
+runs Bun with `--no-install`, so the hook never fetches the package from npm: in a checkout with no
+`node_modules`, the hook blocks each gated edit until `bun install` runs. The `PreToolUse` matcher
+names each tool that a tool gate names, since the hook never sees a call that the matcher skips.
+This example gates `mcp__tracker__update_ticket`:
 
 ```json
 {
@@ -36,7 +38,7 @@ the matcher skips. This example gates `mcp__tracker__update_ticket`:
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate/skill-gate.ts\""
+            "command": "bun --no-install \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate/skill-gate.ts\""
           }
         ]
       }
@@ -47,7 +49,7 @@ the matcher skips. This example gates `mcp__tracker__update_ticket`:
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate/skill-gate.ts\""
+            "command": "bun --no-install \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate/skill-gate.ts\""
           }
         ]
       }
@@ -58,7 +60,7 @@ the matcher skips. This example gates `mcp__tracker__update_ticket`:
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate/skill-gate.ts\""
+            "command": "bun --no-install \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gate/skill-gate.ts\""
           }
         ]
       }

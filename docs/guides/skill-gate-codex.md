@@ -18,7 +18,7 @@ how Codex edits files, and each gated tool. This example gates `mcp__tracker__up
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.claude/hooks/skill-gate/skill-gate.ts\" --harness codex"
+            "command": "bun --no-install \"$(git rev-parse --show-toplevel)/.claude/hooks/skill-gate/skill-gate.ts\" --harness codex"
           }
         ]
       }
@@ -29,7 +29,7 @@ how Codex edits files, and each gated tool. This example gates `mcp__tracker__up
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.claude/hooks/skill-gate/skill-gate.ts\" --harness codex"
+            "command": "bun --no-install \"$(git rev-parse --show-toplevel)/.claude/hooks/skill-gate/skill-gate.ts\" --harness codex"
           }
         ]
       }
@@ -39,7 +39,7 @@ how Codex edits files, and each gated tool. This example gates `mcp__tracker__up
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.claude/hooks/skill-gate/skill-gate.ts\" --harness codex"
+            "command": "bun --no-install \"$(git rev-parse --show-toplevel)/.claude/hooks/skill-gate/skill-gate.ts\" --harness codex"
           }
         ]
       }
@@ -49,7 +49,7 @@ how Codex edits files, and each gated tool. This example gates `mcp__tracker__up
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.claude/hooks/skill-gate/skill-gate.ts\" --harness codex"
+            "command": "bun --no-install \"$(git rev-parse --show-toplevel)/.claude/hooks/skill-gate/skill-gate.ts\" --harness codex"
           }
         ]
       }
