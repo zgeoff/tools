@@ -27,9 +27,6 @@ async function setupTest() {
   await mkdir(stubDirectory);
   await mkdir(runnerTemporaryDirectory);
 
-  // A stub curl that answers every URL with the same body.
-  await createStubCurl(stubDirectory, '# release script\n');
-
   const runStep = async (name: string, environment: Readonly<Record<string, string>>) => {
     const step = await loadWorkflowStep(workflow, 'release', name);
 
@@ -95,6 +92,7 @@ async function setupTest() {
 
   return {
     directory,
+    stubDirectory,
     installReleaseScripts,
     setClock,
     runStep,
@@ -107,6 +105,9 @@ async function setupTest() {
 
 test('it downloads both release scripts from the commit that defines the job', async () => {
   const ctx = await setupTest();
+
+  // A stub curl that answers every URL with the same body.
+  await createStubCurl(ctx.stubDirectory, '# release script\n');
 
   const result = await ctx.runStep('Fetch the release scripts', {
     JOB_CONTEXT: '{"workflow_repository":"acme/tools","workflow_sha":"abc123"}',
@@ -131,6 +132,9 @@ test('it downloads both release scripts from the commit that defines the job', a
 
 test('it downloads nothing when the job context lacks the commit', async () => {
   const ctx = await setupTest();
+
+  // A stub curl that answers every URL with the same body.
+  await createStubCurl(ctx.stubDirectory, '# release script\n');
 
   const result = await ctx.runStep('Fetch the release scripts', {
     JOB_CONTEXT: '{"workflow_repository":"acme/tools"}',
