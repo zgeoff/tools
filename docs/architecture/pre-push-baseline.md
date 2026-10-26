@@ -79,8 +79,7 @@ The entry delivers these files, and their tests stay in tools:
   [worker count and the memory budget](./memory-caps.md#the-worker-count) of the host.
 - `scripts/read-branch-base.ts`, `scripts/parse-added-lines.ts`, `scripts/parse-shell-words.ts`,
   `scripts/collect-command-names.ts` and `scripts/run-program.ts` — the modules these scripts
-  import. The shell parser imports `ts-pattern`, which a repo that takes the entry installs as one
-  of its opt-in changes, and which CI takes from the planner's install.
+  import.
 
 The check scripts exit 0 when clean or skipped, 1 with a problem, and 2 when they cannot run, such
 as in a clone without origin's default branch. One exception: the workflow lint exits 0 with a
@@ -90,7 +89,7 @@ The entry's build adds the package scripts `files:branch`, `lint:files`, `test:r
 `check:commits`, `check:local-paths`, `check:test-timeouts`, `check:workflows` and `memory-capped`
 when the repo lacks them. It changes one script the repo already has: a `files:branch` that runs the
 old `scripts/collect-branch-files.ts` moves to `scripts/read-branch-files.ts`. A repo opts in with
-four changes, which
+three changes, which
 [Opting in to the pre-push baseline](../runbooks/downstream-repo-setup.md#opting-in-to-the-pre-push-baseline)
 lists.
 

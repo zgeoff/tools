@@ -1,4 +1,3 @@
-import { match } from 'ts-pattern';
 import type { ShellWord } from './parse-shell-words.ts';
 import { parseShellWords } from './parse-shell-words.ts';
 
@@ -42,10 +41,11 @@ function collectRunTargets(command: readonly ShellWord[]): string[] | undefined 
     return undefined;
   }
 
-  return match(name)
-    .with('bash', 'sh', () => collectShellTargets(name, rest))
-    .with('bun', () => collectBunTargets(rest))
-    .otherwise(() => [name]);
+  if (name === 'bash' || name === 'sh') {
+    return collectShellTargets(name, rest);
+  }
+
+  return name === 'bun' ? collectBunTargets(rest) : [name];
 }
 
 const shellLongOptions = new Set(['--login', '--noediting', '--noprofile', '--norc', '--posix']);

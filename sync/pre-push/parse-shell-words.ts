@@ -1,5 +1,3 @@
-import { match } from 'ts-pattern';
-
 export interface ShellWord {
   readonly text: string;
   readonly isQuoted: boolean;
@@ -9,7 +7,7 @@ export interface ShellWord {
   readonly isAssignment: boolean;
 }
 
-type ShellContext =
+export type ShellContext =
   | 'plain'
   | 'single-quote'
   | 'double-quote'
@@ -76,26 +74,44 @@ interface ShellCursor {
   readonly redirect: string;
 }
 
-type ShellAction =
-  | { readonly kind: 'text'; readonly text: string }
-  | { readonly kind: 'redirect'; readonly text: string }
-  | { readonly kind: 'escape' }
-  | { readonly kind: 'open'; readonly context: ShellContext; readonly text: string }
-  | { readonly kind: 'close'; readonly text: string }
-  | { readonly kind: 'break' }
-  | { readonly kind: 'operator'; readonly text: string }
-  | { readonly kind: 'comment' };
+interface ShellActionFields {
+  readonly text: { readonly text: string };
+  readonly redirect: { readonly text: string };
+  readonly escape: object;
+  readonly open: { readonly context: ShellContext; readonly text: string };
+  readonly close: { readonly text: string };
+  readonly break: object;
+  readonly operator: { readonly text: string };
+  readonly comment: object;
+}
+
+type ShellActionOf<Kind extends keyof ShellActionFields> = {
+  readonly kind: Kind;
+} & ShellActionFields[Kind];
+
+type ShellAction = {
+  [Kind in keyof ShellActionFields]: ShellActionOf<Kind>;
+}[keyof ShellActionFields];
+
+// A table typed over every context, so a context without a reader fails the type check.
+export type ShellContextReaders = Readonly<
+  Record<ShellContext, (context: ShellContext, cursor: ShellCursor) => ShellAction>
+>;
+
+const contextReaders: ShellContextReaders = {
+  plain: pickCodeAction,
+  substitution: pickCodeAction,
+  group: pickCodeAction,
+  backtick: pickCodeAction,
+  'single-quote': (_context, cursor) => pickSingleQuotedAction(cursor),
+  'double-quote': (_context, cursor) => pickDoubleQuotedAction(cursor),
+  arithmetic: pickArithmeticAction,
+  'arithmetic-group': pickArithmeticAction,
+  parameter: (_context, cursor) => pickParameterAction(cursor),
+};
 
 function pickAction(context: ShellContext, cursor: ShellCursor): ShellAction {
-  return match(context)
-    .with('plain', 'substitution', 'group', 'backtick', (current) =>
-      pickCodeAction(current, cursor),
-    )
-    .with('single-quote', () => pickSingleQuotedAction(cursor))
-    .with('double-quote', () => pickDoubleQuotedAction(cursor))
-    .with('arithmetic', 'arithmetic-group', (current) => pickArithmeticAction(current, cursor))
-    .with('parameter', () => pickParameterAction(cursor))
-    .exhaustive();
+  return contextReaders[context](context, cursor);
 }
 
 function pickCodeAction(context: ShellContext, cursor: ShellCursor): ShellAction {
@@ -266,57 +282,81 @@ function pickParameterAction(cursor: ShellCursor): ShellAction {
 
 function advanceParser(state: ParserState, action: ShellAction, isTopLevel: boolean): void {
   state.redirect = action.kind === 'redirect' ? action.text : '';
+  state.index += runActionHandler(state, action, isTopLevel);
+}
 
-  state.index += match(action)
-    .with({ kind: 'text' }, { kind: 'redirect' }, (step) => {
-      state.text += step.text;
-      state.plainText += state.isPlain ? step.text : '';
+// Each handler returns how many characters its action consumed. The table is typed over every
+// action kind, so an action without a handler fails the type check.
+export type ShellActionHandlers = {
+  readonly [Kind in keyof ShellActionFields]: (
+    state: ParserState,
+    action: ShellActionOf<Kind>,
+    isTopLevel: boolean,
+  ) => number;
+};
 
-      return 1;
-    })
-    .with({ kind: 'escape' }, () => {
-      const escaped = state.command.charAt(state.index + 1);
+const actionHandlers: ShellActionHandlers = {
+  text: appendText,
+  redirect: appendText,
+  escape: (state, _action, isTopLevel) => {
+    const escaped = state.command.charAt(state.index + 1);
 
-      // A backslash before a newline joins the two lines into one.
-      if (escaped !== '\n') {
-        state.isPlain = false;
-        state.text += escaped;
-        state.isQuoted ||= isTopLevel;
-      }
-
-      return 2;
-    })
-    .with({ kind: 'open' }, (step) => {
+    // A backslash before a newline joins the two lines into one.
+    if (escaped !== '\n') {
       state.isPlain = false;
+      state.text += escaped;
+      state.isQuoted ||= isTopLevel;
+    }
 
-      state.contexts.push(step.context);
+    return 2;
+  },
+  open: (state, action, isTopLevel) => {
+    state.isPlain = false;
 
-      state.text += step.text;
-      state.isQuoted ||= isTopLevel && isQuoteContext(step.context);
+    state.contexts.push(action.context);
 
-      return Math.max(step.text.length, 1);
-    })
-    .with({ kind: 'close' }, (step) => {
-      state.contexts.pop();
+    state.text += action.text;
+    state.isQuoted ||= isTopLevel && isQuoteContext(action.context);
 
-      state.text += step.text;
+    return Math.max(action.text.length, 1);
+  },
+  close: (state, action) => {
+    state.contexts.pop();
 
-      return Math.max(step.text.length, 1);
-    })
-    .with({ kind: 'break' }, () => {
-      endWord(state);
+    state.text += action.text;
 
-      return 1;
-    })
-    .with({ kind: 'operator' }, (step) => {
-      endWord(state);
+    return Math.max(action.text.length, 1);
+  },
+  break: (state) => {
+    endWord(state);
 
-      state.words.push({ text: step.text, isQuoted: false, isOperator: true, isAssignment: false });
+    return 1;
+  },
+  operator: (state, action) => {
+    endWord(state);
 
-      return step.text.length;
-    })
-    .with({ kind: 'comment' }, () => state.command.length)
-    .exhaustive();
+    state.words.push({ text: action.text, isQuoted: false, isOperator: true, isAssignment: false });
+
+    return action.text.length;
+  },
+  comment: (state) => state.command.length,
+};
+
+function runActionHandler<Kind extends keyof ShellActionFields>(
+  state: ParserState,
+  action: ShellActionOf<Kind>,
+  isTopLevel: boolean,
+): number {
+  const handler: ShellActionHandlers[Kind] = actionHandlers[action.kind];
+
+  return handler(state, action, isTopLevel);
+}
+
+function appendText(state: ParserState, action: ShellActionFields['text']): number {
+  state.text += action.text;
+  state.plainText += state.isPlain ? action.text : '';
+
+  return 1;
 }
 
 function isQuoteContext(context: ShellContext): boolean {

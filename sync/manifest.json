@@ -241,7 +241,7 @@
   },
   {
     "name": "pre-push-baseline",
-    "description": "The light pre-push baseline: lefthook jobs that check only what the branch changes and run one at a time under a memory cap, a pre-commit typecheck, the scripts they call, the package scripts files:branch, lint:files, test:related, check:commits, check:local-paths, check:test-timeouts, check:workflows and memory-capped where the repo lacks them, and a move of a files:branch script left on the old script path; the repo installs ts-pattern itself, because the workflow lint imports it",
+    "description": "The light pre-push baseline: lefthook jobs that check only what the branch changes and run one at a time under a memory cap, a pre-commit typecheck, the scripts they call, the package scripts files:branch, lint:files, test:related, check:commits, check:local-paths, check:test-timeouts, check:workflows and memory-capped where the repo lacks them, and a move of a files:branch script left on the old script path",
     "optIn": true,
     "files": [
       {

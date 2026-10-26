@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import type { ShellActionHandlers, ShellContextReaders } from './parse-shell-words.ts';
 import { parseShellWords } from './parse-shell-words.ts';
 
 test.each([
@@ -56,4 +57,31 @@ test.each([
   const [word] = parseShellWords(command);
 
   expect(word).toStrictEqual(first);
+});
+
+test('it fails the type check on a reader table or a handler table that misses a key', () => {
+  // @ts-expect-error: the reader table lacks the parameter context
+  const readers: ShellContextReaders = {
+    plain: () => ({ kind: 'break' }),
+    substitution: () => ({ kind: 'break' }),
+    group: () => ({ kind: 'break' }),
+    backtick: () => ({ kind: 'break' }),
+    'single-quote': () => ({ kind: 'break' }),
+    'double-quote': () => ({ kind: 'break' }),
+    arithmetic: () => ({ kind: 'break' }),
+    'arithmetic-group': () => ({ kind: 'break' }),
+  };
+
+  // @ts-expect-error: the handler table lacks the comment action
+  const handlers: ShellActionHandlers = {
+    text: () => 1,
+    redirect: () => 1,
+    escape: () => 2,
+    open: () => 1,
+    close: () => 1,
+    break: () => 1,
+    operator: () => 1,
+  };
+
+  expect([Object.keys(readers).length, Object.keys(handlers).length]).toStrictEqual([8, 7]);
 });
