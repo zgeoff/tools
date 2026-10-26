@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 import { isConditionMet } from './is-condition-met.ts';
 import { loadWorkflowStep } from './load-workflow-step.ts';
-import { parseWorkflowActionStep } from './parse-workflow-action-step.ts';
+import { parseWorkflowStep } from './parse-workflow-step.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'main-'));
@@ -50,10 +50,6 @@ test('it publishes a release that the merge run tagged from a run at the tag', a
     })
     .nothrow()
     .quiet();
-
-  expect(resolve.env).toStrictEqual({
-    RELEASE_OUTPUTS: `\${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) || toJSON(steps.release.outputs) }}`,
-  });
 
   expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
     exitCode: 0,
@@ -125,7 +121,7 @@ test.each([
   const ctx = await setupTest();
   const text = await readFile(ctx.workflow, 'utf8');
 
-  const tag = parseWorkflowActionStep(text, 'release', 'Tag the merged release');
+  const tag = parseWorkflowStep(text, 'release', 'Tag the merged release');
 
   if (tag.kind !== 'parsed') {
     throw new Error(tag.message);

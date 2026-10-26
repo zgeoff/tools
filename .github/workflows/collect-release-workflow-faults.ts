@@ -1,33 +1,47 @@
 import { P, match } from 'ts-pattern';
-import { parseWorkflowActionStep } from './parse-workflow-action-step.ts';
-import type { WorkflowActionStep } from './parse-workflow-action-step.ts';
+import { parseWorkflowStep } from './parse-workflow-step.ts';
+import type { WorkflowStepFields } from './parse-workflow-step.ts';
 
 // The release job's tag step must call the same release-please pin as its
-// first call, with the App token, and open no release PR of its own.
+// first call, with the App token, and open no release PR of its own. The
+// resolve step must read the tag step's outputs when that step released.
 export function collectReleaseWorkflowFaults(text: string): string[] {
-  const release = parseWorkflowActionStep(text, 'release', 'Run release-please');
-  const tag = parseWorkflowActionStep(text, 'release', 'Tag the merged release');
+  const steps = [
+    parseWorkflowStep(text, 'release', 'Run release-please'),
+    parseWorkflowStep(text, 'release', 'Tag the merged release'),
+    parseWorkflowStep(text, 'release', 'Resolve release commit'),
+  ] as const;
 
-  return match([release, tag] as const)
-    .with([{ kind: 'parsed' }, { kind: 'parsed' }], ([first, second]) =>
-      collectTagStepFaults(first.step, second.step),
+  return match(steps)
+    .with(
+      [{ kind: 'parsed' }, { kind: 'parsed' }, { kind: 'parsed' }],
+      ([release, tag, resolve]) => [
+        ...collectTagStepFaults(release.step, tag.step),
+        ...collectResolveStepFaults(resolve.step),
+      ],
     )
-    .with([{ kind: 'missing' }, P._], [P._, { kind: 'missing' }], (results) =>
-      results.flatMap((result) =>
-        match(result)
-          .with({ kind: 'missing' }, (missing) => [missing.message])
-          .with({ kind: 'parsed' }, () => [])
-          .exhaustive(),
-      ),
+    .with(
+      [{ kind: 'missing' }, P._, P._],
+      [P._, { kind: 'missing' }, P._],
+      [P._, P._, { kind: 'missing' }],
+      (results) =>
+        results.flatMap((result) =>
+          match(result)
+            .with({ kind: 'missing' }, (missing) => [missing.message])
+            .with({ kind: 'parsed' }, () => [])
+            .exhaustive(),
+        ),
     )
     .exhaustive();
 }
 
-function collectTagStepFaults(release: WorkflowActionStep, tag: WorkflowActionStep): string[] {
+function collectTagStepFaults(release: WorkflowStepFields, tag: WorkflowStepFields): string[] {
   return [
-    ...(tag.uses === release.uses
+    ...(tag.uses !== null && tag.uses === release.uses
       ? []
-      : [`Tag the merged release uses ${tag.uses}, but Run release-please uses ${release.uses}`]),
+      : [
+          `Tag the merged release uses ${tag.uses ?? 'no action'}, but Run release-please uses ${release.uses ?? 'no action'}`,
+        ]),
     ...(tag.inputs['token'] === `\${{ steps.app-token.outputs.token }}`
       ? []
       : ['Tag the merged release must pass the App token as its token input']),
@@ -35,4 +49,14 @@ function collectTagStepFaults(release: WorkflowActionStep, tag: WorkflowActionSt
       ? []
       : ['Tag the merged release must set skip-github-pull-request: true']),
   ];
+}
+
+function collectResolveStepFaults(resolve: WorkflowStepFields): string[] {
+  const expected = `\${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) || toJSON(steps.release.outputs) }}`;
+
+  return resolve.env['RELEASE_OUTPUTS'] === expected
+    ? []
+    : [
+        'Resolve release commit must read RELEASE_OUTPUTS from the tag step when it released, and from Run release-please otherwise',
+      ];
 }

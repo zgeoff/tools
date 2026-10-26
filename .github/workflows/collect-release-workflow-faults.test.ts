@@ -13,6 +13,10 @@ test('it reports nothing for a tag step on the same pin with the App token and n
     '        with:',
     `          token: \${{ steps.app-token.outputs.token }}`,
     '          skip-github-pull-request: true',
+    '      - name: Resolve release commit',
+    '        env:',
+    `          RELEASE_OUTPUTS: \${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) || toJSON(steps.release.outputs) }}`,
+    '        run: echo resolved',
     '',
   ].join('\n');
 
@@ -32,6 +36,10 @@ test('it reports a tag step on another pin, with another token, that opens relea
     '        uses: acme/release-action@def456',
     '        with:',
     `          token: \${{ github.token }}`,
+    '      - name: Resolve release commit',
+    '        env:',
+    `          RELEASE_OUTPUTS: \${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) || toJSON(steps.release.outputs) }}`,
+    '        run: echo resolved',
     '',
   ].join('\n');
 
@@ -44,7 +52,33 @@ test('it reports a tag step on another pin, with another token, that opens relea
   ]);
 });
 
-test('it reports a release job with no tag step', () => {
+test('it reports a resolve step that reads only the first release-please outputs', () => {
+  const text = [
+    'jobs:',
+    '  release:',
+    '    steps:',
+    '      - name: Run release-please',
+    '        uses: acme/release-action@abc123',
+    '      - name: Tag the merged release',
+    '        uses: acme/release-action@abc123',
+    '        with:',
+    `          token: \${{ steps.app-token.outputs.token }}`,
+    '          skip-github-pull-request: true',
+    '      - name: Resolve release commit',
+    '        env:',
+    `          RELEASE_OUTPUTS: \${{ toJSON(steps.release.outputs) }}`,
+    '        run: echo resolved',
+    '',
+  ].join('\n');
+
+  const faults = collectReleaseWorkflowFaults(text);
+
+  expect(faults).toStrictEqual([
+    'Resolve release commit must read RELEASE_OUTPUTS from the tag step when it released, and from Run release-please otherwise',
+  ]);
+});
+
+test('it reports each step the release job lacks', () => {
   const text = [
     'jobs:',
     '  release:',
@@ -57,6 +91,33 @@ test('it reports a release job with no tag step', () => {
   const faults = collectReleaseWorkflowFaults(text);
 
   expect(faults).toStrictEqual([
-    'the release job has no step named Tag the merged release that uses an action',
+    'the release job has no step named Tag the merged release',
+    'the release job has no step named Resolve release commit',
+  ]);
+});
+
+test('it reports a tag step that runs a script instead of release-please', () => {
+  const text = [
+    'jobs:',
+    '  release:',
+    '    steps:',
+    '      - name: Run release-please',
+    '        uses: acme/release-action@abc123',
+    '      - name: Tag the merged release',
+    '        with:',
+    `          token: \${{ steps.app-token.outputs.token }}`,
+    '          skip-github-pull-request: true',
+    '        run: git tag v1',
+    '      - name: Resolve release commit',
+    '        env:',
+    `          RELEASE_OUTPUTS: \${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) || toJSON(steps.release.outputs) }}`,
+    '        run: echo resolved',
+    '',
+  ].join('\n');
+
+  const faults = collectReleaseWorkflowFaults(text);
+
+  expect(faults).toStrictEqual([
+    'Tag the merged release uses no action, but Run release-please uses acme/release-action@abc123',
   ]);
 });

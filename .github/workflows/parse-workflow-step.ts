@@ -1,21 +1,20 @@
-export interface WorkflowActionStep {
+export interface WorkflowStepFields {
   readonly condition: string | null;
 
-  readonly uses: string;
+  // null for a step that runs a script
+  readonly uses: string | null;
 
   readonly inputs: Readonly<Record<string, string>>;
+
+  readonly env: Readonly<Record<string, string>>;
 }
 
 // A step the workflow lacks is a result, because a check reports it as a fault.
-export type WorkflowActionStepResult =
-  | { readonly kind: 'parsed'; readonly step: WorkflowActionStep }
+export type WorkflowStepResult =
+  | { readonly kind: 'parsed'; readonly step: WorkflowStepFields }
   | { readonly kind: 'missing'; readonly message: string };
 
-export function parseWorkflowActionStep(
-  text: string,
-  job: string,
-  step: string,
-): WorkflowActionStepResult {
+export function parseWorkflowStep(text: string, job: string, step: string): WorkflowStepResult {
   const workflow: unknown = Bun.YAML.parse(text);
   const steps = findField(findField(findField(workflow, 'jobs'), job), 'steps');
 
@@ -25,25 +24,21 @@ export function parseWorkflowActionStep(
 
   const list: unknown[] = steps;
   const found = list.find((candidate) => findField(candidate, 'name') === step);
-  const uses = findField(found, 'uses');
 
-  if (typeof uses !== 'string') {
-    return {
-      kind: 'missing',
-      message: `the ${job} job has no step named ${step} that uses an action`,
-    };
+  if (found === undefined) {
+    return { kind: 'missing', message: `the ${job} job has no step named ${step}` };
   }
 
   const condition = findField(found, 'if');
-  const inputs = findField(found, 'with');
-  const entries = typeof inputs === 'object' && inputs !== null ? Object.entries(inputs) : [];
+  const uses = findField(found, 'uses');
 
   return {
     kind: 'parsed',
     step: {
       condition: typeof condition === 'string' ? condition : null,
-      uses,
-      inputs: Object.fromEntries(entries.map(([name, value]) => [name, String(value)])),
+      uses: typeof uses === 'string' ? uses : null,
+      inputs: toTextRecord(findField(found, 'with')),
+      env: toTextRecord(findField(found, 'env')),
     },
   };
 }
@@ -54,4 +49,10 @@ function findField(value: unknown, key: string): unknown {
   }
 
   return Object.entries(value).find(([name]) => name === key)?.[1];
+}
+
+function toTextRecord(value: unknown): Record<string, string> {
+  const entries = typeof value === 'object' && value !== null ? Object.entries(value) : [];
+
+  return Object.fromEntries(entries.map(([name, field]) => [name, String(field)]));
 }

@@ -35,6 +35,10 @@ test('it prints each fault of the main workflow and exits 1', async () => {
       '        uses: acme/release-action@abc123',
       '        with:',
       `          token: \${{ steps.app-token.outputs.token }}`,
+      '      - name: Resolve release commit',
+      '        env:',
+      `          RELEASE_OUTPUTS: \${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) || toJSON(steps.release.outputs) }}`,
+      '        run: echo resolved',
       '',
     ].join('\n'),
   );
