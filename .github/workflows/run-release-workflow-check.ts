@@ -39,8 +39,12 @@ export async function runReleaseWorkflowCheck(
 async function runCLI(): Promise<void> {
   process.exitCode = await runReleaseWorkflowCheck({
     readWorkflow: () => readFile(workflowPath, 'utf8'),
-    writeOutput: (text) => process.stdout.write(text),
-    writeError: (text) => process.stderr.write(text),
+    writeOutput: (text) => {
+      process.stdout.write(text);
+    },
+    writeError: (text) => {
+      process.stderr.write(text);
+    },
   });
 }
 

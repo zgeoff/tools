@@ -20,8 +20,12 @@ test('it prints each fault of the shared release workflow and returns 1', async 
 
   const exitCode = await runReleaseWorkflowCheck({
     readWorkflow: () => Promise.resolve(text),
-    writeOutput: (line) => output.push(line),
-    writeError: (line) => errors.push(line),
+    writeOutput: (line) => {
+      output.push(line);
+    },
+    writeError: (line) => {
+      errors.push(line);
+    },
   });
 
   expect({ exitCode, output, errors }).toStrictEqual({
@@ -42,8 +46,12 @@ test('it prints the read error and returns 2 when the workflow cannot be read', 
   const exitCode = await runReleaseWorkflowCheck({
     readWorkflow: () =>
       Promise.reject(new Error("ENOENT: no such file or directory, open 'release-please.yml'")),
-    writeOutput: (line) => output.push(line),
-    writeError: (line) => errors.push(line),
+    writeOutput: (line) => {
+      output.push(line);
+    },
+    writeError: (line) => {
+      errors.push(line);
+    },
   });
 
   expect({ exitCode, output, errors }).toStrictEqual({
@@ -86,8 +94,12 @@ test('it prints nothing and returns 0 for a workflow with no fault', async () =>
 
   const exitCode = await runReleaseWorkflowCheck({
     readWorkflow: () => Promise.resolve(text),
-    writeOutput: (line) => output.push(line),
-    writeError: (line) => errors.push(line),
+    writeOutput: (line) => {
+      output.push(line);
+    },
+    writeError: (line) => {
+      errors.push(line);
+    },
   });
 
   expect({ exitCode, output, errors }).toStrictEqual({ exitCode: 0, output: [], errors: [] });
