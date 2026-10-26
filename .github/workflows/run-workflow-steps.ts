@@ -63,8 +63,8 @@ function resolveValue(value: string, values: ReadonlyMap<string, string>): strin
     .map((operand) => /^(?:(?<name>[\w.-]+)|'(?<text>[^']*)')$/u.exec(operand)?.groups);
 
   if (operands !== undefined && operands.every((operand) => operand !== undefined)) {
-    const resolved = operands.map((operand) =>
-      operand['text'] === undefined ? getValue(operand['name'] ?? '', values) : operand['text'],
+    const resolved = operands.map(
+      (operand) => operand['text'] ?? getValue(operand['name'] ?? '', values),
     );
 
     return resolved.find((text) => text !== '') ?? '';
