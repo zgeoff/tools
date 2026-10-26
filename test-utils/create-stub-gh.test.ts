@@ -93,6 +93,25 @@ test('it answers the commit, compare and branch rules endpoints with their respo
   });
 });
 
+test('it prints nothing for a merge and fails the merge whose response is "error"', async () => {
+  const ctx = await setupTest();
+
+  await ctx.gh.writeResponses('merges', ['merged', 'error']);
+
+  const first = Bun.spawnSync([join(ctx.directory, 'gh'), 'pr', 'merge', '145', '--squash']);
+  const second = Bun.spawnSync([join(ctx.directory, 'gh'), 'pr', 'merge', '145', '--auto']);
+
+  expect({ exitCode: first.exitCode, stdout: first.stdout.toString() }).toStrictEqual({
+    exitCode: 0,
+    stdout: '',
+  });
+
+  expect({ exitCode: second.exitCode, stderr: second.stderr.toString() }).toStrictEqual({
+    exitCode: 1,
+    stderr: 'HTTP 502\n',
+  });
+});
+
 test('it fails a call whose body is "error"', async () => {
   const ctx = await setupTest();
 

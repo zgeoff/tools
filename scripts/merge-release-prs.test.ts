@@ -407,6 +407,46 @@ test('it leaves the release PR open without auto-merge while a check the ruleset
   });
 });
 
+test('it exits cleanly with the PR open when auto-merge does not turn on', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeResponses('prs', [[{ number: 145 }]]);
+  await ctx.writeResponses('mergeable', [{ isDraft: false, labels: [], baseRefName: 'main' }]);
+  await ctx.writeResponses('merges', ['error']);
+
+  await ctx.writeResponses('rules', [
+    [
+      {
+        type: 'required_status_checks',
+        parameters: { required_status_checks: [{ context: 'pr / checks' }] },
+      },
+    ],
+  ]);
+
+  await ctx.writeResponses('heads', [
+    buildMockHeadResponse('abc123', [
+      { name: 'pr / checks', status: 'IN_PROGRESS', conclusion: null },
+    ]),
+  ]);
+
+  const result = await ctx.runScript({ CHECKS_TIMEOUT: '0' });
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'release PR #145 checks on abc123 did not finish within 0s; turning on auto-merge\n',
+    stderr:
+      'HTTP 502\nrelease PR #145: auto-merge did not turn on; the next push to main merges it\n',
+  });
+
+  const output = await ctx.readOutput();
+
+  expect(output).toBe('');
+});
+
 test('it leaves a held release PR without auto-merge when the checks outlast the wait', async () => {
   const ctx = await setupTest();
 
