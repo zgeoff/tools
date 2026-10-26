@@ -555,7 +555,7 @@ test('it reports actions/cache in a Bun job', async () => {
   ]);
 });
 
-test('it reads the workflow callers, skips a subfolder, and reads only the paths it is given', async () => {
+test('it reads the workflows and the workflow callers, and skips a subfolder', async () => {
   const ctx = await setupTest();
 
   const brokenJob = [
@@ -574,7 +574,7 @@ test('it reads the workflow callers, skips a subfolder, and reads only the paths
     '.github/workflows/tidy.yml': brokenJob,
   });
 
-  const everyFile = runWorkflowsCheck({
+  const findings = runWorkflowsCheck({
     cwd: ctx.directory,
     env: ctx.env,
     paths: [],
@@ -582,15 +582,7 @@ test('it reads the workflow callers, skips a subfolder, and reads only the paths
     runProgram,
   });
 
-  const askedFile = runWorkflowsCheck({
-    cwd: ctx.directory,
-    env: ctx.env,
-    paths: ['sync/workflow-callers/tidy.yaml', 'src/index.ts'],
-    profile: undefined,
-    runProgram,
-  });
-
-  expect(everyFile).toStrictEqual([
+  expect(findings).toStrictEqual([
     { path: '.github/workflows/tidy.yml', line: 3, message: 'job tidy sets no timeout-minutes' },
     {
       path: 'sync/workflow-callers/tidy.yaml',
@@ -598,8 +590,35 @@ test('it reads the workflow callers, skips a subfolder, and reads only the paths
       message: 'job tidy sets no timeout-minutes',
     },
   ]);
+});
 
-  expect(askedFile).toStrictEqual([
+test('it reads only the workflow files among the paths it is given', async () => {
+  const ctx = await setupTest();
+
+  const brokenJob = [
+    'on: workflow_dispatch',
+    'jobs:',
+    '  tidy:',
+    '    runs-on: ubuntu-latest',
+    '    steps:',
+    '      - run: bun run tidy',
+    '',
+  ].join('\n');
+
+  await ctx.commitFiles({
+    'sync/workflow-callers/tidy.yaml': brokenJob,
+    '.github/workflows/tidy.yml': brokenJob,
+  });
+
+  const findings = runWorkflowsCheck({
+    cwd: ctx.directory,
+    env: ctx.env,
+    paths: ['sync/workflow-callers/tidy.yaml', 'src/index.ts'],
+    profile: undefined,
+    runProgram,
+  });
+
+  expect(findings).toStrictEqual([
     {
       path: 'sync/workflow-callers/tidy.yaml',
       line: 3,
