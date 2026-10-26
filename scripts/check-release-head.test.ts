@@ -15,8 +15,8 @@ async function setupTest() {
 
   const scriptPath = fileURLToPath(new URL('check-release-head.sh', import.meta.url));
 
-  const runScript = async () => {
-    const result = await $`bash ${scriptPath} zgeoff/tools`
+  const runScript = async (repo: string) => {
+    const result = await $`bash ${scriptPath} ${repo}`
       .env({ ...process.env, PATH: `${directory}:${process.env['PATH']}` })
       .nothrow()
       .quiet();
@@ -33,7 +33,7 @@ async function setupTest() {
 
 test('it passes when no merged release PR waits for its tag', async () => {
   const ctx = await setupTest();
-  const result = await ctx.runScript();
+  const result = await ctx.runScript('zgeoff/tools');
   const calls = await ctx.readCalls();
 
   expect(result).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
@@ -52,7 +52,7 @@ test("it passes a release PR whose merge commit is still main's head", async () 
 
   await ctx.writeResponses('commits', [{ sha: 'merge111' }]);
 
-  const result = await ctx.runScript();
+  const result = await ctx.runScript('zgeoff/tools');
   const calls = await ctx.readCalls();
 
   expect(result).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
@@ -75,7 +75,7 @@ test('it passes a release PR whose main moved on with no workflow change', async
     { files: [{ filename: 'README.md' }, { filename: '.github/PULL_REQUEST_TEMPLATE.md' }] },
   ]);
 
-  const result = await ctx.runScript();
+  const result = await ctx.runScript('zgeoff/tools');
 
   expect(result).toStrictEqual({
     exitCode: 0,
@@ -98,7 +98,7 @@ test('it fails, naming both commits, when a workflow change merged after the rel
     { files: [{ filename: '.github/workflows/ci.yml' }, { filename: 'README.md' }] },
   ]);
 
-  const result = await ctx.runScript();
+  const result = await ctx.runScript('zgeoff/tools');
   const calls = await ctx.readCalls();
 
   expect(result).toStrictEqual({
@@ -126,7 +126,7 @@ test('it fails for a release PR that auto-merge merged once its checks outlasted
   await ctx.writeResponses('commits', [{ sha: 'merge111' }, { sha: 'head444' }]);
   await ctx.writeResponses('compares', [{ files: [{ filename: '.github/workflows/main.yml' }] }]);
 
-  const result = await ctx.runScript();
+  const result = await ctx.runScript('zgeoff/tools');
 
   expect(result).toStrictEqual({
     exitCode: 1,

@@ -66,7 +66,8 @@ async function setupTest() {
       env: {
         PATH: `${stubDirectory}:${process.env['PATH']}`,
         RUNNER_TEMP: runnerTemporaryDirectory,
-        GITHUB_REPOSITORY: 'zgeoff/tools',
+
+        // Polls without a pause; no test's outcome reads it.
         POLL_INTERVAL: '0',
         ...environment,
       },
@@ -248,12 +249,17 @@ test('it merges the release PR of the branch the caller names', async () => {
     ]),
   ]);
 
-  const exitCode = await ctx.runSteps(ctx.directory, ['Auto-merge release PRs'], {
-    'steps.app-token.outputs.token': 'app-token',
-    'inputs.merge': 'true',
-    'inputs.release-branch': 'release-please--branches--main--components--@acme/kettle',
-    'inputs.checks-timeout-minutes': '15',
-  });
+  const exitCode = await ctx.runSteps(
+    ctx.directory,
+    ['Auto-merge release PRs'],
+    {
+      'steps.app-token.outputs.token': 'app-token',
+      'inputs.merge': 'true',
+      'inputs.release-branch': 'release-please--branches--main--components--@acme/kettle',
+      'inputs.checks-timeout-minutes': '15',
+    },
+    { GITHUB_REPOSITORY: 'zgeoff/tools' },
+  );
 
   expect(exitCode).toBe(0);
 
@@ -287,12 +293,17 @@ test("it waits exactly the caller's minutes, in seconds, before it leaves the re
     ]),
   ]);
 
-  const exitCode = await ctx.runSteps(ctx.directory, ['Auto-merge release PRs'], {
-    'steps.app-token.outputs.token': 'app-token',
-    'inputs.merge': 'true',
-    'inputs.release-branch': 'release-please--branches--main',
-    'inputs.checks-timeout-minutes': '2',
-  });
+  const exitCode = await ctx.runSteps(
+    ctx.directory,
+    ['Auto-merge release PRs'],
+    {
+      'steps.app-token.outputs.token': 'app-token',
+      'inputs.merge': 'true',
+      'inputs.release-branch': 'release-please--branches--main',
+      'inputs.checks-timeout-minutes': '2',
+    },
+    { GITHUB_REPOSITORY: 'zgeoff/tools' },
+  );
 
   expect(exitCode).toBe(0);
 
@@ -331,7 +342,9 @@ test.each([
     await gh.writeResponses('commits', [{ sha: 'head222' }]);
     await gh.writeResponses('compares', [{ files: [{ filename: '.github/workflows/ci.yml' }] }]);
 
-    const exitCode = await ctx.runSteps(ctx.directory, [row.step], row.expressions);
+    const exitCode = await ctx.runSteps(ctx.directory, [row.step], row.expressions, {
+      GITHUB_REPOSITORY: 'zgeoff/tools',
+    });
 
     expect(exitCode).toBe(1);
 

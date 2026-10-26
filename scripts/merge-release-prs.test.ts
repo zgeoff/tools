@@ -19,11 +19,13 @@ async function setupTest() {
 
   await writeFile(outputPath, '');
 
-  const runScript = (env: Record<string, string> = {}, args: readonly string[] = []) =>
-    $`bash ${scriptPath} zgeoff/tools ${args}`
+  const runScript = (args: readonly string[], env: Record<string, string> = {}) =>
+    $`bash ${scriptPath} ${args}`
       .env({
         ...process.env,
         PATH: `${directory}:${process.env['PATH']}`,
+
+        // Polls without a pause; no test's outcome reads it.
         POLL_INTERVAL: '0',
         GITHUB_OUTPUT: outputPath,
         ...env,
@@ -52,7 +54,7 @@ test('it waits for checks that have not started yet, then merges the checked hea
     ]),
   ]);
 
-  const result = await ctx.runScript();
+  const result = await ctx.runScript(['zgeoff/tools']);
   const calls = await ctx.readCalls();
 
   expect({
@@ -95,7 +97,7 @@ test('it waits on the head a push moved the branch to, and merges that head', as
     ]),
   ]);
 
-  const result = await ctx.runScript();
+  const result = await ctx.runScript(['zgeoff/tools']);
   const calls = await ctx.readCalls();
 
   expect({
@@ -148,7 +150,7 @@ test('it waits for the GitHub Actions checks when other apps pass first', async 
     ),
   ]);
 
-  const result = await ctx.runScript();
+  const result = await ctx.runScript(['zgeoff/tools']);
   const calls = await ctx.readCalls();
 
   expect({
@@ -188,7 +190,7 @@ test('it counts skipped checks and passed commit statuses as passed', async () =
     ),
   ]);
 
-  const result = await ctx.runScript();
+  const result = await ctx.runScript(['zgeoff/tools']);
   const calls = await ctx.readCalls();
 
   expect({
@@ -216,7 +218,7 @@ test('it retries a poll whose API call fails', async () => {
     ]),
   ]);
 
-  const result = await ctx.runScript();
+  const result = await ctx.runScript(['zgeoff/tools']);
   const calls = await ctx.readCalls();
 
   expect({
@@ -246,7 +248,7 @@ test.each(['FAILURE', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAIL
       ]),
     ]);
 
-    const result = await ctx.runScript();
+    const result = await ctx.runScript(['zgeoff/tools']);
     const calls = await ctx.readCalls();
 
     expect({
@@ -276,7 +278,7 @@ test('it fails without a merge when a commit status fails', async () => {
     ),
   ]);
 
-  const result = await ctx.runScript();
+  const result = await ctx.runScript(['zgeoff/tools']);
   const calls = await ctx.readCalls();
 
   expect({
@@ -318,7 +320,7 @@ test('it turns on auto-merge and exits cleanly when only required checks outlast
     ]),
   ]);
 
-  const result = await ctx.runScript({ CHECKS_TIMEOUT: '0' });
+  const result = await ctx.runScript(['zgeoff/tools'], { CHECKS_TIMEOUT: '0' });
   const calls = await ctx.readCalls();
   const output = await ctx.readOutput();
 
@@ -352,7 +354,7 @@ test('it leaves the release PR open without auto-merge when no ruleset requires 
     ]),
   ]);
 
-  const result = await ctx.runScript({ CHECKS_TIMEOUT: '0' });
+  const result = await ctx.runScript(['zgeoff/tools'], { CHECKS_TIMEOUT: '0' });
   const calls = await ctx.readCalls();
   const output = await ctx.readOutput();
 
@@ -388,7 +390,7 @@ test('it leaves the release PR open without auto-merge while a check the ruleset
     ]),
   ]);
 
-  const result = await ctx.runScript({ CHECKS_TIMEOUT: '0' });
+  const result = await ctx.runScript(['zgeoff/tools'], { CHECKS_TIMEOUT: '0' });
   const calls = await ctx.readCalls();
 
   expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
@@ -422,7 +424,7 @@ test('it exits cleanly with the PR open when auto-merge does not turn on', async
     ]),
   ]);
 
-  const result = await ctx.runScript({ CHECKS_TIMEOUT: '0' });
+  const result = await ctx.runScript(['zgeoff/tools'], { CHECKS_TIMEOUT: '0' });
 
   expect({
     exitCode: result.exitCode,
@@ -447,7 +449,7 @@ test('it leaves a held release PR without auto-merge when the checks outlast the
   await ctx.writeResponses('heads', [buildMockHeadResponse('abc123', [])]);
   await ctx.writeResponses('mergeable', [{ mergeable: 'MERGEABLE', isDraft: true, labels: [] }]);
 
-  const result = await ctx.runScript({ CHECKS_TIMEOUT: '0' });
+  const result = await ctx.runScript(['zgeoff/tools'], { CHECKS_TIMEOUT: '0' });
   const calls = await ctx.readCalls();
 
   expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
@@ -471,7 +473,7 @@ test('it fails when the release PR has conflicts', async () => {
 
   await ctx.writeResponses('mergeable', [{ mergeable: 'CONFLICTING' }]);
 
-  const result = await ctx.runScript();
+  const result = await ctx.runScript(['zgeoff/tools']);
 
   expect({
     exitCode: result.exitCode,
@@ -490,7 +492,7 @@ test('it fails when the release PR has conflicts', async () => {
 
 test('it exits cleanly when no release PR is open', async () => {
   const ctx = await setupTest();
-  const result = await ctx.runScript();
+  const result = await ctx.runScript(['zgeoff/tools']);
   const calls = await ctx.readCalls();
 
   expect({
@@ -523,7 +525,8 @@ test('it merges the release PR of the branch it is given', async () => {
     ]),
   ]);
 
-  const result = await ctx.runScript({}, [
+  const result = await ctx.runScript([
+    'zgeoff/tools',
     'release-please--branches--main--components--@acme/kettle',
   ]);
 
@@ -543,7 +546,7 @@ test('it merges the release PR of the branch it is given', async () => {
 
 test('it refuses more than two arguments', async () => {
   const ctx = await setupTest();
-  const result = await ctx.runScript({}, ['release-please--branches--main', 'extra']);
+  const result = await ctx.runScript(['zgeoff/tools', 'release-please--branches--main', 'extra']);
 
   expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
     exitCode: 2,
@@ -569,7 +572,7 @@ test.each([
 
     await ctx.writeResponses('prs', [[listed]]);
 
-    const result = await ctx.runScript();
+    const result = await ctx.runScript(['zgeoff/tools']);
     const calls = await ctx.readCalls();
     const output = await ctx.readOutput();
 
@@ -601,7 +604,7 @@ test('it leaves a release PR open when someone holds it during the wait', async 
     { mergeable: 'MERGEABLE', isDraft: false, labels: [{ name: 'autorelease: hold' }] },
   ]);
 
-  const result = await ctx.runScript();
+  const result = await ctx.runScript(['zgeoff/tools']);
   const calls = await ctx.readCalls();
 
   expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({

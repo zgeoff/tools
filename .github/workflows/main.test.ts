@@ -20,8 +20,11 @@ async function setupTest() {
   await createStubCommand(directory, 'npm', toolLog);
 
   // Resolves the release commit, dispatches the publish, and publishes, from
-  // the outputs of the shared release job, in a run that started at sha.
-  const runPublishSteps = (sha: string, expressions: Readonly<Record<string, string>>) =>
+  // the outputs of the shared release job, with the run's env and expressions.
+  const runPublishSteps = (
+    environment: Readonly<Record<string, string>>,
+    expressions: Readonly<Record<string, string>>,
+  ) =>
     runWorkflowSteps(
       join(import.meta.dir, 'main.yml'),
       'publish',
@@ -34,10 +37,9 @@ async function setupTest() {
         cwd: directory,
         env: {
           PATH: `${directory}:${process.env['PATH']}`,
-          GITHUB_REPOSITORY: 'zgeoff/tools',
-          GITHUB_SHA: sha,
+          ...environment,
         },
-        expressions: { 'github.token': 'app-token', ...expressions },
+        expressions,
         outputPath: join(directory, 'output'),
       },
     );
@@ -69,11 +71,15 @@ test('it dispatches the publish at the tag, with every released path, for a rele
     'packages/tsconfig--tag_name': '@zgeoff/tsconfig@1.2.0',
   };
 
-  const exitCode = await ctx.runPublishSteps('old111', {
-    'needs.release.outputs.releases_created': 'true',
-    'needs.release.outputs.release-outputs': JSON.stringify(releaseOutputs),
-    'inputs.republish_paths': '',
-  });
+  const exitCode = await ctx.runPublishSteps(
+    { GITHUB_REPOSITORY: 'zgeoff/tools', GITHUB_SHA: 'old111' },
+    {
+      'github.token': 'app-token',
+      'needs.release.outputs.releases_created': 'true',
+      'needs.release.outputs.release-outputs': JSON.stringify(releaseOutputs),
+      'inputs.republish_paths': '',
+    },
+  );
 
   expect(exitCode).toBe(0);
 
@@ -101,11 +107,15 @@ test('it publishes the released paths in the run itself when the release tagged 
     'packages/std--version': '0.4.0',
   };
 
-  const exitCode = await ctx.runPublishSteps('old111', {
-    'needs.release.outputs.releases_created': 'true',
-    'needs.release.outputs.release-outputs': JSON.stringify(releaseOutputs),
-    'inputs.republish_paths': '',
-  });
+  const exitCode = await ctx.runPublishSteps(
+    { GITHUB_REPOSITORY: 'zgeoff/tools', GITHUB_SHA: 'old111' },
+    {
+      'github.token': 'app-token',
+      'needs.release.outputs.releases_created': 'true',
+      'needs.release.outputs.release-outputs': JSON.stringify(releaseOutputs),
+      'inputs.republish_paths': '',
+    },
+  );
 
   expect(exitCode).toBe(0);
 
@@ -138,11 +148,15 @@ test('it refuses to publish a package whose version the release did not tag', as
     'packages/std--version': '0.4.0',
   };
 
-  const exitCode = await ctx.runPublishSteps('old111', {
-    'needs.release.outputs.releases_created': 'true',
-    'needs.release.outputs.release-outputs': JSON.stringify(releaseOutputs),
-    'inputs.republish_paths': '',
-  });
+  const exitCode = await ctx.runPublishSteps(
+    { GITHUB_REPOSITORY: 'zgeoff/tools', GITHUB_SHA: 'old111' },
+    {
+      'github.token': 'app-token',
+      'needs.release.outputs.releases_created': 'true',
+      'needs.release.outputs.release-outputs': JSON.stringify(releaseOutputs),
+      'inputs.republish_paths': '',
+    },
+  );
 
   expect(exitCode).toBe(1);
 
@@ -156,13 +170,17 @@ test('it publishes the given paths in a republish run, which has no release outp
 
   await ctx.writePackageManifest('packages/std', { name: '@zgeoff/std', version: '0.4.0' });
 
-  const exitCode = await ctx.runPublishSteps('old111', {
-    'needs.release.outputs.releases_created': '',
-    'needs.release.outputs.release-outputs': '',
-    'steps.release-commit.outputs.here': '',
-    'steps.release-commit.outputs.paths': '',
-    'inputs.republish_paths': '["packages/std"]',
-  });
+  const exitCode = await ctx.runPublishSteps(
+    { GITHUB_REPOSITORY: 'zgeoff/tools', GITHUB_SHA: 'old111' },
+    {
+      'github.token': 'app-token',
+      'needs.release.outputs.releases_created': '',
+      'needs.release.outputs.release-outputs': '',
+      'steps.release-commit.outputs.here': '',
+      'steps.release-commit.outputs.paths': '',
+      'inputs.republish_paths': '["packages/std"]',
+    },
+  );
 
   expect(exitCode).toBe(0);
 
@@ -181,11 +199,15 @@ test('it publishes the given paths in a republish run, which has no release outp
 test('it neither resolves, dispatches nor publishes when the release job tagged nothing', async () => {
   const ctx = await setupTest();
 
-  const exitCode = await ctx.runPublishSteps('old111', {
-    'needs.release.outputs.releases_created': 'false',
-    'steps.release-commit.outputs.here': '',
-    'inputs.republish_paths': '',
-  });
+  const exitCode = await ctx.runPublishSteps(
+    { GITHUB_REPOSITORY: 'zgeoff/tools', GITHUB_SHA: 'old111' },
+    {
+      'github.token': 'app-token',
+      'needs.release.outputs.releases_created': 'false',
+      'steps.release-commit.outputs.here': '',
+      'inputs.republish_paths': '',
+    },
+  );
 
   expect(exitCode).toBe(0);
 
