@@ -72,6 +72,37 @@ test.each([
   ['echo "ready\nset"', []],
   ["echo 'ready\nset'", []],
   ['echo ready \\\nset', []],
+  [String.raw`echo $'can\'t' && bun run lint`, ['&&']],
+  [String.raw`echo $'a\\' ; true`, [';']],
+  [String.raw`echo $'a\0;b' ; true`, [';']],
+  [`echo $'"a;b" \`c;d\` $(e;f) \${g;h} \\' \\\\' ; true`, [';']],
+  [`echo '"a;b" \`c;d\` $(e;f) \${g;h} \\' ; true`, [';']],
+  [`echo \`echo \\;\``, []],
+  [`echo \`echo \\\\;\``, []],
+  [`echo \`echo \\\\\\;\``, [';']],
+  [`echo \`echo \\\\\\\\;\``, [';']],
+  [`echo \`echo \\$(git log; git status)\``, [';']],
+  [`echo \`echo \\"a;b\\"\``, [';']],
+  [`echo "\`echo \\"a;b\\"\`"`, []],
+
+  // A double quote holds no bare double quote, so that pair has its own rows.
+  ...[
+    (inner: string) => inner,
+    (inner: string) => `$(echo ${inner})`,
+    (inner: string) => `\`echo ${inner}\``,
+    (inner: string) => `\${VALUE:-${inner}}`,
+    (inner: string) => `"$(echo ${inner})"`,
+    (inner: string) => `"\`echo ${inner}\`"`,
+    (inner: string) => `"\${VALUE:-${inner}}"`,
+  ].flatMap((enclose) =>
+    ["'a;b'", '"a;b"', String.raw`$'a\';b'`, '$"a;b"', String.raw`\;`].map(
+      (inner): [string, string[]] => [`echo ${enclose(inner)} ; true`, [';']],
+    ),
+  ),
+  ...["'a;b'", String.raw`$'a\';b'`, String.raw`\;`].map((inner): [string, string[]] => [
+    `echo "${inner}" ; true`,
+    [';'],
+  ]),
 ])('it finds the operators %p holds, as %p', (command, operators) => {
   const words = parseShellWords(command);
 
@@ -117,47 +148,6 @@ test.each([
   const words = parseShellWords(command);
 
   expect(words.filter((word) => !word.isOperator).map((word) => word.text)).toStrictEqual(texts);
-});
-
-test.each([
-  [String.raw`echo $'can\'t' && bun run lint`, ['&&']],
-  [String.raw`echo $'a\\' ; true`, [';']],
-  [String.raw`echo $'a\0;b' ; true`, [';']],
-  [`echo $'"a;b" \`c;d\` $(e;f) \${g;h} \\' \\\\' ; true`, [';']],
-  [`echo '"a;b" \`c;d\` $(e;f) \${g;h} \\' ; true`, [';']],
-  [`echo \`echo \\;\``, []],
-  [`echo \`echo \\\\;\``, []],
-  [`echo \`echo \\\\\\;\``, [';']],
-  [`echo \`echo \\\\\\\\;\``, [';']],
-  [`echo \`echo \\$(git log; git status)\``, [';']],
-  [`echo \`echo \\"a;b\\"\``, [';']],
-  [`echo "\`echo \\"a;b\\"\`"`, []],
-])('it applies the quoting rules of %p, as %p', (command, operators) => {
-  const words = parseShellWords(command);
-
-  expect(words.filter((word) => word.isOperator).map((word) => word.text)).toStrictEqual(operators);
-});
-
-// A double quote holds no bare double quote, so that pair has its own rows.
-test.each([
-  ...[
-    (inner: string) => inner,
-    (inner: string) => `$(echo ${inner})`,
-    (inner: string) => `\`echo ${inner}\``,
-    (inner: string) => `\${VALUE:-${inner}}`,
-    (inner: string) => `"$(echo ${inner})"`,
-    (inner: string) => `"\`echo ${inner}\`"`,
-    (inner: string) => `"\${VALUE:-${inner}}"`,
-  ].flatMap((enclose) =>
-    ["'a;b'", '"a;b"', String.raw`$'a\';b'`, '$"a;b"', String.raw`\;`].map((inner) =>
-      enclose(inner),
-    ),
-  ),
-  ...["'a;b'", String.raw`$'a\';b'`, String.raw`\;`].map((inner) => `"${inner}"`),
-])('it keeps the quoted separator in %p out of the operators', (word) => {
-  const words = parseShellWords(`echo ${word} ; true`);
-
-  expect(words.filter((each) => each.isOperator).map((each) => each.text)).toStrictEqual([';']);
 });
 
 test('it fails the type check on a context table or a handler table that misses a key', () => {
