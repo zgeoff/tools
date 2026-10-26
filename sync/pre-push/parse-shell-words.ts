@@ -240,7 +240,7 @@ function makeCodeReader(rules: ShellCodeRules): (cursor: ShellCursor) => ShellAc
 
 // `${` opens a parameter expansion, `$((` an arithmetic expansion, and `$(` or a backtick a
 // command substitution, in every context but a single quote. Outside double quotes, `$'` opens an
-// ANSI-C quote.
+// ANSI-C quote, and `$"` opens a locale quote, which reads as a double quote.
 function pickOpening(cursor: ShellCursor, isInsideQuotes: boolean): ShellAction | undefined {
   const character = cursor.character;
 
@@ -260,6 +260,10 @@ function pickOpening(cursor: ShellCursor, isInsideQuotes: boolean): ShellAction 
 
   if (cursor.ahead.startsWith("'") && !isInsideQuotes) {
     return { kind: 'open', context: 'ansi-c-quote', text: '', length: 2 };
+  }
+
+  if (cursor.ahead.startsWith('"') && !isInsideQuotes) {
+    return { kind: 'open', context: 'double-quote', text: '', length: 2 };
   }
 
   if (cursor.ahead.startsWith('{')) {

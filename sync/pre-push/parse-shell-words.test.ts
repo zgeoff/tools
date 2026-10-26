@@ -108,6 +108,9 @@ test.each([
   [String.raw`echo $'can\'t'`, ['echo', "can't"]],
   [String.raw`echo $'a\tb\x41\101\u00e9\cA\z\\'`, ['echo', 'a\tbAA\u00E9\u0001\\z\\']],
   [`echo "$'a'"`, ['echo', "$'a'"]],
+  [String.raw`$"bun" run lint`, ['bun', 'run', 'lint']],
+  [String.raw`echo $'./caf\303\251.sh' $'\xc3\xa9'`, ['echo', './café.sh', 'é']],
+  [String.raw`echo $'./lint.sh\0ignored\'more'x $'a\c@b'`, ['echo', './lint.shx', 'a']],
   [`echo "\${VALUE:-\\;'a'}"`, ['echo', `\${VALUE:-\\;'a'}`]],
   [`echo \${VALUE:-\\;'a'}`, ['echo', `\${VALUE:-;a}`]],
 ])('it reads the words of %p as %p', (command, texts) => {
@@ -119,6 +122,7 @@ test.each([
 test.each([
   [String.raw`echo $'can\'t' && bun run lint`, ['&&']],
   [String.raw`echo $'a\\' ; true`, [';']],
+  [String.raw`echo $'a\0;b' ; true`, [';']],
   [`echo $'"a;b" \`c;d\` $(e;f) \${g;h} \\' \\\\' ; true`, [';']],
   [`echo '"a;b" \`c;d\` $(e;f) \${g;h} \\' ; true`, [';']],
   [`echo \`echo \\;\``, []],
@@ -145,7 +149,9 @@ test.each([
     (inner: string) => `"\`echo ${inner}\`"`,
     (inner: string) => `"\${VALUE:-${inner}}"`,
   ].flatMap((enclose) =>
-    ["'a;b'", '"a;b"', String.raw`$'a\';b'`, String.raw`\;`].map((inner) => enclose(inner)),
+    ["'a;b'", '"a;b"', String.raw`$'a\';b'`, '$"a;b"', String.raw`\;`].map((inner) =>
+      enclose(inner),
+    ),
   ),
   ...["'a;b'", String.raw`$'a\';b'`, String.raw`\;`].map((inner) => `"${inner}"`),
 ])('it keeps the quoted separator in %p out of the operators', (word) => {

@@ -115,39 +115,83 @@ const ansiCEscapes = new Map([
   ['?', '?'],
 ]);
 
+const ansiCBytePattern = /^\\(?:(?<octal>[0-7]{1,3})|x(?<hex>[\dA-Fa-f]{1,2}))/u;
+
 const ansiCCodePattern =
-  /^\\(?:(?<octal>[0-7]{1,3})|x(?<hex>[\dA-Fa-f]{1,2})|u(?<unicode>[\dA-Fa-f]{1,4})|U(?<wide>[\dA-Fa-f]{1,8})|c(?<control>[\s\S]))/u;
+  /^\\(?:u(?<unicode>[\dA-Fa-f]{1,4})|U(?<wide>[\dA-Fa-f]{1,8})|c(?<control>[\s\S]))/u;
 
 // Inside `$'...'`, a backslash starts one of the escapes the Bash manual lists, and an unknown one
-// keeps its backslash.
+// keeps its backslash. Bash ends the expansion at a NUL, so the rest of the quote drops out.
 function parseANSICEscape(command: string, index: number): ShellEscape {
-  const escaped = command.charAt(index + 1);
-  const named = ansiCEscapes.get(escaped);
-  const code = ansiCCodePattern.exec(command.slice(index, index + 10));
+  const named = ansiCEscapes.get(command.charAt(index + 1));
 
-  if (named !== undefined) {
-    return { text: named, length: 2, isQuoting: false };
-  }
+  const escape =
+    named === undefined
+      ? parseANSICNumber(command, index)
+      : { text: named, length: 2, isQuoting: false };
 
-  if (code?.groups === undefined) {
+  const end = escape?.text.indexOf('\0') ?? -1;
+
+  if (escape === undefined) {
     return { text: '\\', length: 1, isQuoting: false };
   }
 
-  return { text: parseANSICCode(code.groups), length: code[0].length, isQuoting: false };
+  return end === -1
+    ? escape
+    : {
+        text: escape.text.slice(0, end),
+        length: getANSICQuoteEnd(command, index + escape.length) - index,
+        isQuoting: false,
+      };
+}
+
+// Octal and hexadecimal escapes each give one byte, so a run of them decodes as UTF-8 together.
+function parseANSICNumber(command: string, index: number): ShellEscape | undefined {
+  const bytes: number[] = [];
+  let length = 0;
+  let match = ansiCBytePattern.exec(command.slice(index));
+
+  while (match?.groups !== undefined) {
+    const octal = match.groups['octal'];
+
+    bytes.push(
+      (octal === undefined
+        ? Number.parseInt(match.groups['hex'] ?? '', 16)
+        : Number.parseInt(octal, 8)) & 0xff,
+    );
+
+    length += match[0].length;
+    match = ansiCBytePattern.exec(command.slice(index + length));
+  }
+
+  if (bytes.length > 0) {
+    return { text: new TextDecoder().decode(new Uint8Array(bytes)), length, isQuoting: false };
+  }
+
+  const code = ansiCCodePattern.exec(command.slice(index, index + 10));
+
+  return code?.groups === undefined
+    ? undefined
+    : { text: parseANSICCode(code.groups), length: code[0].length, isQuoting: false };
 }
 
 function parseANSICCode(groups: Readonly<Record<string, string | undefined>>): string {
   const control = groups['control'];
-  const octal = groups['octal'];
+  const point = Number.parseInt(groups['unicode'] ?? groups['wide'] ?? '', 16);
 
   if (control !== undefined) {
     return String.fromCodePoint((control.toUpperCase().codePointAt(0) ?? 0) ^ 64);
   }
 
-  const point =
-    octal === undefined
-      ? Number.parseInt(groups['hex'] ?? groups['unicode'] ?? groups['wide'] ?? '', 16)
-      : Number.parseInt(octal, 8);
-
   return point <= 0x10_ff_ff ? String.fromCodePoint(point) : '';
+}
+
+function getANSICQuoteEnd(command: string, start: number): number {
+  let index = start;
+
+  while (index < command.length && command.charAt(index) !== "'") {
+    index += command.charAt(index) === '\\' ? 2 : 1;
+  }
+
+  return Math.min(index, command.length);
 }
