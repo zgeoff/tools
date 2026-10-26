@@ -181,6 +181,130 @@ test.each([
   },
 );
 
+test('it fills toJSON(<object>) with every value under the object, as indented JSON', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    ctx.workflow,
+    [
+      'jobs:',
+      '  build:',
+      '    steps:',
+      '      - name: Write',
+      '        env:',
+      `          JOB: \${{ toJSON(job) }}`,
+      '        run: printf "%s" "$JOB" > written',
+      '',
+    ].join('\n'),
+  );
+
+  await runWorkflowSteps(ctx.workflow, 'build', ['Write'], {
+    cwd: ctx.directory,
+    env: process.env,
+    expressions: {
+      'job.workflow_repository': 'example/app',
+      'job.workflow_sha': 'abc123',
+      'jobs.other': 'unrelated',
+    },
+    outputPath: ctx.outputPath,
+  });
+
+  const written = await readFile(join(ctx.directory, 'written'), 'utf8');
+
+  expect(written).toBe('{\n  "workflow_repository": "example/app",\n  "workflow_sha": "abc123"\n}');
+});
+
+test('it fills toJSON of an object with no values with an empty object', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    ctx.workflow,
+    [
+      'jobs:',
+      '  build:',
+      '    steps:',
+      '      - name: Write',
+      '        env:',
+      `          OUTPUTS: \${{ toJSON(steps.skipped.outputs) }}`,
+      '        run: printf "%s" "$OUTPUTS" > written',
+      '',
+    ].join('\n'),
+  );
+
+  await runWorkflowSteps(ctx.workflow, 'build', ['Write'], {
+    cwd: ctx.directory,
+    env: process.env,
+    expressions: {},
+    outputPath: ctx.outputPath,
+  });
+
+  const written = await readFile(join(ctx.directory, 'written'), 'utf8');
+
+  expect(written).toBe('{}');
+});
+
+test.each([
+  ['true', 'kettle'],
+  ['false', 'teapot'],
+])(
+  "it fills a comparison && a text || a text, with ready %s, as GitHub's operators do",
+  async (ready, expected) => {
+    const ctx = await setupTest();
+
+    await writeFile(
+      ctx.workflow,
+      [
+        'jobs:',
+        '  build:',
+        '    steps:',
+        '      - name: Write',
+        '        env:',
+        `          POT: \${{ inputs.ready == 'true' && 'kettle' || 'teapot' }}`,
+        '        run: echo "$POT" > written',
+        '',
+      ].join('\n'),
+    );
+
+    await runWorkflowSteps(ctx.workflow, 'build', ['Write'], {
+      cwd: ctx.directory,
+      env: process.env,
+      expressions: { 'inputs.ready': ready },
+      outputPath: ctx.outputPath,
+    });
+
+    const written = await readFile(join(ctx.directory, 'written'), 'utf8');
+
+    expect(written).toBe(`${expected}\n`);
+  },
+);
+
+test('it reads no operand after a false comparison decides the && alternative', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    ctx.workflow,
+    [
+      'jobs:',
+      '  build:',
+      '    steps:',
+      '      - name: Write',
+      '        env:',
+      `          POT: \${{ inputs.ready == 'true' && inputs.unset || 'teapot' }}`,
+      '        run: echo "$POT" > written',
+      '',
+    ].join('\n'),
+  );
+
+  const exitCode = await runWorkflowSteps(ctx.workflow, 'build', ['Write'], {
+    cwd: ctx.directory,
+    env: process.env,
+    expressions: { 'inputs.ready': 'false' },
+    outputPath: ctx.outputPath,
+  });
+
+  expect(exitCode).toBe(0);
+});
+
 test.each([
   [
     'an expression with no value',
@@ -188,9 +312,9 @@ test.each([
     'no value for github.repository',
   ],
   [
-    'an expression that calls a function',
-    `OUTPUTS: \${{ toJSON(steps.pick.outputs) }}`,
-    `unsupported expression: \${{ toJSON(steps.pick.outputs) }}`,
+    'an expression that calls a function other than toJSON',
+    `MAIN: \${{ contains(github.ref, 'main') }}`,
+    `unsupported expression: \${{ contains(github.ref, 'main') }}`,
   ],
   [
     'an expression inside other text',

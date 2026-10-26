@@ -11,7 +11,6 @@ import { installReleaseScripts } from '../../test-utils/install-release-scripts.
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { runGit } from '../../test-utils/run-git.ts';
 import { createStubCurl } from './create-stub-curl.ts';
-import { loadWorkflowStep } from './load-workflow-step.ts';
 import { runWorkflowSteps } from './run-workflow-steps.ts';
 
 async function setupTest() {
@@ -27,23 +26,6 @@ async function setupTest() {
   await writeFile(outputPath, '');
   await mkdir(stubDirectory);
   await mkdir(runnerTemporaryDirectory);
-
-  const runStep = async (name: string, environment: Readonly<Record<string, string>>) => {
-    const step = await loadWorkflowStep(workflow, 'release', name);
-
-    const result = await $`bash -c ${step.run}`
-      .cwd(directory)
-      .env({
-        PATH: `${stubDirectory}:${process.env['PATH']}`,
-        GITHUB_OUTPUT: outputPath,
-        RUNNER_TEMP: runnerTemporaryDirectory,
-        ...environment,
-      })
-      .nothrow()
-      .quiet();
-
-    return { exitCode: result.exitCode, stderr: result.stderr.toString() };
-  };
 
   const readOutput = () => readFile(outputPath, 'utf8');
   const readFetchedURLs = () => readFile(join(stubDirectory, 'curl.urls'), 'utf8');
@@ -80,7 +62,6 @@ async function setupTest() {
     directory,
     stubDirectory,
     runnerTemporaryDirectory,
-    runStep,
     runSteps,
     readOutput,
     readFetchedURLs,
@@ -94,11 +75,12 @@ test('it downloads both release scripts from the commit that defines the job', a
   // A stub curl that answers every URL with the same body.
   await createStubCurl(ctx.stubDirectory, '# release script\n');
 
-  const result = await ctx.runStep('Fetch the release scripts', {
-    JOB_CONTEXT: '{"workflow_repository":"acme/tools","workflow_sha":"abc123"}',
+  const exitCode = await ctx.runSteps(ctx.directory, ['Fetch the release scripts'], {
+    'job.workflow_repository': 'acme/tools',
+    'job.workflow_sha': 'abc123',
   });
 
-  expect(result).toStrictEqual({ exitCode: 0, stderr: '' });
+  expect(exitCode).toBe(0);
 
   const urls = await ctx.readFetchedURLs();
 
@@ -121,11 +103,11 @@ test('it downloads nothing when the job context lacks the commit', async () => {
   // A stub curl that answers every URL with the same body.
   await createStubCurl(ctx.stubDirectory, '# release script\n');
 
-  const result = await ctx.runStep('Fetch the release scripts', {
-    JOB_CONTEXT: '{"workflow_repository":"acme/tools"}',
+  const exitCode = await ctx.runSteps(ctx.directory, ['Fetch the release scripts'], {
+    'job.workflow_repository': 'acme/tools',
   });
 
-  expect(result.exitCode).toBe(1);
+  expect(exitCode).toBe(1);
 
   const urls = await ctx.readFetchedURLs();
 
@@ -148,11 +130,18 @@ test('it reports the first package of a multi-package release that the tag step 
     'packages/tsconfig--version': '1.2.0',
   };
 
-  const result = await ctx.runStep('Pick the release outputs', {
-    RELEASE_OUTPUTS: JSON.stringify(outputs),
+  const exitCode = await ctx.runSteps(ctx.directory, ['Pick the release outputs'], {
+    'steps.release.outputs.releases_created': 'false',
+    'steps.release.outputs.paths_released': '[]',
+    'steps.tag.outputs.releases_created': 'true',
+    'steps.tag.outputs.paths_released': '["packages/std","packages/tsconfig"]',
+    'steps.tag.outputs.packages/std--tag_name': '@zgeoff/std@0.4.0',
+    'steps.tag.outputs.packages/std--version': '0.4.0',
+    'steps.tag.outputs.packages/tsconfig--tag_name': '@zgeoff/tsconfig@1.2.0',
+    'steps.tag.outputs.packages/tsconfig--version': '1.2.0',
   });
 
-  expect(result).toStrictEqual({ exitCode: 0, stderr: '' });
+  expect(exitCode).toBe(0);
 
   const output = await ctx.readOutput();
 
@@ -178,11 +167,17 @@ test('it reports the tag and version of a release of one package at the root', a
     version: '4.2.1',
   };
 
-  const result = await ctx.runStep('Pick the release outputs', {
-    RELEASE_OUTPUTS: JSON.stringify(outputs),
+  // The tag step skipped, so its outputs read as empty.
+  const exitCode = await ctx.runSteps(ctx.directory, ['Pick the release outputs'], {
+    'steps.release.outputs.releases_created': 'true',
+    'steps.release.outputs.release_created': 'true',
+    'steps.release.outputs.paths_released': '["."]',
+    'steps.release.outputs.tag_name': 'v4.2.1',
+    'steps.release.outputs.version': '4.2.1',
+    'steps.tag.outputs.releases_created': '',
   });
 
-  expect(result).toStrictEqual({ exitCode: 0, stderr: '' });
+  expect(exitCode).toBe(0);
 
   const output = await ctx.readOutput();
 
@@ -202,11 +197,14 @@ test('it reports no release, tag or version for a run that released nothing', as
 
   const outputs = { releases_created: 'false', paths_released: '[]', prs_created: 'true' };
 
-  const result = await ctx.runStep('Pick the release outputs', {
-    RELEASE_OUTPUTS: JSON.stringify(outputs),
+  const exitCode = await ctx.runSteps(ctx.directory, ['Pick the release outputs'], {
+    'steps.release.outputs.releases_created': 'false',
+    'steps.release.outputs.paths_released': '[]',
+    'steps.release.outputs.prs_created': 'true',
+    'steps.tag.outputs.releases_created': '',
   });
 
-  expect(result).toStrictEqual({ exitCode: 0, stderr: '' });
+  expect(exitCode).toBe(0);
 
   const output = await ctx.readOutput();
 
