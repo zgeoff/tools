@@ -1,3 +1,6 @@
+import type { ShellEscapeParser } from './shell-escape-parsers.ts';
+import { shellEscapeParsers } from './shell-escape-parsers.ts';
+
 export interface ShellWord {
   readonly text: string;
   readonly isQuoted: boolean;
@@ -9,14 +12,17 @@ export interface ShellWord {
 
 export type ShellContext =
   | 'plain'
-  | 'single-quote'
-  | 'double-quote'
   | 'substitution'
   | 'group'
   | 'backtick'
+  | 'quoted-backtick'
+  | 'single-quote'
+  | 'ansi-c-quote'
+  | 'double-quote'
+  | 'parameter'
+  | 'quoted-parameter'
   | 'arithmetic'
-  | 'arithmetic-group'
-  | 'parameter';
+  | 'arithmetic-group';
 
 interface ParserState {
   readonly command: string;
@@ -45,7 +51,7 @@ interface ShellActionFields {
   readonly text: { readonly text: string };
   readonly redirect: { readonly text: string };
   readonly escape: object;
-  readonly open: { readonly context: ShellContext; readonly text: string };
+  readonly open: { readonly context: ShellContext; readonly text: string; readonly length: number };
   readonly close: { readonly text: string };
   readonly break: object;
   readonly operator: { readonly text: string };
@@ -62,6 +68,7 @@ type ShellAction = {
 
 interface ShellContextRules {
   readonly pickAction: (cursor: ShellCursor) => ShellAction;
+  readonly parseEscape: ShellEscapeParser;
 
   // A quote or an escape here marks the word quoted, since the shell strips it from the command's
   // own words.
@@ -76,33 +83,76 @@ export type ShellContextTable = Readonly<Record<ShellContext, ShellContextRules>
 const contextTable: ShellContextTable = {
   plain: {
     pickAction: makeCodeReader({ closer: '', isGrouping: false, isCommenting: true }),
+    parseEscape: shellEscapeParsers.code,
     isTopLevel: true,
     isQuote: false,
   },
   substitution: {
     pickAction: makeCodeReader({ closer: ')', isGrouping: true, isCommenting: false }),
+    parseEscape: shellEscapeParsers.code,
     isTopLevel: false,
     isQuote: false,
   },
   group: {
     pickAction: makeCodeReader({ closer: ')', isGrouping: true, isCommenting: false }),
+    parseEscape: shellEscapeParsers.code,
     isTopLevel: false,
     isQuote: false,
   },
   backtick: {
     pickAction: makeCodeReader({ closer: '`', isGrouping: false, isCommenting: false }),
+    parseEscape: shellEscapeParsers.backtick,
     isTopLevel: false,
     isQuote: false,
   },
-  'single-quote': { pickAction: pickSingleQuotedAction, isTopLevel: false, isQuote: true },
-  'double-quote': { pickAction: pickDoubleQuotedAction, isTopLevel: false, isQuote: true },
-  arithmetic: { pickAction: makeArithmeticReader('))'), isTopLevel: false, isQuote: false },
+  'quoted-backtick': {
+    pickAction: makeCodeReader({ closer: '`', isGrouping: false, isCommenting: false }),
+    parseEscape: shellEscapeParsers['quoted-backtick'],
+    isTopLevel: false,
+    isQuote: false,
+  },
+  'single-quote': {
+    pickAction: pickSingleQuotedAction,
+    parseEscape: shellEscapeParsers.literal,
+    isTopLevel: false,
+    isQuote: true,
+  },
+  'ansi-c-quote': {
+    pickAction: pickANSICQuotedAction,
+    parseEscape: shellEscapeParsers['ansi-c'],
+    isTopLevel: false,
+    isQuote: true,
+  },
+  'double-quote': {
+    pickAction: pickDoubleQuotedAction,
+    parseEscape: shellEscapeParsers['double-quote'],
+    isTopLevel: false,
+    isQuote: true,
+  },
+  parameter: {
+    pickAction: pickParameterAction,
+    parseEscape: shellEscapeParsers.code,
+    isTopLevel: false,
+    isQuote: false,
+  },
+  'quoted-parameter': {
+    pickAction: pickQuotedParameterAction,
+    parseEscape: shellEscapeParsers['double-quote'],
+    isTopLevel: false,
+    isQuote: false,
+  },
+  arithmetic: {
+    pickAction: makeArithmeticReader('))'),
+    parseEscape: shellEscapeParsers['double-quote'],
+    isTopLevel: false,
+    isQuote: false,
+  },
   'arithmetic-group': {
     pickAction: makeArithmeticReader(')'),
+    parseEscape: shellEscapeParsers['double-quote'],
     isTopLevel: false,
     isQuote: false,
   },
-  parameter: { pickAction: pickParameterAction, isTopLevel: false, isQuote: false },
 };
 
 // The parser keeps a stack of the quotes, substitutions and expansions it is inside, and each
@@ -154,22 +204,22 @@ function makeCodeReader(rules: ShellCodeRules): (cursor: ShellCursor) => ShellAc
       return { kind: 'close', text: character };
     }
 
-    const opening = pickOpening(cursor);
+    const opening = pickOpening(cursor, false);
 
     if (opening !== undefined) {
       return opening;
     }
 
     if (character === "'") {
-      return { kind: 'open', context: 'single-quote', text: '' };
+      return { kind: 'open', context: 'single-quote', text: '', length: 1 };
     }
 
     if (character === '"') {
-      return { kind: 'open', context: 'double-quote', text: '' };
+      return { kind: 'open', context: 'double-quote', text: '', length: 1 };
     }
 
     if (character === '(' && rules.isGrouping) {
-      return { kind: 'open', context: 'group', text: '(' };
+      return { kind: 'open', context: 'group', text: '(', length: 1 };
     }
 
     if (character === '#' && cursor.isWordStart && rules.isCommenting) {
@@ -189,26 +239,41 @@ function makeCodeReader(rules: ShellCodeRules): (cursor: ShellCursor) => ShellAc
 }
 
 // `${` opens a parameter expansion, `$((` an arithmetic expansion, and `$(` or a backtick a
-// command substitution, in every context but a single quote.
-function pickOpening(cursor: ShellCursor): ShellAction | undefined {
-  if (cursor.character === '\\') {
+// command substitution, in every context but a single quote. Outside double quotes, `$'` opens an
+// ANSI-C quote.
+function pickOpening(cursor: ShellCursor, isInsideQuotes: boolean): ShellAction | undefined {
+  const character = cursor.character;
+
+  if (character === '\\') {
     return { kind: 'escape' };
   }
 
-  if (cursor.character === '$' && cursor.ahead.startsWith('{')) {
-    return { kind: 'open', context: 'parameter', text: '${' };
+  if (character === '`') {
+    return isInsideQuotes
+      ? { kind: 'open', context: 'quoted-backtick', text: '`', length: 1 }
+      : { kind: 'open', context: 'backtick', text: '`', length: 1 };
   }
 
-  if (cursor.character === '$' && cursor.ahead === '((') {
-    return { kind: 'open', context: 'arithmetic', text: '$((' };
+  if (character !== '$') {
+    return undefined;
   }
 
-  if (cursor.character === '$' && cursor.ahead.startsWith('(')) {
-    return { kind: 'open', context: 'substitution', text: '$(' };
+  if (cursor.ahead.startsWith("'") && !isInsideQuotes) {
+    return { kind: 'open', context: 'ansi-c-quote', text: '', length: 2 };
   }
 
-  if (cursor.character === '`') {
-    return { kind: 'open', context: 'backtick', text: '`' };
+  if (cursor.ahead.startsWith('{')) {
+    return isInsideQuotes
+      ? { kind: 'open', context: 'quoted-parameter', text: '${', length: 2 }
+      : { kind: 'open', context: 'parameter', text: '${', length: 2 };
+  }
+
+  if (cursor.ahead === '((') {
+    return { kind: 'open', context: 'arithmetic', text: '$((', length: 3 };
+  }
+
+  if (cursor.ahead.startsWith('(')) {
+    return { kind: 'open', context: 'substitution', text: '$(', length: 2 };
   }
 
   return undefined;
@@ -246,13 +311,27 @@ function pickPlainAction(character: string): ShellAction {
 }
 
 function pickSingleQuotedAction(cursor: ShellCursor): ShellAction {
+  if (cursor.character === '\\') {
+    return { kind: 'escape' };
+  }
+
+  return cursor.character === "'"
+    ? { kind: 'close', text: '' }
+    : { kind: 'text', text: cursor.character };
+}
+
+function pickANSICQuotedAction(cursor: ShellCursor): ShellAction {
+  if (cursor.character === '\\') {
+    return { kind: 'escape' };
+  }
+
   return cursor.character === "'"
     ? { kind: 'close', text: '' }
     : { kind: 'text', text: cursor.character };
 }
 
 function pickDoubleQuotedAction(cursor: ShellCursor): ShellAction {
-  const opening = pickOpening(cursor);
+  const opening = pickOpening(cursor, true);
 
   if (opening !== undefined) {
     return opening;
@@ -263,17 +342,56 @@ function pickDoubleQuotedAction(cursor: ShellCursor): ShellAction {
     : { kind: 'text', text: cursor.character };
 }
 
+// A parameter expansion reads its default or pattern as text, so `${VALUE:-a;b}` holds no operator,
+// while quotes and expansions inside it keep their meaning.
+function pickParameterAction(cursor: ShellCursor): ShellAction {
+  const opening = pickOpening(cursor, false);
+
+  if (opening !== undefined) {
+    return opening;
+  }
+
+  if (cursor.character === "'") {
+    return { kind: 'open', context: 'single-quote', text: '', length: 1 };
+  }
+
+  if (cursor.character === '"') {
+    return { kind: 'open', context: 'double-quote', text: '', length: 1 };
+  }
+
+  return cursor.character === '}'
+    ? { kind: 'close', text: '}' }
+    : { kind: 'text', text: cursor.character };
+}
+
+// Inside double quotes, a single quote in a parameter expansion is literal text.
+function pickQuotedParameterAction(cursor: ShellCursor): ShellAction {
+  const opening = pickOpening(cursor, true);
+
+  if (opening !== undefined) {
+    return opening;
+  }
+
+  if (cursor.character === '"') {
+    return { kind: 'open', context: 'double-quote', text: '', length: 1 };
+  }
+
+  return cursor.character === '}'
+    ? { kind: 'close', text: '}' }
+    : { kind: 'text', text: cursor.character };
+}
+
 function makeArithmeticReader(closer: ')' | '))'): (cursor: ShellCursor) => ShellAction {
   return (cursor) => {
     const character = cursor.character;
-    const opening = pickOpening(cursor);
+    const opening = pickOpening(cursor, true);
 
     if (opening !== undefined) {
       return opening;
     }
 
     if (character === '(') {
-      return { kind: 'open', context: 'arithmetic-group', text: '(' };
+      return { kind: 'open', context: 'arithmetic-group', text: '(', length: 1 };
     }
 
     if (`${character}${cursor.ahead}`.startsWith(closer)) {
@@ -282,28 +400,6 @@ function makeArithmeticReader(closer: ')' | '))'): (cursor: ShellCursor) => Shel
 
     return { kind: 'text', text: character };
   };
-}
-
-// A parameter expansion reads its default or pattern as text, so `${VALUE:-a;b}` holds no operator,
-// while quotes and expansions inside it keep their meaning.
-function pickParameterAction(cursor: ShellCursor): ShellAction {
-  const opening = pickOpening(cursor);
-
-  if (opening !== undefined) {
-    return opening;
-  }
-
-  if (cursor.character === "'") {
-    return { kind: 'open', context: 'single-quote', text: '' };
-  }
-
-  if (cursor.character === '"') {
-    return { kind: 'open', context: 'double-quote', text: '' };
-  }
-
-  return cursor.character === '}'
-    ? { kind: 'close', text: '}' }
-    : { kind: 'text', text: cursor.character };
 }
 
 function getContext(state: ParserState): ShellContext {
@@ -335,16 +431,16 @@ const actionHandlers: ShellActionHandlers = {
     return appendText(state, action);
   },
   escape: (state, _action, isTopLevel) => {
-    const escaped = state.command.charAt(state.index + 1);
+    const escape = contextTable[getContext(state)].parseEscape(state.command, state.index);
 
-    // A backslash before a newline joins the two lines into one.
-    if (escaped !== '\n') {
+    state.text += escape.text;
+
+    if (escape.isQuoting) {
       state.isPlain = false;
-      state.text += escaped;
       state.isQuoted ||= isTopLevel;
     }
 
-    return 2;
+    return escape.length;
   },
   open: (state, action, isTopLevel) => {
     state.isPlain = false;
@@ -354,7 +450,7 @@ const actionHandlers: ShellActionHandlers = {
     state.text += action.text;
     state.isQuoted ||= isTopLevel && contextTable[action.context].isQuote;
 
-    return Math.max(action.text.length, 1);
+    return action.length;
   },
   close: (state, action) => {
     state.contexts.pop();

@@ -96,9 +96,68 @@ test.each([
   expect(word).toStrictEqual(first);
 });
 
+// Each row follows a rule of the Bash manual's Quoting section.
+test.each([
+  [String.raw`echo \;ls`, ['echo', ';ls']],
+  ['echo a\\\nb', ['echo', 'ab']],
+  [String.raw`echo 'a\b'`, ['echo', String.raw`a\b`]],
+  [String.raw`echo 'a\'`, ['echo', 'a\\']],
+  [String.raw`echo "a\;b"`, ['echo', String.raw`a\;b`]],
+  [String.raw`echo "\$HOME \` \" \\"`, ['echo', '$HOME ` " \\']],
+  ['echo "a\\\nb"', ['echo', 'ab']],
+  [String.raw`echo $'can\'t'`, ['echo', "can't"]],
+  [String.raw`echo $'a\tb\x41\101\u00e9\cA\z\\'`, ['echo', 'a\tbAA\u00E9\u0001\\z\\']],
+  [`echo "$'a'"`, ['echo', "$'a'"]],
+  [`echo "\${VALUE:-\\;'a'}"`, ['echo', `\${VALUE:-\\;'a'}`]],
+  [`echo \${VALUE:-\\;'a'}`, ['echo', `\${VALUE:-;a}`]],
+])('it reads the words of %p as %p', (command, texts) => {
+  const words = parseShellWords(command);
+
+  expect(words.filter((word) => !word.isOperator).map((word) => word.text)).toStrictEqual(texts);
+});
+
+test.each([
+  [String.raw`echo $'can\'t' && bun run lint`, ['&&']],
+  [String.raw`echo $'a\\' ; true`, [';']],
+  [`echo $'"a;b" \`c;d\` $(e;f) \${g;h} \\' \\\\' ; true`, [';']],
+  [`echo '"a;b" \`c;d\` $(e;f) \${g;h} \\' ; true`, [';']],
+  [`echo \`echo \\;\``, []],
+  [`echo \`echo \\\\;\``, []],
+  [`echo \`echo \\\\\\;\``, [';']],
+  [`echo \`echo \\\\\\\\;\``, [';']],
+  [`echo \`echo \\$(git log; git status)\``, [';']],
+  [`echo \`echo \\"a;b\\"\``, [';']],
+  [`echo "\`echo \\"a;b\\"\`"`, []],
+])('it applies the quoting rules of %p, as %p', (command, operators) => {
+  const words = parseShellWords(command);
+
+  expect(words.filter((word) => word.isOperator).map((word) => word.text)).toStrictEqual(operators);
+});
+
+// A double quote holds no bare double quote, so that pair has its own rows.
+test.each([
+  ...[
+    (inner: string) => inner,
+    (inner: string) => `$(echo ${inner})`,
+    (inner: string) => `\`echo ${inner}\``,
+    (inner: string) => `\${VALUE:-${inner}}`,
+    (inner: string) => `"$(echo ${inner})"`,
+    (inner: string) => `"\`echo ${inner}\`"`,
+    (inner: string) => `"\${VALUE:-${inner}}"`,
+  ].flatMap((enclose) =>
+    ["'a;b'", '"a;b"', String.raw`$'a\';b'`, String.raw`\;`].map((inner) => enclose(inner)),
+  ),
+  ...["'a;b'", String.raw`$'a\';b'`, String.raw`\;`].map((inner) => `"${inner}"`),
+])('it keeps the quoted separator in %p out of the operators', (word) => {
+  const words = parseShellWords(`echo ${word} ; true`);
+
+  expect(words.filter((each) => each.isOperator).map((each) => each.text)).toStrictEqual([';']);
+});
+
 test('it fails the type check on a context table or a handler table that misses a key', () => {
   const rules: ShellContextTable['plain'] = {
     pickAction: () => ({ kind: 'break' }),
+    parseEscape: () => ({ text: '', length: 1, isQuoting: false }),
     isTopLevel: false,
     isQuote: false,
   };
@@ -109,8 +168,11 @@ test('it fails the type check on a context table or a handler table that misses 
     substitution: rules,
     group: rules,
     backtick: rules,
+    'quoted-backtick': rules,
     'single-quote': rules,
+    'ansi-c-quote': rules,
     'double-quote': rules,
+    'quoted-parameter': rules,
     arithmetic: rules,
     'arithmetic-group': rules,
   };
@@ -126,5 +188,5 @@ test('it fails the type check on a context table or a handler table that misses 
     operator: () => 1,
   };
 
-  expect([Object.keys(contexts).length, Object.keys(handlers).length]).toStrictEqual([8, 7]);
+  expect([Object.keys(contexts).length, Object.keys(handlers).length]).toStrictEqual([11, 7]);
 });

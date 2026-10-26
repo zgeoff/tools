@@ -297,6 +297,10 @@
         "target": "scripts/parse-shell-words.ts"
       },
       {
+        "source": "sync/pre-push/shell-escape-parsers.ts",
+        "target": "scripts/shell-escape-parsers.ts"
+      },
+      {
         "source": "sync/pre-push/collect-command-names.ts",
         "target": "scripts/collect-command-names.ts"
       }

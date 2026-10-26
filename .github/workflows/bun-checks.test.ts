@@ -416,6 +416,7 @@ test('it downloads the planner, the branch check scripts and the catalog from th
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-test-timeouts-check.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-workflows-check.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/parse-shell-words.ts',
+      'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/shell-escape-parsers.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/collect-command-names.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/package.json',
       '',
@@ -433,6 +434,7 @@ test('it downloads the planner, the branch check scripts and the catalog from th
     'run-program.ts',
     'run-test-timeouts-check.ts',
     'run-workflows-check.ts',
+    'shell-escape-parsers.ts',
     'tools-package.json',
     'write-check-plan.ts',
   ]);

@@ -24,6 +24,7 @@ test.each([
   ['bash -s scripts/open-kvm.sh', ['bash']],
   [`sh -ec 'scripts/ci/check-kvm.sh --strict'`, ['sh', 'scripts/ci/check-kvm.sh']],
   [`bash -c 'bun run ci:open-kvm'`, ['bash', 'bun', 'ci:open-kvm']],
+  [String.raw`bash -c "echo \;scripts/open-kvm.sh"`, ['bash', 'echo']],
   ['bun run ci:open-kvm', ['bun', 'ci:open-kvm']],
   ['bun run --silent ci:open-kvm --strict', ['bun', 'ci:open-kvm']],
   ['bun run --cwd ci:open-kvm lint', ['bun', 'lint']],

@@ -78,8 +78,8 @@ The entry delivers these files, and their tests stay in tools:
 - `scripts/read-worker-count.ts` and `scripts/read-memory-budget.ts` — print the
   [worker count and the memory budget](./memory-caps.md#the-worker-count) of the host.
 - `scripts/read-branch-base.ts`, `scripts/parse-added-lines.ts`, `scripts/parse-shell-words.ts`,
-  `scripts/collect-command-names.ts` and `scripts/run-program.ts` — the modules these scripts
-  import.
+  `scripts/shell-escape-parsers.ts`, `scripts/collect-command-names.ts` and `scripts/run-program.ts`
+  — the modules these scripts import.
 
 The check scripts exit 0 when clean or skipped, 1 with a problem, and 2 when they cannot run, such
 as in a clone without origin's default branch. One exception: the workflow lint exits 0 with a
