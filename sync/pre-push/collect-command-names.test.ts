@@ -47,6 +47,8 @@ test.each([
   ['echo "$(scripts/ci/check-kvm.sh)"'],
   ['echo `scripts/ci/check-kvm.sh`'],
   ['cat <<EOF\nscripts/open-kvm.sh\nEOF'],
+  ['cat <<-EOF\n\tscripts/open-kvm.sh\nEOF'],
+  [`cat <<'EOF'\nscripts/open-kvm.sh\nEOF`],
   ['"$TOOL" scripts/open-kvm.sh'],
   ['bash --rcfile .bashrc scripts/open-kvm.sh'],
   ['bash -c'],
