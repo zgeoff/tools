@@ -1,71 +1,94 @@
-import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { $ } from 'bun';
+import { expect, test } from 'bun:test';
+import { runReleaseWorkflowCheck } from './run-release-workflow-check.ts';
 
-async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'run-release-workflow-check-'));
+test('it prints each fault of the shared release workflow and returns 1', async () => {
+  const output: string[] = [];
+  const errors: string[] = [];
 
-  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+  const text = [
+    'jobs:',
+    '  release:',
+    '    steps:',
+    '      - name: Run release-please',
+    '        uses: acme/release-action@abc123',
+    '      - name: Auto-merge release PRs',
+    '        run: bash merge-release-prs.sh',
+    '      - name: Tag the merged release',
+    '        uses: acme/release-action@abc123',
+    '',
+  ].join('\n');
 
-  const runCheck = () =>
-    $`bun ${join(import.meta.dir, 'run-release-workflow-check.ts')}`
-      .cwd(directory)
-      .nothrow()
-      .quiet();
+  const exitCode = await runReleaseWorkflowCheck({
+    readWorkflow: () => Promise.resolve(text),
+    writeOutput: (line) => output.push(line),
+    writeError: (line) => errors.push(line),
+  });
 
-  return { directory, runCheck };
-}
-
-test('it prints each fault of the shared release workflow and exits 1', async () => {
-  const ctx = await setupTest();
-
-  await mkdir(join(ctx.directory, '.github', 'workflows'), { recursive: true });
-
-  await writeFile(
-    join(ctx.directory, '.github', 'workflows', 'release-please.yml'),
-    [
-      'jobs:',
-      '  release:',
-      '    steps:',
-      '      - name: Run release-please',
-      '        uses: acme/release-action@abc123',
-      '      - name: Auto-merge release PRs',
-      '        run: bash merge-release-prs.sh',
-      '      - name: Tag the merged release',
-      '        uses: acme/release-action@abc123',
-    ].join('\n'),
-  );
-
-  const result = await ctx.runCheck();
-
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  }).toStrictEqual({
+  expect({ exitCode, output, errors }).toStrictEqual({
     exitCode: 1,
-    stdout: [
-      "the release job has no step named Check untagged releases against main's head",
-      "the release job has no step named Check the merge against main's head",
-      'the release job has no step named Pick the release outputs',
-      '',
-    ]
-      .map((line) => (line === '' ? '' : `.github/workflows/release-please.yml: ${line}`))
-      .join('\n'),
-    stderr: '',
+    output: [
+      ".github/workflows/release-please.yml: the release job has no step named Check untagged releases against main's head\n",
+      ".github/workflows/release-please.yml: the release job has no step named Check the merge against main's head\n",
+      '.github/workflows/release-please.yml: the release job has no step named Pick the release outputs\n',
+    ],
+    errors: [],
   });
 });
 
-test('it exits 2 when the repo has no shared release workflow', async () => {
-  const ctx = await setupTest();
-  const result = await ctx.runCheck();
+test('it prints the read error and returns 2 when the workflow cannot be read', async () => {
+  const output: string[] = [];
+  const errors: string[] = [];
 
-  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
-    exitCode: 2,
-    stdout: '',
+  const exitCode = await runReleaseWorkflowCheck({
+    readWorkflow: () =>
+      Promise.reject(new Error("ENOENT: no such file or directory, open 'release-please.yml'")),
+    writeOutput: (line) => output.push(line),
+    writeError: (line) => errors.push(line),
   });
 
-  expect(result.stderr.toString()).toStartWith('release-workflow: ENOENT');
+  expect({ exitCode, output, errors }).toStrictEqual({
+    exitCode: 2,
+    output: [],
+    errors: ["release-workflow: ENOENT: no such file or directory, open 'release-please.yml'\n"],
+  });
+});
+
+test('it prints nothing and returns 0 for a workflow with no fault', async () => {
+  const output: string[] = [];
+  const errors: string[] = [];
+
+  const text = [
+    'jobs:',
+    '  release:',
+    '    steps:',
+    "      - name: Check untagged releases against main's head",
+    '        run: bash check-release-head.sh',
+    '      - name: Run release-please',
+    '        uses: acme/release-action@abc123',
+    '      - name: Auto-merge release PRs',
+    "        if: steps.app-token.outputs.token != '' && inputs.merge == true",
+    '        run: bash merge-release-prs.sh',
+    "      - name: Check the merge against main's head",
+    "        if: steps.merge.outputs.merged == 'true'",
+    '        run: bash check-release-head.sh',
+    '      - name: Tag the merged release',
+    "        if: steps.merge.outputs.merged == 'true' && steps.release.outputs.releases_created != 'true'",
+    '        uses: acme/release-action@abc123',
+    '        with:',
+    `          token: \${{ steps.app-token.outputs.token }}`,
+    '          skip-github-pull-request: true',
+    '      - name: Pick the release outputs',
+    '        env:',
+    `          RELEASE_OUTPUTS: \${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) || toJSON(steps.release.outputs) }}`,
+    '        run: echo picked',
+    '',
+  ].join('\n');
+
+  const exitCode = await runReleaseWorkflowCheck({
+    readWorkflow: () => Promise.resolve(text),
+    writeOutput: (line) => output.push(line),
+    writeError: (line) => errors.push(line),
+  });
+
+  expect({ exitCode, output, errors }).toStrictEqual({ exitCode: 0, output: [], errors: [] });
 });
