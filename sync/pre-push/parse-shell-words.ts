@@ -60,21 +60,49 @@ type ShellAction = {
   [Kind in keyof ShellActionFields]: ShellActionOf<Kind>;
 }[keyof ShellActionFields];
 
-// A table typed over every context, so a context without a reader fails the type check.
-export type ShellContextReaders = Readonly<
-  Record<ShellContext, (cursor: ShellCursor, context: ShellContext) => ShellAction>
->;
+interface ShellContextRules {
+  readonly pickAction: (cursor: ShellCursor) => ShellAction;
 
-const contextReaders: ShellContextReaders = {
-  plain: pickCodeAction,
-  substitution: pickCodeAction,
-  group: pickCodeAction,
-  backtick: pickCodeAction,
-  'single-quote': pickSingleQuotedAction,
-  'double-quote': pickDoubleQuotedAction,
-  arithmetic: pickArithmeticAction,
-  'arithmetic-group': pickArithmeticAction,
-  parameter: pickParameterAction,
+  // A quote or an escape here marks the word quoted, since the shell strips it from the command's
+  // own words.
+  readonly isTopLevel: boolean;
+  readonly isQuote: boolean;
+}
+
+// Every decision that depends on the context lives in this table, which is typed over every
+// context, so a context without its rules fails the type check.
+export type ShellContextTable = Readonly<Record<ShellContext, ShellContextRules>>;
+
+const contextTable: ShellContextTable = {
+  plain: {
+    pickAction: makeCodeReader({ closer: '', isGrouping: false, isCommenting: true }),
+    isTopLevel: true,
+    isQuote: false,
+  },
+  substitution: {
+    pickAction: makeCodeReader({ closer: ')', isGrouping: true, isCommenting: false }),
+    isTopLevel: false,
+    isQuote: false,
+  },
+  group: {
+    pickAction: makeCodeReader({ closer: ')', isGrouping: true, isCommenting: false }),
+    isTopLevel: false,
+    isQuote: false,
+  },
+  backtick: {
+    pickAction: makeCodeReader({ closer: '`', isGrouping: false, isCommenting: false }),
+    isTopLevel: false,
+    isQuote: false,
+  },
+  'single-quote': { pickAction: pickSingleQuotedAction, isTopLevel: false, isQuote: true },
+  'double-quote': { pickAction: pickDoubleQuotedAction, isTopLevel: false, isQuote: true },
+  arithmetic: { pickAction: makeArithmeticReader('))'), isTopLevel: false, isQuote: false },
+  'arithmetic-group': {
+    pickAction: makeArithmeticReader(')'),
+    isTopLevel: false,
+    isQuote: false,
+  },
+  parameter: { pickAction: pickParameterAction, isTopLevel: false, isQuote: false },
 };
 
 // The parser keeps a stack of the quotes, substitutions and expansions it is inside, and each
@@ -93,19 +121,16 @@ export function parseShellWords(command: string): ShellWord[] {
   };
 
   while (state.index < command.length) {
-    const context = state.contexts.at(-1) ?? 'plain';
+    const rules = contextTable[getContext(state)];
 
-    const action = contextReaders[context](
-      {
-        character: command.charAt(state.index),
-        ahead: command.slice(state.index + 1, state.index + 3),
-        isWordStart: state.text === '' && !state.isQuoted,
-        redirect: state.redirect,
-      },
-      context,
-    );
+    const action = rules.pickAction({
+      character: command.charAt(state.index),
+      ahead: command.slice(state.index + 1, state.index + 3),
+      isWordStart: state.text === '' && !state.isQuoted,
+      redirect: state.redirect,
+    });
 
-    advanceParser(state, action, context === 'plain');
+    advanceParser(state, action, rules.isTopLevel);
   }
 
   endWord(state);
@@ -113,50 +138,56 @@ export function parseShellWords(command: string): ShellWord[] {
   return state.words;
 }
 
-function pickCodeAction(cursor: ShellCursor, context: ShellContext): ShellAction {
-  const character = cursor.character;
-  const opening = pickOpening(cursor);
-  const isNested = context === 'substitution' || context === 'group';
+interface ShellCodeRules {
+  // The text that closes the context, or empty when nothing closes it.
+  readonly closer: string;
+  readonly isGrouping: boolean;
+  readonly isCommenting: boolean;
+}
 
-  if (opening !== undefined) {
-    return opening;
-  }
+function makeCodeReader(rules: ShellCodeRules): (cursor: ShellCursor) => ShellAction {
+  return (cursor) => {
+    const character = cursor.character;
+    const opening = pickOpening(cursor);
 
-  if (character === "'") {
-    return { kind: 'open', context: 'single-quote', text: '' };
-  }
+    if (opening !== undefined) {
+      return opening;
+    }
 
-  if (character === '"') {
-    return { kind: 'open', context: 'double-quote', text: '' };
-  }
+    if (character === "'") {
+      return { kind: 'open', context: 'single-quote', text: '' };
+    }
 
-  if (character === '`') {
-    return context === 'backtick'
-      ? { kind: 'close', text: '`' }
-      : { kind: 'open', context: 'backtick', text: '`' };
-  }
+    if (character === '"') {
+      return { kind: 'open', context: 'double-quote', text: '' };
+    }
 
-  if (character === '(' && isNested) {
-    return { kind: 'open', context: 'group', text: '(' };
-  }
+    if (character === rules.closer) {
+      return { kind: 'close', text: character };
+    }
 
-  if (character === ')' && isNested) {
-    return { kind: 'close', text: ')' };
-  }
+    if (character === '`') {
+      return { kind: 'open', context: 'backtick', text: '`' };
+    }
 
-  if (character === '#' && cursor.isWordStart && context === 'plain') {
-    return { kind: 'comment' };
-  }
+    if (character === '(' && rules.isGrouping) {
+      return { kind: 'open', context: 'group', text: '(' };
+    }
 
-  if (character === '\n') {
-    return { kind: 'operator', text: '\n' };
-  }
+    if (character === '#' && cursor.isWordStart && rules.isCommenting) {
+      return { kind: 'comment' };
+    }
 
-  if (/\s/u.test(character)) {
-    return { kind: 'break' };
-  }
+    if (character === '\n') {
+      return { kind: 'operator', text: '\n' };
+    }
 
-  return pickOperator(cursor) ?? pickPlainAction(character);
+    if (/\s/u.test(character)) {
+      return { kind: 'break' };
+    }
+
+    return pickOperator(cursor) ?? pickPlainAction(character);
+  };
 }
 
 // `${` opens a parameter expansion, `$((` an arithmetic expansion and `$(` a command
@@ -234,27 +265,25 @@ function pickDoubleQuotedAction(cursor: ShellCursor): ShellAction {
     : { kind: 'text', text: cursor.character };
 }
 
-function pickArithmeticAction(cursor: ShellCursor, context: ShellContext): ShellAction {
-  const character = cursor.character;
-  const opening = pickOpening(cursor);
+function makeArithmeticReader(closer: ')' | '))'): (cursor: ShellCursor) => ShellAction {
+  return (cursor) => {
+    const character = cursor.character;
+    const opening = pickOpening(cursor);
 
-  if (opening !== undefined) {
-    return opening;
-  }
+    if (opening !== undefined) {
+      return opening;
+    }
 
-  if (character === '(') {
-    return { kind: 'open', context: 'arithmetic-group', text: '(' };
-  }
+    if (character === '(') {
+      return { kind: 'open', context: 'arithmetic-group', text: '(' };
+    }
 
-  if (character === ')' && context === 'arithmetic-group') {
-    return { kind: 'close', text: ')' };
-  }
+    if (`${character}${cursor.ahead}`.startsWith(closer)) {
+      return { kind: 'close', text: closer };
+    }
 
-  if (character === ')' && cursor.ahead.startsWith(')')) {
-    return { kind: 'close', text: '))' };
-  }
-
-  return { kind: 'text', text: character };
+    return { kind: 'text', text: character };
+  };
 }
 
 // A parameter expansion reads its default or pattern as text, so `${VALUE:-a;b}` holds no operator,
@@ -277,6 +306,17 @@ function pickParameterAction(cursor: ShellCursor): ShellAction {
   return cursor.character === '}'
     ? { kind: 'close', text: '}' }
     : { kind: 'text', text: cursor.character };
+}
+
+function getContext(state: ParserState): ShellContext {
+  const context = state.contexts.at(-1);
+
+  // Only a reader inside a nested context closes it, so the plain context never leaves the stack.
+  if (context === undefined) {
+    throw new Error('the shell parser closed its plain context');
+  }
+
+  return context;
 }
 
 // Each handler returns how many characters its action consumed. The table is typed over every
@@ -314,7 +354,7 @@ const actionHandlers: ShellActionHandlers = {
     state.contexts.push(action.context);
 
     state.text += action.text;
-    state.isQuoted ||= isTopLevel && isQuoteContext(action.context);
+    state.isQuoted ||= isTopLevel && contextTable[action.context].isQuote;
 
     return Math.max(action.text.length, 1);
   },
@@ -361,10 +401,6 @@ function appendText(state: ParserState, action: ShellActionFields['text']): numb
   state.plainText += state.isPlain ? action.text : '';
 
   return 1;
-}
-
-function isQuoteContext(context: ShellContext): boolean {
-  return context === 'single-quote' || context === 'double-quote';
 }
 
 const assignmentPattern = /^[A-Za-z_]\w*=/u;

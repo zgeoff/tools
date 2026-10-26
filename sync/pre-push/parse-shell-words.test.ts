@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import type { ShellActionHandlers, ShellContextReaders } from './parse-shell-words.ts';
+import type { ShellActionHandlers, ShellContextTable } from './parse-shell-words.ts';
 import { parseShellWords } from './parse-shell-words.ts';
 
 test.each([
@@ -61,17 +61,23 @@ test.each([
   expect(word).toStrictEqual(first);
 });
 
-test('it fails the type check on a reader table or a handler table that misses a key', () => {
-  // @ts-expect-error: the reader table lacks the parameter context
-  const readers: ShellContextReaders = {
-    plain: () => ({ kind: 'break' }),
-    substitution: () => ({ kind: 'break' }),
-    group: () => ({ kind: 'break' }),
-    backtick: () => ({ kind: 'break' }),
-    'single-quote': () => ({ kind: 'break' }),
-    'double-quote': () => ({ kind: 'break' }),
-    arithmetic: () => ({ kind: 'break' }),
-    'arithmetic-group': () => ({ kind: 'break' }),
+test('it fails the type check on a context table or a handler table that misses a key', () => {
+  const rules: ShellContextTable['plain'] = {
+    pickAction: () => ({ kind: 'break' }),
+    isTopLevel: false,
+    isQuote: false,
+  };
+
+  // @ts-expect-error: the context table lacks the parameter context
+  const contexts: ShellContextTable = {
+    plain: rules,
+    substitution: rules,
+    group: rules,
+    backtick: rules,
+    'single-quote': rules,
+    'double-quote': rules,
+    arithmetic: rules,
+    'arithmetic-group': rules,
   };
 
   // @ts-expect-error: the handler table lacks the comment action
@@ -85,5 +91,5 @@ test('it fails the type check on a reader table or a handler table that misses a
     operator: () => 1,
   };
 
-  expect([Object.keys(readers).length, Object.keys(handlers).length]).toStrictEqual([8, 7]);
+  expect([Object.keys(contexts).length, Object.keys(handlers).length]).toStrictEqual([8, 7]);
 });
