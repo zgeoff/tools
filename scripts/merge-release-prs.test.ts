@@ -326,13 +326,13 @@ test('it turns on auto-merge and exits cleanly when only required checks outlast
     exitCode: result.exitCode,
     stdout: result.stdout.toString(),
     stderr: result.stderr.toString(),
-    output,
   }).toStrictEqual({
     exitCode: 0,
     stdout: 'release PR #145 checks on abc123 did not finish within 0s; turning on auto-merge\n',
     stderr: '',
-    output: '',
   });
+
+  expect(output).toBe('');
 
   expect(calls.filter((call) => call.startsWith('pr merge'))).toStrictEqual([
     'pr merge 145 --repo zgeoff/tools --auto --squash --match-head-commit abc123',
@@ -356,18 +356,14 @@ test('it leaves the release PR open without auto-merge when no ruleset requires 
   const calls = await ctx.readCalls();
   const output = await ctx.readOutput();
 
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    output,
-    merges: calls.filter((call) => call.startsWith('pr merge')),
-  }).toStrictEqual({
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
     exitCode: 0,
     stdout:
       'release PR #145 checks on abc123 did not finish within 0s; a ruleset on main does not require every pending check, so the next push to main merges it\n',
-    output: '',
-    merges: [],
   });
+
+  expect(output).toBe('');
+  expect(calls.filter((call) => call.startsWith('pr merge'))).toBeEmpty();
 });
 
 test('it leaves the release PR open without auto-merge while a check the ruleset does not require runs', async () => {
@@ -395,16 +391,13 @@ test('it leaves the release PR open without auto-merge while a check the ruleset
   const result = await ctx.runScript({ CHECKS_TIMEOUT: '0' });
   const calls = await ctx.readCalls();
 
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    merges: calls.filter((call) => call.startsWith('pr merge')),
-  }).toStrictEqual({
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
     exitCode: 0,
     stdout:
       'release PR #145 checks on abc123 did not finish within 0s; a ruleset on main does not require every pending check, so the next push to main merges it\n',
-    merges: [],
   });
+
+  expect(calls.filter((call) => call.startsWith('pr merge'))).toBeEmpty();
 });
 
 test('it exits cleanly with the PR open when auto-merge does not turn on', async () => {
@@ -580,19 +573,16 @@ test.each([
     const calls = await ctx.readCalls();
     const output = await ctx.readOutput();
 
-    expect({
-      exitCode: result.exitCode,
-      stdout: result.stdout.toString(),
-      calls,
-      output,
-    }).toStrictEqual({
+    expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
       exitCode: 0,
       stdout: `release PR #145 is held (${reason}); leaving it open\n`,
-      calls: [
-        'pr list --repo zgeoff/tools --head release-please--branches--main --json number,isDraft,labels',
-      ],
-      output: '',
     });
+
+    expect(calls).toStrictEqual([
+      'pr list --repo zgeoff/tools --head release-please--branches--main --json number,isDraft,labels',
+    ]);
+
+    expect(output).toBe('');
   },
 );
 

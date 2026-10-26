@@ -82,15 +82,9 @@ test('it answers the commit, compare and branch rules endpoints with their respo
     'repos/zgeoff/tools/rules/branches/main',
   ]);
 
-  expect({
-    commit: commit.stdout.toString(),
-    compare: compare.stdout.toString(),
-    rules: rules.stdout.toString(),
-  }).toStrictEqual({
-    commit: '{"sha":"head222"}\n',
-    compare: '{"files":[{"filename":"README.md"}]}\n',
-    rules: '[{"type":"required_status_checks"}]\n',
-  });
+  expect(commit.stdout.toString()).toBe('{"sha":"head222"}\n');
+  expect(compare.stdout.toString()).toBe('{"files":[{"filename":"README.md"}]}\n');
+  expect(rules.stdout.toString()).toBe('[{"type":"required_status_checks"}]\n');
 });
 
 test('it prints nothing for a merge and fails the merge whose response is "error"', async () => {

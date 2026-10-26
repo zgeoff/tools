@@ -28,15 +28,15 @@ test('it prints each fault of the shared release workflow and returns 1', async 
     },
   });
 
-  expect({ exitCode, output, errors }).toStrictEqual({
-    exitCode: 1,
-    output: [
-      ".github/workflows/release-please.yml: the release job has no step named Check untagged releases against main's head\n",
-      ".github/workflows/release-please.yml: the release job has no step named Check the merge against main's head\n",
-      '.github/workflows/release-please.yml: the release job has no step named Pick the release outputs\n',
-    ],
-    errors: [],
-  });
+  expect(exitCode).toBe(1);
+
+  expect(output).toStrictEqual([
+    ".github/workflows/release-please.yml: the release job has no step named Check untagged releases against main's head\n",
+    ".github/workflows/release-please.yml: the release job has no step named Check the merge against main's head\n",
+    '.github/workflows/release-please.yml: the release job has no step named Pick the release outputs\n',
+  ]);
+
+  expect(errors).toBeEmpty();
 });
 
 test('it prints the read error and returns 2 when the workflow cannot be read', async () => {
@@ -54,11 +54,12 @@ test('it prints the read error and returns 2 when the workflow cannot be read', 
     },
   });
 
-  expect({ exitCode, output, errors }).toStrictEqual({
-    exitCode: 2,
-    output: [],
-    errors: ["release-workflow: ENOENT: no such file or directory, open 'release-please.yml'\n"],
-  });
+  expect(exitCode).toBe(2);
+  expect(output).toBeEmpty();
+
+  expect(errors).toStrictEqual([
+    "release-workflow: ENOENT: no such file or directory, open 'release-please.yml'\n",
+  ]);
 });
 
 test('it prints nothing and returns 0 for a workflow with no fault', async () => {
@@ -102,5 +103,7 @@ test('it prints nothing and returns 0 for a workflow with no fault', async () =>
     },
   });
 
-  expect({ exitCode, output, errors }).toStrictEqual({ exitCode: 0, output: [], errors: [] });
+  expect(exitCode).toBe(0);
+  expect(output).toBeEmpty();
+  expect(errors).toBeEmpty();
 });

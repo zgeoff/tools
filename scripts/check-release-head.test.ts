@@ -36,12 +36,11 @@ test('it passes when no merged release PR waits for its tag', async () => {
   const result = await ctx.runScript();
   const calls = await ctx.readCalls();
 
-  expect({ result, calls }).toStrictEqual({
-    result: { exitCode: 0, stdout: '', stderr: '' },
-    calls: [
-      'pr list --repo zgeoff/tools --state merged --label autorelease: pending --json number,mergeCommit,baseRefName',
-    ],
-  });
+  expect(result).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+
+  expect(calls).toStrictEqual([
+    'pr list --repo zgeoff/tools --state merged --label autorelease: pending --json number,mergeCommit,baseRefName',
+  ]);
 });
 
 test("it passes a release PR whose merge commit is still main's head", async () => {
@@ -56,10 +55,11 @@ test("it passes a release PR whose merge commit is still main's head", async () 
   const result = await ctx.runScript();
   const calls = await ctx.readCalls();
 
-  expect({ result, apiCalls: calls.filter((call) => call.startsWith('api ')) }).toStrictEqual({
-    result: { exitCode: 0, stdout: '', stderr: '' },
-    apiCalls: ['api repos/zgeoff/tools/commits/main'],
-  });
+  expect(result).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+
+  expect(calls.filter((call) => call.startsWith('api '))).toStrictEqual([
+    'api repos/zgeoff/tools/commits/main',
+  ]);
 });
 
 test('it passes a release PR whose main moved on with no workflow change', async () => {
@@ -101,15 +101,14 @@ test('it fails, naming both commits, when a workflow change merged after the rel
   const result = await ctx.runScript();
   const calls = await ctx.readCalls();
 
-  expect({ result, compare: calls.at(-1) }).toStrictEqual({
-    result: {
-      exitCode: 1,
-      stdout: '',
-      stderr:
-        "release PR #145: its merge commit merge111 is no longer main's head head222, and .github/workflows/ci.yml changed since, so the release App cannot tag it; recover with the steps for an untagged release PR in RELEASING.md\n",
-    },
-    compare: 'api repos/zgeoff/tools/compare/merge111...head222',
+  expect(result).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      "release PR #145: its merge commit merge111 is no longer main's head head222, and .github/workflows/ci.yml changed since, so the release App cannot tag it; recover with the steps for an untagged release PR in RELEASING.md\n",
   });
+
+  expect(calls.at(-1)).toBe('api repos/zgeoff/tools/compare/merge111...head222');
 });
 
 test('it fails for a release PR that auto-merge merged once its checks outlasted the wait', async () => {

@@ -56,12 +56,11 @@ test('it dispatches the publish at the tag, with every released path, for a rele
 
   const calls = await ctx.gh.readCalls();
 
-  expect({ exitCode, calls }).toStrictEqual({
-    exitCode: 0,
-    calls: [
-      'workflow run main.yml --repo zgeoff/tools --ref @zgeoff/std@0.4.0 -f republish_paths=["packages/std","packages/tsconfig"]',
-    ],
-  });
+  expect(exitCode).toBe(0);
+
+  expect(calls).toStrictEqual([
+    'workflow run main.yml --repo zgeoff/tools --ref @zgeoff/std@0.4.0 -f republish_paths=["packages/std","packages/tsconfig"]',
+  ]);
 });
 
 test('it publishes in the run itself when the release tagged its own commit', async () => {
@@ -82,11 +81,13 @@ test('it publishes in the run itself when the release tagged its own commit', as
   const output = await readFile(ctx.outputPath, 'utf8');
   const calls = await ctx.gh.readCalls();
 
-  expect({ exitCode, output, calls }).toStrictEqual({
-    exitCode: 0,
-    output: ['tag=@zgeoff/std@0.4.0', 'paths=["packages/std"]', 'here=true', ''].join('\n'),
-    calls: [],
-  });
+  expect(exitCode).toBe(0);
+
+  expect(output).toBe(
+    ['tag=@zgeoff/std@0.4.0', 'paths=["packages/std"]', 'here=true', ''].join('\n'),
+  );
+
+  expect(calls).toBeEmpty();
 });
 
 test('it neither resolves nor dispatches when the release job tagged nothing', async () => {
@@ -99,5 +100,6 @@ test('it neither resolves nor dispatches when the release job tagged nothing', a
 
   const calls = await ctx.gh.readCalls();
 
-  expect({ exitCode, calls }).toStrictEqual({ exitCode: 0, calls: [] });
+  expect(exitCode).toBe(0);
+  expect(calls).toBeEmpty();
 });
