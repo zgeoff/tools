@@ -84,6 +84,7 @@ test('it leaves the main checkout non-bare when the test job runs in a pre-push 
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:workflows': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -125,6 +126,7 @@ test('it fails the push on the shell job alone when a shell file the branch chan
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:workflows': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -176,6 +178,7 @@ test('it fails the push on the shell job alone when a shell file the branch chan
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:workflows': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -223,6 +226,7 @@ test('it passes the push when only a file the branch leaves unchanged fails the 
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:workflows': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -263,6 +267,7 @@ test('it passes the push when the branch changes a clean file whose name starts 
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:workflows': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -306,6 +311,7 @@ test('it hands every shell file the branch changes to the shell check when the b
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:workflows': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -359,6 +365,7 @@ test('it passes the push with a notice when the machine lacks shfmt', async () =
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:workflows': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -414,6 +421,7 @@ test('it passes the push with a notice when the machine lacks actionlint', async
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:workflows': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -440,8 +448,55 @@ test('it passes the push with a notice when the machine lacks actionlint', async
   expect(result.exitCode).toBe(0);
 
   expect(output).toInclude(
-    'workflows: skipped, because actionlint is not on the PATH; CI runs the check',
+    'workflows: actionlint skipped, because it is not on the PATH; CI runs it',
   );
+});
+
+test('it warns and passes the push when the workflow lint faults a workflow caller the branch changes', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await mkdir(join(ctx.worktree, 'sync/workflow-callers'), { recursive: true });
+
+  await writeFile(
+    join(ctx.worktree, 'sync/workflow-callers/greet.yml'),
+    'on: workflow_dispatch\njobs:\n  greet:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n',
+  );
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'echo sync/workflow-callers/greet.yml',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
+        'check:workflows': `bun ${join(import.meta.dir, 'run-workflows-check.ts')}`,
+        'memory-capped': 'exec',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).toBe(0);
+  expect(output).toInclude('sync/workflow-callers/greet.yml:3: job greet sets no timeout-minutes');
 });
 
 test.skipIf(!canRunActionlint)(
@@ -471,6 +526,7 @@ test.skipIf(!canRunActionlint)(
           'check:commits': 'true',
           'check:local-paths': 'true',
           'check:test-timeouts': 'true',
+          'check:workflows': 'true',
           'memory-capped': 'exec',
         },
       }),
@@ -529,6 +585,7 @@ test.skipIf(!canRunActionlint)(
           'check:commits': 'true',
           'check:local-paths': 'true',
           'check:test-timeouts': 'true',
+          'check:workflows': 'true',
           'memory-capped': 'exec',
         },
       }),
@@ -590,6 +647,7 @@ test.skipIf(!canRunActionlint)(
           'check:commits': 'true',
           'check:local-paths': 'true',
           'check:test-timeouts': 'true',
+          'check:workflows': 'true',
           'memory-capped': 'exec',
         },
       }),
@@ -636,6 +694,7 @@ test('it passes the docs job with a notice when the repo has no docs-writing scr
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:workflows': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -696,6 +755,7 @@ test('it fails the push on the docs job when the installed length script rejects
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:workflows': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -749,6 +809,7 @@ test('it fails the push on the docs job when the installed link script finds a b
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:workflows': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -796,6 +857,7 @@ test('it fails the push when a commit of the branch fails commitlint', async () 
         'check:commits': `bun ${join(import.meta.dir, 'run-commits-check.ts')}`,
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:workflows': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -837,6 +899,7 @@ test('it fails the push when a commit of the branch adds the home directory', as
         'check:commits': 'true',
         'check:local-paths': `bun ${join(import.meta.dir, 'run-local-paths-check.ts')}`,
         'check:test-timeouts': 'true',
+        'check:workflows': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -878,6 +941,7 @@ test('it fails the push when a bunfig.toml raises the test timeout above 5 s', a
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': `bun ${join(import.meta.dir, 'run-test-timeouts-check.ts')}`,
+        'check:workflows': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -974,20 +1038,28 @@ test('it skips typecheck on a commit that stages no code or config file', async 
   expect(result.exitCode).toBe(0);
 });
 
-// Each suite that spawns git must stay safe without the baseline's env -u, so it runs here with
-// the GIT_DIR a pre-push hook in the worktree exports.
+// Each suite that spawns git must stay safe without the baseline's env -u, so the tests in it whose
+// code under test runs git run here with the GIT_DIR a pre-push hook in the worktree exports. The
+// filter keeps each nested run inside the per-test timeout.
 test.each([
-  ['packages/oxfmt-config/index.test.ts'],
-  ['sync/pre-push/read-branch-base.test.ts'],
-  ['sync/pre-push/run-commits-check.test.ts'],
-  ['sync/pre-push/run-local-paths-check.test.ts'],
-  ['sync/pre-push/run-test-timeouts-check.test.ts'],
-  ['sync/skills/docs-writing/scripts/check-length.test.ts'],
-  ['sync/skills/docs-writing/scripts/check-links.test.ts'],
-  ['sync/skills/skill-writing/scripts/check-skill.test.ts'],
+  ['packages/oxfmt-config/index.test.ts', 'repo-sync delivers'],
+  ['sync/pre-push/read-branch-base.test.ts', 'merge base'],
+  [
+    'sync/pre-push/run-commits-check.test.ts',
+    'reads only the commits after the base|leaves out a merge commit',
+  ],
+  [
+    'sync/pre-push/run-local-paths-check.test.ts',
+    'reads only the lines the branch adds|a later commit of the branch removes',
+  ],
+  ['sync/pre-push/run-test-timeouts-check.test.ts', 'as HEAD holds them'],
+  ['sync/pre-push/run-workflows-check.test.ts', 'as HEAD holds it|no commit'],
+  ['sync/skills/docs-writing/scripts/check-length.test.ts', 'linguist-vendored'],
+  ['sync/skills/docs-writing/scripts/check-links.test.ts', 'linguist-vendored'],
+  ['sync/skills/skill-writing/scripts/check-skill.test.ts', 'linguist-vendored'],
 ])(
-  'it passes %s and leaves the main checkout config and branch unchanged under a worktree GIT_DIR',
-  async (suite) => {
+  'it passes the git tests of %s that match %p and leaves the main checkout config and branch unchanged under a worktree GIT_DIR',
+  async (suite, pattern) => {
     const ctx = await setupTest();
 
     // A local exclude for every page, so a script whose git reads this repo instead of its own
@@ -998,7 +1070,7 @@ test.each([
     const head = await $`git rev-parse feature`.cwd(ctx.main).env(ctx.env).text();
 
     // The real HOME, so a tool on PATH that reads it, such as a version manager's node shim, runs.
-    const result = await $`bun test ./${suite}`
+    const result = await $`bun test ./${suite} -t ${pattern}`
       .cwd(join(import.meta.dir, '../..'))
       .env({
         ...ctx.env,
@@ -1013,7 +1085,7 @@ test.each([
 
     expect(configAfter).toBe(config);
     expect(headAfter).toBe(head);
-    expect(result.stderr.toString()).toMatch(/^ [1-9]\d* pass\n 0 fail$/mu);
+    expect(result.stderr.toString()).toMatch(/^ [1-9]\d* pass\n \d+ filtered out\n 0 fail$/mu);
     expect(result.exitCode).toBe(0);
   },
 );
@@ -1048,6 +1120,7 @@ test('it skips the test job with the CI notice when the branch has more than 50 
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:workflows': 'true',
         'memory-capped': `bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024`,
       },
     }),
@@ -1103,6 +1176,7 @@ test('it runs the related tests under the memory cap when the branch has 50 or f
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:workflows': 'true',
 
         'memory-capped': `bash -c 'echo "$*" >> capped.txt; exec bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024 "$@"' memory-capped`,
       },
@@ -1165,6 +1239,7 @@ test('it runs no tests in the hook when the branch changes only lane files', asy
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:workflows': 'true',
         'memory-capped': `bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024`,
       },
     }),
@@ -1212,6 +1287,7 @@ test('it passes the slow-host timeout to the tests when the host gets 1 worker',
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:workflows': 'true',
         'memory-capped': `bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024`,
       },
     }),
