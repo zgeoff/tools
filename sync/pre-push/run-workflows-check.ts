@@ -436,9 +436,8 @@ function collectPerRunGroupFindings(
   line: number,
 ): WorkflowFinding[] {
   const group = findMember(concurrency, 'group');
-
-  const perRun =
-    typeof group === 'string' ? perRunValues.find((value) => group.includes(value)) : undefined;
+  const references = typeof group === 'string' ? collectExpressionReferences(group) : [];
+  const perRun = perRunValues.find((value) => references.includes(value));
 
   return perRun === undefined
     ? []
@@ -449,6 +448,19 @@ function collectPerRunGroupFindings(
           message: `the concurrency group holds ${perRun}, so no newer run cancels this one`,
         },
       ];
+}
+
+const expressionPattern = /\$\{\{(?<body>.*?)\}\}/gsu;
+const referencePattern = /[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)+/gu;
+
+// Only a context reference inside an expression changes between runs; the same words outside one
+// are literal text.
+function collectExpressionReferences(text: string): string[] {
+  return [...text.matchAll(expressionPattern)].flatMap((expression) =>
+    [...(expression.groups?.['body'] ?? '').matchAll(referencePattern)].map(
+      (reference) => reference[0],
+    ),
+  );
 }
 
 function collectWorkflowRunFindings(context: WorkflowContext): WorkflowFinding[] {

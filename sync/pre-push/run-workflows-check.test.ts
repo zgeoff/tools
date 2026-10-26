@@ -260,6 +260,37 @@ test('it passes a checks workflow whose every job sets its own cancelling group'
   expect(findings).toStrictEqual([]);
 });
 
+test('it reads a per-run value in a concurrency group only inside an expression', async () => {
+  const ctx = await setupTest();
+
+  await ctx.commitFiles({
+    '.github/workflows/checks.yml': [
+      'on:',
+      '  pull_request:',
+      'concurrency:',
+      `  group: checks-github.sha-\${{ github.ref }}-\${{ github.sha_label }}`,
+      '  cancel-in-progress: true',
+      'jobs:',
+      '  lint:',
+      '    runs-on: ubuntu-latest',
+      '    timeout-minutes: 5',
+      '    steps:',
+      '      - run: bun run lint',
+      '',
+    ].join('\n'),
+  });
+
+  const findings = runWorkflowsCheck({
+    cwd: ctx.directory,
+    env: ctx.env,
+    paths: [],
+    profile: undefined,
+    runProgram,
+  });
+
+  expect(findings).toStrictEqual([]);
+});
+
 test('it reports a release or deploy job that a newer run can cancel', async () => {
   const ctx = await setupTest();
 
