@@ -1,9 +1,11 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import { buildMockHeadResponse } from '../../test-utils/build-mock-head-response.ts';
 import { createGitCommit } from '../../test-utils/create-git-commit.ts';
+import { createStubGH } from '../../test-utils/create-stub-gh.ts';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { runGit } from '../../test-utils/run-git.ts';
 import { createStubCurl } from './create-stub-curl.ts';
@@ -63,18 +65,32 @@ async function setupTest() {
     runWorkflowSteps(workflow, 'release', names, {
       cwd,
       env: {
-        PATH: process.env['PATH'],
+        PATH: `${bin}:${process.env['PATH']}`,
         RUNNER_TEMP: runnerTemp,
         GITHUB_REPOSITORY: 'zgeoff/tools',
+        POLL_INTERVAL: '0',
         ...env,
       },
       expressions,
       outputPath,
     });
 
+  // Puts the repo's own release scripts where the fetch step leaves them,
+  // and a stub gh at the GitHub boundary.
+  const installReleaseScripts = async () => {
+    for (const script of ['check-release-head.sh', 'merge-release-prs.sh']) {
+      await copyFile(
+        join(import.meta.dir, '..', '..', 'scripts', script),
+        join(runnerTemp, script),
+      );
+    }
+
+    return createStubGH(bin);
+  };
+
   return {
     directory,
-    runnerTemp,
+    installReleaseScripts,
     runStep,
     runSteps,
     readOutput,
@@ -210,35 +226,76 @@ test('it reports no release, tag or version for a run that released nothing', as
   );
 });
 
-test('it hands the merge script the release branch and the wait in seconds', async () => {
+test('it merges the release PR of the branch the caller names', async () => {
   const ctx = await setupTest();
+  const gh = await ctx.installReleaseScripts();
 
-  await writeFile(
-    join(ctx.runnerTemp, 'merge-release-prs.sh'),
-    'echo "CHECKS_TIMEOUT=$CHECKS_TIMEOUT GH_TOKEN=$GH_TOKEN $*" > "$RUNNER_TEMP/merge.log"\n',
-  );
+  await gh.writeResponses('prs', [[{ number: 212 }]]);
+
+  await gh.writeResponses('heads', [
+    buildMockHeadResponse('cafe12', [
+      { name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ]),
+  ]);
 
   const exitCode = await ctx.runSteps(ctx.directory, ['Auto-merge release PRs'], {
     'steps.app-token.outputs.token': 'app-token',
     'inputs.merge': 'true',
     'inputs.release-branch': 'release-please--branches--main--components--@acme/kettle',
-    'inputs.checks-timeout-minutes': '60',
+    'inputs.checks-timeout-minutes': '15',
   });
 
   expect(exitCode).toBe(0);
 
-  const recorded = await readFile(join(ctx.runnerTemp, 'merge.log'), 'utf8');
+  const calls = await gh.readCalls();
 
-  expect(recorded).toBe(
-    'CHECKS_TIMEOUT=3600 GH_TOKEN=app-token zgeoff/tools release-please--branches--main--components--@acme/kettle\n',
-  );
+  expect(
+    calls.filter((call) => call.startsWith('pr list') || call.startsWith('pr merge')),
+  ).toStrictEqual([
+    'pr list --repo zgeoff/tools --head release-please--branches--main--components--@acme/kettle --json number,isDraft,labels',
+    'pr merge 212 --repo zgeoff/tools --squash --match-head-commit cafe12',
+  ]);
+
+  const output = await ctx.readOutput();
+
+  expect(output).toBe('merged=true\n');
+});
+
+test("it leaves the release PR open once the caller's wait in minutes runs out", async () => {
+  const ctx = await setupTest();
+  const gh = await ctx.installReleaseScripts();
+
+  await gh.writeResponses('prs', [[{ number: 212 }]]);
+  await gh.writeResponses('mergeable', [{ isDraft: false, labels: [], baseRefName: 'main' }]);
+
+  await gh.writeResponses('heads', [
+    buildMockHeadResponse('cafe12', [
+      { name: 'pr / checks', status: 'IN_PROGRESS', conclusion: null },
+    ]),
+  ]);
+
+  const exitCode = await ctx.runSteps(ctx.directory, ['Auto-merge release PRs'], {
+    'steps.app-token.outputs.token': 'app-token',
+    'inputs.merge': 'true',
+    'inputs.release-branch': 'release-please--branches--main',
+    'inputs.checks-timeout-minutes': '0',
+  });
+
+  expect(exitCode).toBe(0);
+
+  const calls = await gh.readCalls();
+
+  expect(calls.filter((call) => call.startsWith('pr merge'))).toBeEmpty();
+
+  const output = await ctx.readOutput();
+
+  expect(output).toBe('');
 });
 
 test.each([
   {
     step: "Check untagged releases against main's head",
     expressions: { 'steps.app-token.outputs.token': '', 'github.token': 'run-token' },
-    token: 'run-token',
   },
   {
     step: "Check the merge against main's head",
@@ -246,24 +303,33 @@ test.each([
       'steps.app-token.outputs.token': 'app-token',
       'steps.merge.outputs.merged': 'true',
     },
-    token: 'app-token',
   },
-])('it runs the head check for "$step" on the repo with its token', async (row) => {
-  const ctx = await setupTest();
+])(
+  'it fails "$step" when main moved past a pending release with a workflow change',
+  async (row) => {
+    const ctx = await setupTest();
+    const gh = await ctx.installReleaseScripts();
 
-  await writeFile(
-    join(ctx.runnerTemp, 'check-release-head.sh'),
-    'echo "GH_TOKEN=$GH_TOKEN $*" > "$RUNNER_TEMP/check.log"\n',
-  );
+    await gh.writeResponses('prs', [
+      [{ number: 145, mergeCommit: { oid: 'merge111' }, baseRefName: 'main' }],
+    ]);
 
-  const exitCode = await ctx.runSteps(ctx.directory, [row.step], row.expressions);
+    await gh.writeResponses('commits', [{ sha: 'head222' }]);
+    await gh.writeResponses('compares', [{ files: [{ filename: '.github/workflows/ci.yml' }] }]);
 
-  expect(exitCode).toBe(0);
+    const exitCode = await ctx.runSteps(ctx.directory, [row.step], row.expressions);
 
-  const recorded = await readFile(join(ctx.runnerTemp, 'check.log'), 'utf8');
+    expect(exitCode).toBe(1);
 
-  expect(recorded).toBe(`GH_TOKEN=${row.token} zgeoff/tools\n`);
-});
+    const calls = await gh.readCalls();
+
+    expect(calls).toStrictEqual([
+      'pr list --repo zgeoff/tools --state merged --label autorelease: pending --json number,mergeCommit,baseRefName',
+      'api repos/zgeoff/tools/commits/main',
+      'api repos/zgeoff/tools/compare/merge111...head222',
+    ]);
+  },
+);
 
 test.each([
   {
