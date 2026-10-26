@@ -20,8 +20,8 @@ async function setupTest() {
   await createStubCommand(directory, 'npm', toolLog);
 
   // Resolves the release commit, dispatches the publish, and publishes, from
-  // the outputs of the shared release job; the run started at old111.
-  const runPublishSteps = (expressions: Readonly<Record<string, string>>) =>
+  // the outputs of the shared release job, in a run that started at sha.
+  const runPublishSteps = (sha: string, expressions: Readonly<Record<string, string>>) =>
     runWorkflowSteps(
       join(import.meta.dir, 'main.yml'),
       'publish',
@@ -35,7 +35,7 @@ async function setupTest() {
         env: {
           PATH: `${directory}:${process.env['PATH']}`,
           GITHUB_REPOSITORY: 'zgeoff/tools',
-          GITHUB_SHA: 'old111',
+          GITHUB_SHA: sha,
         },
         expressions: { 'github.token': 'app-token', ...expressions },
         outputPath: join(directory, 'output'),
@@ -58,7 +58,8 @@ async function setupTest() {
 test('it dispatches the publish at the tag, with every released path, for a release the merge run tagged', async () => {
   const ctx = await setupTest();
 
-  // The release job tagged the release PR it merged, at merge222.
+  // The release job tagged the release PR it merged, at merge222, after this
+  // run started at old111.
   const releaseOutputs = {
     releases_created: 'true',
     paths_released: '["packages/std","packages/tsconfig"]',
@@ -68,7 +69,7 @@ test('it dispatches the publish at the tag, with every released path, for a rele
     'packages/tsconfig--tag_name': '@zgeoff/tsconfig@1.2.0',
   };
 
-  const exitCode = await ctx.runPublishSteps({
+  const exitCode = await ctx.runPublishSteps('old111', {
     'needs.release.outputs.releases_created': 'true',
     'needs.release.outputs.release-outputs': JSON.stringify(releaseOutputs),
     'inputs.republish_paths': '',
@@ -100,7 +101,7 @@ test('it publishes the released paths in the run itself when the release tagged 
     'packages/std--version': '0.4.0',
   };
 
-  const exitCode = await ctx.runPublishSteps({
+  const exitCode = await ctx.runPublishSteps('old111', {
     'needs.release.outputs.releases_created': 'true',
     'needs.release.outputs.release-outputs': JSON.stringify(releaseOutputs),
     'inputs.republish_paths': '',
@@ -137,7 +138,7 @@ test('it refuses to publish a package whose version the release did not tag', as
     'packages/std--version': '0.4.0',
   };
 
-  const exitCode = await ctx.runPublishSteps({
+  const exitCode = await ctx.runPublishSteps('old111', {
     'needs.release.outputs.releases_created': 'true',
     'needs.release.outputs.release-outputs': JSON.stringify(releaseOutputs),
     'inputs.republish_paths': '',
@@ -155,7 +156,7 @@ test('it publishes the given paths in a republish run, which has no release outp
 
   await ctx.writePackageManifest('packages/std', { name: '@zgeoff/std', version: '0.4.0' });
 
-  const exitCode = await ctx.runPublishSteps({
+  const exitCode = await ctx.runPublishSteps('old111', {
     'needs.release.outputs.releases_created': '',
     'needs.release.outputs.release-outputs': '',
     'steps.release-commit.outputs.here': '',
@@ -180,7 +181,7 @@ test('it publishes the given paths in a republish run, which has no release outp
 test('it neither resolves, dispatches nor publishes when the release job tagged nothing', async () => {
   const ctx = await setupTest();
 
-  const exitCode = await ctx.runPublishSteps({
+  const exitCode = await ctx.runPublishSteps('old111', {
     'needs.release.outputs.releases_created': 'false',
     'steps.release-commit.outputs.here': '',
     'inputs.republish_paths': '',
