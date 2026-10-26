@@ -17,7 +17,8 @@ type ShellContext =
   | 'group'
   | 'backtick'
   | 'arithmetic'
-  | 'arithmetic-group';
+  | 'arithmetic-group'
+  | 'parameter';
 
 interface ParserState {
   readonly command: string;
@@ -91,6 +92,7 @@ function pickAction(context: ShellContext, cursor: ShellCursor): ShellAction {
     .with('single-quote', () => pickSingleQuotedAction(cursor))
     .with('double-quote', () => pickDoubleQuotedAction(cursor))
     .with('arithmetic', 'arithmetic-group', (current) => pickArithmeticAction(current, cursor))
+    .with('parameter', () => pickParameterAction(cursor))
     .exhaustive();
 }
 
@@ -140,11 +142,15 @@ function pickCodeAction(context: ShellContext, cursor: ShellCursor): ShellAction
   return pickOperator(cursor) ?? pickPlainAction(character);
 }
 
-// `$((` opens an arithmetic expansion, and `$(` a command substitution, in code and in double
-// quotes alike.
+// `${` opens a parameter expansion, `$((` an arithmetic expansion and `$(` a command
+// substitution, in code and in double quotes alike.
 function pickOpening(cursor: ShellCursor): ShellAction | undefined {
   if (cursor.character === '\\') {
     return { kind: 'escape' };
+  }
+
+  if (cursor.character === '$' && cursor.ahead.startsWith('{')) {
+    return { kind: 'open', context: 'parameter', text: '${' };
   }
 
   if (cursor.character === '$' && cursor.ahead === '((') {
@@ -231,6 +237,28 @@ function pickArithmeticAction(context: ShellContext, cursor: ShellCursor): Shell
   }
 
   return { kind: 'text', text: character };
+}
+
+// A parameter expansion reads its default or pattern as text, so `${VALUE:-a;b}` holds no operator,
+// while quotes and expansions inside it keep their meaning.
+function pickParameterAction(cursor: ShellCursor): ShellAction {
+  const opening = pickOpening(cursor);
+
+  if (opening !== undefined) {
+    return opening;
+  }
+
+  if (cursor.character === "'") {
+    return { kind: 'open', context: 'single-quote', text: '' };
+  }
+
+  if (cursor.character === '"') {
+    return { kind: 'open', context: 'double-quote', text: '' };
+  }
+
+  return cursor.character === '}'
+    ? { kind: 'close', text: '}' }
+    : { kind: 'text', text: cursor.character };
 }
 
 function advanceParser(state: ParserState, action: ShellAction, isTopLevel: boolean): void {
