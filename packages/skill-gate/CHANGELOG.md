@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.9](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.8...@zgeoff/skill-gate@0.2.9) (2026-10-26)
+
+
+### Bug Fixes
+
+* **skill-gate:** run the hook with bun --no-install ([#341](https://github.com/zgeoff/tools/issues/341)) ([1d22a8f](https://github.com/zgeoff/tools/commit/1d22a8f58929ede5906a3499eb9d62260e46c4f0))
+
 ## [0.2.8](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.7...@zgeoff/skill-gate@0.2.8) (2026-10-25)
 
 ### Features
