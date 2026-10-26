@@ -37,6 +37,16 @@ test('it writes a byte body to the -o path unchanged', async () => {
   expect([...body]).toStrictEqual([0x1f, 0x8b, 0x00, 0xff]);
 });
 
+test('it starts with an empty URL log', async () => {
+  const ctx = await setupTest();
+
+  await createStubCurl(ctx.directory, 'fake shfmt\n');
+
+  const urls = await readFile(join(ctx.directory, 'curl.urls'), 'utf8');
+
+  expect(urls).toBe('');
+});
+
 test('it records the URL of each download in order', async () => {
   const ctx = await setupTest();
 
@@ -55,7 +65,7 @@ test.each([
   ['a download with no -o', ['-fsSL', 'https://example.com/shfmt']],
   ['a download with other flags', ['-sL', '-o', 'out', 'https://example.com/shfmt']],
   ['a download with an extra argument', ['-fsSL', '-o', 'out', 'https://example.com/a', 'b']],
-])('it exits 64 and writes nothing for %s', async (_label, args) => {
+])('it exits 64, writes nothing and records no URL for %s', async (_label, args) => {
   const ctx = await setupTest();
 
   await createStubCurl(ctx.directory, 'fake shfmt\n');
@@ -66,10 +76,10 @@ test.each([
     .quiet();
 
   const wrote = await Bun.file(join(ctx.directory, 'out')).exists();
-  const recorded = await Bun.file(join(ctx.directory, 'curl.urls')).exists();
+  const recorded = await readFile(join(ctx.directory, 'curl.urls'), 'utf8');
 
   expect(result.exitCode).toBe(64);
   expect(result.stderr.toString()).toBe('stub curl: supports only: curl -fsSL -o <path> <url>\n');
   expect(wrote).toBeFalse();
-  expect(recorded).toBeFalse();
+  expect(recorded).toBe('');
 });

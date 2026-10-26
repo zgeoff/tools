@@ -7,6 +7,10 @@ export async function createStubCurl(bin: string, body: string | Uint8Array): Pr
 
   await writeFile(bodyPath, body);
 
+  // The URL log starts empty, so a test reads it the same way whether or not
+  // a download happened.
+  await writeFile(join(bin, 'curl.urls'), '');
+
   await writeFile(
     path,
     [

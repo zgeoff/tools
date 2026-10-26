@@ -45,14 +45,7 @@ async function setupTest() {
   };
 
   const readOutput = () => readFile(outputPath, 'utf8');
-
-  const readFetchedURLs = async () => {
-    const log = Bun.file(join(bin, 'curl.urls'));
-
-    const exists = await log.exists();
-
-    return exists ? log.text() : '';
-  };
+  const readFetchedURLs = () => readFile(join(bin, 'curl.urls'), 'utf8');
 
   const readFetchedFiles = async () => {
     const files = await readdir(runnerTemp);
