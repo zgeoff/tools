@@ -260,7 +260,17 @@ test('it passes a checks workflow whose every job sets its own cancelling group'
   expect(findings).toStrictEqual([]);
 });
 
-test('it reads a per-run value in a concurrency group only inside an expression', async () => {
+test.each([
+  [`checks-github.sha-\${{ github.ref }}`, []],
+  [`checks-\${{ github.sha_label }}`, []],
+  [`\${{ format('{0} github.sha', github.ref) }}`, []],
+  [`\${{ format('it''s github.run_id {0}', github.ref) }}`, []],
+  [`\${{ format('{0}}}', github.ref) }}-\${{ github.sha }}`, ['github.sha']],
+  [`checks-\${{ github.sha }}`, ['github.sha']],
+  [`checks-\${{ github['sha'] }}`, ['github.sha']],
+  [`checks-\${{ github[ 'run_id' ] }}`, ['github.run_id']],
+  [`checks-\${{ github.run_attempt }}`, ['github.run_attempt']],
+])('it reads the concurrency group %p as holding the per-run values %p', async (group, values) => {
   const ctx = await setupTest();
 
   await ctx.commitFiles({
@@ -268,7 +278,7 @@ test('it reads a per-run value in a concurrency group only inside an expression'
       'on:',
       '  pull_request:',
       'concurrency:',
-      `  group: checks-github.sha-\${{ github.ref }}-\${{ github.sha_label }}`,
+      `  group: "${group}"`,
       '  cancel-in-progress: true',
       'jobs:',
       '  lint:',
@@ -288,7 +298,13 @@ test('it reads a per-run value in a concurrency group only inside an expression'
     runProgram,
   });
 
-  expect(findings).toStrictEqual([]);
+  expect(findings).toStrictEqual(
+    values.map((value) => ({
+      path: '.github/workflows/checks.yml',
+      line: 3,
+      message: `the concurrency group holds ${value}, so no newer run cancels this one`,
+    })),
+  );
 });
 
 test('it reports a release or deploy job that a newer run can cancel', async () => {
