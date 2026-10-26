@@ -1,9 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createStubCommand } from '../../test-utils/create-stub-command.ts';
 import { createStubGH } from '../../test-utils/create-stub-gh.ts';
+import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import { runWorkflowSteps } from './run-workflow-steps.ts';
 
 async function setupTest() {
@@ -44,17 +45,9 @@ async function setupTest() {
       },
     );
 
-  const writePackageManifest = async (
-    path: string,
-    manifest: Readonly<Record<string, unknown>>,
-  ) => {
-    await mkdir(join(directory, path), { recursive: true });
-    await writeFile(join(directory, path, 'package.json'), JSON.stringify(manifest));
-  };
-
   const readToolCalls = () => readFile(toolLog, 'utf8');
 
-  return { gh, runPublishSteps, writePackageManifest, readToolCalls };
+  return { directory, gh, runPublishSteps, readToolCalls };
 }
 
 test('it dispatches the publish at the tag, with every released path, for a release the merge run tagged', async () => {
@@ -97,7 +90,9 @@ test('it dispatches the publish at the tag, with every released path, for a rele
 test('it publishes the released paths in the run itself when the release tagged its own commit', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePackageManifest('packages/std', { name: '@zgeoff/std', version: '0.4.0' });
+  await writeTreeFiles(ctx.directory, {
+    'packages/std/package.json': JSON.stringify({ name: '@zgeoff/std', version: '0.4.0' }),
+  });
 
   const releaseOutputs = {
     releases_created: 'true',
@@ -138,7 +133,9 @@ test('it publishes the released paths in the run itself when the release tagged 
 test('it refuses to publish a package whose version the release did not tag', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePackageManifest('packages/std', { name: '@zgeoff/std', version: '0.3.9' });
+  await writeTreeFiles(ctx.directory, {
+    'packages/std/package.json': JSON.stringify({ name: '@zgeoff/std', version: '0.3.9' }),
+  });
 
   const releaseOutputs = {
     releases_created: 'true',
@@ -168,7 +165,9 @@ test('it refuses to publish a package whose version the release did not tag', as
 test('it publishes the given paths in a republish run, which has no release outputs', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePackageManifest('packages/std', { name: '@zgeoff/std', version: '0.4.0' });
+  await writeTreeFiles(ctx.directory, {
+    'packages/std/package.json': JSON.stringify({ name: '@zgeoff/std', version: '0.4.0' }),
+  });
 
   const exitCode = await ctx.runPublishSteps(
     { GITHUB_REPOSITORY: 'zgeoff/tools', GITHUB_SHA: 'old111' },
