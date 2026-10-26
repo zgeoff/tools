@@ -1,15 +1,15 @@
 import { chmod, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-export async function createStubCurl(bin: string, body: string | Uint8Array): Promise<void> {
-  const path = join(bin, 'curl');
-  const bodyPath = join(bin, 'curl.body');
+export async function createStubCurl(directory: string, body: string | Uint8Array): Promise<void> {
+  const path = join(directory, 'curl');
+  const bodyPath = join(directory, 'curl.body');
 
   await writeFile(bodyPath, body);
 
   // The URL log starts empty, so a test reads it the same way whether or not
   // a download happened.
-  await writeFile(join(bin, 'curl.urls'), '');
+  await writeFile(join(directory, 'curl.urls'), '');
 
   await writeFile(
     path,
@@ -20,7 +20,7 @@ export async function createStubCurl(bin: string, body: string | Uint8Array): Pr
       '  exit 64',
       'fi',
       `cat '${bodyPath}' > "$3"`,
-      `echo "$4" >> '${join(bin, 'curl.urls')}'`,
+      `echo "$4" >> '${join(directory, 'curl.urls')}'`,
       '',
     ].join('\n'),
   );

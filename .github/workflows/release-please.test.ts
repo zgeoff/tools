@@ -19,26 +19,26 @@ async function setupTest() {
 
   const workflow = join(import.meta.dir, 'release-please.yml');
   const outputPath = join(directory, 'output');
-  const bin = join(directory, 'bin');
-  const runnerTemp = join(directory, 'runner');
+  const stubDirectory = join(directory, 'bin');
+  const runnerTemporaryDirectory = join(directory, 'runner');
 
   await writeFile(outputPath, '');
-  await mkdir(bin);
-  await mkdir(runnerTemp);
+  await mkdir(stubDirectory);
+  await mkdir(runnerTemporaryDirectory);
 
   // A stub curl that answers every URL with the same body.
-  await createStubCurl(bin, '# release script\n');
+  await createStubCurl(stubDirectory, '# release script\n');
 
-  const runStep = async (name: string, env: Readonly<Record<string, string>>) => {
+  const runStep = async (name: string, environment: Readonly<Record<string, string>>) => {
     const step = await loadWorkflowStep(workflow, 'release', name);
 
     const result = await $`bash -c ${step.run}`
       .cwd(directory)
       .env({
-        PATH: `${bin}:${process.env['PATH']}`,
+        PATH: `${stubDirectory}:${process.env['PATH']}`,
         GITHUB_OUTPUT: outputPath,
-        RUNNER_TEMP: runnerTemp,
-        ...env,
+        RUNNER_TEMP: runnerTemporaryDirectory,
+        ...environment,
       })
       .nothrow()
       .quiet();
@@ -47,29 +47,30 @@ async function setupTest() {
   };
 
   const readOutput = () => readFile(outputPath, 'utf8');
-  const readFetchedURLs = () => readFile(join(bin, 'curl.urls'), 'utf8');
+  const readFetchedURLs = () => readFile(join(stubDirectory, 'curl.urls'), 'utf8');
 
   const readFetchedFiles = async () => {
-    const files = await readdir(runnerTemp);
+    const files = await readdir(runnerTemporaryDirectory);
 
     return files.toSorted();
   };
 
-  // Runs the named steps with their env expressions and conditions, in cwd.
+  // Runs the named steps with their env expressions and conditions, in the
+  // working directory.
   const runSteps = (
-    cwd: string,
+    workingDirectory: string,
     names: readonly string[],
     expressions: Readonly<Record<string, string>>,
-    env: Readonly<Record<string, string | undefined>> = {},
+    environment: Readonly<Record<string, string | undefined>> = {},
   ) =>
     runWorkflowSteps(workflow, 'release', names, {
-      cwd,
+      cwd: workingDirectory,
       env: {
-        PATH: `${bin}:${process.env['PATH']}`,
-        RUNNER_TEMP: runnerTemp,
+        PATH: `${stubDirectory}:${process.env['PATH']}`,
+        RUNNER_TEMP: runnerTemporaryDirectory,
         GITHUB_REPOSITORY: 'zgeoff/tools',
         POLL_INTERVAL: '0',
-        ...env,
+        ...environment,
       },
       expressions,
       outputPath,
@@ -81,11 +82,11 @@ async function setupTest() {
     for (const script of ['check-release-head.sh', 'merge-release-prs.sh']) {
       await copyFile(
         join(import.meta.dir, '..', '..', 'scripts', script),
-        join(runnerTemp, script),
+        join(runnerTemporaryDirectory, script),
       );
     }
 
-    return createStubGH(bin);
+    return createStubGH(stubDirectory);
   };
 
   return {
@@ -345,25 +346,25 @@ test.each([
 ])('it $outcome on the release branch', async (row) => {
   const ctx = await setupTest();
 
-  const gitEnv = readGitEnv(ctx.directory);
+  const gitEnvironment = readGitEnv(ctx.directory);
   const remote = join(ctx.directory, 'remote.git');
   const clone = join(ctx.directory, 'clone');
 
-  await runGit(ctx.directory, gitEnv, ['init', '--quiet', '--bare', remote]);
-  await runGit(ctx.directory, gitEnv, ['clone', '--quiet', remote, clone]);
-  await createGitCommit(clone, gitEnv, { 'README.md': 'kettle\n' });
-  await runGit(clone, gitEnv, ['push', '--quiet', '-u', 'origin', 'HEAD']);
+  await runGit(ctx.directory, gitEnvironment, ['init', '--quiet', '--bare', remote]);
+  await runGit(ctx.directory, gitEnvironment, ['clone', '--quiet', remote, clone]);
+  await createGitCommit(clone, gitEnvironment, { 'README.md': 'kettle\n' });
+  await runGit(clone, gitEnvironment, ['push', '--quiet', '-u', 'origin', 'HEAD']);
 
   const exitCode = await ctx.runSteps(
     clone,
     ['Sync the release PR'],
     { 'steps.release.outputs.prs_created': 'true', 'inputs.sync-command': row.command },
-    gitEnv,
+    gitEnvironment,
   );
 
   expect(exitCode).toBe(0);
 
-  const subject = await $`git -C ${remote} log -1 --format=%s`.env({ ...gitEnv }).text();
+  const subject = await $`git -C ${remote} log -1 --format=%s`.env({ ...gitEnvironment }).text();
 
   expect(subject).toBe(`${row.subject}\n`);
 });
