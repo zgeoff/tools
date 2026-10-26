@@ -17,8 +17,8 @@ The shared files under `sync/` ship by hand-pushed `sync-vN` tags instead, which
    person merges the release PR, and the run of that merge's push tags the release. It runs
    release-please, which opens (or updates) a release PR for the affected packages: version bump per
    conventional-commit type, `CHANGELOG.md`, manifest update. The job syncs `bun.lock` on the PR
-   branch (versions are recorded there too) and auto-merges the PR once every check on its head
-   passes. `scripts/merge-release-prs.sh` waits up to 15 minutes for those checks to start and
+   branch (versions are recorded there too) and merges the PR when every check on its head passes in
+   the wait. `scripts/merge-release-prs.sh` waits up to 15 minutes for those checks to start and
    finish, and fails the run when one fails. When they run longer, it leaves the PR open. When a
    ruleset on `main` requires every check still running, it turns on auto-merge, so GitHub merges
    the PR once they pass; otherwise the next push to `main` waits again. The run of the merge's push
