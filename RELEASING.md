@@ -29,6 +29,26 @@ The shared files under `sync/` ship by hand-pushed `sync-vN` tags instead, which
 Packages with `"private": true` are versioned but skipped by the publish step. Internal `workspace:`
 dependents of a released package get a patch bump automatically (`node-workspace` plugin).
 
+## Hold a release
+
+The release job leaves a held release PR open: a draft, or one labelled `autorelease: hold`. It
+never marks the draft ready, removes the label, or turns on auto-merge for it, and release-please
+keeps both when it updates the PR.
+
+To hold a release:
+
+1. Mark the release PR as a draft, or add the label:
+   `gh pr edit <number> --add-label 'autorelease: hold'`. The first time, create the label:
+   `gh label create 'autorelease: hold'`.
+2. If the PR shows auto-merge as on, turn it off: `gh pr merge <number> --disable-auto`.
+
+To release it:
+
+1. Mark the PR ready for review, or remove the label:
+   `gh pr edit <number> --remove-label 'autorelease: hold'`.
+2. Merge it by hand, or let the release job merge it on the next push to `main` once its checks
+   pass.
+
 ## One-time setup
 
 ### GitHub App (required for the automated chain)

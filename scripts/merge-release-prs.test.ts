@@ -364,7 +364,7 @@ test('it exits cleanly when no release PR is open', async () => {
   });
 
   expect(calls).toStrictEqual([
-    'pr list --repo zgeoff/tools --head release-please--branches--main --json number',
+    'pr list --repo zgeoff/tools --head release-please--branches--main --json number,isDraft,labels',
   ]);
 
   const output = await ctx.readOutput();
@@ -395,7 +395,7 @@ test('it merges the release PR of the branch it is given', async () => {
   });
 
   expect(calls.filter((call) => !call.startsWith('pr view'))).toStrictEqual([
-    'pr list --repo zgeoff/tools --head release-please--branches--main--components--@acme/kettle --json number',
+    'pr list --repo zgeoff/tools --head release-please--branches--main--components--@acme/kettle --json number,isDraft,labels',
     'api graphql -f owner=zgeoff -f name=tools -f ref=refs/heads/release-please--branches--main--components--@acme/kettle',
     'pr merge 212 --repo zgeoff/tools --squash --match-head-commit cafe12',
   ]);
@@ -409,4 +409,68 @@ test('it refuses more than two arguments', async () => {
     exitCode: 2,
     stderr: 'usage: merge-release-prs.sh <owner/repo> [<release branch>]\n',
   });
+});
+
+test.each([
+  ['a draft', { number: 145, isDraft: true, labels: [] }, 'a draft'],
+  [
+    'labelled autorelease: hold',
+    {
+      number: 145,
+      isDraft: false,
+      labels: [{ name: 'autorelease: pending' }, { name: 'autorelease: hold' }],
+    },
+    'labelled autorelease: hold',
+  ],
+])(
+  'it leaves a release PR that is %s open, without a wait or a merge',
+  async (_, listed, reason) => {
+    const ctx = await setupTest();
+
+    await ctx.writeResponses('prs', [[listed]]);
+
+    const result = await ctx.runScript();
+    const calls = await ctx.readCalls();
+    const output = await ctx.readOutput();
+
+    expect({
+      exitCode: result.exitCode,
+      stdout: result.stdout.toString(),
+      calls,
+      output,
+    }).toStrictEqual({
+      exitCode: 0,
+      stdout: `release PR #145 is held (${reason}); leaving it open\n`,
+      calls: [
+        'pr list --repo zgeoff/tools --head release-please--branches--main --json number,isDraft,labels',
+      ],
+      output: '',
+    });
+  },
+);
+
+test('it leaves a release PR open when someone holds it during the wait', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeResponses('prs', [[{ number: 145, isDraft: false, labels: [] }]]);
+
+  await ctx.writeResponses('heads', [
+    buildMockHeadResponse('abc123', [
+      { name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ]),
+  ]);
+
+  await ctx.writeResponses('mergeable', [
+    { mergeable: 'MERGEABLE', isDraft: false, labels: [{ name: 'autorelease: hold' }] },
+  ]);
+
+  const result = await ctx.runScript();
+  const calls = await ctx.readCalls();
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'release PR #145 is held (labelled autorelease: hold); leaving it open\n',
+  });
+
+  expect(calls.filter((call) => call.startsWith('pr merge'))).toBeEmpty();
 });

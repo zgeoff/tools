@@ -7,7 +7,9 @@
 # checks yet counts as pending, because GitHub starts them a few seconds after
 # the push. The merge names the checked commit, so a later push can't slip in.
 # After a merge, it writes merged=true to $GITHUB_OUTPUT, so the release job
-# can tag the merge in the same run.
+# can tag the merge in the same run. A held release PR, a draft or one
+# labelled "autorelease: hold", stays open: the script reads the hold before
+# the wait and again before each merge attempt, and changes neither.
 # Usage: merge-release-prs.sh <owner/repo> [<release branch>]
 #        (default branch: release-please--branches--main)
 # Env: CHECKS_TIMEOUT, the seconds to wait for the checks (default 900);
@@ -25,9 +27,20 @@ branch=${2:-release-please--branches--main}
 timeout=${CHECKS_TIMEOUT:-900}
 interval=${POLL_INTERVAL:-10}
 
-pr=$(gh pr list --repo "$repo" --head "$branch" --json number | jq -r '.[0].number // empty')
-if [ -z "$pr" ]; then
+# Prints why a release PR is held, or nothing, from its JSON on stdin.
+hold_filter='if .isDraft == true then "a draft"
+  elif any(.labels[]?; .name == "autorelease: hold") then "labelled autorelease: hold"
+  else empty end'
+
+listed=$(gh pr list --repo "$repo" --head "$branch" --json number,isDraft,labels | jq -c '.[0] // empty')
+if [ -z "$listed" ]; then
   echo "no open release PR"
+  exit 0
+fi
+pr=$(jq -r .number <<< "$listed")
+hold=$(jq -r "$hold_filter" <<< "$listed")
+if [ -n "$hold" ]; then
+  echo "release PR #$pr is held ($hold); leaving it open"
   exit 0
 fi
 
@@ -107,7 +120,13 @@ done
 # settles. A MERGEABLE read can be stale ("Base branch was modified" from the
 # merge mutation), so the merge itself retries inside the same loop.
 for _ in $(seq 1 12); do
-  state=$(gh pr view "$pr" --repo "$repo" --json mergeable | jq -r .mergeable)
+  view=$(gh pr view "$pr" --repo "$repo" --json mergeable,isDraft,labels)
+  hold=$(jq -r "$hold_filter" <<< "$view")
+  if [ -n "$hold" ]; then
+    echo "release PR #$pr is held ($hold); leaving it open"
+    exit 0
+  fi
+  state=$(jq -r .mergeable <<< "$view")
   if [ "$state" = "CONFLICTING" ]; then
     echo "release PR #$pr has conflicts" >&2
     exit 1
