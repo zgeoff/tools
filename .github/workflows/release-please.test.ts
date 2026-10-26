@@ -8,6 +8,7 @@ import { createGitCommit } from '../../test-utils/create-git-commit.ts';
 import { createStubGH } from '../../test-utils/create-stub-gh.ts';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { runGit } from '../../test-utils/run-git.ts';
+import { createStubClock } from './create-stub-clock.ts';
 import { createStubCurl } from './create-stub-curl.ts';
 import { loadWorkflowStep } from './load-workflow-step.ts';
 import { runWorkflowSteps } from './run-workflow-steps.ts';
@@ -89,9 +90,13 @@ async function setupTest() {
     return createStubGH(stubDirectory);
   };
 
+  // Puts a stub clock first on PATH, which reads out the given Unix times.
+  const setClock = (times: readonly number[]) => createStubClock(stubDirectory, times);
+
   return {
     directory,
     installReleaseScripts,
+    setClock,
     runStep,
     runSteps,
     readOutput,
@@ -262,10 +267,13 @@ test('it merges the release PR of the branch the caller names', async () => {
   expect(output).toBe('merged=true\n');
 });
 
-test("it leaves the release PR open once the caller's wait in minutes runs out", async () => {
+test("it waits exactly the caller's minutes, in seconds, before it leaves the release PR open", async () => {
   const ctx = await setupTest();
   const gh = await ctx.installReleaseScripts();
 
+  // The wait starts at 1000. Two minutes as 120 seconds polls again at 1119
+  // and stops at 1120; any other conversion polls once or more than twice.
+  await ctx.setClock([1000, 1119, 1120, 1121]);
   await gh.writeResponses('prs', [[{ number: 212 }]]);
   await gh.writeResponses('mergeable', [{ isDraft: false, labels: [], baseRefName: 'main' }]);
 
@@ -279,13 +287,14 @@ test("it leaves the release PR open once the caller's wait in minutes runs out",
     'steps.app-token.outputs.token': 'app-token',
     'inputs.merge': 'true',
     'inputs.release-branch': 'release-please--branches--main',
-    'inputs.checks-timeout-minutes': '0',
+    'inputs.checks-timeout-minutes': '2',
   });
 
   expect(exitCode).toBe(0);
 
   const calls = await gh.readCalls();
 
+  expect(calls.filter((call) => call.startsWith('api graphql'))).toHaveLength(2);
   expect(calls.filter((call) => call.startsWith('pr merge'))).toBeEmpty();
 
   const output = await ctx.readOutput();

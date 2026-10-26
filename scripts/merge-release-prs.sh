@@ -85,7 +85,9 @@ filter='.data.repository.ref.target
         elif .state == "SUCCESS" then "pass"
         else "fail:" + .context end)'
 
-deadline=$((SECONDS + timeout))
+# The clock is a command, not $SECONDS, so a test can set the time.
+now() { date +%s; }
+deadline=$(($(now) + timeout))
 sha=unknown
 while :; do
   # A failed read counts as a pending poll, so one API error doesn't end the
@@ -115,7 +117,7 @@ while :; do
   # only when GitHub Actions has created its checks and the base branch's
   # rules require every pending one; otherwise GitHub could merge before a
   # check passes, and the next push to main runs this wait again.
-  if [ "$SECONDS" -ge "$deadline" ]; then
+  if [ "$(now)" -ge "$deadline" ]; then
     view=$(gh pr view "$pr" --repo "$repo" --json isDraft,labels,baseRefName)
     hold=$(jq -r "$hold_filter" <<< "$view")
     if [ -n "$hold" ]; then
