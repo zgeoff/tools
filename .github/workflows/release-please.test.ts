@@ -3,9 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { isConditionMet } from './is-condition-met.ts';
 import { loadWorkflowStep } from './load-workflow-step.ts';
-import { parseWorkflowStep } from './parse-workflow-step.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'release-please-'));
@@ -35,88 +33,8 @@ async function setupTest() {
     return { exitCode: result.exitCode, stderr: result.stderr.toString(), output };
   };
 
-  return { workflow, runPick };
+  return { runPick };
 }
-
-test.each([
-  {
-    verb: 'tags',
-    run: 'a release PR this run merged',
-    merged: 'true',
-    created: 'false',
-    met: true,
-  },
-  { verb: 'leaves', run: 'a run with no merge', merged: '', created: 'false', met: false },
-  {
-    verb: 'leaves',
-    run: 'a run whose first release-please call tagged a release',
-    merged: 'true',
-    created: 'true',
-    met: false,
-  },
-])('it $verb the merge for $run', async (row) => {
-  const ctx = await setupTest();
-  const text = await readFile(ctx.workflow, 'utf8');
-
-  const tag = parseWorkflowStep(text, 'release', 'Tag the merged release');
-
-  if (tag.kind !== 'parsed') {
-    throw new Error(tag.message);
-  }
-
-  const values = new Map([
-    ['steps.merge.outputs.merged', row.merged],
-    ['steps.release.outputs.releases_created', row.created],
-  ]);
-
-  const result = isConditionMet(tag.step.condition ?? '', values);
-
-  expect(result).toBe(row.met);
-});
-
-test.each([
-  { value: 'true', runs: true },
-  { value: 'false', runs: false },
-])('it merges the release PR only when merge is on, with merge $value', async (row) => {
-  const ctx = await setupTest();
-  const text = await readFile(ctx.workflow, 'utf8');
-
-  const step = parseWorkflowStep(text, 'release', 'Auto-merge release PRs');
-
-  if (step.kind !== 'parsed') {
-    throw new Error(step.message);
-  }
-
-  const values = new Map([
-    ['steps.app-token.outputs.token', 'app-token'],
-    ['inputs.merge', row.value],
-  ]);
-
-  const result = isConditionMet(step.step.condition ?? '', values);
-
-  expect(result).toBe(row.runs);
-});
-
-test.each([
-  { merged: 'true', checks: true },
-  { merged: '', checks: false },
-])("it checks main's head after its own merge only, with merged '$merged'", async (row) => {
-  const ctx = await setupTest();
-  const text = await readFile(ctx.workflow, 'utf8');
-
-  const step = parseWorkflowStep(text, 'release', "Check the merge against main's head");
-
-  if (step.kind !== 'parsed') {
-    throw new Error(step.message);
-  }
-
-  const result = isConditionMet(
-    step.step.condition ?? '',
-    new Map([['steps.merge.outputs.merged', row.merged]]),
-  );
-
-  expect(result).toBe(row.checks);
-});
 
 test('it reports the first package of a multi-package release that the tag step made', async () => {
   const ctx = await setupTest();

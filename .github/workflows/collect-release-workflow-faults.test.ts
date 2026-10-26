@@ -198,3 +198,107 @@ test('it reports each step the release job lacks', () => {
     'the release job has no step named Pick the release outputs',
   ]);
 });
+
+test('it reports a tag step that also runs after a run whose first call released', () => {
+  const text = [
+    'jobs:',
+    '  release:',
+    '    steps:',
+    "      - name: Check untagged releases against main's head",
+    '        run: bash check-release-head.sh',
+    '      - name: Run release-please',
+    '        uses: acme/release-action@abc123',
+    '      - name: Auto-merge release PRs',
+    "        if: steps.app-token.outputs.token != '' && inputs.merge == true",
+    '        run: bash merge-release-prs.sh',
+    "      - name: Check the merge against main's head",
+    "        if: steps.merge.outputs.merged == 'true'",
+    '        run: bash check-release-head.sh',
+    '      - name: Tag the merged release',
+    "        if: steps.merge.outputs.merged == 'true'",
+    '        uses: acme/release-action@abc123',
+    '        with:',
+    `          token: \${{ steps.app-token.outputs.token }}`,
+    '          skip-github-pull-request: true',
+    '      - name: Pick the release outputs',
+    '        env:',
+    `          RELEASE_OUTPUTS: \${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) || toJSON(steps.release.outputs) }}`,
+    '        run: echo picked',
+    '',
+  ].join('\n');
+
+  const faults = collectReleaseWorkflowFaults(text);
+
+  expect(faults).toStrictEqual([
+    "Tag the merged release must run only after this run's merge, when the first release-please call released nothing",
+  ]);
+});
+
+test('it reports a merge step that runs with merge off', () => {
+  const text = [
+    'jobs:',
+    '  release:',
+    '    steps:',
+    "      - name: Check untagged releases against main's head",
+    '        run: bash check-release-head.sh',
+    '      - name: Run release-please',
+    '        uses: acme/release-action@abc123',
+    '      - name: Auto-merge release PRs',
+    "        if: steps.app-token.outputs.token != ''",
+    '        run: bash merge-release-prs.sh',
+    "      - name: Check the merge against main's head",
+    "        if: steps.merge.outputs.merged == 'true'",
+    '        run: bash check-release-head.sh',
+    '      - name: Tag the merged release',
+    "        if: steps.merge.outputs.merged == 'true' && steps.release.outputs.releases_created != 'true'",
+    '        uses: acme/release-action@abc123',
+    '        with:',
+    `          token: \${{ steps.app-token.outputs.token }}`,
+    '          skip-github-pull-request: true',
+    '      - name: Pick the release outputs',
+    '        env:',
+    `          RELEASE_OUTPUTS: \${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) || toJSON(steps.release.outputs) }}`,
+    '        run: echo picked',
+    '',
+  ].join('\n');
+
+  const faults = collectReleaseWorkflowFaults(text);
+
+  expect(faults).toStrictEqual([
+    'Auto-merge release PRs must run only with an App token and merge on',
+  ]);
+});
+
+test('it reports a post-merge head check with no condition', () => {
+  const text = [
+    'jobs:',
+    '  release:',
+    '    steps:',
+    "      - name: Check untagged releases against main's head",
+    '        run: bash check-release-head.sh',
+    '      - name: Run release-please',
+    '        uses: acme/release-action@abc123',
+    '      - name: Auto-merge release PRs',
+    "        if: steps.app-token.outputs.token != '' && inputs.merge == true",
+    '        run: bash merge-release-prs.sh',
+    "      - name: Check the merge against main's head",
+    '        run: bash check-release-head.sh',
+    '      - name: Tag the merged release',
+    "        if: steps.merge.outputs.merged == 'true' && steps.release.outputs.releases_created != 'true'",
+    '        uses: acme/release-action@abc123',
+    '        with:',
+    `          token: \${{ steps.app-token.outputs.token }}`,
+    '          skip-github-pull-request: true',
+    '      - name: Pick the release outputs',
+    '        env:',
+    `          RELEASE_OUTPUTS: \${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) || toJSON(steps.release.outputs) }}`,
+    '        run: echo picked',
+    '',
+  ].join('\n');
+
+  const faults = collectReleaseWorkflowFaults(text);
+
+  expect(faults).toStrictEqual([
+    "Check the merge against main's head must run only after this run's merge",
+  ]);
+});
