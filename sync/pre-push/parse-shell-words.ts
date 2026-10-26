@@ -148,6 +148,12 @@ interface ShellCodeRules {
 function makeCodeReader(rules: ShellCodeRules): (cursor: ShellCursor) => ShellAction {
   return (cursor) => {
     const character = cursor.character;
+
+    // A closing backtick would read as an opening one, so the closer comes first.
+    if (character === rules.closer) {
+      return { kind: 'close', text: character };
+    }
+
     const opening = pickOpening(cursor);
 
     if (opening !== undefined) {
@@ -160,14 +166,6 @@ function makeCodeReader(rules: ShellCodeRules): (cursor: ShellCursor) => ShellAc
 
     if (character === '"') {
       return { kind: 'open', context: 'double-quote', text: '' };
-    }
-
-    if (character === rules.closer) {
-      return { kind: 'close', text: character };
-    }
-
-    if (character === '`') {
-      return { kind: 'open', context: 'backtick', text: '`' };
     }
 
     if (character === '(' && rules.isGrouping) {
@@ -190,8 +188,8 @@ function makeCodeReader(rules: ShellCodeRules): (cursor: ShellCursor) => ShellAc
   };
 }
 
-// `${` opens a parameter expansion, `$((` an arithmetic expansion and `$(` a command
-// substitution, in code and in double quotes alike.
+// `${` opens a parameter expansion, `$((` an arithmetic expansion, and `$(` or a backtick a
+// command substitution, in every context but a single quote.
 function pickOpening(cursor: ShellCursor): ShellAction | undefined {
   if (cursor.character === '\\') {
     return { kind: 'escape' };
@@ -207,6 +205,10 @@ function pickOpening(cursor: ShellCursor): ShellAction | undefined {
 
   if (cursor.character === '$' && cursor.ahead.startsWith('(')) {
     return { kind: 'open', context: 'substitution', text: '$(' };
+  }
+
+  if (cursor.character === '`') {
+    return { kind: 'open', context: 'backtick', text: '`' };
   }
 
   return undefined;
@@ -254,10 +256,6 @@ function pickDoubleQuotedAction(cursor: ShellCursor): ShellAction {
 
   if (opening !== undefined) {
     return opening;
-  }
-
-  if (cursor.character === '`') {
-    return { kind: 'open', context: 'backtick', text: '`' };
   }
 
   return cursor.character === '"'
