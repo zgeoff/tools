@@ -1,7 +1,7 @@
 import { chmod, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-export type StubGHEndpoint = 'prs' | 'heads' | 'mergeable' | 'commits' | 'compares';
+export type StubGHEndpoint = 'prs' | 'heads' | 'mergeable' | 'commits' | 'compares' | 'rules';
 
 export interface StubGH {
   writeResponses: (name: StubGHEndpoint, bodies: readonly unknown[]) => Promise<void>;
@@ -29,6 +29,7 @@ case "$*" in
   "pr view "*) take mergeable '{"mergeable":"MERGEABLE"}' ;;
   "api repos/"*"/commits/"*) take commits '{"sha":"unknown"}' ;;
   "api repos/"*"/compare/"*) take compares '{"files":[]}' ;;
+  "api repos/"*"/rules/branches/"*) take rules '[]' ;;
   "pr merge "*) ;;
   "workflow run "*) ;;
   *) echo "unexpected gh call: $*" >&2; exit 1 ;;

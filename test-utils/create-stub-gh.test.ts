@@ -57,11 +57,12 @@ test('it answers an endpoint with no response file with its default body', async
   expect(result.stdout.toString()).toBe('{"mergeable":"MERGEABLE"}\n');
 });
 
-test('it answers the commit and compare endpoints with their responses', async () => {
+test('it answers the commit, compare and branch rules endpoints with their responses', async () => {
   const ctx = await setupTest();
 
   await ctx.gh.writeResponses('commits', [{ sha: 'head222' }]);
   await ctx.gh.writeResponses('compares', [{ files: [{ filename: 'README.md' }] }]);
+  await ctx.gh.writeResponses('rules', [[{ type: 'required_status_checks' }]]);
 
   const commit = Bun.spawnSync([
     join(ctx.directory, 'gh'),
@@ -75,9 +76,20 @@ test('it answers the commit and compare endpoints with their responses', async (
     'repos/zgeoff/tools/compare/merge111...head222',
   ]);
 
-  expect({ commit: commit.stdout.toString(), compare: compare.stdout.toString() }).toStrictEqual({
+  const rules = Bun.spawnSync([
+    join(ctx.directory, 'gh'),
+    'api',
+    'repos/zgeoff/tools/rules/branches/main',
+  ]);
+
+  expect({
+    commit: commit.stdout.toString(),
+    compare: compare.stdout.toString(),
+    rules: rules.stdout.toString(),
+  }).toStrictEqual({
     commit: '{"sha":"head222"}\n',
     compare: '{"files":[{"filename":"README.md"}]}\n',
+    rules: '[{"type":"required_status_checks"}]\n',
   });
 });
 

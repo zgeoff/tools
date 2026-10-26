@@ -41,8 +41,8 @@ on:
         default: release-please--branches--main
       checks-timeout-minutes:
         description:
-          The minutes to wait for the release PR's checks; when they run longer, the job turns on
-          auto-merge and the push of that merge tags the release
+          The minutes to wait for the release PR's checks; when they run longer, the job leaves the
+          PR open, with auto-merge on when a ruleset requires checks
         type: number
         required: false
         default: 15

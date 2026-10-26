@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Merges the open release PR once every check on its head commit has passed,
-# or turns on auto-merge when the checks outlast the wait.
+# and leaves it open when the checks outlast the wait.
 # No branch protection enforces the release PR's checks, so this script waits
 # for them. It reads the head commit from the branch ref, not the PR, on each
 # poll: the release job pushes a sync commit just before this runs, and the PR
@@ -110,17 +110,27 @@ while :; do
   if grep -qx actions <<< "$states" && ! grep -qx pending <<< "$states"; then
     break
   fi
-  # Checks that outlast the wait leave the PR open with auto-merge on, so
-  # GitHub merges it once they pass, and the push of that merge tags it.
+  # Checks that outlast the wait leave the PR open, and the run stays green.
+  # Auto-merge waits only for the checks a ruleset requires, so it turns on
+  # only when the base branch's rules require some; otherwise it would merge
+  # at once, and the next push to main runs this wait again.
   if [ "$SECONDS" -ge "$deadline" ]; then
-    hold=$(gh pr view "$pr" --repo "$repo" --json isDraft,labels | jq -r "$hold_filter")
+    view=$(gh pr view "$pr" --repo "$repo" --json isDraft,labels,baseRefName)
+    hold=$(jq -r "$hold_filter" <<< "$view")
     if [ -n "$hold" ]; then
       echo "release PR #$pr is held ($hold); leaving it open"
       exit 0
     fi
+    base=$(jq -r .baseRefName <<< "$view")
+    required=$(gh api "repos/$repo/rules/branches/$base" |
+      jq '[.[] | select(.type == "required_status_checks")] | length')
+    if [ "$required" -eq 0 ]; then
+      echo "release PR #$pr checks on $sha did not finish within ${timeout}s; no ruleset requires checks on $base, so the next push to $base merges it"
+      exit 0
+    fi
     echo "release PR #$pr checks on $sha did not finish within ${timeout}s; turning on auto-merge"
     if ! gh pr merge "$pr" --repo "$repo" --auto --squash --match-head-commit "$sha"; then
-      echo "release PR #$pr: auto-merge did not turn on; the next push to main merges it" >&2
+      echo "release PR #$pr: auto-merge did not turn on; the next push to $base merges it" >&2
     fi
     exit 0
   fi

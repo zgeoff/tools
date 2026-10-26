@@ -296,10 +296,15 @@ test('it fails without a merge when a commit status fails', async () => {
   expect(output).toBe('');
 });
 
-test('it turns on auto-merge and exits cleanly when the checks outlast the wait', async () => {
+test('it turns on auto-merge and exits cleanly when required checks outlast the wait', async () => {
   const ctx = await setupTest();
 
   await ctx.writeResponses('prs', [[{ number: 145 }]]);
+  await ctx.writeResponses('mergeable', [{ isDraft: false, labels: [], baseRefName: 'main' }]);
+
+  await ctx.writeResponses('rules', [
+    [{ type: 'pull_request' }, { type: 'required_status_checks' }],
+  ]);
 
   await ctx.writeResponses('heads', [
     buildMockHeadResponse('abc123', [
@@ -326,6 +331,37 @@ test('it turns on auto-merge and exits cleanly when the checks outlast the wait'
   expect(calls.filter((call) => call.startsWith('pr merge'))).toStrictEqual([
     'pr merge 145 --repo zgeoff/tools --auto --squash --match-head-commit abc123',
   ]);
+});
+
+test('it leaves the release PR open without auto-merge when no ruleset requires checks', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeResponses('prs', [[{ number: 145 }]]);
+  await ctx.writeResponses('mergeable', [{ isDraft: false, labels: [], baseRefName: 'main' }]);
+  await ctx.writeResponses('rules', [[{ type: 'pull_request' }]]);
+
+  await ctx.writeResponses('heads', [
+    buildMockHeadResponse('abc123', [
+      { name: 'pr / checks', status: 'IN_PROGRESS', conclusion: null },
+    ]),
+  ]);
+
+  const result = await ctx.runScript({ CHECKS_TIMEOUT: '0' });
+  const calls = await ctx.readCalls();
+  const output = await ctx.readOutput();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    output,
+    merges: calls.filter((call) => call.startsWith('pr merge')),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'release PR #145 checks on abc123 did not finish within 0s; no ruleset requires checks on main, so the next push to main merges it\n',
+    output: '',
+    merges: [],
+  });
 });
 
 test('it leaves a held release PR without auto-merge when the checks outlast the wait', async () => {
