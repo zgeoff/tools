@@ -3,9 +3,11 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import { createStubGH } from '../../test-utils/create-stub-gh.ts';
 import { isConditionMet } from './is-condition-met.ts';
 import { loadWorkflowStep } from './load-workflow-step.ts';
 import { parseWorkflowStep } from './parse-workflow-step.ts';
+import { runWorkflowSteps } from './run-workflow-steps.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'main-'));
@@ -22,12 +24,7 @@ async function setupTest() {
 test('it publishes a release that the merge run tagged from a run at the tag', async () => {
   const ctx = await setupTest();
   const resolve = await loadWorkflowStep(ctx.workflow, 'release', 'Resolve release commit');
-
-  const dispatch = await loadWorkflowStep(
-    ctx.workflow,
-    'release',
-    'Dispatch publish at the release tag',
-  );
+  const gh = await createStubGH(ctx.directory);
 
   // The outputs of the tag step after it tags the release PR that this run
   // merged: the merge made commit merge222, and the run started at old111.
@@ -72,12 +69,46 @@ test('it publishes a release that the merge run tagged from a run at the tag', a
     ]),
   );
 
-  const dispatches = isConditionMet(
-    dispatch.condition ?? '',
-    new Map([['steps.release-commit.outputs.here', 'false']]),
+  // The run's first release-please call released nothing, so a dispatch that
+  // read its paths would publish no package.
+  const expressions = Object.fromEntries([
+    ['github.token', 'app-token'],
+    ['steps.release.outputs.paths_released', '[]'],
+    ...output
+      .split('\n')
+      .filter((line) => line !== '')
+      .map((line) => {
+        const [name = '', ...value] = line.split('=');
+
+        return [`steps.release-commit.outputs.${name}`, value.join('=')];
+      }),
+  ]);
+
+  const dispatchExitCode = await runWorkflowSteps(
+    ctx.workflow,
+    'release',
+    ['Dispatch publish at the release tag'],
+    {
+      cwd: ctx.directory,
+      env: {
+        PATH: `${ctx.directory}:${process.env['PATH']}`,
+        GITHUB_REPOSITORY: 'zgeoff/tools',
+        GITHUB_SHA: 'old111',
+      },
+      expressions,
+      outputPath: ctx.outputPath,
+    },
   );
 
-  expect({ resolves, dispatches }).toStrictEqual({ resolves: true, dispatches: true });
+  const calls = await gh.readCalls();
+
+  expect({ resolves, dispatchExitCode, calls }).toStrictEqual({
+    resolves: true,
+    dispatchExitCode: 0,
+    calls: [
+      'workflow run main.yml --repo zgeoff/tools --ref @zgeoff/std@0.4.0 -f republish_paths=["packages/std","packages/tsconfig"]',
+    ],
+  });
 });
 
 test.each([

@@ -28,6 +28,7 @@ case "$*" in
     take heads '' ;;
   "pr view "*) take mergeable '{"mergeable":"MERGEABLE"}' ;;
   "pr merge "*) ;;
+  "workflow run "*) ;;
   *) echo "unexpected gh call: $*" >&2; exit 1 ;;
 esac
 `;

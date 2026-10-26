@@ -96,10 +96,22 @@ test('it logs each call less its GraphQL query', async () => {
 
   Bun.spawnSync([join(ctx.directory, 'gh'), 'pr', 'merge', '145', '--squash']);
 
+  const dispatch = Bun.spawnSync([
+    join(ctx.directory, 'gh'),
+    'workflow',
+    'run',
+    'main.yml',
+    '--ref',
+    '@zgeoff/std@0.4.0',
+  ]);
+
   const calls = await ctx.gh.readCalls();
+
+  expect(dispatch.exitCode).toBe(0);
 
   expect(calls).toStrictEqual([
     'api graphql -f owner=zgeoff -f name=tools -f ref=refs/heads/release-please--branches--main',
     'pr merge 145 --squash',
+    'workflow run main.yml --ref @zgeoff/std@0.4.0',
   ]);
 });
