@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // The delivered entry point resolves @zgeoff/skill-gate from this repo's workspace, as a repo's
-// copy resolves it from its own node_modules.
+// copy resolves it from its own node_modules. A copy that cannot load sits in an installed repo,
+// with a node_modules folder, because Bun auto-installs a missing package from npm without one.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'skill-gate-entry-'));
 
@@ -57,6 +58,7 @@ test('it blocks a gated edit and names the load failure when the repo lacks @zge
   const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
 
   await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await mkdir(join(ctx.directory, 'node_modules'));
   await copyFile(ctx.hookPath, copiedHookPath);
 
   await writeFile(
@@ -88,6 +90,7 @@ test('it blocks a gated edit to a path relative to cwd when the gate cannot load
   const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
 
   await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await mkdir(join(ctx.directory, 'node_modules'));
   await copyFile(ctx.hookPath, copiedHookPath);
 
   await writeFile(
@@ -161,6 +164,7 @@ test('it blocks an edit inside the project when the gate cannot load and the rul
   const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
 
   await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await mkdir(join(ctx.directory, 'node_modules'));
   await copyFile(ctx.hookPath, copiedHookPath);
   await writeFile(join(ctx.directory, '.claude/skill-gate.json'), '{ "gates": [');
 
@@ -184,6 +188,7 @@ test('it blocks an edit inside the project when the gate cannot load and a gate 
   const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
 
   await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await mkdir(join(ctx.directory, 'node_modules'));
   await copyFile(ctx.hookPath, copiedHookPath);
 
   await writeFile(
@@ -212,6 +217,7 @@ test('it blocks an edit inside the project and names both errors when the gate c
   const rulesPath = join(ctx.directory, '.claude/skill-gate.json');
 
   await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await mkdir(join(ctx.directory, 'node_modules'));
   await copyFile(ctx.hookPath, copiedHookPath);
 
   // A folder in the file's place fails the read for root too, which a chmod does not.
@@ -248,6 +254,7 @@ test.each([
     const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
 
     await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+    await mkdir(join(ctx.directory, 'node_modules'));
     await copyFile(ctx.hookPath, copiedHookPath);
 
     await writeFile(
@@ -283,6 +290,7 @@ test('it lets an edit run with the load error on stderr when the gate cannot loa
   const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
 
   await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await mkdir(join(ctx.directory, 'node_modules'));
   await copyFile(ctx.hookPath, copiedHookPath);
 
   const result = spawnSync('bun', [copiedHookPath], {
@@ -308,6 +316,7 @@ test('it blocks a gated tool call and names the load failure when the repo lacks
   const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
 
   await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await mkdir(join(ctx.directory, 'node_modules'));
   await copyFile(ctx.hookPath, copiedHookPath);
 
   await writeFile(
@@ -343,6 +352,7 @@ test('it lets a tool call that no tool gate names run when the gate cannot load'
   const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
 
   await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await mkdir(join(ctx.directory, 'node_modules'));
   await copyFile(ctx.hookPath, copiedHookPath);
 
   await writeFile(
@@ -378,6 +388,7 @@ test('it blocks a tool call when the gate cannot load and the tools list does no
   const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
 
   await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await mkdir(join(ctx.directory, 'node_modules'));
   await copyFile(ctx.hookPath, copiedHookPath);
 
   await writeFile(
@@ -443,6 +454,7 @@ test('it blocks a gated apply_patch edit when the gate cannot load and the harne
   const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
 
   await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await mkdir(join(ctx.directory, 'node_modules'));
   await copyFile(ctx.hookPath, copiedHookPath);
 
   await writeFile(
@@ -479,6 +491,7 @@ test('it finds the project from the git top level when the gate cannot load and 
 
   await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
   await mkdir(join(ctx.directory, 'docs'), { recursive: true });
+  await mkdir(join(ctx.directory, 'node_modules'));
   await copyFile(ctx.hookPath, copiedHookPath);
 
   await writeFile(
