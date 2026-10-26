@@ -339,7 +339,11 @@ const actionHandlers: ShellActionHandlers = {
 
     return action.text.length;
   },
-  comment: (state) => state.command.length,
+  comment: (state) => {
+    const end = state.command.indexOf('\n', state.index);
+
+    return (end === -1 ? state.command.length : end) - state.index;
+  },
 };
 
 function runActionHandler<Kind extends keyof ShellActionFields>(

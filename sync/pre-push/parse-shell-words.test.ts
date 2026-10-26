@@ -28,6 +28,8 @@ test.each([
   ['echo $(( 1 | 2 )) | wc -c', ['|']],
   ['echo "$(( $(git log | wc -l) + 1 ))"', ['|']],
   ['bun run lint # then; test', []],
+  ['bun run lint # then; test\nbun run test', ['\n']],
+  ['# prepare | build\nbun run lint', ['\n']],
   [`echo \${VALUE:-a;b}`, []],
   [`echo "\${VALUE:-a | b}" && true`, ['&&']],
   [`echo \${VALUE:-$(git log | head)}`, ['|']],

@@ -10,6 +10,7 @@ test.each([
   ['FORCE=1', []],
   ['echo one; scripts/open-kvm.sh', ['echo', 'scripts/open-kvm.sh']],
   ['echo ready\nscripts/open-kvm.sh', ['echo', 'scripts/open-kvm.sh']],
+  ['# prepare the VM\nscripts/open-kvm.sh', ['scripts/open-kvm.sh']],
   ['echo ready \\\nscripts/open-kvm.sh', ['echo']],
   ['cat <<< scripts/open-kvm.sh', ['cat']],
   ['echo $(( 1 + 2 ))', ['echo']],
