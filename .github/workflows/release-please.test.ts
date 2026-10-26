@@ -1,8 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import { createStubCurl } from './create-stub-curl.ts';
 import { loadWorkflowStep } from './load-workflow-step.ts';
 
 async function setupTest() {
@@ -33,8 +34,62 @@ async function setupTest() {
     return { exitCode: result.exitCode, stderr: result.stderr.toString(), output };
   };
 
-  return { runPick };
+  // Runs the step that downloads the release scripts, with a stub curl
+  // that answers every URL with the same body.
+  const runFetch = async (jobContext: string) => {
+    const bin = join(directory, 'bin');
+    const runnerTemp = join(directory, 'runner');
+
+    await mkdir(bin);
+    await mkdir(runnerTemp);
+    await createStubCurl(bin, '# release script\n');
+
+    const fetch = await loadWorkflowStep(workflow, 'release', 'Fetch the release scripts');
+
+    const result = await $`bash -c ${fetch.run}`
+      .cwd(directory)
+      .env({
+        PATH: `${bin}:${process.env['PATH']}`,
+        JOB_CONTEXT: jobContext,
+        RUNNER_TEMP: runnerTemp,
+      })
+      .nothrow()
+      .quiet();
+
+    const urls = await readFile(join(bin, 'curl.urls'), 'utf8').catch(() => '');
+    const files = await readdir(runnerTemp);
+
+    return { exitCode: result.exitCode, urls, files: files.toSorted() };
+  };
+
+  return { runPick, runFetch };
 }
+
+test('it downloads both release scripts from the commit that defines the job', async () => {
+  const ctx = await setupTest();
+  const result = await ctx.runFetch('{"workflow_repository":"acme/tools","workflow_sha":"abc123"}');
+
+  expect(result).toStrictEqual({
+    exitCode: 0,
+    urls: [
+      'https://raw.githubusercontent.com/acme/tools/abc123/scripts/check-release-head.sh',
+      'https://raw.githubusercontent.com/acme/tools/abc123/scripts/merge-release-prs.sh',
+      '',
+    ].join('\n'),
+    files: ['check-release-head.sh', 'merge-release-prs.sh'],
+  });
+});
+
+test('it downloads nothing when the job context lacks the commit', async () => {
+  const ctx = await setupTest();
+  const result = await ctx.runFetch('{"workflow_repository":"acme/tools"}');
+
+  expect(result).toStrictEqual({
+    exitCode: 1,
+    urls: '',
+    files: [],
+  });
+});
 
 test('it reports the first package of a multi-package release that the tag step made', async () => {
   const ctx = await setupTest();
