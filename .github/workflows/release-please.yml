@@ -12,9 +12,9 @@ name: Release Please
 # head, so a later tag fails once a workflow change merges in between.
 #
 # The App token exists because GITHUB_TOKEN events don't trigger workflows: a
-# GITHUB_TOKEN commit to the release PR would get no checks. With no App ID,
-# the job leaves release PRs open to merge by hand, and the run that the
-# merge starts tags the release.
+# GITHUB_TOKEN commit to the release PR would get no checks. With merge off
+# or no App ID, the job leaves release PRs open to merge by hand, and the run
+# that the merge starts tags the release.
 on:
   workflow_call:
     inputs:
@@ -23,6 +23,13 @@ on:
         type: string
         required: false
         default: ''
+      merge:
+        description:
+          Merge the release PR once its checks pass; off leaves the merge to a person, and the run
+          of that merge's push tags the release
+        type: boolean
+        required: false
+        default: false
       release-branch:
         description:
           The head branch of the release PR; a component release, such as atc's, appends
@@ -132,7 +139,7 @@ jobs:
       # job.workflow_repository or job.workflow_sha, so the step reads them
       # from the job context as JSON.
       - name: Fetch the merge script
-        if: steps.app-token.outputs.token != ''
+        if: steps.app-token.outputs.token != '' && inputs.merge == true
         env:
           JOB_CONTEXT: ${{ toJSON(job) }}
         run: |
@@ -148,7 +155,7 @@ jobs:
       # pushed, and fails only when one fails.
       - name: Auto-merge release PRs
         id: merge
-        if: steps.app-token.outputs.token != ''
+        if: steps.app-token.outputs.token != '' && inputs.merge == true
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           RELEASE_BRANCH: ${{ inputs.release-branch }}

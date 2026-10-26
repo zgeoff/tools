@@ -76,6 +76,7 @@ jobs:
     uses: ./.github/workflows/release-please.yml
     with:
       app-id: ${{ vars.RELEASE_APP_ID }}
+      merge: true
     secrets:
       app-private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 

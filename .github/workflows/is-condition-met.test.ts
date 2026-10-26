@@ -56,6 +56,16 @@ test.each([
   },
 );
 
+test.each([
+  ['true', 'true', true],
+  ['false', 'true', false],
+  ['false', 'false', true],
+])('it compares the boolean input %s with the literal %s as %p', (value, literal, expected) => {
+  const met = isConditionMet(`inputs.merge == ${literal}`, new Map([['inputs.merge', value]]));
+
+  expect(met).toBe(expected);
+});
+
 test('it keeps a quoted value whole when the value holds && or ||', () => {
   const values = new Map([
     ['steps.pick.outputs.text', 'alpha && beta || gamma'],

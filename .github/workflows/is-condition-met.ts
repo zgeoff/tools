@@ -16,7 +16,9 @@ interface Comparison {
 // inside a quoted value stays part of that value. `&&` binds tighter than
 // `||`, as in GitHub's expressions.
 function parseAlternatives(condition: string): Comparison[][] {
-  const comparisonPattern = /(?<expression>[\w.-]+) (?<operator>==|!=) '(?<expected>[^']*)'/uy;
+  const comparisonPattern =
+    /(?<expression>[\w.-]+) (?<operator>==|!=) (?:'(?<expected>[^']*)'|(?<literal>true|false))/uy;
+
   const alternatives: Comparison[][] = [];
   let comparisons: Comparison[] = [];
   let index = 0;
@@ -33,7 +35,7 @@ function parseAlternatives(condition: string): Comparison[][] {
     comparisons.push({
       expression: groups['expression'] ?? '',
       equal: groups['operator'] === '==',
-      expected: groups['expected'] ?? '',
+      expected: groups['expected'] ?? groups['literal'] ?? '',
     });
 
     index = comparisonPattern.lastIndex;

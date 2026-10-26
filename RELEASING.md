@@ -12,12 +12,13 @@ The shared files under `sync/` ship by hand-pushed `sync-vN` tags instead, which
 
 1. A `feat:`/`fix:` PR touching `packages/<pkg>` merges to `main`.
 2. `main.yml`'s release job calls the shared
-   [`release-please.yml`](./.github/workflows/release-please.yml), which other repos call at a sync
-   tag too. It runs release-please, which opens (or updates) a release PR for the affected packages:
-   version bump per conventional-commit type, `CHANGELOG.md`, manifest update. The job syncs
-   `bun.lock` on the PR branch (versions are recorded there too) and auto-merges the PR once every
-   check on its head passes. `scripts/merge-release-prs.sh` waits up to 15 minutes for those checks
-   to start and finish, and fails the run when one fails. When they run longer, it turns on
+   [`release-please.yml`](./.github/workflows/release-please.yml) with `merge: true`. Other repos
+   call it at a sync tag too, and its `merge` input is off by default, which leaves each release PR
+   to a person. It runs release-please, which opens (or updates) a release PR for the affected
+   packages: version bump per conventional-commit type, `CHANGELOG.md`, manifest update. The job
+   syncs `bun.lock` on the PR branch (versions are recorded there too) and auto-merges the PR once
+   every check on its head passes. `scripts/merge-release-prs.sh` waits up to 15 minutes for those
+   checks to start and finish, and fails the run when one fails. When they run longer, it turns on
    auto-merge, so GitHub merges the PR once they pass, and the run of that merge's push tags it.
 3. Right after the merge, the same job calls release-please again, which tags `@zgeoff/<pkg>@X.Y.Z`
    on the merge commit and creates the GitHub release. The App token has no Workflows permission, so

@@ -74,6 +74,31 @@ test.each([
   expect(result).toBe(row.met);
 });
 
+test.each([
+  { value: 'true', step: 'Fetch the merge script', runs: true },
+  { value: 'true', step: 'Auto-merge release PRs', runs: true },
+  { value: 'false', step: 'Fetch the merge script', runs: false },
+  { value: 'false', step: 'Auto-merge release PRs', runs: false },
+])('it runs "$step" only when merge is on, with merge $value', async (row) => {
+  const ctx = await setupTest();
+  const text = await readFile(ctx.workflow, 'utf8');
+
+  const step = parseWorkflowStep(text, 'release', row.step);
+
+  if (step.kind !== 'parsed') {
+    throw new Error(step.message);
+  }
+
+  const values = new Map([
+    ['steps.app-token.outputs.token', 'app-token'],
+    ['inputs.merge', row.value],
+  ]);
+
+  const result = isConditionMet(step.step.condition ?? '', values);
+
+  expect(result).toBe(row.runs);
+});
+
 test('it reports the first package of a multi-package release that the tag step made', async () => {
   const ctx = await setupTest();
 
