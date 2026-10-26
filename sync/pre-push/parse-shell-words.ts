@@ -32,39 +32,6 @@ interface ParserState {
   isPlain: boolean;
 }
 
-// The parser keeps a stack of the quotes, substitutions and expansions it is inside, and each
-// context reads the next character by the shell's rules for that context.
-export function parseShellWords(command: string): ShellWord[] {
-  const state: ParserState = {
-    command,
-    words: [],
-    contexts: ['plain'],
-    index: 0,
-    text: '',
-    isQuoted: false,
-    redirect: '',
-    plainText: '',
-    isPlain: true,
-  };
-
-  while (state.index < command.length) {
-    const context = state.contexts.at(-1) ?? 'plain';
-
-    const action = pickAction(context, {
-      character: command.charAt(state.index),
-      ahead: command.slice(state.index + 1, state.index + 3),
-      isWordStart: state.text === '' && !state.isQuoted,
-      redirect: state.redirect,
-    });
-
-    advanceParser(state, action, context === 'plain');
-  }
-
-  endWord(state);
-
-  return state.words;
-}
-
 interface ShellCursor {
   readonly character: string;
   readonly ahead: string;
@@ -95,7 +62,7 @@ type ShellAction = {
 
 // A table typed over every context, so a context without a reader fails the type check.
 export type ShellContextReaders = Readonly<
-  Record<ShellContext, (context: ShellContext, cursor: ShellCursor) => ShellAction>
+  Record<ShellContext, (cursor: ShellCursor, context: ShellContext) => ShellAction>
 >;
 
 const contextReaders: ShellContextReaders = {
@@ -103,18 +70,50 @@ const contextReaders: ShellContextReaders = {
   substitution: pickCodeAction,
   group: pickCodeAction,
   backtick: pickCodeAction,
-  'single-quote': (_context, cursor) => pickSingleQuotedAction(cursor),
-  'double-quote': (_context, cursor) => pickDoubleQuotedAction(cursor),
+  'single-quote': pickSingleQuotedAction,
+  'double-quote': pickDoubleQuotedAction,
   arithmetic: pickArithmeticAction,
   'arithmetic-group': pickArithmeticAction,
-  parameter: (_context, cursor) => pickParameterAction(cursor),
+  parameter: pickParameterAction,
 };
 
-function pickAction(context: ShellContext, cursor: ShellCursor): ShellAction {
-  return contextReaders[context](context, cursor);
+// The parser keeps a stack of the quotes, substitutions and expansions it is inside, and each
+// context reads the next character by the shell's rules for that context.
+export function parseShellWords(command: string): ShellWord[] {
+  const state: ParserState = {
+    command,
+    words: [],
+    contexts: ['plain'],
+    index: 0,
+    text: '',
+    isQuoted: false,
+    redirect: '',
+    plainText: '',
+    isPlain: true,
+  };
+
+  while (state.index < command.length) {
+    const context = state.contexts.at(-1) ?? 'plain';
+
+    const action = contextReaders[context](
+      {
+        character: command.charAt(state.index),
+        ahead: command.slice(state.index + 1, state.index + 3),
+        isWordStart: state.text === '' && !state.isQuoted,
+        redirect: state.redirect,
+      },
+      context,
+    );
+
+    advanceParser(state, action, context === 'plain');
+  }
+
+  endWord(state);
+
+  return state.words;
 }
 
-function pickCodeAction(context: ShellContext, cursor: ShellCursor): ShellAction {
+function pickCodeAction(cursor: ShellCursor, context: ShellContext): ShellAction {
   const character = cursor.character;
   const opening = pickOpening(cursor);
   const isNested = context === 'substitution' || context === 'group';
@@ -235,7 +234,7 @@ function pickDoubleQuotedAction(cursor: ShellCursor): ShellAction {
     : { kind: 'text', text: cursor.character };
 }
 
-function pickArithmeticAction(context: ShellContext, cursor: ShellCursor): ShellAction {
+function pickArithmeticAction(cursor: ShellCursor, context: ShellContext): ShellAction {
   const character = cursor.character;
   const opening = pickOpening(cursor);
 
@@ -280,11 +279,6 @@ function pickParameterAction(cursor: ShellCursor): ShellAction {
     : { kind: 'text', text: cursor.character };
 }
 
-function advanceParser(state: ParserState, action: ShellAction, isTopLevel: boolean): void {
-  state.redirect = action.kind === 'redirect' ? action.text : '';
-  state.index += runActionHandler(state, action, isTopLevel);
-}
-
 // Each handler returns how many characters its action consumed. The table is typed over every
 // action kind, so an action without a handler fails the type check.
 export type ShellActionHandlers = {
@@ -297,7 +291,11 @@ export type ShellActionHandlers = {
 
 const actionHandlers: ShellActionHandlers = {
   text: appendText,
-  redirect: appendText,
+  redirect: (state, action) => {
+    state.redirect = action.text;
+
+    return appendText(state, action);
+  },
   escape: (state, _action, isTopLevel) => {
     const escaped = state.command.charAt(state.index + 1);
 
@@ -346,14 +344,16 @@ const actionHandlers: ShellActionHandlers = {
   },
 };
 
-function runActionHandler<Kind extends keyof ShellActionFields>(
+// The handler table is generic over the action kind, so a call with the whole union still checks.
+function advanceParser<Kind extends keyof ShellActionFields>(
   state: ParserState,
   action: ShellActionOf<Kind>,
   isTopLevel: boolean,
-): number {
+): void {
   const handler: ShellActionHandlers[Kind] = actionHandlers[action.kind];
 
-  return handler(state, action, isTopLevel);
+  state.redirect = '';
+  state.index += handler(state, action, isTopLevel);
 }
 
 function appendText(state: ParserState, action: ShellActionFields['text']): number {
