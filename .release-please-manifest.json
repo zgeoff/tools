@@ -1,6 +1,6 @@
 {
   "packages/bun-test-extended": "0.2.1",
-  "packages/format-codemod": "0.3.2",
+  "packages/format-codemod": "0.3.3",
   "packages/oxlint-config": "0.7.0",
   "packages/tsconfig": "2.0.0",
   "packages/commitlint-config": "0.1.0",
