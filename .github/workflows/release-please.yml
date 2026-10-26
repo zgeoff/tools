@@ -6,10 +6,12 @@ name: Release Please
 # the release from this workflow's outputs, in jobs of its own, so each
 # repo's npm trusted publisher keeps naming the caller's workflow.
 #
-# The tag waits for no checks, so it lands while the merge commit is still
-# main's head. The release App's token has no Workflows permission, and
-# GitHub refuses it a tag on a commit whose workflow files differ from main's
-# head, so a later tag fails once a workflow change merges in between.
+# The release App's token has no Workflows permission, and GitHub is
+# expected to refuse it a tag on a commit whose workflow files differ from
+# main's head. The tag waits for no checks, which leaves a workflow change
+# seconds to merge in between, and the job checks main's head before each
+# release-please call that can tag: when main moved past the merge commit
+# with a workflow change, it fails with the recovery steps instead.
 #
 # The App token exists because GITHUB_TOKEN events don't trigger workflows: a
 # GITHUB_TOKEN commit to the release PR would get no checks. With merge off
@@ -100,6 +102,30 @@ jobs:
           client-id: ${{ inputs.app-id }}
           private-key: ${{ secrets.app-private-key }}
 
+      # The scripts live in this repo, not in the caller's checkout, so the
+      # step downloads them from the commit that defines this job: a caller
+      # at a sync tag runs that tag's scripts. actionlint does not know
+      # job.workflow_repository or job.workflow_sha, so the step reads them
+      # from the job context as JSON.
+      - name: Fetch the release scripts
+        env:
+          JOB_CONTEXT: ${{ toJSON(job) }}
+        run: |
+          set -euo pipefail
+          repository=$(jq -er .workflow_repository <<< "$JOB_CONTEXT")
+          sha=$(jq -er .workflow_sha <<< "$JOB_CONTEXT")
+          for script in check-release-head.sh merge-release-prs.sh; do
+            curl -fsSL -o "$RUNNER_TEMP/$script" \
+              "https://raw.githubusercontent.com/$repository/$sha/scripts/$script"
+          done
+
+      # A release PR that a person or auto-merge merged is tagged by the
+      # release-please call below.
+      - name: Check untagged releases against main's head
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+        run: bash "$RUNNER_TEMP/check-release-head.sh" "$GITHUB_REPOSITORY"
+
       - name: Run release-please
         id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
@@ -133,21 +159,6 @@ jobs:
             git push
           fi
 
-      # The merge script lives in this repo, not in the caller's checkout, so
-      # the step downloads it from the commit that defines this job: a caller
-      # at a sync tag runs that tag's script. actionlint does not know
-      # job.workflow_repository or job.workflow_sha, so the step reads them
-      # from the job context as JSON.
-      - name: Fetch the merge script
-        if: steps.app-token.outputs.token != '' && inputs.merge == true
-        env:
-          JOB_CONTEXT: ${{ toJSON(job) }}
-        run: |
-          set -euo pipefail
-          repository=$(jq -er .workflow_repository <<< "$JOB_CONTEXT")
-          sha=$(jq -er .workflow_sha <<< "$JOB_CONTEXT")
-          curl -fsSL -o "$RUNNER_TEMP/merge-release-prs.sh" \
-            "https://raw.githubusercontent.com/$repository/$sha/scripts/merge-release-prs.sh"
       # Reads no release-please outputs on purpose: prs_created is false
       # when the open release PR needed no update (a previous run failed
       # after creating it). The script waits, with a time bound, for the
@@ -164,10 +175,15 @@ jobs:
           CHECKS_TIMEOUT=$((CHECKS_TIMEOUT_MINUTES * 60)) \
             bash "$RUNNER_TEMP/merge-release-prs.sh" "$GITHUB_REPOSITORY" "$RELEASE_BRANCH"
 
-      # Tags the release PR this run just merged, while its merge commit is
-      # still main's head. A run whose first release-please call tagged a
-      # release already leaves this merge to the next run, because a run
-      # reports one release.
+      - name: Check the merge against main's head
+        if: steps.merge.outputs.merged == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: bash "$RUNNER_TEMP/check-release-head.sh" "$GITHUB_REPOSITORY"
+
+      # Tags the release PR this run just merged. A run whose first
+      # release-please call tagged a release already leaves this merge to the
+      # next run, because a run reports one release.
       - name: Tag the merged release
         id: tag
         if: steps.merge.outputs.merged == 'true' && steps.release.outputs.releases_created != 'true'

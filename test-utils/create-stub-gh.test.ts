@@ -57,6 +57,30 @@ test('it answers an endpoint with no response file with its default body', async
   expect(result.stdout.toString()).toBe('{"mergeable":"MERGEABLE"}\n');
 });
 
+test('it answers the commit and compare endpoints with their responses', async () => {
+  const ctx = await setupTest();
+
+  await ctx.gh.writeResponses('commits', [{ sha: 'head222' }]);
+  await ctx.gh.writeResponses('compares', [{ files: [{ filename: 'README.md' }] }]);
+
+  const commit = Bun.spawnSync([
+    join(ctx.directory, 'gh'),
+    'api',
+    'repos/zgeoff/tools/commits/main',
+  ]);
+
+  const compare = Bun.spawnSync([
+    join(ctx.directory, 'gh'),
+    'api',
+    'repos/zgeoff/tools/compare/merge111...head222',
+  ]);
+
+  expect({ commit: commit.stdout.toString(), compare: compare.stdout.toString() }).toStrictEqual({
+    commit: '{"sha":"head222"}\n',
+    compare: '{"files":[{"filename":"README.md"}]}\n',
+  });
+});
+
 test('it fails a call whose body is "error"', async () => {
   const ctx = await setupTest();
 

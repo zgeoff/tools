@@ -75,15 +75,13 @@ test.each([
 });
 
 test.each([
-  { value: 'true', step: 'Fetch the merge script', runs: true },
-  { value: 'true', step: 'Auto-merge release PRs', runs: true },
-  { value: 'false', step: 'Fetch the merge script', runs: false },
-  { value: 'false', step: 'Auto-merge release PRs', runs: false },
-])('it runs "$step" only when merge is on, with merge $value', async (row) => {
+  { value: 'true', runs: true },
+  { value: 'false', runs: false },
+])('it merges the release PR only when merge is on, with merge $value', async (row) => {
   const ctx = await setupTest();
   const text = await readFile(ctx.workflow, 'utf8');
 
-  const step = parseWorkflowStep(text, 'release', row.step);
+  const step = parseWorkflowStep(text, 'release', 'Auto-merge release PRs');
 
   if (step.kind !== 'parsed') {
     throw new Error(step.message);
@@ -97,6 +95,27 @@ test.each([
   const result = isConditionMet(step.step.condition ?? '', values);
 
   expect(result).toBe(row.runs);
+});
+
+test.each([
+  { merged: 'true', checks: true },
+  { merged: '', checks: false },
+])("it checks main's head after its own merge only, with merged '$merged'", async (row) => {
+  const ctx = await setupTest();
+  const text = await readFile(ctx.workflow, 'utf8');
+
+  const step = parseWorkflowStep(text, 'release', "Check the merge against main's head");
+
+  if (step.kind !== 'parsed') {
+    throw new Error(step.message);
+  }
+
+  const result = isConditionMet(
+    step.step.condition ?? '',
+    new Map([['steps.merge.outputs.merged', row.merged]]),
+  );
+
+  expect(result).toBe(row.checks);
 });
 
 test('it reports the first package of a multi-package release that the tag step made', async () => {

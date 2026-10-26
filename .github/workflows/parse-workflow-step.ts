@@ -1,4 +1,7 @@
 export interface WorkflowStepFields {
+  // The step's position in its job, from 0.
+  readonly index: number;
+
   readonly condition: string | null;
 
   // null for a step that runs a script
@@ -23,9 +26,10 @@ export function parseWorkflowStep(text: string, job: string, step: string): Work
   }
 
   const list: unknown[] = steps;
-  const found = list.find((candidate) => findField(candidate, 'name') === step);
+  const index = list.findIndex((candidate) => findField(candidate, 'name') === step);
+  const found: unknown = list[index];
 
-  if (found === undefined) {
+  if (index === -1) {
     return { kind: 'missing', message: `the ${job} job has no step named ${step}` };
   }
 
@@ -35,6 +39,7 @@ export function parseWorkflowStep(text: string, job: string, step: string): Work
   return {
     kind: 'parsed',
     step: {
+      index,
       condition: typeof condition === 'string' ? condition : null,
       uses: typeof uses === 'string' ? uses : null,
       inputs: toTextRecord(findField(found, 'with')),

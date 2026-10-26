@@ -31,15 +31,10 @@ test('it prints each fault of the shared release workflow and exits 1', async ()
       '    steps:',
       '      - name: Run release-please',
       '        uses: acme/release-action@abc123',
+      '      - name: Auto-merge release PRs',
+      '        run: bash merge-release-prs.sh',
       '      - name: Tag the merged release',
       '        uses: acme/release-action@abc123',
-      '        with:',
-      `          token: \${{ steps.app-token.outputs.token }}`,
-      '      - name: Pick the release outputs',
-      '        env:',
-      `          RELEASE_OUTPUTS: \${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) || toJSON(steps.release.outputs) }}`,
-      '        run: echo resolved',
-      '',
     ].join('\n'),
   );
 
@@ -51,8 +46,14 @@ test('it prints each fault of the shared release workflow and exits 1', async ()
     stderr: result.stderr.toString(),
   }).toStrictEqual({
     exitCode: 1,
-    stdout:
-      '.github/workflows/release-please.yml: Tag the merged release must set skip-github-pull-request: true\n',
+    stdout: [
+      "the release job has no step named Check untagged releases against main's head",
+      "the release job has no step named Check the merge against main's head",
+      'the release job has no step named Pick the release outputs',
+      '',
+    ]
+      .map((line) => (line === '' ? '' : `.github/workflows/release-please.yml: ${line}`))
+      .join('\n'),
     stderr: '',
   });
 });

@@ -25,6 +25,7 @@ test('it returns the condition, action, inputs and env of the named step', () =>
   expect(step).toStrictEqual({
     kind: 'parsed',
     step: {
+      index: 1,
       condition: "steps.kettle.outputs.hot == 'true'",
       uses: 'acme/brew-action@v2',
       inputs: { token: `\${{ steps.token.outputs.token }}`, strong: 'true', cups: '2' },
@@ -47,7 +48,7 @@ test('it returns no action, condition, inputs or env for a script step without t
 
   expect(step).toStrictEqual({
     kind: 'parsed',
-    step: { condition: null, uses: null, inputs: {}, env: {} },
+    step: { index: 0, condition: null, uses: null, inputs: {}, env: {} },
   });
 });
 
