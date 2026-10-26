@@ -5,11 +5,11 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 import { buildMockHeadResponse } from '../../test-utils/build-mock-head-response.ts';
 import { createGitCommit } from '../../test-utils/create-git-commit.ts';
+import { createStubClock } from '../../test-utils/create-stub-clock.ts';
 import { createStubGH } from '../../test-utils/create-stub-gh.ts';
 import { installReleaseScripts } from '../../test-utils/install-release-scripts.ts';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { runGit } from '../../test-utils/run-git.ts';
-import { createStubClock } from './create-stub-clock.ts';
 import { createStubCurl } from './create-stub-curl.ts';
 import { loadWorkflowStep } from './load-workflow-step.ts';
 import { runWorkflowSteps } from './run-workflow-steps.ts';
@@ -76,14 +76,10 @@ async function setupTest() {
       outputPath,
     });
 
-  // Puts a stub clock first on PATH, which reads out the given Unix times.
-  const setClock = (times: readonly number[]) => createStubClock(stubDirectory, times);
-
   return {
     directory,
     stubDirectory,
     runnerTemporaryDirectory,
-    setClock,
     runStep,
     runSteps,
     readOutput,
@@ -277,7 +273,8 @@ test("it waits exactly the caller's minutes, in seconds, before it leaves the re
 
   // The wait starts at 1000. Two minutes as 120 seconds polls again at 1119
   // and stops at 1120; any other conversion polls once or more than twice.
-  await ctx.setClock([1000, 1119, 1120, 1121]);
+  await createStubClock(ctx.stubDirectory, [1000, 1119, 1120, 1121]);
+
   await gh.writeResponses('prs', [[{ number: 212 }]]);
   await gh.writeResponses('mergeable', [{ isDraft: false, labels: [], baseRefName: 'main' }]);
 

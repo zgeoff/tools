@@ -2,8 +2,8 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createStubCommand } from '../../test-utils/create-stub-command.ts';
 import { createStubGH } from '../../test-utils/create-stub-gh.ts';
-import { createStubCommand } from './create-stub-command.ts';
 import { runWorkflowSteps } from './run-workflow-steps.ts';
 
 async function setupTest() {
