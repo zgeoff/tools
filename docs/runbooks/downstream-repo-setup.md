@@ -42,12 +42,21 @@ Codex. Repo-sync touches none of them:
 ## Opting in to the pre-push baseline
 
 The [pre-push baseline](../architecture/pre-push-baseline.md) runs its jobs one at a time, so a push
-fits a 2 GiB host. A repo opts in with three changes:
+fits a 2 GiB host. A repo opts in with four changes:
 
-1. Add `pre-push-baseline` to `include` in `.github/workflows/repo-sync.yml`.
-2. In `lefthook.yml`, add `extends: [.lefthook/pre-push-baseline.yml]`, and delete `parallel` and
+1. Install `ts-pattern`, which the workflow lint imports, unless `package.json` already lists it:
+
+   ```bash
+   bun add --dev --exact ts-pattern
+   ```
+
+   Expect `package.json` to list `ts-pattern` and `bun.lock` to change. Without it, the `workflows`
+   job fails on the first push that changes a workflow.
+
+2. Add `pre-push-baseline` to `include` in `.github/workflows/repo-sync.yml`.
+3. In `lefthook.yml`, add `extends: [.lefthook/pre-push-baseline.yml]`, and delete `parallel` and
    the baseline's jobs from `pre-push` and `pre-commit`. lefthook refuses to run a hook that sets
    both `parallel` and the baseline's `piped`. A job the repo keeps under `pre-push.jobs` runs
    before the baseline's, so keep only cheap repo-specific gates there.
-3. Move every whole-tree check the baseline drops, such as type-aware lint, dead code and the full
+4. Move every whole-tree check the baseline drops, such as type-aware lint, dead code and the full
    suite, into CI as a required check, if CI does not run it already.
