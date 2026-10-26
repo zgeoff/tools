@@ -769,6 +769,32 @@ test('it prints each finding as a warning annotation in Actions, and exits 0', a
   });
 });
 
+test('it escapes the characters a workflow command reads as syntax in its file and message', async () => {
+  const ctx = await setupTest();
+
+  await ctx.commitFiles({
+    '.github/workflows/tidy,daily%1:a.yml': [
+      'on: workflow_dispatch',
+      'jobs:',
+      '  tidy%1:',
+      '    runs-on: ubuntu-latest',
+      '    steps:',
+      '      - run: bun run tidy',
+      '',
+    ].join('\n'),
+  });
+
+  const result = await $`bun ${join(import.meta.dir, 'run-workflows-check.ts')}`
+    .cwd(ctx.directory)
+    .env({ ...ctx.env, GITHUB_ACTIONS: 'true' })
+    .nothrow()
+    .quiet();
+
+  expect(result.stdout.toString().split('\n')[0]).toBe(
+    '::warning file=.github/workflows/tidy%2Cdaily%251%3Aa.yml,line=3::job tidy%251 sets no timeout-minutes',
+  );
+});
+
 test('it refuses an option it does not know, and exits 2 before it reads a workflow', async () => {
   const ctx = await setupTest();
 
