@@ -65,8 +65,10 @@ jobs:
   #   merge (release-please.yml).
   # - Run 2, dispatched at the tag: the publish job ships each released
   #   package to npm via OIDC.
+  # The release job waits for no checks job: the release PR passed its own
+  # checks, and the push of a release PR's merge must reach the tag while
+  # the merge commit is still main's head.
   release:
-    needs: checks
     if: github.event_name == 'push'
     permissions:
       contents: write

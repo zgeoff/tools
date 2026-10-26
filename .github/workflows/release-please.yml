@@ -30,6 +30,13 @@ on:
         type: string
         required: false
         default: release-please--branches--main
+      checks-timeout-minutes:
+        description:
+          The minutes to wait for the release PR's checks; when they run longer, the job turns on
+          auto-merge and the push of that merge tags the release
+        type: number
+        required: false
+        default: 15
       sync-command:
         description:
           A command that repairs the release PR so it passes the repo's checks; empty skips the
@@ -138,14 +145,17 @@ jobs:
       # when the open release PR needed no update (a previous run failed
       # after creating it). The script waits, with a time bound, for the
       # checks on the release branch's head, including the sync commit just
-      # pushed, and fails only when one fails or none finish in time.
+      # pushed, and fails only when one fails.
       - name: Auto-merge release PRs
         id: merge
         if: steps.app-token.outputs.token != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           RELEASE_BRANCH: ${{ inputs.release-branch }}
-        run: bash "$RUNNER_TEMP/merge-release-prs.sh" "$GITHUB_REPOSITORY" "$RELEASE_BRANCH"
+          CHECKS_TIMEOUT_MINUTES: ${{ inputs.checks-timeout-minutes }}
+        run: |
+          CHECKS_TIMEOUT=$((CHECKS_TIMEOUT_MINUTES * 60)) \
+            bash "$RUNNER_TEMP/merge-release-prs.sh" "$GITHUB_REPOSITORY" "$RELEASE_BRANCH"
 
       # Tags the release PR this run just merged, while its merge commit is
       # still main's head. A run whose first release-please call tagged a

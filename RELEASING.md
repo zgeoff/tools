@@ -17,7 +17,8 @@ The shared files under `sync/` ship by hand-pushed `sync-vN` tags instead, which
    version bump per conventional-commit type, `CHANGELOG.md`, manifest update. The job syncs
    `bun.lock` on the PR branch (versions are recorded there too) and auto-merges the PR once every
    check on its head passes. `scripts/merge-release-prs.sh` waits up to 15 minutes for those checks
-   to start and finish, and fails the run when one fails.
+   to start and finish, and fails the run when one fails. When they run longer, it turns on
+   auto-merge, so GitHub merges the PR once they pass, and the run of that merge's push tags it.
 3. Right after the merge, the same job calls release-please again, which tags `@zgeoff/<pkg>@X.Y.Z`
    on the merge commit and creates the GitHub release. The App token has no Workflows permission, so
    GitHub refuses it the tag once a workflow change lands on `main` after the merge commit; tagging

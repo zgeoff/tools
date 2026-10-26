@@ -296,23 +296,51 @@ test('it fails without a merge when a commit status fails', async () => {
   expect(output).toBe('');
 });
 
-test('it fails without a merge when the checks do not finish before the timeout', async () => {
+test('it turns on auto-merge and exits cleanly when the checks outlast the wait', async () => {
   const ctx = await setupTest();
 
   await ctx.writeResponses('prs', [[{ number: 145 }]]);
-  await ctx.writeResponses('heads', [buildMockHeadResponse('abc123', [])]);
+
+  await ctx.writeResponses('heads', [
+    buildMockHeadResponse('abc123', [
+      { name: 'pr / checks', status: 'IN_PROGRESS', conclusion: null },
+    ]),
+  ]);
 
   const result = await ctx.runScript({ CHECKS_TIMEOUT: '0' });
   const calls = await ctx.readCalls();
+  const output = await ctx.readOutput();
 
   expect({
     exitCode: result.exitCode,
     stdout: result.stdout.toString(),
     stderr: result.stderr.toString(),
+    output,
   }).toStrictEqual({
-    exitCode: 1,
-    stdout: '',
-    stderr: 'release PR #145 checks on abc123 did not finish within 0s\n',
+    exitCode: 0,
+    stdout: 'release PR #145 checks on abc123 did not finish within 0s; turning on auto-merge\n',
+    stderr: '',
+    output: '',
+  });
+
+  expect(calls.filter((call) => call.startsWith('pr merge'))).toStrictEqual([
+    'pr merge 145 --repo zgeoff/tools --auto --squash --match-head-commit abc123',
+  ]);
+});
+
+test('it leaves a held release PR without auto-merge when the checks outlast the wait', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeResponses('prs', [[{ number: 145 }]]);
+  await ctx.writeResponses('heads', [buildMockHeadResponse('abc123', [])]);
+  await ctx.writeResponses('mergeable', [{ mergeable: 'MERGEABLE', isDraft: true, labels: [] }]);
+
+  const result = await ctx.runScript({ CHECKS_TIMEOUT: '0' });
+  const calls = await ctx.readCalls();
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'release PR #145 is held (a draft); leaving it open\n',
   });
 
   expect(calls.filter((call) => call.startsWith('pr merge'))).toBeEmpty();
