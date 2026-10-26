@@ -71,13 +71,13 @@ test('it publishes a release that the merge run tagged from a run at the tag', a
 
   // The run's first release-please call released nothing, so a dispatch that
   // read its paths would publish no package.
-  const expressions = Object.fromEntries([
+  const expressions = Object.fromEntries<string>([
     ['github.token', 'app-token'],
     ['steps.release.outputs.paths_released', '[]'],
     ...output
       .split('\n')
       .filter((line) => line !== '')
-      .map((line) => {
+      .map((line): [string, string] => {
         const [name = '', ...value] = line.split('=');
 
         return [`steps.release-commit.outputs.${name}`, value.join('=')];
