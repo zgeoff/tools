@@ -350,18 +350,7 @@ test.each([
   },
 );
 
-test.each([
-  {
-    outcome: 'commits and pushes what the sync command changed',
-    command: "printf 'fixed\\n' >> README.md",
-    subject: 'chore: sync lockfile and format release files',
-  },
-  {
-    outcome: 'pushes nothing when the sync command changed nothing',
-    command: 'true',
-    subject: 'change',
-  },
-])('it $outcome on the release branch', async (row) => {
+test('it commits and pushes what the sync command changed on the release branch', async () => {
   const ctx = await setupTest();
 
   const gitEnvironment = readGitEnv(ctx.directory);
@@ -376,13 +365,48 @@ test.each([
   const exitCode = await ctx.runSteps(
     clone,
     ['Sync the release PR'],
-    { 'steps.release.outputs.prs_created': 'true', 'inputs.sync-command': row.command },
+    {
+      'steps.release.outputs.prs_created': 'true',
+      'inputs.sync-command': String.raw`printf 'fixed\n' >> README.md`,
+    },
     gitEnvironment,
   );
 
   expect(exitCode).toBe(0);
 
+  const pushed = await $`git -C ${remote} show HEAD:README.md`.env({ ...gitEnvironment }).text();
+
+  expect(pushed).toBe('kettle\nfixed\n');
+
   const subject = await $`git -C ${remote} log -1 --format=%s`.env({ ...gitEnvironment }).text();
 
-  expect(subject).toBe(`${row.subject}\n`);
+  expect(subject).toBe('chore: sync lockfile and format release files\n');
+});
+
+test('it pushes nothing to the release branch when the sync command changed nothing', async () => {
+  const ctx = await setupTest();
+
+  const gitEnvironment = readGitEnv(ctx.directory);
+  const remote = join(ctx.directory, 'remote.git');
+  const clone = join(ctx.directory, 'clone');
+
+  await runGit(ctx.directory, gitEnvironment, ['init', '--quiet', '--bare', remote]);
+  await runGit(ctx.directory, gitEnvironment, ['clone', '--quiet', remote, clone]);
+  await createGitCommit(clone, gitEnvironment, { 'README.md': 'kettle\n' });
+  await runGit(clone, gitEnvironment, ['push', '--quiet', '-u', 'origin', 'HEAD']);
+
+  const before = await $`git -C ${remote} rev-parse HEAD`.env({ ...gitEnvironment }).text();
+
+  const exitCode = await ctx.runSteps(
+    clone,
+    ['Sync the release PR'],
+    { 'steps.release.outputs.prs_created': 'true', 'inputs.sync-command': 'true' },
+    gitEnvironment,
+  );
+
+  expect(exitCode).toBe(0);
+
+  const after = await $`git -C ${remote} rev-parse HEAD`.env({ ...gitEnvironment }).text();
+
+  expect(after).toBe(before);
 });
