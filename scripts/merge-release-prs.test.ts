@@ -19,8 +19,8 @@ async function setupTest() {
 
   await writeFile(outputPath, '');
 
-  const runScript = (env: Record<string, string> = {}) =>
-    $`bash ${scriptPath} zgeoff/tools`
+  const runScript = (env: Record<string, string> = {}, args: readonly string[] = []) =>
+    $`bash ${scriptPath} zgeoff/tools ${args}`
       .env({
         ...process.env,
         PATH: `${directory}:${process.env['PATH']}`,
@@ -370,4 +370,43 @@ test('it exits cleanly when no release PR is open', async () => {
   const output = await ctx.readOutput();
 
   expect(output).toBe('');
+});
+
+test('it merges the release PR of the branch it is given', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeResponses('prs', [[{ number: 212 }]]);
+
+  await ctx.writeResponses('heads', [
+    buildMockHeadResponse('cafe12', [
+      { name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ]),
+  ]);
+
+  const result = await ctx.runScript({}, [
+    'release-please--branches--main--components--@acme/kettle',
+  ]);
+
+  const calls = await ctx.readCalls();
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'merged release PR #212 at cafe12\n',
+  });
+
+  expect(calls.filter((call) => !call.startsWith('pr view'))).toStrictEqual([
+    'pr list --repo zgeoff/tools --head release-please--branches--main--components--@acme/kettle --json number',
+    'api graphql -f owner=zgeoff -f name=tools -f ref=refs/heads/release-please--branches--main--components--@acme/kettle',
+    'pr merge 212 --repo zgeoff/tools --squash --match-head-commit cafe12',
+  ]);
+});
+
+test('it refuses more than two arguments', async () => {
+  const ctx = await setupTest();
+  const result = await ctx.runScript({}, ['release-please--branches--main', 'extra']);
+
+  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
+    exitCode: 2,
+    stderr: 'usage: merge-release-prs.sh <owner/repo> [<release branch>]\n',
+  });
 });

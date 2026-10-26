@@ -18,13 +18,13 @@ async function setupTest() {
   return { directory, runCheck };
 }
 
-test('it prints each fault of the main workflow and exits 1', async () => {
+test('it prints each fault of the shared release workflow and exits 1', async () => {
   const ctx = await setupTest();
 
   await mkdir(join(ctx.directory, '.github', 'workflows'), { recursive: true });
 
   await writeFile(
-    join(ctx.directory, '.github', 'workflows', 'main.yml'),
+    join(ctx.directory, '.github', 'workflows', 'release-please.yml'),
     [
       'jobs:',
       '  release:',
@@ -35,7 +35,7 @@ test('it prints each fault of the main workflow and exits 1', async () => {
       '        uses: acme/release-action@abc123',
       '        with:',
       `          token: \${{ steps.app-token.outputs.token }}`,
-      '      - name: Resolve release commit',
+      '      - name: Pick the release outputs',
       '        env:',
       `          RELEASE_OUTPUTS: \${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) || toJSON(steps.release.outputs) }}`,
       '        run: echo resolved',
@@ -52,12 +52,12 @@ test('it prints each fault of the main workflow and exits 1', async () => {
   }).toStrictEqual({
     exitCode: 1,
     stdout:
-      '.github/workflows/main.yml: Tag the merged release must set skip-github-pull-request: true\n',
+      '.github/workflows/release-please.yml: Tag the merged release must set skip-github-pull-request: true\n',
     stderr: '',
   });
 });
 
-test('it exits 2 when the repo has no main workflow', async () => {
+test('it exits 2 when the repo has no shared release workflow', async () => {
   const ctx = await setupTest();
   const result = await ctx.runCheck();
 

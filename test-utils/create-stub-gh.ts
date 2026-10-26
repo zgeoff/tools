@@ -24,7 +24,7 @@ take() {
 }
 case "$*" in
   "pr list "*) take prs '[]' ;;
-  "api graphql -f owner=zgeoff -f name=tools -f ref=refs/heads/release-please--branches--main -f query="*)
+  "api graphql -f owner=zgeoff -f name=tools -f ref=refs/heads/release-please--branches--"*" -f query="*)
     take heads '' ;;
   "pr view "*) take mergeable '{"mergeable":"MERGEABLE"}' ;;
   "pr merge "*) ;;

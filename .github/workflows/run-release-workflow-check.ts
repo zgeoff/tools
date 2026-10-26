@@ -3,12 +3,12 @@ import { collectReleaseWorkflowFaults } from './collect-release-workflow-faults.
 
 async function runCLI(): Promise<void> {
   try {
-    const text = await readFile('.github/workflows/main.yml', 'utf8');
+    const text = await readFile('.github/workflows/release-please.yml', 'utf8');
 
     const faults = collectReleaseWorkflowFaults(text);
 
     for (const fault of faults) {
-      process.stdout.write(`.github/workflows/main.yml: ${fault}\n`);
+      process.stdout.write(`.github/workflows/release-please.yml: ${fault}\n`);
     }
 
     process.exitCode = faults.length === 0 ? 0 : 1;

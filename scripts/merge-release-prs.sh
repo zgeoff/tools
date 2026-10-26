@@ -8,19 +8,20 @@
 # the push. The merge names the checked commit, so a later push can't slip in.
 # After a merge, it writes merged=true to $GITHUB_OUTPUT, so the release job
 # can tag the merge in the same run.
-# Usage: merge-release-prs.sh <owner/repo>
+# Usage: merge-release-prs.sh <owner/repo> [<release branch>]
+#        (default branch: release-please--branches--main)
 # Env: CHECKS_TIMEOUT, the seconds to wait for the checks (default 900);
 #      POLL_INTERVAL, the seconds between polls (default 10);
 #      GITHUB_OUTPUT, the step's output file (unset: no output).
 set -euo pipefail
 
-if [ $# -ne 1 ]; then
-  echo "usage: merge-release-prs.sh <owner/repo>" >&2
+if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+  echo "usage: merge-release-prs.sh <owner/repo> [<release branch>]" >&2
   exit 2
 fi
 
 repo=$1
-branch=release-please--branches--main
+branch=${2:-release-please--branches--main}
 timeout=${CHECKS_TIMEOUT:-900}
 interval=${POLL_INTERVAL:-10}
 

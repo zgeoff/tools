@@ -4,22 +4,19 @@ import type { WorkflowStepFields } from './parse-workflow-step.ts';
 
 // The release job's tag step must call the same release-please pin as its
 // first call, with the App token, and open no release PR of its own. The
-// resolve step must read the tag step's outputs when that step released.
+// pick step must report the tag step's outputs when that step released.
 export function collectReleaseWorkflowFaults(text: string): string[] {
   const steps = [
     parseWorkflowStep(text, 'release', 'Run release-please'),
     parseWorkflowStep(text, 'release', 'Tag the merged release'),
-    parseWorkflowStep(text, 'release', 'Resolve release commit'),
+    parseWorkflowStep(text, 'release', 'Pick the release outputs'),
   ] as const;
 
   return match(steps)
-    .with(
-      [{ kind: 'parsed' }, { kind: 'parsed' }, { kind: 'parsed' }],
-      ([release, tag, resolve]) => [
-        ...collectTagStepFaults(release.step, tag.step),
-        ...collectResolveStepFaults(resolve.step),
-      ],
-    )
+    .with([{ kind: 'parsed' }, { kind: 'parsed' }, { kind: 'parsed' }], ([release, tag, pick]) => [
+      ...collectTagStepFaults(release.step, tag.step),
+      ...collectPickStepFaults(pick.step),
+    ])
     .with(
       [{ kind: 'missing' }, P._, P._],
       [P._, { kind: 'missing' }, P._],
@@ -51,12 +48,12 @@ function collectTagStepFaults(release: WorkflowStepFields, tag: WorkflowStepFiel
   ];
 }
 
-function collectResolveStepFaults(resolve: WorkflowStepFields): string[] {
+function collectPickStepFaults(pick: WorkflowStepFields): string[] {
   const expected = `\${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) || toJSON(steps.release.outputs) }}`;
 
-  return resolve.env['RELEASE_OUTPUTS'] === expected
+  return pick.env['RELEASE_OUTPUTS'] === expected
     ? []
     : [
-        'Resolve release commit must read RELEASE_OUTPUTS from the tag step when it released, and from Run release-please otherwise',
+        'Pick the release outputs must read RELEASE_OUTPUTS from the tag step when it released, and from Run release-please otherwise',
       ];
 }

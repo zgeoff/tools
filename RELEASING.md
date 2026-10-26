@@ -11,17 +11,19 @@ The shared files under `sync/` ship by hand-pushed `sync-vN` tags instead, which
 ## Flow
 
 1. A `feat:`/`fix:` PR touching `packages/<pkg>` merges to `main`.
-2. `main.yml` runs release-please, which opens (or updates) a release PR for the affected packages:
+2. `main.yml`'s release job calls the shared
+   [`release-please.yml`](./.github/workflows/release-please.yml), which other repos call at a sync
+   tag too. It runs release-please, which opens (or updates) a release PR for the affected packages:
    version bump per conventional-commit type, `CHANGELOG.md`, manifest update. The job syncs
    `bun.lock` on the PR branch (versions are recorded there too) and auto-merges the PR once every
    check on its head passes. `scripts/merge-release-prs.sh` waits up to 15 minutes for those checks
    to start and finish, and fails the run when one fails.
-3. Right after the merge, the same run calls release-please again, which tags `@zgeoff/<pkg>@X.Y.Z`
+3. Right after the merge, the same job calls release-please again, which tags `@zgeoff/<pkg>@X.Y.Z`
    on the merge commit and creates the GitHub release. The App token has no Workflows permission, so
    GitHub refuses it the tag once a workflow change lands on `main` after the merge commit; tagging
    at once leaves that change seconds to land, not the length of a checks run.
-4. The run dispatches `main.yml` at the tag. The publish step of that run runs `bun pm pack`
-   (resolves `catalog:`/`workspace:` to exact versions — never pack with npm) then
+4. `main.yml`'s publish job dispatches `main.yml` at the tag. The publish job of that run runs
+   `bun pm pack` (resolves `catalog:`/`workspace:` to exact versions — never pack with npm) then
    `npm publish <tarball> --provenance` under OIDC.
 
 Packages with `"private": true` are versioned but skipped by the publish step. Internal `workspace:`

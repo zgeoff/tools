@@ -1,0 +1,185 @@
+name: Release Please
+
+# The release half of a repo's release job: release-please opens or updates
+# the release PR, a sync command repairs it, the job merges it once every
+# check on its head passes, and the same run tags the merge. The caller ships
+# the release from this workflow's outputs, in jobs of its own, so each
+# repo's npm trusted publisher keeps naming the caller's workflow.
+#
+# The tag waits for no checks, so it lands while the merge commit is still
+# main's head. The release App's token has no Workflows permission, and
+# GitHub refuses it a tag on a commit whose workflow files differ from main's
+# head, so a later tag fails once a workflow change merges in between.
+#
+# The App token exists because GITHUB_TOKEN events don't trigger workflows: a
+# GITHUB_TOKEN commit to the release PR would get no checks. With no App ID,
+# the job leaves release PRs open to merge by hand, and the run that the
+# merge starts tags the release.
+on:
+  workflow_call:
+    inputs:
+      app-id:
+        description: The release App's client ID; empty leaves release PRs to merge by hand
+        type: string
+        required: false
+        default: ''
+      release-branch:
+        description:
+          The head branch of the release PR; a component release, such as atc's, appends
+          --components--<component>
+        type: string
+        required: false
+        default: release-please--branches--main
+      sync-command:
+        description:
+          A command that repairs the release PR so it passes the repo's checks; empty skips the
+          repair
+        type: string
+        required: false
+        default: bun install && bun run format
+    secrets:
+      app-private-key:
+        description: The release App's private key
+        required: false
+    outputs:
+      releases_created:
+        description: true when this run tagged a release
+        value: ${{ jobs.release.outputs.releases_created }}
+      tag:
+        description: The release's tag, or the first package's tag in a multi-package release
+        value: ${{ jobs.release.outputs.tag }}
+      version:
+        description: The release's version, or the first package's version
+        value: ${{ jobs.release.outputs.version }}
+      release-outputs:
+        description: Every release-please output of the call that tagged, as JSON
+        value: ${{ jobs.release.outputs.release-outputs }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # Two pushes close together start two runs; without a queue, one run can
+    # merge the release PR while the other is still formatting it.
+    # queue: max keeps every waiting run; the default replaces a waiting run.
+    concurrency:
+      group: release-please
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      # bun install's prepare script installs git hooks that re-run the
+      # caller's checks and would reject this job's bot pushes.
+      LEFTHOOK: '0'
+    outputs:
+      releases_created: ${{ steps.pick.outputs.releases_created }}
+      tag: ${{ steps.pick.outputs.tag }}
+      version: ${{ steps.pick.outputs.version }}
+      release-outputs: ${{ steps.pick.outputs.release-outputs }}
+    steps:
+      - name: Mint GitHub App token
+        id: app-token
+        if: inputs.app-id != ''
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ inputs.app-id }}
+          private-key: ${{ secrets.app-private-key }}
+
+      - name: Run release-please
+        id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ steps.app-token.outputs.token || github.token }}
+
+      - name: Check out release PR
+        if: steps.release.outputs.prs_created == 'true' && inputs.sync-command != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.release-branch }}
+          token: ${{ steps.app-token.outputs.token || github.token }}
+      # No cache: a job that holds the App token must not run a Bun binary
+      # that another run's cache entry could have replaced.
+      - name: Set up bun
+        if: steps.release.outputs.prs_created == 'true' && inputs.sync-command != ''
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+          no-cache: true
+      - name: Sync the release PR
+        if: steps.release.outputs.prs_created == 'true' && inputs.sync-command != ''
+        env:
+          SYNC_COMMAND: ${{ inputs.sync-command }}
+        run: |
+          bash -c "$SYNC_COMMAND"
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -am "chore: sync lockfile and format release files"
+            git push
+          fi
+
+      # The merge script lives in this repo, not in the caller's checkout, so
+      # the step downloads it from the commit that defines this job: a caller
+      # at a sync tag runs that tag's script. actionlint does not know
+      # job.workflow_repository or job.workflow_sha, so the step reads them
+      # from the job context as JSON.
+      - name: Fetch the merge script
+        if: steps.app-token.outputs.token != ''
+        env:
+          JOB_CONTEXT: ${{ toJSON(job) }}
+        run: |
+          set -euo pipefail
+          repository=$(jq -er .workflow_repository <<< "$JOB_CONTEXT")
+          sha=$(jq -er .workflow_sha <<< "$JOB_CONTEXT")
+          curl -fsSL -o "$RUNNER_TEMP/merge-release-prs.sh" \
+            "https://raw.githubusercontent.com/$repository/$sha/scripts/merge-release-prs.sh"
+      # Reads no release-please outputs on purpose: prs_created is false
+      # when the open release PR needed no update (a previous run failed
+      # after creating it). The script waits, with a time bound, for the
+      # checks on the release branch's head, including the sync commit just
+      # pushed, and fails only when one fails or none finish in time.
+      - name: Auto-merge release PRs
+        id: merge
+        if: steps.app-token.outputs.token != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RELEASE_BRANCH: ${{ inputs.release-branch }}
+        run: bash "$RUNNER_TEMP/merge-release-prs.sh" "$GITHUB_REPOSITORY" "$RELEASE_BRANCH"
+
+      # Tags the release PR this run just merged, while its merge commit is
+      # still main's head. A run whose first release-please call tagged a
+      # release already leaves this merge to the next run, because a run
+      # reports one release.
+      - name: Tag the merged release
+        id: tag
+        if: steps.merge.outputs.merged == 'true' && steps.release.outputs.releases_created != 'true'
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          skip-github-pull-request: true
+
+      # toJSON never fails, so the outputs are safe to read in env, and a
+      # skipped tag step reads as an empty object.
+      - name: Pick the release outputs
+        id: pick
+        env:
+          RELEASE_OUTPUTS:
+            ${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) ||
+            toJSON(steps.release.outputs) }}
+        run: |
+          set -euo pipefail
+          # A single package at the root sets tag_name and version; a
+          # multi-package release sets them per path only.
+          first() {
+            jq -r --arg key "$1" '. as $out
+              | ($out.paths_released // "[]" | fromjson) as $paths
+              | $out[$key] // (if ($paths | length) > 0 then $out[$paths[0] + "--" + $key] else null end) // ""' \
+              <<< "$RELEASE_OUTPUTS"
+          }
+          {
+            echo "releases_created=$(jq -r '.releases_created // "false"' <<< "$RELEASE_OUTPUTS")"
+            echo "tag=$(first tag_name)"
+            echo "version=$(first version)"
+            echo "release-outputs=$(jq -c . <<< "$RELEASE_OUTPUTS")"
+          } >> "$GITHUB_OUTPUT"

@@ -13,7 +13,7 @@ test('it reports nothing for a tag step on the same pin with the App token and n
     '        with:',
     `          token: \${{ steps.app-token.outputs.token }}`,
     '          skip-github-pull-request: true',
-    '      - name: Resolve release commit',
+    '      - name: Pick the release outputs',
     '        env:',
     `          RELEASE_OUTPUTS: \${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) || toJSON(steps.release.outputs) }}`,
     '        run: echo resolved',
@@ -36,7 +36,7 @@ test('it reports a tag step on another pin, with another token, that opens relea
     '        uses: acme/release-action@def456',
     '        with:',
     `          token: \${{ github.token }}`,
-    '      - name: Resolve release commit',
+    '      - name: Pick the release outputs',
     '        env:',
     `          RELEASE_OUTPUTS: \${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) || toJSON(steps.release.outputs) }}`,
     '        run: echo resolved',
@@ -52,7 +52,7 @@ test('it reports a tag step on another pin, with another token, that opens relea
   ]);
 });
 
-test('it reports a resolve step that reads only the first release-please outputs', () => {
+test('it reports a pick step that reads only the first release-please outputs', () => {
   const text = [
     'jobs:',
     '  release:',
@@ -64,7 +64,7 @@ test('it reports a resolve step that reads only the first release-please outputs
     '        with:',
     `          token: \${{ steps.app-token.outputs.token }}`,
     '          skip-github-pull-request: true',
-    '      - name: Resolve release commit',
+    '      - name: Pick the release outputs',
     '        env:',
     `          RELEASE_OUTPUTS: \${{ toJSON(steps.release.outputs) }}`,
     '        run: echo resolved',
@@ -74,7 +74,7 @@ test('it reports a resolve step that reads only the first release-please outputs
   const faults = collectReleaseWorkflowFaults(text);
 
   expect(faults).toStrictEqual([
-    'Resolve release commit must read RELEASE_OUTPUTS from the tag step when it released, and from Run release-please otherwise',
+    'Pick the release outputs must read RELEASE_OUTPUTS from the tag step when it released, and from Run release-please otherwise',
   ]);
 });
 
@@ -92,7 +92,7 @@ test('it reports each step the release job lacks', () => {
 
   expect(faults).toStrictEqual([
     'the release job has no step named Tag the merged release',
-    'the release job has no step named Resolve release commit',
+    'the release job has no step named Pick the release outputs',
   ]);
 });
 
@@ -108,7 +108,7 @@ test('it reports a tag step that runs a script instead of release-please', () =>
     `          token: \${{ steps.app-token.outputs.token }}`,
     '          skip-github-pull-request: true',
     '        run: git tag v1',
-    '      - name: Resolve release commit',
+    '      - name: Pick the release outputs',
     '        env:',
     `          RELEASE_OUTPUTS: \${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) || toJSON(steps.release.outputs) }}`,
     '        run: echo resolved',

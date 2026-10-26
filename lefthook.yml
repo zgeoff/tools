@@ -30,5 +30,5 @@ pre-commit:
 pre-push:
   jobs:
     - name: release-workflow
-      glob: '.github/workflows/main.yml'
+      glob: '.github/workflows/release-please.yml'
       run: bun run --silent check:release-workflow
