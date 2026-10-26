@@ -1,0 +1,97 @@
+import { expect, test } from 'bun:test';
+import { isConditionMet } from './is-condition-met.ts';
+
+test.each([
+  ["steps.pick.outputs.color == 'blue'", 'blue', true],
+  ["steps.pick.outputs.color == 'blue'", 'red', false],
+  ["steps.pick.outputs.color != 'blue'", 'red', true],
+  ["steps.pick.outputs.color != 'blue'", 'blue', false],
+])('it evaluates %s with the color %s as %p', (condition, color, expected) => {
+  const met = isConditionMet(condition, new Map([['steps.pick.outputs.color', color]]));
+
+  expect(met).toBe(expected);
+});
+
+test.each([
+  ['blue', 'large', true],
+  ['blue', 'small', false],
+  ['red', 'large', false],
+])(
+  'it meets a condition of two comparisons joined by && only when both hold, with %s and %s as %p',
+  (color, size, expected) => {
+    const values = new Map([
+      ['steps.pick.outputs.color', color],
+      ['steps.pick.outputs.size', size],
+    ]);
+
+    const met = isConditionMet(
+      "steps.pick.outputs.color == 'blue' && steps.pick.outputs.size != 'small'",
+      values,
+    );
+
+    expect(met).toBe(expected);
+  },
+);
+
+test.each([
+  ['blue', 'small', 'light', true],
+  ['red', 'large', 'dark', true],
+  ['red', 'large', 'light', false],
+  ['blue', 'large', 'light', true],
+])(
+  'it meets a condition of alternatives joined by || when one holds, with %s, %s and %s as %p',
+  (color, size, shade, expected) => {
+    const values = new Map([
+      ['steps.pick.outputs.color', color],
+      ['steps.pick.outputs.size', size],
+      ['steps.pick.outputs.shade', shade],
+    ]);
+
+    const met = isConditionMet(
+      "steps.pick.outputs.color == 'blue' || steps.pick.outputs.size == 'large' && steps.pick.outputs.shade == 'dark'",
+      values,
+    );
+
+    expect(met).toBe(expected);
+  },
+);
+
+test.each([
+  ['true', 'true', true],
+  ['false', 'true', false],
+  ['false', 'false', true],
+])('it compares the boolean input %s with the literal %s as %p', (value, literal, expected) => {
+  const met = isConditionMet(`inputs.merge == ${literal}`, new Map([['inputs.merge', value]]));
+
+  expect(met).toBe(expected);
+});
+
+test('it keeps a quoted value whole when the value holds && or ||', () => {
+  const values = new Map([
+    ['steps.pick.outputs.text', 'alpha && beta || gamma'],
+    ['steps.pick.outputs.size', 'large'],
+  ]);
+
+  const met = isConditionMet(
+    "steps.pick.outputs.text == 'alpha && beta || gamma' && steps.pick.outputs.size == 'large'",
+    values,
+  );
+
+  expect(met).toBeTrue();
+});
+
+test.each([
+  ['always()', 'unsupported condition: always()'],
+  [
+    "steps.pick.outputs.color == 'blue' && ",
+    "unsupported condition: steps.pick.outputs.color == 'blue' && ",
+  ],
+  ["steps.pick.outputs.shade == 'dark'", 'no value for steps.pick.outputs.shade'],
+])('it rejects %s', (condition, message) => {
+  const values = new Map([
+    ['steps.pick.outputs.color', 'blue'],
+    ['steps.pick.outputs.size', 'large'],
+  ]);
+
+  expect(() => isConditionMet(condition, values)).toThrow(message);
+});

@@ -35,7 +35,7 @@ sync/               the sources that repo-sync delivers, listed in sync/manifest
 scripts/            the shell scripts that repo-sync and CI run, plus the manual ones that pin a
                     repo to a sync tag and do a package's first npm publish; tests sit beside them
 .github/workflows/  this repo's CI and release, and the reusable workflows that other repos call:
-                    bun-checks, repo-sync, audit-fix and the paths-changed gate
+                    bun-checks, repo-sync, audit-fix, release-please and the paths-changed gate
 .claude/skills/     the code-style skill, which is both this repo's skill and the shared base
 ```
 
@@ -63,3 +63,5 @@ repos too, so an edit to one of them changes every repo that takes it.
   `lint:full`, and when the two type checks disagree, `tsc` is right.
 - `bun run check:sync` checks `sync/manifest.json` against the rules repo-sync assumes. Run it after
   you change the manifest or a file an entry lists. CI runs it, and the pre-push hook does not.
+- `bun run check:release-workflow` checks the tag step of the shared release job in
+  `.github/workflows/release-please.yml`. CI and the pre-push hook run it.

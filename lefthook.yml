@@ -25,3 +25,10 @@ pre-commit:
       glob: '*.{ts,tsx}'
       run: bun packages/format-codemod/src/cli.ts --quiet {staged_files}
       stage_fixed: true
+
+# tools' own checks, beside the baseline's pre-push jobs.
+pre-push:
+  jobs:
+    - name: release-workflow
+      glob: '.github/workflows/release-please.yml'
+      run: bun run --silent check:release-workflow

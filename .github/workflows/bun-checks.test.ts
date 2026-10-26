@@ -461,10 +461,10 @@ test('it fails the fetch and downloads nothing when the job context lacks the co
     .nothrow()
     .quiet();
 
-  const downloaded = await Bun.file(join(ctx.bin, 'curl.urls')).exists();
+  const downloaded = await readFile(join(ctx.bin, 'curl.urls'), 'utf8');
 
   expect(result.exitCode).toBe(1);
-  expect(downloaded).toBeFalse();
+  expect(downloaded).toBe('');
 });
 
 test('it gives a caller that passes no time limit the synced caller fallback', async () => {

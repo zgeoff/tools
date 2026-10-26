@@ -57,6 +57,64 @@ test('it answers an endpoint with no response file with its default body', async
   expect(result.stdout.toString()).toBe('{"mergeable":"MERGEABLE"}\n');
 });
 
+test.each([
+  ['commits', 'repos/zgeoff/tools/commits/main', { sha: 'head222' }, '{"sha":"head222"}\n'],
+  [
+    'compares',
+    'repos/zgeoff/tools/compare/merge111...head222',
+    { files: [{ filename: 'README.md' }] },
+    '{"files":[{"filename":"README.md"}]}\n',
+  ],
+  [
+    'rules',
+    'repos/zgeoff/tools/rules/branches/main',
+    [{ type: 'required_status_checks' }],
+    '[{"type":"required_status_checks"}]\n',
+  ],
+] as const)(
+  'it answers the %s endpoint at %s with its response',
+  async (endpoint, path, response, expected) => {
+    const ctx = await setupTest();
+
+    await ctx.gh.writeResponses(endpoint, [response]);
+
+    const result = Bun.spawnSync([join(ctx.directory, 'gh'), 'api', path]);
+
+    expect(result.stdout.toString()).toBe(expected);
+  },
+);
+
+test('it prints nothing and succeeds for a merge', async () => {
+  const ctx = await setupTest();
+
+  await ctx.gh.writeResponses('merges', ['merged']);
+
+  const result = Bun.spawnSync([join(ctx.directory, 'gh'), 'pr', 'merge', '145', '--squash']);
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 0,
+    stdout: '',
+  });
+});
+
+test('it accepts a workflow dispatch and prints nothing', async () => {
+  const ctx = await setupTest();
+
+  const result = Bun.spawnSync([
+    join(ctx.directory, 'gh'),
+    'workflow',
+    'run',
+    'main.yml',
+    '--ref',
+    '@zgeoff/std@0.4.0',
+  ]);
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 0,
+    stdout: '',
+  });
+});
+
 test('it fails a call whose body is "error"', async () => {
   const ctx = await setupTest();
 
@@ -96,10 +154,20 @@ test('it logs each call less its GraphQL query', async () => {
 
   Bun.spawnSync([join(ctx.directory, 'gh'), 'pr', 'merge', '145', '--squash']);
 
+  Bun.spawnSync([
+    join(ctx.directory, 'gh'),
+    'workflow',
+    'run',
+    'main.yml',
+    '--ref',
+    '@zgeoff/std@0.4.0',
+  ]);
+
   const calls = await ctx.gh.readCalls();
 
   expect(calls).toStrictEqual([
     'api graphql -f owner=zgeoff -f name=tools -f ref=refs/heads/release-please--branches--main',
     'pr merge 145 --squash',
+    'workflow run main.yml --ref @zgeoff/std@0.4.0',
   ]);
 });

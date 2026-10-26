@@ -11,17 +11,66 @@ The shared files under `sync/` ship by hand-pushed `sync-vN` tags instead, which
 ## Flow
 
 1. A `feat:`/`fix:` PR touching `packages/<pkg>` merges to `main`.
-2. `main.yml` runs release-please, which opens (or updates) a release PR for the affected packages:
-   version bump per conventional-commit type, `CHANGELOG.md`, manifest update. The job syncs
-   `bun.lock` on the PR branch (versions are recorded there too) and auto-merges the PR once every
-   check on its head passes. `scripts/merge-release-prs.sh` waits up to 15 minutes for those checks
-   to start and finish, and fails the run when one fails.
-3. The merge triggers `main.yml` again: release-please tags `@zgeoff/<pkg>@X.Y.Z`, creates the
-   GitHub release, and the publish step runs `bun pm pack` (resolves `catalog:`/`workspace:` to
-   exact versions — never pack with npm) then `npm publish <tarball> --provenance` under OIDC.
+2. `main.yml`'s release job calls the shared
+   [`release-please.yml`](./.github/workflows/release-please.yml) with `merge: true`. Other repos
+   call it at a sync tag too, and its `merge` input is off by default. In a repo with `merge` off, a
+   person merges the release PR, and the run of that merge's push tags the release. It runs
+   release-please, which opens (or updates) a release PR for the affected packages: version bump per
+   conventional-commit type, `CHANGELOG.md`, manifest update. The job syncs `bun.lock` on the PR
+   branch (versions are recorded there too) and merges the PR when every check on its head passes in
+   the wait. `scripts/merge-release-prs.sh` waits up to 15 minutes for those checks to start and
+   finish, and fails the run when one fails. When they run longer, it leaves the PR open. When a
+   ruleset on `main` requires every check still running, it turns on auto-merge, so GitHub merges
+   the PR once they pass; otherwise the next push to `main` waits again. The run of the merge's push
+   tags the release.
+3. Right after the merge, the same job calls release-please again, which tags `@zgeoff/<pkg>@X.Y.Z`
+   on the merge commit and creates the GitHub release. The App token has no Workflows permission, so
+   GitHub is expected to refuse it the tag once a workflow change lands on `main` after the merge
+   commit. Tagging at once narrows that window to seconds without closing it, so the job first runs
+   `scripts/check-release-head.sh`: when `main` moved past the merge commit with a workflow change,
+   it fails with both commits named, and the release needs the steps in
+   [Recover an untagged release PR](#recover-an-untagged-release-pr).
+4. `main.yml`'s publish job dispatches `main.yml` at the tag. The publish job of that run runs
+   `bun pm pack` (resolves `catalog:`/`workspace:` to exact versions — never pack with npm) then
+   `npm publish <tarball> --provenance` under OIDC.
 
 Packages with `"private": true` are versioned but skipped by the publish step. Internal `workspace:`
 dependents of a released package get a patch bump automatically (`node-workspace` plugin).
+
+## Hold a release
+
+The release job leaves a held release PR open: a draft, or one labelled `autorelease: hold`. It
+never marks the draft ready, removes the label, or turns on auto-merge for it, and release-please
+keeps both when it updates the PR.
+
+To hold a release:
+
+1. Mark the release PR as a draft, or add the label:
+   `gh pr edit <number> --add-label 'autorelease: hold'`. The first time, create the label:
+   `gh label create 'autorelease: hold'`.
+2. If the PR shows auto-merge as on, turn it off: `gh pr merge <number> --disable-auto`.
+
+To release it:
+
+1. Mark the PR ready for review, or remove the label:
+   `gh pr edit <number> --remove-label 'autorelease: hold'`.
+2. Merge it by hand, or let the release job merge it on the next push to `main` once its checks
+   pass.
+
+## Recover an untagged release PR
+
+The release App cannot tag a merge commit once `main` holds a later workflow change, and every run
+fails on the same commit until a person tags it. A person's token holds the workflow scope, which
+the App lacks.
+
+1. Read the release PR's number, merge commit and tags from the failed job's message and the PR:
+   `gh pr view <number> --json mergeCommit,body`.
+2. Create each release at the merge commit, with its section of the package's `CHANGELOG.md` as the
+   notes: `gh release create '<tag>' --target <merge commit> --title '<tag>' --notes-file <notes>`.
+3. Mark the PR tagged, so release-please stops retrying it:
+   `gh pr edit <number> --remove-label 'autorelease: pending' --add-label 'autorelease: tagged'`.
+4. Publish from the tag: `gh workflow run main.yml --ref '<tag>' -f republish_paths='["<path>"]'`.
+   Another repo runs its own ship step for the tag.
 
 ## One-time setup
 
@@ -60,6 +109,10 @@ Once that's saved, CI publishes all future versions with no tokens.
 - Release PR open but nothing published: the App isn't configured (or its token step failed) — the
   PR won't auto-merge, and merging it by hand from the GitHub UI works fine and triggers the publish
   run.
+- A merged release PR stays untagged, and the release job fails with
+  `its merge commit <sha> is no longer main's head`, or release-please fails with
+  `Resource not accessible by integration`: follow
+  [Recover an untagged release PR](#recover-an-untagged-release-pr).
 - `npm publish` 404/403 on a package's first CI release: trusted publisher not configured for that
   package, or the first manual publish never happened.
 - Publish fails with `the release tagged <x> but <path>/package.json holds <y>`: the publish step
