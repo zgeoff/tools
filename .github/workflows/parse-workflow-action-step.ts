@@ -6,16 +6,21 @@ export interface WorkflowActionStep {
   readonly inputs: Readonly<Record<string, string>>;
 }
 
+// A step the workflow lacks is a result, because a check reports it as a fault.
+export type WorkflowActionStepResult =
+  | { readonly kind: 'parsed'; readonly step: WorkflowActionStep }
+  | { readonly kind: 'missing'; readonly message: string };
+
 export function parseWorkflowActionStep(
   text: string,
   job: string,
   step: string,
-): WorkflowActionStep {
+): WorkflowActionStepResult {
   const workflow: unknown = Bun.YAML.parse(text);
   const steps = findField(findField(findField(workflow, 'jobs'), job), 'steps');
 
   if (!Array.isArray(steps)) {
-    throw new TypeError(`the ${job} job has no steps`);
+    return { kind: 'missing', message: `the ${job} job has no steps` };
   }
 
   const list: unknown[] = steps;
@@ -23,7 +28,10 @@ export function parseWorkflowActionStep(
   const uses = findField(found, 'uses');
 
   if (typeof uses !== 'string') {
-    throw new TypeError(`the ${job} job has no step named ${step} that uses an action`);
+    return {
+      kind: 'missing',
+      message: `the ${job} job has no step named ${step} that uses an action`,
+    };
   }
 
   const condition = findField(found, 'if');
@@ -31,9 +39,12 @@ export function parseWorkflowActionStep(
   const entries = typeof inputs === 'object' && inputs !== null ? Object.entries(inputs) : [];
 
   return {
-    condition: typeof condition === 'string' ? condition : null,
-    uses,
-    inputs: Object.fromEntries(entries.map(([name, value]) => [name, String(value)])),
+    kind: 'parsed',
+    step: {
+      condition: typeof condition === 'string' ? condition : null,
+      uses,
+      inputs: Object.fromEntries(entries.map(([name, value]) => [name, String(value)])),
+    },
   };
 }
 

@@ -127,12 +127,16 @@ test.each([
 
   const tag = parseWorkflowActionStep(text, 'release', 'Tag the merged release');
 
+  if (tag.kind !== 'parsed') {
+    throw new Error(tag.message);
+  }
+
   const values = new Map([
     ['steps.merge.outputs.merged', row.merged],
     ['steps.release.outputs.releases_created', row.created],
   ]);
 
-  const result = isConditionMet(tag.condition ?? '', values);
+  const result = isConditionMet(tag.step.condition ?? '', values);
 
   expect(result).toBe(row.met);
 });
