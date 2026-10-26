@@ -3,8 +3,12 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import { createGitCommit } from '../../test-utils/create-git-commit.ts';
+import { readGitEnv } from '../../test-utils/read-git-env.ts';
+import { runGit } from '../../test-utils/run-git.ts';
 import { createStubCurl } from './create-stub-curl.ts';
 import { loadWorkflowStep } from './load-workflow-step.ts';
+import { runWorkflowSteps } from './run-workflow-steps.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'release-please-'));
@@ -56,7 +60,34 @@ async function setupTest() {
     return files.toSorted();
   };
 
-  return { runStep, readOutput, readFetchedURLs, readFetchedFiles };
+  // Runs the named steps with their env expressions and conditions, in cwd.
+  const runSteps = (
+    cwd: string,
+    names: readonly string[],
+    expressions: Readonly<Record<string, string>>,
+    env: Readonly<Record<string, string | undefined>> = {},
+  ) =>
+    runWorkflowSteps(workflow, 'release', names, {
+      cwd,
+      env: {
+        PATH: process.env['PATH'],
+        RUNNER_TEMP: runnerTemp,
+        GITHUB_REPOSITORY: 'zgeoff/tools',
+        ...env,
+      },
+      expressions,
+      outputPath,
+    });
+
+  return {
+    directory,
+    runnerTemp,
+    runStep,
+    runSteps,
+    readOutput,
+    readFetchedURLs,
+    readFetchedFiles,
+  };
 }
 
 test('it downloads both release scripts from the commit that defines the job', async () => {
@@ -184,4 +215,96 @@ test('it reports no release, tag or version for a run that released nothing', as
       '',
     ].join('\n'),
   );
+});
+
+test('it hands the merge script the release branch and the wait in seconds', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.runnerTemp, 'merge-release-prs.sh'),
+    'echo "CHECKS_TIMEOUT=$CHECKS_TIMEOUT GH_TOKEN=$GH_TOKEN $*" > "$RUNNER_TEMP/merge.log"\n',
+  );
+
+  const exitCode = await ctx.runSteps(ctx.directory, ['Auto-merge release PRs'], {
+    'steps.app-token.outputs.token': 'app-token',
+    'inputs.merge': 'true',
+    'inputs.release-branch': 'release-please--branches--main--components--@acme/kettle',
+    'inputs.checks-timeout-minutes': '60',
+  });
+
+  expect(exitCode).toBe(0);
+
+  const recorded = await readFile(join(ctx.runnerTemp, 'merge.log'), 'utf8');
+
+  expect(recorded).toBe(
+    'CHECKS_TIMEOUT=3600 GH_TOKEN=app-token zgeoff/tools release-please--branches--main--components--@acme/kettle\n',
+  );
+});
+
+test.each([
+  {
+    step: "Check untagged releases against main's head",
+    expressions: { 'steps.app-token.outputs.token': '', 'github.token': 'run-token' },
+    token: 'run-token',
+  },
+  {
+    step: "Check the merge against main's head",
+    expressions: {
+      'steps.app-token.outputs.token': 'app-token',
+      'steps.merge.outputs.merged': 'true',
+    },
+    token: 'app-token',
+  },
+])('it runs the head check for "$step" on the repo with its token', async (row) => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.runnerTemp, 'check-release-head.sh'),
+    'echo "GH_TOKEN=$GH_TOKEN $*" > "$RUNNER_TEMP/check.log"\n',
+  );
+
+  const exitCode = await ctx.runSteps(ctx.directory, [row.step], row.expressions);
+
+  expect(exitCode).toBe(0);
+
+  const recorded = await readFile(join(ctx.runnerTemp, 'check.log'), 'utf8');
+
+  expect(recorded).toBe(`GH_TOKEN=${row.token} zgeoff/tools\n`);
+});
+
+test.each([
+  {
+    outcome: 'commits and pushes what the sync command changed',
+    command: "printf 'fixed\\n' >> README.md",
+    subject: 'chore: sync lockfile and format release files',
+  },
+  {
+    outcome: 'pushes nothing when the sync command changed nothing',
+    command: 'true',
+    subject: 'change',
+  },
+])('it $outcome on the release branch', async (row) => {
+  const ctx = await setupTest();
+
+  const gitEnv = readGitEnv(ctx.directory);
+  const remote = join(ctx.directory, 'remote.git');
+  const clone = join(ctx.directory, 'clone');
+
+  await runGit(ctx.directory, gitEnv, ['init', '--quiet', '--bare', remote]);
+  await runGit(ctx.directory, gitEnv, ['clone', '--quiet', remote, clone]);
+  await createGitCommit(clone, gitEnv, { 'README.md': 'kettle\n' });
+  await runGit(clone, gitEnv, ['push', '--quiet', '-u', 'origin', 'HEAD']);
+
+  const exitCode = await ctx.runSteps(
+    clone,
+    ['Sync the release PR'],
+    { 'steps.release.outputs.prs_created': 'true', 'inputs.sync-command': row.command },
+    gitEnv,
+  );
+
+  expect(exitCode).toBe(0);
+
+  const subject = await $`git -C ${remote} log -1 --format=%s`.env({ ...gitEnv }).text();
+
+  expect(subject).toBe(`${row.subject}\n`);
 });

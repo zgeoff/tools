@@ -53,11 +53,21 @@ export async function runWorkflowSteps(
   return 0;
 }
 
+// An env value is literal text or one expression of names and quoted texts
+// joined by ||, which takes the first operand that is not empty, as GitHub's
+// || does for text.
 function resolveValue(value: string, values: ReadonlyMap<string, string>): string {
-  const expression = /^\$\{\{ (?<name>[\w.-]+) \}\}$/u.exec(value)?.groups?.['name'];
+  const operands = /^\$\{\{ (?<body>.+) \}\}$/u
+    .exec(value)
+    ?.groups?.['body']?.split(' || ')
+    .map((operand) => /^(?:(?<name>[\w.-]+)|'(?<text>[^']*)')$/u.exec(operand)?.groups);
 
-  if (expression !== undefined) {
-    return getValue(expression, values);
+  if (operands !== undefined && operands.every((operand) => operand !== undefined)) {
+    const resolved = operands.map((operand) =>
+      operand['text'] === undefined ? getValue(operand['name'] ?? '', values) : operand['text'],
+    );
+
+    return resolved.find((text) => text !== '') ?? '';
   }
 
   if (value.includes('${{')) {

@@ -144,10 +144,53 @@ test('it stops at the first failing step and returns its exit code', async () =>
 });
 
 test.each([
+  ['the first operand when it is not empty', 'blue', 'red', 'blue'],
+  ['the next operand when the first is empty', '', 'red', 'red'],
+  ['the quoted text when every name is empty', '', '', 'none'],
+])(
+  'it fills an env value of names and a quoted text joined by || with %s',
+  async (_label, first, second, expected) => {
+    const ctx = await setupTest();
+
+    await writeFile(
+      ctx.workflow,
+      [
+        'jobs:',
+        '  build:',
+        '    steps:',
+        '      - name: Write',
+        '        env:',
+        `          COLOR: \${{ steps.pick.outputs.color || inputs.color || 'none' }}`,
+        '        run: echo "$COLOR" > written',
+        '',
+      ].join('\n'),
+    );
+
+    const exitCode = await runWorkflowSteps(ctx.workflow, 'build', ['Write'], {
+      cwd: ctx.directory,
+      env: process.env,
+      expressions: { 'steps.pick.outputs.color': first, 'inputs.color': second },
+      outputPath: ctx.outputPath,
+    });
+
+    expect(exitCode).toBe(0);
+
+    const written = await readFile(join(ctx.directory, 'written'), 'utf8');
+
+    expect(written).toBe(`${expected}\n`);
+  },
+);
+
+test.each([
   [
     'an expression with no value',
     `REPO: \${{ github.repository }}`,
     'no value for github.repository',
+  ],
+  [
+    'an expression that calls a function',
+    `OUTPUTS: \${{ toJSON(steps.pick.outputs) }}`,
+    `unsupported expression: \${{ toJSON(steps.pick.outputs) }}`,
   ],
   [
     'an expression inside other text',
