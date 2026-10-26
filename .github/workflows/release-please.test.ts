@@ -1,11 +1,12 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { buildMockHeadResponse } from '../../test-utils/build-mock-head-response.ts';
 import { createGitCommit } from '../../test-utils/create-git-commit.ts';
 import { createStubGH } from '../../test-utils/create-stub-gh.ts';
+import { installReleaseScripts } from '../../test-utils/install-release-scripts.ts';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { runGit } from '../../test-utils/run-git.ts';
 import { createStubClock } from './create-stub-clock.ts';
@@ -75,26 +76,13 @@ async function setupTest() {
       outputPath,
     });
 
-  // Puts the repo's own release scripts where the fetch step leaves them,
-  // and a stub gh at the GitHub boundary.
-  const installReleaseScripts = async () => {
-    for (const script of ['check-release-head.sh', 'merge-release-prs.sh']) {
-      await copyFile(
-        join(import.meta.dir, '..', '..', 'scripts', script),
-        join(runnerTemporaryDirectory, script),
-      );
-    }
-
-    return createStubGH(stubDirectory);
-  };
-
   // Puts a stub clock first on PATH, which reads out the given Unix times.
   const setClock = (times: readonly number[]) => createStubClock(stubDirectory, times);
 
   return {
     directory,
     stubDirectory,
-    installReleaseScripts,
+    runnerTemporaryDirectory,
     setClock,
     runStep,
     runSteps,
@@ -239,7 +227,10 @@ test('it reports no release, tag or version for a run that released nothing', as
 
 test('it merges the release PR of the branch the caller names', async () => {
   const ctx = await setupTest();
-  const gh = await ctx.installReleaseScripts();
+
+  await installReleaseScripts(ctx.runnerTemporaryDirectory);
+
+  const gh = await createStubGH(ctx.stubDirectory);
 
   await gh.writeResponses('prs', [[{ number: 212 }]]);
 
@@ -279,7 +270,10 @@ test('it merges the release PR of the branch the caller names', async () => {
 
 test("it waits exactly the caller's minutes, in seconds, before it leaves the release PR open", async () => {
   const ctx = await setupTest();
-  const gh = await ctx.installReleaseScripts();
+
+  await installReleaseScripts(ctx.runnerTemporaryDirectory);
+
+  const gh = await createStubGH(ctx.stubDirectory);
 
   // The wait starts at 1000. Two minutes as 120 seconds polls again at 1119
   // and stops at 1120; any other conversion polls once or more than twice.
@@ -333,7 +327,10 @@ test.each([
   'it fails "$step" when main moved past a pending release with a workflow change',
   async (row) => {
     const ctx = await setupTest();
-    const gh = await ctx.installReleaseScripts();
+
+    await installReleaseScripts(ctx.runnerTemporaryDirectory);
+
+    const gh = await createStubGH(ctx.stubDirectory);
 
     await gh.writeResponses('prs', [
       [{ number: 145, mergeCommit: { oid: 'merge111' }, baseRefName: 'main' }],
