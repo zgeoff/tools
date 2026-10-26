@@ -2,8 +2,8 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { $ } from 'bun';
 import { createStubGH } from '../test-utils/create-stub-gh.ts';
+import { runBashScript } from '../test-utils/run-bash-script.ts';
 
 async function setupTest() {
   // Inside the checkout, not the system temp dir: the folder is git-ignored.
@@ -15,18 +15,8 @@ async function setupTest() {
 
   const scriptPath = fileURLToPath(new URL('check-release-head.sh', import.meta.url));
 
-  const runScript = async (repo: string) => {
-    const result = await $`bash ${scriptPath} ${repo}`
-      .env({ ...process.env, PATH: `${directory}:${process.env['PATH']}` })
-      .nothrow()
-      .quiet();
-
-    return {
-      exitCode: result.exitCode,
-      stdout: result.stdout.toString(),
-      stderr: result.stderr.toString(),
-    };
-  };
+  const runScript = (repo: string) =>
+    runBashScript({ script: scriptPath, args: [repo], stubDirectory: directory, env: {} });
 
   return { writeResponses: gh.writeResponses, readCalls: gh.readCalls, runScript };
 }

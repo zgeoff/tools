@@ -2,9 +2,9 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { $ } from 'bun';
 import { buildMockHeadResponse } from '../test-utils/build-mock-head-response.ts';
 import { createStubGH } from '../test-utils/create-stub-gh.ts';
+import { runBashScript } from '../test-utils/run-bash-script.ts';
 
 async function setupTest() {
   // Inside the checkout, not the system temp dir: the folder is git-ignored.
@@ -19,19 +19,15 @@ async function setupTest() {
 
   await writeFile(outputPath, '');
 
-  const runScript = (args: readonly string[], env: Record<string, string> = {}) =>
-    $`bash ${scriptPath} ${args}`
-      .env({
-        ...process.env,
-        PATH: `${directory}:${process.env['PATH']}`,
+  const runScript = (args: readonly string[], env: Readonly<Record<string, string>> = {}) =>
+    runBashScript({
+      script: scriptPath,
+      args,
+      stubDirectory: directory,
 
-        // Polls without a pause; no test's outcome reads it.
-        POLL_INTERVAL: '0',
-        GITHUB_OUTPUT: outputPath,
-        ...env,
-      })
-      .nothrow()
-      .quiet();
+      // Polls without a pause; no test's outcome reads it.
+      env: { POLL_INTERVAL: '0', GITHUB_OUTPUT: outputPath, ...env },
+    });
 
   const readOutput = () => readFile(outputPath, 'utf8');
 
@@ -59,8 +55,8 @@ test('it waits for checks that have not started yet, then merges the checked hea
 
   expect({
     exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
+    stdout: result.stdout,
+    stderr: result.stderr,
   }).toStrictEqual({
     exitCode: 0,
     stdout: 'merged release PR #145 at abc123\n',
@@ -102,8 +98,8 @@ test('it waits on the head a push moved the branch to, and merges that head', as
 
   expect({
     exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
+    stdout: result.stdout,
+    stderr: result.stderr,
   }).toStrictEqual({
     exitCode: 0,
     stdout: 'merged release PR #145 at new222\n',
@@ -155,8 +151,8 @@ test('it waits for the GitHub Actions checks when other apps pass first', async 
 
   expect({
     exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
+    stdout: result.stdout,
+    stderr: result.stderr,
   }).toStrictEqual({
     exitCode: 0,
     stdout: 'merged release PR #145 at abc123\n',
@@ -195,8 +191,8 @@ test('it counts skipped checks and passed commit statuses as passed', async () =
 
   expect({
     exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
+    stdout: result.stdout,
+    stderr: result.stderr,
   }).toStrictEqual({
     exitCode: 0,
     stdout: 'merged release PR #145 at abc123\n',
@@ -223,8 +219,8 @@ test('it retries a poll whose API call fails', async () => {
 
   expect({
     exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
+    stdout: result.stdout,
+    stderr: result.stderr,
   }).toStrictEqual({
     exitCode: 0,
     stdout: 'merged release PR #145 at abc123\n',
@@ -253,8 +249,8 @@ test.each(['FAILURE', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAIL
 
     expect({
       exitCode: result.exitCode,
-      stdout: result.stdout.toString(),
-      stderr: result.stderr.toString(),
+      stdout: result.stdout,
+      stderr: result.stderr,
     }).toStrictEqual({
       exitCode: 1,
       stdout: '',
@@ -283,8 +279,8 @@ test('it fails without a merge when a commit status fails', async () => {
 
   expect({
     exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
+    stdout: result.stdout,
+    stderr: result.stderr,
   }).toStrictEqual({
     exitCode: 1,
     stdout: '',
@@ -326,8 +322,8 @@ test('it turns on auto-merge and exits cleanly when only required checks outlast
 
   expect({
     exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
+    stdout: result.stdout,
+    stderr: result.stderr,
   }).toStrictEqual({
     exitCode: 0,
     stdout: 'release PR #145 checks on abc123 did not finish within 0s; turning on auto-merge\n',
@@ -358,7 +354,7 @@ test('it leaves the release PR open without auto-merge when no ruleset requires 
   const calls = await ctx.readCalls();
   const output = await ctx.readOutput();
 
-  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+  expect({ exitCode: result.exitCode, stdout: result.stdout }).toStrictEqual({
     exitCode: 0,
     stdout:
       'release PR #145 checks on abc123 did not finish within 0s; a ruleset on main does not require every pending check, so the next push to main merges it\n',
@@ -393,7 +389,7 @@ test('it leaves the release PR open without auto-merge while a check the ruleset
   const result = await ctx.runScript(['zgeoff/tools'], { CHECKS_TIMEOUT: '0' });
   const calls = await ctx.readCalls();
 
-  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+  expect({ exitCode: result.exitCode, stdout: result.stdout }).toStrictEqual({
     exitCode: 0,
     stdout:
       'release PR #145 checks on abc123 did not finish within 0s; a ruleset on main does not require every pending check, so the next push to main merges it\n',
@@ -428,8 +424,8 @@ test('it exits cleanly with the PR open when auto-merge does not turn on', async
 
   expect({
     exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
+    stdout: result.stdout,
+    stderr: result.stderr,
   }).toStrictEqual({
     exitCode: 0,
     stdout: 'release PR #145 checks on abc123 did not finish within 0s; turning on auto-merge\n',
@@ -452,7 +448,7 @@ test('it leaves a held release PR without auto-merge when the checks outlast the
   const result = await ctx.runScript(['zgeoff/tools'], { CHECKS_TIMEOUT: '0' });
   const calls = await ctx.readCalls();
 
-  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+  expect({ exitCode: result.exitCode, stdout: result.stdout }).toStrictEqual({
     exitCode: 0,
     stdout: 'release PR #145 is held (a draft); leaving it open\n',
   });
@@ -477,8 +473,8 @@ test('it fails when the release PR has conflicts', async () => {
 
   expect({
     exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
+    stdout: result.stdout,
+    stderr: result.stderr,
   }).toStrictEqual({
     exitCode: 1,
     stdout: '',
@@ -497,8 +493,8 @@ test('it exits cleanly when no release PR is open', async () => {
 
   expect({
     exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
+    stdout: result.stdout,
+    stderr: result.stderr,
   }).toStrictEqual({
     exitCode: 0,
     stdout: 'no open release PR\n',
@@ -532,7 +528,7 @@ test('it merges the release PR of the branch it is given', async () => {
 
   const calls = await ctx.readCalls();
 
-  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+  expect({ exitCode: result.exitCode, stdout: result.stdout }).toStrictEqual({
     exitCode: 0,
     stdout: 'merged release PR #212 at cafe12\n',
   });
@@ -548,7 +544,7 @@ test('it refuses more than two arguments', async () => {
   const ctx = await setupTest();
   const result = await ctx.runScript(['zgeoff/tools', 'release-please--branches--main', 'extra']);
 
-  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
+  expect({ exitCode: result.exitCode, stderr: result.stderr }).toStrictEqual({
     exitCode: 2,
     stderr: 'usage: merge-release-prs.sh <owner/repo> [<release branch>]\n',
   });
@@ -576,7 +572,7 @@ test.each([
     const calls = await ctx.readCalls();
     const output = await ctx.readOutput();
 
-    expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    expect({ exitCode: result.exitCode, stdout: result.stdout }).toStrictEqual({
       exitCode: 0,
       stdout: `release PR #145 is held (${reason}); leaving it open\n`,
     });
@@ -607,7 +603,7 @@ test('it leaves a release PR open when someone holds it during the wait', async 
   const result = await ctx.runScript(['zgeoff/tools']);
   const calls = await ctx.readCalls();
 
-  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+  expect({ exitCode: result.exitCode, stdout: result.stdout }).toStrictEqual({
     exitCode: 0,
     stdout: 'release PR #145 is held (labelled autorelease: hold); leaving it open\n',
   });
