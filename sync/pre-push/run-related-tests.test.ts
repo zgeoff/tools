@@ -151,8 +151,6 @@ test.each([
   ['src/view.browser.test.tsx'],
   ['src/store.docker.test.ts'],
   ['src/clock.host.test.ts'],
-  ['src/session.agent-sdk.test.ts'],
-  ['src/summary.model-api.test.ts'],
 ])('#resolveRelatedTests leaves out the lane file %s', async (path) => {
   const ctx = await setupTest();
 

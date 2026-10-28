@@ -345,12 +345,12 @@ to a warning, unless a comment on that setting holds a ticket or a `floor:`.
 
 A test script runs `bun test --parallel=<N>`, with N from the shared worker helper that repo-sync
 delivers with the pre-push baseline. The helper reads the host's memory, a cgroup cap included, and
-its cores: a host under 4 GiB gets one worker, a larger one gets a few, and `TEST_WORKERS` overrides
-both. A bare `--parallel` never appears, because it starts one worker per core and test memory grows
-in a straight line with the workers. A repo that runs one suite per package under turbo passes N to
-turbo's `--concurrency` and runs one test process per package, so the host never runs more than N.
-Whether files run isolated is each repo's choice, which its test script and its project-testing
-skill state.
+its cores: a host under 4 GiB gets one worker, a larger one gets one per core up to a small cap, and
+`TEST_WORKERS` overrides both. A bare `--parallel` never appears, because it starts one worker per
+core and test memory grows in a straight line with the workers. A repo that runs one suite per
+package under turbo passes N to turbo's `--concurrency` and runs one test process per package, so
+the host never runs more than N. Whether files run isolated is each repo's choice, which its test
+script and its project-testing skill state.
 
 ### The 5 s limit and the hook
 
@@ -360,8 +360,8 @@ related to the files the branch changes, and every lane runs only in CI. Past a 
 related test files, or on a change to a shared test helper or config, the hook skips its tests and
 leaves them to CI. When the helper gives one worker, the shared related-test runner passes
 `--timeout=15000`, so a test that passes on CI does not fail a push from a small host. That runner
-is the one place that raises a timeout: a test file, a test script, and the repo's Bun config never
-do.
+is the one place that raises a timeout above its lane's limit: a test file, a test script, and the
+repo's Bun config never do.
 
 ### Memory
 
