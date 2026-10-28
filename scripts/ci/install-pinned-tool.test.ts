@@ -288,5 +288,7 @@ test.each([
     },
   ],
 ])('it reads %s from the arguments', (_label, args, expected) => {
-  expect<unknown>(parseToolArgs(args, ['shfmt', 'actionlint'])).toStrictEqual(expected);
+  const parsed: unknown = parseToolArgs(args, ['shfmt', 'actionlint']);
+
+  expect(parsed).toStrictEqual(expected);
 });

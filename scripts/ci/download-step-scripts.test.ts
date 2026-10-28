@@ -192,9 +192,9 @@ test.each([
 ])('it reads an HTTP %p answer as %p', async (status, expected) => {
   const server = createStubFileServer({ '/boil.ts': [{ status, body: 'served' }] });
 
-  const outcome = await readURL(`${server.url}/boil.ts`);
+  const outcome: unknown = await readURL(`${server.url}/boil.ts`);
 
-  expect<unknown>(outcome).toStrictEqual(expected);
+  expect(outcome).toStrictEqual(expected);
 });
 
 test('it reads a refused connection as a passing fault', async () => {
@@ -224,7 +224,9 @@ test.each([
     { kind: 'refused', message: expect.toStartWith("Unknown option '--unknown'") },
   ],
 ])('it reads %s from the arguments', (_label, args, expected) => {
-  expect<unknown>(parseDownloadArgs(args)).toStrictEqual(expected);
+  const parsed: unknown = parseDownloadArgs(args);
+
+  expect(parsed).toStrictEqual(expected);
 });
 
 test.each([
