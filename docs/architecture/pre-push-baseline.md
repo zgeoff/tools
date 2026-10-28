@@ -38,9 +38,12 @@ A job that outgrows the host then fails alone, and every job prints its peak mem
 
 ## The related tests
 
-The test job runs unit tests only. It leaves out the lane files, which need a browser, a container
-or the host and run in their own CI job: a file under an `e2e/` folder, and a `.browser`, `.docker`
-or `.host` file. It skips, and passes with a notice that CI runs the full suite, in two cases:
+The test job runs unit tests only. It leaves out the lane files, which need a real system and run
+only in CI: a file under an `e2e/` folder or a `-e2e` package, and a file whose suffix names a
+standard lane or a lane that the `lanes` option of `zgeoff/max-test-timeout` in the root
+`.oxlintrc.json` declares, as
+[the test timeout check](./oxlint-config-tests.md#the-test-timeout-check) reads it. It skips, and
+passes with a notice that CI runs the full suite, in two cases:
 
 - The branch changes a shared test input, a file under a `test-utils/` folder or a `bunfig.toml`,
   which reaches tests beyond the siblings of the files it changes.
@@ -78,8 +81,8 @@ The entry delivers these files, and their tests stay in tools:
 - `scripts/read-worker-count.ts` and `scripts/read-memory-budget.ts` — print the
   [worker count and the memory budget](./memory-caps.md#the-worker-count) of the host.
 - `scripts/read-branch-base.ts`, `scripts/parse-added-lines.ts`, `scripts/parse-shell-words.ts`,
-  `scripts/shell-escape-parsers.ts`, `scripts/collect-command-names.ts` and `scripts/run-program.ts`
-  — the modules these scripts import.
+  `scripts/shell-escape-parsers.ts`, `scripts/collect-command-names.ts`,
+  `scripts/parse-lane-limits.ts` and `scripts/run-program.ts` — the modules these scripts import.
 
 The check scripts exit 0 when clean or skipped, 1 with a problem, and 2 when they cannot run, such
 as in a clone without origin's default branch. One exception: the workflow lint exits 0 with a

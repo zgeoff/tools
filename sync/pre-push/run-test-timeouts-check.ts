@@ -1,4 +1,5 @@
 import { basename, dirname, posix } from 'node:path';
+import { parseLaneLimits } from './parse-lane-limits.ts';
 import type { RunProgram } from './run-program.ts';
 import { runProgram } from './run-program.ts';
 
@@ -21,11 +22,11 @@ export function runTestTimeoutsCheck(
 ): TestTimeoutFinding[] {
   const paths = runGit(options, ['ls-tree', '-r', '-z', '--name-only', 'HEAD']).split('\0');
 
-  const lanes = paths.includes(oxlintConfigPath)
-    ? parseLanes(runGit(options, ['show', `HEAD:${oxlintConfigPath}`]))
-    : undefined;
+  const configText = paths.includes(oxlintConfigPath)
+    ? runGit(options, ['show', `HEAD:${oxlintConfigPath}`])
+    : null;
 
-  const limits = buildLaneLimits(lanes);
+  const limits = parseLaneLimits(configText);
 
   const appRoots = new Set(
     paths.filter((path) => basename(path) === 'package.json').map((path) => dirname(path)),
@@ -63,64 +64,6 @@ function runGit(options: Readonly<TestTimeoutsCheckOptions>, args: readonly stri
   }
 
   return result.stdout;
-}
-
-function parseLanes(text: string): unknown {
-  const config = parseText(oxlintConfigPath, text, (input) => Bun.JSONC.parse(input));
-  const setting = findMember(findMember(config, 'rules'), 'zgeoff/max-test-timeout');
-  const ruleOptions: unknown = Array.isArray(setting) ? setting[1] : undefined;
-
-  return findMember(ruleOptions, 'lanes');
-}
-
-// The limits match the max-test-timeout rule in @zgeoff/oxlint-config, which CI cannot import: the
-// workflow downloads this file and the modules it imports one by one.
-const standardLaneLimits: readonly (readonly [string, number])[] = [
-  ['browser', 10_000],
-  ['e2e', 15_000],
-  ['docker', 15_000],
-  ['host', 15_000],
-  ['agent-sdk', 5000],
-  ['model-api', 120_000],
-];
-
-const listedLaneLimitMs = 15_000;
-
-function parseText(path: string, text: string, parse: (input: string) => unknown): unknown {
-  try {
-    return parse(text);
-  } catch (error) {
-    throw new Error(
-      `cannot parse ${path}: ${error instanceof Error ? error.message : String(error)}`,
-      { cause: error },
-    );
-  }
-}
-
-function findMember(value: unknown, key: string): unknown {
-  return typeof value === 'object' && value !== null && Object.hasOwn(value, key)
-    ? Reflect.get(value, key)
-    : undefined;
-}
-
-function buildLaneLimits(lanes: unknown): ReadonlyMap<string, number> {
-  const limits = new Map(standardLaneLimits);
-
-  if (Array.isArray(lanes)) {
-    for (const lane of lanes) {
-      if (typeof lane === 'string' && !limits.has(lane)) {
-        limits.set(lane, listedLaneLimitMs);
-      }
-    }
-  } else if (typeof lanes === 'object' && lanes !== null) {
-    for (const [lane, limitMs] of Object.entries(lanes)) {
-      if (typeof limitMs === 'number') {
-        limits.set(lane, limitMs);
-      }
-    }
-  }
-
-  return limits;
 }
 
 // A setting that turns a timeout rule off or down to a warning escapes the limits as a disable
@@ -251,6 +194,17 @@ function getStringEnd(path: string, text: string, start: number): number {
   throw new Error(`cannot parse ${path}: a string never closes`);
 }
 
+function parseText(path: string, text: string, parse: (input: string) => unknown): unknown {
+  try {
+    return parse(text);
+  } catch (error) {
+    throw new Error(
+      `cannot parse ${path}: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+}
+
 function collectOverrideLines(values: readonly JSONCToken[]): ReadonlyMap<number, number> {
   const lines = new Map<number, number>();
 
@@ -324,6 +278,12 @@ function collectScriptFindings(
         message: `script "${name}" passes --timeout=${timeoutMs} to bun test, above the ${limit.limitMs} ms limit of the ${limit.lane} lane; ${slowTestsHint}`,
       }));
   });
+}
+
+function findMember(value: unknown, key: string): unknown {
+  return typeof value === 'object' && value !== null && Object.hasOwn(value, key)
+    ? Reflect.get(value, key)
+    : undefined;
 }
 
 interface LaneLimit {

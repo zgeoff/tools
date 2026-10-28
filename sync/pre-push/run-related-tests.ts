@@ -1,7 +1,8 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { availableParallelism, totalmem } from 'node:os';
 import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
+import { parseLaneLimits } from './parse-lane-limits.ts';
 import { readOptionalText } from './read-memory-budget.ts';
 import { readWorkerCount } from './read-worker-count.ts';
 import type { WorkerCountSources } from './read-worker-count.ts';
@@ -11,10 +12,13 @@ import type { WorkerCountSources } from './read-worker-count.ts';
 const slowHostTestTimeoutMs = 15_000;
 const defaultMaxTestFiles = 50;
 
+export type ReadConfigText = (path: string) => string | null;
+
 export async function runRelatedTests(
   args: readonly string[],
   cwd: string,
   workerSources: Readonly<WorkerCountSources>,
+  readConfigText: ReadConfigText,
 ): Promise<number> {
   const options = parseRelatedTestArgs(args);
 
@@ -26,7 +30,7 @@ export async function runRelatedTests(
 
   const plan = buildRelatedTestPlan(
     options.paths,
-    resolveRelatedTests(options.paths, cwd),
+    resolveRelatedTests(options.paths, cwd, readConfigText),
     options.maxFiles,
   );
 
@@ -58,11 +62,17 @@ export async function runRelatedTests(
   return run.exited;
 }
 
-export function resolveRelatedTests(paths: readonly string[], cwd: string): string[] {
+export function resolveRelatedTests(
+  paths: readonly string[],
+  cwd: string,
+  readConfigText: ReadConfigText,
+): string[] {
+  const lanes = [...parseLaneLimits(readConfigText(join(cwd, '.oxlintrc.json'))).keys()];
+
   const selected = new Set<string>();
 
   for (const path of paths) {
-    const test = findRelatedTest(path);
+    const test = findRelatedTest(path, lanes);
 
     if (test !== undefined && existsSync(join(cwd, test))) {
       selected.add(test);
@@ -153,33 +163,44 @@ function isSharedTestInput(path: string): boolean {
 
 const sourcePattern = /^(?<stem>.+?)(?:\.test)?(?<ext>\.tsx?)$/u;
 
-function findRelatedTest(path: string): string | undefined {
+function findRelatedTest(path: string, lanes: readonly string[]): string | undefined {
   const groups = sourcePattern.exec(path)?.groups;
 
-  if (groups === undefined || path.endsWith('.d.ts') || isLaneFile(path)) {
+  if (groups === undefined || path.endsWith('.d.ts') || isLaneFile(path, lanes)) {
     return undefined;
   }
 
   return `${groups['stem']}.test${groups['ext']}`;
 }
 
-// A lane's tests need a browser, a container or the host, and run in their own CI job.
-function isLaneFile(path: string): boolean {
+// A lane's tests need a real system, such as a browser, a container or a live model API, and run
+// only in CI.
+function isLaneFile(path: string, lanes: readonly string[]): boolean {
+  const stem = basename(path).replace(/(?:\.test)?\.tsx?$/u, '');
+
   return (
-    /(?:^|\/)e2e\//u.test(path) ||
-    /\.(?:browser|docker|host)(?:\.test)?\.tsx?$/u.test(basename(path))
+    /(?:^|\/)(?:e2e|[^/]+-e2e)\//u.test(path) || lanes.some((lane) => stem.endsWith(`.${lane}`))
   );
 }
 
 if (import.meta.main) {
-  const exitCode = await runRelatedTests(process.argv.slice(2), process.cwd(), {
-    env: process.env,
-    cores: availableParallelism(),
-    totalMemory: totalmem(),
-    procRoot: '/proc',
-    cgroupRoot: '/sys/fs/cgroup',
-    readText: readOptionalText,
-  });
+  const exitCode = await runRelatedTests(
+    process.argv.slice(2),
+    process.cwd(),
+    {
+      env: process.env,
+      cores: availableParallelism(),
+      totalMemory: totalmem(),
+      procRoot: '/proc',
+      cgroupRoot: '/sys/fs/cgroup',
+      readText: readOptionalText,
+    },
+    readOptionalFileText,
+  );
 
   process.exit(exitCode);
+}
+
+function readOptionalFileText(path: string): string | null {
+  return existsSync(path) ? readFileSync(path, 'utf8') : null;
 }
