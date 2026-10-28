@@ -26,10 +26,12 @@ async function setupTest() {
 
   // Captures each logged command's output, which the CLI's runner prints as it runs.
   const logged: string[] = [];
+  const loggedCommands: (readonly string[])[] = [];
 
   const runLogged: RunCommand = async (argv, options) => {
     const result = await runCommand(argv, options);
 
+    loggedCommands.push(argv);
     logged.push(`${result.stdout}${result.stderr}`);
 
     return result;
@@ -41,7 +43,7 @@ async function setupTest() {
     output.push(text);
   };
 
-  return { repo, env, trackFiles, logged, runLogged, output, writeOutput };
+  return { repo, env, trackFiles, logged, loggedCommands, runLogged, output, writeOutput };
 }
 
 test('it passes tracked scripts that shellcheck and shfmt accept, and skips an untracked one', async () => {
@@ -57,6 +59,7 @@ test('it passes tracked scripts that shellcheck and shfmt accept, and skips an u
     runCommand,
     runLoggedCommand: ctx.runLogged,
     writeOutput: ctx.writeOutput,
+    batchBytes: 128 * 1024,
   });
 
   expect(exitCode).toBe(0);
@@ -78,6 +81,7 @@ test('it fails with the findings of both shellcheck and shfmt', async () => {
     runCommand,
     runLoggedCommand: ctx.runLogged,
     writeOutput: ctx.writeOutput,
+    batchBytes: 128 * 1024,
   });
 
   expect(exitCode).toBe(1);
@@ -102,6 +106,7 @@ test('it fails when only shellcheck rejects a script', async () => {
     runCommand,
     runLoggedCommand: ctx.runLogged,
     writeOutput: ctx.writeOutput,
+    batchBytes: 128 * 1024,
   });
 
   expect(exitCode).toBe(1);
@@ -120,6 +125,7 @@ test('it fails when only shfmt rejects a script', async () => {
     runCommand,
     runLoggedCommand: ctx.runLogged,
     writeOutput: ctx.writeOutput,
+    batchBytes: 128 * 1024,
   });
 
   expect(exitCode).toBe(1);
@@ -135,9 +141,41 @@ test('it passes with a note when the repo tracks no shell script', async () => {
     runCommand,
     runLoggedCommand: ctx.runLogged,
     writeOutput: ctx.writeOutput,
+    batchBytes: 128 * 1024,
   });
 
   expect(exitCode).toBe(0);
   expect(ctx.logged).toStrictEqual([]);
   expect(ctx.output).toStrictEqual(['shell: the repo tracks no shell script\n']);
+});
+
+test('it checks the scripts in batches within the byte limit, and fails on a finding in any batch', async () => {
+  const ctx = await setupTest();
+
+  await ctx.trackFiles({
+    'a.sh': '#!/usr/bin/env bash\necho "a"\n',
+    'b.sh': '#!/usr/bin/env bash\necho $1\n',
+    'c.sh': '#!/usr/bin/env bash\necho "c"\n',
+  });
+
+  // Each path takes 5 bytes with its NUL, so a limit of 10 holds two paths.
+  const exitCode = await runShellCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    runCommand,
+    runLoggedCommand: ctx.runLogged,
+    writeOutput: ctx.writeOutput,
+    batchBytes: 10,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.loggedCommands.map((argv) => argv.slice(argv.indexOf('--') + 1))).toStrictEqual([
+    ['a.sh', 'b.sh'],
+    ['c.sh'],
+    ['a.sh', 'b.sh'],
+    ['c.sh'],
+  ]);
+
+  expect(ctx.logged).toStrictEqual([expect.stringContaining('SC2086'), '', '', '']);
 });

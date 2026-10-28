@@ -50,7 +50,12 @@ async function setupTest() {
   const output: string[] = [];
 
   // Runs the sync job's step in a fresh clone of the caller, with the env the step sets.
-  const runSync = async (entries: unknown[], toolsRef: string, workflows = 'false') => {
+  const runSync = async (
+    entries: unknown[],
+    toolsRef: string,
+    workflows = 'false',
+    extraEnv: Readonly<Record<string, string>> = {},
+  ) => {
     const caller = await mkdtemp(join(directory, 'caller-'));
 
     await $`git clone -q ${origin} ${caller}`.env(env).quiet();
@@ -77,6 +82,7 @@ async function setupTest() {
         SKIP: '',
         WORKFLOWS: workflows,
         BASE: 'main',
+        ...extraEnv,
       },
     });
   };
@@ -892,4 +898,118 @@ test('it reports the path and cause of a copy that fails before it leaves the en
     'No pull request published; the per-entry branches stay.\n',
     '::error::These entries failed and are not in the sync: editor\n',
   ]);
+});
+
+test('it leaves out a file excepted for the caller and drops the Markdown block that needs it', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  await ctx.writeSource(
+    'sync/skills/demo/SKILL.md',
+    [
+      '# Demo',
+      '',
+      '<!-- repo-sync needs references/rust.md -->',
+      'Read [the Rust notes](references/rust.md).',
+      '<!-- repo-sync end -->',
+      '',
+      'Boil the kettle.',
+      '',
+    ].join('\n'),
+  );
+
+  await ctx.writeSource('sync/skills/demo/references/rust.md', '# Rust\n');
+
+  const exitCode = await ctx.runSync(
+    [
+      {
+        name: 'skill-demo',
+        description: 'The demo skill',
+        files: [
+          { source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' },
+          {
+            source: 'sync/skills/demo/references/rust.md',
+            target: '.claude/skills/demo/references/rust.md',
+            except: ['Example/App'],
+          },
+        ],
+      },
+    ],
+    'sync-v7',
+  );
+
+  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
+  const skill = await ctx.readBranch('repo-sync/zgeoff-tools', '.claude/skills/demo/SKILL.md');
+
+  expect(exitCode).toBe(0);
+  expect(files).toStrictEqual(['.claude/skills/demo/SKILL.md', 'README.md']);
+  expect(skill).toBe('# Demo\n\nBoil the kettle.\n');
+});
+
+test('it syncs the other files of an entry whose excepted workflow target is a folder in the caller', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+  await ctx.writeBranch('main', '.github/workflows/demo.yml/notes.txt', 'kept\n');
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+  await ctx.writeSource('sync/workflow-callers/demo.yml', 'on: push\n');
+
+  const exitCode = await ctx.runSync(
+    [
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [
+          { source: 'sync/editorconfig', target: '.editorconfig' },
+          {
+            source: 'sync/workflow-callers/demo.yml',
+            target: '.github/workflows/demo.yml',
+            except: ['example/app'],
+          },
+        ],
+      },
+    ],
+    'sync-v7',
+  );
+
+  const editorconfig = await ctx.readBranch('repo-sync/zgeoff-tools', '.editorconfig');
+
+  const notes = await ctx.readBranch(
+    'repo-sync/zgeoff-tools',
+    '.github/workflows/demo.yml/notes.txt',
+  );
+
+  expect(exitCode).toBe(0);
+  expect(editorconfig).toBe('root = true\n');
+  expect(notes).toBe('kept\n');
+  expect(ctx.output).not.toContain(expect.stringContaining('::error::'));
+});
+
+test("it fails the run with git's error when the remote branch probe cannot reach the remote", async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+  await ctx.writeSource('sync/readme.md', '# app\n');
+
+  // The entry matches the caller, so the probe for the sync branch is the run's first remote call.
+  const syncing = ctx.runSync(
+    [
+      {
+        name: 'readme',
+        description: 'The readme',
+        files: [{ source: 'sync/readme.md', target: 'README.md' }],
+      },
+    ],
+    'sync-v7',
+    'false',
+    { GIT_ALLOW_PROTOCOL: 'https' },
+  );
+
+  expect(syncing).rejects.toThrow(
+    "git ls-remote --exit-code --heads origin repo-sync/zgeoff-tools exited with 128: fatal: transport 'file' not allowed",
+  );
 });

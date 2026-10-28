@@ -7,9 +7,12 @@ import type { CommandResult, RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
 import type { CopyPlan, ExistingWorkflow, SyncFileRow } from './build-copy-plan.ts';
 import { buildCopyPlan } from './build-copy-plan.ts';
+import { buildSyncRowSplit } from './build-sync-row-split.ts';
 import { isWorkflowPath } from './is-workflow-path.ts';
 import type { SyncEntry } from './parse-sync-entries.ts';
 import { parseSyncEntries } from './parse-sync-entries.ts';
+import type { RetiredFileRemoval, SyncedEntry } from './plan-retired-file-removal.ts';
+import { planRetiredFileRemoval, retiredFilesName } from './plan-retired-file-removal.ts';
 import { selectSyncFiles } from './select-sync-files.ts';
 
 export interface SyncEntriesOptions {
@@ -138,11 +141,6 @@ function buildPin(toolsRef: string, workflowRef: string): string {
   return withoutTags.startsWith('refs/heads/')
     ? withoutTags.slice('refs/heads/'.length)
     : withoutTags;
-}
-
-interface SyncedEntry {
-  readonly name: string;
-  readonly description: string;
 }
 
 interface CommittedEntries {
@@ -281,7 +279,10 @@ async function readExistingWorkflows(
 ): Promise<Map<string, ExistingWorkflow>> {
   const workflows = new Map<string, ExistingWorkflow>();
 
-  for (const row of rows.filter((candidate) => isWorkflowPath(candidate.target))) {
+  // A file the caller does not receive is never read: its target may be anything, a folder too.
+  const taken = buildSyncRowSplit(rows).taken;
+
+  for (const row of taken.filter((candidate) => isWorkflowPath(candidate.target))) {
     const target = join(context.cwd, row.target);
 
     const exists = await context.fileSystem.probePath(target);
@@ -347,8 +348,6 @@ function runProbeCommand(context: SyncContext, argv: readonly string[]): Promise
   return context.runCommand(argv, { cwd: context.cwd, env: context.env });
 }
 
-const retiredFilesName = 'retired-files';
-
 type RetiredFiles =
   | { readonly kind: 'removed'; readonly synced: readonly SyncedEntry[] }
   | { readonly kind: 'failed' };
@@ -382,49 +381,64 @@ async function removeRetiredFiles(
 
   context.writeOutput(result.stderr);
 
-  if (result.exitCode !== 0) {
+  const removal = planRetiredFileRemoval({
+    exitCode: result.exitCode,
+    removedText: result.stdout,
+    workflows: context.workflows,
+  });
+
+  return applyRetiredFileRemoval(removal, context);
+}
+
+type RetiredFileRemovalOf<Kind extends RetiredFileRemoval['kind']> = Extract<
+  RetiredFileRemoval,
+  { readonly kind: Kind }
+>;
+
+type RetiredFileRemovalApplier<Kind extends RetiredFileRemoval['kind']> = (
+  removal: RetiredFileRemovalOf<Kind>,
+  context: SyncContext,
+) => Promise<RetiredFiles>;
+
+// A table typed over every kind of removal, so a new kind fails the type check until it applies.
+const retiredFileRemovalAppliers: {
+  readonly [Kind in RetiredFileRemoval['kind']]: RetiredFileRemovalApplier<Kind>;
+} = {
+  failed: async (_removal, context) => {
     context.writeOutput(`::error::${retiredFilesName} failed, so the sync leaves it out.\n`);
 
     await runSyncCommand(context, ['git', 'reset', '-q', '--hard']);
 
     return { kind: 'failed' };
-  }
+  },
+  removed: async (removal, context) => {
+    if (removal.restoresWorkflows) {
+      await runSyncCommand(context, ['git', 'checkout', '-q', '--', '.github/workflows']);
+    }
 
-  const removed = result.stdout.split('\n').filter((path) => path !== '');
+    if (removal.synced.length > 0) {
+      await runSyncCommand(context, ['git', 'add', '-A']);
 
-  // The token cannot push a change under .github/workflows/ without workflows write, so a retired
-  // workflow stays until the repo takes an entry with a workflow target.
-  const kept = context.workflows ? removed : removed.filter((path) => !isWorkflowPath(path));
+      await runSyncCommand(context, [
+        'git',
+        'commit',
+        '-q',
+        '-m',
+        'chore: remove the files zgeoff/tools no longer syncs',
+      ]);
+    }
 
-  if (kept.length < removed.length) {
-    await runSyncCommand(context, ['git', 'checkout', '-q', '--', '.github/workflows']);
-  }
+    return { kind: 'removed', synced: removal.synced };
+  },
+};
 
-  if (kept.length === 0) {
-    return { kind: 'removed', synced: [] };
-  }
+function applyRetiredFileRemoval<Kind extends RetiredFileRemoval['kind']>(
+  removal: RetiredFileRemovalOf<Kind>,
+  context: SyncContext,
+): Promise<RetiredFiles> {
+  const apply: RetiredFileRemovalApplier<Kind> = retiredFileRemovalAppliers[removal.kind];
 
-  await runSyncCommand(context, ['git', 'add', '-A']);
-
-  await runSyncCommand(context, [
-    'git',
-    'commit',
-    '-q',
-    '-m',
-    'chore: remove the files zgeoff/tools no longer syncs',
-  ]);
-
-  const paths = kept.map((path) => `\`${path}\``).join(', ');
-
-  return {
-    kind: 'removed',
-    synced: [
-      {
-        name: retiredFilesName,
-        description: `The copies of files zgeoff/tools no longer syncs: ${paths}`,
-      },
-    ],
-  };
+  return apply(removal, context);
 }
 
 // GitHub closes the pull request of a deleted branch.
@@ -446,17 +460,18 @@ async function pushSyncBranch(context: SyncContext, committed: CommittedEntries)
   return false;
 }
 
+// ls-remote --exit-code exits with 2 when no ref matches; any other failure, such as a refused
+// login or a lost connection, fails the run with git's own error.
 async function probeRemoteBranch(context: SyncContext, branch: string): Promise<boolean> {
-  const result = await runProbeCommand(context, [
-    'git',
-    'ls-remote',
-    '--exit-code',
-    '--heads',
-    'origin',
-    branch,
-  ]);
+  const argv = ['git', 'ls-remote', '--exit-code', '--heads', 'origin', branch];
 
-  return result.exitCode === 0;
+  const result = await runProbeCommand(context, argv);
+
+  if (result.exitCode === 0 || result.exitCode === 2) {
+    return result.exitCode === 0;
+  }
+
+  throw new Error(`${argv.join(' ')} exited with ${result.exitCode}: ${result.stderr}`);
 }
 
 async function writePullRequest(

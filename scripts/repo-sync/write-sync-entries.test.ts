@@ -1,6 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { buildMockSyncEntry } from '../../test-utils/build-mock-sync-entry.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { writeSyncEntries } from './write-sync-entries.ts';
 
@@ -102,20 +103,13 @@ test('it outputs the entries it keeps as compact JSON in the sync entry contract
   const outputs = await readFile(ctx.outputPath, 'utf8');
 
   const entries = [
-    {
-      name: 'editorconfig',
-      description: 'The editor config',
-      files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
-      build: '',
-      optIn: false,
-    },
-    {
+    buildMockSyncEntry({ name: 'editorconfig' }),
+    buildMockSyncEntry({
       name: 'workflow-demo',
       description: 'The demo workflow',
       files: [{ source: 'sync/workflow-demo.yml', target: '.github/workflows/demo.yml' }],
-      build: '',
       optIn: true,
-    },
+    }),
   ];
 
   expect(exitCode).toBe(0);

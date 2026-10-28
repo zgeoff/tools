@@ -212,14 +212,14 @@ jobs:
         name: Setup shfmt
         env: &shfmt-env
           SETUP_TOOL: ${{ inputs.setup-shfmt }}
-        run: &shfmt-body bun "$RUNNER_TEMP/tools/scripts/ci/install-pinned-tool.ts" shfmt
+        run: &shfmt-body bun "$RUNNER_TEMP/tools/scripts/ci/run-pinned-tool-step.ts" shfmt
 
       - &setup-actionlint
         name: Setup actionlint
         id: setup-actionlint
         env: &actionlint-env
           SETUP_TOOL: ${{ inputs.setup-actionlint }}
-        run: &actionlint-body bun "$RUNNER_TEMP/tools/scripts/ci/install-pinned-tool.ts" actionlint
+        run: &actionlint-body bun "$RUNNER_TEMP/tools/scripts/ci/run-pinned-tool-step.ts" actionlint
 
       # Each check and script step after the setup runs even when an earlier
       # one fails, so the run shows every check that fails, each by name.

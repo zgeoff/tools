@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import type { FileSystem } from '../ci/file-system.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { writeStepOutputs } from '../ci/write-step-outputs.ts';
-import type { CheckPart } from './plan-check-scripts.ts';
+import type { CheckPart, CheckPlan } from './plan-check-scripts.ts';
 import { planCheckScripts } from './plan-check-scripts.ts';
 
 export interface CheckPlanStep {
@@ -40,21 +40,7 @@ export async function writeCheckPlan(step: Readonly<CheckPlanStep>): Promise<str
     lane: step.lane,
   });
 
-  if (plan.kind === 'missing') {
-    return [
-      `package.json defines no script named: ${plan.missing.join(' ')}. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list.`,
-    ];
-  }
-
-  // Spaces around each list let a later step match one whole name.
-  await writeStepOutputs(step.fileSystem, step.outputPath, {
-    scripts: ` ${plan.scripts.join(' ')} `,
-    static: ` ${plan.static.join(' ')} `,
-    test: ` ${plan.test.join(' ')} `,
-    lanes: JSON.stringify(plan.lanes),
-  });
-
-  return [];
+  return writePlanOutcome(plan, step);
 }
 
 function readScriptNames(value: unknown): string[] {
@@ -65,6 +51,41 @@ function readScriptNames(value: unknown): string[] {
   const scripts = value.scripts;
 
   return typeof scripts === 'object' && scripts !== null ? Object.keys(scripts) : [];
+}
+
+type CheckPlanOf<Kind extends CheckPlan['kind']> = Extract<CheckPlan, { readonly kind: Kind }>;
+
+type PlanOutcomeWriter<Kind extends CheckPlan['kind']> = (
+  plan: CheckPlanOf<Kind>,
+  step: Readonly<CheckPlanStep>,
+) => Promise<string[]>;
+
+// A table typed over every plan kind, so a new kind fails the type check until it has an outcome.
+const planOutcomeWriters: { readonly [Kind in CheckPlan['kind']]: PlanOutcomeWriter<Kind> } = {
+  missing: (plan) =>
+    Promise.resolve([
+      `package.json defines no script named: ${plan.missing.join(' ')}. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list.`,
+    ]),
+  planned: async (plan, step) => {
+    // Spaces around each list let a later step match one whole name.
+    await writeStepOutputs(step.fileSystem, step.outputPath, {
+      scripts: ` ${plan.scripts.join(' ')} `,
+      static: ` ${plan.static.join(' ')} `,
+      test: ` ${plan.test.join(' ')} `,
+      lanes: JSON.stringify(plan.lanes),
+    });
+
+    return [];
+  },
+};
+
+function writePlanOutcome<Kind extends CheckPlan['kind']>(
+  plan: CheckPlanOf<Kind>,
+  step: Readonly<CheckPlanStep>,
+): Promise<string[]> {
+  const writeOutcome: PlanOutcomeWriter<Kind> = planOutcomeWriters[plan.kind];
+
+  return writeOutcome(plan, step);
 }
 
 if (import.meta.main) {
