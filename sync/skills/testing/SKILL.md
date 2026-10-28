@@ -226,9 +226,10 @@ slow, find its cause in this table and make the change it names. Never raise the
 | runs a linter or checker binary over text the code builds, such as a generated shell script | a real process start                | It is not a test. Export the text and check it in a static check script that runs in the CI static job and before a push.                                                                                                                                                         |
 
 The limits are CI rules, because a host that swaps or shares its cores runs the same test slower. A
-test file, a test script, and the repo's Bun config never raise a timeout above the lane's limit.
-The pre-push hook runs only the unit tests beside the files a branch changes, and every lane runs
-only in CI, as the
+test script and the repo's Bun config never raise a lane's default timeout above its limit, and one
+test that cannot fit carries the disable comment that
+[A test over its limit](#a-test-over-its-limit) describes. The pre-push hook runs only the unit
+tests beside the files a branch changes, and every lane runs only in CI, as the
 [pre-push baseline](https://github.com/zgeoff/tools/blob/main/docs/architecture/pre-push-baseline.md#the-related-tests)
 describes.
 
@@ -237,7 +238,7 @@ describes.
 - `<package>/src/<file>.test.ts` holds the unit suite of one source file.
 - `integration/` holds one flow across several packages, in one process, with per-run fixtures and
   stand-ins. It is a place, not a lane: it runs in the unit run under every unit rule, with the 5 s
-  limit and no raised timeout.
+  limit.
 - `e2e/` holds the tests that drive the built product from outside, through its bundle or binary,
   its CLI, HTTP, or a socket. It holds two kinds of test: the process itself (start-up, signals,
   exit codes, crash recovery), and one happy-path journey per main user flow. A flow's variants,
