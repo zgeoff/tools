@@ -2,10 +2,11 @@
 
 ## [0.7.1](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.7.0...@zgeoff/oxlint-config@0.7.1) (2026-10-28)
 
-
 ### Features
 
-* **pre-push:** add the shared dependency gates check ([#360](https://github.com/zgeoff/tools/issues/360)) ([4d1ffad](https://github.com/zgeoff/tools/commit/4d1ffad9e9029322e110e9bce1395e069f1d6233))
+- **pre-push:** add the shared dependency gates check
+  ([#360](https://github.com/zgeoff/tools/issues/360))
+  ([4d1ffad](https://github.com/zgeoff/tools/commit/4d1ffad9e9029322e110e9bce1395e069f1d6233))
 
 ## [0.7.0](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.6.4...@zgeoff/oxlint-config@0.7.0) (2026-10-24)
 
