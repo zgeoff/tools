@@ -12,5 +12,5 @@ minimumReleaseAge = 604800
 minimumReleaseAgeExcludes = ["@happy-dom/global-registrator", "fast-uri", "happy-dom"]
 
 [test]
-# register jest-extended matchers in every test file
-preload = ["@zgeoff/bun-test-extended"]
+# register jest-extended matchers, and start the one MSW server, in every test file
+preload = ["@zgeoff/bun-test-extended", "./test-utils/mocks/listen-mock-server.ts"]

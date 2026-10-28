@@ -1,7 +1,8 @@
 export interface StubOutputSink {
   readonly write: (chunk: Uint8Array) => void;
 
-  // The text of every chunk written so far.
+  // The text of every chunk written so far. A character whose bytes span two chunks appears once
+  // its last byte arrives.
   readonly readText: () => string;
 
   // Settles at the first write, so a test can act while the writer still runs.
@@ -17,7 +18,7 @@ export function buildStubOutputSink(): StubOutputSink {
 
   return {
     write: (chunk) => {
-      chunks.push(decoder.decode(chunk));
+      chunks.push(decoder.decode(chunk, { stream: true }));
       firstWrite.resolve();
     },
     readText: () => chunks.join(''),

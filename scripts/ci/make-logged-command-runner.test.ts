@@ -21,14 +21,16 @@ test('it copies the output while the command still runs', async () => {
 
   const release = join(ctx.directory, 'release');
 
-  // The command prints a line, then waits until the test creates the release file.
+  // The command prints a line, then waits until the test creates the release file. It also stops
+  // once the test folder is gone, so the folder's onTestFinished cleanup ends a test that fails first.
   const running = ctx.runLoggedCommand(
     [
       'sh',
       '-c',
-      'echo boiling; until [ -e "$1" ]; do sleep 0.01; done; echo boiled',
+      'echo boiling; until [ -e "$1" ] || [ ! -d "$2" ]; do sleep 0.01; done; echo boiled',
       'sh',
       release,
+      ctx.directory,
     ],
     { cwd: ctx.directory, env: { PATH: process.env['PATH'] } },
   );
