@@ -30,7 +30,7 @@ export const stepScriptSets = {
     'scripts/check-release-head.sh',
     'scripts/merge-release-prs.sh',
     'scripts/release/run-sync-release-pr.ts',
-    'scripts/release/pick-release-outputs.ts',
+    'scripts/release/run-release-outputs-step.ts',
   ],
 } as const satisfies Record<string, readonly string[]>;
 

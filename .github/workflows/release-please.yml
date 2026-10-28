@@ -206,4 +206,4 @@ jobs:
           RELEASE_OUTPUTS:
             ${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) ||
             toJSON(steps.release.outputs) }}
-        run: bun "$RUNNER_TEMP/tools/scripts/release/pick-release-outputs.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/release/run-release-outputs-step.ts"

@@ -14,10 +14,13 @@ async function setupTest() {
 
   const errors: string[] = [];
 
-  const runDispatch = (releaseOutputs: Readonly<Record<string, string>>) =>
+  const runDispatch = (
+    releaseOutputs: Readonly<Record<string, string>>,
+    runEnv: Readonly<Record<string, string>> = {},
+  ) =>
     dispatchReleasePublish({
       cwd: directory,
-      env: { PATH: `${directory}:${process.env['PATH']}` },
+      env: { PATH: `${directory}:${process.env['PATH']}`, ...runEnv },
       repository: 'zgeoff/tools',
       releaseOutputsText: JSON.stringify(releaseOutputs),
       runCommand,
@@ -55,13 +58,17 @@ test('it dispatches the publish at the first tag, with every released path and v
 test('it dispatches a release that tagged the commit of the run itself, like any other', async () => {
   const ctx = await setupTest();
 
-  const exitCode = await ctx.runDispatch({
-    releases_created: 'true',
-    paths_released: '["packages/std"]',
-    'packages/std--sha': 'old111',
-    'packages/std--tag_name': '@zgeoff/std@0.4.0',
-    'packages/std--version': '0.4.0',
-  });
+  // The run's own commit is the one the release tagged.
+  const exitCode = await ctx.runDispatch(
+    {
+      releases_created: 'true',
+      paths_released: '["packages/std"]',
+      'packages/std--sha': 'old111',
+      'packages/std--tag_name': '@zgeoff/std@0.4.0',
+      'packages/std--version': '0.4.0',
+    },
+    { GITHUB_SHA: 'old111' },
+  );
 
   const calls = await ctx.gh.readCalls();
 
