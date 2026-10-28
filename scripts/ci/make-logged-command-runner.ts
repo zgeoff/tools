@@ -20,6 +20,7 @@ export function makeLoggedCommandRunner(output: Readonly<LoggedOutput>): RunComm
       stdin: options.stdin === undefined ? 'ignore' : Buffer.from(options.stdin),
       stdout: 'pipe',
       stderr: 'pipe',
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
     });
 
     const [stdout, stderr, exitCode] = await Promise.all([

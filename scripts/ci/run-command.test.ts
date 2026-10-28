@@ -19,3 +19,19 @@ test('it hands the command its stdin and only the given environment', async () =
 
   expect(result).toStrictEqual({ exitCode: 0, stdout: 'water\ncopper', stderr: '' });
 });
+
+test('it stops the command when its signal aborts, and returns the exit code of the stop', async () => {
+  const stopping = new AbortController();
+
+  const running = runCommand(['sh', '-c', 'echo boiling; exec sleep 30'], {
+    cwd: import.meta.dir,
+    env: { PATH: process.env['PATH'] },
+    signal: stopping.signal,
+  });
+
+  stopping.abort();
+
+  const result = await running;
+
+  expect(result.exitCode).toBe(143);
+});
