@@ -144,8 +144,11 @@ jobs:
           ref: ${{ inputs.tools-ref || job.workflow_sha }}
           path: .repo-sync
           persist-credentials: false
-          # The earlier manifests in the history name the files to delete.
+          # The earlier manifests in the history name the files to delete, and
+          # the cleanup reads every past version of each source, which a
+          # blobless clone would fetch one at a time.
           fetch-depth: 0
+          filter: ''
 
       # The step scripts download from the commit of this workflow, whatever
       # tools-ref names, so an older ref still syncs through current scripts.
