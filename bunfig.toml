@@ -7,9 +7,6 @@ exact = true
 
 # supply-chain guard: only install versions published >= 7 days ago
 minimumReleaseAge = 604800
-# fast-uri 3.1.9 and happy-dom 21.0.4 with its registrator skip the guard because each is the only
-# fix for an advisory that fails `bun audit`; they come out on 2026-10-28, once both are 7 days old.
-minimumReleaseAgeExcludes = ["@happy-dom/global-registrator", "fast-uri", "happy-dom"]
 
 [test]
 # register jest-extended matchers, and start the one MSW server, in every test file

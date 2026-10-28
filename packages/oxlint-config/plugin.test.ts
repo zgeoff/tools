@@ -359,23 +359,22 @@ test('it flags a .test.tsx file with no module beside it', async () => {
   expect(result.stdout).toInclude('view.<ext>');
 });
 
-test('it accepts a test beside a .ts, .tsx, .sh, or .json module', async () => {
-  const results = await Promise.all(
-    ['parse-entry.ts', 'view.tsx', 'install.sh', 'turbo.json'].map((module) => {
-      const testFile = module.replace(/\.[a-z]+$/u, '.test.ts');
-
-      return runLintTree(
-        {
-          [module]: '',
-          [testFile]: "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
-        },
-        testFile,
-        { 'zgeoff/test-beside-module': 'error' },
-      );
-    }),
+test.each([
+  ['parse-entry.ts', 'parse-entry.test.ts'],
+  ['view.tsx', 'view.test.ts'],
+  ['install.sh', 'install.test.ts'],
+  ['turbo.json', 'turbo.test.ts'],
+])('it accepts a test beside the module %s', async (module, testFile) => {
+  const result = await runLintTree(
+    {
+      [module]: '',
+      [testFile]: "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
+    testFile,
+    { 'zgeoff/test-beside-module': 'error' },
   );
 
-  expect(results.map((result: Readonly<OxlintRun>) => result.exitCode)).toStrictEqual([0, 0, 0, 0]);
+  expect(result.exitCode).toBe(0);
 });
 
 test('it accepts a .test.tsx file beside its module', async () => {

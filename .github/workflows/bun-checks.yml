@@ -13,10 +13,10 @@
 #
 # The static job, and the checks job in a private repo, run the shared checks
 # as named steps beside the scripts: shell, docs, workflows, the workflow lint,
-# commits, local paths and test timeouts. A check that needs a tool the repo
-# lacks prints a notice and passes. Each step runs one script, which the job
-# downloads from the commit of zgeoff/tools that defines it, so a caller at a
-# sync tag runs that tag's scripts.
+# commits, local paths, test timeouts and dependency gates. A check that needs
+# a tool the repo lacks prints a notice and passes. Each step runs one script,
+# which the job downloads from the commit of zgeoff/tools that defines it, so a
+# caller at a sync tag runs that tag's scripts.
 #
 # `scripts` is a space-separated list of package.json script names. Empty means
 # the standard list: audit deadcode format:check lint typecheck test, then each
@@ -264,6 +264,11 @@ jobs:
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
         run: bun "$RUNNER_TEMP/tools/sync/pre-push/run-test-timeouts-check.ts"
 
+      - &check-dependency-gates
+        name: Check dependency gates
+        if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
+        run: bun "$RUNNER_TEMP/tools/sync/pre-push/dependency-gates/run-dependency-gates-check.ts"
+
       - &run-scripts
         name: Run the check scripts
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
@@ -423,6 +428,7 @@ jobs:
       - *check-commits
       - *check-local-paths
       - *check-test-timeouts
+      - *check-dependency-gates
 
       - name: Static checks
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}

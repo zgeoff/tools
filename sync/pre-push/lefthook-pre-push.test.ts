@@ -84,6 +84,7 @@ test('it leaves the main checkout non-bare when the test job runs in a pre-push 
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'memory-capped': 'exec',
       },
@@ -126,6 +127,7 @@ test('it fails the push on the shell job alone when a shell file the branch chan
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'memory-capped': 'exec',
       },
@@ -178,6 +180,7 @@ test('it fails the push on the shell job alone when a shell file the branch chan
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'memory-capped': 'exec',
       },
@@ -226,6 +229,7 @@ test('it passes the push when only a file the branch leaves unchanged fails the 
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'memory-capped': 'exec',
       },
@@ -267,6 +271,7 @@ test('it passes the push when the branch changes a clean file whose name starts 
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'memory-capped': 'exec',
       },
@@ -311,6 +316,7 @@ test('it hands every shell file the branch changes to the shell check when the b
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'memory-capped': 'exec',
       },
@@ -365,6 +371,7 @@ test('it passes the push with a notice when the machine lacks shfmt', async () =
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'memory-capped': 'exec',
       },
@@ -421,6 +428,7 @@ test('it passes the push with a notice when the machine lacks actionlint', async
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'memory-capped': 'exec',
       },
@@ -475,6 +483,7 @@ test('it warns and passes the push when the workflow lint faults a workflow call
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
         'check:workflows': `bun ${join(import.meta.dir, 'run-workflows-check.ts')}`,
         'memory-capped': 'exec',
       },
@@ -526,6 +535,7 @@ test.skipIf(!canRunActionlint)(
           'check:commits': 'true',
           'check:local-paths': 'true',
           'check:test-timeouts': 'true',
+          'check:dependency-gates': 'true',
           'check:workflows': 'true',
           'memory-capped': 'exec',
         },
@@ -585,6 +595,7 @@ test.skipIf(!canRunActionlint)(
           'check:commits': 'true',
           'check:local-paths': 'true',
           'check:test-timeouts': 'true',
+          'check:dependency-gates': 'true',
           'check:workflows': 'true',
           'memory-capped': 'exec',
         },
@@ -647,6 +658,7 @@ test.skipIf(!canRunActionlint)(
           'check:commits': 'true',
           'check:local-paths': 'true',
           'check:test-timeouts': 'true',
+          'check:dependency-gates': 'true',
           'check:workflows': 'true',
           'memory-capped': 'exec',
         },
@@ -694,6 +706,7 @@ test('it passes the docs job with a notice when the repo has no docs-writing scr
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'memory-capped': 'exec',
       },
@@ -755,6 +768,7 @@ test('it fails the push on the docs job when the installed length script rejects
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'memory-capped': 'exec',
       },
@@ -809,6 +823,7 @@ test('it fails the push on the docs job when the installed link script finds a b
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'memory-capped': 'exec',
       },
@@ -857,6 +872,7 @@ test('it fails the push when a commit of the branch fails commitlint', async () 
         'check:commits': `bun ${join(import.meta.dir, 'run-commits-check.ts')}`,
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'memory-capped': 'exec',
       },
@@ -899,6 +915,7 @@ test('it fails the push when a commit of the branch adds the home directory', as
         'check:commits': 'true',
         'check:local-paths': `bun ${join(import.meta.dir, 'run-local-paths-check.ts')}`,
         'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'memory-capped': 'exec',
       },
@@ -941,6 +958,7 @@ test('it fails the push when a bunfig.toml raises the test timeout above 5 s', a
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': `bun ${join(import.meta.dir, 'run-test-timeouts-check.ts')}`,
+        'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'memory-capped': 'exec',
       },
@@ -965,6 +983,60 @@ test('it fails the push when a bunfig.toml raises the test timeout above 5 s', a
 
   expect(output).toInclude(
     'bunfig.toml: [test] timeout = 30000 raises every test above the 5000 ms limit of the unit lane',
+  );
+});
+
+test('it fails the push when bunfig.toml holds an age-gate exclude past its removal date', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+
+  await writeFile(
+    join(ctx.worktree, 'bunfig.toml'),
+    [
+      '[install]',
+      '# left-pad 1.3.1 (published 2020-03-01, patches GHSA-aaaa-bbbb-cccc) ages past the gate ~2020-03-08 — remove then (audit-fix)',
+      'minimumReleaseAgeExcludes = ["left-pad"]',
+    ].join('\n'),
+  );
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'echo bunfig.toml',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
+        'check:dependency-gates': `bun ${join(import.meta.dir, 'dependency-gates/run-dependency-gates-check.ts')}`,
+        'check:workflows': 'true',
+        'memory-capped': 'exec',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).not.toBe(0);
+
+  expect(output).toInclude(
+    'bunfig.toml: left-pad: the age-gate exclude was due for removal on 2020-03-08',
   );
 });
 
@@ -1120,6 +1192,7 @@ test('it skips the test job with the CI notice when the branch has more than 50 
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'memory-capped': `bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024`,
       },
@@ -1176,6 +1249,7 @@ test('it runs the related tests under the memory cap when the branch has 50 or f
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
         'check:workflows': 'true',
 
         'memory-capped': `bash -c 'echo "$*" >> capped.txt; exec bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024 "$@"' memory-capped`,
@@ -1239,6 +1313,7 @@ test('it runs no tests in the hook when the branch changes only lane files', asy
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'memory-capped': `bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024`,
       },
@@ -1287,6 +1362,7 @@ test('it passes the slow-host timeout to the tests when the host gets 1 worker',
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'memory-capped': `bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024`,
       },

@@ -5,7 +5,8 @@ update pull requests from the shared preset in [`default.json`](../../default.js
 takes with `"extends": ["github>zgeoff/tools"]` in its own `renovate.json`, with no sync entry. The
 `workflow-audit-fix` entry turns a red `bun audit` into a pull request. Neither part uses GitHub's
 dependency graph, because the graph does not read `bun.lock`, so Dependabot alerts stay empty for
-these repos.
+these repos. The [dependency gates check](#the-dependency-gates-check) fails a pull request while
+the repo keeps an override, an age-gate exclude or an audit ignore that no longer guards anything.
 
 ## The Renovate preset
 
@@ -117,3 +118,24 @@ sets. The App token pushes the branch, so the repo's checks run on the pull requ
 default `GITHUB_TOKEN` starts no workflow run.
 
 The [Socket config](./socket-config.md) checks the same dependency changes for supply-chain risks.
+
+## The dependency gates check
+
+The dependency gates check reads the root `package.json`, `bunfig.toml` and `bun.lock` in the
+working tree, and fails on each entry the repo can remove:
+
+- An age-gate exclude whose removal comment, in the form the audit-fix workflow writes, names a day
+  before today. An exclude with no such comment fails too, because the audit-fix workflow never
+  removes it. An exclude of a `@zgeoff/` package never fails: the Renovate preset bumps those
+  packages as soon as they publish, so each one keeps its exclude.
+- A root override that every range in `bun.lock` admits, or one of a package that nothing in
+  `bun.lock` depends on. An override that pins the version the root `workspaces.catalog` holds
+  stays, because without it a dependent's range can resolve to a newer release than the catalog's.
+- An `--ignore` flag in the `audit` script whose advisory `bun audit` no longer reports, or whose
+  package `bun audit fix` can move to a patched release in range.
+
+The check runs `bun audit` only when the `audit` script ignores an advisory, so it needs no network
+in a repo with no ignore. A repo with no override, exclude or ignore passes. The
+`Check dependency gates` step of [`bun-checks.yml`](../../.github/workflows/bun-checks.yml) runs it
+on every pull request, and the [pre-push baseline](./pre-push-baseline.md) runs it before a push.
+Its scripts live in [`sync/pre-push/dependency-gates/`](../../sync/pre-push/dependency-gates/).

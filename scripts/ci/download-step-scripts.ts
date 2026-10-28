@@ -18,6 +18,7 @@ export const stepScriptSets = {
     'sync/pre-push/run-commits-check.ts',
     'sync/pre-push/run-local-paths-check.ts',
     'sync/pre-push/run-test-timeouts-check.ts',
+    'sync/pre-push/dependency-gates/run-dependency-gates-check.ts',
   ],
   'paths-changed': ['scripts/paths-changed/run-changed-files-step.ts'],
   'repo-sync': ['scripts/repo-sync/write-sync-entries.ts', 'scripts/repo-sync/sync-entries.ts'],

@@ -9,18 +9,21 @@ whole-tree check required.
 
 ## What the baseline runs
 
-The baseline runs `format:check` and `typecheck` over the whole tree, and plain `oxlint`, the shell,
-docs and workflows checks and the sibling tests over the files the branch changes. The shell check
-runs `shellcheck` and `shfmt -d`, the docs check runs the docs-writing skill's `check-length.sh` and
-`check-links.sh`, and the workflows check runs `actionlint` and then the workflow lint. Each runs
-only when the branch changes a file that matches its glob.
+The baseline runs `format:check`, `typecheck` and the
+[dependency gates check](./dependency-updates.md#the-dependency-gates-check) over the whole tree,
+and plain `oxlint`, the shell, docs and workflows checks and the sibling tests over the files the
+branch changes. The shell check runs `shellcheck` and `shfmt -d`, the docs check runs the
+docs-writing skill's `check-length.sh` and `check-links.sh`, and the workflows check runs
+`actionlint` and then the workflow lint. Each runs only when the branch changes a file that matches
+its glob.
 
 A check whose program the machine lacks prints a notice and passes, because CI installs the program
 and runs the check. The docs check prints a notice and passes in a repo without
 `.claude/skills/docs-writing/scripts/`. The commits and local-paths checks read the branch's
-commits, and the test-timeouts check reads the files that `HEAD` holds. The baseline also runs
-`typecheck` before a commit that stages a code or JSON file, after the repo's own pre-commit jobs,
-so the type check sees what the fixers wrote.
+commits, and the test-timeouts check reads the files that `HEAD` holds. The dependency gates check
+reads the working tree, as `bun audit` does. The baseline also runs `typecheck` before a commit that
+stages a code or JSON file, after the repo's own pre-commit jobs, so the type check sees what the
+fixers wrote.
 
 The workflows check ignores one actionlint error, on the `queue` key of `concurrency`: GitHub
 documents the key, and the pinned actionlint rejects it. The ignore lapses on an expiry date that
@@ -78,6 +81,9 @@ The entry delivers these files, and their tests stay in tools:
 - `scripts/run-workflows-check.ts` — the workflow lint, which reads the workflow files that `HEAD`
   holds and warns on each fault. The `Lint workflows` step of `bun-checks.yml` downloads it from
   tools and runs it over every workflow.
+- `scripts/dependency-gates/run-dependency-gates-check.ts` and the modules it imports from its
+  folder — the dependency gates check. The `Check dependency gates` step of `bun-checks.yml`
+  downloads them from tools.
 - `scripts/read-worker-count.ts` and `scripts/read-memory-budget.ts` — print the
   [worker count and the memory budget](./memory-caps.md#the-worker-count) of the host.
 - `scripts/read-branch-base.ts`, `scripts/parse-added-lines.ts`, `scripts/parse-shell-words.ts`,
@@ -89,10 +95,10 @@ as in a clone without origin's default branch. One exception: the workflow lint 
 problem, because it only warns.
 
 The entry's build adds the package scripts `files:branch`, `lint:files`, `test:related`,
-`check:commits`, `check:local-paths`, `check:test-timeouts`, `check:workflows` and `memory-capped`
-when the repo lacks them. It changes one script the repo already has: a `files:branch` that runs the
-old `scripts/collect-branch-files.ts` moves to `scripts/read-branch-files.ts`. A repo opts in with
-three changes, which
+`check:commits`, `check:local-paths`, `check:test-timeouts`, `check:dependency-gates`,
+`check:workflows` and `memory-capped` when the repo lacks them. It changes one script the repo
+already has: a `files:branch` that runs the old `scripts/collect-branch-files.ts` moves to
+`scripts/read-branch-files.ts`. A repo opts in with three changes, which
 [Opting in to the pre-push baseline](../runbooks/downstream-repo-setup.md#opting-in-to-the-pre-push-baseline)
 lists.
 
