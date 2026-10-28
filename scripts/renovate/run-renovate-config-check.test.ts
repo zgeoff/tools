@@ -11,37 +11,46 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  return { directory };
+  const calls: { argv: readonly string[]; cwd: string }[] = [];
+  const errors: string[] = [];
+
+  const writeWorkflow = (text: string) =>
+    writeTreeFiles(directory, { '.github/workflows/renovate.yml': text });
+
+  const runCheck = () =>
+    runRenovateConfigCheck({
+      cwd: directory,
+      env: {},
+      fileSystem: nodeFileSystem,
+      runLoggedCommand: (argv: readonly string[], options: Readonly<CommandOptions>) => {
+        calls.push({ argv, cwd: options.cwd });
+
+        return Promise.resolve({
+          exitCode: 1,
+          stdout: 'ERROR: Config validation failed\n',
+          stderr: '',
+        });
+      },
+      writeError: (text) => {
+        errors.push(text);
+      },
+    });
+
+  return { directory, calls, errors, writeWorkflow, runCheck };
 }
 
 test('it validates default.json strictly at the pinned version and returns the validator exit code', async () => {
   const ctx = await setupTest();
 
-  const calls: { argv: readonly string[]; cwd: string }[] = [];
+  await ctx.writeWorkflow(
+    'jobs:\n  renovate:\n    steps:\n      - with:\n          renovate-version: 44.1.0\n',
+  );
 
-  await writeTreeFiles(ctx.directory, {
-    '.github/workflows/renovate.yml':
-      'jobs:\n  renovate:\n    steps:\n      - with:\n          renovate-version: 44.1.0\n',
-  });
-
-  const exitCode = await runRenovateConfigCheck({
-    cwd: ctx.directory,
-    env: {},
-    fileSystem: nodeFileSystem,
-    runLoggedCommand: (argv: readonly string[], options: Readonly<CommandOptions>) => {
-      calls.push({ argv, cwd: options.cwd });
-
-      return Promise.resolve({
-        exitCode: 1,
-        stdout: 'ERROR: Config validation failed\n',
-        stderr: '',
-      });
-    },
-  });
+  const exitCode = await ctx.runCheck();
 
   expect(exitCode).toBe(1);
 
-  expect(calls).toStrictEqual([
+  expect(ctx.calls).toStrictEqual([
     {
       argv: [
         'npx',
@@ -57,4 +66,22 @@ test('it validates default.json strictly at the pinned version and returns the v
       cwd: ctx.directory,
     },
   ]);
+});
+
+test('it fails on stderr and runs no validator when renovate.yml pins no single version', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeWorkflow(
+    'jobs:\n  renovate:\n    steps:\n      - uses: renovatebot/github-action@def\n',
+  );
+
+  const exitCode = await ctx.runCheck();
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.errors).toStrictEqual([
+    '.github/workflows/renovate.yml: the renovate job holds 0 renovate-version inputs; the check reads exactly one\n',
+  ]);
+
+  expect(ctx.calls).toBeEmpty();
 });

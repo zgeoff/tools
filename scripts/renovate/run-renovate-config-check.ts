@@ -14,9 +14,11 @@ export interface RenovateConfigCheck {
 
   // Runs the validator, whose output the log shows as it runs.
   readonly runLoggedCommand: RunCommand;
+
+  readonly writeError: (text: string) => void;
 }
 
-// Returns the validator's exit code.
+// Returns the validator's exit code, or 1 when renovate.yml pins no single exact version.
 export async function runRenovateConfigCheck(
   check: Readonly<RenovateConfigCheck>,
 ): Promise<number> {
@@ -24,14 +26,20 @@ export async function runRenovateConfigCheck(
     join(check.cwd, '.github/workflows/renovate.yml'),
   );
 
-  const version = parseRenovateVersion(workflowText);
+  const parsed = parseRenovateVersion(workflowText);
+
+  if (parsed.kind === 'invalid') {
+    check.writeError(`.github/workflows/renovate.yml: ${parsed.message}\n`);
+
+    return 1;
+  }
 
   const result = await check.runLoggedCommand(
     [
       'npx',
       '--yes',
       '--package',
-      `renovate@${version}`,
+      `renovate@${parsed.version}`,
       '--',
       'renovate-config-validator',
       '--strict',
@@ -50,5 +58,8 @@ if (import.meta.main) {
     env: process.env,
     fileSystem: nodeFileSystem,
     runLoggedCommand: makeLoggedCommandRunner({ stdout: process.stdout, stderr: process.stderr }),
+    writeError: (text) => {
+      process.stderr.write(text);
+    },
   });
 }
