@@ -1,9 +1,9 @@
 import { chmod, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-export async function createStubGh(bin: string, state: string): Promise<void> {
+export async function createStubPullRequestGH(bin: string, state: string): Promise<void> {
   const path = join(bin, 'gh');
-  const script = join(import.meta.dir, 'run-stub-gh.ts');
+  const script = join(import.meta.dir, 'run-stub-pull-request-gh.ts');
 
   await writeFile(state, '[]\n');
 

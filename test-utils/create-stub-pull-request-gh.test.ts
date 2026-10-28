@@ -1,18 +1,17 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { createStubGh } from './create-stub-gh.ts';
+import { createStubPullRequestGH } from './create-stub-pull-request-gh.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'create-stub-gh-'));
+  const directory = await mkdtemp(join(import.meta.dir, '.test-create-stub-pull-request-gh-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   const state = join(directory, 'pulls.json');
 
-  await createStubGh(directory, state);
+  await createStubPullRequestGH(directory, state);
 
   return { gh: join(directory, 'gh'), state };
 }
@@ -127,6 +126,6 @@ test.each([
   expect(result.exitCode).toBe(64);
 
   expect(result.stderr.toString()).toBe(
-    'stub gh: supports only: gh pr list|create|edit, as run-stub-gh.ts lists\n',
+    'stub gh: supports only: gh pr list|create|edit, as run-stub-pull-request-gh.ts lists\n',
   );
 });
