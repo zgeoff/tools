@@ -4,10 +4,11 @@ description:
   Testing rules for zgeoff repos — the three package regimes, flat behavioural tests, a setupTest
   with onTestFinished cleanup, inline data and tested factories, strict assertions and inline
   snapshots, controlled time, condition waits, real filesystems and transports, and the narrow cases
-  for module mocks, plus the fix for each kind of slow test and the lanes with their per-test
-  timeout limits. References cover real databases, HTTP mocking with MSW, observability, and Claude
-  Code mod checks, and, in a repo that uses them, React and TanStack clients and native Go and NixOS
-  conventions. Load when designing, writing, or reviewing tests.
+  for module mocks, plus the fix for each kind of slow test, the lanes with their per-test timeout
+  limits, per-run templates, the worker count, the pre-push hook's scope, and memory budgets.
+  References cover real databases, HTTP mocking with MSW, observability, and Claude Code mod checks,
+  and, in a repo that uses them, React and TanStack clients and native Go and NixOS conventions.
+  Load when designing, writing, or reviewing tests.
 ---
 
 # Testing
@@ -63,6 +64,8 @@ Each line links the section that explains it.
 
 - [Slow tests](#slow-tests): a test finishes in under 5 s; fix the cause the table names, never the
   timeout, and a lane holds only a test whose real system is the contract.
+- [Running tests](#running-tests): the worker helper sets `--parallel=<N>`, the hook runs unit tests
+  only, and a run keeps within its memory budget.
 - [Regimes](#regimes): the furthest edge a package's code reaches picks its regime and the reference
   to open.
 - [Principles](#principles): visible beats concise, every test stands alone, each changed behaviour
@@ -217,7 +220,7 @@ slow, find its cause in this table and make the change it names. Never raise the
 | waits for a deadline, an idle limit or a retry delay                                        | a real timer or deadline            | Make the deadline an option of the code that owns it, pass a short one, and wait on the event that the deadline causes. A runtime or kernel timer gets the shortest faithful value, as [Native timers](./references/system-tests.md#native-timers-and-scenario-delays) describes. |
 | sleeps to let something settle                                                              | no signal to wait on                | Wait on a condition with the repo's `waitFor` helper. When the code offers nothing to wait on, add an event, a log marker or a state flag.                                                                                                                                        |
 | proves that something does not happen                                                       | it waits out a timeout              | Wait for a later event that shows the thing did not happen.                                                                                                                                                                                                                       |
-| migrates a database or builds a bundle                                                      | a shared fixture build              | Use a per-run template: built once per run under a file lock, keyed by a hash of its inputs, and copied per test. A per-process memo is wrong with several workers: each worker builds it again, and the builds race on one output folder.                                        |
+| migrates a database or builds a bundle                                                      | a shared fixture build              | Use a [per-run template](#per-run-templates), built once per run and copied per test.                                                                                                                                                                                             |
 | drives a program the repo starts, such as a guest, a worker or a VM manager                 | a real process start                | Use the program's stateful stand-in from the repo's project-testing skill. When none exists, write one, as [Stateful stand-ins](./references/system-tests.md#stateful-stand-ins) describes.                                                                                       |
 | needs the real system, and the real system is the contract                                  | a VM, the kernel, a browser, an API | Put it in a [lane](#lanes). Its directory or file suffix names the lane.                                                                                                                                                                                                          |
 | runs a linter or checker binary over text the code builds, such as a generated shell script | a real process start                | It is not a test. Export the text and check it in a static check script that runs in the CI static job and before a push.                                                                                                                                                         |
@@ -252,11 +255,29 @@ milliseconds are per-run fixtures. A lane exists only for a real system that the
 host, such as a VM, the kernel or root, a browser, a container image, the Agent SDK subprocess, or a
 live API, or for a test of the process itself.
 
+### Per-run templates
+
+A fixture that costs more to build than a test costs to run, such as a migrated database or a built
+bundle, is a per-run template. The first worker to need it builds it under a file lock, and each
+test copies it or reads it. A per-process memo is wrong: an isolated file evaluates it again, and
+the workers race on one output folder.
+
+- The template's name holds a hash of its inputs, such as the migration files, so a changed input
+  builds a new template and an unchanged one reuses the last.
+- It lives in a git-ignored cache folder inside the repo, never in `/tmp`, because `/tmp` is tmpfs
+  on many hosts and holds every file in RAM.
+- The sweep at the start of each run removes the per-run folders and clones that older runs left and
+  the templates of old hashes. It never removes the template for the current hash, which a
+  concurrent run may be copying.
+
+[Database testing](./references/database.md) describes the template for each engine.
+
 ### Lanes
 
-A lane runs the tests that need one real system. Each lane has its own `test:<lane>` script, its own
-CI step, and a per-test limit, which the script's `--timeout` sets and `zgeoff/max-test-timeout`
-checks in each lane file. The unit run leaves the lane files out by pattern.
+A lane runs the tests that need one real system. Each lane has its own `test:<lane>` script and a
+per-test limit, which the script's `--timeout` sets and `zgeoff/max-test-timeout` checks in each
+lane file. The unit run and the pre-push hook leave the lane files out by pattern. The
+[ci-design](../ci-design/SKILL.md) skill decides where CI runs each lane.
 
 | Lane      | Where                                  | Limit | The real system                                                              |
 | --------- | -------------------------------------- | ----- | ---------------------------------------------------------------------------- |
@@ -319,6 +340,50 @@ The limit never rises to cover one test. `zgeoff/test-timeout-exception-ticket` 
 `zgeoff/max-test-timeout` whose reason after `--` holds neither a ticket nor `floor:` with text, in
 any of its forms. The test timeout check fails an oxlint config that turns either rule off or down
 to a warning, unless a comment on that setting holds a ticket or a `floor:`.
+
+## Running tests
+
+A test script runs `bun test --parallel=<N>`, with N from the shared worker helper that repo-sync
+delivers with the pre-push baseline. The helper reads the host's memory, a cgroup cap included, and
+its cores: a host under 4 GiB gets one worker, a larger one gets a few, and `TEST_WORKERS` overrides
+both. A bare `--parallel` never appears, because it starts one worker per core and test memory grows
+in a straight line with the workers. A repo that runs one suite per package under turbo passes N to
+turbo's `--concurrency` and runs one test process per package, so the host never runs more than N.
+Whether files run isolated is each repo's choice, which its test script and its project-testing
+skill state.
+
+### The 5 s limit and the hook
+
+The 5 s unit limit and each lane's limit are CI rules, because CI runs on a known runner and a host
+that swaps or shares its cores runs the same test slower. The pre-push hook runs only the unit tests
+related to the files the branch changes, and every lane runs only in CI. Past a cap on the number of
+related test files, or on a change to a shared test helper or config, the hook skips its tests and
+leaves them to CI. When the helper gives one worker, the shared related-test runner passes
+`--timeout=15000`, so a test that passes on CI does not fail a push from a small host. That runner
+is the one place that raises a timeout: a test file, a test script, and the repo's Bun config never
+do.
+
+### Memory
+
+Each run keeps its peak anonymous memory, as the memory cap script measures it, within a budget. The
+cap script stops a run that outgrows its cap, so an overrun fails one run instead of the host.
+
+| Host                 | Run                                 | Budget |
+| -------------------- | ----------------------------------- | ------ |
+| A 2 GiB host         | one pre-push job, database included | 1.2 GB |
+| A shared workstation | one pre-push job                    | 2 GB   |
+| A shared workstation | one full suite                      | 4 GB   |
+| CI                   | one full suite                      | 8 GB   |
+
+- Browser tests and builds run one at a time. Browser suites run in their own serial lane, and a run
+  builds each bundle once, outside the workers, because each browser or build holds its memory
+  beside every worker.
+- `/tmp` and a database's data on tmpfs use RAM. A temp folder or a test database that a run leaves
+  behind holds memory until something removes it, so a cleanup gap costs memory as well as
+  isolation.
+- A killed run leaves its processes and folders behind, and
+  [Leftovers of a killed run](./references/cleanup.md#leftovers-of-a-killed-run) bounds them: a test
+  stops a child by its process group, and each run starts with a sweep.
 
 ## Structure and naming
 

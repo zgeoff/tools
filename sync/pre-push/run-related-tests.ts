@@ -163,11 +163,12 @@ function findRelatedTest(path: string): string | undefined {
   return `${groups['stem']}.test${groups['ext']}`;
 }
 
-// A lane's tests need a browser, a container or the host, and run in their own CI job.
+// A lane's tests need a real system, such as a browser, a container or a live model API, and run
+// only in CI.
 function isLaneFile(path: string): boolean {
   return (
     /(?:^|\/)e2e\//u.test(path) ||
-    /\.(?:browser|docker|host)(?:\.test)?\.tsx?$/u.test(basename(path))
+    /\.(?:browser|docker|host|agent-sdk|model-api)(?:\.test)?\.tsx?$/u.test(basename(path))
   );
 }
 
