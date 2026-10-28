@@ -153,12 +153,12 @@ jobs:
           mkdir -p "$RUNNER_TEMP/check-plan"
           base="https://raw.githubusercontent.com/$repository/$sha"
           for file in plan-check-scripts.ts write-check-plan.ts; do
-            curl -fsSL -o "$RUNNER_TEMP/check-plan/$file" "$base/.github/workflows/$file"
+            curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/check-plan/$file" "$base/.github/workflows/$file"
           done
           for file in read-branch-base.ts parse-added-lines.ts run-program.ts run-commits-check.ts run-local-paths-check.ts run-test-timeouts-check.ts run-workflows-check.ts parse-shell-words.ts shell-escape-parsers.ts collect-command-names.ts; do
-            curl -fsSL -o "$RUNNER_TEMP/check-plan/$file" "$base/sync/pre-push/$file"
+            curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/check-plan/$file" "$base/sync/pre-push/$file"
           done
-          curl -fsSL -o "$RUNNER_TEMP/check-plan/tools-package.json" "$base/package.json"
+          curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/check-plan/tools-package.json" "$base/package.json"
 
       # The adapter imports ts-pattern, which the caller's checkout need not
       # hold. The step installs the version tools' catalog pins, beside the
@@ -230,7 +230,7 @@ jobs:
             echo "shfmt: not needed, because this job runs no shell check"
             exit 0
           fi
-          curl -fsSL -o "$RUNNER_TEMP/shfmt.download" "https://github.com/mvdan/sh/releases/download/$SHFMT_VERSION/shfmt_${SHFMT_VERSION}_linux_amd64"
+          curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/shfmt.download" "https://github.com/mvdan/sh/releases/download/$SHFMT_VERSION/shfmt_${SHFMT_VERSION}_linux_amd64"
           echo "$SHFMT_SHA256  $RUNNER_TEMP/shfmt.download" | sha256sum -c -
           mkdir -p "$RUNNER_TEMP/shfmt-bin"
           install -m 0755 "$RUNNER_TEMP/shfmt.download" "$RUNNER_TEMP/shfmt-bin/shfmt"
@@ -251,7 +251,7 @@ jobs:
             echo "actionlint: not needed, because this job runs no workflows check"
             exit 0
           fi
-          curl -fsSL -o "$RUNNER_TEMP/actionlint.tar.gz" "https://github.com/rhysd/actionlint/releases/download/v$ACTIONLINT_VERSION/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/actionlint.tar.gz" "https://github.com/rhysd/actionlint/releases/download/v$ACTIONLINT_VERSION/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
           echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
           mkdir -p "$RUNNER_TEMP/actionlint-bin"
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/actionlint-bin" actionlint

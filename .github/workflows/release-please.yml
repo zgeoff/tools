@@ -115,7 +115,7 @@ jobs:
           repository=$(jq -er .workflow_repository <<< "$JOB_CONTEXT")
           sha=$(jq -er .workflow_sha <<< "$JOB_CONTEXT")
           for script in check-release-head.sh merge-release-prs.sh; do
-            curl -fsSL -o "$RUNNER_TEMP/$script" \
+            curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/$script" \
               "https://raw.githubusercontent.com/$repository/$sha/scripts/$script"
           done
 

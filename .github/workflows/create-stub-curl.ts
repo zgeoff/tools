@@ -15,12 +15,12 @@ export async function createStubCurl(directory: string, body: string | Uint8Arra
     path,
     [
       '#!/bin/sh',
-      'if [ "$#" -ne 4 ] || [ "$1" != -fsSL ] || [ "$2" != -o ]; then',
-      '  echo "stub curl: supports only: curl -fsSL -o <path> <url>" >&2',
+      'if [ "$#" -ne 7 ] || [ "$1" != -fsSL ] || [ "$2" != --retry ] || [ "$3" != 3 ] || [ "$4" != --retry-all-errors ] || [ "$5" != -o ]; then',
+      '  echo "stub curl: supports only: curl -fsSL --retry 3 --retry-all-errors -o <path> <url>" >&2',
       '  exit 64',
       'fi',
-      `cat '${bodyPath}' > "$3"`,
-      `echo "$4" >> '${join(directory, 'curl.urls')}'`,
+      `cat '${bodyPath}' > "$6"`,
+      `echo "$7" >> '${join(directory, 'curl.urls')}'`,
       '',
     ].join('\n'),
   );
