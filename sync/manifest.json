@@ -345,6 +345,10 @@
         "target": "scripts/dependency-gates/parse-root-manifest.ts"
       },
       {
+        "source": "sync/pre-push/dependency-gates/read-dependency-gate-findings.ts",
+        "target": "scripts/dependency-gates/read-dependency-gate-findings.ts"
+      },
+      {
         "source": "sync/pre-push/dependency-gates/run-dependency-gates-check.ts",
         "target": "scripts/dependency-gates/run-dependency-gates-check.ts"
       },

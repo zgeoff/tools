@@ -1,11 +1,15 @@
-import assert from 'node:assert/strict';
+import { parseShellWords } from '../parse-shell-words.ts';
 
 export function parseAuditIgnoreIDs(auditScript: string): string[] {
-  return [...auditScript.matchAll(/--ignore[= ](?<advisoryID>\S+)/gu)].map((match) => {
-    const advisoryID = match.groups?.['advisoryID'];
+  const words = parseShellWords(auditScript).map((word) => word.text);
 
-    assert.ok(advisoryID !== undefined, 'the ignore pattern names the advisory');
+  return words.flatMap((word, index) => {
+    if (word.startsWith('--ignore=')) {
+      return [word.slice('--ignore='.length)];
+    }
 
-    return advisoryID;
+    const next = words[index + 1];
+
+    return word === '--ignore' && next !== undefined ? [next] : [];
   });
 }
