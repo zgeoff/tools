@@ -6,7 +6,7 @@ import { parseArgs } from 'node:util';
 
 // The scripts each reusable workflow's steps run. The download adds every file they import.
 export const stepScriptSets = {
-  'paths-changed': ['scripts/paths-changed/match-changed-files.ts'],
+  'paths-changed': ['scripts/paths-changed/run-changed-files-step.ts'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type StepScriptSet = keyof typeof stepScriptSets;
