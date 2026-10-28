@@ -17,7 +17,7 @@ export interface PackagesPublishOptions {
 
   readonly releasedVersionsText: string;
 
-  readonly fileSystem: FileSystem;
+  readonly fileSystem: Pick<FileSystem, 'readDirectory' | 'readText'>;
 
   // Runs the registry check, whose answer the publish reads.
   readonly runCommand: RunCommand;
@@ -86,7 +86,7 @@ interface ReleasedPackage {
 }
 
 async function readPackage(
-  fileSystem: FileSystem,
+  fileSystem: Pick<FileSystem, 'readDirectory' | 'readText'>,
   folder: string,
   releasedVersion: string | undefined,
 ): Promise<ReleasedPackage> {
