@@ -16,7 +16,7 @@ export interface AuditFixCommitOptions {
   readonly base: string;
   readonly defaultBranch: string;
   readonly outputPath: string;
-  readonly fileSystem: FileSystem;
+  readonly fileSystem: Pick<FileSystem, 'appendText' | 'probePath' | 'readText'>;
   readonly runCommand: RunCommand;
   readonly writeOutput: (text: string) => void;
 }
@@ -91,7 +91,10 @@ export async function commitAuditFix(options: AuditFixCommitOptions): Promise<nu
   return 0;
 }
 
-async function readTextFile(fileSystem: FileSystem, path: string): Promise<string> {
+async function readTextFile(
+  fileSystem: Pick<FileSystem, 'appendText' | 'probePath' | 'readText'>,
+  path: string,
+): Promise<string> {
   const exists = await fileSystem.probePath(path);
 
   return exists ? fileSystem.readText(path) : '';
