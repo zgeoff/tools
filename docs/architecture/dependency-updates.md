@@ -24,15 +24,6 @@ The preset sorts each update by its kind:
 | zgeoff/tools sync tag | none             | one per tag                                  | on green checks |
 | Lock-file maintenance | none             | weekly, for the dependencies of dependencies | on green checks |
 
-In zgeoff/nixie and zgeoff/noslop, every row merges after review instead. Their required
-`pr / checks` check skips on every pull request, and GitHub counts a skipped required check as
-passing, so a merge on green checks there waits for no test. The last package rule matches the two
-repos and turns automerge off. A vulnerability fix keeps the automerge that `vulnerabilityAlerts`
-forces on it, so the rule also sets `automergeType` to `pr-comment`, and Renovate posts a comment
-that no bot acts on in place of the merge. The rule comes out once sync-v24 is tagged, and nixie's
-and noslop's sync bumps to it have merged, with `pr / checks` running and gating on a pull request
-in each.
-
 A TanStack router release, React Start among its packages, reaches a repo as one pull request for
 its patch and minor bumps, so the router and React Start never ship at different versions. That
 group opens at any time, as other minor bumps do.
