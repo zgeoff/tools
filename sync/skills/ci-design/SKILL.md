@@ -150,12 +150,9 @@ Logic in a script runs in the script's tests on every pull request, as the testi
 - **Never put a script under `.github/`.** `bun test` skips the hidden folder, so a script and its
   test there never run in the repo's test suite.
 - **A reusable workflow in zgeoff/tools downloads its script at the commit that defines the job.**
-  The caller's checkout lacks the script, so a step builds the commit's raw URL from
-  `job.workflow_repository` and `job.workflow_sha` and downloads
-  [`download-step-scripts.ts`](https://github.com/zgeoff/tools/blob/main/scripts/ci/download-step-scripts.ts)
-  with `curl`. That script downloads the workflow's scripts and every file they import into
-  `$RUNNER_TEMP/tools`, and refuses one that imports a package. A caller at a sync tag then runs
-  that tag's scripts.
+  The caller's checkout lacks the script, so the step reads `job.workflow_repository` and
+  `job.workflow_sha` from the job context and downloads the file from that commit. A caller at a
+  sync tag then runs that tag's script.
 
 ### The workflow lint
 
@@ -165,16 +162,15 @@ repo's workflows and the workflow callers that zgeoff/tools delivers. The pre-pu
 over the workflow files a branch changes. It reports each fault as a warning and passes, so a repo
 that Renovate moves to a new sync tag keeps a green run while it clears the warnings.
 
-| Rule                                    | The lint warns on                                                                                                                   |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| [One command per `run:`](#step-scripts) | a `run:` that breaks the rule, where a quoted `;`, `\|` or `&&` is part of a word                                                   |
-| [Timeouts](#timeouts)                   | a job without `timeout-minutes`, other than a job that calls a reusable workflow, where GitHub refuses the key                      |
-| [Cancelling runs](#cancelling-runs)     | a checks workflow without `cancel-in-progress: true`, or with a group that holds a per-run value such as `github.sha`               |
-| [Cancelling runs](#cancelling-runs)     | a release or deploy job without its own group and `cancel-in-progress: false`, or under a workflow-level `true`                     |
-| [No rebase churn](#no-rebase-churn)     | a `workflow_run` trigger without a `branches:` filter                                                                               |
-| [Two profiles](#two-profiles)           | a heavy check in a workflow that runs on `pull_request` or `pull_request_target`, unless the run is in a public repo                |
-| [Build once](#build-once)               | an `actions/cache` step in a job that sets up Bun with `oven-sh/setup-bun`                                                          |
-| [Checkout depth](#checkout-depth)       | an `actions/checkout` step with `fetch-depth: 0` and no `filter`, which is `blob:none`, or `''` for a job that reads many old files |
+| Rule                                    | The lint warns on                                                                                                     |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| [One command per `run:`](#step-scripts) | a `run:` that breaks the rule, where a quoted `;`, `\|` or `&&` is part of a word                                     |
+| [Timeouts](#timeouts)                   | a job without `timeout-minutes`, other than a job that calls a reusable workflow, where GitHub refuses the key        |
+| [Cancelling runs](#cancelling-runs)     | a checks workflow without `cancel-in-progress: true`, or with a group that holds a per-run value such as `github.sha` |
+| [Cancelling runs](#cancelling-runs)     | a release or deploy job without its own group and `cancel-in-progress: false`, or under a workflow-level `true`       |
+| [No rebase churn](#no-rebase-churn)     | a `workflow_run` trigger without a `branches:` filter                                                                 |
+| [Two profiles](#two-profiles)           | a heavy check in a workflow that runs on `pull_request` or `pull_request_target`, unless the run is in a public repo  |
+| [Build once](#build-once)               | an `actions/cache` step in a job that sets up Bun with `oven-sh/setup-bun`                                            |
 
 The lint reads three terms by these definitions:
 
@@ -301,10 +297,8 @@ contents:
 
 A blobless clone fetches every commit and tree, and git fetches a file's contents when a command
 first reads them. A history that holds large old files then costs the same to clone as a small one.
-A job that reads many old files, such as one that walks every past version of a file, fetches each
-one on its own from a blobless clone, so it clones the contents too and states that with
-`filter: ''`. A job that diffs only the pull request against its base needs the merge commit and its
-parents, `fetch-depth: 2`.
+A job that diffs only the pull request against its base needs the merge commit and its parents,
+`fetch-depth: 2`.
 
 ## No rebase churn
 
