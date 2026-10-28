@@ -131,6 +131,9 @@ function isStubPullRequest(value: unknown): value is StubPullRequest {
 }
 
 function exitWithUsage(): never {
-  process.stderr.write('stub gh: supports only: gh pr list|create|edit, as run-stub-gh.ts lists\n');
+  process.stderr.write(
+    'stub gh: supports only: gh pr list|create|edit, as run-stub-pull-request-gh.ts lists\n',
+  );
+
   process.exit(64);
 }

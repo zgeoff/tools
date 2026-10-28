@@ -20,6 +20,7 @@ export const stepScriptSets = {
     'sync/pre-push/run-test-timeouts-check.ts',
   ],
   'paths-changed': ['scripts/paths-changed/match-changed-files.ts'],
+  'repo-sync': ['scripts/repo-sync/write-sync-entries.ts', 'scripts/repo-sync/sync-entries.ts'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type StepScriptSet = keyof typeof stepScriptSets;
