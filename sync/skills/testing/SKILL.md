@@ -4,11 +4,10 @@ description:
   Testing rules for zgeoff repos — the three package regimes, flat behavioural tests, a setupTest
   with onTestFinished cleanup, inline data and tested factories, strict assertions and inline
   snapshots, controlled time, condition waits, real filesystems and transports, and the narrow cases
-  for module mocks, plus the fix for each kind of slow test, the lanes with their per-test timeout
-  limits, per-run templates, the worker count, the pre-push hook's scope, and memory budgets.
-  References cover real databases, HTTP mocking with MSW, observability, and Claude Code mod checks,
-  and, in a repo that uses them, React and TanStack clients and native Go and NixOS conventions.
-  Load when designing, writing, or reviewing tests.
+  for module mocks, plus the fix for each kind of slow test, per-run templates, and the lanes with
+  their per-test timeout limits. References cover real databases, HTTP mocking with MSW,
+  observability, and Claude Code mod checks, and, in a repo that uses them, React and TanStack
+  clients and native Go and NixOS conventions. Load when designing, writing, or reviewing tests.
 ---
 
 # Testing
@@ -26,10 +25,13 @@ The repo's [`bunfig.toml`](../../../bunfig.toml) preload registers the matchers,
 lifecycle, and every reset that returns shared state to a clean baseline after each test. Those
 resets keep each file independent in either mode. Isolation hides a leak between files and never
 fixes one. Each repo states its mode in its test script and in its project-testing skill, and the
-pull request that sets the mode holds the measurements. Per-test resources register cleanup with
-`onTestFinished` where they are acquired. A test exercises real behaviour through real code, and it
-reaches for a stand-in only at a boundary the test cannot cross. When existing tests break these
-rules, you align them while you work on the code they cover.
+pull request that sets the mode holds the measurements. The test script takes its worker count from
+the shared worker helper and never passes a bare `--parallel`, which starts one worker per core, as
+[Memory caps](https://github.com/zgeoff/tools/blob/main/docs/architecture/memory-caps.md#the-worker-count)
+describes. Per-test resources register cleanup with `onTestFinished` where they are acquired. A test
+exercises real behaviour through real code, and it reaches for a stand-in only at a boundary the
+test cannot cross. When existing tests break these rules, you align them while you work on the code
+they cover.
 
 The preload starts each shared resource, such as the MSW server, in `beforeAll` and stops it in
 `afterAll`, never at import, so the start and the stop pair up in every mode. Plain `bun test` runs
@@ -64,8 +66,6 @@ Each line links the section that explains it.
 
 - [Slow tests](#slow-tests): a test finishes in under 5 s; fix the cause the table names, never the
   timeout, and a lane holds only a test whose real system is the contract.
-- [Running tests](#running-tests): the worker helper sets `--parallel=<N>`, the hook runs unit tests
-  only, and a run keeps within its memory budget.
 - [Regimes](#regimes): the furthest edge a package's code reaches picks its regime and the reference
   to open.
 - [Principles](#principles): visible beats concise, every test stands alone, each changed behaviour
@@ -225,6 +225,13 @@ slow, find its cause in this table and make the change it names. Never raise the
 | needs the real system, and the real system is the contract                                  | a VM, the kernel, a browser, an API | Put it in a [lane](#lanes). Its directory or file suffix names the lane.                                                                                                                                                                                                          |
 | runs a linter or checker binary over text the code builds, such as a generated shell script | a real process start                | It is not a test. Export the text and check it in a static check script that runs in the CI static job and before a push.                                                                                                                                                         |
 
+The limits are CI rules, because a host that swaps or shares its cores runs the same test slower. A
+test file, a test script, and the repo's Bun config never raise a timeout above the lane's limit.
+The pre-push hook runs only the unit tests beside the files a branch changes, and every lane runs
+only in CI, as the
+[pre-push baseline](https://github.com/zgeoff/tools/blob/main/docs/architecture/pre-push-baseline.md#the-related-tests)
+describes.
+
 ### Where a test lives
 
 - `<package>/src/<file>.test.ts` holds the unit suite of one source file.
@@ -341,50 +348,6 @@ The limit never rises to cover one test. `zgeoff/test-timeout-exception-ticket` 
 any of its forms. The test timeout check fails an oxlint config that turns either rule off or down
 to a warning, unless a comment on that setting holds a ticket or a `floor:`.
 
-## Running tests
-
-A test script runs `bun test --parallel=<N>`, with N from the shared worker helper that repo-sync
-delivers with the pre-push baseline. The helper reads the host's memory, a cgroup cap included, and
-its cores: a host under 4 GiB gets one worker, a larger one gets one per core up to a small cap, and
-`TEST_WORKERS` overrides both. A bare `--parallel` never appears, because it starts one worker per
-core and test memory grows in a straight line with the workers. A repo that runs one suite per
-package under turbo passes N to turbo's `--concurrency` and runs one test process per package, so
-the host never runs more than N. Whether files run isolated is each repo's choice, which its test
-script and its project-testing skill state.
-
-### The 5 s limit and the hook
-
-The 5 s unit limit and each lane's limit are CI rules, because CI runs on a known runner and a host
-that swaps or shares its cores runs the same test slower. The pre-push hook runs only the unit tests
-related to the files the branch changes, and every lane runs only in CI. Past a cap on the number of
-related test files, or on a change to a shared test helper or config, the hook skips its tests and
-leaves them to CI. When the helper gives one worker, the shared related-test runner passes
-`--timeout=15000`, so a test that passes on CI does not fail a push from a small host. That runner
-is the one place that raises a timeout above its lane's limit: a test file, a test script, and the
-repo's Bun config never do.
-
-### Memory
-
-Each run keeps its peak anonymous memory, as the memory cap script measures it, within a budget. The
-cap script stops a run that outgrows its cap, so an overrun fails one run instead of the host.
-
-| Host                 | Run                                 | Budget |
-| -------------------- | ----------------------------------- | ------ |
-| A 2 GiB host         | one pre-push job, database included | 1.2 GB |
-| A shared workstation | one pre-push job                    | 2 GB   |
-| A shared workstation | one full suite                      | 4 GB   |
-| CI                   | one full suite                      | 8 GB   |
-
-- Browser tests and builds run one at a time. Browser suites run in their own serial lane, and a run
-  builds each bundle once, outside the workers, because each browser or build holds its memory
-  beside every worker.
-- `/tmp` and a database's data on tmpfs use RAM. A temp folder or a test database that a run leaves
-  behind holds memory until something removes it, so a cleanup gap costs memory as well as
-  isolation.
-- A killed run leaves its processes and folders behind, and
-  [Leftovers of a killed run](./references/cleanup.md#leftovers-of-a-killed-run) bounds them: a test
-  stops a child by its process group, and each run starts with a sweep.
-
 ## Structure and naming
 
 - Write each test as a top-level `test(…)` call. `describe` is banned: its scope invites shared
@@ -413,7 +376,7 @@ cap script stops a run that outgrows its cap, so an overrun fails one run instea
   The repo has no other `test/`, `tests/`, or `__tests__` directory.
 - A test that drives a real browser goes in `<module>.browser.test.ts` beside its module, which the
   repo runs in a serial lane, as [Browser suites](./references/system-tests.md#browser-suites)
-  describes.
+  describes. A browser beside every worker, or a build per worker, holds memory the workers need.
 
 ```ts
 test.each([
@@ -587,6 +550,12 @@ Each kind of state has one cleanup tool.
 beside the acquisition, and needs no `?.` guard for a resource the test never reached. A helper that
 registers cleanup for its callers, resources that close in order, and cleanup that runs after the
 preload's resets follow [Cleanup](./references/cleanup.md).
+
+A resource that a test leaves behind costs memory as well as isolation: `/tmp` and a database's data
+on tmpfs sit in RAM until something removes them. A run that a kill stops runs no cleanup at all,
+and [Leftovers of a killed run](./references/cleanup.md#leftovers-of-a-killed-run) covers what it
+leaves. Each run keeps within the
+[memory budgets](https://github.com/zgeoff/tools/blob/main/sync/pre-push/README.md#memory-budgets).
 
 A test overrides an environment variable through the repo's env util, and the preload restores every
 override after each test. A test never assigns `process.env` directly. A test never relies on a
