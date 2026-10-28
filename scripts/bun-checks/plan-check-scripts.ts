@@ -1,5 +1,3 @@
-// The caller's runner downloads this file on its own, so it imports nothing.
-
 export type CheckPart = 'all' | 'static' | 'test' | 'lane';
 
 export interface CheckPlanRequest {

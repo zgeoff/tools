@@ -1,4 +1,4 @@
 {
   "extends": "../tsconfig.base.json",
-  "include": ["hooks", "pre-push", "skills"]
+  "include": ["hooks", "pre-push", "skills", "workflow-callers"]
 }
