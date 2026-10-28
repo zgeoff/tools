@@ -1,8 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createStubFileServer } from '../../test-utils/create-stub-file-server.ts';
+import { HttpResponse, http } from 'msw';
 import { makeAnswerQueue } from '../../test-utils/make-answer-queue.ts';
+import { server } from '../../test-utils/mocks/node.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import {
   downloadStepScripts,
@@ -196,15 +197,21 @@ test.each([
   [429, { kind: 'failed', reason: 'HTTP 429' }],
   [503, { kind: 'failed', reason: 'HTTP 503' }],
 ])('it reads an HTTP %p answer as %p', async (status, expected) => {
-  const server = createStubFileServer({ '/boil.ts': [{ status, body: 'served' }] });
+  server.use(
+    http.get('https://raw.example/acme/tools/cafe12/boil.ts', () =>
+      HttpResponse.text('served', { status }),
+    ),
+  );
 
-  const outcome: unknown = await readURL(`${server.url}/boil.ts`);
+  const outcome: unknown = await readURL('https://raw.example/acme/tools/cafe12/boil.ts');
 
   expect(outcome).toStrictEqual(expected);
 });
 
-test('it reads a refused connection as a passing fault', async () => {
-  const outcome = await readURL('http://localhost:1/boil.ts');
+test('it reads a failed connection as a passing fault', async () => {
+  server.use(http.get('https://raw.example/acme/tools/cafe12/boil.ts', () => HttpResponse.error()));
+
+  const outcome = await readURL('https://raw.example/acme/tools/cafe12/boil.ts');
 
   expect(outcome).toMatchObject({ kind: 'failed' });
 });
@@ -364,25 +371,22 @@ test('it refuses an unknown set with the usage and downloads nothing', async () 
 });
 
 test('it downloads the set from the tools commit into the runner folder', async () => {
+  const ctx = await setupTest();
+
   const toolsURL = `https://raw.githubusercontent.com/acme/tools/${'a1'.repeat(20)}`;
   const root = join(import.meta.dir, '../..');
-  const written: string[] = [];
   const output: string[] = [];
 
   const exitCode = await runDownloadStep({
     args: ['paths-changed'],
-    env: { TOOLS_URL: toolsURL, RUNNER_TEMP: '/runner' },
+    env: { TOOLS_URL: toolsURL, RUNNER_TEMP: ctx.destination },
     readURL: async (url) => {
       const text = await readFile(join(root, url.slice(toolsURL.length + 1)), 'utf8');
 
       return { kind: 'read', text };
     },
     wait: () => Promise.resolve(),
-    writeFile: (path) => {
-      written.push(path);
-
-      return Promise.resolve();
-    },
+    writeFile: nodeFileSystem.writeText,
     writeOutput: (text) => {
       output.push(text);
     },
@@ -391,7 +395,20 @@ test('it downloads the set from the tools commit into the runner folder', async 
     },
   });
 
+  const downloaded = await Array.fromAsync(
+    new Bun.Glob('**/*').scan({ cwd: join(ctx.destination, 'tools') }),
+  );
+
+  const contents = await Promise.all(
+    downloaded.map((path) => readFile(join(ctx.destination, 'tools', path), 'utf8')),
+  );
+
+  const repoContents = await Promise.all(
+    downloaded.map((path) => readFile(join(root, path), 'utf8')),
+  );
+
   expect(exitCode).toBe(0);
-  expect(written).toContain('/runner/tools/scripts/paths-changed/match-changed-files.ts');
-  expect(output).toStrictEqual([`downloaded ${written.length} files from ${toolsURL}\n`]);
+  expect(downloaded).toContain('scripts/paths-changed/match-changed-files.ts');
+  expect(contents).toStrictEqual(repoContents);
+  expect(output).toStrictEqual([`downloaded ${downloaded.length} files from ${toolsURL}\n`]);
 });

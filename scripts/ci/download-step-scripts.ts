@@ -19,7 +19,7 @@ export const stepScriptSets = {
     'sync/pre-push/run-local-paths-check.ts',
     'sync/pre-push/run-test-timeouts-check.ts',
   ],
-  'paths-changed': ['scripts/paths-changed/match-changed-files.ts'],
+  'paths-changed': ['scripts/paths-changed/run-changed-files-step.ts'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type StepScriptSet = keyof typeof stepScriptSets;

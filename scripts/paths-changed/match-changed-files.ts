@@ -1,8 +1,5 @@
-import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { RunCommand } from '../ci/run-command.ts';
-import { runCommand } from '../ci/run-command.ts';
-import { writeStepOutputs } from '../ci/write-step-outputs.ts';
 import { runPathMatch } from './run-path-match.ts';
 
 export interface ChangedFilesMatch {
@@ -59,24 +56,4 @@ async function readMergeChangedFiles(match: Readonly<ChangedFilesMatch>): Promis
   );
 
   return result.stdout.split('\0').filter((file) => file !== '');
-}
-
-if (import.meta.main) {
-  const answer = await matchChangedFiles({
-    checkout: process.env['GITHUB_WORKSPACE'] ?? process.cwd(),
-    env: process.env,
-    event: process.env['EVENT'] ?? '',
-    patterns: process.env['PATTERNS'] ?? '',
-    runCommand,
-  });
-
-  for (const line of answer.matches) {
-    process.stdout.write(`${line}\n`);
-  }
-
-  process.stdout.write(`changed=${answer.changed}\n`);
-
-  await writeStepOutputs(nodeFileSystem, process.env['GITHUB_OUTPUT'] ?? '', {
-    changed: String(answer.changed),
-  });
 }
