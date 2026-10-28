@@ -121,7 +121,7 @@ test('it fails when the checkout lacks the base commit', async () => {
     patterns: 'docker/**\n',
   });
 
-  await expect(matching).rejects.toMatchObject({ exitCode: 128 });
+  expect(matching).rejects.toMatchObject({ exitCode: 128 });
 });
 
 test.each([

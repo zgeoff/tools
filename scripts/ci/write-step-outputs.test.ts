@@ -31,7 +31,7 @@ test('it refuses a value that holds a newline and writes no output', async () =>
 
   const writing = writeStepOutputs(ctx.outputPath, { changed: 'true', body: 'one\ntwo' });
 
-  await expect(writing).rejects.toThrow('the step output body holds a newline');
+  expect(writing).rejects.toThrow('the step output body holds a newline');
 
   const text = await readFile(ctx.outputPath, 'utf8');
 

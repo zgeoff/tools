@@ -75,7 +75,7 @@ test('it installs nothing when the download fails its checksum', async () => {
     env: process.env,
   });
 
-  await expect(installing).rejects.toThrow(
+  expect(installing).rejects.toThrow(
     `shfmt: the download's sha256 is ${new Bun.CryptoHasher('sha256').update('fake shfmt\n').digest('hex')}, not the pinned ${'0'.repeat(64)}`,
   );
 
@@ -135,7 +135,7 @@ test('it extracts nothing from a release archive that fails its checksum', async
     env: process.env,
   });
 
-  await expect(installing).rejects.toThrow("actionlint: the download's sha256 is");
+  expect(installing).rejects.toThrow("actionlint: the download's sha256 is");
 
   const runnerFiles = await readdir(ctx.runnerTemp);
   const wrotePath = await Bun.file(ctx.githubPath).exists();

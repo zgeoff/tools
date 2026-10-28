@@ -6,19 +6,10 @@ import { $ } from 'bun';
 // that run does.
 export function parseRenovateVersion(workflowText: string): string {
   const workflow: unknown = Bun.YAML.parse(workflowText);
-  const steps = collectJobSteps(workflow, 'renovate');
+  const steps = findMember(findMember(findMember(workflow, 'jobs'), 'renovate'), 'steps');
 
-  const versions = steps.flatMap((step) => {
-    if (typeof step !== 'object' || step === null || !('with' in step)) {
-      return [];
-    }
-
-    const inputs = step.with;
-
-    const version =
-      typeof inputs === 'object' && inputs !== null && 'renovate-version' in inputs
-        ? inputs['renovate-version']
-        : undefined;
+  const versions = (Array.isArray(steps) ? steps : []).flatMap((step: unknown) => {
+    const version = findMember(findMember(step, 'with'), 'renovate-version');
 
     return typeof version === 'string' ? [version] : [];
   });
@@ -34,21 +25,14 @@ export function parseRenovateVersion(workflowText: string): string {
   return version;
 }
 
-function collectJobSteps(workflow: unknown, jobID: string): unknown[] {
-  if (typeof workflow !== 'object' || workflow === null || !('jobs' in workflow)) {
-    return [];
+function findMember(value: unknown, key: string): unknown {
+  if (typeof value !== 'object' || value === null) {
+    return undefined;
   }
 
-  const jobs = workflow.jobs;
+  const members: [string, unknown][] = Object.entries(value);
 
-  const job =
-    typeof jobs === 'object' && jobs !== null && jobID in jobs
-      ? Reflect.get(jobs, jobID)
-      : undefined;
-
-  const steps = typeof job === 'object' && job !== null && 'steps' in job ? job.steps : undefined;
-
-  return Array.isArray(steps) ? steps : [];
+  return members.find(([name]) => name === key)?.[1];
 }
 
 export async function runRenovateConfigCheck(cwd: string): Promise<number> {

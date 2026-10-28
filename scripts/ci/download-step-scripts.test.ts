@@ -98,7 +98,7 @@ test('it refuses a step script that imports a package, which no caller installs'
     readToolsFile: ctx.readSourceFile,
   });
 
-  await expect(downloading).rejects.toThrow(
+  expect(downloading).rejects.toThrow(
     'scripts/kettle/boil.ts imports the package ts-pattern, which a downloaded step script cannot install',
   );
 });
@@ -124,7 +124,7 @@ test('it reads each file from the tools URL and tries again after a server fault
   expect(server.requests).toHaveLength(3);
 });
 
-test('it fails at once on a file the tools commit lacks', async () => {
+test('it fails at once on a file the tools commit lacks', () => {
   const server = createStubFileServer({
     '/acme/tools/cafe12/scripts/kettle/boil.ts': [
       { status: 404, body: 'missing' },
@@ -138,14 +138,14 @@ test('it fails at once on a file the tools commit lacks', async () => {
     retryDelayMs: 0,
   });
 
-  await expect(readToolsFile('scripts/kettle/boil.ts')).rejects.toThrow(
+  expect(readToolsFile('scripts/kettle/boil.ts')).rejects.toThrow(
     `could not download ${server.url}/acme/tools/cafe12/scripts/kettle/boil.ts: HTTP 404`,
   );
 
   expect(server.requests).toHaveLength(1);
 });
 
-test('it fails once every attempt meets a server fault', async () => {
+test('it fails once every attempt meets a server fault', () => {
   const server = createStubFileServer({
     '/acme/tools/cafe12/scripts/kettle/boil.ts': [{ status: 502, body: 'bad gateway' }],
   });
@@ -156,8 +156,7 @@ test('it fails once every attempt meets a server fault', async () => {
     retryDelayMs: 0,
   });
 
-  await expect(readToolsFile('scripts/kettle/boil.ts')).rejects.toThrow('HTTP 502');
-
+  expect(readToolsFile('scripts/kettle/boil.ts')).rejects.toThrow('HTTP 502');
   expect(server.requests).toHaveLength(2);
 });
 

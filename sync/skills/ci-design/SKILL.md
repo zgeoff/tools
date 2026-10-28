@@ -152,9 +152,10 @@ Logic in a script runs in the script's tests on every pull request, as the testi
 - **A reusable workflow in zgeoff/tools downloads its script at the commit that defines the job.**
   The caller's checkout lacks the script, so a step builds the commit's raw URL from
   `job.workflow_repository` and `job.workflow_sha` and downloads
-  `scripts/ci/download-step-scripts.ts` with `curl`. That script downloads the workflow's scripts
-  and every file they import into `$RUNNER_TEMP/tools`, and refuses one that imports a package. A
-  caller at a sync tag then runs that tag's scripts.
+  [`download-step-scripts.ts`](https://github.com/zgeoff/tools/blob/main/scripts/ci/download-step-scripts.ts)
+  with `curl`. That script downloads the workflow's scripts and every file they import into
+  `$RUNNER_TEMP/tools`, and refuses one that imports a package. A caller at a sync tag then runs
+  that tag's scripts.
 
 ### The workflow lint
 

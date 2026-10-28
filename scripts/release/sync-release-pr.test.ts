@@ -84,7 +84,7 @@ test('it fails and pushes nothing when the sync command fails', async () => {
     syncCommand: String.raw`printf 'half\n' >> README.md; exit 3`,
   });
 
-  await expect(syncing).rejects.toThrow('exit code 3');
+  expect(syncing).rejects.toThrow('exit code 3');
 
   const after = await ctx.readRemote('%H');
 

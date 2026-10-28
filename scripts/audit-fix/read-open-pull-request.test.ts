@@ -45,5 +45,5 @@ test('it fails when gh cannot list the pull requests', async () => {
 
   await ctx.gh.writeResponses('prs', ['error']);
 
-  await expect(ctx.readNumber()).rejects.toThrow('exit code 1');
+  expect(ctx.readNumber()).rejects.toThrow('exit code 1');
 });
