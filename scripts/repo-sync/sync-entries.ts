@@ -101,7 +101,9 @@ function parseSyncSettings(env: Readonly<Record<string, string | undefined>>): S
     };
   }
 
-  const entriesValue: unknown = JSON.parse(env['ENTRIES'] || '[]');
+  const entriesText = env['ENTRIES'] ?? '';
+  const entriesJSON = entriesText === '' ? '[]' : entriesText;
+  const entriesValue: unknown = JSON.parse(entriesJSON);
   const entries = parseSyncEntries(entriesValue);
 
   if (entries === null) {
