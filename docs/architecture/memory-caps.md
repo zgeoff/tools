@@ -52,6 +52,6 @@ total memory, or the tightest cgroup cap on the process and its ancestors when t
 
 A repo passes the count to each tool that starts workers:
 
-- `bun test --parallel=<count>`, always with the flag, `--parallel=1` included.
-- turbo's `--concurrency`, where each package's test script runs `bun test --parallel=1`.
+- `bun test --parallel=<count>`, never a bare `--parallel`.
+- turbo's `--concurrency`, where each package's test script runs one test process.
 - `tsc --checkers`.
