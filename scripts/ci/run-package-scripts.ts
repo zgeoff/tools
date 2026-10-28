@@ -1,3 +1,5 @@
+import { makeBunScriptRunner } from './make-bun-script-runner.ts';
+
 export interface PackageScriptsRun {
   // The planner's space-separated list, padded with spaces at both ends.
   readonly scripts: string;
@@ -25,17 +27,6 @@ export async function runPackageScripts(run: Readonly<PackageScriptsRun>): Promi
   }
 
   return 0;
-}
-
-// A check script's output streams to the step's log as it runs, so the runner leaves the child's
-// output on this process's own.
-export function makeBunScriptRunner(
-  cwd: string,
-  env: Readonly<Record<string, string | undefined>>,
-): (name: string) => Promise<number> {
-  return (name) =>
-    Bun.spawn(['bun', 'run', name], { cwd, env: { ...env }, stdout: 'inherit', stderr: 'inherit' })
-      .exited;
 }
 
 if (import.meta.main) {

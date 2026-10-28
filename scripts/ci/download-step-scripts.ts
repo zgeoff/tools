@@ -11,7 +11,7 @@ export const stepScriptSets = {
     'scripts/bun-checks/run-shell-check.ts',
     'scripts/bun-checks/run-docs-check.ts',
     'scripts/bun-checks/run-actionlint-check.ts',
-    'scripts/ci/install-pinned-tool.ts',
+    'scripts/ci/run-pinned-tool-step.ts',
     'scripts/ci/run-package-scripts.ts',
     'scripts/ci/collect-failed-jobs.ts',
     'sync/pre-push/run-workflows-check.ts',
