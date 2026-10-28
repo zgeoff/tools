@@ -32,8 +32,6 @@ export async function openAuditFixPullRequest(options: AuditFixPullRequestOption
   const body = await options.fileSystem.readText(paths.body);
   const reviewText = await options.fileSystem.readText(paths.review);
 
-  const title = titleText.replace(/\n+$/u, '');
-
   await options.fileSystem.writeText(
     paths.pullRequestBody,
     `${body}\n[Workflow run](${options.runURL})\n`,
@@ -49,47 +47,14 @@ export async function openAuditFixPullRequest(options: AuditFixPullRequestOption
     needsReview: reviewText.trim() === 'true',
     openNumber,
     isAutomerge: options.isAutomerge,
+    base: options.base,
+    branch: paths.branch,
+    title: titleText.replace(/\n+$/u, ''),
+    bodyFile: paths.pullRequestBody,
   });
 
-  // A label the repo already has keeps its colour and description, so a refused create is fine.
-  for (const label of plan.labels) {
-    await gh(['label', 'create', label]);
-  }
-
-  const labelList = plan.labels.join(',');
-  const bodyFile = ['--body-file', paths.pullRequestBody];
-
-  if (plan.write.kind === 'create') {
-    await checkedGH([
-      'pr',
-      'create',
-      '--base',
-      options.base,
-      '--head',
-      paths.branch,
-      '--title',
-      title,
-      ...bodyFile,
-      '--label',
-      labelList,
-    ]);
-  } else {
-    const number = String(plan.write.number);
-
-    await checkedGH([
-      'pr',
-      'edit',
-      number,
-      '--title',
-      title,
-      ...bodyFile,
-      '--add-label',
-      labelList,
-    ]);
-
-    if (plan.write.removesIgnoreLabel) {
-      await gh(['pr', 'edit', number, '--remove-label', 'audit-ignore']);
-    }
+  for (const command of plan.commands) {
+    await (command.mustSucceed ? checkedGH(command.args) : gh(command.args));
   }
 
   if (plan.waitsForReview) {

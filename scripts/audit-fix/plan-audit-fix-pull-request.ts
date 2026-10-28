@@ -5,15 +5,25 @@ export interface AuditFixPullRequestFacts {
   readonly openNumber: number | null;
 
   readonly isAutomerge: boolean;
+
+  readonly base: string;
+
+  readonly branch: string;
+
+  readonly title: string;
+
+  readonly bodyFile: string;
 }
 
-export type PullRequestWrite =
-  | { readonly kind: 'create' }
-  | { readonly kind: 'edit'; readonly number: number; readonly removesIgnoreLabel: boolean };
+// One gh call. A call that may fail, such as a label the repo already has, does not stop the run.
+export interface GHCommand {
+  readonly args: readonly string[];
+
+  readonly mustSucceed: boolean;
+}
 
 export interface AuditFixPullRequestPlan {
-  readonly labels: readonly string[];
-  readonly write: PullRequestWrite;
+  readonly commands: readonly GHCommand[];
 
   // The merge waits for a person when the change adds or renews an ignore.
   readonly waitsForReview: boolean;
@@ -21,16 +31,61 @@ export interface AuditFixPullRequestPlan {
   readonly turnsAutoMergeOn: boolean;
 }
 
+// Plans the gh calls that open or update the fix's pull request, so the runner only runs them.
 export function planAuditFixPullRequest(facts: AuditFixPullRequestFacts): AuditFixPullRequestPlan {
-  const write: PullRequestWrite =
+  const labels = ['dependencies', 'security', ...(facts.needsReview ? ['audit-ignore'] : [])];
+
+  // A label the repo already has keeps its colour and description, so a refused create is fine.
+  const labelCommands = labels.map((label) => ({
+    args: ['label', 'create', label],
+    mustSucceed: false,
+  }));
+
+  const textArgs = ['--title', facts.title, '--body-file', facts.bodyFile];
+
+  const writeCommands: GHCommand[] =
     facts.openNumber === null
-      ? { kind: 'create' }
-      : { kind: 'edit', number: facts.openNumber, removesIgnoreLabel: !facts.needsReview };
+      ? [
+          {
+            args: [
+              'pr',
+              'create',
+              '--base',
+              facts.base,
+              '--head',
+              facts.branch,
+              ...textArgs,
+              '--label',
+              labels.join(','),
+            ],
+            mustSucceed: true,
+          },
+        ]
+      : buildEditCommands(facts, String(facts.openNumber), textArgs, labels);
 
   return {
-    labels: ['dependencies', 'security', ...(facts.needsReview ? ['audit-ignore'] : [])],
-    write,
+    commands: [...labelCommands, ...writeCommands],
     waitsForReview: facts.needsReview,
     turnsAutoMergeOn: !facts.needsReview && facts.isAutomerge,
   };
+}
+
+// An edit drops the audit-ignore label of an earlier run once the fix needs no review.
+function buildEditCommands(
+  facts: AuditFixPullRequestFacts,
+  number: string,
+  textArgs: readonly string[],
+  labels: readonly string[],
+): GHCommand[] {
+  const edit = {
+    args: ['pr', 'edit', number, ...textArgs, '--add-label', labels.join(',')],
+    mustSucceed: true,
+  };
+
+  const removeIgnoreLabel = {
+    args: ['pr', 'edit', number, '--remove-label', 'audit-ignore'],
+    mustSucceed: false,
+  };
+
+  return facts.needsReview ? [edit] : [edit, removeIgnoreLabel];
 }

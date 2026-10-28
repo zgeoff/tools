@@ -168,6 +168,8 @@ test('it leaves the fix branch alone when it already holds the same tree', async
 
   const before = await ctx.readRemoteHead('audit-fix');
 
+  const firstRunCommands = ctx.commands.length;
+
   await runGit(ctx.clone, ctx.gitEnv, ['checkout', '--quiet', 'main']);
   await writeTreeFiles(ctx.clone, { 'bun.lock': 'kettle 1.0.1\n' });
 
@@ -177,6 +179,7 @@ test('it leaves the fix branch alone when it already holds the same tree', async
 
   expect(exitCode).toBe(0);
   expect(after).toBe(before);
+  expect(ctx.commands.slice(firstRunCommands)).not.toContainEqual(expect.toStartWith('git push'));
   expect(ctx.output).toStrictEqual(['The open fix already holds this change.\n']);
   expect(output).toBe('pushed=true\npushed=true\n');
 });
