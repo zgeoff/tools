@@ -33,6 +33,8 @@ Each line links the section that explains it.
 - [Step scripts](#step-scripts): a `run:` holds one plain command, anything more goes in a
   TypeScript script under `scripts/<area>/`, and the workflow lint checks the rules a parser can
   see.
+- [Dependency gates](#dependency-gates): the pull-request checks fail on a stale override, age-gate
+  exclude or audit ignore, through the shared check and never a copy of it.
 - [Path gates](#path-gates): a pull-request job runs only when its input paths change, through a
   `changes` job, and every push to main runs it in full.
 - [Cancelling runs](#cancelling-runs): checks cancel when a newer commit arrives; release, deploy
@@ -195,6 +197,18 @@ The lint reads three terms by these definitions:
 The heavy-check rule binds a private repo alone. In CI the lint reads the run's profile and skips
 the rule in a public repo. The pre-push baseline cannot see the profile, so the hook warns in every
 repo.
+
+## Dependency gates
+
+A Bun repo's pull-request checks fail on a stale dependency gate: a root override that every range
+in the lockfile admits, an age-gate exclude past the removal date in its comment, or an audit ignore
+whose advisory is gone or has a fix in range. A gate that outlives its reason holds a dependency
+back with no one to notice. The `Check dependency gates` step of `bun-checks.yml` runs the shared
+check. A repo that writes its own workflow runs `bun run check:dependency-gates`, which the pre-push
+baseline delivers, and never keeps a copy of the check. Give each hand-written age-gate exclude the
+removal comment that the audit-fix workflow writes, so the check can date it. The
+[dependency gates check](https://github.com/zgeoff/tools/blob/main/docs/architecture/dependency-updates.md#the-dependency-gates-check)
+lists what each gate needs to pass.
 
 ## Path gates
 
