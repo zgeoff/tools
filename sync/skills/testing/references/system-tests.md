@@ -124,36 +124,11 @@ preload starts that Chrome, and a `runInPage` helper runs its page code. Playwri
 `bun test`. It drives an `e2e/` lane that needs Firefox, WebKit on Linux, or a live system, because
 `Bun.WebView` has no Firefox and runs WebKit only on macOS.
 
-### The browser lane
-
-The browser lane runs `bun test --parallel=1` after the unit run, so each file gets its own process
-and Chrome starts on an idle CPU. A cold Chrome start on a CPU that the unit run's workers saturate
-can outlast the test timeout, and a raised timeout only hides that cost. The lane's command runs
-three steps before `bun test`:
-
-1. It builds what the suites load, such as the web client, once for the run. A build in the preload
-   runs again in each file's process, as [Per-run templates](../SKILL.md#per-run-templates)
-   describes.
-2. It makes the run ID and passes it to the test processes in an environment variable, because the
-   preload runs again in each file's process and cannot share an ID that it makes itself.
-3. It sets a short `TMPDIR` for the test processes. Chrome stops at startup when its socket path
-   under `TMPDIR` is too long for a Unix socket, so a host with a long `TMPDIR` breaks every suite.
-
-The preload checks that the build exists and starts Chrome in each file's process, under the run's
-short `TMPDIR`. It gives each file's Chrome its own profile folder inside a folder for the run,
-which sits in the repo's git-ignored cache folder and takes its name from the run ID. `Bun.WebView`
-never removes the temporary profile that it makes under `bun test`
-([oven-sh/bun#45389](https://github.com/oven-sh/bun/issues/45389)), so the preload always passes
-Chrome a profile folder of its own. The sweep at the start of each run removes the profile folders
-of older runs, as [Per-run templates](../SKILL.md#per-run-templates) describes for every per-run
-folder.
-
-The lane runs under the repo's memory-cap script, locally and on CI, and never under `ulimit -v`.
-Chrome's V8 sandbox reserves at least 8 GB of address space and stops below that. `ulimit -v` caps
-address space, while the cgroup cap counts only the memory that a process uses, as
-[Memory caps](https://github.com/zgeoff/tools/blob/main/docs/architecture/memory-caps.md#why-a-cgroup-and-not-ulimit)
-describes. Like every lane, it stays out of the pre-push hook, as
-[Slow tests](../SKILL.md#slow-tests) states.
+The repo's browser lane runs the suites at `bun test --parallel=1` after the unit run, so each file
+gets its own process and Chrome starts on an idle CPU. A cold Chrome start on a CPU that the unit
+run's workers saturate can outlast the test timeout, and a raised timeout only hides that cost.
+[Setting up a browser lane](https://github.com/zgeoff/tools/blob/main/docs/guides/browser-lane.md)
+describes the lane's command, its preload, and its memory cap.
 
 ### Page code
 
