@@ -3,7 +3,7 @@ import type { FileSystem } from './file-system.ts';
 // GitHub Actions reads each `name=value` line of the file that GITHUB_OUTPUT names as one step
 // output, so a value that holds a newline would end its output early.
 export async function writeStepOutputs(
-  fileSystem: FileSystem,
+  fileSystem: Pick<FileSystem, 'appendText'>,
   outputPath: string,
   outputs: Readonly<Record<string, string>>,
 ): Promise<void> {
