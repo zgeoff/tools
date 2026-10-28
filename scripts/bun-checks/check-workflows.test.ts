@@ -5,6 +5,7 @@ import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import { runCommand } from '../ci/run-command.ts';
 import { runWorkflowsCheck } from './check-workflows.ts';
 
 async function setupTest() {
@@ -30,7 +31,12 @@ test('it fails with the actionlint error of a workflow', async () => {
       'on: push\njobs:\n  greet:\n    needs: build\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n',
   });
 
-  const result = await runWorkflowsCheck({ cwd: ctx.repo, env: ctx.env, today: '20261028' });
+  const result = await runWorkflowsCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    runCommand,
+    today: '20261028',
+  });
 
   expect(result.exitCode).toBe(1);
   expect(result.output).toInclude('job "greet" needs job "build" which does not exist');
@@ -55,7 +61,12 @@ test('it passes a concurrency queue key before the ignore expires', async () => 
     ].join('\n'),
   });
 
-  const result = await runWorkflowsCheck({ cwd: ctx.repo, env: ctx.env, today: '20270121' });
+  const result = await runWorkflowsCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    runCommand,
+    today: '20270121',
+  });
 
   expect(result).toStrictEqual({ exitCode: 0, output: '' });
 });
@@ -85,7 +96,12 @@ test('it fails on a concurrency queue key once the ignore expires', async () => 
     join(ctx.repo, '.github/actionlint.yaml'),
   );
 
-  const result = await runWorkflowsCheck({ cwd: ctx.repo, env: ctx.env, today: '20270122' });
+  const result = await runWorkflowsCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    runCommand,
+    today: '20270122',
+  });
 
   expect(result.exitCode).toBe(1);
 

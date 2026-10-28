@@ -1,5 +1,6 @@
 import { writeFile } from 'node:fs/promises';
-import { $ } from 'bun';
+import type { RunCommand } from '../ci/run-command.ts';
+import { runCommand } from '../ci/run-command.ts';
 import { runAuditFix } from './audit-fix.ts';
 import { buildAuditFixPaths } from './build-audit-fix-paths.ts';
 
@@ -11,6 +12,7 @@ export interface AdvisoriesFixOptions {
   readonly defaultBranch: string;
   readonly expiryDays: string;
   readonly runAuditFix: (argv: readonly string[]) => Promise<void>;
+  readonly runCommand: RunCommand;
 }
 
 // An open fix branch's ignores keep their expiry on a rerun, so the rerun builds the same tree.
@@ -38,11 +40,7 @@ async function copyPendingIgnores(
   pendingPath: string,
 ): Promise<boolean> {
   const git = (args: readonly string[]) =>
-    $`git ${args}`
-      .cwd(options.cwd)
-      .env({ ...options.env })
-      .nothrow()
-      .quiet();
+    options.runCommand(['git', ...args], { cwd: options.cwd, env: options.env });
 
   const fetched = await git(['fetch', '--quiet', 'origin', branch]);
 
@@ -70,5 +68,6 @@ if (import.meta.main) {
     defaultBranch: process.env['DEFAULT_BRANCH'] ?? '',
     expiryDays: process.env['EXPIRY_DAYS'] ?? '30',
     runAuditFix,
+    runCommand,
   });
 }

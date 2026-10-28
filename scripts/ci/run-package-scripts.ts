@@ -1,12 +1,11 @@
-import { $ } from 'bun';
-
 export interface PackageScriptsRun {
-  readonly cwd: string;
-
-  readonly env: Readonly<Record<string, string | undefined>>;
-
   // The planner's space-separated list, padded with spaces at both ends.
   readonly scripts: string;
+
+  // Runs one package script and returns its exit code.
+  readonly runScript: (name: string) => Promise<number>;
+
+  readonly writeOutput: (text: string) => void;
 }
 
 // Runs each script in order, each in its own log group, and stops at the first that fails.
@@ -14,27 +13,37 @@ export async function runPackageScripts(run: Readonly<PackageScriptsRun>): Promi
   const names = run.scripts.split(/\s+/u).filter((name) => name !== '');
 
   for (const name of names) {
-    process.stdout.write(`::group::bun run ${name}\n`);
+    run.writeOutput(`::group::bun run ${name}\n`);
 
-    const result = await $`bun run ${name}`
-      .cwd(run.cwd)
-      .env({ ...run.env })
-      .nothrow();
+    const exitCode = await run.runScript(name);
 
-    process.stdout.write('::endgroup::\n');
+    run.writeOutput('::endgroup::\n');
 
-    if (result.exitCode !== 0) {
-      return result.exitCode;
+    if (exitCode !== 0) {
+      return exitCode;
     }
   }
 
   return 0;
 }
 
+// A check script's output streams to the step's log as it runs, so the runner leaves the child's
+// output on this process's own.
+export function makeBunScriptRunner(
+  cwd: string,
+  env: Readonly<Record<string, string | undefined>>,
+): (name: string) => Promise<number> {
+  return (name) =>
+    Bun.spawn(['bun', 'run', name], { cwd, env: { ...env }, stdout: 'inherit', stderr: 'inherit' })
+      .exited;
+}
+
 if (import.meta.main) {
   process.exitCode = await runPackageScripts({
-    cwd: process.cwd(),
-    env: process.env,
     scripts: process.env['SCRIPTS'] ?? '',
+    runScript: makeBunScriptRunner(process.cwd(), process.env),
+    writeOutput: (text) => {
+      process.stdout.write(text);
+    },
   });
 }

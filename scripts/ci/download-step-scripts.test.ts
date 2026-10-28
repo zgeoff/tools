@@ -7,6 +7,8 @@ import {
   downloadStepScripts,
   isToolsURL,
   makeToolsFileReader,
+  parseDownloadArgs,
+  readURL,
   stepScriptSets,
 } from './download-step-scripts.ts';
 
@@ -103,61 +105,126 @@ test('it refuses a step script that imports a package, which no caller installs'
   );
 });
 
-test('it reads each file from the tools URL and tries again after a server fault', async () => {
-  const server = createStubFileServer({
-    '/acme/tools/cafe12/scripts/kettle/boil.ts': [
-      { status: 503, body: 'busy' },
-      { status: 429, body: 'slow down' },
-      { status: 200, body: '// boil\n' },
-    ],
-  });
+test('it reads each file at the tools URL and waits the retry delay after each passing fault', async () => {
+  const outcomes = [
+    { kind: 'failed', reason: 'HTTP 503' },
+    { kind: 'failed', reason: 'HTTP 429' },
+    { kind: 'read', text: '// boil\n' },
+  ] as const;
+
+  const urls: string[] = [];
+  const waits: number[] = [];
 
   const readToolsFile = makeToolsFileReader({
-    toolsURL: `${server.url}/acme/tools/cafe12`,
+    toolsURL: 'https://raw.example/acme/tools/cafe12',
     attempts: 3,
-    retryDelayMs: 0,
+    retryDelayMs: 2000,
+    readURL: (url) => {
+      urls.push(url);
+
+      return Promise.resolve(outcomes[urls.length - 1] ?? outcomes[0]);
+    },
+    wait: (delayMs) => {
+      waits.push(delayMs);
+
+      return Promise.resolve();
+    },
   });
 
   const text = await readToolsFile('scripts/kettle/boil.ts');
 
-  expect(text).toBe('// boil\n');
-  expect(server.requests).toHaveLength(3);
+  expect({ text, urls, waits }).toStrictEqual({
+    text: '// boil\n',
+    urls: Array.from(
+      { length: 3 },
+      () => 'https://raw.example/acme/tools/cafe12/scripts/kettle/boil.ts',
+    ),
+    waits: [2000, 2000],
+  });
 });
 
-test('it fails at once on a file the tools commit lacks', () => {
-  const server = createStubFileServer({
-    '/acme/tools/cafe12/scripts/kettle/boil.ts': [
-      { status: 404, body: 'missing' },
-      { status: 200, body: '// boil\n' },
-    ],
-  });
+test('it fails at once, with no wait, on a file the tools commit lacks', () => {
+  const waits: number[] = [];
 
   const readToolsFile = makeToolsFileReader({
-    toolsURL: `${server.url}/acme/tools/cafe12`,
+    toolsURL: 'https://raw.example/acme/tools/cafe12',
     attempts: 3,
-    retryDelayMs: 0,
+    retryDelayMs: 2000,
+    readURL: () => Promise.resolve({ kind: 'refused', reason: 'HTTP 404' }),
+    wait: (delayMs) => {
+      waits.push(delayMs);
+
+      return Promise.resolve();
+    },
   });
 
   expect(readToolsFile('scripts/kettle/boil.ts')).rejects.toThrow(
-    `could not download ${server.url}/acme/tools/cafe12/scripts/kettle/boil.ts: HTTP 404`,
+    'could not download https://raw.example/acme/tools/cafe12/scripts/kettle/boil.ts: HTTP 404',
   );
 
-  expect(server.requests).toHaveLength(1);
+  expect(waits).toStrictEqual([]);
 });
 
-test('it fails once every attempt meets a server fault', () => {
-  const server = createStubFileServer({
-    '/acme/tools/cafe12/scripts/kettle/boil.ts': [{ status: 502, body: 'bad gateway' }],
-  });
+test('it fails once every attempt meets a passing fault', () => {
+  const urls: string[] = [];
 
   const readToolsFile = makeToolsFileReader({
-    toolsURL: `${server.url}/acme/tools/cafe12`,
+    toolsURL: 'https://raw.example/acme/tools/cafe12',
     attempts: 2,
     retryDelayMs: 0,
+    readURL: (url) => {
+      urls.push(url);
+
+      return Promise.resolve({ kind: 'failed', reason: 'HTTP 502' });
+    },
+    wait: () => Promise.resolve(),
   });
 
   expect(readToolsFile('scripts/kettle/boil.ts')).rejects.toThrow('HTTP 502');
-  expect(server.requests).toHaveLength(2);
+  expect(urls).toHaveLength(2);
+});
+
+test.each([
+  [200, { kind: 'read', text: 'served' }],
+  [404, { kind: 'refused', reason: 'HTTP 404' }],
+  [429, { kind: 'failed', reason: 'HTTP 429' }],
+  [503, { kind: 'failed', reason: 'HTTP 503' }],
+])('it reads an HTTP %p answer as %p', async (status, expected) => {
+  const server = createStubFileServer({ '/boil.ts': [{ status, body: 'served' }] });
+
+  const outcome = await readURL(`${server.url}/boil.ts`);
+
+  expect<unknown>(outcome).toStrictEqual(expected);
+});
+
+test('it reads a refused connection as a passing fault', async () => {
+  const outcome = await readURL('http://localhost:1/boil.ts');
+
+  expect(outcome).toMatchObject({ kind: 'failed' });
+});
+
+test.each([
+  ['a known set', ['bun-checks'], { kind: 'parsed', set: 'bun-checks' }],
+  [
+    'an unknown set',
+    ['kettle'],
+    {
+      kind: 'refused',
+      message: expect.toStartWith('usage: download-step-scripts.ts <bun-checks|'),
+    },
+  ],
+  [
+    'a second set',
+    ['bun-checks', 'release'],
+    { kind: 'refused', message: expect.toStartWith('usage:') },
+  ],
+  [
+    'an unknown option',
+    ['bun-checks', '--unknown'],
+    { kind: 'refused', message: expect.toStartWith("Unknown option '--unknown'") },
+  ],
+])('it reads %s from the arguments', (_label, args, expected) => {
+  expect<unknown>(parseDownloadArgs(args)).toStrictEqual(expected);
 });
 
 test.each([

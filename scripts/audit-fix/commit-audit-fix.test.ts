@@ -7,6 +7,7 @@ import { createStubGH } from '../../test-utils/create-stub-gh.ts';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { runGit } from '../../test-utils/run-git.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import { runCommand } from '../ci/run-command.ts';
 import { commitAuditFix } from './commit-audit-fix.ts';
 
 async function setupTest() {
@@ -42,6 +43,7 @@ async function setupTest() {
       base: 'main',
       defaultBranch: 'main',
       outputPath,
+      runCommand,
       writeOutput: (text) => {
         output.push(text);
       },
@@ -199,4 +201,23 @@ test('it leaves auto-merge alone for a fix that needs no review', async () => {
   const calls = await ctx.gh.readCalls();
 
   expect(calls).toBeEmpty();
+});
+
+test('it fails and writes no output when the push of the fix branch fails', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.clone, { 'bun.lock': 'kettle 1.0.1\n' });
+
+  await ctx.writeAuditResult({
+    'title.txt': 'fix(deps): update kettle to 1.0.1\n',
+    'needs-review.txt': 'false\n',
+  });
+
+  await runGit(ctx.clone, ctx.gitEnv, ['remote', 'set-url', 'origin', join(ctx.clone, 'gone.git')]);
+
+  expect(ctx.runCommit()).rejects.toThrow('git push --force origin audit-fix exited with 128');
+
+  const output = await ctx.readOutput();
+
+  expect(output).toBe('');
 });

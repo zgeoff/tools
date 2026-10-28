@@ -2,6 +2,7 @@
 // of this repo.
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join, normalize } from 'node:path';
+import { parseArgs } from 'node:util';
 
 // The scripts each reusable workflow's steps run. The download adds every file they import.
 export const stepScriptSets = {
@@ -108,12 +109,21 @@ function isBuiltinModule(specifier: string): boolean {
   return specifier === 'bun' || specifier.startsWith('bun:') || specifier.startsWith('node:');
 }
 
+export type URLOutcome =
+  | { readonly kind: 'read'; readonly text: string }
+  | { readonly kind: 'failed'; readonly reason: string }
+  | { readonly kind: 'refused'; readonly reason: string };
+
 export interface ToolsFileReaderOptions {
   readonly toolsURL: string;
 
   readonly attempts: number;
 
   readonly retryDelayMs: number;
+
+  readonly readURL: (url: string) => Promise<URLOutcome>;
+
+  readonly wait: (delayMs: number) => Promise<void>;
 }
 
 // raw.githubusercontent.com answers a missing file with 404 and a passing fault with a 5xx or 429,
@@ -123,7 +133,7 @@ export function makeToolsFileReader(options: Readonly<ToolsFileReaderOptions>): 
     const url = `${options.toolsURL}/${path}`;
 
     for (let attempt = 1; ; attempt += 1) {
-      const outcome = await readURL(url);
+      const outcome = await options.readURL(url);
 
       if (outcome.kind === 'read') {
         return outcome.text;
@@ -133,17 +143,12 @@ export function makeToolsFileReader(options: Readonly<ToolsFileReaderOptions>): 
         throw new Error(`could not download ${url}: ${outcome.reason}`);
       }
 
-      await Bun.sleep(options.retryDelayMs);
+      await options.wait(options.retryDelayMs);
     }
   };
 }
 
-type URLOutcome =
-  | { readonly kind: 'read'; readonly text: string }
-  | { readonly kind: 'failed'; readonly reason: string }
-  | { readonly kind: 'refused'; readonly reason: string };
-
-async function readURL(url: string): Promise<URLOutcome> {
+export async function readURL(url: string): Promise<URLOutcome> {
   try {
     const response = await fetch(url);
 
@@ -172,15 +177,41 @@ function isStepScriptSet(value: string): value is StepScriptSet {
   return Object.hasOwn(stepScriptSets, value);
 }
 
+type DownloadArgs =
+  | { readonly kind: 'parsed'; readonly set: StepScriptSet }
+  | { readonly kind: 'refused'; readonly message: string };
+
+export function parseDownloadArgs(args: readonly string[]): DownloadArgs {
+  const usage = `usage: download-step-scripts.ts <${Object.keys(stepScriptSets).join('|')}>`;
+
+  try {
+    const positionals = parseArgs({
+      args: [...args],
+      options: {},
+      allowPositionals: true,
+      strict: true,
+    }).positionals;
+
+    const [set] = positionals;
+
+    return positionals.length === 1 && set !== undefined && isStepScriptSet(set)
+      ? { kind: 'parsed', set }
+      : { kind: 'refused', message: usage };
+  } catch (error) {
+    return {
+      kind: 'refused',
+      message: `${error instanceof Error ? error.message : String(error)}\n${usage}`,
+    };
+  }
+}
+
 async function runCLI(): Promise<void> {
-  const name = process.argv[2] ?? '';
+  const parsed = parseDownloadArgs(process.argv.slice(2));
   const toolsURL = process.env['TOOLS_URL'] ?? '';
   const runnerTemp = process.env['RUNNER_TEMP'] ?? '';
 
-  if (!isStepScriptSet(name)) {
-    process.stderr.write(
-      `usage: download-step-scripts.ts <${Object.keys(stepScriptSets).join('|')}>\n`,
-    );
+  if (parsed.kind === 'refused') {
+    process.stderr.write(`${parsed.message}\n`);
 
     process.exitCode = 2;
 
@@ -198,9 +229,15 @@ async function runCLI(): Promise<void> {
   }
 
   const written = await downloadStepScripts({
-    entries: stepScriptSets[name],
+    entries: stepScriptSets[parsed.set],
     destination: join(runnerTemp, 'tools'),
-    readToolsFile: makeToolsFileReader({ toolsURL, attempts: 4, retryDelayMs: 2000 }),
+    readToolsFile: makeToolsFileReader({
+      toolsURL,
+      attempts: 4,
+      retryDelayMs: 2000,
+      readURL,
+      wait: (delayMs) => Bun.sleep(delayMs),
+    }),
   });
 
   process.stdout.write(`downloaded ${written.length} files from ${toolsURL}\n`);

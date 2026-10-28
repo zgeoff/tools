@@ -1,6 +1,9 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { $ } from 'bun';
+import { runCheckedCommand } from '../ci/run-checked-command.ts';
+import type { RunCommand } from '../ci/run-command.ts';
+import { runCommand } from '../ci/run-command.ts';
 import { buildAuditFixPaths } from './build-audit-fix-paths.ts';
+import { planAuditFixPullRequest } from './plan-audit-fix-pull-request.ts';
 import { readOpenPullRequest } from './read-open-pull-request.ts';
 
 export interface AuditFixPullRequestOptions {
@@ -11,37 +14,48 @@ export interface AuditFixPullRequestOptions {
   readonly defaultBranch: string;
   readonly isAutomerge: boolean;
   readonly runURL: string;
+  readonly runCommand: RunCommand;
   readonly writeOutput: (text: string) => void;
 }
 
 export async function openAuditFixPullRequest(options: AuditFixPullRequestOptions): Promise<void> {
   const paths = buildAuditFixPaths(options.runnerTemp, options.base, options.defaultBranch);
-  const gh = (args: readonly string[]) => $`gh ${args}`.cwd(options.cwd).env({ ...options.env });
+  const commandOptions = { cwd: options.cwd, env: options.env };
+  const gh = (args: readonly string[]) => options.runCommand(['gh', ...args], commandOptions);
+
+  const checkedGH = (args: readonly string[]) =>
+    runCheckedCommand(options.runCommand, ['gh', ...args], commandOptions);
 
   const titleText = await readFile(paths.title, 'utf8');
   const body = await readFile(paths.body, 'utf8');
   const reviewText = await readFile(paths.review, 'utf8');
 
   const title = titleText.replace(/\n+$/u, '');
-  const needsReview = reviewText.trim() === 'true';
 
   await writeFile(paths.pullRequestBody, `${body}\n[Workflow run](${options.runURL})\n`);
 
-  const labels = ['dependencies', 'security', ...(needsReview ? ['audit-ignore'] : [])];
-
-  // A label the repo already has keeps its colour and description, so a refused create is fine.
-  for (const label of labels) {
-    await gh(['label', 'create', label]).nothrow().quiet();
-  }
-
-  const number = await readOpenPullRequest({
-    cwd: options.cwd,
-    env: options.env,
+  const openNumber = await readOpenPullRequest({
+    ...commandOptions,
     branch: paths.branch,
+    runCommand: options.runCommand,
   });
 
-  if (number === null) {
-    await gh([
+  const plan = planAuditFixPullRequest({
+    needsReview: reviewText.trim() === 'true',
+    openNumber,
+    isAutomerge: options.isAutomerge,
+  });
+
+  // A label the repo already has keeps its colour and description, so a refused create is fine.
+  for (const label of plan.labels) {
+    await gh(['label', 'create', label]);
+  }
+
+  const labelList = plan.labels.join(',');
+  const bodyFile = ['--body-file', paths.pullRequestBody];
+
+  if (plan.write.kind === 'create') {
+    await checkedGH([
       'pr',
       'create',
       '--base',
@@ -50,44 +64,40 @@ export async function openAuditFixPullRequest(options: AuditFixPullRequestOption
       paths.branch,
       '--title',
       title,
-      '--body-file',
-      paths.pullRequestBody,
+      ...bodyFile,
       '--label',
-      labels.join(','),
+      labelList,
     ]);
   } else {
-    await gh([
+    const number = String(plan.write.number);
+
+    await checkedGH([
       'pr',
       'edit',
-      String(number),
+      number,
       '--title',
       title,
-      '--body-file',
-      paths.pullRequestBody,
+      ...bodyFile,
       '--add-label',
-      labels.join(','),
+      labelList,
     ]);
 
-    if (!needsReview) {
-      await gh(['pr', 'edit', String(number), '--remove-label', 'audit-ignore'])
-        .nothrow()
-        .quiet();
+    if (plan.write.removesIgnoreLabel) {
+      await gh(['pr', 'edit', number, '--remove-label', 'audit-ignore']);
     }
   }
 
-  if (needsReview) {
+  if (plan.waitsForReview) {
     options.writeOutput(
       "The pull request adds or renews an ignore, so it waits for a person's review.\n",
     );
+  }
 
+  if (!plan.turnsAutoMergeOn) {
     return;
   }
 
-  if (!options.isAutomerge) {
-    return;
-  }
-
-  const merge = await gh(['pr', 'merge', paths.branch, '--auto', '--squash']).nothrow();
+  const merge = await gh(['pr', 'merge', paths.branch, '--auto', '--squash']);
 
   if (merge.exitCode !== 0) {
     options.writeOutput(
@@ -107,6 +117,7 @@ if (import.meta.main) {
     defaultBranch: env['DEFAULT_BRANCH'] ?? '',
     isAutomerge: env['AUTOMERGE'] === 'true',
     runURL: env['RUN_URL'] ?? '',
+    runCommand,
     writeOutput: (text) => {
       process.stdout.write(text);
     },

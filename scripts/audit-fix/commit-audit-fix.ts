@@ -1,5 +1,7 @@
 import { readFile } from 'node:fs/promises';
-import { $ } from 'bun';
+import { runCheckedCommand } from '../ci/run-checked-command.ts';
+import type { RunCommand } from '../ci/run-command.ts';
+import { runCommand } from '../ci/run-command.ts';
 import { writeStepOutputs } from '../ci/write-step-outputs.ts';
 import { buildAuditFixPaths } from './build-audit-fix-paths.ts';
 import { readOpenPullRequest } from './read-open-pull-request.ts';
@@ -11,6 +13,7 @@ export interface AuditFixCommitOptions {
   readonly base: string;
   readonly defaultBranch: string;
   readonly outputPath: string;
+  readonly runCommand: RunCommand;
   readonly writeOutput: (text: string) => void;
 }
 
@@ -18,25 +21,25 @@ export interface AuditFixCommitOptions {
 // request for.
 export async function commitAuditFix(options: AuditFixCommitOptions): Promise<number> {
   const paths = buildAuditFixPaths(options.runnerTemp, options.base, options.defaultBranch);
+  const commandOptions = { cwd: options.cwd, env: options.env };
 
   const git = (args: readonly string[]) =>
-    $`git ${args}`
-      .cwd(options.cwd)
-      .env({ ...options.env })
-      .quiet();
+    runCheckedCommand(options.runCommand, ['git', ...args], commandOptions);
+
+  const tryGit = (args: readonly string[]) => options.runCommand(['git', ...args], commandOptions);
 
   await git(['config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com']);
   await git(['config', 'user.name', 'github-actions[bot]']);
   await git(['checkout', '-B', paths.branch]);
   await git(['add', '-A']);
 
-  const staged = await git(['diff', '--cached', '--quiet']).nothrow();
+  const staged = await tryGit(['diff', '--cached', '--quiet']);
 
   if (staged.exitCode === 0) {
     options.writeOutput('bun audit passes with nothing to change; nothing to fix.\n');
 
     // Deleting the branch closes a stale pull request; a branch that is already gone is fine.
-    await git(['push', 'origin', '--delete', paths.branch]).nothrow();
+    await tryGit(['push', 'origin', '--delete', paths.branch]);
     await writeStepOutputs(options.outputPath, { pushed: 'false' });
 
     return 0;
@@ -57,15 +60,15 @@ export async function commitAuditFix(options: AuditFixCommitOptions): Promise<nu
   const needsReview = await readReviewFlag(paths.review);
 
   const openNumber = needsReview
-    ? await readOpenPullRequest({ cwd: options.cwd, env: options.env, branch: paths.branch })
+    ? await readOpenPullRequest({
+        ...commandOptions,
+        branch: paths.branch,
+        runCommand: options.runCommand,
+      })
     : null;
 
   if (openNumber !== null) {
-    await $`gh pr merge ${paths.branch} --disable-auto`
-      .cwd(options.cwd)
-      .env({ ...options.env })
-      .nothrow()
-      .quiet();
+    await options.runCommand(['gh', 'pr', 'merge', paths.branch, '--disable-auto'], commandOptions);
   }
 
   // A rerun on an unchanged base makes the same tree; pushing it again would only restart the pull
@@ -99,11 +102,7 @@ async function readReviewFlag(path: string): Promise<boolean> {
 
 async function probeSameTree(options: AuditFixCommitOptions, branch: string): Promise<boolean> {
   const git = (args: readonly string[]) =>
-    $`git ${args}`
-      .cwd(options.cwd)
-      .env({ ...options.env })
-      .nothrow()
-      .quiet();
+    options.runCommand(['git', ...args], { cwd: options.cwd, env: options.env });
 
   const fetched = await git(['fetch', '--quiet', 'origin', branch]);
 
@@ -114,7 +113,7 @@ async function probeSameTree(options: AuditFixCommitOptions, branch: string): Pr
   const head = await git(['rev-parse', 'HEAD^{tree}']);
   const remote = await git(['rev-parse', 'FETCH_HEAD^{tree}']);
 
-  return head.stdout.toString() === remote.stdout.toString();
+  return head.stdout === remote.stdout;
 }
 
 if (import.meta.main) {
@@ -125,6 +124,7 @@ if (import.meta.main) {
     base: process.env['BASE'] ?? '',
     defaultBranch: process.env['DEFAULT_BRANCH'] ?? '',
     outputPath: process.env['GITHUB_OUTPUT'] ?? '',
+    runCommand,
     writeOutput: (text) => {
       process.stdout.write(text);
     },

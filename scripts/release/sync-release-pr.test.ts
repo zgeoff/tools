@@ -1,10 +1,11 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { createGitCommit } from '../../test-utils/create-git-commit.ts';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { runGit } from '../../test-utils/run-git.ts';
+import { runCommand } from '../ci/run-command.ts';
 import { runSyncReleasePR } from './sync-release-pr.ts';
 
 async function setupTest() {
@@ -30,7 +31,20 @@ async function setupTest() {
     Object.entries(env).filter(([name]) => !/^GIT_(?:AUTHOR|COMMITTER)_/u.test(name)),
   );
 
-  return { env, runnerEnv, clone, readRemote, readRemoteFile };
+  const output: string[] = [];
+
+  const runSync = (syncEnv: Readonly<Record<string, string | undefined>>, syncCommand: string) =>
+    runSyncReleasePR({
+      cwd: clone,
+      env: syncEnv,
+      syncCommand,
+      runCommand,
+      writeOutput: (text) => {
+        output.push(text);
+      },
+    });
+
+  return { env, runnerEnv, clone, output, runSync, readRemote, readRemoteFile };
 }
 
 test('it commits and pushes what the sync command changed on the release branch', async () => {
@@ -39,11 +53,7 @@ test('it commits and pushes what the sync command changed on the release branch'
   await createGitCommit(ctx.clone, ctx.env, { 'README.md': 'kettle\n' });
   await runGit(ctx.clone, ctx.env, ['push', '--quiet', '-u', 'origin', 'HEAD']);
 
-  await runSyncReleasePR({
-    cwd: ctx.clone,
-    env: ctx.runnerEnv,
-    syncCommand: String.raw`printf 'fixed\n' >> README.md`,
-  });
+  await ctx.runSync(ctx.runnerEnv, String.raw`printf 'fixed\n' >> README.md`);
 
   const pushed = await ctx.readRemoteFile('README.md');
   const commit = await ctx.readRemote('%s|%an|%ae');
@@ -63,11 +73,15 @@ test('it pushes nothing to the release branch when the sync command changed noth
 
   const before = await ctx.readRemote('%H');
 
-  await runSyncReleasePR({ cwd: ctx.clone, env: ctx.env, syncCommand: 'true' });
+  await ctx.runSync(ctx.env, 'true');
 
   const after = await ctx.readRemote('%H');
 
   expect(after).toBe(before);
+
+  expect(ctx.output).toStrictEqual([
+    'The sync command changed nothing; the release PR stays as it is.\n',
+  ]);
 });
 
 test('it fails and pushes nothing when the sync command fails', async () => {
@@ -78,15 +92,20 @@ test('it fails and pushes nothing when the sync command fails', async () => {
 
   const before = await ctx.readRemote('%H');
 
-  const syncing = runSyncReleasePR({
-    cwd: ctx.clone,
-    env: ctx.env,
-    syncCommand: String.raw`printf 'half\n' >> README.md; exit 3`,
-  });
+  const syncing = ctx.runSync(ctx.env, String.raw`printf 'half\n' >> README.md; exit 3`);
 
-  expect(syncing).rejects.toThrow('exit code 3');
+  expect(syncing).rejects.toThrow('exited with 3');
 
   const after = await ctx.readRemote('%H');
 
   expect(after).toBe(before);
+});
+
+test('it fails when git cannot read the working tree', async () => {
+  const ctx = await setupTest();
+
+  await createGitCommit(ctx.clone, ctx.env, { 'README.md': 'kettle\n' });
+  await writeFile(join(ctx.clone, '.git/index'), 'not an index');
+
+  expect(ctx.runSync(ctx.env, 'true')).rejects.toThrow('git diff failed: ');
 });

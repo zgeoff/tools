@@ -1,13 +1,23 @@
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { $ } from 'bun';
 import { isRecord } from '../../packages/std/src/is-record.ts';
+import { runCheckedCommand } from '../ci/run-checked-command.ts';
+import type { CommandResult, RunCommand } from '../ci/run-command.ts';
+import { runCommand } from '../ci/run-command.ts';
+import type { CopyPlan, ExistingWorkflow, SyncFileRow } from './build-copy-plan.ts';
+import { buildCopyPlan } from './build-copy-plan.ts';
+import { isWorkflowPath } from './is-workflow-path.ts';
 
 export interface SyncEntriesOptions {
   readonly cwd: string;
 
   // The whole environment of each command the sync runs, as the step's env holds it.
   readonly env: Readonly<Record<string, string | undefined>>;
+
+  readonly runCommand: RunCommand;
+
+  // Receives the step's log: each command's output that the log shows, and the error lines.
+  readonly writeOutput: (text: string) => void;
 }
 
 interface SyncEntry {
@@ -34,21 +44,27 @@ interface SyncSettings {
 
 interface SyncContext extends SyncSettings {
   readonly cwd: string;
-  readonly shell: typeof $;
+  readonly env: Readonly<Record<string, string | undefined>>;
+  readonly runCommand: RunCommand;
+  readonly writeOutput: (text: string) => void;
 }
 
 export async function syncEntries(options: Readonly<SyncEntriesOptions>): Promise<number> {
   const settings = parseSyncSettings(options.env);
 
   if (settings.kind === 'refused') {
-    process.stdout.write(`::error::${settings.message}\n`);
+    options.writeOutput(`::error::${settings.message}\n`);
 
     return 1;
   }
 
-  const shell = new $.Shell().cwd(options.cwd).env({ ...options.env });
-
-  const context: SyncContext = { ...settings, cwd: options.cwd, shell };
+  const context: SyncContext = {
+    ...settings,
+    cwd: options.cwd,
+    env: options.env,
+    runCommand: options.runCommand,
+    writeOutput: options.writeOutput,
+  };
 
   const committed = await commitEntries(context);
   const pushed = await pushSyncBranch(context, committed);
@@ -60,7 +76,7 @@ export async function syncEntries(options: Readonly<SyncEntriesOptions>): Promis
   await removeEntryBranches(context, pushed, committed.failed);
 
   if (committed.failed.length > 0) {
-    process.stdout.write(
+    options.writeOutput(
       `::error::These entries failed and are not in the sync: ${committed.failed.join(', ')}\n`,
     );
 
@@ -149,7 +165,6 @@ interface CommittedEntries {
 }
 
 async function commitEntries(context: SyncContext): Promise<CommittedEntries> {
-  const shell = context.shell;
   const synced: SyncedEntry[] = [];
   const failed: string[] = [];
   const taken: string[] = [];
@@ -157,18 +172,25 @@ async function commitEntries(context: SyncContext): Promise<CommittedEntries> {
 
   // The checkout of this repository stays out of every commit.
   await appendFile(join(context.cwd, '.git/info/exclude'), '/.repo-sync/\n');
-  await shell`git config user.email ${'41898282+github-actions[bot]@users.noreply.github.com'}`;
-  await shell`git config user.name ${'github-actions[bot]'}`;
-  await shell`git checkout -q -B ${context.branch}`;
+
+  await runSyncCommand(context, [
+    'git',
+    'config',
+    'user.email',
+    '41898282+github-actions[bot]@users.noreply.github.com',
+  ]);
+
+  await runSyncCommand(context, ['git', 'config', 'user.name', 'github-actions[bot]']);
+  await runSyncCommand(context, ['git', 'checkout', '-q', '-B', context.branch]);
 
   for (const entry of context.entries) {
     const written = await writeEntry(context, entry);
 
     if (written === null) {
-      process.stdout.write(`::error::${entry.name} failed, so the sync leaves it out.\n`);
+      context.writeOutput(`::error::${entry.name} failed, so the sync leaves it out.\n`);
 
-      await shell`git reset -q --hard`;
-      await shell`git clean -q -f -d`;
+      await runSyncCommand(context, ['git', 'reset', '-q', '--hard']);
+      await runSyncCommand(context, ['git', 'clean', '-q', '-f', '-d']);
 
       failed.push(entry.name);
       continue;
@@ -177,16 +199,22 @@ async function commitEntries(context: SyncContext): Promise<CommittedEntries> {
     taken.push(entry.name);
     copied.push(...written);
 
-    await shell`git add -A`;
+    await runSyncCommand(context, ['git', 'add', '-A']);
 
-    const isUnchanged = await probeNothingStaged(shell);
+    const staged = await runProbeCommand(context, ['git', 'diff', '--cached', '--quiet']);
 
-    if (isUnchanged) {
-      process.stdout.write(`${entry.name} matches the source; nothing to sync.\n`);
+    if (staged.exitCode === 0) {
+      context.writeOutput(`${entry.name} matches the source; nothing to sync.\n`);
       continue;
     }
 
-    await shell`git commit -q -m ${`chore: sync ${entry.name} from zgeoff/tools`}`;
+    await runSyncCommand(context, [
+      'git',
+      'commit',
+      '-q',
+      '-m',
+      `chore: sync ${entry.name} from zgeoff/tools`,
+    ]);
 
     synced.push({ name: entry.name, description: entry.description });
   }
@@ -198,8 +226,21 @@ async function commitEntries(context: SyncContext): Promise<CommittedEntries> {
     : { synced: [...synced, ...retired.synced], failed };
 }
 
+function runSyncCommand(
+  context: SyncContext,
+  argv: readonly string[],
+  stdin?: string,
+): Promise<CommandResult> {
+  return runCheckedCommand(context.runCommand, argv, {
+    cwd: context.cwd,
+    env: context.env,
+    ...(stdin === undefined ? {} : { stdin }),
+  });
+}
+
 // The build runs in the caller's checkout with the runner's stock tools; the manifest README states
-// that contract.
+// that contract. The error of a failing copy or build names its path and cause, which the log shows
+// before the entry is reset away.
 async function writeEntry(context: SyncContext, entry: SyncEntry): Promise<string[] | null> {
   try {
     const copied = await copyEntryFiles(context, entry);
@@ -209,66 +250,53 @@ async function writeEntry(context: SyncContext, entry: SyncEntry): Promise<strin
     }
 
     if (entry.build !== '') {
-      await context.shell`bash -euo pipefail -c ${entry.build}`;
+      const build = await runProbeCommand(context, ['bash', '-euo', 'pipefail', '-c', entry.build]);
+
+      context.writeOutput(`${build.stdout}${build.stderr}`);
+
+      if (build.exitCode !== 0) {
+        context.writeOutput(`::error::${entry.name}: its build exited with ${build.exitCode}\n`);
+
+        return null;
+      }
     }
 
     return copied;
-  } catch {
+  } catch (error) {
+    context.writeOutput(
+      `::error::${entry.name}: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+
     return null;
   }
 }
 
 async function copyEntryFiles(context: SyncContext, entry: SyncEntry): Promise<string[] | null> {
-  const shell = context.shell;
+  const selected = await runSyncCommand(
+    context,
+    ['bash', '.repo-sync/scripts/select-sync-files.sh', context.repo],
+    entry.filesJSON,
+  );
 
-  const rowsText =
-    await shell`bash .repo-sync/scripts/select-sync-files.sh ${context.repo} < ${new Response(entry.filesJSON)}`.text();
+  const rows = parseSyncFileRows(selected.stdout);
 
-  const rows = parseSyncFileRows(rowsText);
-  const excluded = rows.filter((row) => row.action === 'skip').map((row) => row.target);
-  const copied: string[] = [];
-  let hasConflict = false;
+  const existingWorkflows = await readExistingWorkflows(context, rows);
 
-  for (const row of rows.filter((candidate) => candidate.action !== 'skip')) {
-    const isOwnWorkflow = await probeOwnWorkflow(context, row);
+  const plan = buildCopyPlan({ rows, existingWorkflows, marker: context.marker });
 
-    if (isOwnWorkflow) {
-      process.stdout.write(
-        `::error file=${row.target}::${row.target} is the repo's own workflow, so ${entry.name} does not overwrite it. Move its jobs to a file with another name, or add ${entry.name} to skip.\n`,
+  if (plan.conflicts.length > 0) {
+    for (const target of plan.conflicts) {
+      context.writeOutput(
+        `::error file=${target}::${target} is the repo's own workflow, so ${entry.name} does not overwrite it. Move its jobs to a file with another name, or add ${entry.name} to skip.\n`,
       );
-
-      hasConflict = true;
-      continue;
     }
 
-    await mkdir(join(context.cwd, dirname(row.target)), { recursive: true });
-    await shell`install -m ${row.mode} ${`.repo-sync/${row.source}`} ${row.target}`;
-
-    if (isWorkflowPath(row.target)) {
-      const path = join(context.cwd, row.target);
-
-      const text = await readFile(path, 'utf8');
-
-      await Bun.write(path, buildPinnedWorkflow(text, context.pin));
-    }
-
-    copied.push(row.target);
+    return null;
   }
 
-  if (excluded.length > 0) {
-    for (const target of copied.filter((path) => path.endsWith('.md'))) {
-      await shell`bash .repo-sync/scripts/remove-excluded-blocks.sh ${target} ${excluded}`;
-    }
-  }
+  await applyCopyPlan(context, plan);
 
-  return hasConflict ? null : copied;
-}
-
-interface SyncFileRow {
-  readonly action: string;
-  readonly source: string;
-  readonly target: string;
-  readonly mode: string;
+  return plan.copies.map((copy) => copy.target);
 }
 
 function parseSyncFileRows(text: string): SyncFileRow[] {
@@ -282,36 +310,57 @@ function parseSyncFileRows(text: string): SyncFileRow[] {
     });
 }
 
-// Overwriting a workflow the repo wrote itself would drop its own jobs in a pull request that reads
-// as a routine sync. The marker line shows a file repo-sync wrote.
-async function probeOwnWorkflow(context: SyncContext, row: SyncFileRow): Promise<boolean> {
-  if (!isWorkflowPath(row.target)) {
-    return false;
+async function readExistingWorkflows(
+  context: SyncContext,
+  rows: readonly SyncFileRow[],
+): Promise<Map<string, ExistingWorkflow>> {
+  const workflows = new Map<string, ExistingWorkflow>();
+
+  for (const row of rows.filter((candidate) => isWorkflowPath(candidate.target))) {
+    const target = Bun.file(join(context.cwd, row.target));
+
+    const exists = await target.exists();
+
+    if (exists) {
+      workflows.set(row.target, {
+        targetText: await target.text(),
+        sourceText: await readFile(join(context.cwd, '.repo-sync', row.source), 'utf8'),
+      });
+    }
   }
 
-  const target = Bun.file(join(context.cwd, row.target));
-
-  const exists = await target.exists();
-
-  if (!exists) {
-    return false;
-  }
-
-  const targetText = await target.text();
-
-  if (targetText.includes(context.marker)) {
-    return false;
-  }
-
-  const sourceText = await readFile(join(context.cwd, '.repo-sync', row.source), 'utf8');
-
-  const calls = new Set(sourceText.match(/zgeoff\/tools\/\.github\/workflows\/[^@\s]+/gu));
-
-  return ![...calls].some((call) => targetText.includes(call));
+  return workflows;
 }
 
-function isWorkflowPath(path: string): boolean {
-  return path.startsWith('.github/workflows/');
+async function applyCopyPlan(context: SyncContext, plan: CopyPlan): Promise<void> {
+  for (const copy of plan.copies) {
+    await mkdir(join(context.cwd, dirname(copy.target)), { recursive: true });
+
+    await runSyncCommand(context, [
+      'install',
+      '-m',
+      copy.mode,
+      `.repo-sync/${copy.source}`,
+      copy.target,
+    ]);
+
+    if (copy.isPinned) {
+      const path = join(context.cwd, copy.target);
+
+      const text = await readFile(path, 'utf8');
+
+      await Bun.write(path, buildPinnedWorkflow(text, context.pin));
+    }
+  }
+
+  for (const target of plan.strippedTargets) {
+    await runSyncCommand(context, [
+      'bash',
+      '.repo-sync/scripts/remove-excluded-blocks.sh',
+      target,
+      ...plan.excluded,
+    ]);
+  }
 }
 
 function buildPinnedWorkflow(text: string, pin: string): string {
@@ -326,10 +375,8 @@ function buildPinnedWorkflow(text: string, pin: string): string {
     .join('\n');
 }
 
-async function probeNothingStaged(shell: typeof $): Promise<boolean> {
-  const result = await shell`git diff --cached --quiet`.nothrow().quiet();
-
-  return result.exitCode === 0;
+function runProbeCommand(context: SyncContext, argv: readonly string[]): Promise<CommandResult> {
+  return context.runCommand(argv, { cwd: context.cwd, env: context.env });
 }
 
 const retiredFilesName = 'retired-files';
@@ -344,53 +391,60 @@ async function removeRetiredFiles(
   taken: readonly string[],
   copied: readonly string[],
 ): Promise<RetiredFiles> {
-  const shell = context.shell;
   const script = '.repo-sync/scripts/remove-retired-sync-files.sh';
 
   const hasScript = await Bun.file(join(context.cwd, script)).exists();
 
   if (!hasScript) {
-    process.stdout.write('The tools ref has no retired-file cleanup; nothing to remove.\n');
+    context.writeOutput('The tools ref has no retired-file cleanup; nothing to remove.\n');
 
     return { kind: 'removed', synced: [] };
   }
 
   const takenList = taken.map((name) => `${name},`).join('');
 
-  const result =
-    await shell`bash ${script} .repo-sync ${takenList} ${context.skip} ${copied.join('\n')}`
-      .nothrow()
-      .quiet();
+  const result = await runProbeCommand(context, [
+    'bash',
+    script,
+    '.repo-sync',
+    takenList,
+    context.skip,
+    copied.join('\n'),
+  ]);
 
-  process.stderr.write(result.stderr);
+  context.writeOutput(result.stderr);
 
   if (result.exitCode !== 0) {
-    process.stdout.write(`::error::${retiredFilesName} failed, so the sync leaves it out.\n`);
+    context.writeOutput(`::error::${retiredFilesName} failed, so the sync leaves it out.\n`);
 
-    await shell`git reset -q --hard`;
+    await runSyncCommand(context, ['git', 'reset', '-q', '--hard']);
 
     return { kind: 'failed' };
   }
 
-  const removed = result.stdout
-    .toString()
-    .split('\n')
-    .filter((path) => path !== '');
+  const removed = result.stdout.split('\n').filter((path) => path !== '');
 
   // The token cannot push a change under .github/workflows/ without workflows write, so a retired
   // workflow stays until the repo takes an entry with a workflow target.
   const kept = context.workflows ? removed : removed.filter((path) => !isWorkflowPath(path));
 
   if (kept.length < removed.length) {
-    await shell`git checkout -q -- .github/workflows`;
+    await runSyncCommand(context, ['git', 'checkout', '-q', '--', '.github/workflows']);
   }
 
   if (kept.length === 0) {
     return { kind: 'removed', synced: [] };
   }
 
-  await shell`git add -A`;
-  await shell`git commit -q -m ${'chore: remove the files zgeoff/tools no longer syncs'}`;
+  await runSyncCommand(context, ['git', 'add', '-A']);
+
+  await runSyncCommand(context, [
+    'git',
+    'commit',
+    '-q',
+    '-m',
+    'chore: remove the files zgeoff/tools no longer syncs',
+  ]);
 
   const paths = kept.map((path) => `\`${path}\``).join(', ');
 
@@ -407,27 +461,32 @@ async function removeRetiredFiles(
 
 // GitHub closes the pull request of a deleted branch.
 async function pushSyncBranch(context: SyncContext, committed: CommittedEntries): Promise<boolean> {
-  const shell = context.shell;
-
   if (committed.synced.length > 0) {
-    await shell`git push -q --force origin ${context.branch}`;
+    await runSyncCommand(context, ['git', 'push', '-q', '--force', 'origin', context.branch]);
 
     return true;
   }
 
-  const hasRemoteBranch = await probeRemoteBranch(shell, context.branch);
+  const hasRemoteBranch = await probeRemoteBranch(context, context.branch);
 
   if (committed.failed.length === 0 && hasRemoteBranch) {
-    process.stdout.write(`Every entry matches the source; deleting ${context.branch}.\n`);
+    context.writeOutput(`Every entry matches the source; deleting ${context.branch}.\n`);
 
-    await shell`git push -q origin --delete ${context.branch}`;
+    await runSyncCommand(context, ['git', 'push', '-q', 'origin', '--delete', context.branch]);
   }
 
   return false;
 }
 
-async function probeRemoteBranch(shell: typeof $, branch: string): Promise<boolean> {
-  const result = await shell`git ls-remote --exit-code --heads origin ${branch}`.nothrow().quiet();
+async function probeRemoteBranch(context: SyncContext, branch: string): Promise<boolean> {
+  const result = await runProbeCommand(context, [
+    'git',
+    'ls-remote',
+    '--exit-code',
+    '--heads',
+    'origin',
+    branch,
+  ]);
 
   return result.exitCode === 0;
 }
@@ -436,24 +495,48 @@ async function writePullRequest(
   context: SyncContext,
   synced: readonly SyncedEntry[],
 ): Promise<void> {
-  const shell = context.shell;
   const title = `chore: sync zgeoff/tools ${context.pin}`;
   const body = renderPullRequestBody(context.pin, synced);
 
-  const listed =
-    await shell`gh pr list --head ${context.branch} --state open --json number --jq ${'.[0].number // empty'}`.text();
+  const listed = await runSyncCommand(context, [
+    'gh',
+    'pr',
+    'list',
+    '--head',
+    context.branch,
+    '--state',
+    'open',
+    '--json',
+    'number',
+    '--jq',
+    '.[0].number // empty',
+  ]);
 
-  const number = listed.trim();
+  const number = listed.stdout.trim();
 
   if (number !== '') {
-    await shell`gh pr edit ${number} --title ${title} --body ${body}`;
+    await runSyncCommand(context, ['gh', 'pr', 'edit', number, '--title', title, '--body', body]);
 
-    process.stdout.write(`Updated pull request #${number} for ${context.branch}.\n`);
+    context.writeOutput(`Updated pull request #${number} for ${context.branch}.\n`);
 
     return;
   }
 
-  await shell`gh pr create --base ${context.base} --head ${context.branch} --title ${title} --body ${body}`;
+  const created = await runSyncCommand(context, [
+    'gh',
+    'pr',
+    'create',
+    '--base',
+    context.base,
+    '--head',
+    context.branch,
+    '--title',
+    title,
+    '--body',
+    body,
+  ]);
+
+  context.writeOutput(created.stdout);
 }
 
 function renderPullRequestBody(pin: string, synced: readonly SyncedEntry[]): string {
@@ -468,7 +551,7 @@ async function removeEntryBranches(
   failed: readonly string[],
 ): Promise<void> {
   if (!pushed && failed.length > 0) {
-    process.stdout.write('No pull request published; the per-entry branches stay.\n');
+    context.writeOutput('No pull request published; the per-entry branches stay.\n');
 
     return;
   }
@@ -476,14 +559,21 @@ async function removeEntryBranches(
   for (const entry of context.entries.filter((candidate) => !failed.includes(candidate.name))) {
     const branch = `sync/${entry.name}`;
 
-    const hasBranch = await probeRemoteBranch(context.shell, branch);
+    const hasBranch = await probeRemoteBranch(context, branch);
 
     if (hasBranch) {
-      await context.shell`git push -q origin --delete ${branch}`;
+      await runSyncCommand(context, ['git', 'push', '-q', 'origin', '--delete', branch]);
     }
   }
 }
 
 if (import.meta.main) {
-  process.exitCode = await syncEntries({ cwd: process.cwd(), env: process.env });
+  process.exitCode = await syncEntries({
+    cwd: process.cwd(),
+    env: process.env,
+    runCommand,
+    writeOutput: (text) => {
+      process.stdout.write(text);
+    },
+  });
 }

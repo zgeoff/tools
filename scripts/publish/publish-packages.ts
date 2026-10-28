@@ -1,6 +1,8 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { $ } from 'bun';
+import { runCheckedCommand } from '../ci/run-checked-command.ts';
+import type { RunCommand } from '../ci/run-command.ts';
+import { runCommand } from '../ci/run-command.ts';
 import { parseTextList } from '../release/parse-text-list.ts';
 import { parseTextRecord } from '../release/parse-text-record.ts';
 
@@ -12,6 +14,8 @@ export interface PackagesPublishOptions {
   readonly pathsText: string;
 
   readonly releasedVersionsText: string;
+
+  readonly runCommand: RunCommand;
 
   readonly writeOutput: (text: string) => void;
 
@@ -107,7 +111,16 @@ async function publishPackage(
   entry: ReleasedPackage,
   options: PackagesPublishOptions,
 ): Promise<void> {
-  const env = { ...options.env };
+  const commandOptions = { cwd: entry.folder, env: options.env };
+
+  // Each command's output reaches the step log once the command ends.
+  const run = async (argv: readonly string[]) => {
+    const result = await runCheckedCommand(options.runCommand, argv, commandOptions);
+
+    if (result.stdout !== '') {
+      options.writeOutput(result.stdout);
+    }
+  };
 
   if (entry.isPrivate) {
     options.writeOutput(`skipping ${entry.name}: private\n`);
@@ -115,23 +128,22 @@ async function publishPackage(
     return;
   }
 
-  const published = await $`npm view ${`${entry.name}@${entry.version}`} version`
-    .cwd(entry.folder)
-    .env(env)
-    .nothrow()
-    .quiet();
+  const published = await options.runCommand(
+    ['npm', 'view', `${entry.name}@${entry.version}`, 'version'],
+    commandOptions,
+  );
 
-  if (published.stdout.toString().trim() === entry.version) {
+  if (published.stdout.trim() === entry.version) {
     options.writeOutput(`skipping ${entry.name}@${entry.version}: already published\n`);
 
     return;
   }
 
   if (entry.hasBuild) {
-    await $`bun run build`.cwd(entry.folder).env(env);
+    await run(['bun', 'run', 'build']);
   }
 
-  await $`bun pm pack`.cwd(entry.folder).env(env);
+  await run(['bun', 'pm', 'pack']);
 
   const files = await readdir(entry.folder);
 
@@ -142,7 +154,7 @@ async function publishPackage(
     throw new Error(`bun pm pack left ${tarballs.length} tarballs in ${entry.folder}`);
   }
 
-  await $`npm publish ${`./${tarball}`} --provenance --access public`.cwd(entry.folder).env(env);
+  await run(['npm', 'publish', `./${tarball}`, '--provenance', '--access', 'public']);
 }
 
 if (import.meta.main) {
@@ -151,6 +163,7 @@ if (import.meta.main) {
     env: process.env,
     pathsText: process.env['PATHS_RELEASED'] ?? '',
     releasedVersionsText: process.env['RELEASED_VERSIONS'] ?? '',
+    runCommand,
     writeOutput: (text) => {
       process.stdout.write(text);
     },

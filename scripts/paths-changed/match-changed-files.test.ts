@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
-import { isPathMatched, matchChangedFiles } from './match-changed-files.ts';
+import { runCommand } from '../ci/run-command.ts';
+import { matchChangedFiles } from './match-changed-files.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(import.meta.dir, '.test-match-changed-files-'));
@@ -48,8 +49,9 @@ test('it answers true when the pull request changes a file that a pattern matche
   );
 
   const answer = await matchChangedFiles({
-    cwd: ctx.repo,
+    checkout: ctx.repo,
     env: ctx.env,
+    runCommand,
     event: 'pull_request',
     patterns: 'docker/**\n',
   });
@@ -66,8 +68,9 @@ test('it answers false when the pull request changes no file that a pattern matc
   await ctx.createMerge(() => writeTreeFiles(ctx.repo, { 'README.md': '# app, renamed\n' }));
 
   const answer = await matchChangedFiles({
-    cwd: ctx.repo,
+    checkout: ctx.repo,
     env: ctx.env,
+    runCommand,
     event: 'pull_request',
     patterns: 'docker/**\nflake.nix\n',
   });
@@ -84,8 +87,9 @@ test('it matches the old path of a file the pull request moves', async () => {
   });
 
   const answer = await matchChangedFiles({
-    cwd: ctx.repo,
+    checkout: ctx.repo,
     env: ctx.env,
+    runCommand,
     event: 'pull_request',
     patterns: 'docker/**\n',
   });
@@ -100,8 +104,9 @@ test('it answers true on any event other than a pull request without reading the
   const ctx = await setupTest();
 
   const answer = await matchChangedFiles({
-    cwd: ctx.repo,
+    checkout: ctx.repo,
     env: ctx.env,
+    runCommand,
     event: 'push',
     patterns: 'docker/**\n',
   });
@@ -115,30 +120,14 @@ test('it fails when the checkout lacks the base commit', async () => {
   await $`git init -q`.cwd(ctx.repo).env({ ...ctx.env });
 
   const matching = matchChangedFiles({
-    cwd: ctx.repo,
+    checkout: ctx.repo,
     env: ctx.env,
+    runCommand,
     event: 'pull_request',
     patterns: 'docker/**\n',
   });
 
-  expect(matching).rejects.toMatchObject({ exitCode: 128 });
-});
-
-test.each([
-  ['a single star across folders', 'docker/app/Dockerfile', 'docker/*', true],
-  ['a double star across folders', 'docker/app/Dockerfile', 'docker/**', true],
-  ['a star inside a name', 'services/api/main.ts', 'services/*/main.ts', true],
-  ['a path outside the pattern', 'README.md', 'docker/**', false],
-  ['a question mark as one character', 'v1.yml', 'v?.yml', true],
-  ['a question mark against two characters', 'v10.yml', 'v?.yml', false],
-  ['a set of characters', 'b.txt', '[abc].txt', true],
-  ['a character outside a set', 'd.txt', '[abc].txt', false],
-  ['a negated set', 'd.txt', '[!abc].txt', true],
-  ['a range', 'k.txt', '[a-m].txt', true],
-  ['a dot as a literal', 'flakeXnix', 'flake.nix', false],
-  ['an escaped star as a literal', 'a*b', String.raw`a\*b`, true],
-  ['an escaped star against other text', 'axb', String.raw`a\*b`, false],
-  ['an unclosed bracket as a literal', '[draft', '[draft', true],
-])('it matches %s as bash does', (_label, path, pattern, expected) => {
-  expect(isPathMatched(path, pattern)).toBe(expected);
+  expect(matching).rejects.toThrow(
+    'git diff -z --name-only --no-renames HEAD^1 HEAD exited with 128',
+  );
 });

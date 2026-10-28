@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import { runCommand } from '../ci/run-command.ts';
 import { runShellCheck } from './check-shell.ts';
 
 async function setupTest() {
@@ -32,7 +33,7 @@ test('it passes tracked scripts that shellcheck and shfmt accept, and skips an u
 
   await writeTreeFiles(ctx.repo, { 'untracked.sh': 'if true;then echo $1;fi\n' });
 
-  const result = await runShellCheck({ cwd: ctx.repo, env: ctx.env });
+  const result = await runShellCheck({ cwd: ctx.repo, env: ctx.env, runCommand });
 
   expect(result).toStrictEqual({ exitCode: 0, output: '' });
 });
@@ -45,7 +46,7 @@ test('it fails with the findings of both shellcheck and shfmt', async () => {
     'cramped.sh': '#!/usr/bin/env bash\nif true;then echo "a";fi\n',
   });
 
-  const result = await runShellCheck({ cwd: ctx.repo, env: ctx.env });
+  const result = await runShellCheck({ cwd: ctx.repo, env: ctx.env, runCommand });
 
   expect(result.exitCode).toBe(1);
   expect(result.output).toInclude('SC2086');
@@ -58,7 +59,7 @@ test('it fails when only shellcheck rejects a script', async () => {
   // shfmt leaves this script as it is, and shellcheck rejects the unquoted $1.
   await ctx.trackFiles({ 'unquoted.sh': '#!/usr/bin/env bash\necho $1\n' });
 
-  const result = await runShellCheck({ cwd: ctx.repo, env: ctx.env });
+  const result = await runShellCheck({ cwd: ctx.repo, env: ctx.env, runCommand });
 
   expect(result.exitCode).toBe(1);
   expect(result.output).toInclude('SC2086');
@@ -71,7 +72,7 @@ test('it fails when only shfmt rejects a script', async () => {
   // shellcheck accepts this script, and shfmt would space it out.
   await ctx.trackFiles({ 'cramped.sh': '#!/usr/bin/env bash\nif true;then echo "a";fi\n' });
 
-  const result = await runShellCheck({ cwd: ctx.repo, env: ctx.env });
+  const result = await runShellCheck({ cwd: ctx.repo, env: ctx.env, runCommand });
 
   expect(result.exitCode).toBe(1);
   expect(result.output).toInclude('+++ cramped.sh');
@@ -80,7 +81,7 @@ test('it fails when only shfmt rejects a script', async () => {
 
 test('it passes with a note when the repo tracks no shell script', async () => {
   const ctx = await setupTest();
-  const result = await runShellCheck({ cwd: ctx.repo, env: ctx.env });
+  const result = await runShellCheck({ cwd: ctx.repo, env: ctx.env, runCommand });
 
   expect(result).toStrictEqual({ exitCode: 0, output: 'shell: the repo tracks no shell script\n' });
 });

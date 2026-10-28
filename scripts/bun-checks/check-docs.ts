@@ -1,11 +1,14 @@
 import { join } from 'node:path';
-import { $ } from 'bun';
+import type { RunCommand } from '../ci/run-command.ts';
+import { runCommand } from '../ci/run-command.ts';
 import type { CheckResult } from './check-shell.ts';
 
 export interface DocsCheckRun {
   readonly cwd: string;
 
   readonly env: Readonly<Record<string, string | undefined>>;
+
+  readonly runCommand: RunCommand;
 }
 
 const scriptsFolder = '.claude/skills/docs-writing/scripts';
@@ -25,13 +28,12 @@ export async function runDocsCheck(run: Readonly<DocsCheckRun>): Promise<CheckRe
   let exitCode = 0;
 
   for (const script of checkScripts) {
-    const result = await $`bash ${join(scriptsFolder, script)}`
-      .cwd(run.cwd)
-      .env({ ...run.env })
-      .nothrow()
-      .quiet();
+    const result = await run.runCommand(['bash', join(scriptsFolder, script)], {
+      cwd: run.cwd,
+      env: run.env,
+    });
 
-    outputs.push(`${result.stdout.toString()}${result.stderr.toString()}`);
+    outputs.push(`${result.stdout}${result.stderr}`);
 
     if (result.exitCode !== 0) {
       outputs.push(
@@ -46,7 +48,7 @@ export async function runDocsCheck(run: Readonly<DocsCheckRun>): Promise<CheckRe
 }
 
 if (import.meta.main) {
-  const result = await runDocsCheck({ cwd: process.cwd(), env: process.env });
+  const result = await runDocsCheck({ cwd: process.cwd(), env: process.env, runCommand });
 
   process.stdout.write(result.output);
 

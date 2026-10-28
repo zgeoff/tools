@@ -24,12 +24,14 @@ on:
 
 jobs:
   # A newer push cancels the checks of an older one. A dispatched publish run
-  # keeps a group of its own, so no push cancels the checks it waits for.
+  # keeps a group of its own, named by its ref and the paths it publishes, so
+  # no push cancels the checks it waits for, and only a dispatch that
+  # publishes the same paths at the same ref replaces it.
   checks:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
-      group: main-checks-${{ github.event_name }}-${{ github.ref }}
+      group: main-checks-${{ github.event_name }}-${{ github.ref }}-${{ inputs.republish_paths }}
       cancel-in-progress: true
     env:
       PART: all
@@ -91,9 +93,12 @@ jobs:
     if: needs.release.outputs.releases_created == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # queue: max keeps every waiting dispatch; the default replaces a waiting
+    # one, whose tagged release would then never publish.
     concurrency:
       group: main-dispatch-publish
       cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
       actions: write

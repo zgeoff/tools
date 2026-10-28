@@ -1,4 +1,6 @@
-import { $ } from 'bun';
+import { runCheckedCommand } from '../ci/run-checked-command.ts';
+import type { RunCommand } from '../ci/run-command.ts';
+import { runCommand } from '../ci/run-command.ts';
 import { parseReleaseOutputs } from '../release/parse-release-outputs.ts';
 
 export interface ReleasePublishDispatchOptions {
@@ -9,6 +11,8 @@ export interface ReleasePublishDispatchOptions {
   readonly repository: string;
 
   readonly releaseOutputsText: string;
+
+  readonly runCommand: RunCommand;
 
   readonly writeError: (text: string) => void;
 }
@@ -26,9 +30,24 @@ export async function dispatchReleasePublish(
     return 1;
   }
 
-  await $`gh workflow run main.yml --repo ${options.repository} --ref ${dispatch.tag} -f ${`republish_paths=${JSON.stringify(dispatch.paths)}`} -f ${`released_versions=${JSON.stringify(dispatch.versions)}`}`
-    .cwd(options.cwd)
-    .env({ ...options.env });
+  await runCheckedCommand(
+    options.runCommand,
+    [
+      'gh',
+      'workflow',
+      'run',
+      'main.yml',
+      '--repo',
+      options.repository,
+      '--ref',
+      dispatch.tag,
+      '-f',
+      `republish_paths=${JSON.stringify(dispatch.paths)}`,
+      '-f',
+      `released_versions=${JSON.stringify(dispatch.versions)}`,
+    ],
+    { cwd: options.cwd, env: options.env },
+  );
 
   return 0;
 }
@@ -80,6 +99,7 @@ if (import.meta.main) {
     env: process.env,
     repository: process.env['GITHUB_REPOSITORY'] ?? '',
     releaseOutputsText: process.env['RELEASE_OUTPUTS'] ?? '',
+    runCommand,
     writeError: (text) => {
       process.stderr.write(text);
     },

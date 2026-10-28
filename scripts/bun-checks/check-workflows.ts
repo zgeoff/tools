@@ -1,4 +1,5 @@
-import { $ } from 'bun';
+import type { RunCommand } from '../ci/run-command.ts';
+import { runCommand } from '../ci/run-command.ts';
 import type { CheckResult } from './check-shell.ts';
 
 export interface WorkflowsCheckRun {
@@ -8,6 +9,8 @@ export interface WorkflowsCheckRun {
 
   // The UTC day as YYYYMMDD.
   readonly today: string;
+
+  readonly runCommand: RunCommand;
 }
 
 // actionlint 1.7.12 rejects the concurrency queue key that GitHub documents, until
@@ -17,12 +20,9 @@ const queueIgnore = 'unexpected key "queue" for "concurrency" section';
 
 export async function runWorkflowsCheck(run: Readonly<WorkflowsCheckRun>): Promise<CheckResult> {
   const isIgnoring = run.today < queueIgnoreExpires;
+  const argv = isIgnoring ? ['actionlint', '-ignore', queueIgnore] : ['actionlint'];
 
-  const result = await (isIgnoring ? $`actionlint -ignore ${queueIgnore}` : $`actionlint`)
-    .cwd(run.cwd)
-    .env({ ...run.env })
-    .nothrow()
-    .quiet();
+  const result = await run.runCommand(argv, { cwd: run.cwd, env: run.env });
 
   const notice = isIgnoring
     ? ''
@@ -30,7 +30,7 @@ export async function runWorkflowsCheck(run: Readonly<WorkflowsCheckRun>): Promi
 
   return {
     exitCode: result.exitCode,
-    output: `${notice}${result.stdout.toString()}${result.stderr.toString()}`,
+    output: `${notice}${result.stdout}${result.stderr}`,
   };
 }
 
@@ -38,6 +38,7 @@ if (import.meta.main) {
   const result = await runWorkflowsCheck({
     cwd: process.cwd(),
     env: process.env,
+    runCommand,
     today: new Date().toISOString().slice(0, 10).replaceAll('-', ''),
   });
 

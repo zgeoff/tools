@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createStubGH } from '../../test-utils/create-stub-gh.ts';
+import { runCommand } from '../ci/run-command.ts';
 import { readOpenPullRequest } from './read-open-pull-request.ts';
 
 async function setupTest() {
@@ -16,6 +17,7 @@ async function setupTest() {
       cwd: directory,
       env: { PATH: `${directory}:${process.env['PATH']}` },
       branch: 'audit-fix',
+      runCommand,
     });
 
   return { gh, readNumber };
@@ -45,5 +47,7 @@ test('it fails when gh cannot list the pull requests', async () => {
 
   await ctx.gh.writeResponses('prs', ['error']);
 
-  expect(ctx.readNumber()).rejects.toThrow('exit code 1');
+  expect(ctx.readNumber()).rejects.toThrow(
+    'gh pr list --head audit-fix --state open --json number exited with 1: HTTP 502',
+  );
 });

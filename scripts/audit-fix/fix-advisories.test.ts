@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { createGitCommit } from '../../test-utils/create-git-commit.ts';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { runGit } from '../../test-utils/run-git.ts';
+import { runCommand } from '../ci/run-command.ts';
 import { fixAdvisories } from './fix-advisories.ts';
 
 async function setupTest() {
@@ -39,6 +40,7 @@ async function setupTest() {
       base,
       defaultBranch: 'main',
       expiryDays: '14',
+      runCommand,
       runAuditFix: (argv) => {
         calls.push(argv);
 

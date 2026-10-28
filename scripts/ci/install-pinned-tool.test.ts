@@ -3,7 +3,13 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { createStubFileServer } from '../../test-utils/create-stub-file-server.ts';
-import { installPinnedTool, shouldInstallTool } from './install-pinned-tool.ts';
+import {
+  installPinnedTool,
+  parseToolArgs,
+  runPinnedToolStep,
+  shouldInstallTool,
+} from './install-pinned-tool.ts';
+import { runCommand } from './run-command.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(import.meta.dir, '.test-install-pinned-tool-'));
@@ -48,6 +54,7 @@ test('it installs a binary release into a runner folder on the PATH when the che
     runnerTemp: ctx.runnerTemp,
     githubPath: ctx.githubPath,
     env: process.env,
+    runCommand,
   });
 
   const installed = await readFile(join(ctx.runnerTemp, 'shfmt-bin/shfmt'), 'utf8');
@@ -73,6 +80,7 @@ test('it installs nothing when the download fails its checksum', async () => {
     runnerTemp: ctx.runnerTemp,
     githubPath: ctx.githubPath,
     env: process.env,
+    runCommand,
   });
 
   expect(installing).rejects.toThrow(
@@ -105,6 +113,7 @@ test('it installs only the tool from a release archive into a runner folder on t
     runnerTemp: ctx.runnerTemp,
     githubPath: ctx.githubPath,
     env: process.env,
+    runCommand,
   });
 
   const installed = await readdir(join(ctx.runnerTemp, 'actionlint-bin'));
@@ -133,6 +142,7 @@ test('it extracts nothing from a release archive that fails its checksum', async
     runnerTemp: ctx.runnerTemp,
     githubPath: ctx.githubPath,
     env: process.env,
+    runCommand,
   });
 
   expect(installing).rejects.toThrow("actionlint: the download's sha256 is");
@@ -157,3 +167,126 @@ test.each([
     expect(shouldInstallTool(part, requested)).toBe(expected);
   },
 );
+
+test.each([
+  ['a test job', 'test', 'false'],
+  ['a lane job', 'lane', 'false'],
+])(
+  'it downloads nothing for %s whose caller does not ask for the tool',
+  async (_label, part, requested) => {
+    const ctx = await setupTest();
+
+    const server = createStubFileServer({ '/shfmt': [{ status: 200, body: 'fake shfmt\n' }] });
+
+    const result = await runPinnedToolStep({
+      args: ['shfmt'],
+      env: {
+        ...process.env,
+        PART: part,
+        SETUP_TOOL: requested,
+        RUNNER_TEMP: ctx.runnerTemp,
+        GITHUB_PATH: ctx.githubPath,
+      },
+      pins: {
+        shfmt: {
+          url: `${server.url}/shfmt`,
+          sha256: new Bun.CryptoHasher('sha256').update('fake shfmt\n').digest('hex'),
+          packaging: 'binary',
+          neededBy: 'shell check',
+        },
+      },
+      runCommand,
+    });
+
+    const runnerFiles = await readdir(ctx.runnerTemp);
+
+    expect(result).toStrictEqual({
+      exitCode: 0,
+      output: 'shfmt: not needed, because this job runs no shell check\n',
+    });
+
+    expect(server.requests).toStrictEqual([]);
+    expect(runnerFiles).toStrictEqual([]);
+  },
+);
+
+test.each([
+  ['the static job', 'static', 'false'],
+  ['a test job whose caller asks for it', 'test', 'true'],
+])('it installs the tool from the step for %s', async (_label, part, requested) => {
+  const ctx = await setupTest();
+
+  const server = createStubFileServer({ '/shfmt': [{ status: 200, body: 'fake shfmt\n' }] });
+
+  const result = await runPinnedToolStep({
+    args: ['shfmt'],
+    env: {
+      ...process.env,
+      PART: part,
+      SETUP_TOOL: requested,
+      RUNNER_TEMP: ctx.runnerTemp,
+      GITHUB_PATH: ctx.githubPath,
+    },
+    pins: {
+      shfmt: {
+        url: `${server.url}/shfmt`,
+        sha256: new Bun.CryptoHasher('sha256').update('fake shfmt\n').digest('hex'),
+        packaging: 'binary',
+        neededBy: 'shell check',
+      },
+    },
+    runCommand,
+  });
+
+  const installed = await readFile(join(ctx.runnerTemp, 'shfmt-bin/shfmt'), 'utf8');
+
+  expect(result).toStrictEqual({ exitCode: 0, output: '' });
+  expect(installed).toBe('fake shfmt\n');
+});
+
+test('it fails the step with an error when the runner gives no RUNNER_TEMP or GITHUB_PATH', async () => {
+  const result = await runPinnedToolStep({
+    args: ['shfmt'],
+    env: { PATH: process.env['PATH'], PART: 'static' },
+    pins: {
+      shfmt: {
+        url: 'http://localhost:1/shfmt',
+        sha256: '0'.repeat(64),
+        packaging: 'binary',
+        neededBy: 'shell check',
+      },
+    },
+    runCommand,
+  });
+
+  expect(result).toStrictEqual({
+    exitCode: 1,
+    output: '::error::shfmt: the install needs RUNNER_TEMP and GITHUB_PATH\n',
+  });
+});
+
+test.each([
+  ['a known tool', ['shfmt'], { kind: 'parsed', name: 'shfmt' }],
+  [
+    'an unknown tool',
+    ['shellcheck'],
+    { kind: 'refused', message: 'usage: install-pinned-tool.ts <shfmt|actionlint>' },
+  ],
+  [
+    'a second tool',
+    ['shfmt', 'actionlint'],
+    { kind: 'refused', message: 'usage: install-pinned-tool.ts <shfmt|actionlint>' },
+  ],
+  ['no tool', [], { kind: 'refused', message: 'usage: install-pinned-tool.ts <shfmt|actionlint>' }],
+  [
+    'an unknown option',
+    ['shfmt', '--force'],
+    {
+      kind: 'refused',
+      message:
+        "Unknown option '--force'. To specify a positional argument starting with a '-', place it at the end of the command after '--', as in '-- \"--force\"\nusage: install-pinned-tool.ts <shfmt|actionlint>",
+    },
+  ],
+])('it reads %s from the arguments', (_label, args, expected) => {
+  expect<unknown>(parseToolArgs(args, ['shfmt', 'actionlint'])).toStrictEqual(expected);
+});

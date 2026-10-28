@@ -65,12 +65,18 @@ jobs:
         with:
           bun-version-file: ${{ runner.temp }}/tools/.bun-version
 
+      # Bun reads bunfig.toml, and its preloads, from its working folder. The
+      # gate decides which checks a pull request runs, so no Bun command runs
+      # in the pull request's checkout: each runs in the downloaded folder, and
+      # the match reads the checkout through git.
       - name: Download the match script
+        working-directory: ${{ runner.temp }}/tools
         env: *tools-url
         run: bun "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts" paths-changed
 
       - name: Match changed files
         id: match
+        working-directory: ${{ runner.temp }}/tools
         env:
           EVENT: ${{ github.event_name }}
           PATTERNS: ${{ inputs.paths }}

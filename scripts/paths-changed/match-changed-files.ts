@@ -1,8 +1,12 @@
-import { $ } from 'bun';
+import { runCheckedCommand } from '../ci/run-checked-command.ts';
+import type { RunCommand } from '../ci/run-command.ts';
+import { runCommand } from '../ci/run-command.ts';
 import { writeStepOutputs } from '../ci/write-step-outputs.ts';
+import { isPathMatched } from './is-path-matched.ts';
 
 export interface ChangedFilesMatch {
-  readonly cwd: string;
+  // The pull request's checkout, which the match reads only through git.
+  readonly checkout: string;
 
   readonly env: Readonly<Record<string, string | undefined>>;
 
@@ -10,6 +14,8 @@ export interface ChangedFilesMatch {
 
   // One pattern per line, as in on.pull_request.paths.
   readonly patterns: string;
+
+  readonly runCommand: RunCommand;
 }
 
 export interface ChangedFilesAnswer {
@@ -43,63 +49,22 @@ export async function matchChangedFiles(
 // The merge commit against the base it merges into: what the merge changes. --no-renames lists a
 // moved file's old path too, and -z leaves a path unquoted whatever its characters.
 async function readMergeChangedFiles(match: Readonly<ChangedFilesMatch>): Promise<string[]> {
-  const listed = await $`git diff -z --name-only --no-renames HEAD^1 HEAD`
-    .cwd(match.cwd)
-    .env({ ...match.env })
-    .quiet()
-    .text();
+  const result = await runCheckedCommand(
+    match.runCommand,
+    ['git', 'diff', '-z', '--name-only', '--no-renames', 'HEAD^1', 'HEAD'],
+    { cwd: match.checkout, env: match.env },
+  );
 
-  return listed.split('\0').filter((file) => file !== '');
-}
-
-// Matches as a bash [[ path == pattern ]] does: `*` matches any text, `/` included, `?` one
-// character, `[...]` one character of a set, and a backslash makes the next character literal.
-export function isPathMatched(path: string, pattern: string): boolean {
-  return new RegExp(`^${buildPatternSource(pattern)}$`, 'su').test(path);
-}
-
-// A bracket set ends at the first `]` after its first member, so `[]a]` holds `]` and `a`. A `[`
-// with no `]` after it is a literal.
-const patternTokens = /\\[\s\S]|\[[!^]?\]?[^\]]*\]|[\s\S]/gu;
-
-function buildPatternSource(pattern: string): string {
-  return (pattern.match(patternTokens) ?? []).map((token) => buildTokenSource(token)).join('');
-}
-
-function buildTokenSource(token: string): string {
-  if (token === '*') {
-    return '.*';
-  }
-
-  if (token === '?') {
-    return '.';
-  }
-
-  if (token.length > 1 && token.startsWith('\\')) {
-    return RegExp.escape(token.slice(1));
-  }
-
-  if (token.length > 1 && token.startsWith('[')) {
-    return buildBracketSource(token.slice(1, -1));
-  }
-
-  return RegExp.escape(token);
-}
-
-function buildBracketSource(members: string): string {
-  const negated = members.startsWith('!') || members.startsWith('^');
-  const set = negated ? members.slice(1) : members;
-  const escaped = set.replaceAll(/[\\\]^]/gu, (character) => `\\${character}`);
-
-  return `[${negated ? '^' : ''}${escaped}]`;
+  return result.stdout.split('\0').filter((file) => file !== '');
 }
 
 if (import.meta.main) {
   const answer = await matchChangedFiles({
-    cwd: process.cwd(),
+    checkout: process.env['GITHUB_WORKSPACE'] ?? process.cwd(),
     env: process.env,
     event: process.env['EVENT'] ?? '',
     patterns: process.env['PATTERNS'] ?? '',
+    runCommand,
   });
 
   for (const line of answer.matches) {

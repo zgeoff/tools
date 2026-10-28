@@ -3,6 +3,7 @@ import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
 import { createStubPullRequestGH } from '../../test-utils/create-stub-pull-request-gh.ts';
+import { runCommand } from '../ci/run-command.ts';
 import { syncEntries } from './sync-entries.ts';
 
 async function setupTest() {
@@ -53,6 +54,8 @@ async function setupTest() {
     .env(env)
     .quiet();
 
+  const logLines: string[] = [];
+
   // Runs the sync job's step in a fresh clone of the caller, with the env the step sets.
   const runSync = async (entries: unknown[], toolsRef: string, workflows = 'false') => {
     const caller = await mkdtemp(join(directory, 'caller-'));
@@ -62,6 +65,10 @@ async function setupTest() {
     await cp(tools, join(caller, '.repo-sync'), { recursive: true });
 
     return syncEntries({
+      runCommand,
+      writeOutput: (text) => {
+        logLines.push(text);
+      },
       cwd: caller,
       env: {
         ...env,
@@ -140,8 +147,15 @@ async function setupTest() {
       .quiet();
   };
 
+  const readErrorLines = () =>
+    logLines
+      .join('')
+      .split('\n')
+      .filter((line) => line.startsWith('::error'));
+
   return {
     runSync,
+    readErrorLines,
     writeSource,
     writeManifestCommit,
     removeSource,
@@ -804,4 +818,32 @@ test('it refuses a ref it cannot pin a workflow to and pushes nothing', async ()
   expect(exitCode).toBe(1);
   expect(branches).toStrictEqual(['main']);
   expect(pulls).toStrictEqual([]);
+});
+
+test('it reports the path and cause of a copy that fails before it leaves the entry out', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeBranch('main', 'config', 'a file where the entry needs a folder\n');
+  await ctx.writeSource('sync/editor.json', '{}\n');
+
+  const exitCode = await ctx.runSync(
+    [
+      {
+        name: 'editor',
+        description: 'The editor settings',
+        files: [{ source: 'sync/editor.json', target: 'config/editor.json' }],
+      },
+    ],
+    'sync-v7',
+  );
+
+  const errors = ctx.readErrorLines();
+
+  expect(exitCode).toBe(1);
+
+  expect(errors).toStrictEqual([
+    expect.stringMatching(/^::error::editor: EEXIST: .*config/u),
+    '::error::editor failed, so the sync leaves it out.',
+    '::error::These entries failed and are not in the sync: editor',
+  ]);
 });

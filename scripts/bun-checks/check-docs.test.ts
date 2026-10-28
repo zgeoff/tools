@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import { runCommand } from '../ci/run-command.ts';
 import { runDocsCheck } from './check-docs.ts';
 
 async function setupTest() {
@@ -34,7 +35,7 @@ async function setupTest() {
 
 test('it skips with a notice when the repo has no docs-writing scripts', async () => {
   const ctx = await setupTest();
-  const result = await runDocsCheck({ cwd: ctx.repo, env: ctx.env });
+  const result = await runDocsCheck({ cwd: ctx.repo, env: ctx.env, runCommand });
 
   expect(result).toStrictEqual({
     exitCode: 0,
@@ -49,7 +50,7 @@ test('it fails on a broken link even when every doc is within its length limit',
   await ctx.copyDocsScripts();
   await ctx.trackFiles({ 'README.md': '# Greeter\n\nRead the [guide](./guide.md).\n' });
 
-  const result = await runDocsCheck({ cwd: ctx.repo, env: ctx.env });
+  const result = await runDocsCheck({ cwd: ctx.repo, env: ctx.env, runCommand });
 
   expect(result.exitCode).toBe(1);
   expect(result.output).toInclude('guide.md');
@@ -66,7 +67,7 @@ test('it fails on a README over its line limit even when every link resolves', a
   await ctx.copyDocsScripts();
   await ctx.trackFiles({ 'README.md': `# Greeter\n${lines.join('\n')}\n` });
 
-  const result = await runDocsCheck({ cwd: ctx.repo, env: ctx.env });
+  const result = await runDocsCheck({ cwd: ctx.repo, env: ctx.env, runCommand });
 
   expect(result.exitCode).toBe(1);
   expect(result.output).toInclude('README.md: 101 lines, over the front page README limit of 100');

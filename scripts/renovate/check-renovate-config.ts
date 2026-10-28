@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { $ } from 'bun';
+import type { RunCommand } from '../ci/run-command.ts';
+import { runCommand } from '../ci/run-command.ts';
 
 // The validator runs at the Renovate version the scheduled run pins, so it reads the preset as
 // that run does.
@@ -35,19 +36,50 @@ function findMember(value: unknown, key: string): unknown {
   return members.find(([name]) => name === key)?.[1];
 }
 
-export async function runRenovateConfigCheck(cwd: string): Promise<number> {
-  const workflowText = await readFile(join(cwd, '.github/workflows/renovate.yml'), 'utf8');
+export interface RenovateConfigCheck {
+  readonly cwd: string;
+
+  readonly env: Readonly<Record<string, string | undefined>>;
+
+  readonly runCommand: RunCommand;
+
+  readonly writeOutput: (text: string) => void;
+}
+
+export async function runRenovateConfigCheck(
+  check: Readonly<RenovateConfigCheck>,
+): Promise<number> {
+  const workflowText = await readFile(join(check.cwd, '.github/workflows/renovate.yml'), 'utf8');
 
   const version = parseRenovateVersion(workflowText);
 
-  const result =
-    await $`npx --yes --package ${`renovate@${version}`} -- renovate-config-validator --strict --no-global default.json`
-      .cwd(cwd)
-      .nothrow();
+  const result = await check.runCommand(
+    [
+      'npx',
+      '--yes',
+      '--package',
+      `renovate@${version}`,
+      '--',
+      'renovate-config-validator',
+      '--strict',
+      '--no-global',
+      'default.json',
+    ],
+    { cwd: check.cwd, env: check.env },
+  );
+
+  check.writeOutput(`${result.stdout}${result.stderr}`);
 
   return result.exitCode;
 }
 
 if (import.meta.main) {
-  process.exitCode = await runRenovateConfigCheck(process.cwd());
+  process.exitCode = await runRenovateConfigCheck({
+    cwd: process.cwd(),
+    env: process.env,
+    runCommand,
+    writeOutput: (text) => {
+      process.stdout.write(text);
+    },
+  });
 }

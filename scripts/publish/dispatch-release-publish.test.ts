@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createStubGH } from '../../test-utils/create-stub-gh.ts';
+import { runCommand } from '../ci/run-command.ts';
 import { dispatchReleasePublish } from './dispatch-release-publish.ts';
 
 async function setupTest() {
@@ -19,6 +20,7 @@ async function setupTest() {
       env: { PATH: `${directory}:${process.env['PATH']}` },
       repository: 'zgeoff/tools',
       releaseOutputsText: JSON.stringify(releaseOutputs),
+      runCommand,
       writeError: (text) => {
         errors.push(text);
       },

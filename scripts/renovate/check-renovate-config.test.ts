@@ -1,7 +1,17 @@
-import { expect, test } from 'bun:test';
-import { readFile } from 'node:fs/promises';
+import { expect, onTestFinished, test } from 'bun:test';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { parseRenovateVersion } from './check-renovate-config.ts';
+import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import type { CommandOptions } from '../ci/run-command.ts';
+import { parseRenovateVersion, runRenovateConfigCheck } from './check-renovate-config.ts';
+
+async function setupTest() {
+  const directory = await mkdtemp(join(import.meta.dir, '.test-check-renovate-config-'));
+
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+
+  return { directory };
+}
 
 test('it reads the renovate-version input of the renovate job', () => {
   const workflow = [
@@ -35,4 +45,54 @@ test('it reads the version that renovate.yml pins for the scheduled run', async 
   );
 
   expect(parseRenovateVersion(text)).toMatch(/^\d+\.\d+\.\d+$/u);
+});
+
+test('it validates default.json strictly at the pinned version and returns the validator exit code', async () => {
+  const ctx = await setupTest();
+
+  const calls: { argv: readonly string[]; cwd: string }[] = [];
+  const output: string[] = [];
+
+  await writeTreeFiles(ctx.directory, {
+    '.github/workflows/renovate.yml':
+      'jobs:\n  renovate:\n    steps:\n      - with:\n          renovate-version: 44.1.0\n',
+  });
+
+  const exitCode = await runRenovateConfigCheck({
+    cwd: ctx.directory,
+    env: {},
+    runCommand: (argv: readonly string[], options: Readonly<CommandOptions>) => {
+      calls.push({ argv, cwd: options.cwd });
+
+      return Promise.resolve({
+        exitCode: 1,
+        stdout: 'ERROR: Config validation failed\n',
+        stderr: '',
+      });
+    },
+    writeOutput: (text) => {
+      output.push(text);
+    },
+  });
+
+  expect({ exitCode, calls, output }).toStrictEqual({
+    exitCode: 1,
+    calls: [
+      {
+        argv: [
+          'npx',
+          '--yes',
+          '--package',
+          'renovate@44.1.0',
+          '--',
+          'renovate-config-validator',
+          '--strict',
+          '--no-global',
+          'default.json',
+        ],
+        cwd: ctx.directory,
+      },
+    ],
+    output: ['ERROR: Config validation failed\n'],
+  });
 });
