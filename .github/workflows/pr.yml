@@ -1,8 +1,9 @@
 name: PR
 
 on:
+  # Every base, as the synced caller does, so each pull request of a stack
+  # gets its checks before the one below it merges.
   pull_request:
-    branches: [main]
 
 concurrency:
   group: pr-${{ github.ref }}
