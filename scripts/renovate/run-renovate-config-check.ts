@@ -10,7 +10,7 @@ export interface RenovateConfigCheck {
 
   readonly env: Readonly<Record<string, string | undefined>>;
 
-  readonly fileSystem: FileSystem;
+  readonly fileSystem: Pick<FileSystem, 'readText'>;
 
   // Runs the validator, whose output the log shows as it runs.
   readonly runLoggedCommand: RunCommand;
