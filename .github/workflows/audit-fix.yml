@@ -54,6 +54,7 @@ jobs:
       contents: read
     env:
       BASE: ${{ inputs.base-branch || github.event.repository.default_branch }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       LEFTHOOK: 0
     steps:
       - name: Mint a write token for the caller
@@ -71,30 +72,20 @@ jobs:
           ref: ${{ env.BASE }}
           token: ${{ steps.app-token.outputs.token }}
 
-      # The script imports @zgeoff/std's source by relative path, because the
-      # caller's install need not hold @zgeoff/std.
-      - name: Check out the audit-fix script
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: zgeoff/tools
-          ref: ${{ job.workflow_sha }}
-          path: .audit-fix
-          sparse-checkout: |
-            scripts/audit-fix
-            packages/std/src
-          persist-credentials: false
-
-      # The default branch's fix lives on audit-fix; another base gets its own
-      # branch, so a test run never touches the real one.
-      - name: Name the fix branch
-        env:
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-        run: |
-          if [ "$BASE" = "$DEFAULT_BRANCH" ]; then
-            echo "BRANCH=audit-fix" >> "$GITHUB_ENV"
-          else
-            echo "BRANCH=audit-fix-${BASE//\//-}" >> "$GITHUB_ENV"
-          fi
+      # The scripts live in this repo, not in the caller's checkout, so the
+      # job downloads them from the commit that defines it: a caller at a sync
+      # tag runs that tag's scripts. actionlint does not know
+      # job.workflow_repository or job.workflow_sha, so each step reads them
+      # through toJSON.
+      - name: Download the step script downloader
+        env: &tools-url
+          TOOLS_URL:
+            https://raw.githubusercontent.com/${{ fromJSON(toJSON(job)).workflow_repository }}/${{
+            fromJSON(toJSON(job)).workflow_sha }}
+        run:
+          curl -fsSL --retry 3 --retry-all-errors --create-dirs -o "$RUNNER_TEMP/tools/.bun-version"
+          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/ci/download-step-scripts.ts"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -104,63 +95,26 @@ jobs:
       - name: Install
         run: bun install --frozen-lockfile --ignore-scripts
 
+      - name: Download the audit-fix scripts
+        env: *tools-url
+        run: bun "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts" audit-fix
+
+      # An open fix branch's ignores keep their expiry on a rerun, so the
+      # rerun builds the same tree.
       - name: Fix the advisories
         env:
           EXPIRY_DAYS: ${{ inputs.expiry-days }}
           NO_COLOR: 1
-        run: |
-          set -euo pipefail
-          # An open fix branch's ignores keep their expiry on a rerun, so the
-          # rerun builds the same tree.
-          pending=()
-          if git fetch --quiet origin "$BRANCH" 2>/dev/null \
-            && git show FETCH_HEAD:audit-ignores.json > "$RUNNER_TEMP/pending-ignores.json" 2>/dev/null; then
-            pending=(--pending-ignores "$RUNNER_TEMP/pending-ignores.json")
-          fi
-          bun .audit-fix/scripts/audit-fix/audit-fix.ts \
-            --title-file "$RUNNER_TEMP/title.txt" \
-            --body-file "$RUNNER_TEMP/body.md" \
-            --review-file "$RUNNER_TEMP/needs-review.txt" \
-            --expiry-days "$EXPIRY_DAYS" \
-            "${pending[@]}"
-          rm -rf .audit-fix
+        run: bun "$RUNNER_TEMP/tools/scripts/audit-fix/fix-advisories.ts"
 
+      # An ignore must not ride an auto-merge armed for an earlier fix, so
+      # auto-merge goes off before the push, and a rerun that makes the tree
+      # the open fix holds pushes nothing.
       - name: Commit and push the fix
         id: push
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          set -euo pipefail
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
-          git checkout -B "$BRANCH"
-          git add -A
-          if git diff --cached --quiet; then
-            echo "bun audit passes with nothing to change; nothing to fix."
-            git push origin --delete "$BRANCH" 2>/dev/null || true
-            echo "pushed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if [ ! -s "$RUNNER_TEMP/title.txt" ]; then
-            echo "::error::audit-fix changed files but wrote no pull-request title"
-            exit 1
-          fi
-          git commit -m "$(cat "$RUNNER_TEMP/title.txt")"
-          # An ignore must not ride an auto-merge armed for an earlier fix, so
-          # auto-merge goes off before the push.
-          if [ "$(cat "$RUNNER_TEMP/needs-review.txt")" = true ] \
-            && [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')" ]; then
-            gh pr merge "$BRANCH" --disable-auto > /dev/null 2>&1 || true
-          fi
-          # A rerun on an unchanged default branch makes the same tree; pushing
-          # it again would only restart the pull request's checks.
-          if git fetch --quiet origin "$BRANCH" 2>/dev/null \
-            && [ "$(git rev-parse 'HEAD^{tree}')" = "$(git rev-parse 'FETCH_HEAD^{tree}')" ]; then
-            echo "The open fix already holds this change."
-          else
-            git push --force origin "$BRANCH"
-          fi
-          echo "pushed=true" >> "$GITHUB_OUTPUT"
+        run: bun "$RUNNER_TEMP/tools/scripts/audit-fix/commit-audit-fix.ts"
 
       - name: Open or update the pull request
         if: steps.push.outputs.pushed == 'true'
@@ -169,33 +123,4 @@ jobs:
           AUTOMERGE: ${{ inputs.automerge }}
           RUN_URL:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          title=$(cat "$RUNNER_TEMP/title.txt")
-          { cat "$RUNNER_TEMP/body.md"; echo; echo "[Workflow run]($RUN_URL)"; } > "$RUNNER_TEMP/pr-body.md"
-          needs_review=$(cat "$RUNNER_TEMP/needs-review.txt")
-          labels=(dependencies security)
-          if [ "$needs_review" = true ]; then
-            labels+=(audit-ignore)
-          fi
-          # A label the repo already has keeps its colour and description.
-          for label in "${labels[@]}"; do
-            gh label create "$label" > /dev/null 2>&1 || true
-          done
-          label_list=$(IFS=,; echo "${labels[*]}")
-          number=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
-          if [ -n "$number" ]; then
-            gh pr edit "$number" --title "$title" --body-file "$RUNNER_TEMP/pr-body.md" --add-label "$label_list"
-            if [ "$needs_review" != true ]; then
-              gh pr edit "$number" --remove-label audit-ignore > /dev/null 2>&1 || true
-            fi
-          else
-            gh pr create --base "$BASE" --head "$BRANCH" --title "$title" \
-              --body-file "$RUNNER_TEMP/pr-body.md" --label "$label_list"
-          fi
-          if [ "$needs_review" = true ]; then
-            echo "The pull request adds or renews an ignore, so it waits for a person's review."
-          elif [ "$AUTOMERGE" = true ]; then
-            gh pr merge "$BRANCH" --auto --squash \
-              || echo "::warning::GitHub refused auto-merge; allow auto-merge in the repo settings, or merge the pull request by hand."
-          fi
+        run: bun "$RUNNER_TEMP/tools/scripts/audit-fix/open-audit-fix-pull-request.ts"

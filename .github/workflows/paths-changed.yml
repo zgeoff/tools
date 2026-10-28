@@ -47,30 +47,31 @@ jobs:
           filter: blob:none
           persist-credentials: false
 
+      # actionlint does not know job.workflow_repository or job.workflow_sha,
+      # so the step reads them through toJSON. The job sets up the Bun that
+      # tools pins, because the caller's checkout comes only on a pull request.
+      - name: Download the step script downloader
+        env: &tools-url
+          TOOLS_URL:
+            https://raw.githubusercontent.com/${{ fromJSON(toJSON(job)).workflow_repository }}/${{
+            fromJSON(toJSON(job)).workflow_sha }}
+        run:
+          curl -fsSL --retry 3 --retry-all-errors --create-dirs -o "$RUNNER_TEMP/tools/.bun-version"
+          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/ci/download-step-scripts.ts"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: ${{ runner.temp }}/tools/.bun-version
+
+      - name: Download the match script
+        env: *tools-url
+        run: bun "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts" paths-changed
+
       - name: Match changed files
         id: match
         env:
           EVENT: ${{ github.event_name }}
           PATTERNS: ${{ inputs.paths }}
-        run: |
-          set -euo pipefail
-          if [[ $EVENT != pull_request ]]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # The merge commit against the base it merges into: what the merge
-          # changes. --no-renames lists a moved file's old path too, and -z
-          # leaves a path unquoted whatever its characters. A file, not a
-          # process substitution, so a failed diff fails the step.
-          git diff -z --name-only --no-renames HEAD^1 HEAD > "$RUNNER_TEMP/changed-files"
-          changed=false
-          while IFS= read -r -d '' file; do
-            while IFS= read -r pattern; do
-              # shellcheck disable=SC2053 # the pattern is a glob on purpose
-              if [[ -n $pattern && $file == $pattern ]]; then
-                echo "$file matches $pattern"
-                changed=true
-              fi
-            done <<< "$PATTERNS"
-          done < "$RUNNER_TEMP/changed-files"
-          echo "changed=$changed" | tee -a "$GITHUB_OUTPUT"
+        run: bun "$RUNNER_TEMP/tools/scripts/paths-changed/match-changed-files.ts"

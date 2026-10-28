@@ -6,4 +6,5 @@ dist/
 .env.*
 packages/*/.test-*
 scripts/.test-*
+scripts/*/.test-*
 test-utils/.test-*

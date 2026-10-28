@@ -14,7 +14,9 @@
 # The static job, and the checks job in a private repo, run the shared checks
 # as named steps beside the scripts: shell, docs, workflows, the workflow lint,
 # commits, local paths and test timeouts. A check that needs a tool the repo
-# lacks prints a notice and passes.
+# lacks prints a notice and passes. Each step runs one script, which the job
+# downloads from the commit of zgeoff/tools that defines it, so a caller at a
+# sync tag runs that tag's scripts.
 #
 # `scripts` is a space-separated list of package.json script names. Empty means
 # the standard list: audit deadcode format:check lint typecheck test, then each
@@ -137,46 +139,34 @@ jobs:
         with: &bun-version
           bun-version-file: .bun-version
 
-      # The planner and the branch check scripts live in this repo, not in the
-      # caller's checkout, so the step downloads them from the commit that
-      # defines this job: a caller at a sync tag runs that tag's scripts.
       # actionlint does not know job.workflow_repository or job.workflow_sha,
-      # so the step reads them from the job context as JSON.
-      - &fetch-planner
-        name: Fetch the check scripts
-        env: &job-context
-          JOB_CONTEXT: ${{ toJSON(job) }}
-        run: &fetch-body |
-          set -euo pipefail
-          repository=$(jq -er .workflow_repository <<< "$JOB_CONTEXT")
-          sha=$(jq -er .workflow_sha <<< "$JOB_CONTEXT")
-          mkdir -p "$RUNNER_TEMP/check-plan"
-          base="https://raw.githubusercontent.com/$repository/$sha"
-          for file in plan-check-scripts.ts write-check-plan.ts; do
-            curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/check-plan/$file" "$base/.github/workflows/$file"
-          done
-          for file in read-branch-base.ts parse-added-lines.ts run-program.ts run-commits-check.ts run-local-paths-check.ts parse-lane-limits.ts run-test-timeouts-check.ts run-workflows-check.ts parse-shell-words.ts shell-escape-parsers.ts collect-command-names.ts; do
-            curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/check-plan/$file" "$base/sync/pre-push/$file"
-          done
-          curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/check-plan/tools-package.json" "$base/package.json"
+      # so the step reads them through toJSON. The first download is the one
+      # script that downloads the others with every file they import.
+      - &download-downloader
+        name: Download the step script downloader
+        env: &tools-url
+          TOOLS_URL:
+            https://raw.githubusercontent.com/${{ fromJSON(toJSON(job)).workflow_repository }}/${{
+            fromJSON(toJSON(job)).workflow_sha }}
+        run:
+          &download-downloader-body curl -fsSL --retry 3 --retry-all-errors --create-dirs -o
+          "$RUNNER_TEMP/tools/.bun-version" "$TOOLS_URL/.bun-version" -o
+          "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/ci/download-step-scripts.ts"
 
-      # The adapter imports ts-pattern, which the caller's checkout need not
-      # hold. The step installs the version tools' catalog pins, beside the
-      # planner, from the package.json the fetch downloaded.
-      - &install-planner
-        name: Install the check planner
-        run: &install-planner-body |
-          set -euo pipefail
-          cd "$RUNNER_TEMP/check-plan"
-          jq '{dependencies: {"ts-pattern": (.workspaces.catalog["ts-pattern"] // error("tools pins no ts-pattern"))}}' tools-package.json > package.json
-          bun install
+      - &download-scripts
+        name: Download the check scripts
+        env: *tools-url
+        run:
+          &download-scripts-body bun "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts"
+          bun-checks
 
       - &plan
         name: Plan the check scripts
         id: plan
         env: &plan-env
           SCRIPTS: ${{ inputs.scripts }}
-        run: &plan-body bun "$RUNNER_TEMP/check-plan/write-check-plan.ts"
+        run: &plan-body bun "$RUNNER_TEMP/tools/scripts/bun-checks/write-check-plan.ts"
 
   static:
     if:
@@ -210,107 +200,43 @@ jobs:
         name: Install
         run: &install-body bun install --frozen-lockfile
 
-      - *fetch-planner
-      - *install-planner
+      - *download-downloader
+      - *download-scripts
       - *plan
 
-      # The shell check runs shellcheck, which the runner image carries, and
-      # shfmt, which it lacks. The step installs the pinned binary in a job
-      # that runs the shell check, or when the caller asks for it, into a
-      # folder the runner owns, put on the PATH of the later steps.
+      # The shell check runs shfmt and the workflows check runs actionlint,
+      # which the runner image lacks. Each step installs its pinned binary in a
+      # job that runs the check, or when the caller asks for it, into a folder
+      # the runner owns, put on the PATH of the later steps.
       - &setup-shfmt
         name: Setup shfmt
         env: &shfmt-env
-          SETUP_SHFMT: ${{ inputs.setup-shfmt }}
-          SHFMT_VERSION: v3.13.1
-          SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
-        run: &shfmt-body |
-          set -euo pipefail
-          if [ "$SETUP_SHFMT" != true ] && [ "$PART" != static ] && [ "$PART" != all ]; then
-            echo "shfmt: not needed, because this job runs no shell check"
-            exit 0
-          fi
-          curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/shfmt.download" "https://github.com/mvdan/sh/releases/download/$SHFMT_VERSION/shfmt_${SHFMT_VERSION}_linux_amd64"
-          echo "$SHFMT_SHA256  $RUNNER_TEMP/shfmt.download" | sha256sum -c -
-          mkdir -p "$RUNNER_TEMP/shfmt-bin"
-          install -m 0755 "$RUNNER_TEMP/shfmt.download" "$RUNNER_TEMP/shfmt-bin/shfmt"
-          echo "$RUNNER_TEMP/shfmt-bin" >> "$GITHUB_PATH"
+          SETUP_TOOL: ${{ inputs.setup-shfmt }}
+        run: &shfmt-body bun "$RUNNER_TEMP/tools/scripts/ci/install-pinned-tool.ts" shfmt
 
-      # The workflows check runs actionlint, which the runner image lacks. The
-      # step installs the pinned release the same way as shfmt.
       - &setup-actionlint
         name: Setup actionlint
         id: setup-actionlint
         env: &actionlint-env
-          SETUP_ACTIONLINT: ${{ inputs.setup-actionlint }}
-          ACTIONLINT_VERSION: 1.7.12
-          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
-        run: &actionlint-body |
-          set -euo pipefail
-          if [ "$SETUP_ACTIONLINT" != true ] && [ "$PART" != static ] && [ "$PART" != all ]; then
-            echo "actionlint: not needed, because this job runs no workflows check"
-            exit 0
-          fi
-          curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/actionlint.tar.gz" "https://github.com/rhysd/actionlint/releases/download/v$ACTIONLINT_VERSION/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
-          mkdir -p "$RUNNER_TEMP/actionlint-bin"
-          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/actionlint-bin" actionlint
-          echo "$RUNNER_TEMP/actionlint-bin" >> "$GITHUB_PATH"
+          SETUP_TOOL: ${{ inputs.setup-actionlint }}
+        run: &actionlint-body bun "$RUNNER_TEMP/tools/scripts/ci/install-pinned-tool.ts" actionlint
 
       # Each check and script step after the setup runs even when an earlier
       # one fails, so the run shows every check that fails, each by name.
       - &check-shell
         name: Check shell
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: |
-          set -euo pipefail
-          list=$(mktemp)
-          git ls-files -z -- '*.sh' > "$list"
-          if [ ! -s "$list" ]; then
-            echo "shell: the repo tracks no shell script"
-            exit 0
-          fi
-          status=0
-          xargs -0 -a "$list" shellcheck --external-sources --source-path=SCRIPTDIR "--source-path=$PWD" -- || status=1
-          xargs -0 -a "$list" shfmt -d -- || status=1
-          exit "$status"
+        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/check-shell.ts"
 
-      # The docs-writing skill's scripts pick the docs they read themselves.
       - &check-docs
         name: Check docs
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: |
-          set -euo pipefail
-          scripts=.claude/skills/docs-writing/scripts
-          if [ ! -f "$scripts/check-length.sh" ]; then
-            echo "::notice::docs: skipped, because the repo has no $scripts/check-length.sh; take the skill-docs-writing entry of repo-sync to run it"
-            exit 0
-          fi
-          status=0
-          for script in check-length.sh check-links.sh; do
-            if ! bash "$scripts/$script"; then
-              echo "::error::docs: $script failed; its output above holds each failing file and its fault"
-              status=1
-            fi
-          done
-          exit "$status"
+        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/check-docs.ts"
 
-      # actionlint 1.7.12 rejects the concurrency queue key that GitHub documents,
-      # until rhysd/actionlint#654 ships. The ignore lapses on its expiry date, and
-      # the pre-push workflows job holds the same ignore and date.
       - &check-workflows
         name: Check workflows
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        env:
-          QUEUE_IGNORE_EXPIRES: '20270122'
-        run: |
-          set -euo pipefail
-          if [ "$(date -u +%Y%m%d)" -lt "$QUEUE_IGNORE_EXPIRES" ]; then
-            actionlint -ignore 'unexpected key "queue" for "concurrency" section'
-          else
-            echo "::warning::workflows: the ignore of the concurrency queue key expired on $QUEUE_IGNORE_EXPIRES; move ACTIONLINT_VERSION to a release with rhysd/actionlint#654"
-            actionlint
-          fi
+        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/check-workflows.ts"
 
       # The workflow lint reads the profile, because one of its rules covers a
       # private repo alone.
@@ -321,36 +247,29 @@ jobs:
           CHECKS_PROFILE:
             ${{ ((github.event.repository && github.event.repository.private) ||
             (!github.event.repository && inputs.private)) && 'private' || 'public' }}
-        run: bun "$RUNNER_TEMP/check-plan/run-workflows-check.ts"
+        run: bun "$RUNNER_TEMP/tools/sync/pre-push/run-workflows-check.ts"
 
       - &check-commits
         name: Check commits
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/check-plan/run-commits-check.ts"
+        run: bun "$RUNNER_TEMP/tools/sync/pre-push/run-commits-check.ts"
 
       - &check-local-paths
         name: Check local paths
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/check-plan/run-local-paths-check.ts"
+        run: bun "$RUNNER_TEMP/tools/sync/pre-push/run-local-paths-check.ts"
 
       - &check-test-timeouts
         name: Check test timeouts
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/check-plan/run-test-timeouts-check.ts"
+        run: bun "$RUNNER_TEMP/tools/sync/pre-push/run-test-timeouts-check.ts"
 
       - &run-scripts
         name: Run the check scripts
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
         env:
           SCRIPTS: ${{ steps.plan.outputs.scripts }}
-        run: &run-body |
-          set -euo pipefail
-          read -ra list <<< "$SCRIPTS"
-          for name in "${list[@]}"; do
-            echo "::group::bun run $name"
-            bun run "$name"
-            echo "::endgroup::"
-          done
+        run: &run-body bun "$RUNNER_TEMP/tools/scripts/ci/run-package-scripts.ts"
 
   test:
     if:
@@ -369,8 +288,8 @@ jobs:
       - *setup-node
       - *setup-bun
       - *install
-      - *fetch-planner
-      - *install-planner
+      - *download-downloader
+      - *download-scripts
       - *plan
       - *setup-shfmt
       - *setup-actionlint
@@ -399,8 +318,8 @@ jobs:
       - *setup-node
       - *setup-bun
       - *install
-      - *fetch-planner
-      - *install-planner
+      - *download-downloader
+      - *download-scripts
       - *plan
       - *setup-shfmt
       - *setup-actionlint
@@ -408,11 +327,11 @@ jobs:
 
   # The one check a caller requires, in either profile. In a private repo it
   # is the profile's single job: the public jobs it needs skip, so it starts
-  # at once and runs every step but the last. In a public repo it starts after
-  # every other job ends and runs only its last step, which fails when one of
-  # them failed or was cancelled; a job skipped by design, such as the lane
-  # job of a repo without lanes, passes. In a public repo it runs on a cancel
-  # too, because GitHub counts a skipped required check as a pass.
+  # at once and runs every step but the last two. In a public repo it starts
+  # after every other job ends and runs only its last two steps, which fail
+  # when one of them failed or was cancelled; a job skipped by design, such as
+  # the lane job of a repo without lanes, passes. In a public repo it runs on
+  # a cancel too, because GitHub counts a skipped required check as a pass.
   checks:
     needs: [gitleaks, plan, static, test, test-lane]
     if:
@@ -460,14 +379,23 @@ jobs:
         if: env.PROFILE == 'private'
         run: *install-body
 
-      - name: Fetch the check scripts
-        if: env.PROFILE == 'private'
-        env: *job-context
-        run: *fetch-body
+      # The public profile's last step needs the downloads too, so they run in
+      # either profile, and after a cancel.
+      - name: Download the step script downloader
+        if: ${{ always() }}
+        env: *tools-url
+        run: *download-downloader-body
 
-      - name: Install the check planner
-        if: env.PROFILE == 'private'
-        run: *install-planner-body
+      - name: Setup tools' Bun
+        if: ${{ always() && env.PROFILE == 'public' }}
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: ${{ runner.temp }}/tools/.bun-version
+
+      - name: Download the check scripts
+        if: ${{ always() }}
+        env: *tools-url
+        run: *download-scripts-body
 
       - name: Plan the check scripts
         id: plan
@@ -540,19 +468,10 @@ jobs:
           SCRIPTS: test:host
         run: *run-body
 
-      # Every other step skips in a public repo, and this one runs even after a
+      # Every check step skips in a public repo, and this one runs even after a
       # cancel, so the check fails rather than ending cancelled or skipped.
       - name: Require every job
         if: ${{ always() && env.PROFILE == 'public' }}
         env:
           NEEDS: ${{ toJSON(needs) }}
-        run: |
-          set -euo pipefail
-          failed=$(jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | "\(.key): \(.value.result)"' <<< "$NEEDS")
-          if [ -n "$failed" ]; then
-            while read -r line; do
-              echo "::error::$line"
-            done <<< "$failed"
-            exit 1
-          fi
-          echo "every job passed or skipped by design"
+        run: bun "$RUNNER_TEMP/tools/scripts/ci/require-every-job.ts"

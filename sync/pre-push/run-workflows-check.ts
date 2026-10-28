@@ -157,6 +157,7 @@ const jobRules: readonly ((context: WorkflowContext, job: Job) => WorkflowFindin
   collectTimeoutFindings,
   collectHeavyFindings,
   collectCacheFindings,
+  collectCheckoutFindings,
 ];
 
 function collectRunFindings(context: WorkflowContext, job: Job): WorkflowFinding[] {
@@ -307,6 +308,31 @@ function collectCacheFindings(context: WorkflowContext, job: Job): WorkflowFindi
         ]
       : [],
   );
+}
+
+const checkoutPattern = /^actions\/checkout(?:@|$)/u;
+
+// A full clone of history needs every commit and tree, and git fetches a file's contents only when
+// a command reads them, so a blobless clone costs the same whatever the history's old files hold.
+function collectCheckoutFindings(context: WorkflowContext, job: Job): WorkflowFinding[] {
+  return collectSteps(job).flatMap((step, index) => {
+    const action = findMember(step, 'uses');
+    const inputs = findMember(step, 'with');
+    const depth = findMember(inputs, 'fetch-depth');
+
+    const isFullHistory =
+      typeof action === 'string' && checkoutPattern.test(action) && (depth === 0 || depth === '0');
+
+    return isFullHistory && findMember(inputs, 'filter') !== 'blob:none'
+      ? [
+          {
+            path: context.path,
+            line: job.line,
+            message: `job ${job.id}, ${formatStepLabel(step, index)}: a checkout with fetch-depth: 0 sets filter: blob:none, so it clones the history without the file contents`,
+          },
+        ]
+      : [];
+  });
 }
 
 function collectConcurrencyFindings(context: WorkflowContext): WorkflowFinding[] {

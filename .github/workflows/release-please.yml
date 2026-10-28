@@ -74,6 +74,9 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # The merge step alone waits up to checks-timeout-minutes, 15 by default,
+    # and an expression cannot add the rest of the job to it.
+    timeout-minutes: 60
     # Two pushes close together start two runs; without a queue, one run can
     # merge the release PR while the other is still formatting it.
     # queue: max keeps every waiting run; the default replaces a waiting run.
@@ -103,28 +106,39 @@ jobs:
           private-key: ${{ secrets.app-private-key }}
 
       # The scripts live in this repo, not in the caller's checkout, so the
-      # step downloads them from the commit that defines this job: a caller
-      # at a sync tag runs that tag's scripts. actionlint does not know
-      # job.workflow_repository or job.workflow_sha, so the step reads them
-      # from the job context as JSON.
-      - name: Fetch the release scripts
-        env:
-          JOB_CONTEXT: ${{ toJSON(job) }}
-        run: |
-          set -euo pipefail
-          repository=$(jq -er .workflow_repository <<< "$JOB_CONTEXT")
-          sha=$(jq -er .workflow_sha <<< "$JOB_CONTEXT")
-          for script in check-release-head.sh merge-release-prs.sh; do
-            curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/$script" \
-              "https://raw.githubusercontent.com/$repository/$sha/scripts/$script"
-          done
+      # job downloads them from the commit that defines it: a caller at a sync
+      # tag runs that tag's scripts. actionlint does not know
+      # job.workflow_repository or job.workflow_sha, so each step reads them
+      # through toJSON. The job sets up tools' Bun, because the caller's
+      # checkout, and its .bun-version, comes only with a release PR.
+      - name: Download the step script downloader
+        env: &tools-url
+          TOOLS_URL:
+            https://raw.githubusercontent.com/${{ fromJSON(toJSON(job)).workflow_repository }}/${{
+            fromJSON(toJSON(job)).workflow_sha }}
+        run:
+          curl -fsSL --retry 3 --retry-all-errors --create-dirs -o "$RUNNER_TEMP/tools/.bun-version"
+          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/ci/download-step-scripts.ts"
+
+      # No cache: a job that holds the App token must not run a Bun binary
+      # that another run's cache entry could have replaced.
+      - name: Set up tools' bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: ${{ runner.temp }}/tools/.bun-version
+          no-cache: true
+
+      - name: Download the release scripts
+        env: *tools-url
+        run: bun "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts" release
 
       # A release PR that a person or auto-merge merged is tagged by the
       # release-please call below.
       - name: Check untagged releases against main's head
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
-        run: bash "$RUNNER_TEMP/check-release-head.sh" "$GITHUB_REPOSITORY"
+        run: bash "$RUNNER_TEMP/tools/scripts/check-release-head.sh" "$GITHUB_REPOSITORY"
 
       - name: Run release-please
         id: release
@@ -138,9 +152,8 @@ jobs:
         with:
           ref: ${{ inputs.release-branch }}
           token: ${{ steps.app-token.outputs.token || github.token }}
-      # No cache: a job that holds the App token must not run a Bun binary
-      # that another run's cache entry could have replaced.
-      - name: Set up bun
+      # The sync command runs with the caller's Bun.
+      - name: Set up the release PR's bun
         if: steps.release.outputs.prs_created == 'true' && inputs.sync-command != ''
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
@@ -150,14 +163,7 @@ jobs:
         if: steps.release.outputs.prs_created == 'true' && inputs.sync-command != ''
         env:
           SYNC_COMMAND: ${{ inputs.sync-command }}
-        run: |
-          bash -c "$SYNC_COMMAND"
-          if ! git diff --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -am "chore: sync lockfile and format release files"
-            git push
-          fi
+        run: bun "$RUNNER_TEMP/tools/scripts/release/sync-release-pr.ts"
 
       # Reads no release-please outputs on purpose: prs_created is false
       # when the open release PR needed no update (a previous run failed
@@ -171,15 +177,15 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           RELEASE_BRANCH: ${{ inputs.release-branch }}
           CHECKS_TIMEOUT_MINUTES: ${{ inputs.checks-timeout-minutes }}
-        run: |
-          CHECKS_TIMEOUT=$((CHECKS_TIMEOUT_MINUTES * 60)) \
-            bash "$RUNNER_TEMP/merge-release-prs.sh" "$GITHUB_REPOSITORY" "$RELEASE_BRANCH"
+        run:
+          bash "$RUNNER_TEMP/tools/scripts/merge-release-prs.sh" "$GITHUB_REPOSITORY"
+          "$RELEASE_BRANCH"
 
       - name: Check the merge against main's head
         if: steps.merge.outputs.merged == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: bash "$RUNNER_TEMP/check-release-head.sh" "$GITHUB_REPOSITORY"
+        run: bash "$RUNNER_TEMP/tools/scripts/check-release-head.sh" "$GITHUB_REPOSITORY"
 
       # Tags the release PR this run just merged. A run whose first
       # release-please call tagged a release already leaves this merge to the
@@ -200,19 +206,4 @@ jobs:
           RELEASE_OUTPUTS:
             ${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) ||
             toJSON(steps.release.outputs) }}
-        run: |
-          set -euo pipefail
-          # A single package at the root sets tag_name and version; a
-          # multi-package release sets them per path only.
-          first() {
-            jq -r --arg key "$1" '. as $out
-              | ($out.paths_released // "[]" | fromjson) as $paths
-              | $out[$key] // (if ($paths | length) > 0 then $out[$paths[0] + "--" + $key] else null end) // ""' \
-              <<< "$RELEASE_OUTPUTS"
-          }
-          {
-            echo "releases_created=$(jq -r '.releases_created // "false"' <<< "$RELEASE_OUTPUTS")"
-            echo "tag=$(first tag_name)"
-            echo "version=$(first version)"
-            echo "release-outputs=$(jq -c . <<< "$RELEASE_OUTPUTS")"
-          } >> "$GITHUB_OUTPUT"
+        run: bun "$RUNNER_TEMP/tools/scripts/release/pick-release-outputs.ts"

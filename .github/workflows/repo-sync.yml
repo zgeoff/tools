@@ -55,6 +55,7 @@ jobs:
   prepare:
     name: Read the manifest
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
     outputs:
@@ -69,42 +70,38 @@ jobs:
           sparse-checkout: sync/manifest.json
           sparse-checkout-cone-mode: false
 
+      # The step scripts download from the commit of this workflow, whatever
+      # tools-ref names, so an older ref still syncs through current scripts.
+      # actionlint does not know job.workflow_repository or job.workflow_sha,
+      # so the step reads them through toJSON.
+      - name: Download the step script downloader
+        env: &tools-url
+          TOOLS_URL:
+            https://raw.githubusercontent.com/${{ fromJSON(toJSON(job)).workflow_repository }}/${{
+            fromJSON(toJSON(job)).workflow_sha }}
+        run:
+          curl -fsSL --retry 3 --retry-all-errors --create-dirs -o "$RUNNER_TEMP/tools/.bun-version"
+          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/ci/download-step-scripts.ts"
+
+      # No cache: a job that holds an App token must not run a Bun binary
+      # that another run's cache entry could have replaced.
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: ${{ runner.temp }}/tools/.bun-version
+          no-cache: true
+
+      - name: Download the sync scripts
+        env: *tools-url
+        run: bun "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts" repo-sync
+
       - name: Drop the skipped and the unrequested entries
         id: manifest
         env:
           SKIP: ${{ inputs.skip }}
           INCLUDE: ${{ inputs.include }}
-        run: |
-          set -euo pipefail
-          result=$(jq -c --arg skip "$SKIP" --arg include "$INCLUDE" \
-            'def names: split(",") | map(gsub("\\s"; "")) | map(select(. != ""));
-             ($skip | names) as $skip
-             | ($include | names) as $include
-             | [.[] | select(.optIn == true) | .name] as $optIn
-             | {
-                 unknown: [$include[] | select(. as $n | $optIn | index($n) | not)],
-                 both: [$include[] | select(. as $n | $skip | index($n))],
-                 entries: [.[]
-                   | select(.name as $n | $skip | index($n) | not)
-                   | select((.optIn != true) or (.name as $n | $include | index($n)))
-                   | del(.optIn)
-                   | .workflows = (any(.files[]; .target | startswith(".github/workflows/")))]
-               }' \
-            sync/manifest.json)
-          # The colons go, so a value cannot start a workflow command in the log.
-          unknown=$(printf '%s' "$result" | jq -r '.unknown | join(", ") | gsub(":"; " ")')
-          if [ -n "$unknown" ]; then
-            echo "::error::include lists no opt-in manifest entry: $unknown"
-            exit 1
-          fi
-          both=$(printf '%s' "$result" | jq -r '.both | join(", ") | gsub(":"; " ")')
-          if [ -n "$both" ]; then
-            echo "::error::skip and include both list: $both"
-            exit 1
-          fi
-          entries=$(printf '%s' "$result" | jq -c '.entries')
-          echo "entries=$entries" >> "$GITHUB_OUTPUT"
-          echo "workflows=$(printf '%s' "$entries" | jq 'any(.[]; .workflows)')" >> "$GITHUB_OUTPUT"
+        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/write-sync-entries.ts"
 
   sync:
     name: Sync the entries
@@ -112,6 +109,7 @@ jobs:
     # The job runs with no entry too, since it still removes retired files.
     if: ${{ success() }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # Two runs at once could push one release's files and then write the other
     # release's title and body. The group names only the caller, so runs from
     # every ref and every sync tag wait for each other.
@@ -149,9 +147,35 @@ jobs:
           # The earlier manifests in the history name the files to delete.
           fetch-depth: 0
 
+      # The step scripts download from the commit of this workflow, whatever
+      # tools-ref names, so an older ref still syncs through current scripts.
+      # actionlint does not know job.workflow_repository or job.workflow_sha,
+      # so the step reads them through toJSON.
+      - name: Download the step script downloader
+        env: &sync-tools-url
+          TOOLS_URL:
+            https://raw.githubusercontent.com/${{ fromJSON(toJSON(job)).workflow_repository }}/${{
+            fromJSON(toJSON(job)).workflow_sha }}
+        run:
+          curl -fsSL --retry 3 --retry-all-errors --create-dirs -o "$RUNNER_TEMP/tools/.bun-version"
+          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/ci/download-step-scripts.ts"
+
+      # No cache: a job that holds an App token must not run a Bun binary
+      # that another run's cache entry could have replaced.
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: ${{ runner.temp }}/tools/.bun-version
+          no-cache: true
+
+      - name: Download the sync scripts
+        env: *sync-tools-url
+        run: bun "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts" repo-sync
+
       # Each entry becomes one commit on the sync branch. An entry that fails,
       # through a conflict or its build, is reset away and left out, the other
-      # entries still sync, and the last step fails the run.
+      # entries still sync, and the step fails once the pull request is open.
       #
       # A file whose `except` list names the caller is not copied, and each
       # Markdown file the entry delivers loses the blocks that need it, so the
@@ -165,8 +189,12 @@ jobs:
       #
       # The build runs in the caller's checkout with the runner's stock tools
       # (bash, git, jq); the manifest README states that contract.
-      - name: Commit each entry's files
-        id: entries
+      #
+      # The branch is recreated from the base on every run, so the push forces
+      # it, and GitHub closes the pull request of a deleted branch. Each
+      # entry's own branch, sync/<name>, closes once the one pull request
+      # carries its files; a failed entry keeps its branch.
+      - name: Sync the entries
         env:
           ENTRIES: ${{ needs.prepare.outputs.entries }}
           BRANCH: repo-sync/zgeoff-tools
@@ -176,209 +204,6 @@ jobs:
           REPO: ${{ github.repository }}
           SKIP: ${{ inputs.skip }}
           WORKFLOWS: ${{ needs.prepare.outputs.workflows }}
-        run: |
-          set -euo pipefail
-          # A delivered workflow calls this repository at the ref this run syncs
-          # from, so a caller pinned to a tag never runs the shared jobs of main.
-          pin="${TOOLS_REF:-${WORKFLOW_REF##*@}}"
-          pin="${pin#refs/tags/}"
-          pin="${pin#refs/heads/}"
-          if [[ ! "$pin" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-            echo "::error::cannot pin delivered workflows to the ref '${pin//:/ }'"
-            exit 1
-          fi
-
-          copy_entry() {
-            local name=$1 files=$2 rows conflicts=0 excluded=() copied=()
-            rows=$(printf '%s' "$files" | bash .repo-sync/scripts/select-sync-files.sh "$REPO")
-            while IFS=$'\t' read -r action source target mode; do
-              if [ "$action" = skip ]; then
-                excluded+=("$target")
-                continue
-              fi
-              if [[ "$target" == .github/workflows/* && -f "$target" ]] && ! grep -qF "$MARKER" "$target"; then
-                calls=$(grep -oE 'zgeoff/tools/\.github/workflows/[^@[:space:]]+' ".repo-sync/$source" | sort -u || true)
-                if [ -z "$calls" ] || ! grep -qFf <(printf '%s\n' "$calls") "$target"; then
-                  echo "::error file=$target::$target is the repo's own workflow, so $name does not overwrite it. Move its jobs to a file with another name, or add $name to skip."
-                  conflicts=1
-                  continue
-                fi
-              fi
-              mkdir -p "$(dirname "$target")"
-              install -m "$mode" ".repo-sync/$source" "$target"
-              if [[ "$target" == .github/workflows/* ]]; then
-                sed -i -E "s#(zgeoff/tools/\.github/workflows/[^]@[:space:]\"'{},]+)@main([]{},[:space:]\"']|\$)#\1@$pin\2#g" "$target"
-              fi
-              copied+=("$target")
-            done <<< "$rows"
-            if [ "${#excluded[@]}" -gt 0 ]; then
-              for target in "${copied[@]}"; do
-                if [[ "$target" == *.md ]]; then
-                  bash .repo-sync/scripts/remove-excluded-blocks.sh "$target" "${excluded[@]}"
-                fi
-              done
-            fi
-            printf '%s\n' "${copied[@]}" > "$entry_copied"
-            return "$conflicts"
-          }
-
-          # The checkout of this repository stays out of every commit.
-          echo /.repo-sync/ >> .git/info/exclude
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
-          git checkout -q -B "$BRANCH"
-          synced='[]'
-          failed='[]'
-          taken=
-          # The targets each entry wrote, and those of the entries that synced,
-          # which name the files that replace a renamed file's old path.
-          entry_copied=$(mktemp)
-          copied_list=$(mktemp)
-          while IFS= read -r entry; do
-            name=$(printf '%s' "$entry" | jq -r '.name')
-            : > "$entry_copied"
-            # Each entry runs in a subshell with errexit on, outside any
-            # condition, so its first failing command stops it.
-            set +e
-            (
-              set -e
-              copy_entry "$name" "$(printf '%s' "$entry" | jq -c '.files')"
-              build=$(printf '%s' "$entry" | jq -r '.build // empty')
-              if [ -n "$build" ]; then
-                bash -euo pipefail -c "$build"
-              fi
-            )
-            status=$?
-            set -e
-            if [ "$status" -ne 0 ]; then
-              echo "::error::$name failed, so the sync leaves it out."
-              git reset -q --hard
-              git clean -q -f -d
-              failed=$(printf '%s' "$failed" | jq -c --arg name "$name" '. + [$name]')
-              continue
-            fi
-            taken+="$name,"
-            cat "$entry_copied" >> "$copied_list"
-            git add -A
-            if git diff --cached --quiet; then
-              echo "$name matches the source; nothing to sync."
-              continue
-            fi
-            git commit -q -m "chore: sync $name from zgeoff/tools"
-            synced=$(printf '%s' "$synced" | jq -c --argjson entry "$entry" '. + [$entry | {name, description}]')
-          done < <(printf '%s' "$ENTRIES" | jq -c '.[]')
-
-          # A file that an earlier manifest delivered and this one drops goes
-          # in one more commit, unless the repo changed it, or its entry failed
-          # or sits outside this run. The old path of a renamed file goes even
-          # when the repo changed it, once this run wrote the new path. A tools ref from before the cleanup
-          # holds no script for it, so that run removes nothing.
-          name=retired-files
-          removed=
-          if [ ! -f .repo-sync/scripts/remove-retired-sync-files.sh ]; then
-            echo "The tools ref has no retired-file cleanup; nothing to remove."
-          else
-            set +e
-            removed=$(bash .repo-sync/scripts/remove-retired-sync-files.sh .repo-sync "$taken" "$SKIP" "$(cat "$copied_list")")
-            status=$?
-            set -e
-            if [ "$status" -ne 0 ]; then
-              echo "::error::$name failed, so the sync leaves it out."
-              git reset -q --hard
-              failed=$(printf '%s' "$failed" | jq -c --arg name "$name" '. + [$name]')
-              removed=
-            fi
-          fi
-          # The token cannot push a change under .github/workflows/ without
-          # workflows write, so a retired workflow stays until the repo takes
-          # an entry with a workflow target.
-          if [ "$WORKFLOWS" != true ] && grep -q '^\.github/workflows/' <<< "$removed"; then
-            git checkout -q -- .github/workflows
-            removed=$(grep -v '^\.github/workflows/' <<< "$removed" || true)
-          fi
-          if [ -n "$removed" ]; then
-            git add -A
-            git commit -q -m "chore: remove the files zgeoff/tools no longer syncs"
-            description=$(printf '%s\n' "$removed" | jq -R -s -r 'split("\n") | map(select(. != "") | "`\(.)`") | "The copies of files zgeoff/tools no longer syncs: \(join(", "))"')
-            synced=$(printf '%s' "$synced" | jq -c --arg name "$name" --arg description "$description" '. + [{name: $name, description: $description}]')
-          fi
-          {
-            echo "pin=$pin"
-            echo "synced=$synced"
-            echo "failed=$failed"
-          } >> "$GITHUB_OUTPUT"
-
-      # The branch is recreated from the base on every run, so it never
-      # fast-forwards the remote, and the push forces it. GitHub closes the
-      # pull request of a deleted branch.
-      - name: Push the sync branch
-        id: push
-        env:
-          BRANCH: repo-sync/zgeoff-tools
-          SYNCED: ${{ steps.entries.outputs.synced }}
-          FAILED: ${{ steps.entries.outputs.failed }}
-        run: |
-          set -euo pipefail
-          if [ "$SYNCED" != '[]' ]; then
-            git push -q --force origin "$BRANCH"
-            echo "pushed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # A failed entry leaves the branch as the last run pushed it.
-          if [ "$FAILED" = '[]' ] && git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null; then
-            echo "Every entry matches the source; deleting $BRANCH."
-            git push -q origin --delete "$BRANCH"
-          fi
-          echo "pushed=false" >> "$GITHUB_OUTPUT"
-
-      - name: Open or update the pull request
-        if: steps.push.outputs.pushed == 'true'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          BRANCH: repo-sync/zgeoff-tools
           BASE: ${{ github.ref_name }}
-          PIN: ${{ steps.entries.outputs.pin }}
-          SYNCED: ${{ steps.entries.outputs.synced }}
-        run: |
-          set -euo pipefail
-          title="chore: sync zgeoff/tools $PIN"
-          body=$(printf '%s' "$SYNCED" | jq -r --arg pin "$PIN" '
-            "Copied from zgeoff/tools at \($pin) by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry:\n\n"
-            + (map("- `\(.name)`: \(.description)") | join("\n"))')
-          number=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
-          if [ -n "$number" ]; then
-            gh pr edit "$number" --title "$title" --body "$body"
-            echo "Updated pull request #$number for $BRANCH."
-            exit 0
-          fi
-          gh pr create --base "$BASE" --head "$BRANCH" --title "$title" --body "$body"
-
-      # Each entry's own branch, sync/<name>, closes once the one pull request
-      # carries its files: after that pull request publishes, or when every
-      # entry matches the base. A failed entry keeps its branch.
-      - name: Delete the per-entry sync branches
-        env:
-          ENTRIES: ${{ needs.prepare.outputs.entries }}
-          PUSHED: ${{ steps.push.outputs.pushed }}
-          FAILED: ${{ steps.entries.outputs.failed }}
-        run: |
-          set -euo pipefail
-          if [ "$PUSHED" != true ] && [ "$FAILED" != '[]' ]; then
-            echo "No pull request published; the per-entry branches stay."
-            exit 0
-          fi
-          while IFS= read -r name; do
-            if git ls-remote --exit-code --heads origin "sync/$name" > /dev/null; then
-              git push -q origin --delete "sync/$name"
-            fi
-          done < <(printf '%s' "$ENTRIES" | jq -r --argjson failed "$FAILED" '.[].name | select(. as $name | $failed | index($name) | not)')
-
-      - name: Fail on the entries left out
-        env:
-          FAILED: ${{ steps.entries.outputs.failed }}
-        run: |
-          set -euo pipefail
-          if [ "$FAILED" != '[]' ]; then
-            echo "::error::These entries failed and are not in the sync: $(printf '%s' "$FAILED" | jq -r 'join(", ")')"
-            exit 1
-          fi
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/sync-entries.ts"

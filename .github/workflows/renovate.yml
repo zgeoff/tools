@@ -50,16 +50,16 @@ jobs:
           private-key: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
 
+      # Renovate commits as the App's bot user, whose noreply address holds
+      # the user's ID.
       - name: Resolve the App's bot identity
         id: bot
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           SLUG: ${{ steps.app-token.outputs.app-slug }}
-        run: |
-          set -euo pipefail
-          id=$(gh api "users/${SLUG}%5Bbot%5D" --jq .id)
-          echo "username=${SLUG}[bot]" >> "$GITHUB_OUTPUT"
-          echo "git-author=${SLUG}[bot] <${id}+${SLUG}[bot]@users.noreply.github.com>" >> "$GITHUB_OUTPUT"
+        run:
+          gh api "users/${SLUG}%5Bbot%5D" --jq '"git-author=\(.login)
+          <\(.id)+\(.login)@users.noreply.github.com>"' >> "$GITHUB_OUTPUT"
 
       - name: Run Renovate
         uses: renovatebot/github-action@f0f41e5f2e706165f6814b1d0f0d0e319de7d1d9 # v46.3.8
@@ -70,7 +70,7 @@ jobs:
           LOG_LEVEL: ${{ inputs.log-level || 'info' }}
           RENOVATE_AUTODISCOVER: 'true'
           RENOVATE_ONBOARDING: 'false'
-          RENOVATE_USERNAME: ${{ steps.bot.outputs.username }}
+          RENOVATE_USERNAME: ${{ steps.app-token.outputs.app-slug }}[bot]
           RENOVATE_GIT_AUTHOR: ${{ steps.bot.outputs.git-author }}
           RENOVATE_ALLOWED_COMMANDS: '["^bun install --ignore-scripts( --minimum-release-age=0)?$"]'
           RENOVATE_DRY_RUN: ${{ inputs.dry-run != 'off' && inputs.dry-run || '' }}

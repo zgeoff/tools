@@ -150,9 +150,11 @@ Logic in a script runs in the script's tests on every pull request, as the testi
 - **Never put a script under `.github/`.** `bun test` skips the hidden folder, so a script and its
   test there never run in the repo's test suite.
 - **A reusable workflow in zgeoff/tools downloads its script at the commit that defines the job.**
-  The caller's checkout lacks the script, so the step reads `job.workflow_repository` and
-  `job.workflow_sha` from the job context and downloads the file from that commit. A caller at a
-  sync tag then runs that tag's script.
+  The caller's checkout lacks the script, so a step builds the commit's raw URL from
+  `job.workflow_repository` and `job.workflow_sha` and downloads
+  `scripts/ci/download-step-scripts.ts` with `curl`. That script downloads the workflow's scripts
+  and every file they import into `$RUNNER_TEMP/tools`, and refuses one that imports a package. A
+  caller at a sync tag then runs that tag's scripts.
 
 ### The workflow lint
 
@@ -171,6 +173,7 @@ that Renovate moves to a new sync tag keeps a green run while it clears the warn
 | [No rebase churn](#no-rebase-churn)     | a `workflow_run` trigger without a `branches:` filter                                                                 |
 | [Two profiles](#two-profiles)           | a heavy check in a workflow that runs on `pull_request` or `pull_request_target`, unless the run is in a public repo  |
 | [Build once](#build-once)               | an `actions/cache` step in a job that sets up Bun with `oven-sh/setup-bun`                                            |
+| [Checkout depth](#checkout-depth)       | an `actions/checkout` step with `fetch-depth: 0` and no `filter: blob:none`                                           |
 
 The lint reads three terms by these definitions:
 

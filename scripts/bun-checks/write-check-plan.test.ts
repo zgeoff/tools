@@ -1,0 +1,186 @@
+import { expect, onTestFinished, test } from 'bun:test';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { writeCheckPlan } from './write-check-plan.ts';
+
+async function setupTest() {
+  const directory = await mkdtemp(join(import.meta.dir, '.test-write-check-plan-'));
+
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+
+  const outputPath = join(directory, 'output');
+
+  const writePackageScripts = (names: readonly string[]) => {
+    const scripts = Object.fromEntries(names.map((name) => [name, 'true']));
+
+    return writeFile(join(directory, 'package.json'), JSON.stringify({ scripts }));
+  };
+
+  const readOutput = () => readFile(outputPath, 'utf8');
+
+  return { directory, outputPath, writePackageScripts, readOutput };
+}
+
+test('it writes the plan for the script names package.json defines to the step outputs', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePackageScripts(['lint', 'test', 'test:e2e']);
+
+  const errors = await writeCheckPlan({
+    cwd: ctx.directory,
+    outputPath: ctx.outputPath,
+    part: 'all',
+    scripts: 'lint test test:e2e',
+    lane: '',
+  });
+
+  const output = await ctx.readOutput();
+
+  expect(errors).toStrictEqual([]);
+
+  expect(output).toBe(
+    ['scripts= lint test test:e2e ', 'static= lint ', 'test= test ', 'lanes=["e2e"]', ''].join(
+      '\n',
+    ),
+  );
+});
+
+test('it plans the standard static checks for the static job of a caller that lists no scripts', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePackageScripts([
+    'audit',
+    'deadcode',
+    'format:check',
+    'lint',
+    'check',
+    'typecheck',
+    'test',
+  ]);
+
+  await writeCheckPlan({
+    cwd: ctx.directory,
+    outputPath: ctx.outputPath,
+    part: 'static',
+    scripts: '',
+    lane: '',
+  });
+
+  const output = await ctx.readOutput();
+
+  expect(output).toInclude('scripts= audit deadcode format:check lint typecheck \n');
+});
+
+test('it plans no lanes for a repo without lane scripts, so no public lane job starts', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePackageScripts(['lint', 'test']);
+
+  await writeCheckPlan({
+    cwd: ctx.directory,
+    outputPath: ctx.outputPath,
+    part: 'all',
+    scripts: 'lint test',
+    lane: '',
+  });
+
+  const output = await ctx.readOutput();
+
+  expect(output).toBe(
+    ['scripts= lint test ', 'static= lint ', 'test= test ', 'lanes=[]', ''].join('\n'),
+  );
+});
+
+test('it plans one lane per lane script, and a lane job runs only its own lane script', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePackageScripts(['lint', 'test', 'test:e2e', 'test:host']);
+
+  await writeCheckPlan({
+    cwd: ctx.directory,
+    outputPath: ctx.outputPath,
+    part: 'lane',
+    scripts: 'lint test test:e2e test:host',
+    lane: 'host',
+  });
+
+  const output = await ctx.readOutput();
+
+  expect(output).toBe(
+    ['scripts= test:host ', 'static= lint ', 'test= test ', 'lanes=["e2e","host"]', ''].join('\n'),
+  );
+});
+
+test('it plans the static checks, the tests and each lane once for the private checks job', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePackageScripts([
+    'lint',
+    'test',
+    'test:e2e',
+    'test:browser',
+    'test:docker',
+    'test:host',
+  ]);
+
+  await writeCheckPlan({
+    cwd: ctx.directory,
+    outputPath: ctx.outputPath,
+    part: 'all',
+    scripts: 'lint test test:e2e test:browser test:docker test:host',
+    lane: '',
+  });
+
+  const output = await ctx.readOutput();
+
+  expect(output).toBe(
+    [
+      'scripts= lint test test:e2e test:browser test:docker test:host ',
+      'static= lint ',
+      'test= test ',
+      'lanes=["e2e","browser","docker","host"]',
+      '',
+    ].join('\n'),
+  );
+});
+
+test('it fails with an error and writes no outputs when a listed script is missing', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePackageScripts(['lint']);
+
+  const errors = await writeCheckPlan({
+    cwd: ctx.directory,
+    outputPath: ctx.outputPath,
+    part: 'all',
+    scripts: 'lint check',
+    lane: '',
+  });
+
+  const wroteOutput = await Bun.file(ctx.outputPath).exists();
+
+  expect({ errors, wroteOutput }).toStrictEqual({
+    errors: [
+      'package.json defines no script named: check. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list.',
+    ],
+    wroteOutput: false,
+  });
+});
+
+test('it fails with an error on a part it does not know', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePackageScripts(['lint']);
+
+  const errors = await writeCheckPlan({
+    cwd: ctx.directory,
+    outputPath: ctx.outputPath,
+    part: 'everything',
+    scripts: 'lint',
+    lane: '',
+  });
+
+  expect(errors).toStrictEqual([
+    'the plan step needs PART (one of all, static, test, lane) and GITHUB_OUTPUT.',
+  ]);
+});

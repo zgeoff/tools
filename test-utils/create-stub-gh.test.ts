@@ -171,3 +171,40 @@ test('it logs each call less its GraphQL query', async () => {
     'workflow run main.yml --ref @zgeoff/std@0.4.0',
   ]);
 });
+
+test.each([
+  ['a label', ['label', 'create', 'security']],
+  ['an edit of a pull request', ['pr', 'edit', '12', '--title', 'fix: update kettle']],
+])('it prints nothing and succeeds for %s', async (_label, args) => {
+  const ctx = await setupTest();
+
+  const result = Bun.spawnSync([join(ctx.directory, 'gh'), ...args]);
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 0,
+    stdout: '',
+  });
+});
+
+test('it prints the next answer for a new pull request', async () => {
+  const ctx = await setupTest();
+
+  await ctx.gh.writeResponses('creates', ['https://github.com/acme/kettle/pull/12']);
+
+  const result = Bun.spawnSync([join(ctx.directory, 'gh'), 'pr', 'create', '--head', 'audit-fix']);
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 0,
+    stdout: '"https://github.com/acme/kettle/pull/12"\n',
+  });
+});
+
+test('it fails a label call whose answer is "error"', async () => {
+  const ctx = await setupTest();
+
+  await ctx.gh.writeResponses('labels', ['error']);
+
+  const result = Bun.spawnSync([join(ctx.directory, 'gh'), 'label', 'create', 'security']);
+
+  expect(result.exitCode).toBe(1);
+});
