@@ -10,22 +10,18 @@ async function setupTest() {
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   const outputPath = join(directory, 'output');
-
-  const writePackageScripts = (names: readonly string[]) => {
-    const scripts = Object.fromEntries(names.map((name) => [name, 'true']));
-
-    return writeFile(join(directory, 'package.json'), JSON.stringify({ scripts }));
-  };
-
   const readOutput = () => readFile(outputPath, 'utf8');
 
-  return { directory, outputPath, writePackageScripts, readOutput };
+  return { directory, outputPath, readOutput };
 }
 
 test('it writes the plan for the script names package.json defines to the step outputs', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePackageScripts(['lint', 'test', 'test:e2e']);
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { lint: 'true', test: 'true', 'test:e2e': 'true' } }),
+  );
 
   const errors = await writeCheckPlan({
     cwd: ctx.directory,
@@ -50,15 +46,20 @@ test('it writes the plan for the script names package.json defines to the step o
 test('it plans the standard static checks for the static job of a caller that lists no scripts', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePackageScripts([
-    'audit',
-    'deadcode',
-    'format:check',
-    'lint',
-    'check',
-    'typecheck',
-    'test',
-  ]);
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        audit: 'true',
+        deadcode: 'true',
+        'format:check': 'true',
+        lint: 'true',
+        check: 'true',
+        typecheck: 'true',
+        test: 'true',
+      },
+    }),
+  );
 
   await writeCheckPlan({
     cwd: ctx.directory,
@@ -77,7 +78,10 @@ test('it plans the standard static checks for the static job of a caller that li
 test('it plans no lanes for a repo without lane scripts, so no public lane job starts', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePackageScripts(['lint', 'test']);
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { lint: 'true', test: 'true' } }),
+  );
 
   await writeCheckPlan({
     cwd: ctx.directory,
@@ -98,7 +102,12 @@ test('it plans no lanes for a repo without lane scripts, so no public lane job s
 test('it plans one lane per lane script, and a lane job runs only its own lane script', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePackageScripts(['lint', 'test', 'test:e2e', 'test:host']);
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({
+      scripts: { lint: 'true', test: 'true', 'test:e2e': 'true', 'test:host': 'true' },
+    }),
+  );
 
   await writeCheckPlan({
     cwd: ctx.directory,
@@ -119,14 +128,19 @@ test('it plans one lane per lane script, and a lane job runs only its own lane s
 test('it plans the static checks, the tests and each lane once for the private checks job', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePackageScripts([
-    'lint',
-    'test',
-    'test:e2e',
-    'test:browser',
-    'test:docker',
-    'test:host',
-  ]);
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        lint: 'true',
+        test: 'true',
+        'test:e2e': 'true',
+        'test:browser': 'true',
+        'test:docker': 'true',
+        'test:host': 'true',
+      },
+    }),
+  );
 
   await writeCheckPlan({
     cwd: ctx.directory,
@@ -153,7 +167,10 @@ test('it plans the static checks, the tests and each lane once for the private c
 test('it fails with an error and writes no outputs when a listed script is missing', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePackageScripts(['lint']);
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { lint: 'true' } }),
+  );
 
   const errors = await writeCheckPlan({
     cwd: ctx.directory,
@@ -176,7 +193,10 @@ test('it fails with an error and writes no outputs when a listed script is missi
 test('it fails with an error on a part it does not know', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePackageScripts(['lint']);
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { lint: 'true' } }),
+  );
 
   const errors = await writeCheckPlan({
     cwd: ctx.directory,
