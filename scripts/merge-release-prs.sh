@@ -13,7 +13,8 @@
 # the wait and again before each merge attempt, and changes neither.
 # Usage: merge-release-prs.sh <owner/repo> [<release branch>]
 #        (default branch: release-please--branches--main)
-# Env: CHECKS_TIMEOUT, the seconds to wait for the checks (default 900);
+# Env: CHECKS_TIMEOUT_MINUTES, the whole minutes to wait for the checks
+#      (default 15);
 #      POLL_INTERVAL, the seconds between polls (default 10);
 #      GITHUB_OUTPUT, the step's output file (unset: no output).
 set -euo pipefail
@@ -25,7 +26,7 @@ fi
 
 repo=$1
 branch=${2:-release-please--branches--main}
-timeout=${CHECKS_TIMEOUT:-900}
+timeout=$((${CHECKS_TIMEOUT_MINUTES:-15} * 60))
 interval=${POLL_INTERVAL:-10}
 
 # Prints why a release PR is held, or nothing, from its JSON on stdin.

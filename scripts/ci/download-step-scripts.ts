@@ -26,6 +26,12 @@ export const stepScriptSets = {
     'scripts/audit-fix/commit-audit-fix.ts',
     'scripts/audit-fix/open-audit-fix-pull-request.ts',
   ],
+  release: [
+    'scripts/check-release-head.sh',
+    'scripts/merge-release-prs.sh',
+    'scripts/release/run-sync-release-pr.ts',
+    'scripts/release/pick-release-outputs.ts',
+  ],
 } as const satisfies Record<string, readonly string[]>;
 
 export type StepScriptSet = keyof typeof stepScriptSets;

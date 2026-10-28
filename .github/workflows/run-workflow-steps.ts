@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { $ } from 'bun';
-import { isConditionMet } from './is-condition-met.ts';
+import { isConditionMet } from '../../scripts/release/is-condition-met.ts';
 import { loadWorkflowStep } from './load-workflow-step.ts';
 
 export interface WorkflowStepsOptions {
