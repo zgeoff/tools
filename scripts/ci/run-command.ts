@@ -5,6 +5,9 @@ export interface CommandOptions {
   readonly env: Readonly<Record<string, string | undefined>>;
 
   readonly stdin?: string;
+
+  // Aborting it stops the command, whose result then holds the exit code of the stop.
+  readonly signal?: AbortSignal;
 }
 
 export interface CommandResult {
@@ -29,6 +32,7 @@ export async function runCommand(
     stdin: options.stdin === undefined ? 'ignore' : Buffer.from(options.stdin),
     stdout: 'pipe',
     stderr: 'pipe',
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
   });
 
   const [stdout, stderr, exitCode] = await Promise.all([
