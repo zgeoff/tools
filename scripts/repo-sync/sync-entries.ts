@@ -18,7 +18,10 @@ export interface SyncEntriesOptions {
   // The whole environment of each command the sync runs, as the step's env holds it.
   readonly env: Readonly<Record<string, string | undefined>>;
 
-  readonly fileSystem: FileSystem;
+  readonly fileSystem: Pick<
+    FileSystem,
+    'appendText' | 'createDirectory' | 'probePath' | 'readText' | 'writeText'
+  >;
 
   readonly runCommand: RunCommand;
 
@@ -44,7 +47,10 @@ interface SyncSettings {
 interface SyncContext extends SyncSettings {
   readonly cwd: string;
   readonly env: Readonly<Record<string, string | undefined>>;
-  readonly fileSystem: FileSystem;
+  readonly fileSystem: Pick<
+    FileSystem,
+    'appendText' | 'createDirectory' | 'probePath' | 'readText' | 'writeText'
+  >;
   readonly runCommand: RunCommand;
   readonly runLoggedCommand: RunCommand;
   readonly writeOutput: (text: string) => void;
