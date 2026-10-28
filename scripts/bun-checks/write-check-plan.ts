@@ -16,7 +16,7 @@ export interface CheckPlanStep {
 
   readonly lane: string;
 
-  readonly fileSystem: FileSystem;
+  readonly fileSystem: Pick<FileSystem, 'appendText' | 'readText'>;
 }
 
 const parts: readonly CheckPart[] = ['all', 'static', 'test', 'lane'];

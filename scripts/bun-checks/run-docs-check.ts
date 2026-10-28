@@ -9,7 +9,7 @@ export interface DocsCheckRun {
 
   readonly env: Readonly<Record<string, string | undefined>>;
 
-  readonly fileSystem: FileSystem;
+  readonly fileSystem: Pick<FileSystem, 'probePath'>;
 
   // Runs a check script whose output the log shows as it runs.
   readonly runLoggedCommand: RunCommand;
