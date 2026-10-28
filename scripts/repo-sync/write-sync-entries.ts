@@ -10,7 +10,7 @@ export interface WriteSyncEntriesOptions {
   readonly skip: string;
   readonly include: string;
   readonly outputPath: string;
-  readonly fileSystem: FileSystem;
+  readonly fileSystem: Pick<FileSystem, 'appendText' | 'readText'>;
 
   // Receives the step's error lines.
   readonly writeOutput: (text: string) => void;

@@ -14,3 +14,10 @@ test('it answers every call with a lone answer', () => {
 
   expect(answers).toStrictEqual(['boiled', 'boiled']);
 });
+
+test('it answers null and undefined in their turn', () => {
+  const answer = makeAnswerQueue<string | null | undefined>(['ready', null, undefined]);
+  const answers = [answer(), answer(), answer(), answer()];
+
+  expect(answers).toStrictEqual(['ready', null, undefined, undefined]);
+});
