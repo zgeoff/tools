@@ -3,7 +3,7 @@ import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
 import { createStubPullRequestGH } from '../../test-utils/create-stub-pull-request-gh.ts';
-import { nodeFileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { syncEntries } from './sync-entries.ts';
 

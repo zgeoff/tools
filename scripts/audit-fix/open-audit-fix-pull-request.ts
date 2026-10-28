@@ -1,5 +1,5 @@
 import type { FileSystem } from '../ci/file-system.ts';
-import { nodeFileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';

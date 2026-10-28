@@ -7,12 +7,12 @@ import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
-import { runWorkflowsCheck } from './check-workflows.ts';
+import { runActionlintCheck } from './run-actionlint-check.ts';
 
 async function setupTest() {
   invariant(Bun.which('actionlint') !== null, 'install actionlint');
 
-  const directory = await mkdtemp(join(import.meta.dir, '.test-check-workflows-'));
+  const directory = await mkdtemp(join(import.meta.dir, '.test-run-actionlint-check-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
@@ -49,7 +49,7 @@ test('it fails with the actionlint error of a workflow', async () => {
       'on: push\njobs:\n  greet:\n    needs: build\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n',
   });
 
-  const exitCode = await runWorkflowsCheck({
+  const exitCode = await runActionlintCheck({
     cwd: ctx.repo,
     env: ctx.env,
     runLoggedCommand: ctx.runLogged,
@@ -85,7 +85,7 @@ test('it passes a concurrency queue key before the ignore expires', async () => 
     ].join('\n'),
   });
 
-  const exitCode = await runWorkflowsCheck({
+  const exitCode = await runActionlintCheck({
     cwd: ctx.repo,
     env: ctx.env,
     runLoggedCommand: ctx.runLogged,
@@ -123,7 +123,7 @@ test('it fails on a concurrency queue key once the ignore expires', async () => 
     join(ctx.repo, '.github/actionlint.yaml'),
   );
 
-  const exitCode = await runWorkflowsCheck({
+  const exitCode = await runActionlintCheck({
     cwd: ctx.repo,
     env: ctx.env,
     runLoggedCommand: ctx.runLogged,

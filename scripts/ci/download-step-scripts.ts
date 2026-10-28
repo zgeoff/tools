@@ -8,12 +8,12 @@ import { parseArgs } from 'node:util';
 export const stepScriptSets = {
   'bun-checks': [
     'scripts/bun-checks/write-check-plan.ts',
-    'scripts/bun-checks/check-shell.ts',
-    'scripts/bun-checks/check-docs.ts',
-    'scripts/bun-checks/check-workflows.ts',
+    'scripts/bun-checks/run-shell-check.ts',
+    'scripts/bun-checks/run-docs-check.ts',
+    'scripts/bun-checks/run-actionlint-check.ts',
     'scripts/ci/install-pinned-tool.ts',
     'scripts/ci/run-package-scripts.ts',
-    'scripts/ci/require-every-job.ts',
+    'scripts/ci/collect-failed-jobs.ts',
     'sync/pre-push/run-workflows-check.ts',
     'sync/pre-push/run-commits-check.ts',
     'sync/pre-push/run-local-paths-check.ts',
@@ -29,7 +29,7 @@ export const stepScriptSets = {
   release: [
     'scripts/check-release-head.sh',
     'scripts/merge-release-prs.sh',
-    'scripts/release/sync-release-pr.ts',
+    'scripts/release/run-sync-release-pr.ts',
     'scripts/release/pick-release-outputs.ts',
   ],
 } as const satisfies Record<string, readonly string[]>;

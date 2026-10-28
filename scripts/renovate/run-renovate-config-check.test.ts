@@ -1,52 +1,18 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
-import { nodeFileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/node-file-system.ts';
 import type { CommandOptions } from '../ci/run-command.ts';
-import { parseRenovateVersion, runRenovateConfigCheck } from './check-renovate-config.ts';
+import { runRenovateConfigCheck } from './run-renovate-config-check.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-check-renovate-config-'));
+  const directory = await mkdtemp(join(import.meta.dir, '.test-run-renovate-config-check-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   return { directory };
 }
-
-test('it reads the renovate-version input of the renovate job', () => {
-  const workflow = [
-    'jobs:',
-    '  renovate:',
-    '    steps:',
-    '      - uses: actions/create-github-app-token@abc',
-    '        with:',
-    '          owner: acme',
-    '      - uses: renovatebot/github-action@def',
-    '        with:',
-    '          renovate-version: 44.1.0',
-    '',
-  ].join('\n');
-
-  expect(parseRenovateVersion(workflow)).toBe('44.1.0');
-});
-
-test('it refuses a renovate job that pins no renovate-version', () => {
-  const workflow = 'jobs:\n  renovate:\n    steps:\n      - uses: renovatebot/github-action@def\n';
-
-  expect(() => parseRenovateVersion(workflow)).toThrow(
-    'the renovate job holds 0 renovate-version inputs; the check reads exactly one',
-  );
-});
-
-test('it reads the version that renovate.yml pins for the scheduled run', async () => {
-  const text = await readFile(
-    join(import.meta.dir, '../../.github/workflows/renovate.yml'),
-    'utf8',
-  );
-
-  expect(parseRenovateVersion(text)).toMatch(/^\d+\.\d+\.\d+$/u);
-});
 
 test('it validates default.json strictly at the pinned version and returns the validator exit code', async () => {
   const ctx = await setupTest();

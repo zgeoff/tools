@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
-import { isPathMatched } from './is-path-matched.ts';
+import { runCommand } from '../ci/run-command.ts';
+import { runPathMatch } from './run-path-match.ts';
 
 test.each([
   ['a single star across folders', 'docker/app/Dockerfile', 'docker/*', true],
@@ -46,9 +47,70 @@ test.each([
   ['a dash at the end of a set', '-', '[a-]', true],
   ['an escaped dash in a set', 'b', String.raw`[a\-c]`, false],
   ['an unclosed class as plain members', ':', '[[:]', true],
-])('it matches %s as bash does', (_label, path, pattern, expected) => {
-  const bash = Bun.spawnSync(['bash', '-c', '[[ $1 == $2 ]]', 'bash', path, pattern]);
+  ['a closing parenthesis in a set inside a group', 'b', '@(a[)]|b)', true],
+  ['a bar in a set inside a group', 'a|', '@(a[|])', true],
+  ['a bar in a set inside a group against one side', 'a', '@(a[|])', false],
+])('it matches %s as bash does', async (_label, path, pattern, expected) => {
+  const matches = await runPathMatch({
+    paths: [path],
+    patterns: [pattern],
+    cwd: import.meta.dir,
+    env: { PATH: process.env['PATH'] },
+    runCommand,
+  });
 
-  expect(isPathMatched(path, pattern)).toBe(expected);
-  expect(bash.exitCode === 0).toBe(expected);
+  expect(matches.length === 1).toBe(expected);
+});
+
+test('it returns each matching path and pattern pair, in the order of the paths, then the patterns', async () => {
+  const matches = await runPathMatch({
+    paths: ['docs/guide.md', 'README.md', 'docker/app/Dockerfile'],
+    patterns: ['docker/**', '*.md', 'docs/**'],
+    cwd: import.meta.dir,
+    env: { PATH: process.env['PATH'] },
+    runCommand,
+  });
+
+  expect(matches).toStrictEqual([
+    { path: 'docs/guide.md', pattern: '*.md' },
+    { path: 'docs/guide.md', pattern: 'docs/**' },
+    { path: 'README.md', pattern: '*.md' },
+    { path: 'docker/app/Dockerfile', pattern: 'docker/**' },
+  ]);
+});
+
+test('it reads a path that holds a newline, a dollar sign and quotes as plain text', async () => {
+  const path = 'docs/$(touch pwned)\n"a b".md';
+
+  const matches = await runPathMatch({
+    paths: [path],
+    patterns: ['docs/*'],
+    cwd: import.meta.dir,
+    env: { PATH: process.env['PATH'] },
+    runCommand,
+  });
+
+  const touched = await Bun.file(`${import.meta.dir}/pwned`).exists();
+
+  expect(matches).toStrictEqual([{ path, pattern: 'docs/*' }]);
+  expect(touched).toBeFalse();
+});
+
+test('it runs nothing when there is no path to match', async () => {
+  const calls: (readonly string[])[] = [];
+
+  const matches = await runPathMatch({
+    paths: [],
+    patterns: ['docs/*'],
+    cwd: import.meta.dir,
+    env: {},
+    runCommand: (argv) => {
+      calls.push(argv);
+
+      return Promise.resolve({ exitCode: 0, stdout: '', stderr: '' });
+    },
+  });
+
+  expect(matches).toStrictEqual([]);
+  expect(calls).toStrictEqual([]);
 });

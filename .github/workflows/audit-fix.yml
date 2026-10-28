@@ -1,6 +1,6 @@
 # Reusable workflow: turns a red `bun audit` on the caller's default branch, or
 # on `base-branch`, into a pull request against that branch.
-# scripts/audit-fix/audit-fix.ts updates each vulnerable package to a fixed
+# scripts/audit-fix/run-audit-fix.ts updates each vulnerable package to a fixed
 # release, excludes a fix younger than the minimumReleaseAge gate in bunfig.toml
 # with a dated comment, and records each advisory it cannot fix in
 # audit-ignores.json with a reason and an expiry, mirrored as an --ignore flag in

@@ -7,7 +7,8 @@ import { createStubGH } from '../../test-utils/create-stub-gh.ts';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { runGit } from '../../test-utils/run-git.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
-import { nodeFileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/node-file-system.ts';
+import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { commitAuditFix } from './commit-audit-fix.ts';
 
@@ -34,6 +35,15 @@ async function setupTest() {
 
   const output: string[] = [];
 
+  // Records every command the commit runs, gh and git alike, in order.
+  const commands: string[] = [];
+
+  const runRecordedCommand: RunCommand = (argv, options) => {
+    commands.push(argv.join(' '));
+
+    return runCommand(argv, options);
+  };
+
   const runCommit = () =>
     commitAuditFix({
       cwd: clone,
@@ -43,7 +53,7 @@ async function setupTest() {
       defaultBranch: 'main',
       outputPath,
       fileSystem: nodeFileSystem,
-      runCommand,
+      runCommand: runRecordedCommand,
       writeOutput: (text) => {
         output.push(text);
       },
@@ -71,6 +81,7 @@ async function setupTest() {
     gitEnv,
     gh,
     output,
+    commands,
     runCommit,
     writeAuditResult,
     readRemoteBranches,
@@ -185,13 +196,27 @@ test('it turns auto-merge off on the open pull request before it pushes an ignor
     'needs-review.txt': 'true\n',
   });
 
-  await ctx.runCommit();
-
+  const exitCode = await ctx.runCommit();
   const calls = await ctx.gh.readCalls();
+
+  expect(exitCode).toBe(0);
 
   expect(calls).toStrictEqual([
     'pr list --head audit-fix --state open --json number',
     'pr merge audit-fix --disable-auto',
+  ]);
+
+  expect(ctx.commands).toStrictEqual([
+    'git config user.email 41898282+github-actions[bot]@users.noreply.github.com',
+    'git config user.name github-actions[bot]',
+    'git checkout -B audit-fix',
+    'git add -A',
+    'git diff --cached --quiet',
+    'git commit -m chore(deps): ignore GHSA-1234',
+    'gh pr list --head audit-fix --state open --json number',
+    'git fetch --quiet origin audit-fix',
+    'gh pr merge audit-fix --disable-auto',
+    'git push --force origin audit-fix',
   ]);
 });
 

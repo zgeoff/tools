@@ -1,10 +1,10 @@
 import { join } from 'node:path';
 import type { FileSystem } from '../ci/file-system.ts';
-import { nodeFileSystem } from '../ci/file-system.ts';
+import { makeLoggedCommandRunner } from '../ci/make-logged-command-runner.ts';
+import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
-import { runLoggedCommand } from '../ci/run-logged-command.ts';
 import { parseTextList } from '../release/parse-text-list.ts';
 import { parseTextRecord } from '../release/parse-text-record.ts';
 
@@ -170,7 +170,7 @@ if (import.meta.main) {
     releasedVersionsText: process.env['RELEASED_VERSIONS'] ?? '',
     fileSystem: nodeFileSystem,
     runCommand,
-    runLoggedCommand,
+    runLoggedCommand: makeLoggedCommandRunner({ stdout: process.stdout, stderr: process.stderr }),
     writeOutput: (text) => {
       process.stdout.write(text);
     },

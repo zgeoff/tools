@@ -1,8 +1,8 @@
 import { join } from 'node:path';
-import { isRecord } from '../../packages/std/src/is-record.ts';
 import type { FileSystem } from '../ci/file-system.ts';
-import { nodeFileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { writeStepOutputs } from '../ci/write-step-outputs.ts';
+import { parseSyncEntries } from './parse-sync-entries.ts';
 import { pickSyncEntries } from './pick-sync-entries.ts';
 
 export interface WriteSyncEntriesOptions {
@@ -21,10 +21,11 @@ export async function writeSyncEntries(
 ): Promise<number> {
   const manifestText = await options.fileSystem.readText(join(options.cwd, 'sync/manifest.json'));
 
-  const manifest: unknown = JSON.parse(manifestText);
+  const manifestValue: unknown = JSON.parse(manifestText);
+  const manifest = parseSyncEntries(manifestValue);
 
-  if (!Array.isArray(manifest) || !manifest.every((entry) => isRecord(entry))) {
-    options.writeOutput('::error::sync/manifest.json holds no list of entries\n');
+  if (manifest === null) {
+    options.writeOutput('::error::sync/manifest.json holds no list of valid entries\n');
 
     return 1;
   }

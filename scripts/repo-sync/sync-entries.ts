@@ -1,15 +1,15 @@
 import { dirname, join } from 'node:path';
-import { isRecord } from '../../packages/std/src/is-record.ts';
 import type { FileSystem } from '../ci/file-system.ts';
-import { nodeFileSystem } from '../ci/file-system.ts';
+import { makeLoggedCommandRunner } from '../ci/make-logged-command-runner.ts';
+import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { CommandResult, RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
-import { runLoggedCommand } from '../ci/run-logged-command.ts';
 import type { CopyPlan, ExistingWorkflow, SyncFileRow } from './build-copy-plan.ts';
 import { buildCopyPlan } from './build-copy-plan.ts';
 import { isWorkflowPath } from './is-workflow-path.ts';
-import type { SyncFile } from './select-sync-files.ts';
+import type { SyncEntry } from './parse-sync-entries.ts';
+import { parseSyncEntries } from './parse-sync-entries.ts';
 import { selectSyncFiles } from './select-sync-files.ts';
 
 export interface SyncEntriesOptions {
@@ -27,14 +27,6 @@ export interface SyncEntriesOptions {
 
   // Receives the step's log: the output of the commands that the log shows, and the error lines.
   readonly writeOutput: (text: string) => void;
-}
-
-interface SyncEntry {
-  readonly name: string;
-  readonly description: string;
-  readonly files: readonly SyncFile[];
-
-  readonly build: string;
 }
 
 interface SyncSettings {
@@ -109,7 +101,8 @@ function parseSyncSettings(env: Readonly<Record<string, string | undefined>>): S
     };
   }
 
-  const entries = parseSyncEntries(env['ENTRIES'] ?? '');
+  const entriesValue: unknown = JSON.parse(env['ENTRIES'] || '[]');
+  const entries = parseSyncEntries(entriesValue);
 
   if (entries === null) {
     return { kind: 'refused', message: 'ENTRIES holds no list of manifest entries' };
@@ -137,70 +130,6 @@ function buildPin(toolsRef: string, workflowRef: string): string {
   return withoutTags.startsWith('refs/heads/')
     ? withoutTags.slice('refs/heads/'.length)
     : withoutTags;
-}
-
-function parseSyncEntries(text: string): SyncEntry[] | null {
-  const json = text === '' ? '[]' : text;
-  const parsed: unknown = JSON.parse(json);
-
-  if (!Array.isArray(parsed)) {
-    return null;
-  }
-
-  const entries = parsed.map((entry: unknown) => parseSyncEntry(entry));
-
-  return entries.every((entry) => entry !== null) ? entries : null;
-}
-
-function parseSyncEntry(entry: unknown): SyncEntry | null {
-  if (!isRecord(entry) || typeof entry['name'] !== 'string' || !Array.isArray(entry['files'])) {
-    return null;
-  }
-
-  const files = entry['files'].map((file: unknown) => parseSyncFile(file));
-
-  if (!files.every((file) => file !== null)) {
-    return null;
-  }
-
-  return {
-    name: entry['name'],
-    description: formatDescription(entry['description']),
-    files,
-    build: typeof entry['build'] === 'string' ? entry['build'] : '',
-  };
-}
-
-function parseSyncFile(file: unknown): SyncFile | null {
-  if (!isRecord(file) || typeof file['source'] !== 'string' || typeof file['target'] !== 'string') {
-    return null;
-  }
-
-  const mode = file['mode'];
-  const except = file['except'];
-
-  if (mode !== undefined && typeof mode !== 'string') {
-    return null;
-  }
-
-  if (except !== undefined && !isStringList(except)) {
-    return null;
-  }
-
-  return {
-    source: file['source'],
-    target: file['target'],
-    ...(mode === undefined ? {} : { mode }),
-    ...(except === undefined ? {} : { except }),
-  };
-}
-
-function isStringList(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string');
-}
-
-function formatDescription(description: unknown): string {
-  return typeof description === 'string' ? description : JSON.stringify(description ?? null);
 }
 
 interface SyncedEntry {
@@ -604,7 +533,7 @@ if (import.meta.main) {
     env: process.env,
     fileSystem: nodeFileSystem,
     runCommand,
-    runLoggedCommand,
+    runLoggedCommand: makeLoggedCommandRunner({ stdout: process.stdout, stderr: process.stderr }),
     writeOutput: (text) => {
       process.stdout.write(text);
     },

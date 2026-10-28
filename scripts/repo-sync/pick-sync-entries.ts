@@ -1,7 +1,8 @@
-import { isRecord } from '../../packages/std/src/is-record.ts';
+import type { SyncEntry } from './parse-sync-entries.ts';
+import type { SyncFile } from './select-sync-files.ts';
 
 export interface SyncEntrySelection {
-  readonly manifest: readonly Readonly<Record<string, unknown>>[];
+  readonly manifest: readonly SyncEntry[];
 
   // Comma-separated entry names, as the skip and include inputs hold them.
   readonly skip: string;
@@ -11,7 +12,7 @@ export interface SyncEntrySelection {
 export type PickedSyncEntries =
   | {
       readonly kind: 'picked';
-      readonly entries: readonly Readonly<Record<string, unknown>>[];
+      readonly entries: readonly SyncEntry[];
       readonly workflows: boolean;
     }
   | { readonly kind: 'refused'; readonly message: string };
@@ -21,7 +22,7 @@ export function pickSyncEntries(selection: SyncEntrySelection): PickedSyncEntrie
   const include = parseEntryNames(selection.include);
 
   const optIn = new Set(
-    selection.manifest.filter((entry) => entry['optIn'] === true).map((entry) => entry['name']),
+    selection.manifest.filter((entry) => entry.optIn).map((entry) => entry.name),
   );
 
   const unknown = include.filter((name) => !optIn.has(name));
@@ -40,18 +41,13 @@ export function pickSyncEntries(selection: SyncEntrySelection): PickedSyncEntrie
   }
 
   const entries = selection.manifest
-    .filter((entry) => !skip.some((name) => name === entry['name']))
-    .filter((entry) => entry['optIn'] !== true || include.some((name) => name === entry['name']))
-    .map((entry) => {
-      const { optIn: _optIn, ...kept } = entry;
-
-      return Object.assign(kept, { workflows: hasWorkflowTarget(entry['files']) });
-    });
+    .filter((entry) => !skip.includes(entry.name))
+    .filter((entry) => !entry.optIn || include.includes(entry.name));
 
   return {
     kind: 'picked',
     entries,
-    workflows: entries.some((entry) => entry.workflows),
+    workflows: entries.some((entry) => hasWorkflowTarget(entry.files)),
   };
 }
 
@@ -68,14 +64,6 @@ function formatLogNames(names: readonly string[]): string {
   return names.join(', ').replaceAll(':', ' ');
 }
 
-function hasWorkflowTarget(files: unknown): boolean {
-  return (
-    Array.isArray(files) &&
-    files.some(
-      (file) =>
-        isRecord(file) &&
-        typeof file['target'] === 'string' &&
-        file['target'].startsWith('.github/workflows/'),
-    )
-  );
+function hasWorkflowTarget(files: readonly SyncFile[]): boolean {
+  return files.some((file) => file.target.startsWith('.github/workflows/'));
 }

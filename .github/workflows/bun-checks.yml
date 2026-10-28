@@ -226,17 +226,17 @@ jobs:
       - &check-shell
         name: Check shell
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/check-shell.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/run-shell-check.ts"
 
       - &check-docs
         name: Check docs
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/check-docs.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/run-docs-check.ts"
 
       - &check-workflows
         name: Check workflows
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/check-workflows.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/run-actionlint-check.ts"
 
       # The workflow lint reads the profile, because one of its rules covers a
       # private repo alone.
@@ -474,4 +474,4 @@ jobs:
         if: ${{ always() && env.PROFILE == 'public' }}
         env:
           NEEDS: ${{ toJSON(needs) }}
-        run: bun "$RUNNER_TEMP/tools/scripts/ci/require-every-job.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/ci/collect-failed-jobs.ts"

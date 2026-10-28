@@ -1,8 +1,8 @@
 import { join } from 'node:path';
 import type { FileSystem } from '../ci/file-system.ts';
-import { nodeFileSystem } from '../ci/file-system.ts';
+import { makeLoggedCommandRunner } from '../ci/make-logged-command-runner.ts';
+import { nodeFileSystem } from '../ci/node-file-system.ts';
 import type { RunCommand } from '../ci/run-command.ts';
-import { runLoggedCommand } from '../ci/run-logged-command.ts';
 
 export interface DocsCheckRun {
   readonly cwd: string;
@@ -60,7 +60,7 @@ if (import.meta.main) {
     cwd: process.cwd(),
     env: process.env,
     fileSystem: nodeFileSystem,
-    runLoggedCommand,
+    runLoggedCommand: makeLoggedCommandRunner({ stdout: process.stdout, stderr: process.stderr }),
     writeOutput: (text) => {
       process.stdout.write(text);
     },

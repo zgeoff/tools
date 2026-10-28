@@ -1,7 +1,7 @@
+import { makeLoggedCommandRunner } from '../ci/make-logged-command-runner.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
-import { runLoggedCommand } from '../ci/run-logged-command.ts';
 
 export interface ShellCheckRun {
   readonly cwd: string;
@@ -58,7 +58,7 @@ if (import.meta.main) {
     cwd: process.cwd(),
     env: process.env,
     runCommand,
-    runLoggedCommand,
+    runLoggedCommand: makeLoggedCommandRunner({ stdout: process.stdout, stderr: process.stderr }),
     writeOutput: (text) => {
       process.stdout.write(text);
     },

@@ -6,10 +6,10 @@ import { createGitCommit } from '../../test-utils/create-git-commit.ts';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { runGit } from '../../test-utils/run-git.ts';
 import { runCommand } from '../ci/run-command.ts';
-import { runSyncReleasePR } from './sync-release-pr.ts';
+import { runSyncReleasePR } from './run-sync-release-pr.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-sync-release-pr-'));
+  const directory = await mkdtemp(join(import.meta.dir, '.test-run-sync-release-pr-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

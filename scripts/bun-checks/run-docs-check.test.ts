@@ -4,13 +4,13 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
-import { nodeFileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/node-file-system.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
-import { runDocsCheck } from './check-docs.ts';
+import { runDocsCheck } from './run-docs-check.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-check-docs-'));
+  const directory = await mkdtemp(join(import.meta.dir, '.test-run-docs-check-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

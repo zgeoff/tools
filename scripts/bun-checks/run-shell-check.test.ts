@@ -6,10 +6,10 @@ import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
-import { runShellCheck } from './check-shell.ts';
+import { runShellCheck } from './run-shell-check.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-check-shell-'));
+  const directory = await mkdtemp(join(import.meta.dir, '.test-run-shell-check-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

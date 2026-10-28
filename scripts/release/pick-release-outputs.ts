@@ -1,4 +1,4 @@
-import { nodeFileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { writeStepOutputs } from '../ci/write-step-outputs.ts';
 import { parseReleaseOutputs } from './parse-release-outputs.ts';
 

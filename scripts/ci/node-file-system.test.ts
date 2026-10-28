@@ -1,10 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { nodeFileSystem } from './file-system.ts';
+import { nodeFileSystem } from './node-file-system.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-file-system-'));
+  const directory = await mkdtemp(join(import.meta.dir, '.test-node-file-system-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

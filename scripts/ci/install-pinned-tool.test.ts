@@ -3,13 +3,13 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createStubFileServer } from '../../test-utils/create-stub-file-server.ts';
 import { createTarArchive } from '../../test-utils/create-tar-archive.ts';
-import { nodeFileSystem } from './file-system.ts';
 import {
   installPinnedTool,
   parseToolArgs,
   runPinnedToolStep,
   shouldInstallTool,
 } from './install-pinned-tool.ts';
+import { nodeFileSystem } from './node-file-system.ts';
 import { runCommand } from './run-command.ts';
 
 async function setupTest() {

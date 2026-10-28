@@ -1,10 +1,12 @@
 import type { FileSystem } from '../ci/file-system.ts';
-import { nodeFileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { writeStepOutputs } from '../ci/write-step-outputs.ts';
 import { buildAuditFixPaths } from './build-audit-fix-paths.ts';
+import { planAuditFixCommit } from './plan-audit-fix-commit.ts';
+import { planAuditFixPush } from './plan-audit-fix-push.ts';
 import { readOpenPullRequest } from './read-open-pull-request.ts';
 
 export interface AuditFixCommitOptions {
@@ -36,32 +38,33 @@ export async function commitAuditFix(options: AuditFixCommitOptions): Promise<nu
   await git(['add', '-A']);
 
   const staged = await tryGit(['diff', '--cached', '--quiet']);
+  const titleText = await readTextFile(options.fileSystem, paths.title);
+  const reviewText = await readTextFile(options.fileSystem, paths.review);
 
-  if (staged.exitCode === 0) {
-    options.writeOutput('bun audit passes with nothing to change; nothing to fix.\n');
+  const plan = planAuditFixCommit({
+    hasStagedChange: staged.exitCode !== 0,
+    titleText,
+    reviewText,
+  });
 
-    // Deleting the branch closes a stale pull request; a branch that is already gone is fine.
+  writeLogLines(options, plan.logLines);
+
+  if (plan.deletesBranch) {
+    // A branch that is already gone is fine.
     await tryGit(['push', 'origin', '--delete', paths.branch]);
-    await writeStepOutputs(options.fileSystem, options.outputPath, { pushed: 'false' });
-
-    return 0;
   }
 
-  const title = await readTextFile(options.fileSystem, paths.title);
-
-  if (title.trim() === '') {
-    options.writeOutput('::error::audit-fix changed files but wrote no pull-request title\n');
-
-    return 1;
+  if (plan.pushedOutput !== null) {
+    await writeStepOutputs(options.fileSystem, options.outputPath, { pushed: plan.pushedOutput });
   }
 
-  await git(['commit', '-m', title.replace(/\n+$/u, '')]);
+  if (plan.commitMessage === null) {
+    return plan.exitCode;
+  }
 
-  // An ignore must not ride an auto-merge armed for an earlier fix, so auto-merge goes off before
-  // the push.
-  const needsReview = await readReviewFlag(options.fileSystem, paths.review);
+  await git(['commit', '-m', plan.commitMessage]);
 
-  const openNumber = needsReview
+  const openNumber = plan.readsOpenPullRequest
     ? await readOpenPullRequest({
         ...commandOptions,
         branch: paths.branch,
@@ -69,19 +72,19 @@ export async function commitAuditFix(options: AuditFixCommitOptions): Promise<nu
       })
     : null;
 
-  if (openNumber !== null) {
+  const isSameTree = await probeSameTree(options, paths.branch);
+
+  const push = planAuditFixPush({ openNumber, isSameTree });
+
+  if (push.disablesAutoMerge) {
     await options.runCommand(['gh', 'pr', 'merge', paths.branch, '--disable-auto'], commandOptions);
   }
 
-  // A rerun on an unchanged base makes the same tree; pushing it again would only restart the pull
-  // request's checks.
-  const isSameTree = await probeSameTree(options, paths.branch);
-
-  if (isSameTree) {
-    options.writeOutput('The open fix already holds this change.\n');
-  } else {
+  if (push.pushes) {
     await git(['push', '--force', 'origin', paths.branch]);
   }
+
+  writeLogLines(options, push.logLines);
 
   await writeStepOutputs(options.fileSystem, options.outputPath, { pushed: 'true' });
 
@@ -94,10 +97,10 @@ async function readTextFile(fileSystem: FileSystem, path: string): Promise<strin
   return exists ? fileSystem.readText(path) : '';
 }
 
-async function readReviewFlag(fileSystem: FileSystem, path: string): Promise<boolean> {
-  const text = await fileSystem.readText(path);
-
-  return text.trim() === 'true';
+function writeLogLines(options: AuditFixCommitOptions, lines: readonly string[]): void {
+  for (const line of lines) {
+    options.writeOutput(line);
+  }
 }
 
 async function probeSameTree(options: AuditFixCommitOptions, branch: string): Promise<boolean> {

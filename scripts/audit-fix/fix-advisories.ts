@@ -1,9 +1,9 @@
 import type { FileSystem } from '../ci/file-system.ts';
-import { nodeFileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/node-file-system.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
-import { runAuditFix } from './audit-fix.ts';
 import { buildAuditFixPaths } from './build-audit-fix-paths.ts';
+import { runAuditFix } from './run-audit-fix.ts';
 
 export interface AdvisoriesFixOptions {
   readonly cwd: string;

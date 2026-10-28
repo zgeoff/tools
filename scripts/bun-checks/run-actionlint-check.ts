@@ -1,7 +1,7 @@
+import { makeLoggedCommandRunner } from '../ci/make-logged-command-runner.ts';
 import type { RunCommand } from '../ci/run-command.ts';
-import { runLoggedCommand } from '../ci/run-logged-command.ts';
 
-export interface WorkflowsCheckRun {
+export interface ActionlintCheckRun {
   readonly cwd: string;
 
   readonly env: Readonly<Record<string, string | undefined>>;
@@ -21,7 +21,7 @@ const queueIgnoreExpires = '20270122';
 const queueIgnore = 'unexpected key "queue" for "concurrency" section';
 
 // Returns actionlint's exit code.
-export async function runWorkflowsCheck(run: Readonly<WorkflowsCheckRun>): Promise<number> {
+export async function runActionlintCheck(run: Readonly<ActionlintCheckRun>): Promise<number> {
   const isIgnoring = run.today < queueIgnoreExpires;
 
   if (!isIgnoring) {
@@ -38,11 +38,11 @@ export async function runWorkflowsCheck(run: Readonly<WorkflowsCheckRun>): Promi
 }
 
 if (import.meta.main) {
-  process.exitCode = await runWorkflowsCheck({
+  process.exitCode = await runActionlintCheck({
     cwd: process.cwd(),
     env: process.env,
     today: new Date().toISOString().slice(0, 10).replaceAll('-', ''),
-    runLoggedCommand,
+    runLoggedCommand: makeLoggedCommandRunner({ stdout: process.stdout, stderr: process.stderr }),
     writeOutput: (text) => {
       process.stdout.write(text);
     },

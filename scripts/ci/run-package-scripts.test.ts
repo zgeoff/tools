@@ -45,15 +45,14 @@ test('it runs each listed script in order, each in its own log group', async () 
 
 test('it stops at the first script that fails and returns its exit code', async () => {
   const ran: string[] = [];
+  const exitCodes: Readonly<Record<string, number>> = { lint: 3, test: 0 };
 
   const exitCode = await runPackageScripts({
     scripts: ' lint test ',
     runScript: (name) => {
       ran.push(name);
 
-      const scriptExitCode = name === 'lint' ? 3 : 0;
-
-      return Promise.resolve(scriptExitCode);
+      return Promise.resolve(exitCodes[name] ?? 0);
     },
     writeOutput: () => {},
   });

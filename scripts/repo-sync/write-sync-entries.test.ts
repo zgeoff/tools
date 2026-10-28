@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { nodeFileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { writeSyncEntries } from './write-sync-entries.ts';
 
 async function setupTest() {
@@ -63,7 +63,7 @@ test.each([
   expect(ctx.output).toStrictEqual([]);
 });
 
-test('it outputs the entries it keeps as compact JSON, without optIn and with workflows', async () => {
+test('it outputs the entries it keeps as compact JSON in the sync entry contract', async () => {
   const ctx = await setupTest();
 
   await writeFile(
@@ -106,13 +106,15 @@ test('it outputs the entries it keeps as compact JSON, without optIn and with wo
       name: 'editorconfig',
       description: 'The editor config',
       files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
-      workflows: false,
+      build: '',
+      optIn: false,
     },
     {
       name: 'workflow-demo',
       description: 'The demo workflow',
       files: [{ source: 'sync/workflow-demo.yml', target: '.github/workflows/demo.yml' }],
-      workflows: true,
+      build: '',
+      optIn: true,
     },
   ];
 
@@ -127,7 +129,11 @@ test('it fails with an error and writes no output when include names an entry th
   await writeFile(
     ctx.manifestPath,
     JSON.stringify([
-      { name: 'editorconfig', files: [{ source: 'sync/editorconfig', target: '.editorconfig' }] },
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+      },
     ]),
   );
 
@@ -160,6 +166,7 @@ test('it fails with an error and writes no output when skip and include name the
     JSON.stringify([
       {
         name: 'workflow-demo',
+        description: 'The demo workflow',
         optIn: true,
         files: [{ source: 'sync/workflow-demo.yml', target: '.github/workflows/demo.yml' }],
       },
@@ -184,10 +191,13 @@ test('it fails with an error and writes no output when skip and include name the
   expect(ctx.output).toStrictEqual(['::error::skip and include both list: workflow-demo\n']);
 });
 
-test('it fails with an error when the manifest holds no list of entries', async () => {
+test.each([
+  ['an object in place of a list', { name: 'editorconfig' }],
+  ['an entry with no description', [{ name: 'editorconfig', files: [] }]],
+])('it fails with an error when the manifest holds %s', async (_label, manifest) => {
   const ctx = await setupTest();
 
-  await writeFile(ctx.manifestPath, JSON.stringify({ name: 'editorconfig' }));
+  await writeFile(ctx.manifestPath, JSON.stringify(manifest));
   await writeFile(ctx.outputPath, '');
 
   const exitCode = await writeSyncEntries({
@@ -203,5 +213,8 @@ test('it fails with an error when the manifest holds no list of entries', async 
 
   expect(exitCode).toBe(1);
   expect(outputs).toBe('');
-  expect(ctx.output).toStrictEqual(['::error::sync/manifest.json holds no list of entries\n']);
+
+  expect(ctx.output).toStrictEqual([
+    '::error::sync/manifest.json holds no list of valid entries\n',
+  ]);
 });

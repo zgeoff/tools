@@ -1,4 +1,4 @@
-import { nodeFileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { collectReleaseWorkflowFaults } from './collect-release-workflow-faults.ts';
 
 export interface ReleaseWorkflowCheckOptions {

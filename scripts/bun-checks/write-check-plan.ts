@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import type { FileSystem } from '../ci/file-system.ts';
-import { nodeFileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { writeStepOutputs } from '../ci/write-step-outputs.ts';
 import type { CheckPart } from './plan-check-scripts.ts';
 import { planCheckScripts } from './plan-check-scripts.ts';

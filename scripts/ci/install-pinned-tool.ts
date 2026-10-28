@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import type { FileSystem } from './file-system.ts';
-import { nodeFileSystem } from './file-system.ts';
+import { nodeFileSystem } from './node-file-system.ts';
 import { runCheckedCommand } from './run-checked-command.ts';
 import type { RunCommand } from './run-command.ts';
 import { runCommand } from './run-command.ts';

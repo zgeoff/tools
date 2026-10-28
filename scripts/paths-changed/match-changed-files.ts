@@ -1,9 +1,9 @@
-import { nodeFileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { writeStepOutputs } from '../ci/write-step-outputs.ts';
-import { isPathMatched } from './is-path-matched.ts';
+import { runPathMatch } from './run-path-match.ts';
 
 export interface ChangedFilesMatch {
   // The pull request's checkout, which the match reads only through git.
@@ -36,13 +36,15 @@ export async function matchChangedFiles(
 
   const files = await readMergeChangedFiles(match);
 
-  const patterns = match.patterns.split('\n').filter((pattern) => pattern !== '');
+  const pathMatches = await runPathMatch({
+    paths: files,
+    patterns: match.patterns.split('\n').filter((pattern) => pattern !== ''),
+    cwd: match.checkout,
+    env: match.env,
+    runCommand: match.runCommand,
+  });
 
-  const matches = files.flatMap((file) =>
-    patterns
-      .filter((pattern) => isPathMatched(file, pattern))
-      .map((pattern) => `${file} matches ${pattern}`),
-  );
+  const matches = pathMatches.map((pathMatch) => `${pathMatch.path} matches ${pathMatch.pattern}`);
 
   return { changed: matches.length > 0, matches };
 }

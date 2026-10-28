@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { collectFailedJobs } from './require-every-job.ts';
+import { collectFailedJobs } from './collect-failed-jobs.ts';
 
 test.each([
   [
