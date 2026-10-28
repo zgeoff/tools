@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
-import type { CommandOptions } from '../ci/run-command.ts';
+import type { CommandOptions, CommandResult } from '../ci/run-command.ts';
 import { runRenovateConfigCheck } from './run-renovate-config-check.ts';
 
 async function setupTest() {
@@ -17,7 +17,8 @@ async function setupTest() {
   const writeWorkflow = (text: string) =>
     writeTreeFiles(directory, { '.github/workflows/renovate.yml': text });
 
-  const runCheck = () =>
+  // Runs the check; the validator, if it runs, answers with the given result.
+  const runCheck = (validatorResult: Readonly<CommandResult>) =>
     runRenovateConfigCheck({
       cwd: directory,
       env: {},
@@ -25,11 +26,7 @@ async function setupTest() {
       runLoggedCommand: (argv: readonly string[], options: Readonly<CommandOptions>) => {
         calls.push({ argv, cwd: options.cwd });
 
-        return Promise.resolve({
-          exitCode: 1,
-          stdout: 'ERROR: Config validation failed\n',
-          stderr: '',
-        });
+        return Promise.resolve(validatorResult);
       },
       writeError: (text) => {
         errors.push(text);
@@ -46,7 +43,11 @@ test('it validates default.json strictly at the pinned version and returns the v
     'jobs:\n  renovate:\n    steps:\n      - with:\n          renovate-version: 44.1.0\n',
   );
 
-  const exitCode = await ctx.runCheck();
+  const exitCode = await ctx.runCheck({
+    exitCode: 1,
+    stdout: 'ERROR: Config validation failed\n',
+    stderr: '',
+  });
 
   expect(exitCode).toBe(1);
 
@@ -75,7 +76,7 @@ test('it fails on stderr and runs no validator when renovate.yml pins no single 
     'jobs:\n  renovate:\n    steps:\n      - uses: renovatebot/github-action@def\n',
   );
 
-  const exitCode = await ctx.runCheck();
+  const exitCode = await ctx.runCheck({ exitCode: 0, stdout: '', stderr: '' });
 
   expect(exitCode).toBe(1);
 
