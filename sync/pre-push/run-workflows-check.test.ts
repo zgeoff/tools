@@ -602,6 +602,57 @@ test('it reports actions/cache in a Bun job', async () => {
   ]);
 });
 
+test('it reports a full-history checkout that states no filter', async () => {
+  const ctx = await setupTest();
+
+  await ctx.commitFiles({
+    '.github/workflows/scan.yml': [
+      'on: workflow_dispatch',
+      'jobs:',
+      '  scan:',
+      '    runs-on: ubuntu-latest',
+      '    timeout-minutes: 5',
+      '    steps:',
+      '      - name: Clone every commit',
+      '        uses: actions/checkout@v7',
+      '        with:',
+      '          fetch-depth: 0',
+      '      - name: Clone every commit without the contents',
+      '        uses: actions/checkout@v7',
+      '        with:',
+      '          fetch-depth: 0',
+      '          filter: blob:none',
+      '      - name: Clone every commit with the contents',
+      '        uses: actions/checkout@v7',
+      '        with:',
+      "          fetch-depth: '0'",
+      "          filter: ''",
+      '      - name: Clone the merge and its parents',
+      '        uses: actions/checkout@v7',
+      '        with:',
+      '          fetch-depth: 2',
+      '',
+    ].join('\n'),
+  });
+
+  const findings = runWorkflowsCheck({
+    cwd: ctx.directory,
+    env: ctx.env,
+    paths: [],
+    profile: undefined,
+    runProgram,
+  });
+
+  expect(findings).toStrictEqual([
+    {
+      path: '.github/workflows/scan.yml',
+      line: 3,
+      message:
+        'job scan, step "Clone every commit": a checkout with fetch-depth: 0 sets filter: blob:none to clone the history without the file contents, or filter: \'\' when the job reads many old files',
+    },
+  ]);
+});
+
 test('it reads the workflows and the workflow callers, and skips a subfolder', async () => {
   const ctx = await setupTest();
 
