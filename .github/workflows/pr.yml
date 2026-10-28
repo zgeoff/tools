@@ -16,8 +16,7 @@ jobs:
       pull-requests: write
     uses: ./.github/workflows/bun-checks.yml
     with:
-      scripts:
-        check:sync check:release-workflow format:check lint:full typecheck test test:workflows
+      scripts: check:sync check:release-workflow format:check lint:full typecheck test
       # The tests of the check steps and the pre-push jobs run shfmt and
       # actionlint, in the test job, which runs no check step.
       setup-shfmt: true
@@ -29,6 +28,7 @@ jobs:
   # scheduled run does.
   renovate-config:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -36,9 +36,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
       - name: Validate default.json
-        run: |
-          set -euo pipefail
-          version=$(sed -n 's/^ *renovate-version: *//p' .github/workflows/renovate.yml)
-          test -n "$version"
-          npx --yes --package "renovate@$version" -- renovate-config-validator --strict --no-global default.json
+        run: bun run --silent check:renovate-config

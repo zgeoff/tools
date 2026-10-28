@@ -157,6 +157,7 @@ const jobRules: readonly ((context: WorkflowContext, job: Job) => WorkflowFindin
   collectTimeoutFindings,
   collectHeavyFindings,
   collectCacheFindings,
+  collectCheckoutFindings,
 ];
 
 function collectRunFindings(context: WorkflowContext, job: Job): WorkflowFinding[] {
@@ -307,6 +308,32 @@ function collectCacheFindings(context: WorkflowContext, job: Job): WorkflowFindi
         ]
       : [],
   );
+}
+
+const checkoutPattern = /^actions\/checkout(?:@|$)/u;
+
+// A blobless clone fetches every commit and tree, and git fetches a file's contents when a command
+// first reads them, which suits a job that reads history but few old files. A job that reads many
+// old files, one fetch each, clones them all and states so with an empty filter.
+function collectCheckoutFindings(context: WorkflowContext, job: Job): WorkflowFinding[] {
+  return collectSteps(job).flatMap((step, index) => {
+    const action = findMember(step, 'uses');
+    const inputs = findMember(step, 'with');
+    const depth = findMember(inputs, 'fetch-depth');
+
+    const isFullHistory =
+      typeof action === 'string' && checkoutPattern.test(action) && (depth === 0 || depth === '0');
+
+    return isFullHistory && typeof findMember(inputs, 'filter') !== 'string'
+      ? [
+          {
+            path: context.path,
+            line: job.line,
+            message: `job ${job.id}, ${formatStepLabel(step, index)}: a checkout with fetch-depth: 0 sets filter: blob:none to clone the history without the file contents, or filter: '' when the job reads many old files`,
+          },
+        ]
+      : [];
+  });
 }
 
 function collectConcurrencyFindings(context: WorkflowContext): WorkflowFinding[] {

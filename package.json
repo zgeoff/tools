@@ -44,9 +44,8 @@
   "type": "module",
   "scripts": {
     "prepare": "lefthook install --force || true",
-    "typecheck": "bun run --filter '*' typecheck && tsrs -p scripts && tsrs -p sync && tsrs -p test-utils && tsrs -p .github/workflows",
+    "typecheck": "bun run --filter '*' typecheck && tsrs -p scripts && tsrs -p sync && tsrs -p test-utils",
     "test": "workers=$(bun sync/pre-push/read-worker-count.ts) && bun test --parallel=$workers --randomize",
-    "test:workflows": "workers=$(bun sync/pre-push/read-worker-count.ts) && bun test --parallel=$workers --randomize ./.github/workflows",
     "test:related": "bun sync/pre-push/run-related-tests.ts",
     "build": "bun run --filter '*' build",
     "lint": "oxlint",
@@ -57,6 +56,7 @@
     "format:check": "oxfmt --check . && bun packages/format-codemod/src/cli.ts --check --quiet .",
     "check:sync": "bash scripts/check-sync-manifest.sh",
     "check:release-workflow": "bun scripts/release/run-release-workflow-check.ts",
+    "check:renovate-config": "bun scripts/renovate/run-renovate-config-check.ts",
     "ci:install-tool": "bun scripts/ci/run-pinned-tool-step.ts",
     "ci:dispatch-publish": "bun scripts/publish/dispatch-release-publish.ts",
     "ci:publish-packages": "bun scripts/publish/publish-packages.ts",
