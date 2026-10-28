@@ -1,7 +1,8 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { availableParallelism, totalmem } from 'node:os';
 import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
+import { parseLaneLimits } from './parse-lane-limits.ts';
 import { readOptionalText } from './read-memory-budget.ts';
 import { readWorkerCount } from './read-worker-count.ts';
 import type { WorkerCountSources } from './read-worker-count.ts';
@@ -59,10 +60,14 @@ export async function runRelatedTests(
 }
 
 export function resolveRelatedTests(paths: readonly string[], cwd: string): string[] {
+  const configPath = join(cwd, '.oxlintrc.json');
+  const configText = existsSync(configPath) ? readFileSync(configPath, 'utf8') : undefined;
+  const lanes = [...parseLaneLimits(configText).keys()];
+
   const selected = new Set<string>();
 
   for (const path of paths) {
-    const test = findRelatedTest(path);
+    const test = findRelatedTest(path, lanes);
 
     if (test !== undefined && existsSync(join(cwd, test))) {
       selected.add(test);
@@ -153,21 +158,23 @@ function isSharedTestInput(path: string): boolean {
 
 const sourcePattern = /^(?<stem>.+?)(?:\.test)?(?<ext>\.tsx?)$/u;
 
-function findRelatedTest(path: string): string | undefined {
+function findRelatedTest(path: string, lanes: readonly string[]): string | undefined {
   const groups = sourcePattern.exec(path)?.groups;
 
-  if (groups === undefined || path.endsWith('.d.ts') || isLaneFile(path)) {
+  if (groups === undefined || path.endsWith('.d.ts') || isLaneFile(path, lanes)) {
     return undefined;
   }
 
   return `${groups['stem']}.test${groups['ext']}`;
 }
 
-// A lane's tests need a browser, a container or the host, and run in their own CI job.
-function isLaneFile(path: string): boolean {
+// A lane's tests need a real system, such as a browser, a container or a live model API, and run
+// only in CI.
+function isLaneFile(path: string, lanes: readonly string[]): boolean {
+  const stem = basename(path).replace(/(?:\.test)?\.tsx?$/u, '');
+
   return (
-    /(?:^|\/)e2e\//u.test(path) ||
-    /\.(?:browser|docker|host)(?:\.test)?\.tsx?$/u.test(basename(path))
+    /(?:^|\/)(?:e2e|[^/]+-e2e)\//u.test(path) || lanes.some((lane) => stem.endsWith(`.${lane}`))
   );
 }
 

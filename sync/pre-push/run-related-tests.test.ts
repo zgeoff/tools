@@ -151,15 +151,42 @@ test.each([
   ['src/view.browser.test.tsx'],
   ['src/store.docker.test.ts'],
   ['src/clock.host.test.ts'],
+  ['src/session.agent-sdk.test.ts'],
+  ['src/summary.model-api.test.ts'],
+  ['packages/shop-e2e/checkout.test.ts'],
 ])('#resolveRelatedTests leaves out the lane file %s', async (path) => {
   const ctx = await setupTest();
 
   await mkdir(join(ctx.directory, 'e2e'));
   await mkdir(join(ctx.directory, 'packages/shop/e2e'), { recursive: true });
+  await mkdir(join(ctx.directory, 'packages/shop-e2e'));
   await writeFile(join(ctx.directory, path), '');
   await writeFile(join(ctx.directory, 'e2e/helpers.test.ts'), '');
 
   expect(resolveRelatedTests([path], ctx.directory)).toBeEmpty();
+});
+
+test('#resolveRelatedTests leaves out a file of a lane that the oxlint config declares', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, '.oxlintrc.json'),
+    '{\n  // the radar suites drive a real sensor\n  "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": { "radar": 30000 } }] },\n}\n',
+  );
+
+  await writeFile(join(ctx.directory, 'src/sweep.radar.test.ts'), '');
+
+  expect(resolveRelatedTests(['src/sweep.radar.test.ts'], ctx.directory)).toBeEmpty();
+});
+
+test('#resolveRelatedTests selects a test whose suffix no lane declares', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'src/sweep.radar.test.ts'), '');
+
+  expect(resolveRelatedTests(['src/sweep.radar.test.ts'], ctx.directory)).toStrictEqual([
+    'src/sweep.radar.test.ts',
+  ]);
 });
 
 test('#runRelatedTests passes --parallel=1 and the slow-host timeout to the test script when the host gets 1 worker', async () => {

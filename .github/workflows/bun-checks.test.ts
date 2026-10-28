@@ -413,6 +413,7 @@ test('it downloads the planner, the branch check scripts and the catalog from th
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-program.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-commits-check.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-local-paths-check.ts',
+      'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/parse-lane-limits.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-test-timeouts-check.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/run-workflows-check.ts',
       'https://raw.githubusercontent.com/acme/tools/abc123/sync/pre-push/parse-shell-words.ts',
@@ -426,6 +427,7 @@ test('it downloads the planner, the branch check scripts and the catalog from th
   expect(files.toSorted()).toStrictEqual([
     'collect-command-names.ts',
     'parse-added-lines.ts',
+    'parse-lane-limits.ts',
     'parse-shell-words.ts',
     'plan-check-scripts.ts',
     'read-branch-base.ts',
@@ -1275,7 +1277,7 @@ test('it fails the test timeouts check on a bunfig.toml that raises the test tim
 
   await mkdir(join(ctx.gitEnv.RUNNER_TEMP, 'check-plan'), { recursive: true });
 
-  for (const file of ['run-program.ts', 'run-test-timeouts-check.ts']) {
+  for (const file of ['run-program.ts', 'parse-lane-limits.ts', 'run-test-timeouts-check.ts']) {
     await cp(
       join(import.meta.dir, '../../sync/pre-push', file),
       join(ctx.gitEnv.RUNNER_TEMP, 'check-plan', file),
