@@ -99,6 +99,32 @@ test('it publishes the given paths in a republish by hand, which names no releas
   );
 });
 
+test('it skips a private root with no version and publishes the rest of a republish batch', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createNPM('');
+
+  await writeTreeFiles(ctx.repo, {
+    'package.json': JSON.stringify({ name: 'kettle-workspace', private: true }),
+    'packages/std/package.json': JSON.stringify({ name: '@zgeoff/std', version: '0.4.0' }),
+  });
+
+  const exitCode = await ctx.runPublish(['.', 'packages/std'], '');
+  const calls = await ctx.readNPMCalls();
+
+  expect(exitCode).toBe(0);
+
+  expect(calls).toBe(
+    [
+      'npm view @zgeoff/std@0.4.0 version',
+      'npm publish ./zgeoff-std-0.4.0.tgz --provenance --access public',
+      '',
+    ].join('\n'),
+  );
+
+  expect(ctx.output).toContain('skipping kettle-workspace: private\n');
+});
+
 test('it refuses to publish any package when one holds a version the release did not tag', async () => {
   const ctx = await setupTest();
 

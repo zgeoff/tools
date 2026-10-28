@@ -7,6 +7,8 @@ import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { parseTextList } from '../release/parse-text-list.ts';
 import { parseTextRecord } from '../release/parse-text-record.ts';
+import type { PackageManifest } from './parse-package-manifest.ts';
+import { parsePackageManifest } from './parse-package-manifest.ts';
 
 export interface PackagesPublishOptions {
   readonly cwd: string;
@@ -47,91 +49,100 @@ export async function publishPackages(options: PackagesPublishOptions): Promise<
     return 1;
   }
 
-  const packages = await Promise.all(
-    paths.map((path) =>
-      readPackage(options.fileSystem, join(options.cwd, path), releasedVersions[path]),
-    ),
+  const manifests = await Promise.all(
+    paths.map(async (path) => {
+      const folder = join(options.cwd, path);
+
+      const text = await options.fileSystem.readText(join(folder, 'package.json'));
+
+      return parsePackageManifest(text, folder, releasedVersions[path]);
+    }),
   );
 
   // A tag whose version the checkout does not hold fails the run before anything publishes, which
   // the already-published skip would otherwise hide.
-  const mismatches = packages.filter(
-    (entry) => entry.releasedVersion !== undefined && entry.releasedVersion !== entry.version,
-  );
+  const mismatches = manifests.flatMap((manifest) => collectVersionMismatches(manifest));
 
   if (mismatches.length > 0) {
-    for (const entry of mismatches) {
-      options.writeError(
-        `::error::${entry.name}: the release tagged ${entry.releasedVersion ?? ''} but ${join(entry.folder, 'package.json')} holds ${entry.version}\n`,
-      );
+    for (const mismatch of mismatches) {
+      options.writeError(`::error::${mismatch}\n`);
     }
 
     return 1;
   }
 
-  for (const entry of packages) {
-    await publishPackage(entry, options);
+  for (const manifest of manifests) {
+    await publishManifest(manifest, options);
   }
 
   return 0;
 }
 
-interface ReleasedPackage {
-  readonly folder: string;
-  readonly name: string;
-  readonly version: string;
-  readonly isPrivate: boolean;
-  readonly hasBuild: boolean;
-  readonly releasedVersion: string | undefined;
+type ManifestOf<Kind extends PackageManifest['kind']> = Extract<
+  PackageManifest,
+  { readonly kind: Kind }
+>;
+
+type VersionMismatchCollector<Kind extends PackageManifest['kind']> = (
+  manifest: ManifestOf<Kind>,
+) => string[];
+
+// A private package never publishes, so the release's version check covers public ones only.
+const versionMismatchCollectors: {
+  readonly [Kind in PackageManifest['kind']]: VersionMismatchCollector<Kind>;
+} = {
+  private: () => [],
+  public: (manifest) =>
+    manifest.releasedVersion === undefined || manifest.releasedVersion === manifest.version
+      ? []
+      : [
+          `${manifest.name}: the release tagged ${manifest.releasedVersion} but ${join(manifest.folder, 'package.json')} holds ${manifest.version}`,
+        ],
+};
+
+function collectVersionMismatches<Kind extends PackageManifest['kind']>(
+  manifest: ManifestOf<Kind>,
+): string[] {
+  const collectMismatches: VersionMismatchCollector<Kind> =
+    versionMismatchCollectors[manifest.kind];
+
+  return collectMismatches(manifest);
 }
 
-async function readPackage(
-  fileSystem: Pick<FileSystem, 'readDirectory' | 'readText'>,
-  folder: string,
-  releasedVersion: string | undefined,
-): Promise<ReleasedPackage> {
-  const text = await fileSystem.readText(join(folder, 'package.json'));
+type ManifestPublisher<Kind extends PackageManifest['kind']> = (
+  manifest: ManifestOf<Kind>,
+  options: PackagesPublishOptions,
+) => Promise<void>;
 
-  const manifest: unknown = JSON.parse(text);
+// A table typed over every manifest kind, so a new kind fails the type check until it has a publish.
+const manifestPublishers: { readonly [Kind in PackageManifest['kind']]: ManifestPublisher<Kind> } =
+  {
+    private: (manifest, options) => {
+      options.writeOutput(`skipping ${manifest.name}: private\n`);
 
-  if (typeof manifest !== 'object' || manifest === null) {
-    throw new Error(`${folder}/package.json holds no JSON object`);
-  }
-
-  const name = 'name' in manifest ? manifest.name : undefined;
-  const version = 'version' in manifest ? manifest.version : undefined;
-
-  if (typeof name !== 'string' || typeof version !== 'string') {
-    throw new TypeError(`${folder}/package.json names no package and version`);
-  }
-
-  const scripts = 'scripts' in manifest ? manifest.scripts : undefined;
-
-  return {
-    folder,
-    name,
-    version,
-    isPrivate: 'private' in manifest && manifest.private === true,
-    hasBuild: typeof scripts === 'object' && scripts !== null && 'build' in scripts,
-    releasedVersion,
+      return Promise.resolve();
+    },
+    public: (manifest, options) => publishPackage(manifest, options),
   };
+
+function publishManifest<Kind extends PackageManifest['kind']>(
+  manifest: ManifestOf<Kind>,
+  options: PackagesPublishOptions,
+): Promise<void> {
+  const publish: ManifestPublisher<Kind> = manifestPublishers[manifest.kind];
+
+  return publish(manifest, options);
 }
 
 // The registry check makes a rerun after a partial publish skip the packages already on npm.
 async function publishPackage(
-  entry: ReleasedPackage,
+  entry: ManifestOf<'public'>,
   options: PackagesPublishOptions,
 ): Promise<void> {
   const commandOptions = { cwd: entry.folder, env: options.env };
 
   const run = (argv: readonly string[]) =>
     runCheckedCommand(options.runLoggedCommand, argv, commandOptions);
-
-  if (entry.isPrivate) {
-    options.writeOutput(`skipping ${entry.name}: private\n`);
-
-    return;
-  }
 
   const published = await options.runCommand(
     ['npm', 'view', `${entry.name}@${entry.version}`, 'version'],

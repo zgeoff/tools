@@ -1,3 +1,4 @@
+import { buildSyncRowSplit } from './build-sync-row-split.ts';
 import { isWorkflowPath } from './is-workflow-path.ts';
 
 export interface SyncFileRow {
@@ -45,8 +46,9 @@ export interface CopyPlan {
 }
 
 export function buildCopyPlan(facts: Readonly<CopyPlanFacts>): CopyPlan {
-  const excluded = facts.rows.filter((row) => row.action === 'skip').map((row) => row.target);
-  const taken = facts.rows.filter((row) => row.action !== 'skip');
+  const split = buildSyncRowSplit(facts.rows);
+  const excluded = split.excluded.map((row) => row.target);
+  const taken = split.taken;
 
   const conflicts = taken
     .filter((row) => isOwnWorkflow(facts.existingWorkflows.get(row.target), facts.marker))

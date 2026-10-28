@@ -1,5 +1,3 @@
-import { nodeFileSystem } from '../ci/node-file-system.ts';
-import { writeStepOutputs } from '../ci/write-step-outputs.ts';
 import { parseReleaseOutputs } from './parse-release-outputs.ts';
 
 export type ReleaseOutputsResult =
@@ -30,22 +28,4 @@ export function pickReleaseOutputs(releaseOutputsText: string): ReleaseOutputsRe
       'release-outputs': JSON.stringify(outputs),
     },
   };
-}
-
-async function runCLI(): Promise<void> {
-  const result = pickReleaseOutputs(process.env['RELEASE_OUTPUTS'] ?? '');
-
-  if (result.kind === 'invalid') {
-    console.log(`::error::RELEASE_OUTPUTS: ${result.message}`);
-
-    process.exitCode = 1;
-
-    return;
-  }
-
-  await writeStepOutputs(nodeFileSystem, process.env['GITHUB_OUTPUT'] ?? '', result.outputs);
-}
-
-if (import.meta.main) {
-  await runCLI();
 }
