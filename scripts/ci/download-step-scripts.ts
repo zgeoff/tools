@@ -6,6 +6,19 @@ import { parseArgs } from 'node:util';
 
 // The scripts each reusable workflow's steps run. The download adds every file they import.
 export const stepScriptSets = {
+  'bun-checks': [
+    'scripts/bun-checks/write-check-plan.ts',
+    'scripts/bun-checks/run-shell-check.ts',
+    'scripts/bun-checks/run-docs-check.ts',
+    'scripts/bun-checks/run-actionlint-check.ts',
+    'scripts/ci/install-pinned-tool.ts',
+    'scripts/ci/run-package-scripts.ts',
+    'scripts/ci/collect-failed-jobs.ts',
+    'sync/pre-push/run-workflows-check.ts',
+    'sync/pre-push/run-commits-check.ts',
+    'sync/pre-push/run-local-paths-check.ts',
+    'sync/pre-push/run-test-timeouts-check.ts',
+  ],
   'paths-changed': ['scripts/paths-changed/match-changed-files.ts'],
 } as const satisfies Record<string, readonly string[]>;
 
