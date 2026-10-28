@@ -1,12 +1,16 @@
-import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { isRecord } from '../../packages/std/src/is-record.ts';
+import type { FileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { CommandResult, RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { runLoggedCommand } from '../ci/run-logged-command.ts';
 import type { CopyPlan, ExistingWorkflow, SyncFileRow } from './build-copy-plan.ts';
 import { buildCopyPlan } from './build-copy-plan.ts';
 import { isWorkflowPath } from './is-workflow-path.ts';
+import type { SyncFile } from './select-sync-files.ts';
+import { selectSyncFiles } from './select-sync-files.ts';
 
 export interface SyncEntriesOptions {
   readonly cwd: string;
@@ -14,18 +18,21 @@ export interface SyncEntriesOptions {
   // The whole environment of each command the sync runs, as the step's env holds it.
   readonly env: Readonly<Record<string, string | undefined>>;
 
+  readonly fileSystem: FileSystem;
+
   readonly runCommand: RunCommand;
 
-  // Receives the step's log: each command's output that the log shows, and the error lines.
+  // Runs an entry's build, whose output the log shows as the build writes it.
+  readonly runLoggedCommand: RunCommand;
+
+  // Receives the step's log: the output of the commands that the log shows, and the error lines.
   readonly writeOutput: (text: string) => void;
 }
 
 interface SyncEntry {
   readonly name: string;
   readonly description: string;
-
-  // The entry's files as the manifest lists them, which the file selector reads as JSON.
-  readonly filesJSON: string;
+  readonly files: readonly SyncFile[];
 
   readonly build: string;
 }
@@ -45,7 +52,9 @@ interface SyncSettings {
 interface SyncContext extends SyncSettings {
   readonly cwd: string;
   readonly env: Readonly<Record<string, string | undefined>>;
+  readonly fileSystem: FileSystem;
   readonly runCommand: RunCommand;
+  readonly runLoggedCommand: RunCommand;
   readonly writeOutput: (text: string) => void;
 }
 
@@ -62,7 +71,9 @@ export async function syncEntries(options: Readonly<SyncEntriesOptions>): Promis
     ...settings,
     cwd: options.cwd,
     env: options.env,
+    fileSystem: options.fileSystem,
     runCommand: options.runCommand,
+    runLoggedCommand: options.runLoggedCommand,
     writeOutput: options.writeOutput,
   };
 
@@ -136,18 +147,56 @@ function parseSyncEntries(text: string): SyncEntry[] | null {
     return null;
   }
 
-  const entries = parsed.map((entry: unknown) =>
-    isRecord(entry) && typeof entry['name'] === 'string' && Array.isArray(entry['files'])
-      ? {
-          name: entry['name'],
-          description: formatDescription(entry['description']),
-          filesJSON: JSON.stringify(entry['files']),
-          build: typeof entry['build'] === 'string' ? entry['build'] : '',
-        }
-      : null,
-  );
+  const entries = parsed.map((entry: unknown) => parseSyncEntry(entry));
 
   return entries.every((entry) => entry !== null) ? entries : null;
+}
+
+function parseSyncEntry(entry: unknown): SyncEntry | null {
+  if (!isRecord(entry) || typeof entry['name'] !== 'string' || !Array.isArray(entry['files'])) {
+    return null;
+  }
+
+  const files = entry['files'].map((file: unknown) => parseSyncFile(file));
+
+  if (!files.every((file) => file !== null)) {
+    return null;
+  }
+
+  return {
+    name: entry['name'],
+    description: formatDescription(entry['description']),
+    files,
+    build: typeof entry['build'] === 'string' ? entry['build'] : '',
+  };
+}
+
+function parseSyncFile(file: unknown): SyncFile | null {
+  if (!isRecord(file) || typeof file['source'] !== 'string' || typeof file['target'] !== 'string') {
+    return null;
+  }
+
+  const mode = file['mode'];
+  const except = file['except'];
+
+  if (mode !== undefined && typeof mode !== 'string') {
+    return null;
+  }
+
+  if (except !== undefined && !isStringList(except)) {
+    return null;
+  }
+
+  return {
+    source: file['source'],
+    target: file['target'],
+    ...(mode === undefined ? {} : { mode }),
+    ...(except === undefined ? {} : { except }),
+  };
+}
+
+function isStringList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
 function formatDescription(description: unknown): string {
@@ -171,7 +220,7 @@ async function commitEntries(context: SyncContext): Promise<CommittedEntries> {
   const copied: string[] = [];
 
   // The checkout of this repository stays out of every commit.
-  await appendFile(join(context.cwd, '.git/info/exclude'), '/.repo-sync/\n');
+  await context.fileSystem.appendText(join(context.cwd, '.git/info/exclude'), '/.repo-sync/\n');
 
   await runSyncCommand(context, [
     'git',
@@ -226,16 +275,8 @@ async function commitEntries(context: SyncContext): Promise<CommittedEntries> {
     : { synced: [...synced, ...retired.synced], failed };
 }
 
-function runSyncCommand(
-  context: SyncContext,
-  argv: readonly string[],
-  stdin?: string,
-): Promise<CommandResult> {
-  return runCheckedCommand(context.runCommand, argv, {
-    cwd: context.cwd,
-    env: context.env,
-    ...(stdin === undefined ? {} : { stdin }),
-  });
+function runSyncCommand(context: SyncContext, argv: readonly string[]): Promise<CommandResult> {
+  return runCheckedCommand(context.runCommand, argv, { cwd: context.cwd, env: context.env });
 }
 
 // The build runs in the caller's checkout with the runner's stock tools; the manifest README states
@@ -250,9 +291,13 @@ async function writeEntry(context: SyncContext, entry: SyncEntry): Promise<strin
     }
 
     if (entry.build !== '') {
-      const build = await runProbeCommand(context, ['bash', '-euo', 'pipefail', '-c', entry.build]);
-
-      context.writeOutput(`${build.stdout}${build.stderr}`);
+      const build = await context.runLoggedCommand(
+        ['bash', '-euo', 'pipefail', '-c', entry.build],
+        {
+          cwd: context.cwd,
+          env: context.env,
+        },
+      );
 
       if (build.exitCode !== 0) {
         context.writeOutput(`::error::${entry.name}: its build exited with ${build.exitCode}\n`);
@@ -272,13 +317,7 @@ async function writeEntry(context: SyncContext, entry: SyncEntry): Promise<strin
 }
 
 async function copyEntryFiles(context: SyncContext, entry: SyncEntry): Promise<string[] | null> {
-  const selected = await runSyncCommand(
-    context,
-    ['bash', '.repo-sync/scripts/select-sync-files.sh', context.repo],
-    entry.filesJSON,
-  );
-
-  const rows = parseSyncFileRows(selected.stdout);
+  const rows = selectSyncFiles(entry.files, context.repo);
 
   const existingWorkflows = await readExistingWorkflows(context, rows);
 
@@ -299,17 +338,6 @@ async function copyEntryFiles(context: SyncContext, entry: SyncEntry): Promise<s
   return plan.copies.map((copy) => copy.target);
 }
 
-function parseSyncFileRows(text: string): SyncFileRow[] {
-  return text
-    .split('\n')
-    .filter((line) => line !== '')
-    .map((line) => {
-      const [action = '', source = '', target = '', mode = ''] = line.split('\t');
-
-      return { action, source, target, mode };
-    });
-}
-
 async function readExistingWorkflows(
   context: SyncContext,
   rows: readonly SyncFileRow[],
@@ -317,15 +345,18 @@ async function readExistingWorkflows(
   const workflows = new Map<string, ExistingWorkflow>();
 
   for (const row of rows.filter((candidate) => isWorkflowPath(candidate.target))) {
-    const target = Bun.file(join(context.cwd, row.target));
+    const target = join(context.cwd, row.target);
 
-    const exists = await target.exists();
+    const exists = await context.fileSystem.probePath(target);
 
     if (exists) {
-      workflows.set(row.target, {
-        targetText: await target.text(),
-        sourceText: await readFile(join(context.cwd, '.repo-sync', row.source), 'utf8'),
-      });
+      const targetText = await context.fileSystem.readText(target);
+
+      const sourceText = await context.fileSystem.readText(
+        join(context.cwd, '.repo-sync', row.source),
+      );
+
+      workflows.set(row.target, { targetText, sourceText });
     }
   }
 
@@ -334,7 +365,7 @@ async function readExistingWorkflows(
 
 async function applyCopyPlan(context: SyncContext, plan: CopyPlan): Promise<void> {
   for (const copy of plan.copies) {
-    await mkdir(join(context.cwd, dirname(copy.target)), { recursive: true });
+    await context.fileSystem.createDirectory(join(context.cwd, dirname(copy.target)));
 
     await runSyncCommand(context, [
       'install',
@@ -347,9 +378,9 @@ async function applyCopyPlan(context: SyncContext, plan: CopyPlan): Promise<void
     if (copy.isPinned) {
       const path = join(context.cwd, copy.target);
 
-      const text = await readFile(path, 'utf8');
+      const text = await context.fileSystem.readText(path);
 
-      await Bun.write(path, buildPinnedWorkflow(text, context.pin));
+      await context.fileSystem.writeText(path, buildPinnedWorkflow(text, context.pin));
     }
   }
 
@@ -393,7 +424,7 @@ async function removeRetiredFiles(
 ): Promise<RetiredFiles> {
   const script = '.repo-sync/scripts/remove-retired-sync-files.sh';
 
-  const hasScript = await Bun.file(join(context.cwd, script)).exists();
+  const hasScript = await context.fileSystem.probePath(join(context.cwd, script));
 
   if (!hasScript) {
     context.writeOutput('The tools ref has no retired-file cleanup; nothing to remove.\n');
@@ -571,7 +602,9 @@ if (import.meta.main) {
   process.exitCode = await syncEntries({
     cwd: process.cwd(),
     env: process.env,
+    fileSystem: nodeFileSystem,
     runCommand,
+    runLoggedCommand,
     writeOutput: (text) => {
       process.stdout.write(text);
     },

@@ -1,7 +1,8 @@
-import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { FileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/file-system.ts';
 import type { RunCommand } from '../ci/run-command.ts';
-import { runCommand } from '../ci/run-command.ts';
+import { runLoggedCommand } from '../ci/run-logged-command.ts';
 
 // The validator runs at the Renovate version the scheduled run pins, so it reads the preset as
 // that run does.
@@ -41,19 +42,23 @@ export interface RenovateConfigCheck {
 
   readonly env: Readonly<Record<string, string | undefined>>;
 
-  readonly runCommand: RunCommand;
+  readonly fileSystem: FileSystem;
 
-  readonly writeOutput: (text: string) => void;
+  // Runs the validator, whose output the log shows as it runs.
+  readonly runLoggedCommand: RunCommand;
 }
 
+// Returns the validator's exit code.
 export async function runRenovateConfigCheck(
   check: Readonly<RenovateConfigCheck>,
 ): Promise<number> {
-  const workflowText = await readFile(join(check.cwd, '.github/workflows/renovate.yml'), 'utf8');
+  const workflowText = await check.fileSystem.readText(
+    join(check.cwd, '.github/workflows/renovate.yml'),
+  );
 
   const version = parseRenovateVersion(workflowText);
 
-  const result = await check.runCommand(
+  const result = await check.runLoggedCommand(
     [
       'npx',
       '--yes',
@@ -68,8 +73,6 @@ export async function runRenovateConfigCheck(
     { cwd: check.cwd, env: check.env },
   );
 
-  check.writeOutput(`${result.stdout}${result.stderr}`);
-
   return result.exitCode;
 }
 
@@ -77,9 +80,7 @@ if (import.meta.main) {
   process.exitCode = await runRenovateConfigCheck({
     cwd: process.cwd(),
     env: process.env,
-    runCommand,
-    writeOutput: (text) => {
-      process.stdout.write(text);
-    },
+    fileSystem: nodeFileSystem,
+    runLoggedCommand,
   });
 }

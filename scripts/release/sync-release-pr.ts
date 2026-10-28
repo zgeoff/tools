@@ -1,6 +1,7 @@
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { runLoggedCommand } from '../ci/run-logged-command.ts';
 
 export interface SyncReleasePROptions {
   readonly cwd: string;
@@ -9,7 +10,11 @@ export interface SyncReleasePROptions {
 
   readonly syncCommand: string;
 
+  // Runs git diff, whose exit code the sync reads.
   readonly runCommand: RunCommand;
+
+  // Runs the sync command and the commit and push, whose output the log shows as each writes it.
+  readonly runLoggedCommand: RunCommand;
 
   readonly writeOutput: (text: string) => void;
 }
@@ -17,16 +22,8 @@ export interface SyncReleasePROptions {
 export async function runSyncReleasePR(options: SyncReleasePROptions): Promise<void> {
   const commandOptions = { cwd: options.cwd, env: options.env };
 
-  // Each command's output reaches the step log once the command ends.
-  const run = async (argv: readonly string[]) => {
-    const result = await runCheckedCommand(options.runCommand, argv, commandOptions);
-
-    const text = `${result.stdout}${result.stderr}`;
-
-    if (text !== '') {
-      options.writeOutput(text);
-    }
-  };
+  const run = (argv: readonly string[]) =>
+    runCheckedCommand(options.runLoggedCommand, argv, commandOptions);
 
   await run(['bash', '-c', options.syncCommand]);
 
@@ -62,6 +59,7 @@ if (import.meta.main) {
     env: process.env,
     syncCommand: process.env['SYNC_COMMAND'] ?? '',
     runCommand,
+    runLoggedCommand,
     writeOutput: (text) => {
       process.stdout.write(text);
     },

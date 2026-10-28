@@ -38,12 +38,17 @@ export type StepScriptSet = keyof typeof stepScriptSets;
 
 export type ReadToolsFile = (path: string) => Promise<string>;
 
+// Writes the text as the file at the path, and creates its folders first.
+export type WriteFile = (path: string, text: string) => Promise<void>;
+
 export interface StepScriptsDownload {
   readonly entries: readonly string[];
 
   readonly destination: string;
 
   readonly readToolsFile: ReadToolsFile;
+
+  readonly writeFile: WriteFile;
 }
 
 // Returns the repo paths it wrote, each under the destination at the same relative path, so a
@@ -66,10 +71,7 @@ export async function downloadStepScripts(
       batch.map(async (path) => {
         const text = await download.readToolsFile(path);
 
-        const target = join(download.destination, path);
-
-        await mkdir(dirname(target), { recursive: true });
-        await writeFile(target, text);
+        await download.writeFile(join(download.destination, path), text);
 
         return collectImportedPaths(path, text);
       }),
@@ -205,27 +207,40 @@ export function parseDownloadArgs(args: readonly string[]): DownloadArgs {
   }
 }
 
-async function runCLI(): Promise<void> {
-  const parsed = parseDownloadArgs(process.argv.slice(2));
-  const toolsURL = process.env['TOOLS_URL'] ?? '';
-  const runnerTemp = process.env['RUNNER_TEMP'] ?? '';
+export interface DownloadStep {
+  readonly args: readonly string[];
+
+  readonly env: Readonly<Record<string, string | undefined>>;
+
+  readonly readURL: (url: string) => Promise<URLOutcome>;
+
+  readonly wait: (delayMs: number) => Promise<void>;
+
+  readonly writeFile: WriteFile;
+
+  readonly writeOutput: (text: string) => void;
+
+  readonly writeError: (text: string) => void;
+}
+
+// Returns the step's exit code: 2 for a wrong argument, 1 for a job context that lacks the commit.
+export async function runDownloadStep(step: Readonly<DownloadStep>): Promise<number> {
+  const parsed = parseDownloadArgs(step.args);
+  const toolsURL = step.env['TOOLS_URL'] ?? '';
+  const runnerTemp = step.env['RUNNER_TEMP'] ?? '';
 
   if (parsed.kind === 'refused') {
-    process.stderr.write(`${parsed.message}\n`);
+    step.writeError(`${parsed.message}\n`);
 
-    process.exitCode = 2;
-
-    return;
+    return 2;
   }
 
   if (!isToolsURL(toolsURL) || runnerTemp === '') {
-    process.stdout.write(
+    step.writeOutput(
       `::error::the download needs TOOLS_URL, raw.githubusercontent.com/<owner>/<repo>/<commit sha>, and RUNNER_TEMP; TOOLS_URL is '${toolsURL}'\n`,
     );
 
-    process.exitCode = 1;
-
-    return;
+    return 1;
   }
 
   const written = await downloadStepScripts({
@@ -235,14 +250,32 @@ async function runCLI(): Promise<void> {
       toolsURL,
       attempts: 4,
       retryDelayMs: 2000,
-      readURL,
-      wait: (delayMs) => Bun.sleep(delayMs),
+      readURL: step.readURL,
+      wait: step.wait,
     }),
+    writeFile: step.writeFile,
   });
 
-  process.stdout.write(`downloaded ${written.length} files from ${toolsURL}\n`);
+  step.writeOutput(`downloaded ${written.length} files from ${toolsURL}\n`);
+
+  return 0;
 }
 
 if (import.meta.main) {
-  await runCLI();
+  process.exitCode = await runDownloadStep({
+    args: process.argv.slice(2),
+    env: process.env,
+    readURL,
+    wait: (delayMs) => Bun.sleep(delayMs),
+    writeFile: async (path, text) => {
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, text);
+    },
+    writeOutput: (text) => {
+      process.stdout.write(text);
+    },
+    writeError: (text) => {
+      process.stderr.write(text);
+    },
+  });
 }

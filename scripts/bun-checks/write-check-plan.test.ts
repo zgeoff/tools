@@ -1,6 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { nodeFileSystem } from '../ci/file-system.ts';
 import { writeCheckPlan } from './write-check-plan.ts';
 
 async function setupTest() {
@@ -32,6 +33,7 @@ test('it writes the plan for the script names package.json defines to the step o
     part: 'all',
     scripts: 'lint test test:e2e',
     lane: '',
+    fileSystem: nodeFileSystem,
   });
 
   const output = await ctx.readOutput();
@@ -64,6 +66,7 @@ test('it plans the standard static checks for the static job of a caller that li
     part: 'static',
     scripts: '',
     lane: '',
+    fileSystem: nodeFileSystem,
   });
 
   const output = await ctx.readOutput();
@@ -82,6 +85,7 @@ test('it plans no lanes for a repo without lane scripts, so no public lane job s
     part: 'all',
     scripts: 'lint test',
     lane: '',
+    fileSystem: nodeFileSystem,
   });
 
   const output = await ctx.readOutput();
@@ -102,6 +106,7 @@ test('it plans one lane per lane script, and a lane job runs only its own lane s
     part: 'lane',
     scripts: 'lint test test:e2e test:host',
     lane: 'host',
+    fileSystem: nodeFileSystem,
   });
 
   const output = await ctx.readOutput();
@@ -129,6 +134,7 @@ test('it plans the static checks, the tests and each lane once for the private c
     part: 'all',
     scripts: 'lint test test:e2e test:browser test:docker test:host',
     lane: '',
+    fileSystem: nodeFileSystem,
   });
 
   const output = await ctx.readOutput();
@@ -155,16 +161,16 @@ test('it fails with an error and writes no outputs when a listed script is missi
     part: 'all',
     scripts: 'lint check',
     lane: '',
+    fileSystem: nodeFileSystem,
   });
 
   const wroteOutput = await Bun.file(ctx.outputPath).exists();
 
-  expect({ errors, wroteOutput }).toStrictEqual({
-    errors: [
-      'package.json defines no script named: check. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list.',
-    ],
-    wroteOutput: false,
-  });
+  expect(errors).toStrictEqual([
+    'package.json defines no script named: check. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list.',
+  ]);
+
+  expect(wroteOutput).toBeFalse();
 });
 
 test('it fails with an error on a part it does not know', async () => {
@@ -178,6 +184,7 @@ test('it fails with an error on a part it does not know', async () => {
     part: 'everything',
     scripts: 'lint',
     lane: '',
+    fileSystem: nodeFileSystem,
   });
 
   expect(errors).toStrictEqual([

@@ -30,11 +30,8 @@ test('it answers 404 for a path it does not list and records every request', asy
   const missing = await fetch(`${server.url}/teapot.txt`);
   const found = await fetch(`${server.url}/kettle.txt`);
 
-  expect({ missing: missing.status, found: found.status }).toStrictEqual({
-    missing: 404,
-    found: 200,
-  });
-
+  expect(missing.status).toBe(404);
+  expect(found.status).toBe(200);
   expect(server.requests).toStrictEqual(['/teapot.txt', '/kettle.txt']);
 });
 

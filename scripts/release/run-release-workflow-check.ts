@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { nodeFileSystem } from '../ci/file-system.ts';
 import { collectReleaseWorkflowFaults } from './collect-release-workflow-faults.ts';
 
 export interface ReleaseWorkflowCheckOptions {
@@ -38,7 +38,7 @@ export async function runReleaseWorkflowCheck(
 
 async function runCLI(): Promise<void> {
   process.exitCode = await runReleaseWorkflowCheck({
-    readWorkflow: () => readFile(workflowPath, 'utf8'),
+    readWorkflow: () => nodeFileSystem.readText(workflowPath),
     writeOutput: (text) => {
       process.stdout.write(text);
     },

@@ -1,3 +1,4 @@
+import { nodeFileSystem } from '../ci/file-system.ts';
 import { writeStepOutputs } from '../ci/write-step-outputs.ts';
 import { parseReleaseOutputs } from './parse-release-outputs.ts';
 
@@ -42,7 +43,7 @@ async function runCLI(): Promise<void> {
     return;
   }
 
-  await writeStepOutputs(process.env['GITHUB_OUTPUT'] ?? '', result.outputs);
+  await writeStepOutputs(nodeFileSystem, process.env['GITHUB_OUTPUT'] ?? '', result.outputs);
 }
 
 if (import.meta.main) {

@@ -27,10 +27,11 @@ test('it runs each listed script in order, each in its own log group', async () 
     },
   });
 
-  expect({ exitCode, ran, output: output.join('') }).toStrictEqual({
-    exitCode: 0,
-    ran: ['lint', 'check', 'test'],
-    output: [
+  expect(exitCode).toBe(0);
+  expect(ran).toStrictEqual(['lint', 'check', 'test']);
+
+  expect(output.join('')).toBe(
+    [
       '::group::bun run lint',
       '::endgroup::',
       '::group::bun run check',
@@ -39,7 +40,7 @@ test('it runs each listed script in order, each in its own log group', async () 
       '::endgroup::',
       '',
     ].join('\n'),
-  });
+  );
 });
 
 test('it stops at the first script that fails and returns its exit code', async () => {
@@ -57,7 +58,8 @@ test('it stops at the first script that fails and returns its exit code', async 
     writeOutput: () => {},
   });
 
-  expect({ exitCode, ran }).toStrictEqual({ exitCode: 3, ran: ['lint'] });
+  expect(exitCode).toBe(3);
+  expect(ran).toStrictEqual(['lint']);
 });
 
 test('it runs nothing for an empty list', async () => {
@@ -73,7 +75,8 @@ test('it runs nothing for an empty list', async () => {
     writeOutput: () => {},
   });
 
-  expect({ exitCode, ran }).toStrictEqual({ exitCode: 0, ran: [] });
+  expect(exitCode).toBe(0);
+  expect(ran).toStrictEqual([]);
 });
 
 test('it runs a package script through bun run and returns its exit code', async () => {
@@ -89,5 +92,6 @@ test('it runs a package script through bun run and returns its exit code', async
   const exitCode = await runScript('lint');
   const ran = await readFile(join(ctx.directory, 'ran'), 'utf8');
 
-  expect({ exitCode, ran }).toStrictEqual({ exitCode: 3, ran: 'lint\n' });
+  expect(exitCode).toBe(3);
+  expect(ran).toBe('lint\n');
 });

@@ -1,4 +1,5 @@
-import { writeFile } from 'node:fs/promises';
+import type { FileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/file-system.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { runAuditFix } from './audit-fix.ts';
@@ -11,6 +12,7 @@ export interface AdvisoriesFixOptions {
   readonly base: string;
   readonly defaultBranch: string;
   readonly expiryDays: string;
+  readonly fileSystem: FileSystem;
   readonly runAuditFix: (argv: readonly string[]) => Promise<void>;
   readonly runCommand: RunCommand;
 }
@@ -54,7 +56,7 @@ async function copyPendingIgnores(
     return false;
   }
 
-  await writeFile(pendingPath, shown.stdout);
+  await options.fileSystem.writeText(pendingPath, shown.stdout);
 
   return true;
 }
@@ -67,6 +69,7 @@ if (import.meta.main) {
     base: process.env['BASE'] ?? '',
     defaultBranch: process.env['DEFAULT_BRANCH'] ?? '',
     expiryDays: process.env['EXPIRY_DAYS'] ?? '30',
+    fileSystem: nodeFileSystem,
     runAuditFix,
     runCommand,
   });

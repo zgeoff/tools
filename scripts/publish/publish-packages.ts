@@ -1,8 +1,10 @@
-import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { FileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { runLoggedCommand } from '../ci/run-logged-command.ts';
 import { parseTextList } from '../release/parse-text-list.ts';
 import { parseTextRecord } from '../release/parse-text-record.ts';
 
@@ -15,7 +17,13 @@ export interface PackagesPublishOptions {
 
   readonly releasedVersionsText: string;
 
+  readonly fileSystem: FileSystem;
+
+  // Runs the registry check, whose answer the publish reads.
   readonly runCommand: RunCommand;
+
+  // Runs the build, pack and publish, whose output the log shows as each command writes it.
+  readonly runLoggedCommand: RunCommand;
 
   readonly writeOutput: (text: string) => void;
 
@@ -40,7 +48,9 @@ export async function publishPackages(options: PackagesPublishOptions): Promise<
   }
 
   const packages = await Promise.all(
-    paths.map((path) => readPackage(join(options.cwd, path), releasedVersions[path])),
+    paths.map((path) =>
+      readPackage(options.fileSystem, join(options.cwd, path), releasedVersions[path]),
+    ),
   );
 
   // A tag whose version the checkout does not hold fails the run before anything publishes, which
@@ -76,10 +86,11 @@ interface ReleasedPackage {
 }
 
 async function readPackage(
+  fileSystem: FileSystem,
   folder: string,
   releasedVersion: string | undefined,
 ): Promise<ReleasedPackage> {
-  const text = await readFile(join(folder, 'package.json'), 'utf8');
+  const text = await fileSystem.readText(join(folder, 'package.json'));
 
   const manifest: unknown = JSON.parse(text);
 
@@ -113,14 +124,8 @@ async function publishPackage(
 ): Promise<void> {
   const commandOptions = { cwd: entry.folder, env: options.env };
 
-  // Each command's output reaches the step log once the command ends.
-  const run = async (argv: readonly string[]) => {
-    const result = await runCheckedCommand(options.runCommand, argv, commandOptions);
-
-    if (result.stdout !== '') {
-      options.writeOutput(result.stdout);
-    }
-  };
+  const run = (argv: readonly string[]) =>
+    runCheckedCommand(options.runLoggedCommand, argv, commandOptions);
 
   if (entry.isPrivate) {
     options.writeOutput(`skipping ${entry.name}: private\n`);
@@ -145,7 +150,7 @@ async function publishPackage(
 
   await run(['bun', 'pm', 'pack']);
 
-  const files = await readdir(entry.folder);
+  const files = await options.fileSystem.readDirectory(entry.folder);
 
   const tarballs = files.filter((file) => file.endsWith('.tgz'));
   const [tarball] = tarballs;
@@ -163,7 +168,9 @@ if (import.meta.main) {
     env: process.env,
     pathsText: process.env['PATHS_RELEASED'] ?? '',
     releasedVersionsText: process.env['RELEASED_VERSIONS'] ?? '',
+    fileSystem: nodeFileSystem,
     runCommand,
+    runLoggedCommand,
     writeOutput: (text) => {
       process.stdout.write(text);
     },

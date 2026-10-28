@@ -1,4 +1,5 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import type { FileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
@@ -14,6 +15,7 @@ export interface AuditFixPullRequestOptions {
   readonly defaultBranch: string;
   readonly isAutomerge: boolean;
   readonly runURL: string;
+  readonly fileSystem: FileSystem;
   readonly runCommand: RunCommand;
   readonly writeOutput: (text: string) => void;
 }
@@ -26,13 +28,16 @@ export async function openAuditFixPullRequest(options: AuditFixPullRequestOption
   const checkedGH = (args: readonly string[]) =>
     runCheckedCommand(options.runCommand, ['gh', ...args], commandOptions);
 
-  const titleText = await readFile(paths.title, 'utf8');
-  const body = await readFile(paths.body, 'utf8');
-  const reviewText = await readFile(paths.review, 'utf8');
+  const titleText = await options.fileSystem.readText(paths.title);
+  const body = await options.fileSystem.readText(paths.body);
+  const reviewText = await options.fileSystem.readText(paths.review);
 
   const title = titleText.replace(/\n+$/u, '');
 
-  await writeFile(paths.pullRequestBody, `${body}\n[Workflow run](${options.runURL})\n`);
+  await options.fileSystem.writeText(
+    paths.pullRequestBody,
+    `${body}\n[Workflow run](${options.runURL})\n`,
+  );
 
   const openNumber = await readOpenPullRequest({
     ...commandOptions,
@@ -117,6 +122,7 @@ if (import.meta.main) {
     defaultBranch: env['DEFAULT_BRANCH'] ?? '',
     isAutomerge: env['AUTOMERGE'] === 'true',
     runURL: env['RUN_URL'] ?? '',
+    fileSystem: nodeFileSystem,
     runCommand,
     writeOutput: (text) => {
       process.stdout.write(text);

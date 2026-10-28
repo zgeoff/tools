@@ -1,24 +1,25 @@
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { runLoggedCommand } from '../ci/run-logged-command.ts';
 
 export interface ShellCheckRun {
   readonly cwd: string;
 
   readonly env: Readonly<Record<string, string | undefined>>;
 
+  // Runs a command whose output the check reads.
   readonly runCommand: RunCommand;
-}
 
-export interface CheckResult {
-  readonly exitCode: number;
+  // Runs a check command whose output the log shows as it runs.
+  readonly runLoggedCommand: RunCommand;
 
-  readonly output: string;
+  readonly writeOutput: (text: string) => void;
 }
 
 // Runs shellcheck and shfmt over every shell script git tracks, and fails on the findings of
-// either, after both have run.
-export async function runShellCheck(run: Readonly<ShellCheckRun>): Promise<CheckResult> {
+// either, after both have run. Returns the step's exit code.
+export async function runShellCheck(run: Readonly<ShellCheckRun>): Promise<number> {
   const options = { cwd: run.cwd, env: run.env };
 
   const listed = await runCheckedCommand(
@@ -30,10 +31,12 @@ export async function runShellCheck(run: Readonly<ShellCheckRun>): Promise<Check
   const scripts = listed.stdout.split('\0').filter((path) => path !== '');
 
   if (scripts.length === 0) {
-    return { exitCode: 0, output: 'shell: the repo tracks no shell script\n' };
+    run.writeOutput('shell: the repo tracks no shell script\n');
+
+    return 0;
   }
 
-  const shellcheck = await run.runCommand(
+  const shellcheck = await run.runLoggedCommand(
     [
       'shellcheck',
       '--external-sources',
@@ -45,20 +48,19 @@ export async function runShellCheck(run: Readonly<ShellCheckRun>): Promise<Check
     options,
   );
 
-  const shfmt = await run.runCommand(['shfmt', '-d', '--', ...scripts], options);
+  const shfmt = await run.runLoggedCommand(['shfmt', '-d', '--', ...scripts], options);
 
-  const results = [shellcheck, shfmt];
-
-  return {
-    exitCode: results.every((result) => result.exitCode === 0) ? 0 : 1,
-    output: results.map((result) => `${result.stdout}${result.stderr}`).join(''),
-  };
+  return shellcheck.exitCode === 0 && shfmt.exitCode === 0 ? 0 : 1;
 }
 
 if (import.meta.main) {
-  const result = await runShellCheck({ cwd: process.cwd(), env: process.env, runCommand });
-
-  process.stdout.write(result.output);
-
-  process.exitCode = result.exitCode;
+  process.exitCode = await runShellCheck({
+    cwd: process.cwd(),
+    env: process.env,
+    runCommand,
+    runLoggedCommand,
+    writeOutput: (text) => {
+      process.stdout.write(text);
+    },
+  });
 }

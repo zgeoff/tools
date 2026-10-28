@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { createGitCommit } from '../../test-utils/create-git-commit.ts';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { runGit } from '../../test-utils/run-git.ts';
+import { nodeFileSystem } from '../ci/file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { fixAdvisories } from './fix-advisories.ts';
 
@@ -20,8 +21,6 @@ async function setupTest() {
   await mkdir(runnerTemp);
   await runGit(directory, env, ['init', '--quiet', '--bare', '--initial-branch=main', remote]);
   await runGit(directory, env, ['clone', '--quiet', remote, clone]);
-  await createGitCommit(clone, env, { 'package.json': '{}\n' });
-  await runGit(clone, env, ['push', '--quiet', 'origin', 'HEAD:main']);
 
   const pushBranch = async (branch: string, files: Readonly<Record<string, string>>) => {
     await runGit(clone, env, ['checkout', '--quiet', '-b', branch]);
@@ -40,6 +39,7 @@ async function setupTest() {
       base,
       defaultBranch: 'main',
       expiryDays: '14',
+      fileSystem: nodeFileSystem,
       runCommand,
       runAuditFix: (argv) => {
         calls.push(argv);
@@ -48,11 +48,14 @@ async function setupTest() {
       },
     });
 
-  return { runnerTemp, calls, pushBranch, runFix };
+  return { env, clone, runnerTemp, calls, pushBranch, runFix };
 }
 
 test('it hands the audit the ignores of the open fix branch, so a rerun keeps their expiry', async () => {
   const ctx = await setupTest();
+
+  await createGitCommit(ctx.clone, ctx.env, { 'package.json': '{}\n' });
+  await runGit(ctx.clone, ctx.env, ['push', '--quiet', 'origin', 'HEAD:main']);
 
   await ctx.pushBranch('audit-fix', { 'audit-ignores.json': '{"GHSA-1234":{}}\n' });
   await ctx.runFix('main');
@@ -80,6 +83,9 @@ test('it hands the audit the ignores of the open fix branch, so a rerun keeps th
 test('it runs the audit with no pending ignores when no fix branch exists', async () => {
   const ctx = await setupTest();
 
+  await createGitCommit(ctx.clone, ctx.env, { 'package.json': '{}\n' });
+  await runGit(ctx.clone, ctx.env, ['push', '--quiet', 'origin', 'HEAD:main']);
+
   await ctx.runFix('main');
 
   const hasPending = await Bun.file(join(ctx.runnerTemp, 'pending-ignores.json')).exists();
@@ -103,6 +109,9 @@ test('it runs the audit with no pending ignores when no fix branch exists', asyn
 test('it runs the audit with no pending ignores when the fix branch records none', async () => {
   const ctx = await setupTest();
 
+  await createGitCommit(ctx.clone, ctx.env, { 'package.json': '{}\n' });
+  await runGit(ctx.clone, ctx.env, ['push', '--quiet', 'origin', 'HEAD:main']);
+
   await ctx.pushBranch('audit-fix', { 'bun.lock': 'kettle\n' });
   await ctx.runFix('main');
 
@@ -115,6 +124,9 @@ test('it runs the audit with no pending ignores when the fix branch records none
 
 test('it reads the pending ignores from the fix branch of another base', async () => {
   const ctx = await setupTest();
+
+  await createGitCommit(ctx.clone, ctx.env, { 'package.json': '{}\n' });
+  await runGit(ctx.clone, ctx.env, ['push', '--quiet', 'origin', 'HEAD:main']);
 
   await ctx.pushBranch('audit-fix', { 'audit-ignores.json': '{"GHSA-main":{}}\n' });
   await ctx.pushBranch('audit-fix-release-v2', { 'audit-ignores.json': '{"GHSA-v2":{}}\n' });

@@ -1,5 +1,6 @@
-import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { FileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/file-system.ts';
 import { writeStepOutputs } from '../ci/write-step-outputs.ts';
 import type { CheckPart } from './plan-check-scripts.ts';
 import { planCheckScripts } from './plan-check-scripts.ts';
@@ -14,6 +15,8 @@ export interface CheckPlanStep {
   readonly scripts: string;
 
   readonly lane: string;
+
+  readonly fileSystem: FileSystem;
 }
 
 const parts: readonly CheckPart[] = ['all', 'static', 'test', 'lane'];
@@ -26,7 +29,7 @@ export async function writeCheckPlan(step: Readonly<CheckPlanStep>): Promise<str
     return [`the plan step needs PART (one of ${parts.join(', ')}) and GITHUB_OUTPUT.`];
   }
 
-  const packageText = await readFile(join(step.cwd, 'package.json'), 'utf8');
+  const packageText = await step.fileSystem.readText(join(step.cwd, 'package.json'));
 
   const packageJSON: unknown = JSON.parse(packageText);
 
@@ -44,7 +47,7 @@ export async function writeCheckPlan(step: Readonly<CheckPlanStep>): Promise<str
   }
 
   // Spaces around each list let a later step match one whole name.
-  await writeStepOutputs(step.outputPath, {
+  await writeStepOutputs(step.fileSystem, step.outputPath, {
     scripts: ` ${plan.scripts.join(' ')} `,
     static: ` ${plan.static.join(' ')} `,
     test: ` ${plan.test.join(' ')} `,
@@ -71,6 +74,7 @@ if (import.meta.main) {
     part: process.env['PART'] ?? '',
     scripts: process.env['SCRIPTS'] ?? '',
     lane: process.env['LANE'] ?? '',
+    fileSystem: nodeFileSystem,
   });
 
   for (const error of errors) {

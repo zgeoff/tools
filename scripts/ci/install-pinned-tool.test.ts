@@ -1,8 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { $ } from 'bun';
 import { createStubFileServer } from '../../test-utils/create-stub-file-server.ts';
+import { createTarArchive } from '../../test-utils/create-tar-archive.ts';
+import { nodeFileSystem } from './file-system.ts';
 import {
   installPinnedTool,
   parseToolArgs,
@@ -21,23 +22,7 @@ async function setupTest() {
 
   await mkdir(runnerTemp);
 
-  const createReleaseArchive = async (files: Readonly<Record<string, string>>) => {
-    const release = join(directory, 'release');
-
-    await mkdir(release);
-
-    for (const [name, content] of Object.entries(files)) {
-      await writeFile(join(release, name), content, { mode: 0o755 });
-    }
-
-    const archive = join(directory, 'release.tar.gz');
-
-    await $`tar -czf ${archive} -C ${release} ${Object.keys(files)}`.quiet();
-
-    return readFile(archive);
-  };
-
-  return { runnerTemp, githubPath, createReleaseArchive };
+  return { directory, runnerTemp, githubPath };
 }
 
 test('it installs a binary release into a runner folder on the PATH when the checksum matches', async () => {
@@ -54,6 +39,7 @@ test('it installs a binary release into a runner folder on the PATH when the che
     runnerTemp: ctx.runnerTemp,
     githubPath: ctx.githubPath,
     env: process.env,
+    fileSystem: nodeFileSystem,
     runCommand,
   });
 
@@ -80,6 +66,7 @@ test('it installs nothing when the download fails its checksum', async () => {
     runnerTemp: ctx.runnerTemp,
     githubPath: ctx.githubPath,
     env: process.env,
+    fileSystem: nodeFileSystem,
     runCommand,
   });
 
@@ -97,9 +84,9 @@ test('it installs nothing when the download fails its checksum', async () => {
 test('it installs only the tool from a release archive into a runner folder on the PATH', async () => {
   const ctx = await setupTest();
 
-  const archive = await ctx.createReleaseArchive({
-    actionlint: 'fake actionlint\n',
-    'README.md': 'fake readme\n',
+  const archive = await createTarArchive(ctx.directory, {
+    actionlint: { content: 'fake actionlint\n', mode: 0o755 },
+    'README.md': { content: 'fake readme\n', mode: 0o644 },
   });
 
   await installPinnedTool({
@@ -113,6 +100,7 @@ test('it installs only the tool from a release archive into a runner folder on t
     runnerTemp: ctx.runnerTemp,
     githubPath: ctx.githubPath,
     env: process.env,
+    fileSystem: nodeFileSystem,
     runCommand,
   });
 
@@ -129,7 +117,10 @@ test('it installs only the tool from a release archive into a runner folder on t
 
 test('it extracts nothing from a release archive that fails its checksum', async () => {
   const ctx = await setupTest();
-  const archive = await ctx.createReleaseArchive({ actionlint: 'fake actionlint\n' });
+
+  const archive = await createTarArchive(ctx.directory, {
+    actionlint: { content: 'fake actionlint\n', mode: 0o755 },
+  });
 
   const installing = installPinnedTool({
     name: 'actionlint',
@@ -142,6 +133,7 @@ test('it extracts nothing from a release archive that fails its checksum', async
     runnerTemp: ctx.runnerTemp,
     githubPath: ctx.githubPath,
     env: process.env,
+    fileSystem: nodeFileSystem,
     runCommand,
   });
 
@@ -195,16 +187,14 @@ test.each([
           neededBy: 'shell check',
         },
       },
+      fileSystem: nodeFileSystem,
       runCommand,
     });
 
     const runnerFiles = await readdir(ctx.runnerTemp);
 
-    expect(result).toStrictEqual({
-      exitCode: 0,
-      output: 'shfmt: not needed, because this job runs no shell check\n',
-    });
-
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toBe('shfmt: not needed, because this job runs no shell check\n');
     expect(server.requests).toStrictEqual([]);
     expect(runnerFiles).toStrictEqual([]);
   },
@@ -235,12 +225,14 @@ test.each([
         neededBy: 'shell check',
       },
     },
+    fileSystem: nodeFileSystem,
     runCommand,
   });
 
   const installed = await readFile(join(ctx.runnerTemp, 'shfmt-bin/shfmt'), 'utf8');
 
-  expect(result).toStrictEqual({ exitCode: 0, output: '' });
+  expect(result.exitCode).toBe(0);
+  expect(result.output).toBe('');
   expect(installed).toBe('fake shfmt\n');
 });
 
@@ -256,13 +248,12 @@ test('it fails the step with an error when the runner gives no RUNNER_TEMP or GI
         neededBy: 'shell check',
       },
     },
+    fileSystem: nodeFileSystem,
     runCommand,
   });
 
-  expect(result).toStrictEqual({
-    exitCode: 1,
-    output: '::error::shfmt: the install needs RUNNER_TEMP and GITHUB_PATH\n',
-  });
+  expect(result.exitCode).toBe(1);
+  expect(result.output).toBe('::error::shfmt: the install needs RUNNER_TEMP and GITHUB_PATH\n');
 });
 
 test.each([

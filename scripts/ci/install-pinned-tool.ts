@@ -1,6 +1,7 @@
-import { appendFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
+import type { FileSystem } from './file-system.ts';
+import { nodeFileSystem } from './file-system.ts';
 import { runCheckedCommand } from './run-checked-command.ts';
 import type { RunCommand } from './run-command.ts';
 import { runCommand } from './run-command.ts';
@@ -42,6 +43,8 @@ export interface PinnedToolStep {
   readonly env: Readonly<Record<string, string | undefined>>;
 
   readonly pins: Readonly<Record<string, ToolPin>>;
+
+  readonly fileSystem: FileSystem;
 
   readonly runCommand: RunCommand;
 }
@@ -85,6 +88,7 @@ export async function runPinnedToolStep(step: Readonly<PinnedToolStep>): Promise
     runnerTemp,
     githubPath,
     env: step.env,
+    fileSystem: step.fileSystem,
     runCommand: step.runCommand,
   });
 
@@ -136,6 +140,8 @@ export interface ToolInstall {
 
   readonly env: Readonly<Record<string, string | undefined>>;
 
+  readonly fileSystem: FileSystem;
+
   readonly runCommand: RunCommand;
 }
 
@@ -152,19 +158,19 @@ export async function installPinnedTool(install: Readonly<ToolInstall>): Promise
     options,
   );
 
-  const bytes = await Bun.file(download).bytes();
+  const bytes = await install.fileSystem.readBytes(download);
 
   const sha256 = new Bun.CryptoHasher('sha256').update(bytes).digest('hex');
 
   if (sha256 !== install.pin.sha256) {
-    await rm(download);
+    await install.fileSystem.removePath(download);
 
     throw new Error(
       `${install.name}: the download's sha256 is ${sha256}, not the pinned ${install.pin.sha256}`,
     );
   }
 
-  await mkdir(folder, { recursive: true });
+  await install.fileSystem.createDirectory(folder);
 
   await runCheckedCommand(
     install.runCommand,
@@ -172,7 +178,7 @@ export async function installPinnedTool(install: Readonly<ToolInstall>): Promise
     options,
   );
 
-  await appendFile(install.githubPath, `${folder}\n`);
+  await install.fileSystem.appendText(install.githubPath, `${folder}\n`);
 }
 
 // A table typed over every packaging, so a new one fails the type check until it has a command.
@@ -197,6 +203,7 @@ if (import.meta.main) {
     args: process.argv.slice(2),
     env: process.env,
     pins: toolPins,
+    fileSystem: nodeFileSystem,
     runCommand,
   });
 

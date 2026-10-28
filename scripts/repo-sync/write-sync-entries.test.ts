@@ -1,6 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { nodeFileSystem } from '../ci/file-system.ts';
 import { writeSyncEntries } from './write-sync-entries.ts';
 
 async function setupTest() {
@@ -8,20 +9,17 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
+  await mkdir(join(directory, 'sync'));
+
+  const manifestPath = join(directory, 'sync', 'manifest.json');
   const outputPath = join(directory, 'output');
+  const output: string[] = [];
 
-  const runPrepare = async (manifest: unknown, skip: string, include: string) => {
-    await mkdir(join(directory, 'sync'), { recursive: true });
-    await writeFile(join(directory, 'sync', 'manifest.json'), JSON.stringify(manifest));
-    await writeFile(outputPath, '');
-
-    const exitCode = await writeSyncEntries({ cwd: directory, skip, include, outputPath });
-    const output = await readFile(outputPath, 'utf8');
-
-    return { exitCode, output };
+  const writeOutput = (text: string) => {
+    output.push(text);
   };
 
-  return { runPrepare };
+  return { directory, manifestPath, outputPath, output, writeOutput };
 }
 
 test.each([
@@ -30,8 +28,9 @@ test.each([
 ])('it outputs workflows %s targets a workflow', async (_label, include, expected) => {
   const ctx = await setupTest();
 
-  const result = await ctx.runPrepare(
-    [
+  await writeFile(
+    ctx.manifestPath,
+    JSON.stringify([
       {
         name: 'editorconfig',
         description: 'The editor config',
@@ -43,20 +42,33 @@ test.each([
         optIn: true,
         files: [{ source: 'sync/workflow-demo.yml', target: '.github/workflows/demo.yml' }],
       },
-    ],
-    '',
-    include,
+    ]),
   );
 
-  expect(result.exitCode).toBe(0);
-  expect(result.output).toEndWith(`\nworkflows=${expected}\n`);
+  await writeFile(ctx.outputPath, '');
+
+  const exitCode = await writeSyncEntries({
+    cwd: ctx.directory,
+    skip: '',
+    include,
+    outputPath: ctx.outputPath,
+    fileSystem: nodeFileSystem,
+    writeOutput: ctx.writeOutput,
+  });
+
+  const outputs = await readFile(ctx.outputPath, 'utf8');
+
+  expect(exitCode).toBe(0);
+  expect(outputs).toEndWith(`\nworkflows=${expected}\n`);
+  expect(ctx.output).toStrictEqual([]);
 });
 
 test('it outputs the entries it keeps as compact JSON, without optIn and with workflows', async () => {
   const ctx = await setupTest();
 
-  const result = await ctx.runPrepare(
-    [
+  await writeFile(
+    ctx.manifestPath,
+    JSON.stringify([
       {
         name: 'editorconfig',
         description: 'The editor config',
@@ -73,10 +85,21 @@ test('it outputs the entries it keeps as compact JSON, without optIn and with wo
         optIn: true,
         files: [{ source: 'sync/workflow-demo.yml', target: '.github/workflows/demo.yml' }],
       },
-    ],
-    ' socket ',
-    'workflow-demo',
+    ]),
   );
+
+  await writeFile(ctx.outputPath, '');
+
+  const exitCode = await writeSyncEntries({
+    cwd: ctx.directory,
+    skip: ' socket ',
+    include: 'workflow-demo',
+    outputPath: ctx.outputPath,
+    fileSystem: nodeFileSystem,
+    writeOutput: ctx.writeOutput,
+  });
+
+  const outputs = await readFile(ctx.outputPath, 'utf8');
 
   const entries = [
     {
@@ -93,38 +116,92 @@ test('it outputs the entries it keeps as compact JSON, without optIn and with wo
     },
   ];
 
-  expect(result).toStrictEqual({
-    exitCode: 0,
-    output: `entries=${JSON.stringify(entries)}\nworkflows=true\n`,
-  });
+  expect(exitCode).toBe(0);
+  expect(outputs).toBe(`entries=${JSON.stringify(entries)}\nworkflows=true\n`);
+  expect(ctx.output).toStrictEqual([]);
 });
 
-test('it fails and writes no output when include names an entry that is not opt-in', async () => {
+test('it fails with an error and writes no output when include names an entry that is not opt-in', async () => {
   const ctx = await setupTest();
 
-  const result = await ctx.runPrepare(
-    [{ name: 'editorconfig', files: [{ source: 'sync/editorconfig', target: '.editorconfig' }] }],
-    '',
-    'editorconfig,ghost::x',
+  await writeFile(
+    ctx.manifestPath,
+    JSON.stringify([
+      { name: 'editorconfig', files: [{ source: 'sync/editorconfig', target: '.editorconfig' }] },
+    ]),
   );
 
-  expect(result).toStrictEqual({ exitCode: 1, output: '' });
+  await writeFile(ctx.outputPath, '');
+
+  const exitCode = await writeSyncEntries({
+    cwd: ctx.directory,
+    skip: '',
+    include: 'editorconfig,ghost::x',
+    outputPath: ctx.outputPath,
+    fileSystem: nodeFileSystem,
+    writeOutput: ctx.writeOutput,
+  });
+
+  const outputs = await readFile(ctx.outputPath, 'utf8');
+
+  expect(exitCode).toBe(1);
+  expect(outputs).toBe('');
+
+  expect(ctx.output).toStrictEqual([
+    '::error::include lists no opt-in manifest entry: editorconfig, ghost  x\n',
+  ]);
 });
 
-test('it fails and writes no output when skip and include name the same entry', async () => {
+test('it fails with an error and writes no output when skip and include name the same entry', async () => {
   const ctx = await setupTest();
 
-  const result = await ctx.runPrepare(
-    [
+  await writeFile(
+    ctx.manifestPath,
+    JSON.stringify([
       {
         name: 'workflow-demo',
         optIn: true,
         files: [{ source: 'sync/workflow-demo.yml', target: '.github/workflows/demo.yml' }],
       },
-    ],
-    'workflow-demo',
-    'workflow-demo',
+    ]),
   );
 
-  expect(result).toStrictEqual({ exitCode: 1, output: '' });
+  await writeFile(ctx.outputPath, '');
+
+  const exitCode = await writeSyncEntries({
+    cwd: ctx.directory,
+    skip: 'workflow-demo',
+    include: 'workflow-demo',
+    outputPath: ctx.outputPath,
+    fileSystem: nodeFileSystem,
+    writeOutput: ctx.writeOutput,
+  });
+
+  const outputs = await readFile(ctx.outputPath, 'utf8');
+
+  expect(exitCode).toBe(1);
+  expect(outputs).toBe('');
+  expect(ctx.output).toStrictEqual(['::error::skip and include both list: workflow-demo\n']);
+});
+
+test('it fails with an error when the manifest holds no list of entries', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(ctx.manifestPath, JSON.stringify({ name: 'editorconfig' }));
+  await writeFile(ctx.outputPath, '');
+
+  const exitCode = await writeSyncEntries({
+    cwd: ctx.directory,
+    skip: '',
+    include: '',
+    outputPath: ctx.outputPath,
+    fileSystem: nodeFileSystem,
+    writeOutput: ctx.writeOutput,
+  });
+
+  const outputs = await readFile(ctx.outputPath, 'utf8');
+
+  expect(exitCode).toBe(1);
+  expect(outputs).toBe('');
+  expect(ctx.output).toStrictEqual(['::error::sync/manifest.json holds no list of entries\n']);
 });

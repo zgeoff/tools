@@ -1,8 +1,9 @@
-import { appendFile } from 'node:fs/promises';
+import type { FileSystem } from './file-system.ts';
 
 // GitHub Actions reads each `name=value` line of the file that GITHUB_OUTPUT names as one step
 // output, so a value that holds a newline would end its output early.
 export async function writeStepOutputs(
+  fileSystem: FileSystem,
   outputPath: string,
   outputs: Readonly<Record<string, string>>,
 ): Promise<void> {
@@ -14,5 +15,5 @@ export async function writeStepOutputs(
     return `${name}=${value}\n`;
   });
 
-  await appendFile(outputPath, lines.join(''));
+  await fileSystem.appendText(outputPath, lines.join(''));
 }

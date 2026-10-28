@@ -22,15 +22,10 @@ test('it records each call with its arguments, prints nothing and succeeds', asy
   const first = await $`${join(ctx.directory, 'npm')} view kettle@1.0.0 version`.nothrow().quiet();
   const second = await $`${join(ctx.directory, 'npm')} publish ./kettle.tgz`.nothrow().quiet();
 
-  expect({ exitCode: first.exitCode, stdout: first.stdout.toString() }).toStrictEqual({
-    exitCode: 0,
-    stdout: '',
-  });
-
-  expect({ exitCode: second.exitCode, stdout: second.stdout.toString() }).toStrictEqual({
-    exitCode: 0,
-    stdout: '',
-  });
+  expect(first.exitCode).toBe(0);
+  expect(first.stdout.toString()).toBe('');
+  expect(second.exitCode).toBe(0);
+  expect(second.stdout.toString()).toBe('');
 
   const calls = await readFile(log, 'utf8');
 
@@ -47,13 +42,8 @@ test('it prints the output it is given on each call', async () => {
   const first = await $`${join(ctx.directory, 'npm')} view kettle@1.0.0 version`.nothrow().quiet();
   const second = await $`${join(ctx.directory, 'npm')} view kettle@1.0.0 version`.nothrow().quiet();
 
-  expect({ exitCode: first.exitCode, stdout: first.stdout.toString() }).toStrictEqual({
-    exitCode: 0,
-    stdout: '1.0.0\n',
-  });
-
-  expect({ exitCode: second.exitCode, stdout: second.stdout.toString() }).toStrictEqual({
-    exitCode: 0,
-    stdout: '1.0.0\n',
-  });
+  expect(first.exitCode).toBe(0);
+  expect(first.stdout.toString()).toBe('1.0.0\n');
+  expect(second.exitCode).toBe(0);
+  expect(second.stdout.toString()).toBe('1.0.0\n');
 });

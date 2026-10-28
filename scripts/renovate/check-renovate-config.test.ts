@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import { nodeFileSystem } from '../ci/file-system.ts';
 import type { CommandOptions } from '../ci/run-command.ts';
 import { parseRenovateVersion, runRenovateConfigCheck } from './check-renovate-config.ts';
 
@@ -51,7 +52,6 @@ test('it validates default.json strictly at the pinned version and returns the v
   const ctx = await setupTest();
 
   const calls: { argv: readonly string[]; cwd: string }[] = [];
-  const output: string[] = [];
 
   await writeTreeFiles(ctx.directory, {
     '.github/workflows/renovate.yml':
@@ -61,7 +61,8 @@ test('it validates default.json strictly at the pinned version and returns the v
   const exitCode = await runRenovateConfigCheck({
     cwd: ctx.directory,
     env: {},
-    runCommand: (argv: readonly string[], options: Readonly<CommandOptions>) => {
+    fileSystem: nodeFileSystem,
+    runLoggedCommand: (argv: readonly string[], options: Readonly<CommandOptions>) => {
       calls.push({ argv, cwd: options.cwd });
 
       return Promise.resolve({
@@ -70,29 +71,24 @@ test('it validates default.json strictly at the pinned version and returns the v
         stderr: '',
       });
     },
-    writeOutput: (text) => {
-      output.push(text);
-    },
   });
 
-  expect({ exitCode, calls, output }).toStrictEqual({
-    exitCode: 1,
-    calls: [
-      {
-        argv: [
-          'npx',
-          '--yes',
-          '--package',
-          'renovate@44.1.0',
-          '--',
-          'renovate-config-validator',
-          '--strict',
-          '--no-global',
-          'default.json',
-        ],
-        cwd: ctx.directory,
-      },
-    ],
-    output: ['ERROR: Config validation failed\n'],
-  });
+  expect(exitCode).toBe(1);
+
+  expect(calls).toStrictEqual([
+    {
+      argv: [
+        'npx',
+        '--yes',
+        '--package',
+        'renovate@44.1.0',
+        '--',
+        'renovate-config-validator',
+        '--strict',
+        '--no-global',
+        'default.json',
+      ],
+      cwd: ctx.directory,
+    },
+  ]);
 });

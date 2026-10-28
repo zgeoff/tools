@@ -1,6 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { nodeFileSystem } from './file-system.ts';
 import { writeStepOutputs } from './write-step-outputs.ts';
 
 async function setupTest() {
@@ -17,7 +18,7 @@ test('it appends one name=value line for each output after the lines already in 
   const ctx = await setupTest();
 
   await writeFile(ctx.outputPath, 'planned=true\n');
-  await writeStepOutputs(ctx.outputPath, { lanes: '["e2e"]', changed: 'false' });
+  await writeStepOutputs(nodeFileSystem, ctx.outputPath, { lanes: '["e2e"]', changed: 'false' });
 
   const text = await readFile(ctx.outputPath, 'utf8');
 
@@ -29,7 +30,10 @@ test('it refuses a value that holds a newline and writes no output', async () =>
 
   await writeFile(ctx.outputPath, '');
 
-  const writing = writeStepOutputs(ctx.outputPath, { changed: 'true', body: 'one\ntwo' });
+  const writing = writeStepOutputs(nodeFileSystem, ctx.outputPath, {
+    changed: 'true',
+    body: 'one\ntwo',
+  });
 
   expect(writing).rejects.toThrow('the step output body holds a newline');
 

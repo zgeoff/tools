@@ -1,6 +1,5 @@
 import type { RunCommand } from '../ci/run-command.ts';
-import { runCommand } from '../ci/run-command.ts';
-import type { CheckResult } from './check-shell.ts';
+import { runLoggedCommand } from '../ci/run-logged-command.ts';
 
 export interface WorkflowsCheckRun {
   readonly cwd: string;
@@ -10,7 +9,10 @@ export interface WorkflowsCheckRun {
   // The UTC day as YYYYMMDD.
   readonly today: string;
 
-  readonly runCommand: RunCommand;
+  // Runs actionlint, whose output the log shows as it runs.
+  readonly runLoggedCommand: RunCommand;
+
+  readonly writeOutput: (text: string) => void;
 }
 
 // actionlint 1.7.12 rejects the concurrency queue key that GitHub documents, until
@@ -18,31 +20,31 @@ export interface WorkflowsCheckRun {
 const queueIgnoreExpires = '20270122';
 const queueIgnore = 'unexpected key "queue" for "concurrency" section';
 
-export async function runWorkflowsCheck(run: Readonly<WorkflowsCheckRun>): Promise<CheckResult> {
+// Returns actionlint's exit code.
+export async function runWorkflowsCheck(run: Readonly<WorkflowsCheckRun>): Promise<number> {
   const isIgnoring = run.today < queueIgnoreExpires;
+
+  if (!isIgnoring) {
+    run.writeOutput(
+      `::warning::workflows: the ignore of the concurrency queue key expired on ${queueIgnoreExpires}; move the actionlint pin to a release with rhysd/actionlint#654\n`,
+    );
+  }
+
   const argv = isIgnoring ? ['actionlint', '-ignore', queueIgnore] : ['actionlint'];
 
-  const result = await run.runCommand(argv, { cwd: run.cwd, env: run.env });
+  const result = await run.runLoggedCommand(argv, { cwd: run.cwd, env: run.env });
 
-  const notice = isIgnoring
-    ? ''
-    : `::warning::workflows: the ignore of the concurrency queue key expired on ${queueIgnoreExpires}; move the actionlint pin to a release with rhysd/actionlint#654\n`;
-
-  return {
-    exitCode: result.exitCode,
-    output: `${notice}${result.stdout}${result.stderr}`,
-  };
+  return result.exitCode;
 }
 
 if (import.meta.main) {
-  const result = await runWorkflowsCheck({
+  process.exitCode = await runWorkflowsCheck({
     cwd: process.cwd(),
     env: process.env,
-    runCommand,
     today: new Date().toISOString().slice(0, 10).replaceAll('-', ''),
+    runLoggedCommand,
+    writeOutput: (text) => {
+      process.stdout.write(text);
+    },
   });
-
-  process.stdout.write(result.output);
-
-  process.exitCode = result.exitCode;
 }

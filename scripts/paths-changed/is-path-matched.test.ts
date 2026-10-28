@@ -36,6 +36,19 @@ test.each([
   ['a not group against its own pattern', 'docs/guide.md', 'docs/!(*.md)', false],
   ['a nested group', 'a/xy/b', 'a/@(x@(y|z))/b', true],
   ['an unclosed group as plain characters', 'v@(1', 'v@(1', true],
+  ['a character class', 'build/1/Dockerfile', 'build/[[:digit:]]/**', true],
+  ['a character outside a class', 'build/x/Dockerfile', 'build/[[:digit:]]/**', false],
+  ['an unknown class', 'a', '[[:kettle:]]', false],
+  ['a negated class', 'a', '[![:digit:]]', true],
+  ['two classes in one set', 'B', '[[:upper:][:digit:]]', true],
+  ['a closing bracket after a class', 'x]', '[[:alpha:]]]', true],
+  ['a closing bracket as the first member', ']', '[]a]', true],
+  ['a dash at the end of a set', '-', '[a-]', true],
+  ['an escaped dash in a set', 'b', String.raw`[a\-c]`, false],
+  ['an unclosed class as plain members', ':', '[[:]', true],
 ])('it matches %s as bash does', (_label, path, pattern, expected) => {
+  const bash = Bun.spawnSync(['bash', '-c', '[[ $1 == $2 ]]', 'bash', path, pattern]);
+
   expect(isPathMatched(path, pattern)).toBe(expected);
+  expect(bash.exitCode === 0).toBe(expected);
 });

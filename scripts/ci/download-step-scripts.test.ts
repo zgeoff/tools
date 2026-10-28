@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createStubFileServer } from '../../test-utils/create-stub-file-server.ts';
+import { makeAnswerQueue } from '../../test-utils/make-answer-queue.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import {
   downloadStepScripts,
@@ -9,8 +10,11 @@ import {
   makeToolsFileReader,
   parseDownloadArgs,
   readURL,
+  runDownloadStep,
   stepScriptSets,
 } from './download-step-scripts.ts';
+import type { URLOutcome } from './download-step-scripts.ts';
+import { nodeFileSystem } from './file-system.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(import.meta.dir, '.test-download-step-scripts-'));
@@ -45,6 +49,7 @@ test('it writes each entry and every file it imports at its repo path under the 
     entries: ['scripts/kettle/boil.ts', 'scripts/kettle/whistle.sh'],
     destination: ctx.destination,
     readToolsFile: ctx.readSourceFile,
+    writeFile: nodeFileSystem.writeText,
   });
 
   const fill = await readFile(join(ctx.destination, 'sync/cup/fill.ts'), 'utf8');
@@ -78,6 +83,7 @@ test('it downloads a file that two files import once', async () => {
 
       return ctx.readSourceFile(path);
     },
+    writeFile: nodeFileSystem.writeText,
   });
 
   expect(read).toStrictEqual([
@@ -98,6 +104,7 @@ test('it refuses a step script that imports a package, which no caller installs'
     entries: ['scripts/kettle/boil.ts'],
     destination: ctx.destination,
     readToolsFile: ctx.readSourceFile,
+    writeFile: nodeFileSystem.writeText,
   });
 
   expect(downloading).rejects.toThrow(
@@ -106,11 +113,11 @@ test('it refuses a step script that imports a package, which no caller installs'
 });
 
 test('it reads each file at the tools URL and waits the retry delay after each passing fault', async () => {
-  const outcomes = [
+  const answerURL = makeAnswerQueue<URLOutcome>([
     { kind: 'failed', reason: 'HTTP 503' },
     { kind: 'failed', reason: 'HTTP 429' },
     { kind: 'read', text: '// boil\n' },
-  ] as const;
+  ]);
 
   const urls: string[] = [];
   const waits: number[] = [];
@@ -122,7 +129,7 @@ test('it reads each file at the tools URL and waits the retry delay after each p
     readURL: (url) => {
       urls.push(url);
 
-      return Promise.resolve(outcomes[urls.length - 1] ?? outcomes[0]);
+      return Promise.resolve(answerURL());
     },
     wait: (delayMs) => {
       waits.push(delayMs);
@@ -133,14 +140,13 @@ test('it reads each file at the tools URL and waits the retry delay after each p
 
   const text = await readToolsFile('scripts/kettle/boil.ts');
 
-  expect({ text, urls, waits }).toStrictEqual({
-    text: '// boil\n',
-    urls: Array.from(
-      { length: 3 },
-      () => 'https://raw.example/acme/tools/cafe12/scripts/kettle/boil.ts',
-    ),
-    waits: [2000, 2000],
-  });
+  expect(text).toBe('// boil\n');
+
+  expect(urls).toStrictEqual(
+    Array.from({ length: 3 }, () => 'https://raw.example/acme/tools/cafe12/scripts/kettle/boil.ts'),
+  );
+
+  expect(waits).toStrictEqual([2000, 2000]);
 });
 
 test('it fails at once, with no wait, on a file the tools commit lacks', () => {
@@ -253,6 +259,7 @@ test.each(Object.entries(stepScriptSets))(
       entries,
       destination: ctx.destination,
       readToolsFile: (path) => readFile(join(root, path), 'utf8'),
+      writeFile: nodeFileSystem.writeText,
     });
 
     const build = await Bun.build({
@@ -267,3 +274,124 @@ test.each(Object.entries(stepScriptSets))(
     expect(build.success).toBeTrue();
   },
 );
+
+test('it fails the step and downloads nothing when TOOLS_URL names no commit', async () => {
+  const urls: string[] = [];
+  const written: string[] = [];
+  const output: string[] = [];
+
+  const exitCode = await runDownloadStep({
+    args: ['paths-changed'],
+    env: { TOOLS_URL: 'https://raw.githubusercontent.com/acme/tools/', RUNNER_TEMP: '/runner' },
+    readURL: (url) => {
+      urls.push(url);
+
+      return Promise.resolve({ kind: 'read', text: '' });
+    },
+    wait: () => Promise.resolve(),
+    writeFile: (path) => {
+      written.push(path);
+
+      return Promise.resolve();
+    },
+    writeOutput: (text) => {
+      output.push(text);
+    },
+    writeError: (text) => {
+      output.push(text);
+    },
+  });
+
+  expect(exitCode).toBe(1);
+  expect(urls).toStrictEqual([]);
+  expect(written).toStrictEqual([]);
+
+  expect(output).toStrictEqual([
+    "::error::the download needs TOOLS_URL, raw.githubusercontent.com/<owner>/<repo>/<commit sha>, and RUNNER_TEMP; TOOLS_URL is 'https://raw.githubusercontent.com/acme/tools/'\n",
+  ]);
+});
+
+test('it fails the step and downloads nothing when the runner gives no RUNNER_TEMP', async () => {
+  const urls: string[] = [];
+
+  const exitCode = await runDownloadStep({
+    args: ['paths-changed'],
+    env: { TOOLS_URL: `https://raw.githubusercontent.com/acme/tools/${'a1'.repeat(20)}` },
+    readURL: (url) => {
+      urls.push(url);
+
+      return Promise.resolve({ kind: 'read', text: '' });
+    },
+    wait: () => Promise.resolve(),
+    writeFile: () => Promise.resolve(),
+    writeOutput: () => {},
+    writeError: () => {},
+  });
+
+  expect(exitCode).toBe(1);
+  expect(urls).toStrictEqual([]);
+});
+
+test('it refuses an unknown set with the usage and downloads nothing', async () => {
+  const urls: string[] = [];
+  const errors: string[] = [];
+
+  const exitCode = await runDownloadStep({
+    args: ['kettle'],
+    env: {
+      TOOLS_URL: `https://raw.githubusercontent.com/acme/tools/${'a1'.repeat(20)}`,
+      RUNNER_TEMP: '/runner',
+    },
+    readURL: (url) => {
+      urls.push(url);
+
+      return Promise.resolve({ kind: 'read', text: '' });
+    },
+    wait: () => Promise.resolve(),
+    writeFile: () => Promise.resolve(),
+    writeOutput: () => {},
+    writeError: (text) => {
+      errors.push(text);
+    },
+  });
+
+  expect(exitCode).toBe(2);
+  expect(urls).toStrictEqual([]);
+
+  expect(errors).toStrictEqual([
+    expect.toStartWith('usage: download-step-scripts.ts <bun-checks|'),
+  ]);
+});
+
+test('it downloads the set from the tools commit into the runner folder', async () => {
+  const toolsURL = `https://raw.githubusercontent.com/acme/tools/${'a1'.repeat(20)}`;
+  const root = join(import.meta.dir, '../..');
+  const written: string[] = [];
+  const output: string[] = [];
+
+  const exitCode = await runDownloadStep({
+    args: ['paths-changed'],
+    env: { TOOLS_URL: toolsURL, RUNNER_TEMP: '/runner' },
+    readURL: async (url) => {
+      const text = await readFile(join(root, url.slice(toolsURL.length + 1)), 'utf8');
+
+      return { kind: 'read', text };
+    },
+    wait: () => Promise.resolve(),
+    writeFile: (path) => {
+      written.push(path);
+
+      return Promise.resolve();
+    },
+    writeOutput: (text) => {
+      output.push(text);
+    },
+    writeError: (text) => {
+      output.push(text);
+    },
+  });
+
+  expect(exitCode).toBe(0);
+  expect(written).toContain('/runner/tools/scripts/paths-changed/match-changed-files.ts');
+  expect(output).toStrictEqual([`downloaded ${written.length} files from ${toolsURL}\n`]);
+});

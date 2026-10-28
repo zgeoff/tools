@@ -1,3 +1,4 @@
+import { nodeFileSystem } from '../ci/file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
@@ -73,5 +74,7 @@ if (import.meta.main) {
 
   process.stdout.write(`changed=${answer.changed}\n`);
 
-  await writeStepOutputs(process.env['GITHUB_OUTPUT'] ?? '', { changed: String(answer.changed) });
+  await writeStepOutputs(nodeFileSystem, process.env['GITHUB_OUTPUT'] ?? '', {
+    changed: String(answer.changed),
+  });
 }

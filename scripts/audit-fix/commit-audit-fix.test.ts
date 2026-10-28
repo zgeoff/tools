@@ -7,6 +7,7 @@ import { createStubGH } from '../../test-utils/create-stub-gh.ts';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { runGit } from '../../test-utils/run-git.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import { nodeFileSystem } from '../ci/file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { commitAuditFix } from './commit-audit-fix.ts';
 
@@ -30,8 +31,6 @@ async function setupTest() {
 
   await runGit(directory, gitEnv, ['init', '--quiet', '--bare', '--initial-branch=main', remote]);
   await runGit(directory, gitEnv, ['clone', '--quiet', remote, clone]);
-  await createGitCommit(clone, gitEnv, { 'bun.lock': 'kettle 1.0.0\n' });
-  await runGit(clone, gitEnv, ['push', '--quiet', 'origin', 'HEAD:main']);
 
   const output: string[] = [];
 
@@ -43,6 +42,7 @@ async function setupTest() {
       base: 'main',
       defaultBranch: 'main',
       outputPath,
+      fileSystem: nodeFileSystem,
       runCommand,
       writeOutput: (text) => {
         output.push(text);
@@ -82,6 +82,8 @@ async function setupTest() {
 test('it commits the fix under the title the audit wrote and force-pushes the fix branch', async () => {
   const ctx = await setupTest();
 
+  await createGitCommit(ctx.clone, ctx.gitEnv, { 'bun.lock': 'kettle 1.0.0\n' });
+  await runGit(ctx.clone, ctx.gitEnv, ['push', '--quiet', 'origin', 'HEAD:main']);
   await writeTreeFiles(ctx.clone, { 'bun.lock': 'kettle 1.0.1\n' });
 
   await ctx.writeAuditResult({
@@ -101,6 +103,8 @@ test('it commits the fix under the title the audit wrote and force-pushes the fi
 test('it deletes the fix branch and pushes nothing when the audit changed nothing', async () => {
   const ctx = await setupTest();
 
+  await createGitCommit(ctx.clone, ctx.gitEnv, { 'bun.lock': 'kettle 1.0.0\n' });
+  await runGit(ctx.clone, ctx.gitEnv, ['push', '--quiet', 'origin', 'HEAD:main']);
   await runGit(ctx.clone, ctx.gitEnv, ['push', '--quiet', 'origin', 'HEAD:audit-fix']);
 
   await ctx.writeAuditResult({ 'title.txt': '', 'needs-review.txt': 'false\n' });
@@ -117,6 +121,8 @@ test('it deletes the fix branch and pushes nothing when the audit changed nothin
 test('it fails without a push when the audit changed files but wrote no title', async () => {
   const ctx = await setupTest();
 
+  await createGitCommit(ctx.clone, ctx.gitEnv, { 'bun.lock': 'kettle 1.0.0\n' });
+  await runGit(ctx.clone, ctx.gitEnv, ['push', '--quiet', 'origin', 'HEAD:main']);
   await writeTreeFiles(ctx.clone, { 'bun.lock': 'kettle 1.0.1\n' });
 
   await ctx.writeAuditResult({ 'title.txt': '', 'needs-review.txt': 'false\n' });
@@ -138,6 +144,8 @@ test('it fails without a push when the audit changed files but wrote no title', 
 test('it leaves the fix branch alone when it already holds the same tree', async () => {
   const ctx = await setupTest();
 
+  await createGitCommit(ctx.clone, ctx.gitEnv, { 'bun.lock': 'kettle 1.0.0\n' });
+  await runGit(ctx.clone, ctx.gitEnv, ['push', '--quiet', 'origin', 'HEAD:main']);
   await writeTreeFiles(ctx.clone, { 'bun.lock': 'kettle 1.0.1\n' });
 
   await ctx.writeAuditResult({
@@ -165,6 +173,9 @@ test('it leaves the fix branch alone when it already holds the same tree', async
 test('it turns auto-merge off on the open pull request before it pushes an ignore', async () => {
   const ctx = await setupTest();
 
+  await createGitCommit(ctx.clone, ctx.gitEnv, { 'bun.lock': 'kettle 1.0.0\n' });
+  await runGit(ctx.clone, ctx.gitEnv, ['push', '--quiet', 'origin', 'HEAD:main']);
+
   await ctx.gh.writeResponses('prs', [[{ number: 41 }]]);
 
   await writeTreeFiles(ctx.clone, { 'audit-ignores.json': '{"GHSA-1234":{}}\n' });
@@ -187,6 +198,9 @@ test('it turns auto-merge off on the open pull request before it pushes an ignor
 test('it leaves auto-merge alone for a fix that needs no review', async () => {
   const ctx = await setupTest();
 
+  await createGitCommit(ctx.clone, ctx.gitEnv, { 'bun.lock': 'kettle 1.0.0\n' });
+  await runGit(ctx.clone, ctx.gitEnv, ['push', '--quiet', 'origin', 'HEAD:main']);
+
   await ctx.gh.writeResponses('prs', [[{ number: 41 }]]);
 
   await writeTreeFiles(ctx.clone, { 'bun.lock': 'kettle 1.0.1\n' });
@@ -206,6 +220,8 @@ test('it leaves auto-merge alone for a fix that needs no review', async () => {
 test('it fails and writes no output when the push of the fix branch fails', async () => {
   const ctx = await setupTest();
 
+  await createGitCommit(ctx.clone, ctx.gitEnv, { 'bun.lock': 'kettle 1.0.0\n' });
+  await runGit(ctx.clone, ctx.gitEnv, ['push', '--quiet', 'origin', 'HEAD:main']);
   await writeTreeFiles(ctx.clone, { 'bun.lock': 'kettle 1.0.1\n' });
 
   await ctx.writeAuditResult({

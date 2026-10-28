@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createStubCommand } from '../../test-utils/create-stub-command.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import { nodeFileSystem } from '../ci/file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { publishPackages } from './publish-packages.ts';
 
@@ -23,6 +24,7 @@ async function setupTest() {
   const createNPM = (viewOutput: string) => createStubCommand(bin, 'npm', npmLog, viewOutput);
   const output: string[] = [];
   const errors: string[] = [];
+  const loggedCalls: string[][] = [];
 
   const runPublish = (paths: readonly string[], releasedVersions: string) =>
     publishPackages({
@@ -30,7 +32,13 @@ async function setupTest() {
       env: { PATH: `${bin}:${process.env['PATH']}`, HOME: directory },
       pathsText: JSON.stringify(paths),
       releasedVersionsText: releasedVersions,
+      fileSystem: nodeFileSystem,
       runCommand,
+      runLoggedCommand: (argv, options) => {
+        loggedCalls.push([...argv]);
+
+        return runCommand(argv, options);
+      },
       writeOutput: (text) => {
         output.push(text);
       },
@@ -41,7 +49,7 @@ async function setupTest() {
 
   const readNPMCalls = () => readFile(npmLog, 'utf8');
 
-  return { repo, output, errors, createNPM, runPublish, readNPMCalls };
+  return { repo, output, errors, loggedCalls, createNPM, runPublish, readNPMCalls };
 }
 
 test('it packs and publishes each released package with provenance', async () => {
@@ -57,6 +65,7 @@ test('it packs and publishes each released package with provenance', async () =>
   const calls = await ctx.readNPMCalls();
 
   expect(exitCode).toBe(0);
+  expect(ctx.output).toStrictEqual([]);
 
   expect(calls).toBe(
     [
@@ -178,6 +187,32 @@ test('it builds a package that defines a build script before it packs it', async
   expect(built).toBe('built\n');
 });
 
+test('it runs the build, pack and publish through the runner that streams their output to the log', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createNPM('');
+
+  await writeTreeFiles(ctx.repo, {
+    'packages/std/package.json': JSON.stringify({
+      name: '@zgeoff/std',
+      version: '0.4.0',
+      scripts: { build: 'echo built' },
+    }),
+  });
+
+  const exitCode = await ctx.runPublish(['packages/std'], '');
+
+  expect(exitCode).toBe(0);
+
+  expect(ctx.loggedCalls).toStrictEqual([
+    ['bun', 'run', 'build'],
+    ['bun', 'pm', 'pack'],
+    ['npm', 'publish', './zgeoff-std-0.4.0.tgz', '--provenance', '--access', 'public'],
+  ]);
+
+  expect(ctx.output).toStrictEqual([]);
+});
+
 test('it refuses a paths list that is not a JSON array and publishes nothing', async () => {
   const ctx = await setupTest();
 
@@ -186,7 +221,9 @@ test('it refuses a paths list that is not a JSON array and publishes nothing', a
     env: {},
     pathsText: 'packages/std',
     releasedVersionsText: '',
+    fileSystem: nodeFileSystem,
     runCommand,
+    runLoggedCommand: runCommand,
     writeOutput: () => {},
     writeError: (text) => {
       ctx.errors.push(text);

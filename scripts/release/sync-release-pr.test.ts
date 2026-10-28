@@ -32,6 +32,7 @@ async function setupTest() {
   );
 
   const output: string[] = [];
+  const loggedCalls: string[][] = [];
 
   const runSync = (syncEnv: Readonly<Record<string, string | undefined>>, syncCommand: string) =>
     runSyncReleasePR({
@@ -39,12 +40,17 @@ async function setupTest() {
       env: syncEnv,
       syncCommand,
       runCommand,
+      runLoggedCommand: (argv, options) => {
+        loggedCalls.push([...argv]);
+
+        return runCommand(argv, options);
+      },
       writeOutput: (text) => {
         output.push(text);
       },
     });
 
-  return { env, runnerEnv, clone, output, runSync, readRemote, readRemoteFile };
+  return { env, runnerEnv, clone, output, loggedCalls, runSync, readRemote, readRemoteFile };
 }
 
 test('it commits and pushes what the sync command changed on the release branch', async () => {
@@ -63,6 +69,25 @@ test('it commits and pushes what the sync command changed on the release branch'
   expect(commit).toBe(
     'chore: sync lockfile and format release files|github-actions[bot]|41898282+github-actions[bot]@users.noreply.github.com\n',
   );
+});
+
+test('it runs the sync command, the commit and the push through the runner that streams their output', async () => {
+  const ctx = await setupTest();
+
+  await createGitCommit(ctx.clone, ctx.env, { 'README.md': 'kettle\n' });
+  await runGit(ctx.clone, ctx.env, ['push', '--quiet', '-u', 'origin', 'HEAD']);
+
+  await ctx.runSync(ctx.runnerEnv, String.raw`printf 'fixed\n' >> README.md`);
+
+  expect(ctx.loggedCalls).toStrictEqual([
+    ['bash', '-c', String.raw`printf 'fixed\n' >> README.md`],
+    ['git', 'config', 'user.name', 'github-actions[bot]'],
+    ['git', 'config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com'],
+    ['git', 'commit', '-am', 'chore: sync lockfile and format release files'],
+    ['git', 'push'],
+  ]);
+
+  expect(ctx.output).toStrictEqual([]);
 });
 
 test('it pushes nothing to the release branch when the sync command changed nothing', async () => {

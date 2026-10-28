@@ -91,10 +91,8 @@ test('it prints nothing and succeeds for a merge', async () => {
 
   const result = Bun.spawnSync([join(ctx.directory, 'gh'), 'pr', 'merge', '145', '--squash']);
 
-  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
-    exitCode: 0,
-    stdout: '',
-  });
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('');
 });
 
 test('it accepts a workflow dispatch and prints nothing', async () => {
@@ -109,10 +107,8 @@ test('it accepts a workflow dispatch and prints nothing', async () => {
     '@zgeoff/std@0.4.0',
   ]);
 
-  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
-    exitCode: 0,
-    stdout: '',
-  });
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('');
 });
 
 test('it fails a call whose body is "error"', async () => {
@@ -180,10 +176,8 @@ test.each([
 
   const result = Bun.spawnSync([join(ctx.directory, 'gh'), ...args]);
 
-  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
-    exitCode: 0,
-    stdout: '',
-  });
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('');
 });
 
 test('it prints the next answer for a new pull request', async () => {
@@ -193,10 +187,8 @@ test('it prints the next answer for a new pull request', async () => {
 
   const result = Bun.spawnSync([join(ctx.directory, 'gh'), 'pr', 'create', '--head', 'audit-fix']);
 
-  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
-    exitCode: 0,
-    stdout: '"https://github.com/acme/kettle/pull/12"\n',
-  });
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('"https://github.com/acme/kettle/pull/12"\n');
 });
 
 test('it fails a label call whose answer is "error"', async () => {

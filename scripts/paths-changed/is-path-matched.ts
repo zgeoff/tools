@@ -6,11 +6,16 @@ export function isPathMatched(path: string, pattern: string): boolean {
 
 type ExtendedOperator = '@' | '?' | '*' | '+' | '!';
 
+type SetMember =
+  | { readonly kind: 'character'; readonly character: string }
+  | { readonly kind: 'range'; readonly first: string; readonly last: string }
+  | { readonly kind: 'class'; readonly name: string };
+
 type PatternNode =
   | { readonly kind: 'literal'; readonly character: string }
   | { readonly kind: 'any' }
   | { readonly kind: 'one' }
-  | { readonly kind: 'set'; readonly isNegated: boolean; readonly members: string }
+  | { readonly kind: 'set'; readonly isNegated: boolean; readonly members: readonly SetMember[] }
   | {
       readonly kind: 'extended';
       readonly operator: ExtendedOperator;
@@ -67,22 +72,35 @@ function collectNodeEnds(node: PatternNode, text: string, position: number): num
   return ends[node.kind]();
 }
 
-function isSetMember(members: string, character: string): boolean {
-  for (let index = 0; index < members.length; index += 1) {
-    const isRange = members.charAt(index + 1) === '-' && index + 2 < members.length;
+// An unknown class name, as in `[[:kettle:]]`, matches no character, as bash's does.
+const characterClasses: ReadonlyMap<string, RegExp> = new Map(
+  Object.entries({
+    alnum: /^[\p{L}\p{Nd}]$/u,
+    alpha: /^\p{L}$/u,
+    blank: /^[ \t]$/u,
+    cntrl: /^\p{Cc}$/u,
+    digit: /^[0-9]$/u,
+    graph: /^[^\p{Cc}\p{Z}]$/u,
+    lower: /^\p{Ll}$/u,
+    print: /^[^\p{Cc}]$/u,
+    punct: /^[!-/:-@[-`{-~]$/u,
+    space: /^\s$/u,
+    upper: /^\p{Lu}$/u,
+    word: /^[\p{L}\p{Nd}_]$/u,
+    xdigit: /^[0-9A-Fa-f]$/u,
+  }),
+);
 
-    if (isRange) {
-      if (members.charAt(index) <= character && character <= members.charAt(index + 2)) {
-        return true;
-      }
+function isSetMember(members: readonly SetMember[], character: string): boolean {
+  const isMember: Record<SetMember['kind'], (member: SetMember) => boolean> = {
+    character: (member) => member.kind === 'character' && member.character === character,
+    range: (member) =>
+      member.kind === 'range' && member.first <= character && character <= member.last,
+    class: (member) =>
+      member.kind === 'class' && (characterClasses.get(member.name)?.test(character) ?? false),
+  };
 
-      index += 2;
-    } else if (members.charAt(index) === character) {
-      return true;
-    }
-  }
-
-  return false;
+  return members.some((member) => isMember[member.kind](member));
 }
 
 interface ExtendedNode {
@@ -231,22 +249,74 @@ function splitAlternatives(body: string): string[] {
 }
 
 // A set ends at the first `]` after its first member, so `[]a]` holds `]` and `a`, and a `[` with
-// no `]` after it is a literal.
+// no `]` after it is a literal. A `]` inside a class such as `[:digit:]` does not end the set.
 function parseSet(pattern: string, index: number): ParsedNode | undefined {
   if (pattern.charAt(index) !== '[') {
     return undefined;
   }
 
   const isNegated = pattern.charAt(index + 1) === '!' || pattern.charAt(index + 1) === '^';
-  const firstMember = index + (isNegated ? 2 : 1);
-  const close = pattern.indexOf(']', firstMember + 1);
+  const members: SetMember[] = [];
+  let position = index + (isNegated ? 2 : 1);
 
-  if (close === -1) {
-    return undefined;
+  while (position < pattern.length) {
+    if (pattern.charAt(position) === ']' && members.length > 0) {
+      return { node: { kind: 'set', isNegated, members }, end: position + 1 };
+    }
+
+    const parsed = parseSetMember(pattern, position);
+
+    members.push(parsed.member);
+
+    position = parsed.end;
   }
 
-  return {
-    node: { kind: 'set', isNegated, members: pattern.slice(firstMember, close) },
-    end: close + 1,
-  };
+  return undefined;
+}
+
+interface ParsedSetMember {
+  readonly member: SetMember;
+  readonly end: number;
+}
+
+function parseSetMember(pattern: string, position: number): ParsedSetMember {
+  const classMatch = /^\[:(?<name>[a-z]*):\]/u.exec(pattern.slice(position));
+
+  if (classMatch !== null) {
+    return {
+      member: { kind: 'class', name: classMatch.groups?.['name'] ?? '' },
+      end: position + classMatch[0].length,
+    };
+  }
+
+  const first = parseSetCharacter(pattern, position);
+
+  const isRange =
+    pattern.charAt(first.end) === '-' &&
+    first.end + 1 < pattern.length &&
+    pattern.charAt(first.end + 1) !== ']';
+
+  if (isRange) {
+    const last = parseSetCharacter(pattern, first.end + 1);
+
+    return {
+      member: { kind: 'range', first: first.character, last: last.character },
+      end: last.end,
+    };
+  }
+
+  return { member: { kind: 'character', character: first.character }, end: first.end };
+}
+
+interface ParsedSetCharacter {
+  readonly character: string;
+  readonly end: number;
+}
+
+function parseSetCharacter(pattern: string, position: number): ParsedSetCharacter {
+  const isEscape = pattern.charAt(position) === '\\' && position + 1 < pattern.length;
+
+  return isEscape
+    ? { character: pattern.charAt(position + 1), end: position + 2 }
+    : { character: pattern.charAt(position), end: position + 1 };
 }

@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises';
+import type { FileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
@@ -13,6 +14,7 @@ export interface AuditFixCommitOptions {
   readonly base: string;
   readonly defaultBranch: string;
   readonly outputPath: string;
+  readonly fileSystem: FileSystem;
   readonly runCommand: RunCommand;
   readonly writeOutput: (text: string) => void;
 }
@@ -40,12 +42,12 @@ export async function commitAuditFix(options: AuditFixCommitOptions): Promise<nu
 
     // Deleting the branch closes a stale pull request; a branch that is already gone is fine.
     await tryGit(['push', 'origin', '--delete', paths.branch]);
-    await writeStepOutputs(options.outputPath, { pushed: 'false' });
+    await writeStepOutputs(options.fileSystem, options.outputPath, { pushed: 'false' });
 
     return 0;
   }
 
-  const title = await readTextFile(paths.title);
+  const title = await readTextFile(options.fileSystem, paths.title);
 
   if (title.trim() === '') {
     options.writeOutput('::error::audit-fix changed files but wrote no pull-request title\n');
@@ -57,7 +59,7 @@ export async function commitAuditFix(options: AuditFixCommitOptions): Promise<nu
 
   // An ignore must not ride an auto-merge armed for an earlier fix, so auto-merge goes off before
   // the push.
-  const needsReview = await readReviewFlag(paths.review);
+  const needsReview = await readReviewFlag(options.fileSystem, paths.review);
 
   const openNumber = needsReview
     ? await readOpenPullRequest({
@@ -81,21 +83,19 @@ export async function commitAuditFix(options: AuditFixCommitOptions): Promise<nu
     await git(['push', '--force', 'origin', paths.branch]);
   }
 
-  await writeStepOutputs(options.outputPath, { pushed: 'true' });
+  await writeStepOutputs(options.fileSystem, options.outputPath, { pushed: 'true' });
 
   return 0;
 }
 
-async function readTextFile(path: string): Promise<string> {
-  const file = Bun.file(path);
+async function readTextFile(fileSystem: FileSystem, path: string): Promise<string> {
+  const exists = await fileSystem.probePath(path);
 
-  const exists = await file.exists();
-
-  return exists ? file.text() : '';
+  return exists ? fileSystem.readText(path) : '';
 }
 
-async function readReviewFlag(path: string): Promise<boolean> {
-  const text = await readFile(path, 'utf8');
+async function readReviewFlag(fileSystem: FileSystem, path: string): Promise<boolean> {
+  const text = await fileSystem.readText(path);
 
   return text.trim() === 'true';
 }
@@ -124,6 +124,7 @@ if (import.meta.main) {
     base: process.env['BASE'] ?? '',
     defaultBranch: process.env['DEFAULT_BRANCH'] ?? '',
     outputPath: process.env['GITHUB_OUTPUT'] ?? '',
+    fileSystem: nodeFileSystem,
     runCommand,
     writeOutput: (text) => {
       process.stdout.write(text);

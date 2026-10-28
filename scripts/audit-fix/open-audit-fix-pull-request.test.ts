@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createStubGH } from '../../test-utils/create-stub-gh.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import { nodeFileSystem } from '../ci/file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { openAuditFixPullRequest } from './open-audit-fix-pull-request.ts';
 
@@ -24,6 +25,7 @@ async function setupTest() {
       defaultBranch: 'main',
       isAutomerge,
       runURL: 'https://github.com/acme/kettle/actions/runs/7',
+      fileSystem: nodeFileSystem,
       runCommand,
       writeOutput: (text) => {
         output.push(text);
