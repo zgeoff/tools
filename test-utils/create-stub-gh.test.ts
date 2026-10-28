@@ -91,10 +91,8 @@ test('it prints nothing and succeeds for a merge', async () => {
 
   const result = Bun.spawnSync([join(ctx.directory, 'gh'), 'pr', 'merge', '145', '--squash']);
 
-  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
-    exitCode: 0,
-    stdout: '',
-  });
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('');
 });
 
 test('it accepts a workflow dispatch and prints nothing', async () => {
@@ -109,10 +107,8 @@ test('it accepts a workflow dispatch and prints nothing', async () => {
     '@zgeoff/std@0.4.0',
   ]);
 
-  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
-    exitCode: 0,
-    stdout: '',
-  });
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('');
 });
 
 test('it fails a call whose body is "error"', async () => {
@@ -170,4 +166,37 @@ test('it logs each call less its GraphQL query', async () => {
     'pr merge 145 --squash',
     'workflow run main.yml --ref @zgeoff/std@0.4.0',
   ]);
+});
+
+test.each([
+  ['a label', ['label', 'create', 'security']],
+  ['an edit of a pull request', ['pr', 'edit', '12', '--title', 'fix: update kettle']],
+])('it prints nothing and succeeds for %s', async (_label, args) => {
+  const ctx = await setupTest();
+
+  const result = Bun.spawnSync([join(ctx.directory, 'gh'), ...args]);
+
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('');
+});
+
+test('it prints the next answer for a new pull request', async () => {
+  const ctx = await setupTest();
+
+  await ctx.gh.writeResponses('creates', ['https://github.com/acme/kettle/pull/12']);
+
+  const result = Bun.spawnSync([join(ctx.directory, 'gh'), 'pr', 'create', '--head', 'audit-fix']);
+
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe('"https://github.com/acme/kettle/pull/12"\n');
+});
+
+test('it fails a label call whose answer is "error"', async () => {
+  const ctx = await setupTest();
+
+  await ctx.gh.writeResponses('labels', ['error']);
+
+  const result = Bun.spawnSync([join(ctx.directory, 'gh'), 'label', 'create', 'security']);
+
+  expect(result.exitCode).toBe(1);
 });

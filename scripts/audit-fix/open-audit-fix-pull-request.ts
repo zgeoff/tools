@@ -1,0 +1,96 @@
+import type { FileSystem } from '../ci/file-system.ts';
+import { nodeFileSystem } from '../ci/node-file-system.ts';
+import { runCheckedCommand } from '../ci/run-checked-command.ts';
+import type { RunCommand } from '../ci/run-command.ts';
+import { runCommand } from '../ci/run-command.ts';
+import { buildAuditFixPaths } from './build-audit-fix-paths.ts';
+import { planAuditFixPullRequest } from './plan-audit-fix-pull-request.ts';
+import { readOpenPullRequest } from './read-open-pull-request.ts';
+
+export interface AuditFixPullRequestOptions {
+  readonly cwd: string;
+  readonly env: Readonly<Record<string, string | undefined>>;
+  readonly runnerTemp: string;
+  readonly base: string;
+  readonly defaultBranch: string;
+  readonly isAutomerge: boolean;
+  readonly runURL: string;
+  readonly fileSystem: Pick<FileSystem, 'readText' | 'writeText'>;
+  readonly runCommand: RunCommand;
+  readonly writeOutput: (text: string) => void;
+}
+
+export async function openAuditFixPullRequest(options: AuditFixPullRequestOptions): Promise<void> {
+  const paths = buildAuditFixPaths(options.runnerTemp, options.base, options.defaultBranch);
+  const commandOptions = { cwd: options.cwd, env: options.env };
+  const gh = (args: readonly string[]) => options.runCommand(['gh', ...args], commandOptions);
+
+  const checkedGH = (args: readonly string[]) =>
+    runCheckedCommand(options.runCommand, ['gh', ...args], commandOptions);
+
+  const titleText = await options.fileSystem.readText(paths.title);
+  const body = await options.fileSystem.readText(paths.body);
+  const reviewText = await options.fileSystem.readText(paths.review);
+
+  await options.fileSystem.writeText(
+    paths.pullRequestBody,
+    `${body}\n[Workflow run](${options.runURL})\n`,
+  );
+
+  const openNumber = await readOpenPullRequest({
+    ...commandOptions,
+    branch: paths.branch,
+    runCommand: options.runCommand,
+  });
+
+  const plan = planAuditFixPullRequest({
+    needsReview: reviewText.trim() === 'true',
+    openNumber,
+    isAutomerge: options.isAutomerge,
+    base: options.base,
+    branch: paths.branch,
+    title: titleText.replace(/\n+$/u, ''),
+    bodyFile: paths.pullRequestBody,
+  });
+
+  for (const command of plan.commands) {
+    await (command.mustSucceed ? checkedGH(command.args) : gh(command.args));
+  }
+
+  if (plan.waitsForReview) {
+    options.writeOutput(
+      "The pull request adds or renews an ignore, so it waits for a person's review.\n",
+    );
+  }
+
+  if (!plan.turnsAutoMergeOn) {
+    return;
+  }
+
+  const merge = await gh(['pr', 'merge', paths.branch, '--auto', '--squash']);
+
+  if (merge.exitCode !== 0) {
+    options.writeOutput(
+      '::warning::GitHub refused auto-merge; allow auto-merge in the repo settings, or merge the pull request by hand.\n',
+    );
+  }
+}
+
+if (import.meta.main) {
+  const env = process.env;
+
+  await openAuditFixPullRequest({
+    cwd: process.cwd(),
+    env,
+    runnerTemp: env['RUNNER_TEMP'] ?? '',
+    base: env['BASE'] ?? '',
+    defaultBranch: env['DEFAULT_BRANCH'] ?? '',
+    isAutomerge: env['AUTOMERGE'] === 'true',
+    runURL: env['RUN_URL'] ?? '',
+    fileSystem: nodeFileSystem,
+    runCommand,
+    writeOutput: (text) => {
+      process.stdout.write(text);
+    },
+  });
+}
