@@ -12,7 +12,7 @@ export interface AdvisoriesFixOptions {
   readonly base: string;
   readonly defaultBranch: string;
   readonly expiryDays: string;
-  readonly fileSystem: FileSystem;
+  readonly fileSystem: Pick<FileSystem, 'writeText'>;
   readonly runAuditFix: (argv: readonly string[]) => Promise<void>;
   readonly runCommand: RunCommand;
 }

@@ -15,7 +15,7 @@ export interface AuditFixPullRequestOptions {
   readonly defaultBranch: string;
   readonly isAutomerge: boolean;
   readonly runURL: string;
-  readonly fileSystem: FileSystem;
+  readonly fileSystem: Pick<FileSystem, 'readText' | 'writeText'>;
   readonly runCommand: RunCommand;
   readonly writeOutput: (text: string) => void;
 }

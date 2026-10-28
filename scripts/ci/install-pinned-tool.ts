@@ -44,7 +44,10 @@ export interface PinnedToolStep {
 
   readonly pins: Readonly<Record<string, ToolPin>>;
 
-  readonly fileSystem: FileSystem;
+  readonly fileSystem: Pick<
+    FileSystem,
+    'appendText' | 'createDirectory' | 'readBytes' | 'removePath'
+  >;
 
   readonly runCommand: RunCommand;
 }
@@ -140,7 +143,10 @@ export interface ToolInstall {
 
   readonly env: Readonly<Record<string, string | undefined>>;
 
-  readonly fileSystem: FileSystem;
+  readonly fileSystem: Pick<
+    FileSystem,
+    'appendText' | 'createDirectory' | 'readBytes' | 'removePath'
+  >;
 
   readonly runCommand: RunCommand;
 }
