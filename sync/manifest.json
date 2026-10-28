@@ -241,7 +241,7 @@
   },
   {
     "name": "pre-push-baseline",
-    "description": "The light pre-push baseline: lefthook jobs that check only what the branch changes and run one at a time under a memory cap, a pre-commit typecheck, the scripts they call, the package scripts files:branch, lint:files, test:related, check:commits, check:local-paths, check:test-timeouts, check:workflows and memory-capped where the repo lacks them, and a move of a files:branch script left on the old script path",
+    "description": "The light pre-push baseline: lefthook jobs that check only what the branch changes and run one at a time under a memory cap, a pre-commit typecheck, the scripts they call, the package scripts files:branch, lint:files, test:related, check:commits, check:local-paths, check:test-timeouts, check:dependency-gates, check:workflows and memory-capped where the repo lacks them, and a move of a files:branch script left on the old script path",
     "optIn": true,
     "files": [
       {
@@ -307,6 +307,50 @@
       {
         "source": "sync/pre-push/collect-command-names.ts",
         "target": "scripts/collect-command-names.ts"
+      },
+      {
+        "source": "sync/pre-push/dependency-gates/collect-stale-age-gate-excludes.ts",
+        "target": "scripts/dependency-gates/collect-stale-age-gate-excludes.ts"
+      },
+      {
+        "source": "sync/pre-push/dependency-gates/collect-unneeded-audit-ignores.ts",
+        "target": "scripts/dependency-gates/collect-unneeded-audit-ignores.ts"
+      },
+      {
+        "source": "sync/pre-push/dependency-gates/collect-unneeded-overrides.ts",
+        "target": "scripts/dependency-gates/collect-unneeded-overrides.ts"
+      },
+      {
+        "source": "sync/pre-push/dependency-gates/is-record.ts",
+        "target": "scripts/dependency-gates/is-record.ts"
+      },
+      {
+        "source": "sync/pre-push/dependency-gates/parse-audit-advisories.ts",
+        "target": "scripts/dependency-gates/parse-audit-advisories.ts"
+      },
+      {
+        "source": "sync/pre-push/dependency-gates/parse-audit-ignore-ids.ts",
+        "target": "scripts/dependency-gates/parse-audit-ignore-ids.ts"
+      },
+      {
+        "source": "sync/pre-push/dependency-gates/parse-fixable-packages.ts",
+        "target": "scripts/dependency-gates/parse-fixable-packages.ts"
+      },
+      {
+        "source": "sync/pre-push/dependency-gates/parse-lockfile-dependents.ts",
+        "target": "scripts/dependency-gates/parse-lockfile-dependents.ts"
+      },
+      {
+        "source": "sync/pre-push/dependency-gates/parse-root-manifest.ts",
+        "target": "scripts/dependency-gates/parse-root-manifest.ts"
+      },
+      {
+        "source": "sync/pre-push/dependency-gates/run-dependency-gates-check.ts",
+        "target": "scripts/dependency-gates/run-dependency-gates-check.ts"
+      },
+      {
+        "source": "sync/pre-push/dependency-gates/types.ts",
+        "target": "scripts/dependency-gates/types.ts"
       }
     ],
     "scripts": {
@@ -316,9 +360,10 @@
       "check:commits": "bun scripts/run-commits-check.ts",
       "check:local-paths": "bun scripts/run-local-paths-check.ts",
       "check:test-timeouts": "bun scripts/run-test-timeouts-check.ts",
+      "check:dependency-gates": "bun scripts/dependency-gates/run-dependency-gates-check.ts",
       "check:workflows": "bun scripts/run-workflows-check.ts",
       "memory-capped": "bash scripts/run-memory-capped.sh \"$(bun scripts/read-memory-budget.ts)\""
     },
-    "build": "old='bun scripts/collect-branch-files.ts'; new='bun scripts/read-branch-files.ts'; if [ \"$(jq -r '.scripts[\"files:branch\"] // empty' package.json)\" = \"$old\" ]; then jq --arg new \"$new\" '.scripts[\"files:branch\"] = $new' package.json > package.json.tmp; mv package.json.tmp package.json; fi; add=$(jq -cn --arg new \"$new\" --arg capped 'bash scripts/run-memory-capped.sh \"$(bun scripts/read-memory-budget.ts)\"' '{\"files:branch\":$new,\"lint:files\":\"oxlint --no-error-on-unmatched-pattern\",\"test:related\":\"bun scripts/run-related-tests.ts\",\"check:commits\":\"bun scripts/run-commits-check.ts\",\"check:local-paths\":\"bun scripts/run-local-paths-check.ts\",\"check:test-timeouts\":\"bun scripts/run-test-timeouts-check.ts\",\"check:workflows\":\"bun scripts/run-workflows-check.ts\",\"memory-capped\":$capped}'); missing=$(jq -c --argjson add \"$add\" '(.scripts // {}) as $s | $add | with_entries(select(.key as $k | $s | has($k) | not))' package.json); if [ \"$missing\" != '{}' ]; then jq --argjson missing \"$missing\" '.scripts = (.scripts // {}) + $missing' package.json > package.json.tmp; mv package.json.tmp package.json; fi"
+    "build": "old='bun scripts/collect-branch-files.ts'; new='bun scripts/read-branch-files.ts'; if [ \"$(jq -r '.scripts[\"files:branch\"] // empty' package.json)\" = \"$old\" ]; then jq --arg new \"$new\" '.scripts[\"files:branch\"] = $new' package.json > package.json.tmp; mv package.json.tmp package.json; fi; add=$(jq -cn --arg new \"$new\" --arg capped 'bash scripts/run-memory-capped.sh \"$(bun scripts/read-memory-budget.ts)\"' '{\"files:branch\":$new,\"lint:files\":\"oxlint --no-error-on-unmatched-pattern\",\"test:related\":\"bun scripts/run-related-tests.ts\",\"check:commits\":\"bun scripts/run-commits-check.ts\",\"check:local-paths\":\"bun scripts/run-local-paths-check.ts\",\"check:test-timeouts\":\"bun scripts/run-test-timeouts-check.ts\",\"check:dependency-gates\":\"bun scripts/dependency-gates/run-dependency-gates-check.ts\",\"check:workflows\":\"bun scripts/run-workflows-check.ts\",\"memory-capped\":$capped}'); missing=$(jq -c --argjson add \"$add\" '(.scripts // {}) as $s | $add | with_entries(select(.key as $k | $s | has($k) | not))' package.json); if [ \"$missing\" != '{}' ]; then jq --argjson missing \"$missing\" '.scripts = (.scripts // {}) + $missing' package.json > package.json.tmp; mv package.json.tmp package.json; fi"
   }
 ]
