@@ -4,6 +4,7 @@ import { parseLockfileDependents } from './parse-lockfile-dependents.ts';
 test('it lists the declared ranges of each registry package', () => {
   const lockfile = `{
     "lockfileVersion": 1,
+    "workspaces": {},
     "packages": {
       "pad-tools": ["pad-tools@2.0.0", "", { "dependencies": { "left-pad": "^1.3.0" }, "optionalDependencies": { "fsevents": "~2.3.0" }, "peerDependencies": { "text-kit": ">=4" } }, "sha512-x"],
     },
@@ -16,9 +17,26 @@ test('it lists the declared ranges of each registry package', () => {
   ]);
 });
 
+test("it lists each workspace's declared ranges, its dev dependencies included", () => {
+  const lockfile = `{
+    "lockfileVersion": 1,
+    "workspaces": {
+      "": { "name": "kettle", "dependencies": { "left-pad": "^1.0.0" } },
+      "packages/spout": { "name": "@acme/spout", "devDependencies": { "right-pad": "catalog:" } },
+    },
+    "packages": {},
+  }`;
+
+  expect(parseLockfileDependents(lockfile)).toStrictEqual([
+    { dependent: 'the root workspace', name: 'left-pad', range: '^1.0.0' },
+    { dependent: 'packages/spout', name: 'right-pad', range: 'catalog:' },
+  ]);
+});
+
 test('it skips a workspace entry and a package with no dependencies', () => {
   const lockfile = `{
     "lockfileVersion": 1,
+    "workspaces": { "": { "name": "kettle" } },
     "packages": {
       "@acme/app": ["@acme/app@workspace:apps/app"],
       "left-pad": ["left-pad@1.3.1", "", {}, "sha512-y"],
@@ -28,16 +46,22 @@ test('it skips a workspace entry and a package with no dependencies', () => {
   expect(parseLockfileDependents(lockfile)).toStrictEqual([]);
 });
 
+test('it rejects a lockfile with no workspaces', () => {
+  expect(() =>
+    parseLockfileDependents('{ "lockfileVersion": 1, "packages": {} }'),
+  ).toThrowWithMessage(TypeError, 'bun.lock has no workspaces object');
+});
+
 test('it rejects a lockfile with no packages', () => {
-  expect(() => parseLockfileDependents('{ "lockfileVersion": 1 }')).toThrowWithMessage(
-    TypeError,
-    'bun.lock has no packages object',
-  );
+  expect(() =>
+    parseLockfileDependents('{ "lockfileVersion": 1, "workspaces": {} }'),
+  ).toThrowWithMessage(TypeError, 'bun.lock has no packages object');
 });
 
 test('it rejects a package entry that does not start with its id', () => {
   const lockfile = `{
     "lockfileVersion": 1,
+    "workspaces": {},
     "packages": {
       "left-pad": [{}, "", {}, "sha512-y"],
     },

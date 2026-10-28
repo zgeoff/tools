@@ -76,6 +76,7 @@ test('it reports a stale exclude, an unneeded override and an unneeded audit ign
     join(ctx.directory, 'bun.lock'),
     `{
       "lockfileVersion": 1,
+      "workspaces": { "": { "name": "kettle", "dependencies": { "pad-tools": "2.0.0" } } },
       "packages": {
         "pad-tools": ["pad-tools@2.0.0", "", { "dependencies": { "left-pad": "^1.3.0" } }, "sha512-x"],
       },
@@ -112,6 +113,37 @@ test('it reports a stale exclude, an unneeded override and an unneeded audit ign
       problem: 'no locked package has the ignored advisory',
     },
   ]);
+});
+
+test("it keeps an override of a workspace's own dependency that the workspace's range excludes", async () => {
+  const ctx = await setupTest();
+
+  const runProgram = mock(() => ({ exitCode: 0, stdout: '{}', stderr: '' }));
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ dependencies: { 'left-pad': '^1.0.0' }, overrides: { 'left-pad': '2.0.0' } }),
+  );
+
+  await writeFile(
+    join(ctx.directory, 'bun.lock'),
+    `{
+      "lockfileVersion": 1,
+      "workspaces": { "": { "name": "kettle", "dependencies": { "left-pad": "^1.0.0" } } },
+      "packages": {
+        "left-pad": ["left-pad@2.0.0", "", {}, "sha512-y"],
+      },
+    }`,
+  );
+
+  const findings = runDependencyGatesCheck({
+    cwd: ctx.directory,
+    env: ctx.env,
+    today: '2026-03-09',
+    runProgram,
+  });
+
+  expect(findings).toStrictEqual([]);
 });
 
 test('it fails a repo that overrides a package and has no bun.lock', async () => {
