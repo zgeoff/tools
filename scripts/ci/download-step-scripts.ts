@@ -21,6 +21,11 @@ export const stepScriptSets = {
   ],
   'paths-changed': ['scripts/paths-changed/match-changed-files.ts'],
   'repo-sync': ['scripts/repo-sync/write-sync-entries.ts', 'scripts/repo-sync/sync-entries.ts'],
+  'audit-fix': [
+    'scripts/audit-fix/fix-advisories.ts',
+    'scripts/audit-fix/commit-audit-fix.ts',
+    'scripts/audit-fix/open-audit-fix-pull-request.ts',
+  ],
 } as const satisfies Record<string, readonly string[]>;
 
 export type StepScriptSet = keyof typeof stepScriptSets;

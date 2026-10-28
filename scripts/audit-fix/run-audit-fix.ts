@@ -46,7 +46,7 @@ export async function runAuditFix(argv: readonly string[]): Promise<void> {
     expiryDays > 90
   ) {
     throw new Error(
-      'usage: audit-fix.ts --title-file <path> --body-file <path> --review-file <path> [--pending-ignores <path>] [--expiry-days <1-90>]',
+      'usage: run-audit-fix.ts --title-file <path> --body-file <path> --review-file <path> [--pending-ignores <path>] [--expiry-days <1-90>]',
     );
   }
 

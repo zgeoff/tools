@@ -8,7 +8,10 @@ export type StubGHEndpoint =
   | 'commits'
   | 'compares'
   | 'rules'
-  | 'merges';
+  | 'merges'
+  | 'labels'
+  | 'edits'
+  | 'creates';
 
 export interface StubGH {
   writeResponses: (name: StubGHEndpoint, bodies: readonly unknown[]) => Promise<void>;
@@ -38,6 +41,9 @@ case "$*" in
   "api repos/"*"/compare/"*) take compares '{"files":[]}' ;;
   "api repos/"*"/rules/branches/"*) take rules '[]' ;;
   "pr merge "*) take merges '' > /dev/null ;;
+  "label create "*) take labels '' > /dev/null ;;
+  "pr edit "*) take edits '' > /dev/null ;;
+  "pr create "*) take creates '' ;;
   "workflow run "*) ;;
   *) echo "unexpected gh call: $*" >&2; exit 1 ;;
 esac
