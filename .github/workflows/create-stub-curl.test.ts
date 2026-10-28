@@ -18,7 +18,7 @@ test('it writes the body to the -o path of a download', async () => {
 
   await createStubCurl(ctx.directory, 'fake shfmt\n');
 
-  await $`${join(ctx.directory, 'curl')} -fsSL -o ${join(ctx.directory, 'out')} https://example.com/shfmt`.quiet();
+  await $`${join(ctx.directory, 'curl')} -fsSL --retry 3 --retry-all-errors -o ${join(ctx.directory, 'out')} https://example.com/shfmt`.quiet();
 
   const body = await readFile(join(ctx.directory, 'out'), 'utf8');
 
@@ -30,7 +30,7 @@ test('it writes a byte body to the -o path unchanged', async () => {
 
   await createStubCurl(ctx.directory, new Uint8Array([0x1f, 0x8b, 0x00, 0xff]));
 
-  await $`${join(ctx.directory, 'curl')} -fsSL -o ${join(ctx.directory, 'out')} https://example.com/a.tar.gz`.quiet();
+  await $`${join(ctx.directory, 'curl')} -fsSL --retry 3 --retry-all-errors -o ${join(ctx.directory, 'out')} https://example.com/a.tar.gz`.quiet();
 
   const body = await readFile(join(ctx.directory, 'out'));
 
@@ -54,7 +54,7 @@ test('it records the URL of each download in order', async () => {
 
   const curl = join(ctx.directory, 'curl');
 
-  await $`${curl} -fsSL -o ${join(ctx.directory, 'a')} https://example.com/a && ${curl} -fsSL -o ${join(ctx.directory, 'b')} https://example.com/b`.quiet();
+  await $`${curl} -fsSL --retry 3 --retry-all-errors -o ${join(ctx.directory, 'a')} https://example.com/a && ${curl} -fsSL --retry 3 --retry-all-errors -o ${join(ctx.directory, 'b')} https://example.com/b`.quiet();
 
   const urls = await readFile(join(ctx.directory, 'curl.urls'), 'utf8');
 
@@ -62,9 +62,23 @@ test('it records the URL of each download in order', async () => {
 });
 
 test.each([
-  ['a download with no -o', ['-fsSL', 'https://example.com/shfmt']],
-  ['a download with other flags', ['-sL', '-o', 'out', 'https://example.com/shfmt']],
-  ['a download with an extra argument', ['-fsSL', '-o', 'out', 'https://example.com/a', 'b']],
+  [
+    'a download with no -o',
+    ['-fsSL', '--retry', '3', '--retry-all-errors', 'https://example.com/shfmt'],
+  ],
+  ['a download with no retry', ['-fsSL', '-o', 'out', 'https://example.com/shfmt']],
+  [
+    'a download with a retry that skips transient errors',
+    ['-fsSL', '--retry', '3', '-o', 'out', 'https://example.com/shfmt'],
+  ],
+  [
+    'a download with other flags',
+    ['-sL', '--retry', '3', '--retry-all-errors', '-o', 'out', 'https://example.com/shfmt'],
+  ],
+  [
+    'a download with an extra argument',
+    ['-fsSL', '--retry', '3', '--retry-all-errors', '-o', 'out', 'https://example.com/a', 'b'],
+  ],
 ])('it exits 64, writes nothing and records no URL for %s', async (_label, args) => {
   const ctx = await setupTest();
 
@@ -79,7 +93,11 @@ test.each([
   const recorded = await readFile(join(ctx.directory, 'curl.urls'), 'utf8');
 
   expect(result.exitCode).toBe(64);
-  expect(result.stderr.toString()).toBe('stub curl: supports only: curl -fsSL -o <path> <url>\n');
+
+  expect(result.stderr.toString()).toBe(
+    'stub curl: supports only: curl -fsSL --retry 3 --retry-all-errors -o <path> <url>\n',
+  );
+
   expect(wrote).toBeFalse();
   expect(recorded).toBe('');
 });
