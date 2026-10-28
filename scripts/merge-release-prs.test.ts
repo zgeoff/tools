@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildMockHeadResponse } from '../test-utils/build-mock-head-response.ts';
+import { createStubClock } from '../test-utils/create-stub-clock.ts';
 import { createStubGH } from '../test-utils/create-stub-gh.ts';
 import { runBashScript } from '../test-utils/run-bash-script.ts';
 
@@ -31,7 +32,13 @@ async function setupTest() {
 
   const readOutput = () => readFile(outputPath, 'utf8');
 
-  return { writeResponses: gh.writeResponses, runScript, readCalls: gh.readCalls, readOutput };
+  return {
+    stubDirectory: directory,
+    writeResponses: gh.writeResponses,
+    runScript,
+    readCalls: gh.readCalls,
+    readOutput,
+  };
 }
 
 test('it waits for checks that have not started yet, then merges the checked head', async () => {
@@ -316,7 +323,7 @@ test('it turns on auto-merge and exits cleanly when only required checks outlast
     ]),
   ]);
 
-  const result = await ctx.runScript(['zgeoff/tools'], { CHECKS_TIMEOUT: '0' });
+  const result = await ctx.runScript(['zgeoff/tools'], { CHECKS_TIMEOUT_MINUTES: '0' });
   const calls = await ctx.readCalls();
   const output = await ctx.readOutput();
 
@@ -350,7 +357,7 @@ test('it leaves the release PR open without auto-merge when no ruleset requires 
     ]),
   ]);
 
-  const result = await ctx.runScript(['zgeoff/tools'], { CHECKS_TIMEOUT: '0' });
+  const result = await ctx.runScript(['zgeoff/tools'], { CHECKS_TIMEOUT_MINUTES: '0' });
   const calls = await ctx.readCalls();
   const output = await ctx.readOutput();
 
@@ -386,7 +393,7 @@ test('it leaves the release PR open without auto-merge while a check the ruleset
     ]),
   ]);
 
-  const result = await ctx.runScript(['zgeoff/tools'], { CHECKS_TIMEOUT: '0' });
+  const result = await ctx.runScript(['zgeoff/tools'], { CHECKS_TIMEOUT_MINUTES: '0' });
   const calls = await ctx.readCalls();
 
   expect({ exitCode: result.exitCode, stdout: result.stdout }).toStrictEqual({
@@ -420,7 +427,7 @@ test('it exits cleanly with the PR open when auto-merge does not turn on', async
     ]),
   ]);
 
-  const result = await ctx.runScript(['zgeoff/tools'], { CHECKS_TIMEOUT: '0' });
+  const result = await ctx.runScript(['zgeoff/tools'], { CHECKS_TIMEOUT_MINUTES: '0' });
 
   expect({
     exitCode: result.exitCode,
@@ -445,7 +452,7 @@ test('it leaves a held release PR without auto-merge when the checks outlast the
   await ctx.writeResponses('heads', [buildMockHeadResponse('abc123', [])]);
   await ctx.writeResponses('mergeable', [{ mergeable: 'MERGEABLE', isDraft: true, labels: [] }]);
 
-  const result = await ctx.runScript(['zgeoff/tools'], { CHECKS_TIMEOUT: '0' });
+  const result = await ctx.runScript(['zgeoff/tools'], { CHECKS_TIMEOUT_MINUTES: '0' });
   const calls = await ctx.readCalls();
 
   expect({ exitCode: result.exitCode, stdout: result.stdout }).toStrictEqual({
@@ -609,4 +616,30 @@ test('it leaves a release PR open when someone holds it during the wait', async 
   });
 
   expect(calls.filter((call) => call.startsWith('pr merge'))).toBeEmpty();
+});
+
+test("it waits exactly the caller's minutes, in seconds, before it leaves the release PR open", async () => {
+  const ctx = await setupTest();
+
+  // The wait starts at 1000. Two minutes as 120 seconds polls again at 1119
+  // and stops at 1120; any other conversion polls once or more than twice.
+  await createStubClock(ctx.stubDirectory, [1000, 1119, 1120, 1121]);
+
+  await ctx.writeResponses('prs', [[{ number: 212 }]]);
+  await ctx.writeResponses('mergeable', [{ isDraft: false, labels: [], baseRefName: 'main' }]);
+
+  await ctx.writeResponses('heads', [
+    buildMockHeadResponse('cafe12', [
+      { name: 'pr / checks', status: 'IN_PROGRESS', conclusion: null },
+    ]),
+  ]);
+
+  const result = await ctx.runScript(['zgeoff/tools'], { CHECKS_TIMEOUT_MINUTES: '2' });
+  const calls = await ctx.readCalls();
+  const output = await ctx.readOutput();
+
+  expect(result.exitCode).toBe(0);
+  expect(calls.filter((call) => call.startsWith('api graphql'))).toHaveLength(2);
+  expect(calls.filter((call) => call.startsWith('pr merge'))).toBeEmpty();
+  expect(output).toBe('');
 });

@@ -3,73 +3,88 @@ name: Main
 on:
   push:
     branches: [main]
-  # Recovery path for a release that tagged but failed to publish: skips the
-  # release-please steps and re-runs only the publish steps for the given
-  # package dirs. Already-published versions are skipped, so listing extra
-  # paths is safe.
+  # The publish run, which a push run dispatches at the release tag, and the
+  # recovery path for a release that tagged but failed to publish: it skips
+  # the release job and publishes the given package dirs after the checks
+  # pass. Already-published versions are skipped, so listing extra paths is
+  # safe.
   workflow_dispatch:
     inputs:
       republish_paths:
         description: 'JSON array of package dirs to republish, e.g. ["packages/format-codemod"]'
         required: true
         type: string
+      released_versions:
+        description:
+          'JSON object of the version the release tagged for each dir, e.g.
+          {"packages/std":"0.4.0"}; empty skips the check'
+        required: false
+        type: string
+        default: ''
 
 jobs:
+  # A newer push cancels the checks of an older one.
   checks:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    steps:
+    timeout-minutes: 20
+    concurrency:
+      group: main-checks-${{ github.ref }}
+      cancel-in-progress: true
+    env:
+      PART: all
+    steps: &check-steps
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
-      # The tests of the check steps and the pre-push jobs run shfmt, which the
-      # runner image lacks. The step and its pin match the Setup shfmt step of
-      # bun-checks.yml.
+      # The tests of the check steps and the pre-push jobs run shfmt and
+      # actionlint, which the runner image lacks. The script holds the pins
+      # that bun-checks.yml installs too.
       - name: Setup shfmt
-        env:
-          SHFMT_VERSION: v3.13.1
-          SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
-        run: |
-          set -euo pipefail
-          curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/shfmt.download" "https://github.com/mvdan/sh/releases/download/$SHFMT_VERSION/shfmt_${SHFMT_VERSION}_linux_amd64"
-          echo "$SHFMT_SHA256  $RUNNER_TEMP/shfmt.download" | sha256sum -c -
-          mkdir -p "$RUNNER_TEMP/shfmt-bin"
-          install -m 0755 "$RUNNER_TEMP/shfmt.download" "$RUNNER_TEMP/shfmt-bin/shfmt"
-          echo "$RUNNER_TEMP/shfmt-bin" >> "$GITHUB_PATH"
-      # The same tests run actionlint, which the runner image lacks. The step
-      # and its pin match the Setup actionlint step of bun-checks.yml.
+        run: bun run --silent ci:install-tool shfmt
       - name: Setup actionlint
-        env:
-          ACTIONLINT_VERSION: 1.7.12
-          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
-        run: |
-          set -euo pipefail
-          curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/actionlint.tar.gz" "https://github.com/rhysd/actionlint/releases/download/v$ACTIONLINT_VERSION/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
-          mkdir -p "$RUNNER_TEMP/actionlint-bin"
-          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/actionlint-bin" actionlint
-          echo "$RUNNER_TEMP/actionlint-bin" >> "$GITHUB_PATH"
+        run: bun run --silent ci:install-tool actionlint
       - run: bun run check:sync
       - run: bun run check:release-workflow
       - run: bun run format:check
       - run: bun run lint:full
       - run: bun run typecheck
       - run: bun run test
-      - run: bun run test:workflows
+
+  # The same checks gate a dispatched publish run. The run ID gives each
+  # dispatch a group of its own, so no push and no other dispatch cancels the
+  # checks that its publish waits for.
+  release-checks:
+    name: Check the release before publish
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: main-release-checks-${{ github.run_id }}
+      cancel-in-progress: false
+    env:
+      PART: all
+    steps: *check-steps
 
   # A release takes two runs:
   # - Run 1, after a releasable commit lands on main: the shared
   #   release-please job opens or updates the release PR (version bumps +
   #   changelogs), makes it pass the checks job, merges it, and tags the
-  #   merge (release-please.yml).
+  #   merge (release-please.yml). The dispatch job then starts run 2.
   # - Run 2, dispatched at the tag: the publish job ships each released
-  #   package to npm via OIDC.
+  #   package to npm via OIDC, after the checks of the tagged commit pass.
   # The release job waits for no checks job: the release PR passed its own
   # checks, and the push of a release PR's merge must reach the tag while
-  # the merge commit is still main's head.
+  # the merge commit is still main's head. Its queue keeps every waiting
+  # run; the default replaces a waiting run, which would skip its release.
   release:
     if: github.event_name == 'push'
+    concurrency:
+      group: main-release
+      cancel-in-progress: false
+      queue: max
     permissions:
       contents: write
       pull-requests: write
@@ -80,15 +95,45 @@ jobs:
     secrets:
       app-private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
-  publish:
-    needs: [checks, release]
-    # The release job is skipped on a republish dispatch.
-    if:
-      ${{ !cancelled() && needs.checks.result == 'success' &&
-      (needs.release.outputs.releases_created == 'true' || inputs.republish_paths != '') }}
+  # npm provenance names GITHUB_SHA as the source commit, and the signing
+  # certificate binds the run's own commit, so a push run never publishes:
+  # release-please can tag a merge that the run's commit does not hold. A
+  # GITHUB_TOKEN workflow_dispatch starts a run, unlike its pushes, and the
+  # run at the tag has the tagged commit as its github.sha.
+  dispatch-publish:
+    name: Dispatch the release publish
+    needs: release
+    if: needs.release.outputs.releases_created == 'true'
     runs-on: ubuntu-latest
-    # queue: max keeps every waiting run; the default replaces a waiting run,
-    # which would cancel a pending republish dispatch.
+    timeout-minutes: 5
+    # queue: max keeps every waiting dispatch; the default replaces a waiting
+    # one, whose tagged release would then never publish.
+    concurrency:
+      group: main-dispatch-publish
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - name: Dispatch publish at the release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_OUTPUTS: ${{ needs.release.outputs.release-outputs }}
+        run: bun run --silent ci:dispatch-publish
+
+  # queue: max keeps every waiting run; the default replaces a waiting run,
+  # which would cancel a pending publish dispatch.
+  publish:
+    name: Publish the release
+    needs: release-checks
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     concurrency:
       group: publish
       cancel-in-progress: false
@@ -96,53 +141,9 @@ jobs:
     permissions:
       contents: read
       id-token: write
-      # Dispatches the publish run at the release tag.
-      actions: write
     steps:
-      # release-please reads main through the API, not this run's commit,
-      # so it can tag a merge that this run's commit does not hold: the
-      # release job tags the release PR it merges, after this run's push.
-      # npm provenance names GITHUB_SHA as the source commit, and the signing
-      # certificate binds the run's own commit, so checking out the tagged
-      # commit isn't enough. This run publishes only when it is the tagged
-      # commit; otherwise it dispatches a publish run at the tag, whose
-      # github.sha is the tagged commit.
-      - name: Resolve release commit
-        id: release-commit
-        if: needs.release.outputs.releases_created == 'true'
-        env:
-          RELEASE_OUTPUTS: ${{ needs.release.outputs.release-outputs }}
-        run: |
-          shas=$(printf '%s' "$RELEASE_OUTPUTS" \
-            | jq -r '. as $out | $out.paths_released | fromjson | map($out[. + "--sha"]) | unique | .[]')
-          if [ "$(printf '%s\n' "$shas" | grep -c .)" -ne 1 ] || [ "$shas" = "null" ]; then
-            echo "expected one release commit, got: $shas" >&2
-            exit 1
-          fi
-          tag=$(printf '%s' "$RELEASE_OUTPUTS" \
-            | jq -r '. as $out | $out.paths_released | fromjson | $out[.[0] + "--tag_name"]')
-          {
-            echo "tag=$tag"
-            printf 'paths=%s\n' "$(printf '%s' "$RELEASE_OUTPUTS" | jq -c '.paths_released | fromjson')"
-            if [ "$shas" = "$GITHUB_SHA" ]; then echo "here=true"; else echo "here=false"; fi
-          } >> "$GITHUB_OUTPUT"
-      # A GITHUB_TOKEN workflow_dispatch starts a run, unlike its pushes. The
-      # dispatched run queues behind this one in the publish group.
-      - name: Dispatch publish at the release tag
-        if: steps.release-commit.outputs.here == 'false'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.release-commit.outputs.tag }}
-          PATHS_RELEASED: ${{ steps.release-commit.outputs.paths }}
-        run: |
-          echo "$TAG is not this run's commit ($GITHUB_SHA); publishing from a run at the tag"
-          gh workflow run main.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f republish_paths="$PATHS_RELEASED"
-      - name: Check out merged release
-        if: steps.release-commit.outputs.here == 'true' || inputs.republish_paths != ''
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Set up bun for publish
-        if: steps.release-commit.outputs.here == 'true' || inputs.republish_paths != ''
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: .bun-version
       # npm does the publishing, not bun: trusted publishing (OIDC) needs
@@ -150,45 +151,12 @@ jobs:
       # no OIDC support (oven-sh/bun#15601). Never upgrade the bundled npm in
       # place: a cross-major overlay prunes transitive deps that
       # libnpmpublish needs at publish time (sigstore).
-      - name: Set up node
-        if: steps.release-commit.outputs.here == 'true' || inputs.republish_paths != ''
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-      - name: Install dependencies
-        if: steps.release-commit.outputs.here == 'true' || inputs.republish_paths != ''
-        run: bun install --frozen-lockfile
-      # The registry-version check makes the loop idempotent: a re-run after
-      # a partial publish (some packages shipped, one failed) skips the ones
-      # already on npm instead of erroring on the republish.
+      - run: bun install --frozen-lockfile
       - name: Publish released packages
-        if: steps.release-commit.outputs.here == 'true' || inputs.republish_paths != ''
         env:
-          PATHS_RELEASED: ${{ steps.release-commit.outputs.paths || inputs.republish_paths }}
-          RELEASE_OUTPUTS: ${{ needs.release.outputs.release-outputs || '{}' }}
-        run: |
-          for path in $(printf '%s' "${PATHS_RELEASED:-[]}" | jq -r '.[]'); do
-            name=$(jq -r .name "$path/package.json")
-            version=$(jq -r .version "$path/package.json")
-            # A tag whose version the checkout doesn't hold must fail the run:
-            # the "already published" skip below would otherwise hide it.
-            tagged=$(printf '%s' "$RELEASE_OUTPUTS" | jq -r --arg p "$path" '.[$p + "--version"] // empty')
-            if [ -n "$tagged" ] && [ "$tagged" != "$version" ]; then
-              echo "$name: the release tagged $tagged but $path/package.json holds $version" >&2
-              exit 1
-            fi
-            if [ "$(jq -r '.private // false' "$path/package.json")" = "true" ]; then
-              echo "skipping $name: private"
-              continue
-            fi
-            if [ "$(npm view "$name@$version" version 2>/dev/null)" = "$version" ]; then
-              echo "skipping $name@$version: already published"
-              continue
-            fi
-            if [ -n "$(jq -r '.scripts.build // empty' "$path/package.json")" ]; then
-              (cd "$path" && bun run build)
-            fi
-            # bun resolves catalog:/workspace: protocols to exact versions at
-            # pack time; npm pack would ship them verbatim and break installs.
-            (cd "$path" && bun pm pack && npm publish ./*.tgz --provenance --access public)
-          done
+          PATHS_RELEASED: ${{ inputs.republish_paths }}
+          RELEASED_VERSIONS: ${{ inputs.released_versions }}
+        run: bun run --silent ci:publish-packages
