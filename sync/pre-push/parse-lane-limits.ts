@@ -11,10 +11,10 @@ const standardLaneLimits: readonly (readonly [string, number])[] = [
 
 const listedLaneLimitMs = 15_000;
 
-export function parseLaneLimits(configText: string | undefined): ReadonlyMap<string, number> {
+export function parseLaneLimits(configText: string | null): ReadonlyMap<string, number> {
   const limits = new Map(standardLaneLimits);
 
-  const lanes = configText === undefined ? undefined : parseLanesOption(configText);
+  const lanes = configText === null ? undefined : parseLanesOption(configText);
 
   if (Array.isArray(lanes)) {
     for (const lane of lanes) {

@@ -20,7 +20,9 @@ test('#resolveRelatedTests selects a test file that exists', async () => {
 
   await writeFile(join(ctx.directory, 'src/a.test.ts'), '');
 
-  expect(resolveRelatedTests(['src/a.test.ts'], ctx.directory)).toStrictEqual(['src/a.test.ts']);
+  expect(resolveRelatedTests(['src/a.test.ts'], ctx.directory, () => null)).toStrictEqual([
+    'src/a.test.ts',
+  ]);
 });
 
 test('#resolveRelatedTests selects the sibling test of a source file', async () => {
@@ -29,7 +31,9 @@ test('#resolveRelatedTests selects the sibling test of a source file', async () 
   await writeFile(join(ctx.directory, 'src/a.ts'), '');
   await writeFile(join(ctx.directory, 'src/a.test.ts'), '');
 
-  expect(resolveRelatedTests(['src/a.ts'], ctx.directory)).toStrictEqual(['src/a.test.ts']);
+  expect(resolveRelatedTests(['src/a.ts'], ctx.directory, () => null)).toStrictEqual([
+    'src/a.test.ts',
+  ]);
 });
 
 test('#resolveRelatedTests selects the sibling test of a TSX component', async () => {
@@ -38,7 +42,9 @@ test('#resolveRelatedTests selects the sibling test of a TSX component', async (
   await writeFile(join(ctx.directory, 'src/view.tsx'), '');
   await writeFile(join(ctx.directory, 'src/view.test.tsx'), '');
 
-  expect(resolveRelatedTests(['src/view.tsx'], ctx.directory)).toStrictEqual(['src/view.test.tsx']);
+  expect(resolveRelatedTests(['src/view.tsx'], ctx.directory, () => null)).toStrictEqual([
+    'src/view.test.tsx',
+  ]);
 });
 
 test('#resolveRelatedTests skips a source file with no sibling test and a deleted test file', async () => {
@@ -46,7 +52,9 @@ test('#resolveRelatedTests skips a source file with no sibling test and a delete
 
   await writeFile(join(ctx.directory, 'src/a.ts'), '');
 
-  expect(resolveRelatedTests(['src/a.ts', 'src/gone.test.ts'], ctx.directory)).toBeEmpty();
+  expect(
+    resolveRelatedTests(['src/a.ts', 'src/gone.test.ts'], ctx.directory, () => null),
+  ).toBeEmpty();
 });
 
 test('#resolveRelatedTests skips a declaration file even when a test sits beside it', async () => {
@@ -55,7 +63,7 @@ test('#resolveRelatedTests skips a declaration file even when a test sits beside
   await writeFile(join(ctx.directory, 'src/types.d.ts'), '');
   await writeFile(join(ctx.directory, 'src/types.d.test.ts'), '');
 
-  expect(resolveRelatedTests(['src/types.d.ts'], ctx.directory)).toBeEmpty();
+  expect(resolveRelatedTests(['src/types.d.ts'], ctx.directory, () => null)).toBeEmpty();
 });
 
 test('#resolveRelatedTests skips files that are not TypeScript', async () => {
@@ -64,7 +72,7 @@ test('#resolveRelatedTests skips files that are not TypeScript', async () => {
   await writeFile(join(ctx.directory, 'src/a.md'), '');
   await writeFile(join(ctx.directory, 'src/a.test.ts'), '');
 
-  expect(resolveRelatedTests(['src/a.md', 'README.md'], ctx.directory)).toBeEmpty();
+  expect(resolveRelatedTests(['src/a.md', 'README.md'], ctx.directory, () => null)).toBeEmpty();
 });
 
 test('#resolveRelatedTests keeps the order of the paths and drops duplicates', async () => {
@@ -75,7 +83,7 @@ test('#resolveRelatedTests keeps the order of the paths and drops duplicates', a
   await writeFile(join(ctx.directory, 'src/a.test.ts'), '');
 
   expect(
-    resolveRelatedTests(['src/b.ts', 'src/a.test.ts', 'src/b.test.ts'], ctx.directory),
+    resolveRelatedTests(['src/b.ts', 'src/a.test.ts', 'src/b.test.ts'], ctx.directory, () => null),
   ).toStrictEqual(['src/b.test.ts', 'src/a.test.ts']);
 });
 
@@ -163,20 +171,21 @@ test.each([
   await writeFile(join(ctx.directory, path), '');
   await writeFile(join(ctx.directory, 'e2e/helpers.test.ts'), '');
 
-  expect(resolveRelatedTests([path], ctx.directory)).toBeEmpty();
+  expect(resolveRelatedTests([path], ctx.directory, () => null)).toBeEmpty();
 });
 
 test('#resolveRelatedTests leaves out a file of a lane that the oxlint config declares', async () => {
   const ctx = await setupTest();
 
-  await writeFile(
-    join(ctx.directory, '.oxlintrc.json'),
-    '{\n  // the radar suites drive a real sensor\n  "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": { "radar": 30000 } }] },\n}\n',
-  );
-
   await writeFile(join(ctx.directory, 'src/sweep.radar.test.ts'), '');
 
-  expect(resolveRelatedTests(['src/sweep.radar.test.ts'], ctx.directory)).toBeEmpty();
+  const tests = resolveRelatedTests(['src/sweep.radar.test.ts'], ctx.directory, (path) =>
+    path === join(ctx.directory, '.oxlintrc.json')
+      ? '{ "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": { "radar": 30000 } }] } }'
+      : null,
+  );
+
+  expect(tests).toBeEmpty();
 });
 
 test('#resolveRelatedTests selects a test whose suffix no lane declares', async () => {
@@ -184,9 +193,9 @@ test('#resolveRelatedTests selects a test whose suffix no lane declares', async 
 
   await writeFile(join(ctx.directory, 'src/sweep.radar.test.ts'), '');
 
-  expect(resolveRelatedTests(['src/sweep.radar.test.ts'], ctx.directory)).toStrictEqual([
-    'src/sweep.radar.test.ts',
-  ]);
+  expect(resolveRelatedTests(['src/sweep.radar.test.ts'], ctx.directory, () => null)).toStrictEqual(
+    ['src/sweep.radar.test.ts'],
+  );
 });
 
 test('#runRelatedTests passes --parallel=1 and the slow-host timeout to the test script when the host gets 1 worker', async () => {

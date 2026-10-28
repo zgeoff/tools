@@ -12,10 +12,13 @@ import type { WorkerCountSources } from './read-worker-count.ts';
 const slowHostTestTimeoutMs = 15_000;
 const defaultMaxTestFiles = 50;
 
+export type ReadConfigText = (path: string) => string | null;
+
 export async function runRelatedTests(
   args: readonly string[],
   cwd: string,
   workerSources: Readonly<WorkerCountSources>,
+  readConfigText: ReadConfigText,
 ): Promise<number> {
   const options = parseRelatedTestArgs(args);
 
@@ -27,7 +30,7 @@ export async function runRelatedTests(
 
   const plan = buildRelatedTestPlan(
     options.paths,
-    resolveRelatedTests(options.paths, cwd),
+    resolveRelatedTests(options.paths, cwd, readConfigText),
     options.maxFiles,
   );
 
@@ -59,10 +62,12 @@ export async function runRelatedTests(
   return run.exited;
 }
 
-export function resolveRelatedTests(paths: readonly string[], cwd: string): string[] {
-  const configPath = join(cwd, '.oxlintrc.json');
-  const configText = existsSync(configPath) ? readFileSync(configPath, 'utf8') : undefined;
-  const lanes = [...parseLaneLimits(configText).keys()];
+export function resolveRelatedTests(
+  paths: readonly string[],
+  cwd: string,
+  readConfigText: ReadConfigText,
+): string[] {
+  const lanes = [...parseLaneLimits(readConfigText(join(cwd, '.oxlintrc.json'))).keys()];
 
   const selected = new Set<string>();
 
@@ -179,14 +184,23 @@ function isLaneFile(path: string, lanes: readonly string[]): boolean {
 }
 
 if (import.meta.main) {
-  const exitCode = await runRelatedTests(process.argv.slice(2), process.cwd(), {
-    env: process.env,
-    cores: availableParallelism(),
-    totalMemory: totalmem(),
-    procRoot: '/proc',
-    cgroupRoot: '/sys/fs/cgroup',
-    readText: readOptionalText,
-  });
+  const exitCode = await runRelatedTests(
+    process.argv.slice(2),
+    process.cwd(),
+    {
+      env: process.env,
+      cores: availableParallelism(),
+      totalMemory: totalmem(),
+      procRoot: '/proc',
+      cgroupRoot: '/sys/fs/cgroup',
+      readText: readOptionalText,
+    },
+    readOptionalFileText,
+  );
 
   process.exit(exitCode);
+}
+
+function readOptionalFileText(path: string): string | null {
+  return existsSync(path) ? readFileSync(path, 'utf8') : null;
 }

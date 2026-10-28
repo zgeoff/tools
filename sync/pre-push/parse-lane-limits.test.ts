@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { parseLaneLimits } from './parse-lane-limits.ts';
 
 test('it gives the standard lanes their limits when the repo has no oxlint config', () => {
-  expect(parseLaneLimits(undefined)).toStrictEqual(
+  expect(parseLaneLimits(null)).toStrictEqual(
     new Map([
       ['browser', 10_000],
       ['e2e', 15_000],

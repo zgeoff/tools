@@ -24,7 +24,7 @@ export function runTestTimeoutsCheck(
 
   const configText = paths.includes(oxlintConfigPath)
     ? runGit(options, ['show', `HEAD:${oxlintConfigPath}`])
-    : undefined;
+    : null;
 
   const limits = parseLaneLimits(configText);
 
