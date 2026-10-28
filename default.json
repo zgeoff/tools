@@ -104,19 +104,23 @@
       "enabled": false
     },
     {
-      "description": "zgeoff and impz packages bump at any level as soon as they publish, each in its own PR, and merge on green CI. bun install still needs the package in the repo's minimumReleaseAgeExcludes.",
+      "description": "zgeoff and impz packages bump at any level as soon as they publish, each in its own PR, and merge on green CI. bun install still needs the package in the repo's minimumReleaseAgeExcludes. A limit of 0 lets the branch open while the repo's other update branches fill the concurrent limit.",
       "matchPackageNames": ["@zgeoff/**", "@impz/**"],
       "minimumReleaseAge": null,
+      "prConcurrentLimit": 0,
+      "branchConcurrentLimit": 0,
       "schedule": ["at any time"],
       "groupName": null,
       "automerge": true
     },
     {
-      "description": "The zgeoff/tools workflow refs move to the newest sync tag as soon as it is cut, and merge on green CI. The tags are sync-v1, sync-v2 and so on, which are not semver.",
+      "description": "The zgeoff/tools workflow refs move to the newest sync tag as soon as it is cut, and merge on green CI. The tags are sync-v1, sync-v2 and so on, which are not semver. A limit of 0 lets the branch open while the repo's other update branches fill the concurrent limit.",
       "matchManagers": ["github-actions"],
       "matchDepNames": ["zgeoff/tools"],
       "versioning": "regex:^sync-v(?<major>\\d+)$",
       "minimumReleaseAge": null,
+      "prConcurrentLimit": 0,
+      "branchConcurrentLimit": 0,
       "schedule": ["at any time"],
       "groupName": null,
       "automerge": true

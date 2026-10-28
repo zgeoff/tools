@@ -37,6 +37,12 @@ A TanStack router release, React Start among its packages, reaches a repo as one
 its patch and minor bumps, so the router and React Start never ship at different versions. That
 group opens at any time, as other minor bumps do.
 
+A `@zgeoff/*` or `@impz/*` bump and a sync-tag bump ignore Renovate's concurrent limit of 10 update
+branches per repo. A busy repo keeps more than 10 update branches open, and Renovate would hold a
+new sync tag on its Dependency Dashboard under Rate-Limited until a person closed some of them. The
+two rules set `prConcurrentLimit` and `branchConcurrentLimit` to 0, which Renovate reads as no limit
+for a branch that holds their updates.
+
 The release-age wait matches the `minimumReleaseAge = 604800` gate in each repo's `bunfig.toml`, so
 Renovate proposes no version that `bun install` would refuse. Security fixes come from OSV, through
 `osvVulnerabilityAlerts`, for every package Renovate finds. Their lock refresh runs
