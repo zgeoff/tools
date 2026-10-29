@@ -33,6 +33,8 @@ sync/               the sources that repo-sync delivers, listed in sync/manifest
   workflow-callers/ workflow stubs that call this repo's reusable workflows, all opt-in but the
                     repo-sync guard
   hooks/            the skill-gate hook
+  docs-vision/      the vision doc check, which docs-writing's check-length runs in a repo that
+                    takes it
 scripts/            the step scripts that this repo's workflows run, one folder per area, the
                     shell scripts that repo-sync and the release job run, and the manual ones
                     that pin a repo to a sync tag and do a package's first npm publish; tests sit

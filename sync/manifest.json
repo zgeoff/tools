@@ -207,6 +207,18 @@
     ]
   },
   {
+    "name": "docs-vision-check",
+    "description": "The vision doc check, which docs-writing's check-length runs to fail a repo whose docs/vision.md is missing or over one page",
+    "optIn": true,
+    "files": [
+      {
+        "source": "sync/docs-vision/check-vision.sh",
+        "target": ".claude/skills/docs-writing/scripts/check-vision.sh",
+        "mode": "0755"
+      }
+    ]
+  },
+  {
     "name": "skill-ci-design",
     "description": "The shared ci-design skill, which holds the patterns for a GitHub Actions pipeline; a repo keeps its own pipeline in a project-ci-design skill",
     "optIn": true,

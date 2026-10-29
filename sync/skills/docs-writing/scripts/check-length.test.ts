@@ -38,7 +38,7 @@ async function setupTest() {
   const run = (...args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`.cwd(directory).env(env).nothrow().quiet();
 
-  return { directory, writeLines, writeText, run };
+  return { directory, env, writeLines, writeText, run };
 }
 
 test('it fails when the root README is over the front page limit', async () => {
@@ -461,6 +461,91 @@ test('it fails when the repo has check-skill and a skill fails it', async () => 
       '\n' +
       '.claude/skills/demo/SKILL.md: has no description\n' +
       'check-skill: 1 skills, 1 errors, 0 warnings\n' +
+      '\n' +
+      'check-length: 1 READMEs, 0 over the line limit\n',
+    stderr: '',
+  });
+});
+
+test('it fails when check-vision sits beside it and the repo has no docs/vision.md', async () => {
+  const ctx = await setupTest();
+
+  const scripts = '.claude/skills/docs-writing/scripts';
+
+  const checkLength = await readFile(new URL('check-length.sh', import.meta.url), 'utf8');
+  const checkProse = await readFile(new URL('check-prose.sh', import.meta.url), 'utf8');
+
+  const checkVision = await readFile(
+    new URL('../../../docs-vision/check-vision.sh', import.meta.url),
+    'utf8',
+  );
+
+  await ctx.writeText(join(scripts, 'check-length.sh'), checkLength);
+  await ctx.writeText(join(scripts, 'check-prose.sh'), checkProse);
+  await ctx.writeText(join(scripts, 'check-vision.sh'), checkVision);
+  await ctx.writeLines('README.md', 10);
+
+  const result = await $`bash ${join(scripts, 'check-length.sh')}`
+    .cwd(ctx.directory)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'README.md: 10 lines (front page README; target 80, limit 100)\n' +
+      '\n' +
+      'check-prose: clean (candidates above, if any, need judgment only)\n' +
+      '\n' +
+      "docs/vision.md: missing; write the vision doc the docs-writing skill's docs-tree reference describes (error)\n" +
+      '\n' +
+      'check-length: 1 READMEs, 0 over the line limit\n',
+    stderr: '',
+  });
+});
+
+test('it passes when check-vision sits beside it and docs/vision.md fits', async () => {
+  const ctx = await setupTest();
+
+  const scripts = '.claude/skills/docs-writing/scripts';
+
+  const checkLength = await readFile(new URL('check-length.sh', import.meta.url), 'utf8');
+  const checkProse = await readFile(new URL('check-prose.sh', import.meta.url), 'utf8');
+
+  const checkVision = await readFile(
+    new URL('../../../docs-vision/check-vision.sh', import.meta.url),
+    'utf8',
+  );
+
+  await ctx.writeText(join(scripts, 'check-length.sh'), checkLength);
+  await ctx.writeText(join(scripts, 'check-prose.sh'), checkProse);
+  await ctx.writeText(join(scripts, 'check-vision.sh'), checkVision);
+  await ctx.writeLines('README.md', 10);
+  await ctx.writeLines('docs/vision.md', 40);
+
+  const result = await $`bash ${join(scripts, 'check-length.sh')}`
+    .cwd(ctx.directory)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'README.md: 10 lines (front page README; target 80, limit 100)\n' +
+      '\n' +
+      'check-prose: clean (candidates above, if any, need judgment only)\n' +
+      '\n' +
+      'docs/vision.md: 40 lines (vision doc; limit 60)\n' +
       '\n' +
       'check-length: 1 READMEs, 0 over the line limit\n',
     stderr: '',
