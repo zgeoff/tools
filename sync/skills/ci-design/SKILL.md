@@ -4,8 +4,10 @@ description:
   How CI runs in a zgeoff repo — the public and private job profiles, job timeouts, test budgets and
   the audit data each main run uploads, reusable workflows instead of composite actions, path gates
   on pull requests with a full run on main, which jobs cancel and which never do, building once and
-  passing the result, checkout depth, and triggers that rerun nothing. Load it before adding,
-  changing, or reviewing a workflow, a job, a trigger, or a Renovate setting that starts CI runs.
+  passing the result, checkout depth, triggers that rerun nothing, the dependency gates check, and
+  when a dependency exception is allowed. Load it before adding, changing, or reviewing a workflow,
+  a job, a trigger, a Renovate setting that starts CI runs, or a release-age exclude, an override or
+  an audit ignore.
 ---
 
 # CI design
@@ -35,6 +37,8 @@ Each line links the section that explains it.
   see.
 - [Dependency gates](#dependency-gates): run the shared check that fails on a stale override,
   release-age exclude or audit ignore, and never a copy of it.
+- [Dependency exceptions](#dependency-exceptions): add an exclude, an override or an audit ignore
+  only with a named reason, the narrowest scope, provenance for an exclude, and its cleanup record.
 - [Path gates](#path-gates): a pull-request job runs only when its input paths change, through a
   `changes` job, and every push to main runs it in full.
 - [Cancelling runs](#cancelling-runs): checks cancel when a newer commit arrives; release, deploy
@@ -203,9 +207,7 @@ repo.
 
 Run the shared dependency gates check in the pull-request checks of every Bun repo, and never write
 a copy of it. The `Check dependency gates` step of `bun-checks.yml` runs it. A repo with its own
-workflow runs `bun run check:dependency-gates`, a script that the pre-push baseline adds. When you
-add a release-age exclude by hand, give it the dated removal comment that the audit-fix workflow
-writes, so the check can read the date the exclude comes out.
+workflow runs `bun run check:dependency-gates`, a script that the pre-push baseline adds.
 
 A dependency gate holds a package back on purpose: it pins a version, skips the wait for new
 releases, or ignores an advisory. When its reason is gone, the gate keeps holding the package back,
@@ -218,6 +220,36 @@ fails on three kinds of stale gate:
 - An override whose pinned version every range in the lockfile allows.
 - A release-age exclude whose removal date has passed.
 - An ignored advisory that is gone, or that a release in range fixes.
+
+## Dependency exceptions
+
+A dependency exception is a dependency gate that you add by hand, outside the audit-fix workflow: a
+release-age exclude, a root override, or an audit ignore. Add one only when it is de-risked and
+carries its own cleanup. Every zgeoff repo follows this rule, so a repo's AGENTS.md or project skill
+links here and states no exception rule of its own.
+
+An exception is de-risked when its pull request shows three things:
+
+- A named reason: the change the exception unblocks, such as a fix the repo needs or a tool that
+  nothing older provides. Convenience is no reason: when an older release does the job, pin the
+  newest version that passes the gate.
+- The narrowest scope: each package by its full name, and the catalog or the override pinning one
+  exact version.
+- Provenance for a release-age exclude: every excluded release has an npm provenance attestation, so
+  its publisher built it in CI from a public source. Check each one with
+  `npm view <package>@<version> dist.attestations.provenance`, which prints a `predicateType` for an
+  attested release and nothing for one without. A release with no attestation gets no exclude.
+
+Each kind of exception carries the record that takes it out:
+
+- A release-age exclude carries the dated removal comment that the audit-fix workflow writes, which
+  holds the day the release ages past the gate. The dependency gates check fails on an exclude
+  without the comment, because the audit-fix workflow never removes an exclude without it.
+- An audit ignore carries an `audit-ignores.json` entry with the reason and an expiry, beside the
+  `--ignore` flag. Without the entry, the ignore never expires, and the audit-fix workflow never
+  audits the advisory again.
+- A root override needs no record: the dependency gates check fails once every range in the lockfile
+  admits the pinned version.
 
 ## Path gates
 

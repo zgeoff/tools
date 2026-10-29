@@ -58,7 +58,9 @@ repos too, so an edit to one of them changes every repo that takes it.
 
 - Run `bun run test` from the repo root, which hands `bun test` this host's worker count. The
   jest-extended preload lives in the root `bunfig.toml`, so a run from a package folder lacks the
-  extra matchers.
+  extra matchers. The workflow-lint tests run `actionlint`, so put it on the `PATH` first: the
+  pinned build lands in `<dir>/actionlint-bin` after
+  `PART=all RUNNER_TEMP=<dir> GITHUB_PATH=<dir>/path bun run ci:install-tool actionlint`.
 - `bun run format` fixes formatting. lefthook runs the light checks before a commit and a push, and
   CI runs the rest.
 - `bun run lint` is plain oxlint. `bun run lint:full` adds the type-aware pass and its type check.
