@@ -98,12 +98,12 @@ if (group === 'api') {
 } else if (command === 'view' && rest.length === 1 && flagNames === 'jq json') {
   const pull = pulls.find((candidate) => candidate.number === Number(rest[0]));
 
-  if (pull === undefined || flags.json !== 'id') {
+  if (pull === undefined || flags.json !== 'id,baseRefName') {
     exitWithUsage();
   }
 
   const viewed =
-    await $`jq -r ${flags.jq ?? ''} < ${Response.json({ id: `PR_${pull.number}` })}`.text();
+    await $`jq -r ${flags.jq ?? ''} < ${Response.json({ id: `PR_${pull.number}`, baseRefName: pull.base })}`.text();
 
   process.stdout.write(viewed);
 } else if (command === 'merge' && rest.length === 1 && flagNames === 'disable-auto') {

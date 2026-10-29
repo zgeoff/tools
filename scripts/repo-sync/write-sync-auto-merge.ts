@@ -13,7 +13,8 @@ export interface SyncAutoMergeRequest {
   // The number of the pull request the run opened or updated.
   readonly number: string;
 
-  // The commit the sync branch starts from.
+  // The branch the run synced from, and the commit of it that the sync branch starts from.
+  readonly base: string;
   readonly start: string;
 
   // The targets the run copied and the retired copies it removed.
@@ -30,6 +31,29 @@ export async function writeSyncAutoMerge(
   context: SyncCommandContext,
   request: SyncAutoMergeRequest,
 ): Promise<void> {
+  const viewed = await runChecked(context, [
+    'gh',
+    'pr',
+    'view',
+    request.number,
+    '--json',
+    'id,baseRefName',
+    '--jq',
+    String.raw`"\(.id) \(.baseRefName)"`,
+  ]);
+
+  const [pullRequestID = '', base = ''] = viewed.stdout.trim().split(' ');
+
+  // The run diffs its branch against the commit it checked out, which is the pull request's base
+  // only when the pull request merges into the branch the run synced from.
+  if (base !== request.base) {
+    context.writeOutput(
+      `::warning::Pull request #${request.number} merges into ${base}, not ${request.base}, which the run synced from, so it waits for review.\n`,
+    );
+
+    return;
+  }
+
   const head = await runChecked(context, ['git', 'rev-parse', 'HEAD']);
 
   const diff = await runChecked(context, [
@@ -63,17 +87,6 @@ export async function writeSyncAutoMerge(
     return;
   }
 
-  const pullRequestID = await runChecked(context, [
-    'gh',
-    'pr',
-    'view',
-    request.number,
-    '--json',
-    'id',
-    '--jq',
-    '.id',
-  ]);
-
   // gh pr merge --auto merges a pull request that can merge at once, before any check runs. The
   // mutation refuses one instead, so such a pull request waits for review.
   const armed = await runProbe(context, [
@@ -83,7 +96,7 @@ export async function writeSyncAutoMerge(
     '-f',
     `query=${enableAutoMergeMutation}`,
     '-f',
-    `pullRequestID=${pullRequestID.stdout.trim()}`,
+    `pullRequestID=${pullRequestID}`,
     '-f',
     `head=${head.stdout.trim()}`,
   ]);

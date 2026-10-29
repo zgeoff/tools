@@ -135,7 +135,7 @@ test('it turns auto-merge on for a head and lists it, then turns it off', async 
 
   await $`${ctx.gh} pr create --base main --head sync --title one --body one`.quiet();
 
-  const pullRequestID = await $`${ctx.gh} pr view 1 --json id --jq .id`.text();
+  const pullRequestID = await $`${ctx.gh} pr view 1 --json id,baseRefName --jq .id`.text();
 
   await $`${ctx.gh} api graphql -f ${'query=mutation { enablePullRequestAutoMerge }'} -f ${`pullRequestID=${pullRequestID.trim()}`} -f head=abc123`.quiet();
 

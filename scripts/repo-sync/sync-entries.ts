@@ -90,7 +90,7 @@ export async function syncEntries(options: Readonly<SyncEntriesOptions>): Promis
   if (pushed) {
     const number = await writePullRequest(context, committed.synced);
 
-    await writeSyncAutoMerge(context, { ...committed, number });
+    await writeSyncAutoMerge(context, { ...committed, number, base: context.base });
   }
 
   await removeEntryBranches(context, pushed, committed.failed);

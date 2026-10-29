@@ -1197,3 +1197,32 @@ test('it warns and passes when the repo refuses auto-merge', async () => {
     '::warning::Auto-merge of pull request #1 did not turn on, so it waits for review: GraphQL: Auto merge is not allowed for this repository\n',
   );
 });
+
+test('it leaves auto-merge off when the open pull request merges into another branch than the run synced from', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const entries = [
+    {
+      name: 'editorconfig',
+      description: 'The editor config',
+      files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+    },
+  ];
+
+  await ctx.runSync(entries, 'sync-v7');
+  await ctx.writeSource('sync/editorconfig', 'root = false\n');
+
+  const exitCode = await ctx.runSync(entries, 'sync-v8', 'false', { BASE: 'feature' });
+  const pulls = await ctx.readPullRequests();
+
+  expect(exitCode).toBe(0);
+  expect(pulls).toStrictEqual([expect.not.objectContaining({ autoMerge: expect.anything() })]);
+
+  expect(ctx.output).toContain(
+    '::warning::Pull request #1 merges into main, not feature, which the run synced from, so it waits for review.\n',
+  );
+});

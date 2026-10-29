@@ -116,13 +116,13 @@ earlier manifests from this repo's history, so the workflow checks out the full 
 The workflow turns on GitHub's auto-merge, with a squash, for the pull request it opens or updates,
 so the pull request merges once the repo's required checks pass. Its files are text that tools
 already reviewed, so it needs no review in the repo. The workflow turns auto-merge on only when the
-branch changes nothing but the targets the run copied, the retired copies it removed, and
-`package.json` changed only by the scripts that an entry's `scripts` field declares. On any other
-change it warns and leaves auto-merge off, and the pull request waits for review. Auto-merge binds
-to the head commit that the run checked. A repo whose settings disallow auto-merge gets a warning,
-and its sync pull requests wait for review. GitHub refuses auto-merge for a pull request that can
-merge at once, such as one in a repo whose rules require no check, so that pull request waits for
-review too.
+pull request merges into the branch the run synced from, and the branch changes nothing but the
+targets the run copied, the retired copies it removed, and `package.json` changed only by the
+scripts that an entry's `scripts` field declares. On any other change it warns and leaves auto-merge
+off, and the pull request waits for review. Auto-merge binds to the head commit that the run
+checked. A repo whose settings disallow auto-merge gets a warning, and its sync pull requests wait
+for review. GitHub refuses auto-merge for a pull request that can merge at once, such as one in a
+repo whose rules require no check, so that pull request waits for review too.
 
 GitHub keeps auto-merge on through a later push by anyone with write access, the workflow's own
 force push included, so two steps keep an unchecked commit from merging on its own. The workflow
