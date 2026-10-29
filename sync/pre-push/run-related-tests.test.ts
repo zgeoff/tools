@@ -1,4 +1,4 @@
-import { expect, onTestFinished, test } from 'bun:test';
+import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -19,7 +19,7 @@ test('#resolveRelatedTests selects a test file that the probe finds', () => {
   const sources = {
     cwd: '/repo',
     readConfigText: () => null,
-    probeFile: (path: string) => path === '/repo/src/a.test.ts',
+    probeFile: (path: string) => Object.hasOwn({ '/repo/src/a.test.ts': true }, path),
   };
 
   expect(resolveRelatedTests(['src/a.test.ts'], sources)).toStrictEqual(['src/a.test.ts']);
@@ -29,7 +29,7 @@ test('#resolveRelatedTests selects the sibling test of a source file', () => {
   const sources = {
     cwd: '/repo',
     readConfigText: () => null,
-    probeFile: (path: string) => path === '/repo/src/a.test.ts',
+    probeFile: (path: string) => Object.hasOwn({ '/repo/src/a.test.ts': true }, path),
   };
 
   expect(resolveRelatedTests(['src/a.ts'], sources)).toStrictEqual(['src/a.test.ts']);
@@ -39,7 +39,7 @@ test('#resolveRelatedTests selects the sibling test of a TSX component', () => {
   const sources = {
     cwd: '/repo',
     readConfigText: () => null,
-    probeFile: (path: string) => path === '/repo/src/view.test.tsx',
+    probeFile: (path: string) => Object.hasOwn({ '/repo/src/view.test.tsx': true }, path),
   };
 
   expect(resolveRelatedTests(['src/view.tsx'], sources)).toStrictEqual(['src/view.test.tsx']);
@@ -67,7 +67,8 @@ test('#resolveRelatedTests keeps the order of the paths and drops duplicates', (
   const sources = {
     cwd: '/repo',
     readConfigText: () => null,
-    probeFile: (path: string) => ['/repo/src/b.test.ts', '/repo/src/a.test.ts'].includes(path),
+    probeFile: (path: string) =>
+      Object.hasOwn({ '/repo/src/b.test.ts': true, '/repo/src/a.test.ts': true }, path),
   };
 
   expect(
@@ -157,16 +158,20 @@ test.each([
 });
 
 test('#resolveRelatedTests leaves out a file of a lane that the oxlint config declares', () => {
-  const sources = {
-    cwd: '/repo',
-    readConfigText: (path: string) =>
-      path === '/repo/.oxlintrc.json'
-        ? '{ "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": { "radar": 30000 } }] } }'
-        : null,
-    probeFile: () => true,
-  };
+  const readConfigText = mock(
+    () => '{ "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": { "radar": 30000 } }] } }',
+  );
 
-  expect(resolveRelatedTests(['src/sweep.radar.test.ts'], sources)).toBeEmpty();
+  expect(
+    resolveRelatedTests(['src/sweep.radar.test.ts'], {
+      cwd: '/repo',
+      readConfigText,
+      probeFile: () => true,
+    }),
+  ).toBeEmpty();
+
+  expect(readConfigText).toHaveBeenCalledTimes(1);
+  expect(readConfigText).toHaveBeenCalledWith('/repo/.oxlintrc.json');
 });
 
 test('#resolveRelatedTests selects a test whose suffix no lane declares', () => {
