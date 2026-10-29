@@ -49,3 +49,37 @@ test('it lists a commit that two ranges share once', async () => {
 
   expect(commits).toStrictEqual([sharedText.trim(), farewellText.trim()]);
 });
+
+test('it keeps the exclusions of each range to that range', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  await $`git update-ref refs/remotes/origin/main HEAD`.cwd(ctx.directory).env(ctx.env);
+
+  await $`git commit --quiet --allow-empty -m ${'feat: add the greeting'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const greetingText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  const greeting = greetingText.trim();
+
+  await $`git commit --quiet --allow-empty -m ${'feat: add the farewell'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const farewellText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  const farewell = farewellText.trim();
+
+  // A new ref at the greeting, and a ref that moves from the greeting to the farewell.
+  const commits = readRangeCommits({ cwd: ctx.directory, env: ctx.env, runProgram }, [
+    [greeting, '^origin/main'],
+    [farewell, '^origin/main', `^${greeting}`],
+  ]);
+
+  expect(commits).toStrictEqual([greeting, farewell]);
+});
