@@ -29,6 +29,22 @@ pre-push:
   # Sequential, to bound memory on a small host or with parallel agents.
   piped: true
   jobs:
+    # The jobs after this one read the files on disk, so an uncommitted change
+    # to a file the branch changes would hide a fault in the pushed commit.
+    # This job fails the push and names each such file. An uncommitted change
+    # to a file the branch leaves unchanged passes.
+    - name: uncommitted
+      files: bun run --silent files:branch
+      run: |
+        if ! changed=$(git -c core.quotePath=false --literal-pathspecs diff --name-only HEAD -- {files}); then
+          echo "uncommitted: git diff failed; its output above holds the cause"
+          exit 2
+        fi
+        if [ -n "$changed" ]; then
+          echo "uncommitted: these files the branch changes hold a change that is not committed, so the checks would read a copy the push does not send; commit or stash it:"
+          printf '%s\n' "$changed"
+          exit 1
+        fi
     - name: format:check
       run: bun run --silent memory-capped bun run format:check
     # Plain oxlint, without the unused-directive check: a directive for a

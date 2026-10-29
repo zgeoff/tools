@@ -17,6 +17,11 @@ docs-writing skill's `check-length.sh` and `check-links.sh`, and the workflows c
 `actionlint` and then the workflow lint. Each runs only when the branch changes a file that matches
 its glob.
 
+The uncommitted check runs first. It fails the push when a file the branch changes holds a change
+that is not committed, staged or not, and it names each such file. The checks after it read the
+files on disk, so a fixed copy on disk would hide a fault in the commit that the push sends. A
+change to a file the branch leaves unchanged passes.
+
 A check whose program the machine lacks prints a notice and passes, because CI installs the program
 and runs the check. The docs check prints a notice and passes in a repo without
 `.claude/skills/docs-writing/scripts/`. The commits and local-paths checks read the branch's
@@ -106,6 +111,9 @@ lists.
 
 The file list comes from the checked-out branch. `git push origin <other-branch>` lints and tests
 the checked-out branch's files, not the pushed branch's, and CI catches what the hook skips.
+
+A job that a repo adds in its `lefthook.yml` runs before the uncommitted check, so it can read an
+uncommitted copy of a file the branch changes.
 
 A repo changes what a baseline job runs through the package script that the job calls, such as
 `typecheck`. The shell and docs checks and the workflows check's actionlint call their programs

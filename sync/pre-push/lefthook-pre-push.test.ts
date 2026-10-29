@@ -109,6 +109,106 @@ test('it leaves the main checkout non-bare when the test job runs in a pre-push 
   expect(existsSync(join(ctx.worktree, 'sandbox/.git'))).toBeTrue();
 });
 
+test('it fails the push on the uncommitted job and names the file when a file the branch changes holds an uncommitted change', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.worktree, 'guide.md'), '# Guide\n\nA draft that runs too long.\n');
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': `bun ${join(import.meta.dir, 'read-branch-files.ts')}`,
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
+        'check:workflows': 'true',
+        'memory-capped': 'exec',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  // The fixed copy stays on disk, uncommitted, as the push sends the draft.
+  await writeFile(join(ctx.worktree, 'guide.md'), '# Guide\n\nA short copy.\n');
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  const failedJobs = [...output.matchAll(/^🥊\s+(?<job>\S+)/gmu)].map(
+    (failure) => failure.groups?.['job'],
+  );
+
+  expect(result.exitCode).not.toBe(0);
+  expect(failedJobs).toStrictEqual(['uncommitted']);
+  expect(output).toMatch(/^guide\.md$/mu);
+});
+
+test('it passes the push when only a file the branch leaves unchanged holds an uncommitted change', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.main, 'notes.md'), '# Notes\n');
+
+  await $`git add notes.md`.cwd(ctx.main).env(ctx.env);
+  await $`git commit --quiet -m ${'docs: add the notes'}`.cwd(ctx.main).env(ctx.env);
+  await $`git push --quiet origin main`.cwd(ctx.main).env(ctx.env);
+  await $`git merge --quiet --ff-only main`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.worktree, 'fixture.ts'), 'export {};\n');
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': `bun ${join(import.meta.dir, 'read-branch-files.ts')}`,
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
+        'check:workflows': 'true',
+        'memory-capped': 'exec',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(join(ctx.worktree, 'notes.md'), '# Notes\n\nA line in progress.\n');
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  expect(result.exitCode).toBe(0);
+});
+
 test('it fails the push on the shell job alone when a shell file the branch changes fails shellcheck', async () => {
   const ctx = await setupTest();
 
