@@ -6,6 +6,7 @@
       "packages/*"
     ],
     "catalog": {
+      "@actions/expressions": "0.3.61",
       "@commitlint/cli": "21.2.4",
       "@happy-dom/global-registrator": "21.0.4",
       "@maschwenk/tsrslint": "0.1.6",
@@ -69,6 +70,7 @@
     "memory-capped": "bash sync/pre-push/run-memory-capped.sh \"$(bun sync/pre-push/read-memory-budget.ts)\""
   },
   "devDependencies": {
+    "@actions/expressions": "catalog:",
     "@commitlint/cli": "catalog:",
     "@maschwenk/tsrslint": "catalog:",
     "@tsconfig/strictest": "catalog:",

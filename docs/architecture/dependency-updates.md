@@ -86,8 +86,10 @@ The `workflow-audit-fix` caller runs the reusable
 [`audit-fix.yml`](../../.github/workflows/audit-fix.yml) every day, by hand, and after a run fails
 in the workflow that holds a repo's `bun audit`: `PR`, `pr`, `CI`, `Dependency Health` or
 `Dep Health`. Only a failed run on `main` starts it, because the job audits the default branch, and
-a failure on a pull-request branch leaves that audit unchanged. The job opens a pull request on the
-branch `audit-fix` only when the audit needs a change:
+a failure on a pull-request branch leaves that audit unchanged. That failed run must come from a
+push, the schedule or a dispatch in the repo itself, because a fork's pull request can come from a
+branch named `main`, and the job holds the repo-sync App secrets. The job opens a pull request on
+the branch `audit-fix` only when the audit needs a change:
 
 - `bun audit fix` updates each vulnerable package to the lowest fixed release that every dependent's
   range accepts.
