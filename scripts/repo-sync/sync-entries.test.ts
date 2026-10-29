@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
 import { createStubPullRequestGH } from '../../test-utils/create-stub-pull-request-gh.ts';
@@ -164,6 +164,8 @@ async function setupTest() {
   };
 
   return {
+    origin,
+    state,
     output,
     runSync,
     writeMainCommit,
@@ -1031,6 +1033,53 @@ test("it fails the run with git's error when the remote branch probe cannot reac
   expect(syncing).rejects.toThrow(
     "git ls-remote --exit-code --heads origin repo-sync/zgeoff-tools exited with 128: fatal: transport 'file' not allowed",
   );
+});
+
+test('it turns auto-merge off before it pushes a later release to the sync branch', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const entries = [
+    {
+      name: 'editorconfig',
+      description: 'The editor config',
+      files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+    },
+  ];
+
+  await ctx.runSync(entries, 'sync-v7');
+  await ctx.writeSource('sync/editorconfig', 'root = false\n');
+
+  // The remote refuses a push to the sync branch while its pull request has auto-merge on.
+  const hook = join(ctx.origin, 'hooks', 'pre-receive');
+
+  await writeFile(
+    hook,
+    [
+      '#!/usr/bin/env bash',
+      'while read -r _old _new ref; do',
+      `  if [ "$ref" = refs/heads/repo-sync/zgeoff-tools ] && jq -e 'any(.[]; has("autoMerge"))' '${ctx.state}' > /dev/null; then`,
+      "    echo 'auto-merge is on' >&2",
+      '    exit 1',
+      '  fi',
+      'done',
+      '',
+    ].join('\n'),
+  );
+
+  await chmod(hook, 0o755);
+
+  const exitCode = await ctx.runSync(entries, 'sync-v8');
+  const pulls = await ctx.readPullRequests();
+  const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
+  const editorconfig = await ctx.readBranch('repo-sync/zgeoff-tools', '.editorconfig');
+
+  expect(exitCode).toBe(0);
+  expect(editorconfig).toBe('root = false\n');
+  expect(pulls).toStrictEqual([expect.objectContaining({ autoMerge: { method: 'squash', head } })]);
 });
 
 test('it leaves auto-merge off when a build writes a file the manifest does not deliver', async () => {

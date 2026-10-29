@@ -2,6 +2,8 @@ import { isRecord } from '../../packages/std/src/is-record.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
+import type { SyncPullRequest } from './build-hand-pushed-sync-plan.ts';
+import { buildHandPushedSyncPlan } from './build-hand-pushed-sync-plan.ts';
 
 export interface HoldHandPushedSyncOptions {
   readonly cwd: string;
@@ -35,40 +37,19 @@ export async function holdHandPushedSync(
 
   const pullsValue: unknown = JSON.parse(listed.stdout);
   const pullRequests = parseSyncPullRequests(pullsValue);
+  const plan = buildHandPushedSyncPlan({ branch, pusher, pullRequests });
 
-  if (pullRequests.length === 0) {
-    options.writeOutput(`${branch} has no open pull request; nothing to hold.\n`);
+  for (const number of plan.turnOff) {
+    await runCheckedCommand(
+      options.runCommand,
+      ['gh', 'pr', 'merge', String(number), '--disable-auto', '--repo', repo],
+      commandOptions,
+    );
   }
 
-  for (const pullRequest of pullRequests) {
-    if (pullRequest.author === pusher) {
-      options.writeOutput(
-        `${pusher} opened pull request #${pullRequest.number}; nothing to hold.\n`,
-      );
-    } else if (pullRequest.isAutoMergeOn) {
-      await runCheckedCommand(
-        options.runCommand,
-        ['gh', 'pr', 'merge', String(pullRequest.number), '--disable-auto', '--repo', repo],
-        commandOptions,
-      );
-
-      options.writeOutput(
-        `::warning::${pusher} pushed to ${branch}, so auto-merge of pull request #${pullRequest.number} is off and it waits for review.\n`,
-      );
-    } else {
-      options.writeOutput(
-        `${pusher} pushed to ${branch}, and pull request #${pullRequest.number} has auto-merge off.\n`,
-      );
-    }
-  }
+  options.writeOutput(plan.messages.join(''));
 
   return 0;
-}
-
-interface SyncPullRequest {
-  readonly number: number;
-  readonly author: string;
-  readonly isAutoMergeOn: boolean;
 }
 
 function parseSyncPullRequests(value: unknown): SyncPullRequest[] {
