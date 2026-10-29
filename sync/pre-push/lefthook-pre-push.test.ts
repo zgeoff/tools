@@ -1172,6 +1172,280 @@ test('it fails the push when a commit of the branch adds the home directory', as
   expect(output).toInclude(`cache.txt:1: commit `);
 });
 
+test('it fails a push of another branch when that branch adds the home directory', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'true',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': `bun ${join(import.meta.dir, 'run-local-paths-check.ts')}`,
+        'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
+        'check:workflows': 'true',
+        'check:uncommitted': 'true',
+        'memory-capped': 'exec',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the hook config'}`.cwd(ctx.worktree).env(ctx.env);
+  await $`git switch --quiet -c cache-notes main`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(join(ctx.worktree, 'cache.txt'), `cache: ${ctx.env.HOME}/.cache\n`);
+
+  await $`git add cache.txt`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'docs: note the cache folder'}`.cwd(ctx.worktree).env(ctx.env);
+  await $`git switch --quiet feature`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin cache-notes`
+    .cwd(ctx.worktree)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).not.toBe(0);
+  expect(output).toInclude('cache.txt:1: commit ');
+});
+
+test('it passes the commits check and fails the local-paths check on a push of another branch from a checkout with nothing to push', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.main, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.main, '.gitignore'), 'node_modules\n');
+  await symlink(join(import.meta.dir, '../../node_modules'), join(ctx.main, 'node_modules'));
+
+  await writeFile(
+    join(ctx.main, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'true',
+        'test:related': 'true',
+        'check:commits': `bun ${join(import.meta.dir, 'run-commits-check.ts')}`,
+        'check:local-paths': `bun ${join(import.meta.dir, 'run-local-paths-check.ts')}`,
+        'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
+        'check:workflows': 'true',
+        'check:uncommitted': 'true',
+        'memory-capped': 'exec',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.main).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the hook config'}`.cwd(ctx.main).env(ctx.env);
+  await $`git push --quiet origin main`.cwd(ctx.main).env(ctx.env);
+  await $`git switch --quiet -c cache-notes`.cwd(ctx.main).env(ctx.env);
+
+  await writeFile(join(ctx.main, 'cache.txt'), `cache: ${ctx.env.HOME}/.cache\n`);
+
+  await $`git add cache.txt`.cwd(ctx.main).env(ctx.env);
+  await $`git commit --quiet -m ${'docs: note the cache folder'}`.cwd(ctx.main).env(ctx.env);
+  await $`git switch --quiet main`.cwd(ctx.main).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin cache-notes`.cwd(ctx.main).env(ctx.env).nothrow().quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).not.toBe(0);
+  expect(output).toMatch(/✔️ commits \(/u);
+  expect(output).toInclude('cache.txt:1: commit ');
+});
+
+test('it fails the commits check on a push of another branch from a checkout with nothing to push', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.main, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.main, '.gitignore'), 'node_modules\n');
+  await symlink(join(import.meta.dir, '../../node_modules'), join(ctx.main, 'node_modules'));
+
+  await writeFile(
+    join(ctx.main, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'true',
+        'test:related': 'true',
+        'check:commits': `bun ${join(import.meta.dir, 'run-commits-check.ts')}`,
+        'check:local-paths': `bun ${join(import.meta.dir, 'run-local-paths-check.ts')}`,
+        'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
+        'check:workflows': 'true',
+        'check:uncommitted': 'true',
+        'memory-capped': 'exec',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.main).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the hook config'}`.cwd(ctx.main).env(ctx.env);
+  await $`git push --quiet origin main`.cwd(ctx.main).env(ctx.env);
+  await $`git switch --quiet -c cache-notes`.cwd(ctx.main).env(ctx.env);
+
+  await writeFile(join(ctx.main, 'cache.txt'), `cache: ${ctx.env.HOME}/.cache\n`);
+
+  await $`git add cache.txt`.cwd(ctx.main).env(ctx.env);
+  await $`git commit --quiet -m ${'note the cache folder'}`.cwd(ctx.main).env(ctx.env);
+  await $`git switch --quiet main`.cwd(ctx.main).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin cache-notes`.cwd(ctx.main).env(ctx.env).nothrow().quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).not.toBe(0);
+  expect(output).toInclude('subject may not be empty [subject-empty]');
+});
+
+test('it checks each branch of a push that sends two', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'true',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': `bun ${join(import.meta.dir, 'run-local-paths-check.ts')}`,
+        'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
+        'check:workflows': 'true',
+        'check:uncommitted': 'true',
+        'memory-capped': 'exec',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the hook config'}`.cwd(ctx.worktree).env(ctx.env);
+  await $`git switch --quiet -c cache-notes main`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(join(ctx.worktree, 'cache.txt'), `cache: ${ctx.env.HOME}/.cache\n`);
+
+  await $`git add cache.txt`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'docs: note the cache folder'}`.cwd(ctx.worktree).env(ctx.env);
+  await $`git switch --quiet -c log-notes main`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(join(ctx.worktree, 'log.txt'), `logs: ${ctx.env.HOME}/.logs\n`);
+
+  await $`git add log.txt`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'docs: note the log folder'}`.cwd(ctx.worktree).env(ctx.env);
+  await $`git switch --quiet feature`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin cache-notes log-notes`
+    .cwd(ctx.worktree)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).not.toBe(0);
+  expect(output).toInclude('cache.txt:1: commit ');
+  expect(output).toInclude('log.txt:1: commit ');
+});
+
+test('it fails a push of another branch when a commit of that branch fails commitlint', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.worktree, '.gitignore'), 'node_modules\n');
+  await symlink(join(import.meta.dir, '../../node_modules'), join(ctx.worktree, 'node_modules'));
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'true',
+        'test:related': 'true',
+        'check:commits': `bun ${join(import.meta.dir, 'run-commits-check.ts')}`,
+        'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
+        'check:workflows': 'true',
+        'check:uncommitted': 'true',
+        'memory-capped': 'exec',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the hook config'}`.cwd(ctx.worktree).env(ctx.env);
+  await $`git switch --quiet -c tidy-notes main`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet --allow-empty -m ${'tidy up'}`.cwd(ctx.worktree).env(ctx.env);
+  await $`git switch --quiet feature`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin tidy-notes`
+    .cwd(ctx.worktree)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).not.toBe(0);
+  expect(output).toInclude('subject may not be empty [subject-empty]');
+});
+
 test('it fails the push when a bunfig.toml raises the test timeout above 5 s', async () => {
   const ctx = await setupTest();
 

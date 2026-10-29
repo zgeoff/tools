@@ -7,10 +7,7 @@ export interface ReadBranchBaseOptions {
 }
 
 export function readBranchBase(options: Readonly<ReadBranchBaseOptions>): string {
-  const head = runGit(options, ['rev-parse', '--abbrev-ref', 'origin/HEAD']);
-
-  // A clone made before origin/HEAD existed, and a CI checkout, have no symbolic ref.
-  const defaultBranch = head.exitCode === 0 ? head.stdout.trim() : 'origin/main';
+  const defaultBranch = readDefaultBranch(options);
   const base = runGit(options, ['merge-base', 'HEAD', defaultBranch]);
 
   if (base.exitCode !== 0) {
@@ -20,6 +17,13 @@ export function readBranchBase(options: Readonly<ReadBranchBaseOptions>): string
   }
 
   return base.stdout.trim();
+}
+
+export function readDefaultBranch(options: Readonly<ReadBranchBaseOptions>): string {
+  const head = runGit(options, ['rev-parse', '--abbrev-ref', 'origin/HEAD']);
+
+  // A clone made before origin/HEAD existed, and a CI checkout, have no symbolic ref.
+  return head.exitCode === 0 ? head.stdout.trim() : 'origin/main';
 }
 
 function runGit(options: Readonly<ReadBranchBaseOptions>, args: readonly string[]) {

@@ -271,6 +271,26 @@
         "target": "scripts/read-branch-base.ts"
       },
       {
+        "source": "sync/pre-push/read-pushed-ranges.ts",
+        "target": "scripts/read-pushed-ranges.ts"
+      },
+      {
+        "source": "sync/pre-push/parse-pushed-refs.ts",
+        "target": "scripts/parse-pushed-refs.ts"
+      },
+      {
+        "source": "sync/pre-push/read-range-commits.ts",
+        "target": "scripts/read-range-commits.ts"
+      },
+      {
+        "source": "sync/pre-push/format-commit-lines.ts",
+        "target": "scripts/format-commit-lines.ts"
+      },
+      {
+        "source": "sync/pre-push/read-pushed-refs-input.ts",
+        "target": "scripts/read-pushed-refs-input.ts"
+      },
+      {
         "source": "sync/pre-push/parse-added-lines.ts",
         "target": "scripts/parse-added-lines.ts"
       },

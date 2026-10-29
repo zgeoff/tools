@@ -69,7 +69,7 @@ test('it passes a branch whose commits are all Conventional Commits', async () =
   const problems = runCommitsCheck({
     cwd: ctx.directory,
     runProgram: stub.runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     commitlint: ctx.commitlint,
     config: ctx.config,
@@ -110,7 +110,7 @@ test('it reports each problem of a commit that is not a Conventional Commit at i
   const problems = runCommitsCheck({
     cwd: ctx.directory,
     runProgram: stub.runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     commitlint: ctx.commitlint,
     config: ctx.config,
@@ -120,6 +120,32 @@ test('it reports each problem of a commit that is not a Conventional Commit at i
     `commit ${hash}: subject may not be empty [subject-empty]`,
     `commit ${hash}: type may not be empty [type-empty]`,
   ]);
+});
+
+test('it reports nothing for no range, though HEAD is not a Conventional Commit', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'tidy up'}`.cwd(ctx.directory).env(ctx.env);
+
+  const stub = buildStubCommitlint(ctx.commitlint, [
+    {
+      exitCode: 1,
+      stdout:
+        '⧗   --- input ---\ntidy up\n✖   subject may not be empty [subject-empty]\n\n✖   found 1 problems, 0 warnings\n',
+      stderr: '',
+    },
+  ]);
+
+  const problems = runCommitsCheck({
+    cwd: ctx.directory,
+    runProgram: stub.runProgram,
+    ranges: [],
+    env: ctx.env,
+    commitlint: ctx.commitlint,
+    config: ctx.config,
+  });
+
+  expect(problems).toStrictEqual([]);
 });
 
 test('it reports a commit that is not a Conventional Commit when a later commit is', async () => {
@@ -152,7 +178,7 @@ test('it reports a commit that is not a Conventional Commit when a later commit 
   const problems = runCommitsCheck({
     cwd: ctx.directory,
     runProgram: stub.runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     commitlint: ctx.commitlint,
     config: ctx.config,
@@ -191,7 +217,7 @@ test('it lints with @zgeoff/commitlint-config, not a commitlint config in the re
   const problems = runCommitsCheck({
     cwd: ctx.directory,
     runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     commitlint: ctx.commitlint,
     config: ctx.config,
@@ -222,7 +248,7 @@ test('it reads only the commits after the base', async () => {
   const problems = runCommitsCheck({
     cwd: ctx.directory,
     runProgram: stub.runProgram,
-    base,
+    ranges: [[`${base}..HEAD`]],
     env: ctx.env,
     commitlint: ctx.commitlint,
     config: ctx.config,
@@ -265,7 +291,7 @@ test('it leaves out a merge commit', async () => {
   const problems = runCommitsCheck({
     cwd: ctx.directory,
     runProgram: stub.runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     commitlint: ctx.commitlint,
     config: ctx.config,
@@ -360,6 +386,40 @@ test('it prints each problem and exits 1 when run as a script', async () => {
   });
 });
 
+test('it checks the refs that stdin names when run as a script with --pushed-refs', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  await $`git update-ref refs/remotes/origin/main HEAD`.cwd(ctx.directory).env(ctx.env);
+  await $`git switch --quiet -c greeting`.cwd(ctx.directory).env(ctx.env);
+
+  await $`git commit --quiet --allow-empty -m ${'feat: Add the greeting'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const localText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+  const hashText = await $`git rev-parse --short HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  await $`git switch --quiet main`.cwd(ctx.directory).env(ctx.env);
+
+  const pushedRefs = `refs/heads/greeting ${localText.trim()} refs/heads/greeting ${'0'.repeat(40)}\n`;
+
+  const result =
+    await $`${process.execPath} ${join(import.meta.dir, 'run-commits-check.ts')} --pushed-refs < ${Buffer.from(pushedRefs)}`
+      .cwd(ctx.directory)
+      .env(ctx.env)
+      .nothrow()
+      .quiet();
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 1,
+    stdout: `commit ${hashText.trim()}: header must be lower-case [header-case]\ncommit ${hashText.trim()}: subject must be lower-case [subject-case]\n`,
+  });
+});
+
 test('it prints the skip as a GitHub notice and exits 0 when run as a script in Actions', async () => {
   const ctx = await setupTest();
 
@@ -384,7 +444,7 @@ test('it prints the skip as a GitHub notice and exits 0 when run as a script in 
   });
 });
 
-test('it throws the git log error when the base is not a commit', async () => {
+test('it throws the git rev-list error when a range names no commit', async () => {
   const ctx = await setupTest();
 
   await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
@@ -395,12 +455,14 @@ test('it throws the git log error when the base is not a commit', async () => {
     runCommitsCheck({
       cwd: ctx.directory,
       runProgram,
-      base: 'no-such-greeting',
+      ranges: [['no-such-greeting..HEAD']],
       env: ctx.env,
       commitlint: ctx.commitlint,
       config: ctx.config,
     }),
-  ).toThrow(/^git log failed: fatal: ambiguous argument 'no-such-greeting\.\.HEAD'/u);
+  ).toThrow(
+    /^git rev-list no-such-greeting\.\.HEAD failed: fatal: ambiguous argument 'no-such-greeting\.\.HEAD'/u,
+  );
 });
 
 test('it throws the error of commitlint when commitlint exits with a code above 1', async () => {
@@ -428,7 +490,7 @@ test('it throws the error of commitlint when commitlint exits with a code above 
     runCommitsCheck({
       cwd: ctx.directory,
       runProgram: stub.runProgram,
-      base: baseText.trim(),
+      ranges: [[`${baseText.trim()}..HEAD`]],
       env: ctx.env,
       commitlint: ctx.commitlint,
       config: ctx.config,
@@ -457,7 +519,7 @@ test('it throws the error of commitlint when commitlint exits 1 and reports no p
     runCommitsCheck({
       cwd: ctx.directory,
       runProgram: stub.runProgram,
-      base: baseText.trim(),
+      ranges: [[`${baseText.trim()}..HEAD`]],
       env: ctx.env,
       commitlint: ctx.commitlint,
       config: ctx.config,
