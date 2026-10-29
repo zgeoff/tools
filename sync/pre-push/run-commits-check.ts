@@ -107,8 +107,7 @@ async function runCLI(): Promise<void> {
     // An installed package that still fails to resolve, such as one whose export names a missing
     // file, is broken, so it throws here rather than skip.
     const config = Bun.resolveSync('@zgeoff/commitlint-config', cwd);
-
-    const base = await readBranchBase({ cwd });
+    const base = readBranchBase({ cwd, env: process.env, runProgram });
 
     const problems = runCommitsCheck({
       cwd,

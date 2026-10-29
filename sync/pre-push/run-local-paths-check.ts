@@ -234,9 +234,9 @@ function collectBlobIds(rawDiff: string): string[] {
 
 const BLOB_MODES = new Set(['100644', '100755', '120000']);
 
-async function runCLI(): Promise<void> {
+function runCLI(): void {
   try {
-    const base = await readBranchBase({ cwd: process.cwd() });
+    const base = readBranchBase({ cwd: process.cwd(), env: process.env, runProgram });
 
     const findings = runLocalPathsCheck({
       cwd: process.cwd(),
@@ -261,5 +261,5 @@ async function runCLI(): Promise<void> {
 }
 
 if (import.meta.main) {
-  await runCLI();
+  runCLI();
 }
