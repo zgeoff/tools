@@ -96,7 +96,9 @@ The entry delivers these files, and their tests stay in tools:
   downloads them from tools.
 - `scripts/read-worker-count.ts` and `scripts/read-memory-budget.ts` — print the
   [worker count and the memory budget](./memory-caps.md#the-worker-count) of the host.
-- `scripts/read-branch-base.ts`, `scripts/read-pushed-ranges.ts`, `scripts/parse-added-lines.ts`,
+- `scripts/read-branch-base.ts`, `scripts/read-pushed-ranges.ts`, `scripts/parse-pushed-refs.ts`,
+  `scripts/read-range-commits.ts`, `scripts/format-commit-lines.ts`,
+  `scripts/read-pushed-refs-input.ts`, `scripts/parse-added-lines.ts`,
   `scripts/parse-shell-words.ts`, `scripts/shell-escape-parsers.ts`,
   `scripts/collect-command-names.ts`, `scripts/parse-lane-limits.ts` and `scripts/run-program.ts` —
   the modules these scripts import.

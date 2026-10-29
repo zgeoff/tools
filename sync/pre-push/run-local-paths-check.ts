@@ -1,12 +1,10 @@
 import { hostname } from 'node:os';
+import { formatCommitLines } from './format-commit-lines.ts';
 import { parseAddedLines } from './parse-added-lines.ts';
-import type { CommitRange } from './read-pushed-ranges.ts';
-import {
-  formatCommitLines,
-  readPushedRanges,
-  readPushedRefsInput,
-  readRangeCommits,
-} from './read-pushed-ranges.ts';
+import { readPushedRanges } from './read-pushed-ranges.ts';
+import { readPushedRefsInput } from './read-pushed-refs-input.ts';
+import type { CommitRange } from './read-range-commits.ts';
+import { readRangeCommits } from './read-range-commits.ts';
 import type { RunProgram } from './run-program.ts';
 import { runProgram } from './run-program.ts';
 
