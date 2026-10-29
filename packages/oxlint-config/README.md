@@ -54,8 +54,9 @@ The plugin is addressable on its own at `@zgeoff/oxlint-config/plugin` for confi
   direct dependency of the consuming project. Hoisting package managers (bun's default linker, npm)
   resolve it transitively anyway, but isolated layouts (pnpm, `bun install --linker isolated`) fail
   with `Cannot find module '@stylistic/eslint-plugin'` unless it's installed directly.
-- Type-aware rules activate under `oxlint --type-aware` (requires `oxlint-tsgolint`); the config
-  works without it.
+- Type-aware rules activate under `oxlint --type-aware`, which needs a type-aware backend: install
+  `oxlint-tsgolint`, or install `@maschwenk/tsrslint` and set `OXLINT_TSGOLINT_PATH` to the path
+  that its `tsrslint-path` command prints. The config works without a backend.
 
 ## Rules
 
