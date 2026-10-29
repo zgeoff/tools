@@ -17,7 +17,15 @@ baseline need changes in the repo beyond the `include` line, which repo-sync nev
 
 2. Copy [`repo-sync.yml`](../../sync/repo-sync.yml) to `.github/workflows/repo-sync.yml`, and pin it
    to the newest sync tag with `scripts/pin-tools-ref.sh`.
-3. Dispatch it once: `gh workflow run repo-sync.yml -R zgeoff/<repo>`. Expect one pull request that
+3. Allow auto-merge in the repo, so a sync pull request merges on green checks:
+
+   ```sh
+   gh api -X PATCH repos/zgeoff/<repo> -F allow_auto_merge=true --jq .allow_auto_merge
+   ```
+
+   Expect: `true`.
+
+4. Dispatch it once: `gh workflow run repo-sync.yml -R zgeoff/<repo>`. Expect one pull request that
    carries every entry the repo is behind on.
 
 ## Opting in to the skill gate

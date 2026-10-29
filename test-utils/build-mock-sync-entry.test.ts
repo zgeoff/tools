@@ -8,6 +8,7 @@ test('it builds a default sync entry', () => {
     files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
     build: '',
     optIn: false,
+    scripts: {},
   });
 });
 
@@ -20,5 +21,6 @@ test('it applies overrides on top of the defaults', () => {
     files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
     build: '',
     optIn: true,
+    scripts: {},
   });
 });

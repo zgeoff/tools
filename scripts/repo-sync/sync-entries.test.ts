@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
 import { createStubPullRequestGH } from '../../test-utils/create-stub-pull-request-gh.ts';
@@ -117,6 +117,12 @@ async function setupTest() {
     return files.split('\n').filter((file) => file !== '');
   };
 
+  const readBranchHead = async (branch: string) => {
+    const head = await $`git -C ${origin} rev-parse ${branch}`.text();
+
+    return head.trim();
+  };
+
   const readBranchNames = async () => {
     const refs =
       await $`git -C ${origin} for-each-ref ${'--format=%(refname:short)'} refs/heads`.text();
@@ -158,6 +164,8 @@ async function setupTest() {
   };
 
   return {
+    origin,
+    state,
     output,
     runSync,
     writeMainCommit,
@@ -166,6 +174,7 @@ async function setupTest() {
     removeSource,
     readBranch,
     readBranchFiles,
+    readBranchHead,
     readBranchNames,
     readCommitSubjects,
     readPullRequests,
@@ -216,6 +225,7 @@ test('it opens one pull request that carries every changed file of every entry',
 
   const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
   const pulls = await ctx.readPullRequests();
+  const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
 
   expect(exitCode).toBe(0);
   expect(branches).toStrictEqual(['main', 'repo-sync/zgeoff-tools']);
@@ -247,6 +257,7 @@ test('it opens one pull request that carries every changed file of every entry',
         '- `editorconfig`: The editor config\n' +
         '- `skill-demo`: The demo skill',
       state: 'open',
+      autoMerge: { method: 'squash', head },
     },
   ]);
 });
@@ -280,6 +291,7 @@ test('it updates the open pull request when a later release syncs before it merg
   const editorconfig = await ctx.readBranch('repo-sync/zgeoff-tools', '.editorconfig');
   const socket = await ctx.readBranch('repo-sync/zgeoff-tools', 'socket.yml');
   const pulls = await ctx.readPullRequests();
+  const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
 
   expect(exitCode).toBe(0);
   expect(branches).toStrictEqual(['main', 'repo-sync/zgeoff-tools']);
@@ -297,6 +309,7 @@ test('it updates the open pull request when a later release syncs before it merg
         '- `editorconfig`: The editor config\n' +
         '- `socket`: The Socket config',
       state: 'open',
+      autoMerge: { method: 'squash', head },
     },
   ]);
 });
@@ -380,6 +393,7 @@ test('it leaves a failing entry out, syncs the others, and fails the run', async
   const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
   const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
   const pulls = await ctx.readPullRequests();
+  const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
 
   expect(exitCode).toBe(1);
   expect(files).toStrictEqual(['.editorconfig', 'README.md']);
@@ -395,6 +409,7 @@ test('it leaves a failing entry out, syncs the others, and fails the run', async
         'Copied from zgeoff/tools at sync-v7 by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry:\n\n' +
         '- `editorconfig`: The editor config',
       state: 'open',
+      autoMerge: { method: 'squash', head },
     },
   ]);
 });
@@ -523,6 +538,7 @@ test('it keeps the sync branch and its pull request when every entry of a later 
   const exitCode = await ctx.runSync([{ ...entry, build: 'exit 3' }], 'sync-v8');
   const editorconfig = await ctx.readBranch('repo-sync/zgeoff-tools', '.editorconfig');
   const pulls = await ctx.readPullRequests();
+  const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
 
   expect(exitCode).toBe(1);
   expect(editorconfig).toBe('root = true\n');
@@ -537,6 +553,7 @@ test('it keeps the sync branch and its pull request when every entry of a later 
         'Copied from zgeoff/tools at sync-v7 by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry:\n\n' +
         '- `editorconfig`: The editor config',
       state: 'open',
+      autoMerge: { method: 'squash', head },
     },
   ]);
 });
@@ -568,6 +585,7 @@ test('it deletes a file that tools no longer syncs in a commit of its own', asyn
   const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
   const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
   const pulls = await ctx.readPullRequests();
+  const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
 
   expect(exitCode).toBe(0);
   expect(files).toStrictEqual(['.claude/skills/demo/SKILL.md', 'README.md']);
@@ -588,6 +606,7 @@ test('it deletes a file that tools no longer syncs in a commit of its own', asyn
         '- `skill-demo`: The demo skill\n' +
         '- `retired-files`: The copies of files zgeoff/tools no longer syncs: `.claude/skills/demo/scripts/check.sh`',
       state: 'open',
+      autoMerge: { method: 'squash', head },
     },
   ]);
 });
@@ -739,6 +758,7 @@ test('it keeps a retired workflow and removes the rest when the token lacks work
 
   const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
   const pulls = await ctx.readPullRequests();
+  const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
 
   expect(exitCode).toBe(0);
   expect(files).toStrictEqual(['.editorconfig', '.github/workflows/lint.yml', 'README.md']);
@@ -754,6 +774,7 @@ test('it keeps a retired workflow and removes the rest when the token lacks work
         '- `editorconfig`: The editor config\n' +
         '- `retired-files`: The copies of files zgeoff/tools no longer syncs: `scripts/lint.sh`',
       state: 'open',
+      autoMerge: { method: 'squash', head },
     },
   ]);
 });
@@ -1011,5 +1032,197 @@ test("it fails the run with git's error when the remote branch probe cannot reac
 
   expect(syncing).rejects.toThrow(
     "git ls-remote --exit-code --heads origin repo-sync/zgeoff-tools exited with 128: fatal: transport 'file' not allowed",
+  );
+});
+
+test('it turns auto-merge off before it pushes a later release to the sync branch', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const entries = [
+    {
+      name: 'editorconfig',
+      description: 'The editor config',
+      files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+    },
+  ];
+
+  await ctx.runSync(entries, 'sync-v7');
+  await ctx.writeSource('sync/editorconfig', 'root = false\n');
+
+  // The remote refuses a push to the sync branch while its pull request has auto-merge on.
+  const hook = join(ctx.origin, 'hooks', 'pre-receive');
+
+  await writeFile(
+    hook,
+    [
+      '#!/usr/bin/env bash',
+      'while read -r _old _new ref; do',
+      `  if [ "$ref" = refs/heads/repo-sync/zgeoff-tools ] && jq -e 'any(.[]; has("autoMerge"))' '${ctx.state}' > /dev/null; then`,
+      "    echo 'auto-merge is on' >&2",
+      '    exit 1',
+      '  fi',
+      'done',
+      '',
+    ].join('\n'),
+  );
+
+  await chmod(hook, 0o755);
+
+  const exitCode = await ctx.runSync(entries, 'sync-v8');
+  const pulls = await ctx.readPullRequests();
+  const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
+  const editorconfig = await ctx.readBranch('repo-sync/zgeoff-tools', '.editorconfig');
+
+  expect(exitCode).toBe(0);
+  expect(editorconfig).toBe('root = false\n');
+  expect(pulls).toStrictEqual([expect.objectContaining({ autoMerge: { method: 'squash', head } })]);
+});
+
+test('it leaves auto-merge off when a build writes a file the manifest does not deliver', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const exitCode = await ctx.runSync(
+    [
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+        build: 'echo stray > notes.txt',
+      },
+    ],
+    'sync-v7',
+  );
+
+  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
+  const pulls = await ctx.readPullRequests();
+
+  expect(exitCode).toBe(0);
+  expect(files).toStrictEqual(['.editorconfig', 'README.md', 'notes.txt']);
+  expect(pulls).toStrictEqual([expect.not.objectContaining({ autoMerge: expect.anything() })]);
+
+  expect(ctx.output).toContain(
+    '::warning::Pull request #1 changes files the manifest does not deliver, so it waits for review: notes.txt\n',
+  );
+});
+
+test('it turns auto-merge off when a later run carries a file the manifest does not deliver', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const entry = {
+    name: 'editorconfig',
+    description: 'The editor config',
+    files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+  };
+
+  await ctx.runSync([entry], 'sync-v7');
+  await ctx.writeSource('sync/editorconfig', 'root = false\n');
+
+  const exitCode = await ctx.runSync([{ ...entry, build: 'echo stray > notes.txt' }], 'sync-v8');
+  const pulls = await ctx.readPullRequests();
+
+  expect(exitCode).toBe(0);
+  expect(pulls).toStrictEqual([expect.not.objectContaining({ autoMerge: expect.anything() })]);
+});
+
+test('it turns auto-merge on when a build changes package.json only by the scripts it declares', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit(
+    'package.json',
+    '{ "name": "app", "scripts": { "test": "bun test" } }\n',
+  );
+
+  await ctx.writeManifestCommit([]);
+  await ctx.writeSource('sync/check-demo.ts', 'export {};\n');
+
+  const exitCode = await ctx.runSync(
+    [
+      {
+        name: 'check-demo',
+        description: 'The demo check',
+        files: [{ source: 'sync/check-demo.ts', target: 'scripts/check-demo.ts' }],
+        build:
+          'jq \'.scripts["check:demo"] = "bun scripts/check-demo.ts"\' package.json > package.json.tmp && mv package.json.tmp package.json',
+        scripts: { 'check:demo': 'bun scripts/check-demo.ts' },
+      },
+    ],
+    'sync-v7',
+  );
+
+  const pulls = await ctx.readPullRequests();
+  const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
+
+  expect(exitCode).toBe(0);
+  expect(pulls).toStrictEqual([expect.objectContaining({ autoMerge: { method: 'squash', head } })]);
+});
+
+test('it warns and passes when the repo refuses auto-merge', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const exitCode = await ctx.runSync(
+    [
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+      },
+    ],
+    'sync-v7',
+    'false',
+    { STUB_GH_AUTO_MERGE_REFUSAL: 'GraphQL: Auto merge is not allowed for this repository' },
+  );
+
+  const pulls = await ctx.readPullRequests();
+
+  expect(exitCode).toBe(0);
+  expect(pulls).toStrictEqual([expect.not.objectContaining({ autoMerge: expect.anything() })]);
+
+  expect(ctx.output).toContain(
+    '::warning::Auto-merge of pull request #1 did not turn on, so it waits for review: GraphQL: Auto merge is not allowed for this repository\n',
+  );
+});
+
+test('it leaves auto-merge off when the open pull request merges into another branch than the run synced from', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const entries = [
+    {
+      name: 'editorconfig',
+      description: 'The editor config',
+      files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+    },
+  ];
+
+  await ctx.runSync(entries, 'sync-v7');
+  await ctx.writeSource('sync/editorconfig', 'root = false\n');
+
+  const exitCode = await ctx.runSync(entries, 'sync-v8', 'false', { BASE: 'feature' });
+  const pulls = await ctx.readPullRequests();
+
+  expect(exitCode).toBe(0);
+  expect(pulls).toStrictEqual([expect.not.objectContaining({ autoMerge: expect.anything() })]);
+
+  expect(ctx.output).toContain(
+    '::warning::Pull request #1 merges into main, not feature, which the run synced from, so it waits for review.\n',
   );
 });

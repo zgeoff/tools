@@ -4,9 +4,12 @@ Repo sync keeps the files every downstream repo carries a copy of current in eac
 [`manifest.json`](../../sync/manifest.json) lists them as entries, and the
 [repo-sync workflow](../../.github/workflows/repo-sync.yml) delivers them to a downstream repo as
 one pull request on the branch `repo-sync/zgeoff-tools`, with one commit for each entry that
-changed. A run while that pull request is open updates it.
+changed. A run while that pull request is open updates it, and the pull request merges on green
+checks with no review, as [Auto-merge](#auto-merge) describes.
 [`repo-sync.yml`](../../sync/repo-sync.yml) is the stub a downstream repo installs to call it. A
-downstream repo calls the workflow at a sync tag, as [Sync tags](./sync-tags.md) describes.
+downstream repo calls the workflow at a sync tag, as [Sync tags](./sync-tags.md) describes. The stub
+runs the workflow when a push to `main` changes the stub, such as the merge of Renovate's bump to a
+newer tag, so the tag's files reach the repo without waiting for the stub's weekly run.
 
 ## Manifest entries
 
@@ -34,11 +37,13 @@ in its source. Without it, the workflow never overwrites a workflow file the rep
 
 ## Workflow callers
 
-Files under [`workflow-callers/`](../../sync/workflow-callers/) are opt-in entries: each is a short
-workflow that calls a reusable workflow in this repo, and a repo lists the ones it runs in the
-stub's `include` input. A caller reads repo-specific values from repo variables, which its header
-comment names, since the copy is otherwise verbatim. `workflow-bun-pr` runs
-[`bun-checks.yml`](../../.github/workflows/bun-checks.yml), the standard Bun pull-request checks.
+Files under [`workflow-callers/`](../../sync/workflow-callers/) are short workflows that each call a
+reusable workflow in this repo. Each is an opt-in entry, which a repo lists in the stub's `include`
+input. One exception: `workflow-repo-sync-guard` reaches every repo, because every repo's sync pull
+request merges on its own, as [Auto-merge](#auto-merge) describes. A caller reads repo-specific
+values from repo variables, which its header comment names, since the copy is otherwise verbatim.
+`workflow-bun-pr` runs [`bun-checks.yml`](../../.github/workflows/bun-checks.yml), the standard Bun
+pull-request checks.
 
 ## Skills
 
@@ -106,8 +111,30 @@ repo takes no entry with a workflow target, because the run's token then cannot 
 [`scripts/remove-retired-sync-files.sh`](../../scripts/remove-retired-sync-files.sh) reads the
 earlier manifests from this repo's history, so the workflow checks out the full history.
 
+## Auto-merge
+
+The workflow turns on GitHub's auto-merge, with a squash, for the pull request it opens or updates,
+so the pull request merges once the repo's required checks pass. Its files are text that tools
+already reviewed, so it needs no review in the repo. The workflow turns auto-merge on only when the
+pull request merges into the branch the run synced from, and the branch changes nothing but the
+targets the run copied, the retired copies it removed, and `package.json` changed only by the
+scripts that an entry's `scripts` field declares. On any other change it warns and leaves auto-merge
+off, and the pull request waits for review. Auto-merge binds to the head commit that the run
+checked. A repo whose settings disallow auto-merge gets a warning, and its sync pull requests wait
+for review. GitHub refuses auto-merge for a pull request that can merge at once, such as one in a
+repo whose rules require no check, so that pull request waits for review too.
+
+GitHub keeps auto-merge on through a later push by anyone with write access, the workflow's own
+force push included, so two steps keep an unchecked commit from merging on its own. The workflow
+turns auto-merge off before it pushes, so a run that stops before its check leaves the pull request
+waiting for review. The `workflow-repo-sync-guard` entry delivers a workflow that runs on each push
+to the sync branch and turns auto-merge off when the pusher is not the pull request's author, the
+repo-sync App. The guard races the repo's required checks: a required check that passes on the
+pushed commit before the guard runs lets GitHub merge it.
+
 ## The sync branch
 
 The sync branch is force-pushed on every run, so a commit a person adds to it is lost on the next
-run. Edit the source in tools instead. An entry that fails, through a workflow conflict or its
-build, is left out of the pull request, and the run fails after the other entries sync.
+run, and the push turns the pull request's auto-merge off. Edit the source in tools instead. An
+entry that fails, through a workflow conflict or its build, is left out of the pull request, and the
+run fails after the other entries sync.

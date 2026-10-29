@@ -70,6 +70,16 @@
     ]
   },
   {
+    "name": "workflow-repo-sync-guard",
+    "description": "The workflow that turns off auto-merge of the repo-sync pull request when anyone but its author pushes to the sync branch",
+    "files": [
+      {
+        "source": "sync/workflow-callers/repo-sync-guard.yml",
+        "target": ".github/workflows/repo-sync-guard.yml"
+      }
+    ]
+  },
+  {
     "name": "skill-testing",
     "description": "The shared testing skill and its references; a repo keeps its own rules in a project-testing skill",
     "optIn": true,

@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { parseSyncEntries } from './parse-sync-entries.ts';
 
-test('it reads each entry with its defaults for build and optIn', () => {
+test('it reads each entry with its defaults for build, optIn and scripts', () => {
   const entries = parseSyncEntries([
     {
       name: 'editorconfig',
@@ -25,6 +25,7 @@ test('it reads each entry with its defaults for build and optIn', () => {
       files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
       build: '',
       optIn: false,
+      scripts: {},
     },
     {
       name: 'hook-demo',
@@ -32,6 +33,7 @@ test('it reads each entry with its defaults for build and optIn', () => {
       files: [{ source: 'sync/run.sh', target: 'run.sh', mode: '0755', except: ['Kettle'] }],
       build: 'bun install',
       optIn: true,
+      scripts: { 'check:demo': 'true' },
     },
   ]);
 });
@@ -44,6 +46,7 @@ test('it reads what it wrote, so the sync job reads the entries the prepare job 
       files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
       build: 'true',
       optIn: false,
+      scripts: { 'check:demo': 'true' },
     },
   ]);
 
@@ -66,6 +69,17 @@ test.each([
   [
     'an entry whose optIn is no boolean',
     [{ name: 'editorconfig', description: 'The editor config', files: [], optIn: 'yes' }],
+  ],
+  [
+    'an entry whose scripts hold a value that is no string',
+    [
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [],
+        scripts: { 'check:demo': 3 },
+      },
+    ],
   ],
   [
     'a file with no target',

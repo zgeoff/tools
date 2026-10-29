@@ -8,6 +8,7 @@ export function buildMockSyncEntry(overrides: Partial<SyncEntry> = {}): SyncEntr
     files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
     build: '',
     optIn: false,
+    scripts: {},
     ...overrides,
   };
 }
