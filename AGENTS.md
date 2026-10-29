@@ -59,10 +59,12 @@ repos too, so an edit to one of them changes every repo that takes it.
   extra matchers.
 - `bun run format` fixes formatting. lefthook runs the light checks before a commit and a push, and
   CI runs the rest.
-- `bun run lint` is plain oxlint. `bun run lint:full` adds the type-aware pass and tsgolint's type
-  check, and is CI-only: never run it locally.
-- `bun run typecheck` runs `tsc` per package and over `scripts/` and `sync/`. CI runs it beside
-  `lint:full`, and when the two type checks disagree, `tsc` is right.
+- `bun run lint` is plain oxlint. `bun run lint:full` adds the type-aware pass and its type check.
+  oxlint runs both through tsrslint (`@maschwenk/tsrslint`), a Rust port of tsgolint, in tsgolint's
+  place, because stock tsgolint runs out of memory under 2 GiB on impz. `lint:full` is CI-only:
+  never run it locally.
+- `bun run typecheck` runs `tsrs` per package and over `scripts/`, `sync/` and `test-utils/`. CI
+  runs it beside `lint:full`, and when the two type checks disagree, `tsrs` is right.
 - `bun run check:sync` checks `sync/manifest.json` against the rules repo-sync assumes. Run it after
   you change the manifest or a file an entry lists. CI runs it, and the pre-push hook does not.
 - `bun run check:release-workflow` checks the tag step of the shared release job in

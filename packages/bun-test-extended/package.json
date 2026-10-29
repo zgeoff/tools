@@ -25,7 +25,6 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
-    "prepare": "bun run build",
     "typecheck": "tsrs"
   },
   "dependencies": {

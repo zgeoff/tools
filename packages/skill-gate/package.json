@@ -30,7 +30,6 @@
   "scripts": {
     "build": "rm -rf dist && bun run build:outdir dist",
     "build:outdir": "sh -c 'bun build src/index.ts --target bun --outdir \"$0\" && tsc -p tsconfig.build.json --outDir \"$0\"'",
-    "prepare": "bun run build",
     "typecheck": "tsrs"
   },
   "devDependencies": {
