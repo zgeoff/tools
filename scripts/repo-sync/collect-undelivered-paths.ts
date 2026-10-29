@@ -39,13 +39,12 @@ function isDeclaredScriptsChange(
 ): boolean {
   const before = parsePackageJSON(beforeText);
   const after = parsePackageJSON(afterText);
+  const beforeScripts = before === null ? null : findScripts(before);
+  const afterScripts = after === null ? null : findScripts(after);
 
-  if (before === null || after === null) {
+  if (before === null || after === null || beforeScripts === null || afterScripts === null) {
     return false;
   }
-
-  const beforeScripts = isRecord(before['scripts']) ? before['scripts'] : {};
-  const afterScripts = isRecord(after['scripts']) ? after['scripts'] : {};
 
   const isEachScriptDeclared = Object.entries(scripts).every(
     ([key, value]) => afterScripts[key] === value || afterScripts[key] === beforeScripts[key],
@@ -68,6 +67,14 @@ function parsePackageJSON(text: string): Record<string, unknown> | null {
   } catch {
     return null;
   }
+}
+
+function findScripts(
+  packageJSON: Readonly<Record<string, unknown>>,
+): Record<string, unknown> | null {
+  const scripts = packageJSON['scripts'] ?? {};
+
+  return isRecord(scripts) ? scripts : null;
 }
 
 function buildWithoutScripts(

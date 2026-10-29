@@ -81,6 +81,7 @@ test.each([
     'a field outside the scripts',
     JSON.stringify({ name: 'app', dependencies: { 'left-pad': '1.3.0' } }),
   ],
+  ['a scripts field that is no object', JSON.stringify({ name: 'app', scripts: 'broken' })],
   ['text that is no JSON', '{ "name": "app",'],
 ])('it returns package.json when the change holds %s', (_label, after) => {
   const undelivered = collectUndeliveredPaths({

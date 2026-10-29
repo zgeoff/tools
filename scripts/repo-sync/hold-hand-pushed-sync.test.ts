@@ -90,8 +90,8 @@ test('it holds nothing when the branch has no open pull request', async () => {
   ]);
 });
 
-test('it fails on a pull request with no author', async () => {
+test('it fails on a pull request with no author', () => {
   const promise = setupTest([{ number: 7, auto_merge: null }]);
 
-  await expect(promise).rejects.toThrow('gh api returned a pull request with no number or author');
+  expect(promise).rejects.toThrow('gh api returned a pull request with no number or author');
 });
