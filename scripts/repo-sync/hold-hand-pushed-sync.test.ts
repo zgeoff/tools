@@ -52,7 +52,7 @@ test('it turns auto-merge off when someone other than the author pushes', async 
   expect(exitCode).toBe(0);
 
   expect(calls).toBe(
-    'gh api repos/example/app/pulls?state=open&head=example:repo-sync/zgeoff-tools\n' +
+    'gh api -X GET repos/example/app/pulls -f state=open -f head=example:repo-sync/zgeoff-tools\n' +
       'gh pr merge 7 --disable-auto --repo example/app\n',
   );
 
@@ -85,7 +85,7 @@ test('it leaves auto-merge on when the author pushes', async () => {
   expect(exitCode).toBe(0);
 
   expect(calls).toBe(
-    'gh api repos/example/app/pulls?state=open&head=example:repo-sync/zgeoff-tools\n',
+    'gh api -X GET repos/example/app/pulls -f state=open -f head=example:repo-sync/zgeoff-tools\n',
   );
 
   expect(ctx.output).toStrictEqual(['octo-dev opened pull request #7; nothing to hold.\n']);
@@ -104,4 +104,30 @@ test('it fails on a pull request with no author', async () => {
   });
 
   expect(holding).rejects.toThrow('gh api returned a pull request with no number or author');
+});
+
+test('it builds a pull request lookup that gh runs outside a git checkout', async () => {
+  const ctx = await setupTest();
+
+  // gh fills a path placeholder from the git checkout it runs in, and the guard's job has none. The
+  // ceiling hides this repo from git, and the closed port stops gh after it builds the request.
+  const holding = holdHandPushedSync({
+    cwd: ctx.directory,
+    env: {
+      PATH: process.env['PATH'],
+      HOME: ctx.directory,
+      GIT_CEILING_DIRECTORIES: import.meta.dir,
+      GH_HOST: '127.0.0.1:9',
+      GH_ENTERPRISE_TOKEN: 'test-token',
+      REPO: 'example/app',
+      BRANCH: 'repo-sync/zgeoff-tools',
+      PUSHER: 'octo-dev',
+    },
+    runCommand,
+    writeOutput: ctx.writeOutput,
+  });
+
+  expect(holding).rejects.toThrow(
+    'Get "https://127.0.0.1:9/api/v3/repos/example/app/pulls?head=example%3Arepo-sync%2Fzgeoff-tools&state=open"',
+  );
 });
