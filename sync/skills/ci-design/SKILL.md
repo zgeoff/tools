@@ -41,7 +41,8 @@ Each line links the section that explains it.
 - [Checkout depth](#checkout-depth): depth 1 for a job that never reads history, a blobless full
   clone for one that does.
 - [No rebase churn](#no-rebase-churn): rebase a bot's pull request only on a conflict, and filter a
-  `workflow_run` trigger to the branch its job acts on.
+  `workflow_run` trigger to the branch its job acts on, with a guard on the run's event and
+  repository where the job holds a secret.
 
 ## Loading the skill
 
@@ -316,4 +317,15 @@ every open pull request.
 
 A `workflow_run` trigger starts on every completed run of the named workflows, on every branch. A
 job that acts on one branch, such as an audit of the default branch, filters the trigger with
-`branches:` to that branch, so a pull-request run starts nothing.
+`branches:` to that branch, so a run on another branch starts nothing.
+
+The `branches:` filter matches the head branch's name alone, so the run of a fork's pull request
+from a branch named `main` passes `branches: [main]`. A job that holds a secret or writes to the
+repo also checks, in its `if:`, that the triggering run came from an event a fork cannot start and
+from the repo itself:
+
+```yaml
+if: >-
+  contains(fromJSON('["push","schedule"]'), github.event.workflow_run.event) &&
+  github.event.workflow_run.head_repository.full_name == github.repository
+```
