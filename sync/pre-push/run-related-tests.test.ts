@@ -16,33 +16,36 @@ async function setupTest() {
 }
 
 test('#resolveRelatedTests selects a test file that the probe finds', () => {
-  const sources = {
-    cwd: '/repo',
-    readConfigText: () => null,
-    probeFile: (path: string) => Object.hasOwn({ '/repo/src/a.test.ts': true }, path),
-  };
+  const probeFile = mock(() => true);
 
-  expect(resolveRelatedTests(['src/a.test.ts'], sources)).toStrictEqual(['src/a.test.ts']);
+  expect(
+    resolveRelatedTests(['src/a.test.ts'], { cwd: '/repo', readConfigText: () => null, probeFile }),
+  ).toStrictEqual(['src/a.test.ts']);
+
+  expect(probeFile).toHaveBeenCalledTimes(1);
+  expect(probeFile).toHaveBeenCalledWith('/repo/src/a.test.ts');
 });
 
 test('#resolveRelatedTests selects the sibling test of a source file', () => {
-  const sources = {
-    cwd: '/repo',
-    readConfigText: () => null,
-    probeFile: (path: string) => Object.hasOwn({ '/repo/src/a.test.ts': true }, path),
-  };
+  const probeFile = mock(() => true);
 
-  expect(resolveRelatedTests(['src/a.ts'], sources)).toStrictEqual(['src/a.test.ts']);
+  expect(
+    resolveRelatedTests(['src/a.ts'], { cwd: '/repo', readConfigText: () => null, probeFile }),
+  ).toStrictEqual(['src/a.test.ts']);
+
+  expect(probeFile).toHaveBeenCalledTimes(1);
+  expect(probeFile).toHaveBeenCalledWith('/repo/src/a.test.ts');
 });
 
 test('#resolveRelatedTests selects the sibling test of a TSX component', () => {
-  const sources = {
-    cwd: '/repo',
-    readConfigText: () => null,
-    probeFile: (path: string) => Object.hasOwn({ '/repo/src/view.test.tsx': true }, path),
-  };
+  const probeFile = mock(() => true);
 
-  expect(resolveRelatedTests(['src/view.tsx'], sources)).toStrictEqual(['src/view.test.tsx']);
+  expect(
+    resolveRelatedTests(['src/view.tsx'], { cwd: '/repo', readConfigText: () => null, probeFile }),
+  ).toStrictEqual(['src/view.test.tsx']);
+
+  expect(probeFile).toHaveBeenCalledTimes(1);
+  expect(probeFile).toHaveBeenCalledWith('/repo/src/view.test.tsx');
 });
 
 test('#resolveRelatedTests skips a source file with no sibling test and a deleted test file', () => {
@@ -64,16 +67,20 @@ test('#resolveRelatedTests skips files that are not TypeScript', () => {
 });
 
 test('#resolveRelatedTests keeps the order of the paths and drops duplicates', () => {
-  const sources = {
-    cwd: '/repo',
-    readConfigText: () => null,
-    probeFile: (path: string) =>
-      Object.hasOwn({ '/repo/src/b.test.ts': true, '/repo/src/a.test.ts': true }, path),
-  };
+  const probeFile = mock(() => true);
 
   expect(
-    resolveRelatedTests(['src/b.ts', 'src/a.test.ts', 'src/b.test.ts'], sources),
+    resolveRelatedTests(['src/b.ts', 'src/a.test.ts', 'src/b.test.ts'], {
+      cwd: '/repo',
+      readConfigText: () => null,
+      probeFile,
+    }),
   ).toStrictEqual(['src/b.test.ts', 'src/a.test.ts']);
+
+  expect(probeFile).toHaveBeenCalledTimes(3);
+  expect(probeFile).toHaveBeenNthCalledWith(1, '/repo/src/b.test.ts');
+  expect(probeFile).toHaveBeenNthCalledWith(2, '/repo/src/a.test.ts');
+  expect(probeFile).toHaveBeenNthCalledWith(3, '/repo/src/b.test.ts');
 });
 
 test('#runRelatedTests exits 0 and says so when no path has a related test', async () => {
