@@ -14,6 +14,7 @@ import { parseSyncEntries } from './parse-sync-entries.ts';
 import type { RetiredFileRemoval, SyncedEntry } from './plan-retired-file-removal.ts';
 import { planRetiredFileRemoval, retiredFilesName } from './plan-retired-file-removal.ts';
 import { selectSyncFiles } from './select-sync-files.ts';
+import { writeSyncAutoMerge } from './write-sync-auto-merge.ts';
 
 export interface SyncEntriesOptions {
   readonly cwd: string;
@@ -79,10 +80,17 @@ export async function syncEntries(options: Readonly<SyncEntriesOptions>): Promis
   };
 
   const committed = await commitEntries(context);
+
+  if (committed.synced.length > 0) {
+    await removeAutoMerge(context);
+  }
+
   const pushed = await pushSyncBranch(context, committed);
 
   if (pushed) {
-    await writePullRequest(context, committed.synced);
+    const number = await writePullRequest(context, committed.synced);
+
+    await writeSyncAutoMerge(context, { ...committed, number });
   }
 
   await removeEntryBranches(context, pushed, committed.failed);
@@ -146,6 +154,15 @@ function buildPin(toolsRef: string, workflowRef: string): string {
 interface CommittedEntries {
   readonly synced: readonly SyncedEntry[];
   readonly failed: readonly string[];
+
+  // The commit the sync branch starts from.
+  readonly start: string;
+
+  // The targets the run copied and the retired copies it removed.
+  readonly delivered: readonly string[];
+
+  // Each package.json script that a build of the run writes, with the value it writes.
+  readonly scripts: Readonly<Record<string, string>>;
 }
 
 async function commitEntries(context: SyncContext): Promise<CommittedEntries> {
@@ -153,6 +170,7 @@ async function commitEntries(context: SyncContext): Promise<CommittedEntries> {
   const failed: string[] = [];
   const taken: string[] = [];
   const copied: string[] = [];
+  const scripts: Record<string, string> = {};
 
   // The checkout of this repository stays out of every commit.
   await context.fileSystem.appendText(join(context.cwd, '.git/info/exclude'), '/.repo-sync/\n');
@@ -166,6 +184,10 @@ async function commitEntries(context: SyncContext): Promise<CommittedEntries> {
 
   await runSyncCommand(context, ['git', 'config', 'user.name', 'github-actions[bot]']);
   await runSyncCommand(context, ['git', 'checkout', '-q', '-B', context.branch]);
+
+  const startHead = await runSyncCommand(context, ['git', 'rev-parse', 'HEAD']);
+
+  const start = startHead.stdout.trim();
 
   for (const entry of context.entries) {
     const written = await writeEntry(context, entry);
@@ -182,6 +204,7 @@ async function commitEntries(context: SyncContext): Promise<CommittedEntries> {
 
     taken.push(entry.name);
     copied.push(...written);
+    Object.assign(scripts, entry.scripts);
 
     await runSyncCommand(context, ['git', 'add', '-A']);
 
@@ -206,8 +229,14 @@ async function commitEntries(context: SyncContext): Promise<CommittedEntries> {
   const retired = await removeRetiredFiles(context, taken, copied);
 
   return retired.kind === 'failed'
-    ? { synced, failed: [...failed, retiredFilesName] }
-    : { synced: [...synced, ...retired.synced], failed };
+    ? { synced, failed: [...failed, retiredFilesName], start, delivered: copied, scripts }
+    : {
+        synced: [...synced, ...retired.synced],
+        failed,
+        start,
+        delivered: [...copied, ...retired.paths],
+        scripts,
+      };
 }
 
 function runSyncCommand(context: SyncContext, argv: readonly string[]): Promise<CommandResult> {
@@ -349,7 +378,11 @@ function runProbeCommand(context: SyncContext, argv: readonly string[]): Promise
 }
 
 type RetiredFiles =
-  | { readonly kind: 'removed'; readonly synced: readonly SyncedEntry[] }
+  | {
+      readonly kind: 'removed';
+      readonly synced: readonly SyncedEntry[];
+      readonly paths: readonly string[];
+    }
   | { readonly kind: 'failed' };
 
 // A tools ref from before the retired-file cleanup holds no script for it.
@@ -365,7 +398,7 @@ async function removeRetiredFiles(
   if (!hasScript) {
     context.writeOutput('The tools ref has no retired-file cleanup; nothing to remove.\n');
 
-    return { kind: 'removed', synced: [] };
+    return { kind: 'removed', synced: [], paths: [] };
   }
 
   const takenList = taken.map((name) => `${name},`).join('');
@@ -428,7 +461,7 @@ const retiredFileRemovalAppliers: {
       ]);
     }
 
-    return { kind: 'removed', synced: removal.synced };
+    return { kind: 'removed', synced: removal.synced, paths: removal.paths };
   },
 };
 
@@ -439,6 +472,29 @@ function applyRetiredFileRemoval<Kind extends RetiredFileRemoval['kind']>(
   const apply: RetiredFileRemovalApplier<Kind> = retiredFileRemovalAppliers[removal.kind];
 
   return apply(removal, context);
+}
+
+// GitHub keeps auto-merge on through a push by a user with write access, the sync's own force push
+// included, and checks --match-head-commit only when auto-merge turns on. Auto-merge goes off before
+// the push, so a run that stops before it checks the new head leaves the pull request to review.
+async function removeAutoMerge(context: SyncContext): Promise<void> {
+  const listed = await runSyncCommand(context, [
+    'gh',
+    'pr',
+    'list',
+    '--head',
+    context.branch,
+    '--state',
+    'open',
+    '--json',
+    'number,autoMergeRequest',
+    '--jq',
+    '.[] | select(.autoMergeRequest != null) | .number',
+  ]);
+
+  for (const number of listed.stdout.split('\n').filter((line) => line !== '')) {
+    await runSyncCommand(context, ['gh', 'pr', 'merge', number, '--disable-auto']);
+  }
 }
 
 // GitHub closes the pull request of a deleted branch.
@@ -477,7 +533,7 @@ async function probeRemoteBranch(context: SyncContext, branch: string): Promise<
 async function writePullRequest(
   context: SyncContext,
   synced: readonly SyncedEntry[],
-): Promise<void> {
+): Promise<string> {
   const title = `chore: sync zgeoff/tools ${context.pin}`;
   const body = renderPullRequestBody(context.pin, synced);
 
@@ -502,7 +558,7 @@ async function writePullRequest(
 
     context.writeOutput(`Updated pull request #${number} for ${context.branch}.\n`);
 
-    return;
+    return number;
   }
 
   const created = await runSyncCommand(context, [
@@ -520,6 +576,11 @@ async function writePullRequest(
   ]);
 
   context.writeOutput(created.stdout);
+
+  // gh prints the new pull request's URL, which ends in its number.
+  const url = created.stdout.trim();
+
+  return url.slice(url.lastIndexOf('/') + 1);
 }
 
 function renderPullRequestBody(pin: string, synced: readonly SyncedEntry[]): string {

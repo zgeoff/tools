@@ -11,8 +11,8 @@ holds and how a run delivers, updates and retires the files.
 - [`manifest.json`](./manifest.json) — the entries, which `scripts/check-sync-manifest.sh` checks in
   CI.
 - [`repo-sync.yml`](./repo-sync.yml) — the stub that calls the repo-sync workflow at a sync tag.
-- [`workflow-callers/`](./workflow-callers/) — opt-in workflows that each call a reusable workflow
-  in this repo.
+- [`workflow-callers/`](./workflow-callers/) — workflows that each call a reusable workflow in this
+  repo, all opt-in but the repo-sync guard.
 - [`skills/`](./skills/) — the shared base of each Claude skill, with its scripts' tests.
 - [`hooks/`](./hooks/) — Claude Code hooks, such as the skill gate's entry point, with their tests.
 - [`pre-push/`](./pre-push/) — the [pre-push baseline](../docs/architecture/pre-push-baseline.md)

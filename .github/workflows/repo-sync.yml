@@ -21,6 +21,11 @@
 # GITHUB_TOKEN starts no workflow run. This repository is public, so reading
 # it needs no token.
 #
+# The job turns on auto-merge of the pull request, bound to the head it pushed,
+# when every file the branch changes is one the run delivered. It turns
+# auto-merge off before each push, and the repo-sync guard that the manifest
+# delivers turns it off after a push by anyone else.
+#
 # A manifest entry marked `"optIn": true` reaches a caller only when the caller
 # lists its name in the `include` input. `include` fails the run on a name that
 # is not an opt-in entry, because listing it has no effect. `skip` leaves out

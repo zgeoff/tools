@@ -22,6 +22,9 @@ export type RetiredFileRemoval =
       // The removed workflows go back, because the token cannot push their removal.
       readonly restoresWorkflows: boolean;
 
+      // The paths the removal commit deletes.
+      readonly paths: readonly string[];
+
       // Empty when nothing is left to commit.
       readonly synced: readonly SyncedEntry[];
     };
@@ -37,18 +40,19 @@ export function planRetiredFileRemoval(facts: Readonly<RetiredFileFacts>): Retir
 
   const removed = facts.removedText.split('\n').filter((path) => path !== '');
   const kept = facts.workflows ? removed : removed.filter((path) => !isWorkflowPath(path));
-  const paths = kept.map((path) => `\`${path}\``).join(', ');
+  const pathList = kept.map((path) => `\`${path}\``).join(', ');
 
   return {
     kind: 'removed',
     restoresWorkflows: kept.length < removed.length,
+    paths: kept,
     synced:
       kept.length === 0
         ? []
         : [
             {
               name: retiredFilesName,
-              description: `The copies of files zgeoff/tools no longer syncs: ${paths}`,
+              description: `The copies of files zgeoff/tools no longer syncs: ${pathList}`,
             },
           ],
   };

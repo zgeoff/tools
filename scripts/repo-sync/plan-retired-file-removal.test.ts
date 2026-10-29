@@ -14,6 +14,7 @@ test.each([
     {
       kind: 'removed',
       restoresWorkflows: false,
+      paths: ['a.md', '.github/workflows/old.yml'],
       synced: [
         {
           name: 'retired-files',
@@ -29,6 +30,7 @@ test.each([
     {
       kind: 'removed',
       restoresWorkflows: true,
+      paths: ['a.md'],
       synced: [
         {
           name: 'retired-files',
@@ -40,12 +42,12 @@ test.each([
   [
     'restores a removed workflow and commits nothing when it was the only removed path',
     { exitCode: 0, removedText: '.github/workflows/old.yml\n', workflows: false },
-    { kind: 'removed', restoresWorkflows: true, synced: [] },
+    { kind: 'removed', restoresWorkflows: true, paths: [], synced: [] },
   ],
   [
     'commits nothing when the script removed nothing',
     { exitCode: 0, removedText: '', workflows: true },
-    { kind: 'removed', restoresWorkflows: false, synced: [] },
+    { kind: 'removed', restoresWorkflows: false, paths: [], synced: [] },
   ],
 ])('it %s', (_label, facts, expected) => {
   const removal: unknown = planRetiredFileRemoval(facts);

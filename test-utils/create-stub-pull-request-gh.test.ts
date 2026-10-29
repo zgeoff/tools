@@ -126,6 +126,47 @@ test.each([
   expect(result.exitCode).toBe(64);
 
   expect(result.stderr.toString()).toBe(
-    'stub gh: supports only: gh pr list|create|edit, as run-stub-pull-request-gh.ts lists\n',
+    'stub gh: supports only: gh pr list|create|edit|merge, as run-stub-pull-request-gh.ts lists\n',
   );
+});
+
+test('it turns auto-merge on for a head and lists it, then turns it off', async () => {
+  const ctx = await setupTest();
+
+  await $`${ctx.gh} pr create --base main --head sync --title one --body one`.quiet();
+  await $`${ctx.gh} pr merge 1 --auto --squash --match-head-commit abc123`.quiet();
+
+  const armedText = await readFile(ctx.state, 'utf8');
+
+  const armed: unknown = JSON.parse(armedText);
+
+  const listed =
+    await $`${ctx.gh} pr list --head sync --state open --json number,autoMergeRequest --jq ${String.raw`.[0] | "\(.number) \(.autoMergeRequest != null)"`}`.text();
+
+  await $`${ctx.gh} pr merge 1 --disable-auto`.quiet();
+
+  const disarmedText = await readFile(ctx.state, 'utf8');
+
+  const disarmed: unknown = JSON.parse(disarmedText);
+
+  expect(armed).toStrictEqual([
+    expect.objectContaining({ number: 1, autoMerge: { method: 'squash', head: 'abc123' } }),
+  ]);
+
+  expect(listed).toBe('1 true\n');
+  expect(disarmed).toStrictEqual([expect.not.objectContaining({ autoMerge: expect.anything() })]);
+});
+
+test('it refuses auto-merge with the text the refusal variable holds', async () => {
+  const ctx = await setupTest();
+
+  await $`${ctx.gh} pr create --base main --head sync --title one --body one`.quiet();
+
+  const result = await $`${ctx.gh} pr merge 1 --auto --squash --match-head-commit abc123`
+    .env({ ...process.env, STUB_GH_AUTO_MERGE_REFUSAL: 'Auto merge is not allowed' })
+    .nothrow()
+    .quiet();
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toBe('Auto merge is not allowed\n');
 });

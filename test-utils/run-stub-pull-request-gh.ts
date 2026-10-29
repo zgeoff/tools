@@ -9,6 +9,9 @@ interface StubPullRequest {
   readonly title: string;
   readonly body: string;
   readonly state: 'open';
+
+  // Set while auto-merge is on, with the head commit it was turned on for.
+  readonly autoMerge?: { readonly method: 'squash'; readonly head: string };
 }
 
 const [statePath = '', ...commandLine] = process.argv.slice(2);
@@ -33,13 +36,23 @@ if (group !== 'pr') {
 }
 
 if (command === 'list' && rest.length === 0 && flagNames === 'head jq json state') {
-  if (flags.state !== 'open' || flags.json !== 'number') {
+  if (
+    flags.state !== 'open' ||
+    (flags.json !== 'number' && flags.json !== 'number,autoMergeRequest')
+  ) {
     exitWithUsage();
   }
 
   const open = pulls
     .filter((pull) => pull.head === flags.head)
-    .map((pull) => ({ number: pull.number }));
+    .map((pull) =>
+      flags.json === 'number'
+        ? { number: pull.number }
+        : {
+            number: pull.number,
+            autoMergeRequest: pull.autoMerge === undefined ? null : { mergeMethod: 'SQUASH' },
+          },
+    );
 
   const listed = await $`jq -r ${flags.jq ?? ''} < ${Response.json(open)}`.text();
 
@@ -82,6 +95,39 @@ if (command === 'list' && rest.length === 0 && flagNames === 'head jq json state
   await writeFile(statePath, `${JSON.stringify(pulls, null, 2)}\n`);
 
   process.stdout.write(`https://github.com/example/repo/pull/${number}\n`);
+} else if (
+  command === 'merge' &&
+  rest.length === 1 &&
+  (flagNames === 'auto match-head-commit squash' || flagNames === 'disable-auto')
+) {
+  const number = Number(rest[0]);
+  const index = pulls.findIndex((pull) => pull.number === number);
+  const pull = pulls[index];
+
+  if (pull === undefined) {
+    process.stderr.write(`no open pull request #${rest[0]}\n`);
+    process.exit(1);
+  }
+
+  // A test sets this to stand for a repo that refuses auto-merge.
+  const refusal = process.env['STUB_GH_AUTO_MERGE_REFUSAL'] ?? '';
+
+  if (flags.auto === true && refusal !== '') {
+    process.stderr.write(`${refusal}\n`);
+    process.exit(1);
+  }
+
+  const { autoMerge: _autoMerge, ...withoutAutoMerge } = pull;
+
+  pulls[index] =
+    flags.auto === true
+      ? {
+          ...withoutAutoMerge,
+          autoMerge: { method: 'squash', head: flags['match-head-commit'] ?? '' },
+        }
+      : withoutAutoMerge;
+
+  await writeFile(statePath, `${JSON.stringify(pulls, null, 2)}\n`);
 } else {
   exitWithUsage();
 }
@@ -93,11 +139,15 @@ function parseCommandLine(args: string[]) {
       allowPositionals: true,
       strict: true,
       options: {
+        auto: { type: 'boolean' },
         base: { type: 'string' },
         body: { type: 'string' },
+        'disable-auto': { type: 'boolean' },
         head: { type: 'string' },
         jq: { type: 'string' },
         json: { type: 'string' },
+        'match-head-commit': { type: 'string' },
+        squash: { type: 'boolean' },
         state: { type: 'string' },
         title: { type: 'string' },
       },
@@ -126,13 +176,25 @@ function isStubPullRequest(value: unknown): value is StubPullRequest {
     'body' in value &&
     typeof value.body === 'string' &&
     'state' in value &&
-    value.state === 'open'
+    value.state === 'open' &&
+    (!('autoMerge' in value) || isStubAutoMerge(value.autoMerge))
+  );
+}
+
+function isStubAutoMerge(value: unknown): value is StubPullRequest['autoMerge'] {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'method' in value &&
+    value.method === 'squash' &&
+    'head' in value &&
+    typeof value.head === 'string'
   );
 }
 
 function exitWithUsage(): never {
   process.stderr.write(
-    'stub gh: supports only: gh pr list|create|edit, as run-stub-pull-request-gh.ts lists\n',
+    'stub gh: supports only: gh pr list|create|edit|merge, as run-stub-pull-request-gh.ts lists\n',
   );
 
   process.exit(64);

@@ -11,7 +11,8 @@ downstream repo then moves to. Run these steps from a tools checkout:
    git push origin sync-v2
    ```
 
-2. Between sweeps, move each downstream repo to the tag in a pull request.
+2. Renovate moves each downstream repo to the tag in a pull request that merges on green checks, and
+   the merge starts the repo's sync run. To move a repo by hand instead,
    [`scripts/pin-tools-ref.sh`](../../scripts/pin-tools-ref.sh) rewrites every call to a workflow in
    tools in the repo's `.github/workflows/`, and prints each file it changed:
 

@@ -1,0 +1,56 @@
+# Reusable workflow: turns off auto-merge of the repo-sync pull request when
+# anyone but the pull request's author pushes to its branch. The repo-sync
+# workflow turns auto-merge on, bound to the head it pushed, only when the
+# branch changes nothing the manifest does not deliver. GitHub keeps auto-merge
+# on through a later push by a user with write access, so a hand-pushed commit
+# would otherwise merge on green with no review.
+#
+# Callers install sync/workflow-callers/repo-sync-guard.yml, which runs on each
+# push to the sync branch.
+name: Repo sync guard (reusable)
+
+on:
+  workflow_call:
+
+jobs:
+  hold:
+    name: Hold a hand-pushed sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Turning auto-merge off needs both write permissions.
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # The step scripts download from the commit of this workflow. actionlint
+      # does not know job.workflow_repository or job.workflow_sha, so the step
+      # reads them through toJSON.
+      - name: Download the step script downloader
+        env: &tools-url
+          TOOLS_URL:
+            https://raw.githubusercontent.com/${{ fromJSON(toJSON(job)).workflow_repository }}/${{
+            fromJSON(toJSON(job)).workflow_sha }}
+        run:
+          curl -fsSL --retry 3 --retry-all-errors --create-dirs -o "$RUNNER_TEMP/tools/.bun-version"
+          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/ci/download-step-scripts.ts"
+
+      # No cache: a job that holds a write token must not run a Bun binary
+      # that another run's cache entry could have replaced.
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: ${{ runner.temp }}/tools/.bun-version
+          no-cache: true
+
+      - name: Download the guard script
+        env: *tools-url
+        run: bun "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts" repo-sync-guard
+
+      - name: Turn off auto-merge after a hand push
+        env:
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          PUSHER: ${{ github.event.sender.login }}
+          GH_TOKEN: ${{ github.token }}
+        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/hold-hand-pushed-sync.ts"

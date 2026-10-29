@@ -22,6 +22,7 @@ export const stepScriptSets = {
   ],
   'paths-changed': ['scripts/paths-changed/run-changed-files-step.ts'],
   'repo-sync': ['scripts/repo-sync/write-sync-entries.ts', 'scripts/repo-sync/sync-entries.ts'],
+  'repo-sync-guard': ['scripts/repo-sync/hold-hand-pushed-sync.ts'],
   'audit-fix': [
     'scripts/audit-fix/fix-advisories.ts',
     'scripts/audit-fix/commit-audit-fix.ts',
