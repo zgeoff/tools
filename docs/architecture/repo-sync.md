@@ -120,7 +120,9 @@ branch changes nothing but the targets the run copied, the retired copies it rem
 `package.json` changed only by the scripts that an entry's `scripts` field declares. On any other
 change it warns and leaves auto-merge off, and the pull request waits for review. Auto-merge binds
 to the head commit that the run checked. A repo whose settings disallow auto-merge gets a warning,
-and its sync pull requests wait for review.
+and its sync pull requests wait for review. GitHub refuses auto-merge for a pull request that can
+merge at once, such as one in a repo whose rules require no check, so that pull request waits for
+review too.
 
 GitHub keeps auto-merge on through a later push by anyone with write access, the workflow's own
 force push included, so two steps keep an unchecked commit from merging on its own. The workflow

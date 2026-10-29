@@ -23,6 +23,9 @@ export interface SyncAutoMergeRequest {
   readonly scripts: Readonly<Record<string, string>>;
 }
 
+const enableAutoMergeMutation =
+  'mutation($pullRequestID: ID!, $head: GitObjectID!) { enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestID, mergeMethod: SQUASH, expectedHeadOid: $head }) { clientMutationId } }';
+
 export async function writeSyncAutoMerge(
   context: SyncCommandContext,
   request: SyncAutoMergeRequest,
@@ -60,15 +63,29 @@ export async function writeSyncAutoMerge(
     return;
   }
 
-  const armed = await runProbe(context, [
+  const pullRequestID = await runChecked(context, [
     'gh',
     'pr',
-    'merge',
+    'view',
     request.number,
-    '--auto',
-    '--squash',
-    '--match-head-commit',
-    head.stdout.trim(),
+    '--json',
+    'id',
+    '--jq',
+    '.id',
+  ]);
+
+  // gh pr merge --auto merges a pull request that can merge at once, before any check runs. The
+  // mutation refuses one instead, so such a pull request waits for review.
+  const armed = await runProbe(context, [
+    'gh',
+    'api',
+    'graphql',
+    '-f',
+    `query=${enableAutoMergeMutation}`,
+    '-f',
+    `pullRequestID=${pullRequestID.stdout.trim()}`,
+    '-f',
+    `head=${head.stdout.trim()}`,
   ]);
 
   if (armed.exitCode !== 0) {

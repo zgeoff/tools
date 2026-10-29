@@ -126,7 +126,7 @@ test.each([
   expect(result.exitCode).toBe(64);
 
   expect(result.stderr.toString()).toBe(
-    'stub gh: supports only: gh pr list|create|edit|merge, as run-stub-pull-request-gh.ts lists\n',
+    'stub gh: supports only: gh pr list|create|edit|view|merge and gh api graphql, as run-stub-pull-request-gh.ts lists\n',
   );
 });
 
@@ -134,7 +134,10 @@ test('it turns auto-merge on for a head and lists it, then turns it off', async 
   const ctx = await setupTest();
 
   await $`${ctx.gh} pr create --base main --head sync --title one --body one`.quiet();
-  await $`${ctx.gh} pr merge 1 --auto --squash --match-head-commit abc123`.quiet();
+
+  const pullRequestID = await $`${ctx.gh} pr view 1 --json id --jq .id`.text();
+
+  await $`${ctx.gh} api graphql -f ${'query=mutation { enablePullRequestAutoMerge }'} -f ${`pullRequestID=${pullRequestID.trim()}`} -f head=abc123`.quiet();
 
   const armedText = await readFile(ctx.state, 'utf8');
 
@@ -149,6 +152,8 @@ test('it turns auto-merge on for a head and lists it, then turns it off', async 
 
   const disarmed: unknown = JSON.parse(disarmedText);
 
+  expect(pullRequestID).toBe('PR_1\n');
+
   expect(armed).toStrictEqual([
     expect.objectContaining({ number: 1, autoMerge: { method: 'squash', head: 'abc123' } }),
   ]);
@@ -162,11 +167,12 @@ test('it refuses auto-merge with the text the refusal variable holds', async () 
 
   await $`${ctx.gh} pr create --base main --head sync --title one --body one`.quiet();
 
-  const result = await $`${ctx.gh} pr merge 1 --auto --squash --match-head-commit abc123`
-    .env({ ...process.env, STUB_GH_AUTO_MERGE_REFUSAL: 'Auto merge is not allowed' })
-    .nothrow()
-    .quiet();
+  const result =
+    await $`${ctx.gh} api graphql -f ${'query=mutation { enablePullRequestAutoMerge }'} -f pullRequestID=PR_1 -f head=abc123`
+      .env({ ...process.env, STUB_GH_AUTO_MERGE_REFUSAL: 'Pull request is in clean status' })
+      .nothrow()
+      .quiet();
 
   expect(result.exitCode).toBe(1);
-  expect(result.stderr.toString()).toBe('Auto merge is not allowed\n');
+  expect(result.stderr.toString()).toBe('Pull request is in clean status\n');
 });
