@@ -122,7 +122,7 @@ async function runCLI(): Promise<void> {
     const ranges = readPushedRanges({
       cwd,
       env: process.env,
-      pushedRefs: await readPushedRefsInput(process.argv.slice(2)),
+      pushedRefs: await readPushedRefsInput(process.argv.slice(2), () => Bun.stdin.text()),
       runProgram,
     });
 
