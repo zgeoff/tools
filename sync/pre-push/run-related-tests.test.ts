@@ -1,4 +1,4 @@
-import { expect, onTestFinished, test } from 'bun:test';
+import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,76 +15,72 @@ async function setupTest() {
   return { directory };
 }
 
-test('#resolveRelatedTests selects a test file that exists', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(join(ctx.directory, 'src/a.test.ts'), '');
-
-  expect(resolveRelatedTests(['src/a.test.ts'], ctx.directory, () => null)).toStrictEqual([
-    'src/a.test.ts',
-  ]);
-});
-
-test('#resolveRelatedTests selects the sibling test of a source file', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(join(ctx.directory, 'src/a.ts'), '');
-  await writeFile(join(ctx.directory, 'src/a.test.ts'), '');
-
-  expect(resolveRelatedTests(['src/a.ts'], ctx.directory, () => null)).toStrictEqual([
-    'src/a.test.ts',
-  ]);
-});
-
-test('#resolveRelatedTests selects the sibling test of a TSX component', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(join(ctx.directory, 'src/view.tsx'), '');
-  await writeFile(join(ctx.directory, 'src/view.test.tsx'), '');
-
-  expect(resolveRelatedTests(['src/view.tsx'], ctx.directory, () => null)).toStrictEqual([
-    'src/view.test.tsx',
-  ]);
-});
-
-test('#resolveRelatedTests skips a source file with no sibling test and a deleted test file', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(join(ctx.directory, 'src/a.ts'), '');
+test('#resolveRelatedTests selects a test file that the probe finds', () => {
+  const probeFile = mock(() => true);
 
   expect(
-    resolveRelatedTests(['src/a.ts', 'src/gone.test.ts'], ctx.directory, () => null),
-  ).toBeEmpty();
+    resolveRelatedTests(['src/a.test.ts'], { cwd: '/repo', readConfigText: () => null, probeFile }),
+  ).toStrictEqual(['src/a.test.ts']);
+
+  expect(probeFile).toHaveBeenCalledTimes(1);
+  expect(probeFile).toHaveBeenCalledWith('/repo/src/a.test.ts');
 });
 
-test('#resolveRelatedTests skips a declaration file even when a test sits beside it', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(join(ctx.directory, 'src/types.d.ts'), '');
-  await writeFile(join(ctx.directory, 'src/types.d.test.ts'), '');
-
-  expect(resolveRelatedTests(['src/types.d.ts'], ctx.directory, () => null)).toBeEmpty();
-});
-
-test('#resolveRelatedTests skips files that are not TypeScript', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(join(ctx.directory, 'src/a.md'), '');
-  await writeFile(join(ctx.directory, 'src/a.test.ts'), '');
-
-  expect(resolveRelatedTests(['src/a.md', 'README.md'], ctx.directory, () => null)).toBeEmpty();
-});
-
-test('#resolveRelatedTests keeps the order of the paths and drops duplicates', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(join(ctx.directory, 'src/b.ts'), '');
-  await writeFile(join(ctx.directory, 'src/b.test.ts'), '');
-  await writeFile(join(ctx.directory, 'src/a.test.ts'), '');
+test('#resolveRelatedTests selects the sibling test of a source file', () => {
+  const probeFile = mock(() => true);
 
   expect(
-    resolveRelatedTests(['src/b.ts', 'src/a.test.ts', 'src/b.test.ts'], ctx.directory, () => null),
+    resolveRelatedTests(['src/a.ts'], { cwd: '/repo', readConfigText: () => null, probeFile }),
+  ).toStrictEqual(['src/a.test.ts']);
+
+  expect(probeFile).toHaveBeenCalledTimes(1);
+  expect(probeFile).toHaveBeenCalledWith('/repo/src/a.test.ts');
+});
+
+test('#resolveRelatedTests selects the sibling test of a TSX component', () => {
+  const probeFile = mock(() => true);
+
+  expect(
+    resolveRelatedTests(['src/view.tsx'], { cwd: '/repo', readConfigText: () => null, probeFile }),
+  ).toStrictEqual(['src/view.test.tsx']);
+
+  expect(probeFile).toHaveBeenCalledTimes(1);
+  expect(probeFile).toHaveBeenCalledWith('/repo/src/view.test.tsx');
+});
+
+test('#resolveRelatedTests skips a source file with no sibling test and a deleted test file', () => {
+  const sources = { cwd: '/repo', readConfigText: () => null, probeFile: () => false };
+
+  expect(resolveRelatedTests(['src/a.ts', 'src/gone.test.ts'], sources)).toBeEmpty();
+});
+
+test('#resolveRelatedTests skips a declaration file even when a test sits beside it', () => {
+  const sources = { cwd: '/repo', readConfigText: () => null, probeFile: () => true };
+
+  expect(resolveRelatedTests(['src/types.d.ts'], sources)).toBeEmpty();
+});
+
+test('#resolveRelatedTests skips files that are not TypeScript', () => {
+  const sources = { cwd: '/repo', readConfigText: () => null, probeFile: () => true };
+
+  expect(resolveRelatedTests(['src/a.md', 'README.md'], sources)).toBeEmpty();
+});
+
+test('#resolveRelatedTests keeps the order of the paths and drops duplicates', () => {
+  const probeFile = mock(() => true);
+
+  expect(
+    resolveRelatedTests(['src/b.ts', 'src/a.test.ts', 'src/b.test.ts'], {
+      cwd: '/repo',
+      readConfigText: () => null,
+      probeFile,
+    }),
   ).toStrictEqual(['src/b.test.ts', 'src/a.test.ts']);
+
+  expect(probeFile).toHaveBeenCalledTimes(3);
+  expect(probeFile).toHaveBeenNthCalledWith(1, '/repo/src/b.test.ts');
+  expect(probeFile).toHaveBeenNthCalledWith(2, '/repo/src/a.test.ts');
+  expect(probeFile).toHaveBeenNthCalledWith(3, '/repo/src/b.test.ts');
 });
 
 test('#runRelatedTests exits 0 and says so when no path has a related test', async () => {
@@ -162,40 +158,35 @@ test.each([
   ['src/session.agent-sdk.test.ts'],
   ['src/summary.model-api.test.ts'],
   ['packages/shop-e2e/checkout.test.ts'],
-])('#resolveRelatedTests leaves out the lane file %s', async (path) => {
-  const ctx = await setupTest();
+])('#resolveRelatedTests leaves out the lane file %s', (path) => {
+  const sources = { cwd: '/repo', readConfigText: () => null, probeFile: () => true };
 
-  await mkdir(join(ctx.directory, 'e2e'));
-  await mkdir(join(ctx.directory, 'packages/shop/e2e'), { recursive: true });
-  await mkdir(join(ctx.directory, 'packages/shop-e2e'));
-  await writeFile(join(ctx.directory, path), '');
-  await writeFile(join(ctx.directory, 'e2e/helpers.test.ts'), '');
-
-  expect(resolveRelatedTests([path], ctx.directory, () => null)).toBeEmpty();
+  expect(resolveRelatedTests([path], sources)).toBeEmpty();
 });
 
-test('#resolveRelatedTests leaves out a file of a lane that the oxlint config declares', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(join(ctx.directory, 'src/sweep.radar.test.ts'), '');
-
-  const tests = resolveRelatedTests(['src/sweep.radar.test.ts'], ctx.directory, (path) =>
-    path === join(ctx.directory, '.oxlintrc.json')
-      ? '{ "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": { "radar": 30000 } }] } }'
-      : null,
+test('#resolveRelatedTests leaves out a file of a lane that the oxlint config declares', () => {
+  const readConfigText = mock(
+    () => '{ "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": { "radar": 30000 } }] } }',
   );
 
-  expect(tests).toBeEmpty();
+  expect(
+    resolveRelatedTests(['src/sweep.radar.test.ts'], {
+      cwd: '/repo',
+      readConfigText,
+      probeFile: () => true,
+    }),
+  ).toBeEmpty();
+
+  expect(readConfigText).toHaveBeenCalledTimes(1);
+  expect(readConfigText).toHaveBeenCalledWith('/repo/.oxlintrc.json');
 });
 
-test('#resolveRelatedTests selects a test whose suffix no lane declares', async () => {
-  const ctx = await setupTest();
+test('#resolveRelatedTests selects a test whose suffix no lane declares', () => {
+  const sources = { cwd: '/repo', readConfigText: () => null, probeFile: () => true };
 
-  await writeFile(join(ctx.directory, 'src/sweep.radar.test.ts'), '');
-
-  expect(resolveRelatedTests(['src/sweep.radar.test.ts'], ctx.directory, () => null)).toStrictEqual(
-    ['src/sweep.radar.test.ts'],
-  );
+  expect(resolveRelatedTests(['src/sweep.radar.test.ts'], sources)).toStrictEqual([
+    'src/sweep.radar.test.ts',
+  ]);
 });
 
 test('#runRelatedTests passes --parallel=1 and the slow-host timeout to the test script when the host gets 1 worker', async () => {
@@ -296,43 +287,16 @@ test('#runRelatedTests skips with the CI notice past 50 related test files', asy
   });
 });
 
-test('#runRelatedTests skips past the cap that --max-files sets', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(
-    join(ctx.directory, 'package.json'),
-    JSON.stringify({ scripts: { test: 'echo test-args' } }),
-  );
-
-  await writeFile(join(ctx.directory, 'src/a.test.ts'), '');
-  await writeFile(join(ctx.directory, 'src/b.test.ts'), '');
-  await writeFile(join(ctx.directory, 'src/c.test.ts'), '');
-
-  const result =
-    await $`bun ${join(import.meta.dir, 'run-related-tests.ts')} --max-files=2 src/a.test.ts src/b.test.ts src/c.test.ts`
-      .cwd(ctx.directory)
-      .env({ PATH: process.env['PATH'] ?? '', TEST_WORKERS: '2' })
-      .nothrow()
-      .quiet();
-
-  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
-    exitCode: 0,
-    stdout:
-      'run-related-tests: skipped, because the branch has 3 related unit test files, over the cap of 2; CI runs the full suite\n',
-  });
-});
-
-test.each([['none'], ['0'], ['9'.repeat(30)]])(
-  '#runRelatedTests exits 2 for a --max-files of %s',
-  async (value) => {
+test.each([['--max-files=2'], ['--max-file=2']])(
+  '#runRelatedTests exits 2 for the option %s, which it does not declare',
+  async (option) => {
     const ctx = await setupTest();
 
-    const result =
-      await $`bun ${join(import.meta.dir, 'run-related-tests.ts')} --max-files=${value} src/a.ts`
-        .cwd(ctx.directory)
-        .env({ PATH: process.env['PATH'] ?? '' })
-        .nothrow()
-        .quiet();
+    const result = await $`bun ${join(import.meta.dir, 'run-related-tests.ts')} ${option} src/a.ts`
+      .cwd(ctx.directory)
+      .env({ PATH: process.env['PATH'] ?? '' })
+      .nothrow()
+      .quiet();
 
     expect({
       exitCode: result.exitCode,
@@ -341,30 +305,10 @@ test.each([['none'], ['0'], ['9'.repeat(30)]])(
     }).toStrictEqual({
       exitCode: 2,
       stdout: '',
-      stderr: `run-related-tests: --max-files is ${value}; set it to a whole number above 0\n`,
+      stderr: expect.toStartWith(`run-related-tests: Unknown option '${option.split('=')[0]}'`),
     });
   },
 );
-
-test('#runRelatedTests exits 2 for an option it does not declare', async () => {
-  const ctx = await setupTest();
-
-  const result = await $`bun ${join(import.meta.dir, 'run-related-tests.ts')} --max-file=2 src/a.ts`
-    .cwd(ctx.directory)
-    .env({ PATH: process.env['PATH'] ?? '' })
-    .nothrow()
-    .quiet();
-
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  }).toStrictEqual({
-    exitCode: 2,
-    stdout: '',
-    stderr: expect.toStartWith("run-related-tests: Unknown option '--max-file'"),
-  });
-});
 
 test.each([
   ['test-utils/build-order.ts'],
