@@ -130,6 +130,7 @@ test.each([
   ['a single-quoted echo of the command', "'echo' bun test --timeout=30000 && bun test"],
   ['a single-quoted printf of the command', "'printf' '%s' bun test --timeout=30000"],
   ['a short name pattern', "bun test -t '--timeout 30000'"],
+  ['a file filter after the option terminator', "bun test -- '--timeout=30000'"],
   ['a quoted value under the limit', 'bun test --timeout="5000"'],
   ['a single-quoted value under the limit', "bun test --timeout '4000'"],
 ])('it leaves %s alone', async (_, command) => {

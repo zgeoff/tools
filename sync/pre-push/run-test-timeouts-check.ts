@@ -325,7 +325,7 @@ const valueOptions = new Set([
 ]);
 
 // `--timeout 20000` and `--timeout=20000` both reach `bun test`, and the shell removes any quotes or
-// escapes from either form before Bun reads it.
+// escapes from either form before Bun reads it. Bun reads each word after `--` as a file filter.
 function collectTimeoutValues(command: string): number[] {
   const values: number[] = [];
 
@@ -348,6 +348,10 @@ function collectTimeoutValues(command: string): number[] {
 
     for (let index = 0; index < args.length; index += 1) {
       const arg = args[index] ?? '';
+
+      if (arg === '--') {
+        break;
+      }
 
       if (arg === '--timeout') {
         values.push(toTimeoutMs(args[index + 1]));
