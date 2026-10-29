@@ -1,13 +1,19 @@
 import { hostname } from 'node:os';
 import { parseAddedLines } from './parse-added-lines.ts';
-import { readBranchBase } from './read-branch-base.ts';
+import type { CommitRange } from './read-pushed-ranges.ts';
+import {
+  formatCommitLines,
+  readPushedRanges,
+  readPushedRefsInput,
+  readRangeCommits,
+} from './read-pushed-ranges.ts';
 import type { RunProgram } from './run-program.ts';
 import { runProgram } from './run-program.ts';
 
 export interface LocalPathsCheckOptions {
   readonly cwd: string;
 
-  readonly base: string;
+  readonly ranges: readonly CommitRange[];
 
   readonly env: Readonly<Record<string, string | undefined>>;
 
@@ -36,7 +42,14 @@ export function runLocalPathsCheck(options: Readonly<LocalPathsCheckOptions>): L
     return [];
   }
 
-  runMergeBlobsFetch(options);
+  const commits = readRangeCommits(options, options.ranges);
+
+  // git log reads HEAD when stdin names no commit.
+  if (commits.length === 0) {
+    return [];
+  }
+
+  runMergeBlobsFetch(options, commits);
 
   const result = options.runProgram(
     [
@@ -55,9 +68,10 @@ export function runLocalPathsCheck(options: Readonly<LocalPathsCheckOptions>): L
       // resolution; the lines it brings from either parent come from commits the log reads anyway.
       '--diff-merges=remerge',
       '--format=%x00%h',
-      `${options.base}..HEAD`,
+      '--no-walk=unsorted',
+      '--stdin',
     ],
-    { cwd: options.cwd, env: options.env },
+    { cwd: options.cwd, env: options.env, stdin: formatCommitLines(commits) },
   );
 
   if (result.exitCode !== 0) {
@@ -109,7 +123,10 @@ function findHostPattern(name: string): { name: string; pattern: RegExp } | null
 // A blobless clone fetches a merge's missing blobs during the log, in one batch with the
 // conflict-marked blob that the log builds in a temporary folder, and the server refuses the whole
 // batch. Fetching the blobs first leaves the log nothing to ask for.
-function runMergeBlobsFetch(options: Readonly<LocalPathsCheckOptions>): void {
+function runMergeBlobsFetch(
+  options: Readonly<LocalPathsCheckOptions>,
+  commits: readonly string[],
+): void {
   const promisor = options.runProgram(
     ['git', 'config', '--type=bool', '--get', 'remote.origin.promisor'],
     { cwd: options.cwd, env: options.env },
@@ -120,7 +137,11 @@ function runMergeBlobsFetch(options: Readonly<LocalPathsCheckOptions>): void {
   }
 
   const merges = splitLines(
-    runGit(options, ['rev-list', '--merges', '--parents', `${options.base}..HEAD`]),
+    runGit(
+      options,
+      ['rev-list', '--merges', '--parents', '--no-walk=unsorted', '--stdin'],
+      formatCommitLines(commits),
+    ),
   );
 
   if (merges.length === 0) {
@@ -128,8 +149,8 @@ function runMergeBlobsFetch(options: Readonly<LocalPathsCheckOptions>): void {
   }
 
   const pairs = merges.flatMap((merge) => {
-    const commits = merge.split(' ');
-    const argv = ['git', 'merge-base', '--all', ...commits.slice(1)];
+    const mergeAndParents = merge.split(' ');
+    const argv = ['git', 'merge-base', '--all', ...mergeAndParents.slice(1)];
     const bases = options.runProgram(argv, { cwd: options.cwd, env: options.env });
 
     // `git merge-base` exits 1 when the parents share no commit.
@@ -138,18 +159,18 @@ function runMergeBlobsFetch(options: Readonly<LocalPathsCheckOptions>): void {
     }
 
     return splitLines(bases.stdout).flatMap((base) =>
-      commits.map((commit) => `${base} ${commit}\n`),
+      mergeAndParents.map((commit) => `${base} ${commit}\n`),
     );
   });
 
-  const commits = new Set(pairs.flatMap((pair) => pair.trim().split(' ')));
+  const pairCommits = new Set(pairs.flatMap((pair) => pair.trim().split(' ')));
 
   // A blob ID on the command line makes git 2.43's rev-list die when the blob is missing, so the
   // listing starts from the commits instead.
   const listing = runGit(
     options,
     ['rev-list', '--objects', '--missing=print', '--no-walk', '--stdin'],
-    [...commits].map((commit) => `${commit}\n`).join(''),
+    formatCommitLines([...pairCommits]),
   );
 
   const missing = new Set(
@@ -234,13 +255,18 @@ function collectBlobIds(rawDiff: string): string[] {
 
 const BLOB_MODES = new Set(['100644', '100755', '120000']);
 
-function runCLI(): void {
+async function runCLI(): Promise<void> {
   try {
-    const base = readBranchBase({ cwd: process.cwd(), env: process.env, runProgram });
+    const ranges = readPushedRanges({
+      cwd: process.cwd(),
+      env: process.env,
+      pushedRefs: await readPushedRefsInput(process.argv.slice(2)),
+      runProgram,
+    });
 
     const findings = runLocalPathsCheck({
       cwd: process.cwd(),
-      base,
+      ranges,
       env: process.env,
       host: hostname(),
       runProgram,
@@ -261,5 +287,5 @@ function runCLI(): void {
 }
 
 if (import.meta.main) {
-  runCLI();
+  await runCLI();
 }

@@ -101,10 +101,14 @@ pre-push:
         fi
         bun run --silent memory-capped bun run --silent check:workflows {files} || status=1
         exit "$status"
+    # git lists the refs a push sends on the hook's stdin, and lefthook hands
+    # stdin only to a job that asks for it.
     - name: commits
-      run: bun run --silent memory-capped bun run --silent check:commits
+      use_stdin: true
+      run: bun run --silent memory-capped bun run --silent check:commits --pushed-refs
     - name: local-paths
-      run: bun run --silent memory-capped bun run --silent check:local-paths
+      use_stdin: true
+      run: bun run --silent memory-capped bun run --silent check:local-paths --pushed-refs
     - name: test-timeouts
       run: bun run --silent memory-capped bun run --silent check:test-timeouts
     - name: dependency-gates

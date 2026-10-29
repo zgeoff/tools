@@ -1,12 +1,18 @@
 import { dirname, join } from 'node:path';
-import { readBranchBase } from './read-branch-base.ts';
+import type { CommitRange } from './read-pushed-ranges.ts';
+import {
+  formatCommitLines,
+  readPushedRanges,
+  readPushedRefsInput,
+  readRangeCommits,
+} from './read-pushed-ranges.ts';
 import type { ProgramResult, RunProgram } from './run-program.ts';
 import { runProgram } from './run-program.ts';
 
 export interface CommitsCheckOptions {
   readonly cwd: string;
 
-  readonly base: string;
+  readonly ranges: readonly CommitRange[];
 
   readonly env: Readonly<Record<string, string | undefined>>;
 
@@ -36,9 +42,16 @@ interface Commit {
 
 // A merge commit carries the message git wrote, so the check leaves it out.
 function readBranchCommits(options: Readonly<CommitsCheckOptions>): Commit[] {
+  const commits = readRangeCommits(options, options.ranges);
+
+  // git log reads HEAD when stdin names no commit.
+  if (commits.length === 0) {
+    return [];
+  }
+
   const result = options.runProgram(
-    ['git', 'log', '--no-merges', '-z', '--format=%h%n%B', `${options.base}..HEAD`],
-    { cwd: options.cwd, env: options.env },
+    ['git', 'log', '--no-merges', '-z', '--format=%h%n%B', '--no-walk=unsorted', '--stdin'],
+    { cwd: options.cwd, env: options.env, stdin: formatCommitLines(commits) },
   );
 
   if (result.exitCode !== 0) {
@@ -107,11 +120,17 @@ async function runCLI(): Promise<void> {
     // An installed package that still fails to resolve, such as one whose export names a missing
     // file, is broken, so it throws here rather than skip.
     const config = Bun.resolveSync('@zgeoff/commitlint-config', cwd);
-    const base = readBranchBase({ cwd, env: process.env, runProgram });
+
+    const ranges = readPushedRanges({
+      cwd,
+      env: process.env,
+      pushedRefs: await readPushedRefsInput(process.argv.slice(2)),
+      runProgram,
+    });
 
     const problems = runCommitsCheck({
       cwd,
-      base,
+      ranges,
       env: process.env,
       commitlint,
       config,

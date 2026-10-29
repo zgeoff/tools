@@ -48,7 +48,7 @@ test('it passes a branch whose added lines hold no local path', async () => {
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
     runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     host: 'greeter-box',
   });
@@ -78,7 +78,7 @@ test('it reports an added line that holds the home directory at its path and lin
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
     runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     host: 'greeter-box',
   });
@@ -111,7 +111,7 @@ test('it reports an added line that holds the host name as a whole word', async 
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
     runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     host: 'greeter-box',
   });
@@ -142,7 +142,7 @@ test('it passes the host name inside a longer word', async () => {
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
     runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     host: 'greeter-box',
   });
@@ -170,7 +170,7 @@ test.each([
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
     runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     host,
   });
@@ -201,7 +201,7 @@ test('it reads only the lines the branch adds, not the lines it keeps or removes
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
     runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     host: 'greeter-box',
   });
@@ -232,7 +232,7 @@ test('it reports a line that a later commit of the branch removes', async () => 
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
     runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     host: 'greeter-box',
   });
@@ -262,7 +262,7 @@ test('it reports nothing for a file that the branch only renames', async () => {
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
     runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     host: 'greeter-box',
   });
@@ -287,7 +287,7 @@ test('it reads no home directory when HOME is the root folder', async () => {
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
     runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: { ...ctx.env, HOME: '/' },
     host: 'greeter-box',
   });
@@ -326,7 +326,7 @@ test('it reports a line that a merge adds when it resolves a conflict', async ()
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
     runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     host: 'greeter-box',
   });
@@ -410,7 +410,7 @@ test('it reports a line that a conflict-resolving merge adds in a blobless clone
   const findings = runLocalPathsCheck({
     cwd: clone,
     runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     host: 'greeter-box',
   });
@@ -461,7 +461,7 @@ test('it passes a blobless clone whose unpushed merge holds blobs the server lac
   const findings = runLocalPathsCheck({
     cwd: clone,
     runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     host: 'greeter-box',
   });
@@ -506,7 +506,7 @@ test('it throws the fetch error when a blobless clone cannot reach its origin fo
     runLocalPathsCheck({
       cwd: clone,
       runProgram,
-      base: baseText.trim(),
+      ranges: [[`${baseText.trim()}..HEAD`]],
       env: ctx.env,
       host: 'greeter-box',
     }),
@@ -537,7 +537,7 @@ test('it reports the real path of a file whose name git quotes', async () => {
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
     runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     host: 'greeter-box',
   });
@@ -570,7 +570,7 @@ test('it reports the real path of a quoted file name that holds an emoji', async
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
     runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     host: 'greeter-box',
   });
@@ -605,7 +605,7 @@ test('it reports the right line when the repo joins nearby hunks with diff.inter
   const findings = runLocalPathsCheck({
     cwd: ctx.directory,
     runProgram,
-    base: baseText.trim(),
+    ranges: [[`${baseText.trim()}..HEAD`]],
     env: ctx.env,
     host: 'greeter-box',
   });
@@ -647,6 +647,41 @@ test('it prints each finding at its path and line and exits 1 when run as a scri
   });
 });
 
+test('it checks the refs that stdin names when run as a script with --pushed-refs', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  await $`git update-ref refs/remotes/origin/main HEAD`.cwd(ctx.directory).env(ctx.env);
+  await $`git switch --quiet -c cache-notes`.cwd(ctx.directory).env(ctx.env);
+
+  await writeFile(join(ctx.directory, 'cache.txt'), `cache: ${ctx.directory}/.cache\n`);
+
+  await $`git add cache.txt`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'docs: note the cache folder'}`.cwd(ctx.directory).env(ctx.env);
+
+  const localText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+  const hashText = await $`git rev-parse --short HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  await $`git switch --quiet -`.cwd(ctx.directory).env(ctx.env);
+
+  const pushedRefs = `refs/heads/cache-notes ${localText.trim()} refs/heads/cache-notes ${'0'.repeat(40)}\n`;
+
+  const result =
+    await $`${process.execPath} ${join(import.meta.dir, 'run-local-paths-check.ts')} --pushed-refs < ${Buffer.from(pushedRefs)}`
+      .cwd(ctx.directory)
+      .env(ctx.env)
+      .nothrow()
+      .quiet();
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 1,
+    stdout: `cache.txt:1: commit ${hashText.trim()} adds the home directory ${ctx.directory}/; remove it before you push\n`,
+  });
+});
+
 test('it exits 2 and names the missing base when run as a script in a repo with no remote', async () => {
   const ctx = await setupTest();
 
@@ -667,7 +702,7 @@ test('it exits 2 and names the missing base when run as a script in a repo with 
   });
 });
 
-test('it throws the git log error when the base is not a commit', async () => {
+test('it throws the git rev-list error when a range names no commit', async () => {
   const ctx = await setupTest();
 
   await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
@@ -678,9 +713,11 @@ test('it throws the git log error when the base is not a commit', async () => {
     runLocalPathsCheck({
       cwd: ctx.directory,
       runProgram,
-      base: 'no-such-greeting',
+      ranges: [['no-such-greeting..HEAD']],
       env: ctx.env,
       host: 'greeter-box',
     }),
-  ).toThrow(/^git log failed: fatal: ambiguous argument 'no-such-greeting\.\.HEAD'/u);
+  ).toThrow(
+    /^git rev-list no-such-greeting\.\.HEAD failed: fatal: ambiguous argument 'no-such-greeting\.\.HEAD'/u,
+  );
 });

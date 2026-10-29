@@ -25,11 +25,14 @@ leaves unchanged passes.
 
 A check whose program the machine lacks prints a notice and passes, because CI installs the program
 and runs the check. The docs check prints a notice and passes in a repo without
-`.claude/skills/docs-writing/scripts/`. The commits and local-paths checks read the branch's
-commits, and the test-timeouts check reads the files that `HEAD` holds. The dependency gates check
-reads the working tree, as `bun audit` does. The baseline also runs `typecheck` before a commit that
-stages a code or JSON file, after the repo's own pre-commit jobs, so the type check sees what the
-fixers wrote.
+`.claude/skills/docs-writing/scripts/`. The commits and local-paths checks read the commits that
+each pushed ref sends, from the ref lines that git hands the hook on stdin. A ref that the push
+creates sends the commits that origin's default branch lacks, a ref that it updates leaves out the
+remote ref's commit too, and a ref that it deletes sends none. Run outside a push, as in CI, the two
+checks read the branch's commits. The test-timeouts check reads the files that `HEAD` holds. The
+dependency gates check reads the working tree, as `bun audit` does. The baseline also runs
+`typecheck` before a commit that stages a code or JSON file, after the repo's own pre-commit jobs,
+so the type check sees what the fixers wrote.
 
 The workflows check ignores one actionlint error, on the `queue` key of `concurrency`: GitHub
 documents the key, and the pinned actionlint rejects it. The ignore lapses on an expiry date that
@@ -75,12 +78,11 @@ The entry delivers these files, and their tests stay in tools:
 - `scripts/run-related-tests.ts` — runs each changed file's sibling unit test through the repo's
   `test` script, as [The related tests](#the-related-tests) describes.
 - `scripts/run-commits-check.ts` — runs `commitlint` with the rules of `@zgeoff/commitlint-config`
-  on the message of each commit since that merge base, merge commits left out. A repo that does not
-  install both `@commitlint/cli` and `@zgeoff/commitlint-config` gets a notice in place of the
-  check.
-- `scripts/run-local-paths-check.ts` — fails each line that a commit since that merge base adds and
-  that holds the home directory of whoever runs it, followed by a slash, or the machine's host name
-  as a whole word. A home of `/` and the host `localhost` are left out.
+  on the message of each pushed commit, merge commits left out. A repo that does not install both
+  `@commitlint/cli` and `@zgeoff/commitlint-config` gets a notice in place of the check.
+- `scripts/run-local-paths-check.ts` — fails each line that a pushed commit adds and that holds the
+  home directory of whoever runs it, followed by a slash, or the machine's host name as a whole
+  word. A home of `/` and the host `localhost` are left out.
 - `scripts/run-test-timeouts-check.ts` — fails each `bun test --timeout` above the default timeout
   in a `package.json` script, and each `bunfig.toml` whose `[test] timeout` is above it, as
   [the test timeout check](./oxlint-config-tests.md#the-test-timeout-check) describes.
@@ -94,9 +96,10 @@ The entry delivers these files, and their tests stay in tools:
   downloads them from tools.
 - `scripts/read-worker-count.ts` and `scripts/read-memory-budget.ts` — print the
   [worker count and the memory budget](./memory-caps.md#the-worker-count) of the host.
-- `scripts/read-branch-base.ts`, `scripts/parse-added-lines.ts`, `scripts/parse-shell-words.ts`,
-  `scripts/shell-escape-parsers.ts`, `scripts/collect-command-names.ts`,
-  `scripts/parse-lane-limits.ts` and `scripts/run-program.ts` — the modules these scripts import.
+- `scripts/read-branch-base.ts`, `scripts/read-pushed-ranges.ts`, `scripts/parse-added-lines.ts`,
+  `scripts/parse-shell-words.ts`, `scripts/shell-escape-parsers.ts`,
+  `scripts/collect-command-names.ts`, `scripts/parse-lane-limits.ts` and `scripts/run-program.ts` —
+  the modules these scripts import.
 
 The check scripts exit 0 when clean or skipped, 1 with a problem, and 2 when they cannot run, such
 as in a clone without origin's default branch. One exception: the workflow lint exits 0 with a
@@ -114,6 +117,8 @@ lists.
 
 The file list comes from the checked-out branch. `git push origin <other-branch>` lints and tests
 the checked-out branch's files, not the pushed branch's, and CI catches what the hook skips.
+lefthook skips every pre-push job when the checked-out branch has no file to push, so that push runs
+no check when the checked-out branch matches its upstream.
 
 A job that a repo adds in its `lefthook.yml` runs before the uncommitted check, so it can read an
 uncommitted copy of a file the branch changes.
