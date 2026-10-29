@@ -81,6 +81,165 @@ test('it says no release fixes an advisory the fix marks unfixable', () => {
   expect(plan.added[0]?.reason).toBe('No published release of tinypool fixes it.');
 });
 
+test('it says no patched release exists when the fix it names sits below the vulnerable range', () => {
+  const plan = planAuditIgnores({
+    report: {
+      deepmerge: [
+        {
+          id: 1_098_001,
+          url: 'https://github.com/advisories/GHSA-abcd-efgh-jkmn',
+          title: 'deepmerge: Prototype Pollution through a crafted source object',
+          severity: 'low',
+          vulnerable_versions: '>=4.2.0 <=4.3.1',
+        },
+      ],
+    },
+    ignores: {},
+    unmanagedIDs: [],
+    plan: {
+      fixes: [],
+      blocked: [
+        {
+          name: 'deepmerge',
+          from: '4.3.1',
+          to: '4.1.2',
+          blockers: [{ dependent: 'html-to-text@9.0.5', range: '^4.3.1' }],
+        },
+      ],
+      unfixable: [],
+    },
+    auditLevel: null,
+    today: '2026-10-17',
+    expiryDays: 30,
+    pending: {},
+  });
+
+  expect(plan.added).toStrictEqual([
+    {
+      advisory: 'GHSA-abcd-efgh-jkmn',
+      title: 'deepmerge: Prototype Pollution through a crafted source object',
+      package: 'deepmerge',
+      reason:
+        'No patched release exists for deepmerge >=4.2.0 <=4.3.1, and html-to-text@9.0.5 accepts only ^4.3.1.',
+      expires: '2026-11-16',
+    },
+  ]);
+});
+
+test('it names the fix when the vulnerable range ends at an inclusive bound below it', () => {
+  const plan = planAuditIgnores({
+    report: {
+      deepmerge: [
+        {
+          id: 1_098_001,
+          url: 'https://github.com/advisories/GHSA-abcd-efgh-jkmn',
+          title: 'deepmerge: Prototype Pollution through a crafted source object',
+          severity: 'low',
+          vulnerable_versions: '>=4.2.0 <=4.3.1',
+        },
+      ],
+    },
+    ignores: {},
+    unmanagedIDs: [],
+    plan: {
+      fixes: [],
+      blocked: [
+        {
+          name: 'deepmerge',
+          from: '4.3.1',
+          to: '4.3.2',
+          blockers: [{ dependent: 'html-to-text@9.0.5', range: '4.3.1' }],
+        },
+      ],
+      unfixable: [],
+    },
+    auditLevel: null,
+    today: '2026-10-17',
+    expiryDays: 30,
+    pending: {},
+  });
+
+  expect(plan.added[0]?.reason).toBe(
+    'The fix is deepmerge 4.3.2, but html-to-text@9.0.5 accepts only 4.3.1.',
+  );
+});
+
+test('it keeps the fix it names below the range when the advisory lists a patched release', () => {
+  const plan = planAuditIgnores({
+    report: {
+      deepmerge: [
+        {
+          id: 1_098_001,
+          url: 'https://github.com/advisories/GHSA-abcd-efgh-jkmn',
+          title: 'deepmerge: Prototype Pollution through a crafted source object',
+          severity: 'low',
+          vulnerable_versions: '>=4.2.0 <4.3.2',
+        },
+      ],
+    },
+    ignores: {},
+    unmanagedIDs: [],
+    plan: {
+      fixes: [],
+      blocked: [
+        {
+          name: 'deepmerge',
+          from: '4.3.1',
+          to: '4.1.2',
+          blockers: [{ dependent: 'html-to-text@9.0.5', range: '^4.3.1' }],
+        },
+      ],
+      unfixable: [],
+    },
+    auditLevel: null,
+    today: '2026-10-17',
+    expiryDays: 30,
+    pending: {},
+  });
+
+  expect(plan.added[0]?.reason).toBe(
+    'The fix is deepmerge 4.1.2, but html-to-text@9.0.5 accepts only ^4.3.1.',
+  );
+});
+
+test('it says no patched release exists when the newest vulnerable range has no upper bound', () => {
+  const plan = planAuditIgnores({
+    report: {
+      deepmerge: [
+        {
+          id: 1_098_001,
+          url: 'https://github.com/advisories/GHSA-abcd-efgh-jkmn',
+          title: 'deepmerge: Prototype Pollution through a crafted source object',
+          severity: 'low',
+          vulnerable_versions: '<3.3.1 || >=4.2.0',
+        },
+      ],
+    },
+    ignores: {},
+    unmanagedIDs: [],
+    plan: {
+      fixes: [],
+      blocked: [
+        {
+          name: 'deepmerge',
+          from: '4.3.1',
+          to: '4.1.2',
+          blockers: [{ dependent: 'html-to-text@9.0.5', range: '^4.3.1' }],
+        },
+      ],
+      unfixable: [],
+    },
+    auditLevel: null,
+    today: '2026-10-17',
+    expiryDays: 30,
+    pending: {},
+  });
+
+  expect(plan.added[0]?.reason).toBe(
+    'No patched release exists for deepmerge <3.3.1 || >=4.2.0, and html-to-text@9.0.5 accepts only ^4.3.1.',
+  );
+});
+
 test('it keys an advisory with no GHSA ID by its numeric ID', () => {
   const plan = planAuditIgnores({
     report: {
