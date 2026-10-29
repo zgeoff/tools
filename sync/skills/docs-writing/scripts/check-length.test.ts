@@ -1,9 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { $ } from 'bun';
+import { nodeFileSystem } from '../../../../scripts/ci/node-file-system.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'check-length-'));
@@ -24,21 +25,17 @@ async function setupTest() {
   const scriptPath = fileURLToPath(new URL('check-length.sh', import.meta.url));
 
   const writeLines = async (path: string, count: number) => {
-    await mkdir(dirname(join(directory, path)), { recursive: true });
-
     // Each line is a list item, which the prose check's paragraph limit skips.
-    await writeFile(join(directory, path), '- The tool reads one file.\n'.repeat(count));
-  };
-
-  const writeText = async (path: string, text: string) => {
-    await mkdir(dirname(join(directory, path)), { recursive: true });
-    await writeFile(join(directory, path), text);
+    await nodeFileSystem.writeText(
+      join(directory, path),
+      '- The tool reads one file.\n'.repeat(count),
+    );
   };
 
   const run = (...args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`.cwd(directory).env(env).nothrow().quiet();
 
-  return { directory, env, writeLines, writeText, run };
+  return { directory, env, writeLines, run };
 }
 
 test('it fails when the root README is over the front page limit', async () => {
@@ -163,7 +160,11 @@ test('it holds a README below a package folder to the folder limit', async () =>
 test('it holds a README beside a public package.json outside packages/ to the folder limit', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('tools/lint/package.json', '{ "name": "lint" }\n');
+  await nodeFileSystem.writeText(
+    join(ctx.directory, 'tools/lint/package.json'),
+    '{ "name": "lint" }\n',
+  );
+
   await ctx.writeLines('tools/lint/README.md', 71);
 
   const result = await ctx.run();
@@ -212,7 +213,11 @@ test('it fails when check-prose finds a violation in a spike results.md', async 
   const ctx = await setupTest();
 
   await ctx.writeLines('research/cold-start/README.md', 10);
-  await ctx.writeText('research/cold-start/results.md', 'The cache is load-bearing.\n');
+
+  await nodeFileSystem.writeText(
+    join(ctx.directory, 'research/cold-start/results.md'),
+    'The cache is load-bearing.\n',
+  );
 
   const result = await ctx.run();
 
@@ -358,8 +363,10 @@ test('it fails when check-prose finds a violation in a doc', async () => {
 
   await ctx.writeLines('README.md', 10);
 
-  await mkdir(join(ctx.directory, 'docs'), { recursive: true });
-  await writeFile(join(ctx.directory, 'docs/overview.md'), 'The cache is load-bearing.\n');
+  await nodeFileSystem.writeText(
+    join(ctx.directory, 'docs/overview.md'),
+    'The cache is load-bearing.\n',
+  );
 
   const result = await ctx.run();
 
@@ -385,7 +392,11 @@ test('it fails when check-prose finds a violation in a skill', async () => {
   const ctx = await setupTest();
 
   await ctx.writeLines('README.md', 10);
-  await ctx.writeText('.claude/skills/demo/SKILL.md', 'The cache is load-bearing.\n');
+
+  await nodeFileSystem.writeText(
+    join(ctx.directory, '.claude/skills/demo/SKILL.md'),
+    'The cache is load-bearing.\n',
+  );
 
   const result = await ctx.run();
 
@@ -411,8 +422,16 @@ test('it skips a skill that git marks linguist-vendored', async () => {
   const ctx = await setupTest();
 
   await ctx.writeLines('README.md', 10);
-  await ctx.writeText('.gitattributes', '.claude/skills/vendor-db/** linguist-vendored\n');
-  await ctx.writeText('.claude/skills/vendor-db/SKILL.md', 'The cache is load-bearing.\n');
+
+  await nodeFileSystem.writeText(
+    join(ctx.directory, '.gitattributes'),
+    '.claude/skills/vendor-db/** linguist-vendored\n',
+  );
+
+  await nodeFileSystem.writeText(
+    join(ctx.directory, '.claude/skills/vendor-db/SKILL.md'),
+    'The cache is load-bearing.\n',
+  );
 
   const result = await ctx.run();
 
@@ -443,8 +462,15 @@ test('it fails when the repo has check-skill and a skill fails it', async () => 
 
   const source = await readFile(checkSkill, 'utf8');
 
-  await ctx.writeText('.claude/skills/skill-writing/scripts/check-skill.sh', source);
-  await ctx.writeText('.claude/skills/demo/SKILL.md', '---\nname: demo\n---\n');
+  await nodeFileSystem.writeText(
+    join(ctx.directory, '.claude/skills/skill-writing/scripts/check-skill.sh'),
+    source,
+  );
+
+  await nodeFileSystem.writeText(
+    join(ctx.directory, '.claude/skills/demo/SKILL.md'),
+    '---\nname: demo\n---\n',
+  );
 
   const result = await ctx.run();
 
@@ -480,9 +506,9 @@ test('it fails when check-vision sits beside it and the repo has no docs/vision.
     'utf8',
   );
 
-  await ctx.writeText(join(scripts, 'check-length.sh'), checkLength);
-  await ctx.writeText(join(scripts, 'check-prose.sh'), checkProse);
-  await ctx.writeText(join(scripts, 'check-vision.sh'), checkVision);
+  await nodeFileSystem.writeText(join(ctx.directory, scripts, 'check-length.sh'), checkLength);
+  await nodeFileSystem.writeText(join(ctx.directory, scripts, 'check-prose.sh'), checkProse);
+  await nodeFileSystem.writeText(join(ctx.directory, scripts, 'check-vision.sh'), checkVision);
   await ctx.writeLines('README.md', 10);
 
   const result = await $`bash ${join(scripts, 'check-length.sh')}`
@@ -522,9 +548,9 @@ test('it passes when check-vision sits beside it and docs/vision.md fits', async
     'utf8',
   );
 
-  await ctx.writeText(join(scripts, 'check-length.sh'), checkLength);
-  await ctx.writeText(join(scripts, 'check-prose.sh'), checkProse);
-  await ctx.writeText(join(scripts, 'check-vision.sh'), checkVision);
+  await nodeFileSystem.writeText(join(ctx.directory, scripts, 'check-length.sh'), checkLength);
+  await nodeFileSystem.writeText(join(ctx.directory, scripts, 'check-prose.sh'), checkProse);
+  await nodeFileSystem.writeText(join(ctx.directory, scripts, 'check-vision.sh'), checkVision);
   await ctx.writeLines('README.md', 10);
   await ctx.writeLines('docs/vision.md', 40);
 
@@ -582,9 +608,7 @@ test('it fails a value with a unit under docs/architecture but not one in code o
 
   await ctx.writeLines('README.md', 10);
 
-  await mkdir(join(ctx.directory, 'docs/architecture'), { recursive: true });
-
-  await writeFile(
+  await nodeFileSystem.writeText(
     join(ctx.directory, 'docs/architecture/overview.md'),
     [
       'The design dates from the 1990s.',

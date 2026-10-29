@@ -1,9 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { $ } from 'bun';
+import { nodeFileSystem } from '../../scripts/ci/node-file-system.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'check-vision-'));
@@ -23,15 +24,10 @@ async function setupTest() {
 
   const scriptPath = fileURLToPath(new URL('check-vision.sh', import.meta.url));
 
-  const writeText = async (path: string, text: string) => {
-    await mkdir(dirname(join(directory, path)), { recursive: true });
-    await writeFile(join(directory, path), text);
-  };
-
   const run = (...args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`.cwd(directory).env(env).nothrow().quiet();
 
-  return { writeText, run };
+  return { directory, run };
 }
 
 test('it fails when the repo has no docs/vision.md', async () => {
@@ -53,7 +49,10 @@ test('it fails when the repo has no docs/vision.md', async () => {
 test('it passes when docs/vision.md fits in 60 lines', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('docs/vision.md', '- The relay serves one team.\n'.repeat(60));
+  await nodeFileSystem.writeText(
+    join(ctx.directory, 'docs/vision.md'),
+    '- The relay serves one team.\n'.repeat(60),
+  );
 
   const result = await ctx.run();
 
@@ -71,7 +70,10 @@ test('it passes when docs/vision.md fits in 60 lines', async () => {
 test('it fails when docs/vision.md runs past 60 lines', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('docs/vision.md', '- The relay serves one team.\n'.repeat(61));
+  await nodeFileSystem.writeText(
+    join(ctx.directory, 'docs/vision.md'),
+    '- The relay serves one team.\n'.repeat(61),
+  );
 
   const result = await ctx.run();
 
@@ -90,8 +92,12 @@ test('it fails when docs/vision.md runs past 60 lines', async () => {
 test('it fails when git ignores docs/vision.md', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('.gitignore', 'docs/vision.md\n');
-  await ctx.writeText('docs/vision.md', '- The relay serves one team.\n');
+  await nodeFileSystem.writeText(join(ctx.directory, '.gitignore'), 'docs/vision.md\n');
+
+  await nodeFileSystem.writeText(
+    join(ctx.directory, 'docs/vision.md'),
+    '- The relay serves one team.\n',
+  );
 
   const result = await ctx.run();
 
