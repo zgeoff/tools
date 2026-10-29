@@ -102,13 +102,24 @@ pre-push:
         bun run --silent memory-capped bun run --silent check:workflows {files} || status=1
         exit "$status"
     # git lists the refs a push sends on the hook's stdin, and lefthook hands
-    # stdin only to a job that asks for it.
+    # stdin only to a job that asks for it. lefthook 2.2.2 skips a pre-push
+    # job whose run substitutes no file when the checked-out branch has
+    # nothing to push (internal/run/controller/command/build_command.go,
+    # lines 47-49 and 71-80), which would skip a push of another branch. So
+    # each job lists package.json for {files}, inside a shell comment the
+    # check never sees: every repo that takes the baseline has the file, as
+    # the baseline's jobs call its scripts, and lefthook drops a listed path
+    # that does not exist.
     - name: commits
+      files: echo package.json
       use_stdin: true
-      run: bun run --silent memory-capped bun run --silent check:commits --pushed-refs
+      run: 'bun run --silent memory-capped bun run --silent check:commits --pushed-refs # {files}'
+    # package.json keeps this job from the same lefthook skip.
     - name: local-paths
+      files: echo package.json
       use_stdin: true
-      run: bun run --silent memory-capped bun run --silent check:local-paths --pushed-refs
+      run:
+        'bun run --silent memory-capped bun run --silent check:local-paths --pushed-refs # {files}'
     - name: test-timeouts
       run: bun run --silent memory-capped bun run --silent check:test-timeouts
     - name: dependency-gates

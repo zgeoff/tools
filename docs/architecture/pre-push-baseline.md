@@ -119,8 +119,6 @@ lists.
 
 The file list comes from the checked-out branch. `git push origin <other-branch>` lints and tests
 the checked-out branch's files, not the pushed branch's, and CI catches what the hook skips.
-lefthook skips every pre-push job when the checked-out branch has no file to push, so that push runs
-no check when the checked-out branch matches its upstream.
 
 A job that a repo adds in its `lefthook.yml` runs before the uncommitted check, so it can read an
 uncommitted copy of a file the branch changes.
