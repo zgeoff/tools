@@ -17,10 +17,11 @@ docs-writing skill's `check-length.sh` and `check-links.sh`, and the workflows c
 `actionlint` and then the workflow lint. Each runs only when the branch changes a file that matches
 its glob.
 
-The uncommitted check runs first. It fails the push when a file the branch changes or deletes holds
-a change that is not committed, staged or not, and it names each such file. The checks after it read
-the files on disk, so a fixed copy on disk would hide a fault in the commit that the push sends. A
-change to a file the branch leaves unchanged passes.
+The uncommitted check runs first. It fails the push when a file the branch changes or deletes
+differs from the pushed commit on disk or in the index, such as a staged change or a deleted file
+back on disk, and it names each such file. The checks after it read the files on disk, so a fixed
+copy on disk would hide a fault in the commit that the push sends. A change to a file the branch
+leaves unchanged passes.
 
 A check whose program the machine lacks prints a notice and passes, because CI installs the program
 and runs the check. The docs check prints a notice and passes in a repo without
@@ -83,8 +84,8 @@ The entry delivers these files, and their tests stay in tools:
 - `scripts/run-test-timeouts-check.ts` — fails each `bun test --timeout` above the default timeout
   in a `package.json` script, and each `bunfig.toml` whose `[test] timeout` is above it, as
   [the test timeout check](./oxlint-config-tests.md#the-test-timeout-check) describes.
-- `scripts/run-uncommitted-check.ts` — the uncommitted check, which compares the disk and the index
-  with `HEAD` for each file the branch changes or deletes.
+- `scripts/run-uncommitted-check.ts` — the uncommitted check, which reads `git status` for each file
+  the branch changes or deletes.
 - `scripts/run-workflows-check.ts` — the workflow lint, which reads the workflow files that `HEAD`
   holds and warns on each fault. The `Lint workflows` step of `bun-checks.yml` downloads it from
   tools and runs it over every workflow.

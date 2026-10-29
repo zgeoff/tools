@@ -81,6 +81,63 @@ test('it returns a file the push deletes that is restored on disk', async () => 
   expect(changed).toStrictEqual(['helper.ts']);
 });
 
+test('it returns a file the push deletes that is restored on disk and left untracked', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createCommit({ 'helper.ts': 'export {};\n' });
+  await ctx.runGit('rm', '--quiet', 'helper.ts');
+  await ctx.runGit('commit', '--quiet', '-m', 'remove the helper');
+
+  await writeFile(join(ctx.repo, 'helper.ts'), 'export {};\n');
+
+  const changed = runUncommittedCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    files: ['helper.ts'],
+    runProgram,
+  });
+
+  expect(changed).toStrictEqual(['helper.ts']);
+});
+
+test('it returns a file whose staged change the disk undoes', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createCommit({ 'guide.md': '# Guide\n' });
+
+  await writeFile(join(ctx.repo, 'guide.md'), '# Guide\n\nA new line.\n');
+
+  await ctx.runGit('add', 'guide.md');
+
+  await writeFile(join(ctx.repo, 'guide.md'), '# Guide\n');
+
+  const changed = runUncommittedCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    files: ['guide.md'],
+    runProgram,
+  });
+
+  expect(changed).toStrictEqual(['guide.md']);
+});
+
+test('it returns a file whose name holds a byte past ASCII', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createCommit({ 'café.md': '# Menu\n' });
+
+  await writeFile(join(ctx.repo, 'café.md'), '# Menu\n\nA new dish.\n');
+
+  const changed = runUncommittedCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    files: ['café.md'],
+    runProgram,
+  });
+
+  expect(changed).toStrictEqual(['café.md']);
+});
+
 test('it returns nothing when only a file outside the push holds a change', async () => {
   const ctx = await setupTest();
 
@@ -103,5 +160,5 @@ test('it throws the git error when the folder is not a repository', async () => 
 
   expect(() =>
     runUncommittedCheck({ cwd: ctx.directory, env: ctx.env, files: ['guide.md'], runProgram }),
-  ).toThrow(/^git diff failed: /u);
+  ).toThrow(/^git status failed: /u);
 });

@@ -12,22 +12,26 @@ export interface UncommittedCheckOptions {
   readonly runProgram: RunProgram;
 }
 
-// The checks after this one read the files on disk, so a change that is not committed, staged or
-// not, to a file the push sends or deletes would hide a fault in the pushed commit. It returns each
-// such file. git lists every tracked change, so no file name reaches its argv.
+// The later checks read the disk, so a change to a pushed file that is not committed would hide a
+// fault in the pushed commit. git status lists index, disk and untracked changes, such as a deleted
+// file restored on disk, and it lists every path, so no file name reaches its argv.
 export function runUncommittedCheck(options: Readonly<UncommittedCheckOptions>): string[] {
-  const result = options.runProgram(['git', 'diff', '--name-only', '--no-renames', '-z', 'HEAD'], {
-    cwd: options.cwd,
-    env: options.env,
-  });
+  const result = options.runProgram(
+    ['git', 'status', '--porcelain=v1', '-z', '--no-renames', '--untracked-files=all'],
+    { cwd: options.cwd, env: options.env },
+  );
 
   if (result.exitCode !== 0) {
-    throw new Error(`git diff failed: ${result.stderr.trim()}`);
+    throw new Error(`git status failed: ${result.stderr.trim()}`);
   }
 
   const files = new Set(options.files);
 
-  return result.stdout.split('\0').filter((path) => files.has(path));
+  // Each entry is two status letters, a space and the path.
+  return result.stdout
+    .split('\0')
+    .map((entry) => entry.slice(3))
+    .filter((path) => files.has(path));
 }
 
 async function runCLI(): Promise<void> {

@@ -20,6 +20,7 @@ export async function readBranchFiles(
   const diff = await runGit(options, [
     'diff',
     '--name-only',
+    '-z',
     '--no-renames',
     ...(options.withDeleted === true ? [] : ['--diff-filter=d']),
     base,
@@ -30,7 +31,8 @@ export async function readBranchFiles(
     throw new Error(`git diff failed: ${diff.stderr.trim()}`);
   }
 
-  return diff.stdout.split('\n').filter((line) => line !== '');
+  // -z prints each path as it is, where a newline list would quote a path with a byte past ASCII.
+  return diff.stdout.split('\0').filter((path) => path !== '');
 }
 
 async function runGit(options: Readonly<ReadBranchFilesOptions>, args: readonly string[]) {
