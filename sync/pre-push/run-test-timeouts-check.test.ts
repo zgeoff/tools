@@ -129,7 +129,10 @@ test.each([
   ['a double-quoted echo of the command', '"echo" bun test --timeout=30000 && bun test'],
   ['a single-quoted echo of the command', "'echo' bun test --timeout=30000 && bun test"],
   ['a single-quoted printf of the command', "'printf' '%s' bun test --timeout=30000"],
-  ['an escaped flag', String.raw`bun test \--timeout=30000`],
+  ['a short name pattern', "bun test -t '--timeout 30000'"],
+  ['a file filter after the option terminator', "bun test -- '--timeout=30000'"],
+  ['a quoted value under the limit', 'bun test --timeout="5000"'],
+  ['a single-quoted value under the limit', "bun test --timeout '4000'"],
 ])('it leaves %s alone', async (_, command) => {
   const ctx = await setupTest();
 
@@ -146,12 +149,20 @@ test.each([
   expect(findings).toStrictEqual([]);
 });
 
-test('it reports a bun test whose command words are quoted', async () => {
+test.each([
+  ['its command words are quoted', `"bun" 'test' --timeout=30000`],
+  ['its timeout value is double-quoted', 'bun test --timeout="30000"'],
+  ['its timeout value is single-quoted', "bun test --timeout='30000'"],
+  ['its separate timeout value is single-quoted', "bun test --timeout '30000'"],
+  ['its whole flag is quoted', `bun test "--timeout=30000"`],
+  ['its flag is escaped', String.raw`bun test \--timeout=30000`],
+  ['its flag follows a name pattern', 'bun test -t slow --timeout=30000'],
+])('it reports a bun test when %s', async (_, command) => {
   const ctx = await setupTest();
 
   await writeFile(
     join(ctx.directory, 'package.json'),
-    JSON.stringify({ scripts: { test: `"bun" 'test' --timeout=30000` } }),
+    JSON.stringify({ scripts: { test: command } }),
   );
 
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);

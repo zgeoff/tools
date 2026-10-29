@@ -1,5 +1,7 @@
 import { basename, dirname, posix } from 'node:path';
 import { parseLaneLimits } from './parse-lane-limits.ts';
+import type { ShellWord } from './parse-shell-words.ts';
+import { parseShellWords } from './parse-shell-words.ts';
 import type { RunProgram } from './run-program.ts';
 import { runProgram } from './run-program.ts';
 
@@ -299,18 +301,36 @@ function pickLaneLimit(limits: ReadonlyMap<string, number>, lane: string | null)
     : { lane, limitMs };
 }
 
-const assignmentPattern = /^[A-Za-z_][A-Za-z0-9_]*=/u;
-
 // A wrapper such as `bash with-home.sh bun test` runs the words after it, and these only print them.
 const printCommands = new Set(['echo', 'printf']);
 
-// `--timeout 20000` and `--timeout=20000` both reach `bun test`, and a quoted word, such as a name
-// pattern, is a value rather than a flag. A shell runs a quoted command name as the bare one.
+// The `bun test` options that need a value take the next word whole, even one that starts with
+// `--timeout`, as `bun test --help` lists them.
+const valueOptions = new Set([
+  '-t',
+  '--test-name-pattern',
+  '--timeout',
+  '--rerun-each',
+  '--retry',
+  '--seed',
+  '--coverage-reporter',
+  '--coverage-dir',
+  '--reporter',
+  '--reporter-outfile',
+  '--max-concurrency',
+  '--path-ignore-patterns',
+  '--parallel-delay',
+  '--shard',
+  '--timings',
+]);
+
+// `--timeout 20000` and `--timeout=20000` both reach `bun test`, and the shell removes any quotes or
+// escapes from either form before Bun reads it. Bun reads each word after `--` as a file filter.
 function collectTimeoutValues(command: string): number[] {
   const values: number[] = [];
 
-  for (const words of parseShellCommands(command)) {
-    const name = words.find((word) => word.isQuoted || !assignmentPattern.test(word.text));
+  for (const words of collectShellCommands(parseShellWords(command))) {
+    const name = words.find((word) => !word.isAssignment);
 
     if (name !== undefined && printCommands.has(name.text)) {
       continue;
@@ -324,13 +344,23 @@ function collectTimeoutValues(command: string): number[] {
       continue;
     }
 
-    const args = words.slice(start + 2);
+    const args = words.slice(start + 2).map((word) => word.text);
 
-    for (const [index, word] of args.entries()) {
-      if (isBareWord(word, '--timeout')) {
-        values.push(toTimeoutMs(args[index + 1]?.text));
-      } else if (!word.isQuoted && word.text.startsWith('--timeout=')) {
-        values.push(toTimeoutMs(word.text.slice('--timeout='.length)));
+    for (let index = 0; index < args.length; index += 1) {
+      const arg = args[index] ?? '';
+
+      if (arg === '--') {
+        break;
+      }
+
+      if (arg === '--timeout') {
+        values.push(toTimeoutMs(args[index + 1]));
+      } else if (arg.startsWith('--timeout=')) {
+        values.push(toTimeoutMs(arg.slice('--timeout='.length)));
+      }
+
+      if (valueOptions.has(arg)) {
+        index += 1;
       }
     }
   }
@@ -338,76 +368,18 @@ function collectTimeoutValues(command: string): number[] {
   return values;
 }
 
-interface ShellWord {
-  readonly text: string;
+function collectShellCommands(words: readonly ShellWord[]): ShellWord[][] {
+  const commands: ShellWord[][] = [[]];
 
-  // Any part of the word sat inside quotes or behind a backslash.
-  readonly isQuoted: boolean;
-}
-
-function parseShellCommands(command: string): ShellWord[][] {
-  const commands: ShellWord[][] = [];
-  let words: ShellWord[] = [];
-  let text = '';
-  let isQuoted = false;
-  let hasWord = false;
-  let quote: string | null = null;
-
-  const endWord = () => {
-    if (hasWord) {
-      words.push({ text, isQuoted });
-    }
-
-    text = '';
-    isQuoted = false;
-    hasWord = false;
-  };
-
-  for (let index = 0; index < command.length; index += 1) {
-    const character = command.charAt(index);
-
-    if (quote !== null) {
-      if (character === quote) {
-        quote = null;
-      } else {
-        text += character;
-      }
-    } else if (character === "'" || character === '"') {
-      quote = character;
-      isQuoted = true;
-      hasWord = true;
-    } else if (character === '\\') {
-      index += 1;
-      text += command.charAt(index);
-      isQuoted = true;
-      hasWord = true;
-    } else if (/\s/u.test(character)) {
-      endWord();
-    } else if (character === ';' || character === '|' || character === '&') {
-      endWord();
-
-      commands.push(words);
-
-      words = [];
-
-      if (command.charAt(index + 1) === character) {
-        index += 1;
-      }
+  for (const word of words) {
+    if (word.isOperator) {
+      commands.push([]);
     } else {
-      text += character;
-      hasWord = true;
+      commands.at(-1)?.push(word);
     }
   }
 
-  endWord();
-
-  commands.push(words);
-
   return commands;
-}
-
-function isBareWord(word: ShellWord | undefined, text: string): boolean {
-  return word !== undefined && !word.isQuoted && word.text === text;
 }
 
 function toTimeoutMs(value: string | undefined): number {
