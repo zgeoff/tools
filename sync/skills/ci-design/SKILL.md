@@ -33,6 +33,8 @@ Each line links the section that explains it.
 - [Step scripts](#step-scripts): a `run:` holds one plain command, anything more goes in a
   TypeScript script under `scripts/<area>/`, and the workflow lint checks the rules a parser can
   see.
+- [Dependency gates](#dependency-gates): run the shared check that fails on a stale override,
+  release-age exclude or audit ignore, and never a copy of it.
 - [Path gates](#path-gates): a pull-request job runs only when its input paths change, through a
   `changes` job, and every push to main runs it in full.
 - [Cancelling runs](#cancelling-runs): checks cancel when a newer commit arrives; release, deploy
@@ -196,6 +198,26 @@ The lint reads three terms by these definitions:
 The heavy-check rule binds a private repo alone. In CI the lint reads the run's profile and skips
 the rule in a public repo. The pre-push baseline cannot see the profile, so the hook warns in every
 repo.
+
+## Dependency gates
+
+Run the shared dependency gates check in the pull-request checks of every Bun repo, and never write
+a copy of it. The `Check dependency gates` step of `bun-checks.yml` runs it. A repo with its own
+workflow runs `bun run check:dependency-gates`, a script that the pre-push baseline adds. When you
+add a release-age exclude by hand, give it the dated removal comment that the audit-fix workflow
+writes, so the check can read the date the exclude comes out.
+
+A dependency gate holds a package back on purpose: it pins a version, skips the wait for new
+releases, or ignores an advisory. When its reason is gone, the gate keeps holding the package back,
+and nobody notices unless a check fails.
+
+The
+[dependency gates check](https://github.com/zgeoff/tools/blob/main/docs/architecture/dependency-updates.md#the-dependency-gates-check)
+fails on three kinds of stale gate:
+
+- An override whose pinned version every range in the lockfile allows.
+- A release-age exclude whose removal date has passed.
+- An ignored advisory that is gone, or that a release in range fixes.
 
 ## Path gates
 
