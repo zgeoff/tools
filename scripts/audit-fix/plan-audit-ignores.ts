@@ -1,6 +1,13 @@
 import { buildDateAfter } from './build-date-after.ts';
 import { severities } from './types.ts';
-import type { AuditIgnore, AuditIgnores, AuditReport, FixPlan, Severity } from './types.ts';
+import type {
+  AuditIgnore,
+  AuditIgnores,
+  AuditReport,
+  BlockedPackage,
+  FixPlan,
+  Severity,
+} from './types.ts';
 
 interface PlanAuditIgnoresInput {
   readonly report: AuditReport;
@@ -80,6 +87,7 @@ export function planAuditIgnores(input: PlanAuditIgnoresInput): AuditIgnoresPlan
 interface RemainingAdvisory {
   readonly packageName: string;
   readonly title: string;
+  readonly vulnerableVersions: string;
 }
 
 function collectRemainingAdvisories(
@@ -94,6 +102,7 @@ function collectRemainingAdvisories(
         remaining.set(getAdvisoryID(advisory.url, advisory.id), {
           packageName,
           title: advisory.title,
+          vulnerableVersions: advisory.vulnerable_versions,
         });
       }
     }
@@ -121,18 +130,24 @@ function buildIgnoreChange(
     advisory: advisoryID,
     title: advisory.title,
     package: advisory.packageName,
-    reason: buildIgnoreReason(advisory.packageName, plan),
+    reason: buildIgnoreReason(advisory, plan),
     expires,
   };
 }
 
-function buildIgnoreReason(packageName: string, plan: FixPlan): string {
+function buildIgnoreReason(advisory: RemainingAdvisory, plan: FixPlan): string {
+  const packageName = advisory.packageName;
   const blocked = plan.blocked.find((entry) => entry.name === packageName);
 
   if (blocked !== undefined) {
     const blockers = blocked.blockers
       .map((blocker) => `${blocker.dependent} accepts only ${blocker.range}`)
       .join('; ');
+
+    // bun audit fix names a release outside the vulnerable range as the fix, even one below it.
+    if (isDowngrade(blocked) && !hasPatchedRelease(advisory.vulnerableVersions)) {
+      return `No patched release exists for ${packageName} ${advisory.vulnerableVersions}, and ${blockers}.`;
+    }
 
     return `The fix is ${packageName} ${blocked.to}, but ${blockers}.`;
   }
@@ -142,6 +157,16 @@ function buildIgnoreReason(packageName: string, plan: FixPlan): string {
   }
 
   return `bun audit fix found no fix for ${packageName} that it could apply.`;
+}
+
+function isDowngrade(blocked: BlockedPackage): boolean {
+  return Bun.semver.order(blocked.to, blocked.from) < 0;
+}
+
+function hasPatchedRelease(vulnerableVersions: string): boolean {
+  return vulnerableVersions
+    .split('||')
+    .every((comparators) => /(?:^|[\s,])<(?!=)/u.test(comparators));
 }
 
 function toAuditIgnore(change: IgnoreChange): AuditIgnore {
