@@ -122,6 +122,32 @@ test('it reports each problem of a commit that is not a Conventional Commit at i
   ]);
 });
 
+test('it reports nothing for no range, though HEAD is not a Conventional Commit', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'tidy up'}`.cwd(ctx.directory).env(ctx.env);
+
+  const stub = buildStubCommitlint(ctx.commitlint, [
+    {
+      exitCode: 1,
+      stdout:
+        '⧗   --- input ---\ntidy up\n✖   subject may not be empty [subject-empty]\n\n✖   found 1 problems, 0 warnings\n',
+      stderr: '',
+    },
+  ]);
+
+  const problems = runCommitsCheck({
+    cwd: ctx.directory,
+    runProgram: stub.runProgram,
+    ranges: [],
+    env: ctx.env,
+    commitlint: ctx.commitlint,
+    config: ctx.config,
+  });
+
+  expect(problems).toStrictEqual([]);
+});
+
 test('it reports a commit that is not a Conventional Commit when a later commit is', async () => {
   const ctx = await setupTest();
 

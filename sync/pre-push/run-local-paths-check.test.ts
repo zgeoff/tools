@@ -92,6 +92,25 @@ test('it reports an added line that holds the home directory at its path and lin
   ]);
 });
 
+test('it reports nothing for no range, though HEAD adds the home directory', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'greet.txt'), `cache: ${ctx.directory}/.cache/greeting\n`);
+
+  await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'feat: add the greeting'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = runLocalPathsCheck({
+    cwd: ctx.directory,
+    runProgram,
+    ranges: [],
+    env: ctx.env,
+    host: 'greeter-box',
+  });
+
+  expect(findings).toStrictEqual([]);
+});
+
 test('it reports an added line that holds the host name as a whole word', async () => {
   const ctx = await setupTest();
 
