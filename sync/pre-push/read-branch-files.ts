@@ -5,6 +5,9 @@ interface ReadBranchFilesOptions {
 
   // The whole environment of the git runs; left out, they inherit this process's.
   readonly env?: Readonly<Record<string, string | undefined>>;
+
+  // Lists the paths the branch deletes too, which a check that compares the disk with HEAD needs.
+  readonly withDeleted?: boolean;
 }
 
 // lefthook's {push_files} lists all of history for a branch with no upstream, so the pre-push
@@ -18,7 +21,7 @@ export async function readBranchFiles(
     'diff',
     '--name-only',
     '--no-renames',
-    '--diff-filter=d',
+    ...(options.withDeleted === true ? [] : ['--diff-filter=d']),
     base,
     'HEAD',
   ]);

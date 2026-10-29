@@ -91,6 +91,18 @@ test('it leaves out a file the branch deleted', async () => {
   expect(files).toStrictEqual(['a.ts']);
 });
 
+test('it lists a file the branch deleted when asked for deleted paths', async () => {
+  const ctx = await setupTest();
+
+  await ctx.runGit('switch', '--quiet', '--create', 'feature');
+  await ctx.runGit('rm', '--quiet', 'README.md');
+  await ctx.createCommit({ 'a.ts': 'a' });
+
+  const files = await readBranchFiles({ cwd: ctx.repo, env: ctx.env, withDeleted: true });
+
+  expect(files).toIncludeSameMembers(['README.md', 'a.ts']);
+});
+
 test('it lists the new path of a file the branch renamed', async () => {
   const ctx = await setupTest();
 
