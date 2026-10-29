@@ -33,8 +33,8 @@ Each line links the section that explains it.
 - [Step scripts](#step-scripts): a `run:` holds one plain command, anything more goes in a
   TypeScript script under `scripts/<area>/`, and the workflow lint checks the rules a parser can
   see.
-- [Dependency gates](#dependency-gates): the pull-request checks fail on a stale override, age-gate
-  exclude or audit ignore, through the shared check and never a copy of it.
+- [Dependency gates](#dependency-gates): run the shared check that fails on a stale override,
+  release-age exclude or audit ignore, and never a copy of it.
 - [Path gates](#path-gates): a pull-request job runs only when its input paths change, through a
   `changes` job, and every push to main runs it in full.
 - [Cancelling runs](#cancelling-runs): checks cancel when a newer commit arrives; release, deploy
@@ -200,15 +200,23 @@ repo.
 
 ## Dependency gates
 
-A Bun repo's pull-request checks fail on a stale dependency gate: a root override that every range
-in the lockfile admits, an age-gate exclude past the removal date in its comment, or an audit ignore
-whose advisory is gone or has a fix in range. A gate that outlives its reason holds a dependency
-back with no one to notice. The `Check dependency gates` step of `bun-checks.yml` runs the shared
-check. A repo that writes its own workflow runs `bun run check:dependency-gates`, which the pre-push
-baseline delivers, and never keeps a copy of the check. Give each hand-written age-gate exclude the
-removal comment that the audit-fix workflow writes, so the check can date it. The
+Run the shared dependency gates check in the pull-request checks of every Bun repo, and never write
+a copy of it. The `Check dependency gates` step of `bun-checks.yml` runs it. A repo with its own
+workflow runs `bun run check:dependency-gates`, a script that the pre-push baseline adds. When you
+add a release-age exclude by hand, give it the dated removal comment that the audit-fix workflow
+writes, so the check can read the date the exclude comes out.
+
+A dependency gate holds a package back on purpose: it pins a version, skips the wait for new
+releases, or ignores an advisory. When its reason is gone, the gate keeps holding the package back,
+and nobody notices unless a check fails.
+
+The
 [dependency gates check](https://github.com/zgeoff/tools/blob/main/docs/architecture/dependency-updates.md#the-dependency-gates-check)
-lists what each gate needs to pass.
+fails on three kinds of stale gate:
+
+- An override whose pinned version every range in the lockfile allows.
+- A release-age exclude whose removal date has passed.
+- An ignored advisory that is gone, or that a release in range fixes.
 
 ## Path gates
 
