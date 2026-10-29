@@ -44,12 +44,11 @@ function runGit(options: Readonly<UncommittedCheckOptions>, args: readonly strin
   return result.stdout;
 }
 
-async function runCLI(): Promise<void> {
+function runCLI(): void {
   const cwd = process.cwd();
 
   try {
-    const files = await readBranchFiles({ cwd, withDeleted: true });
-
+    const files = readBranchFiles({ cwd, env: process.env, runProgram, withDeleted: true });
     const changed = runUncommittedCheck({ cwd, env: process.env, files, runProgram });
 
     if (changed.length > 0) {
@@ -69,5 +68,5 @@ async function runCLI(): Promise<void> {
 }
 
 if (import.meta.main) {
-  await runCLI();
+  runCLI();
 }

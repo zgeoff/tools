@@ -1,10 +1,11 @@
 import { readBranchBase } from './read-branch-base.ts';
+import type { RunProgram } from './run-program.ts';
+import { runProgram } from './run-program.ts';
 
 interface ReadBranchFilesOptions {
   readonly cwd: string;
-
-  // The whole environment of the git runs; left out, they inherit this process's.
-  readonly env?: Readonly<Record<string, string | undefined>>;
+  readonly env: Readonly<Record<string, string | undefined>>;
+  readonly runProgram: RunProgram;
 
   // Lists the paths the branch deletes too, which a check that compares the disk with HEAD needs.
   readonly withDeleted?: boolean;
@@ -12,20 +13,22 @@ interface ReadBranchFilesOptions {
 
 // lefthook's {push_files} lists all of history for a branch with no upstream, so the pre-push
 // baseline reads its file list from here.
-export async function readBranchFiles(
-  options: Readonly<ReadBranchFilesOptions>,
-): Promise<string[]> {
-  const base = await readBranchBase(options);
+export function readBranchFiles(options: Readonly<ReadBranchFilesOptions>): string[] {
+  const base = readBranchBase(options);
 
-  const diff = await runGit(options, [
-    'diff',
-    '--name-only',
-    '-z',
-    '--no-renames',
-    ...(options.withDeleted === true ? [] : ['--diff-filter=d']),
-    base,
-    'HEAD',
-  ]);
+  const diff = options.runProgram(
+    [
+      'git',
+      'diff',
+      '--name-only',
+      '-z',
+      '--no-renames',
+      ...(options.withDeleted === true ? [] : ['--diff-filter=d']),
+      base,
+      'HEAD',
+    ],
+    { cwd: options.cwd, env: options.env },
+  );
 
   if (diff.exitCode !== 0) {
     throw new Error(`git diff failed: ${diff.stderr.trim()}`);
@@ -35,27 +38,9 @@ export async function readBranchFiles(
   return diff.stdout.split('\0').filter((path) => path !== '');
 }
 
-async function runGit(options: Readonly<ReadBranchFilesOptions>, args: readonly string[]) {
-  const subprocess = Bun.spawn(['git', ...args], {
-    cwd: options.cwd,
-    ...(options.env === undefined ? {} : { env: { ...options.env } }),
-    stdin: 'ignore',
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
-
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(subprocess.stdout).text(),
-    new Response(subprocess.stderr).text(),
-    subprocess.exited,
-  ]);
-
-  return { exitCode, stdout, stderr };
-}
-
-async function runCLI(): Promise<void> {
+function runCLI(): void {
   try {
-    const files = await readBranchFiles({ cwd: process.cwd() });
+    const files = readBranchFiles({ cwd: process.cwd(), env: process.env, runProgram });
 
     if (files.length > 0) {
       process.stdout.write(`${files.join('\n')}\n`);
@@ -70,5 +55,5 @@ async function runCLI(): Promise<void> {
 }
 
 if (import.meta.main) {
-  await runCLI();
+  runCLI();
 }
