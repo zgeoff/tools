@@ -85,7 +85,7 @@ The entry delivers these files, and their tests stay in tools:
   in a `package.json` script, and each `bunfig.toml` whose `[test] timeout` is above it, as
   [the test timeout check](./oxlint-config-tests.md#the-test-timeout-check) describes.
 - `scripts/run-uncommitted-check.ts` — the uncommitted check, which reads `git status` for each file
-  the branch changes or deletes.
+  the branch changes and looks on disk for each file it deletes.
 - `scripts/run-workflows-check.ts` — the workflow lint, which reads the workflow files that `HEAD`
   holds and warns on each fault. The `Lint workflows` step of `bun-checks.yml` downloads it from
   tools and runs it over every workflow.

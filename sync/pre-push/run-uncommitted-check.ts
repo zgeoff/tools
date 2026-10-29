@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { readBranchFiles } from './read-branch-files.ts';
 import type { RunProgram } from './run-program.ts';
 import { runProgram } from './run-program.ts';
@@ -13,25 +15,33 @@ export interface UncommittedCheckOptions {
 }
 
 // The later checks read the disk, so a change to a pushed file that is not committed would hide a
-// fault in the pushed commit. git status lists index, disk and untracked changes, such as a deleted
-// file restored on disk, and it lists every path, so no file name reaches its argv.
+// fault in the pushed commit. A file the branch deletes fails when it is back on disk, even under an
+// ignore rule. Each git call lists every path, so no file name reaches its argv.
 export function runUncommittedCheck(options: Readonly<UncommittedCheckOptions>): string[] {
-  const result = options.runProgram(
-    ['git', 'status', '--porcelain=v1', '-z', '--no-renames', '--untracked-files=all'],
-    { cwd: options.cwd, env: options.env },
+  // Each entry is two status letters, a space and the path.
+  const changed = new Set(
+    runGit(options, ['status', '--porcelain=v1', '-z', '--no-renames', '--untracked-files=no'])
+      .split('\0')
+      .map((entry) => entry.slice(3)),
   );
 
+  const tracked = new Set(
+    runGit(options, ['ls-tree', '-r', '-z', '--full-tree', '--name-only', 'HEAD']).split('\0'),
+  );
+
+  return options.files.filter(
+    (path) => changed.has(path) || (!tracked.has(path) && existsSync(join(options.cwd, path))),
+  );
+}
+
+function runGit(options: Readonly<UncommittedCheckOptions>, args: readonly string[]): string {
+  const result = options.runProgram(['git', ...args], { cwd: options.cwd, env: options.env });
+
   if (result.exitCode !== 0) {
-    throw new Error(`git status failed: ${result.stderr.trim()}`);
+    throw new Error(`git ${args[0]} failed: ${result.stderr.trim()}`);
   }
 
-  const files = new Set(options.files);
-
-  // Each entry is two status letters, a space and the path.
-  return result.stdout
-    .split('\0')
-    .map((entry) => entry.slice(3))
-    .filter((path) => files.has(path));
+  return result.stdout;
 }
 
 async function runCLI(): Promise<void> {

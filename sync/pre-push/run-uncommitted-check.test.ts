@@ -100,6 +100,47 @@ test('it returns a file the push deletes that is restored on disk and left untra
   expect(changed).toStrictEqual(['helper.ts']);
 });
 
+test('it returns a file the push deletes that is restored on disk under an ignore rule', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createCommit({ '.gitignore': '*.log\n' });
+
+  await writeFile(join(ctx.repo, 'build.log'), 'done\n');
+
+  await ctx.runGit('add', '--force', 'build.log');
+  await ctx.runGit('commit', '--quiet', '-m', 'add the log');
+  await ctx.runGit('rm', '--quiet', 'build.log');
+  await ctx.runGit('commit', '--quiet', '-m', 'remove the log');
+
+  await writeFile(join(ctx.repo, 'build.log'), 'done\n');
+
+  const changed = runUncommittedCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    files: ['build.log'],
+    runProgram,
+  });
+
+  expect(changed).toStrictEqual(['build.log']);
+});
+
+test('it returns nothing for a file the push deletes that stays off the disk', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createCommit({ 'helper.ts': 'export {};\n' });
+  await ctx.runGit('rm', '--quiet', 'helper.ts');
+  await ctx.runGit('commit', '--quiet', '-m', 'remove the helper');
+
+  const changed = runUncommittedCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    files: ['helper.ts'],
+    runProgram,
+  });
+
+  expect(changed).toStrictEqual([]);
+});
+
 test('it returns a file whose staged change the disk undoes', async () => {
   const ctx = await setupTest();
 
