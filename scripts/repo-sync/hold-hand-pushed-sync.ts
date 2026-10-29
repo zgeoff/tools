@@ -31,7 +31,20 @@ export async function holdHandPushedSync(
 
   const listed = await runCheckedCommand(
     options.runCommand,
-    ['gh', 'api', `repos/${repo}/pulls?state=open&head=${owner}:${branch}`],
+
+    // gh api reads ":repo" in a path as a placeholder that it fills from a local checkout, which
+    // this job lacks, so the head filter goes in a field.
+    [
+      'gh',
+      'api',
+      '-X',
+      'GET',
+      `repos/${repo}/pulls`,
+      '-f',
+      'state=open',
+      '-f',
+      `head=${owner}:${branch}`,
+    ],
     commandOptions,
   );
 
