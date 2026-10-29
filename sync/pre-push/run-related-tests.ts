@@ -10,15 +10,22 @@ import type { WorkerCountSources } from './read-worker-count.ts';
 // A host with one worker runs each file slower than CI, and a test that passes there must not fail
 // the push.
 const slowHostTestTimeoutMs = 15_000;
-const defaultMaxTestFiles = 50;
+const maxTestFiles = 50;
 
 export type ReadConfigText = (path: string) => string | null;
 
+export type ProbeFile = (path: string) => boolean;
+
+export interface RelatedTestSources {
+  readonly cwd: string;
+  readonly readConfigText: ReadConfigText;
+  readonly probeFile: ProbeFile;
+}
+
 export async function runRelatedTests(
   args: readonly string[],
-  cwd: string,
+  sources: Readonly<RelatedTestSources>,
   workerSources: Readonly<WorkerCountSources>,
-  readConfigText: ReadConfigText,
 ): Promise<number> {
   const options = parseRelatedTestArgs(args);
 
@@ -28,11 +35,7 @@ export async function runRelatedTests(
     return 2;
   }
 
-  const plan = buildRelatedTestPlan(
-    options.paths,
-    resolveRelatedTests(options.paths, cwd, readConfigText),
-    options.maxFiles,
-  );
+  const plan = buildRelatedTestPlan(options.paths, resolveRelatedTests(options.paths, sources));
 
   if (plan.kind === 'skip') {
     process.stdout.write(`run-related-tests: ${plan.message}\n`);
@@ -56,7 +59,7 @@ export async function runRelatedTests(
   // bun test reads a bare argument as a name filter; the ./ makes it a path.
   const run = Bun.spawn(
     ['bun', 'run', 'test', ...flags, ...plan.tests.map((path) => `./${path}`)],
-    { cwd, stdin: 'inherit', stdout: 'inherit', stderr: 'inherit' },
+    { cwd: sources.cwd, stdin: 'inherit', stdout: 'inherit', stderr: 'inherit' },
   );
 
   return run.exited;
@@ -64,17 +67,18 @@ export async function runRelatedTests(
 
 export function resolveRelatedTests(
   paths: readonly string[],
-  cwd: string,
-  readConfigText: ReadConfigText,
+  sources: Readonly<RelatedTestSources>,
 ): string[] {
-  const lanes = [...parseLaneLimits(readConfigText(join(cwd, '.oxlintrc.json'))).keys()];
+  const lanes = [
+    ...parseLaneLimits(sources.readConfigText(join(sources.cwd, '.oxlintrc.json'))).keys(),
+  ];
 
   const selected = new Set<string>();
 
   for (const path of paths) {
     const test = findRelatedTest(path, lanes);
 
-    if (test !== undefined && existsSync(join(cwd, test))) {
+    if (test !== undefined && sources.probeFile(join(sources.cwd, test))) {
       selected.add(test);
     }
   }
@@ -83,44 +87,18 @@ export function resolveRelatedTests(
 }
 
 type RelatedTestArgs =
-  | { readonly kind: 'valid'; readonly maxFiles: number; readonly paths: readonly string[] }
+  | { readonly kind: 'valid'; readonly paths: readonly string[] }
   | { readonly kind: 'invalid'; readonly message: string };
 
-function parseRelatedTestArgs(args: readonly string[]): RelatedTestArgs {
-  const parsed = parseCLIArgs(args);
-
-  if (parsed instanceof Error) {
-    return { kind: 'invalid', message: parsed.message };
-  }
-
-  const maxFiles = parsed.values['max-files'];
-
-  if (maxFiles === undefined) {
-    return { kind: 'valid', maxFiles: defaultMaxTestFiles, paths: parsed.positionals };
-  }
-
-  const count = Number(maxFiles);
-
-  if (!/^[1-9]\d*$/u.test(maxFiles) || !Number.isSafeInteger(count)) {
-    return {
-      kind: 'invalid',
-      message: `--max-files is ${maxFiles}; set it to a whole number above 0`,
-    };
-  }
-
-  return { kind: 'valid', maxFiles: count, paths: parsed.positionals };
-}
-
 // parseArgs throws on an option it does not declare, which the caller reports as a refused input.
-function parseCLIArgs(args: readonly string[]) {
+function parseRelatedTestArgs(args: readonly string[]): RelatedTestArgs {
   try {
-    return parseArgs({
-      args: [...args],
-      options: { 'max-files': { type: 'string' } },
-      allowPositionals: true,
-    });
+    return {
+      kind: 'valid',
+      paths: parseArgs({ args: [...args], options: {}, allowPositionals: true }).positionals,
+    };
   } catch (error) {
-    return error instanceof Error ? error : new Error(String(error));
+    return { kind: 'invalid', message: error instanceof Error ? error.message : String(error) };
   }
 }
 
@@ -128,11 +106,7 @@ type RelatedTestPlan =
   | { readonly kind: 'run'; readonly tests: readonly string[] }
   | { readonly kind: 'skip'; readonly message: string };
 
-function buildRelatedTestPlan(
-  paths: readonly string[],
-  tests: readonly string[],
-  maxFiles: number,
-): RelatedTestPlan {
+function buildRelatedTestPlan(paths: readonly string[], tests: readonly string[]): RelatedTestPlan {
   const shared = paths.find((path) => isSharedTestInput(path));
 
   if (shared !== undefined) {
@@ -142,10 +116,10 @@ function buildRelatedTestPlan(
     };
   }
 
-  if (tests.length > maxFiles) {
+  if (tests.length > maxTestFiles) {
     return {
       kind: 'skip',
-      message: `skipped, because the branch has ${tests.length} related unit test files, over the cap of ${maxFiles}; CI runs the full suite`,
+      message: `skipped, because the branch has ${tests.length} related unit test files, over the cap of ${maxTestFiles}; CI runs the full suite`,
     };
   }
 
@@ -186,7 +160,7 @@ function isLaneFile(path: string, lanes: readonly string[]): boolean {
 if (import.meta.main) {
   const exitCode = await runRelatedTests(
     process.argv.slice(2),
-    process.cwd(),
+    { cwd: process.cwd(), readConfigText: readOptionalFileText, probeFile: existsSync },
     {
       env: process.env,
       cores: availableParallelism(),
@@ -195,7 +169,6 @@ if (import.meta.main) {
       cgroupRoot: '/sys/fs/cgroup',
       readText: readOptionalText,
     },
-    readOptionalFileText,
   );
 
   process.exit(exitCode);

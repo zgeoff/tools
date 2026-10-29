@@ -56,8 +56,7 @@ passes with a notice that CI runs the full suite, in two cases:
 
 - The branch changes a shared test input, a file under a `test-utils/` folder or a `bunfig.toml`,
   which reaches tests beyond the siblings of the files it changes.
-- The branch has more related unit test files than the cap. A repo sets its own cap with
-  `--max-files=<count>` in its `test:related` script.
+- The branch has more than 50 related unit test files.
 
 The job passes `bun test` the [worker count](./memory-caps.md#the-worker-count) as `--parallel`.
 With one worker it also raises the per-test timeout, because a host with one worker runs each file
