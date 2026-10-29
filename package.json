@@ -43,7 +43,7 @@
   },
   "type": "module",
   "scripts": {
-    "prepare": "lefthook install --force || true",
+    "prepare": "lefthook install --force || true; bun run build",
     "typecheck": "bun run --filter '*' typecheck && tsrs -p scripts && tsrs -p sync && tsrs -p test-utils",
     "test": "workers=$(bun sync/pre-push/read-worker-count.ts) && bun test --parallel=$workers --randomize",
     "test:related": "bun sync/pre-push/run-related-tests.ts",
