@@ -29,6 +29,11 @@ pre-push:
   # Sequential, to bound memory on a small host or with parallel agents.
   piped: true
   jobs:
+    # The jobs after this one read the files on disk, so this one fails the
+    # push when a file the branch changes or deletes holds a change that is
+    # not committed, and names each such file.
+    - name: uncommitted
+      run: bun run --silent memory-capped bun run --silent check:uncommitted
     - name: format:check
       run: bun run --silent memory-capped bun run format:check
     # Plain oxlint, without the unused-directive check: a directive for a

@@ -67,6 +67,7 @@
     "check:test-timeouts": "bun sync/pre-push/run-test-timeouts-check.ts",
     "check:dependency-gates": "bun sync/pre-push/dependency-gates/run-dependency-gates-check.ts",
     "check:workflows": "bun sync/pre-push/run-workflows-check.ts",
+    "check:uncommitted": "bun sync/pre-push/run-uncommitted-check.ts",
     "memory-capped": "bash sync/pre-push/run-memory-capped.sh \"$(bun sync/pre-push/read-memory-budget.ts)\""
   },
   "devDependencies": {

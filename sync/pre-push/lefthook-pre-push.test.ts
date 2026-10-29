@@ -86,6 +86,7 @@ test('it leaves the main checkout non-bare when the test job runs in a pre-push 
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -109,6 +110,221 @@ test('it leaves the main checkout non-bare when the test job runs in a pre-push 
   expect(existsSync(join(ctx.worktree, 'sandbox/.git'))).toBeTrue();
 });
 
+test('it fails the push on the uncommitted job and names the file when a file the branch changes holds an uncommitted change', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.worktree, 'guide.md'), '# Guide\n\nA draft that runs too long.\n');
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'true',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
+        'check:workflows': 'true',
+        'check:uncommitted': `bun ${join(import.meta.dir, 'run-uncommitted-check.ts')}`,
+        'memory-capped': 'exec',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  // The fixed copy stays on disk, uncommitted, as the push sends the draft.
+  await writeFile(join(ctx.worktree, 'guide.md'), '# Guide\n\nA short copy.\n');
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  const failedJobs = [...output.matchAll(/^🥊\s+(?<job>\S+)/gmu)].map(
+    (failure) => failure.groups?.['job'],
+  );
+
+  expect(result.exitCode).not.toBe(0);
+  expect(failedJobs).toStrictEqual(['uncommitted']);
+  expect(output).toMatch(/^guide\.md$/mu);
+});
+
+test('it fails the push on the uncommitted job and names the file when a file the branch changes holds a staged change', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.worktree, 'guide.md'), '# Guide\n\nA draft that runs too long.\n');
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'true',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
+        'check:workflows': 'true',
+        'check:uncommitted': `bun ${join(import.meta.dir, 'run-uncommitted-check.ts')}`,
+        'memory-capped': 'exec',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  // The fixed copy sits in the index, uncommitted, so the disk and the index agree.
+  await writeFile(join(ctx.worktree, 'guide.md'), '# Guide\n\nA short copy.\n');
+
+  await $`git add guide.md`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  const failedJobs = [...output.matchAll(/^🥊\s+(?<job>\S+)/gmu)].map(
+    (failure) => failure.groups?.['job'],
+  );
+
+  expect(result.exitCode).not.toBe(0);
+  expect(failedJobs).toStrictEqual(['uncommitted']);
+  expect(output).toMatch(/^guide\.md$/mu);
+});
+
+test('it fails the push on the uncommitted job and names the file when a file the branch deletes is restored on disk', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.main, 'helper.ts'), 'export const greeting = "hello";\n');
+
+  await $`git add helper.ts`.cwd(ctx.main).env(ctx.env);
+  await $`git commit --quiet -m ${'feat: add the helper'}`.cwd(ctx.main).env(ctx.env);
+  await $`git push --quiet origin main`.cwd(ctx.main).env(ctx.env);
+  await $`git merge --quiet --ff-only main`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'true',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
+        'check:workflows': 'true',
+        'check:uncommitted': `bun ${join(import.meta.dir, 'run-uncommitted-check.ts')}`,
+        'memory-capped': 'exec',
+      },
+    }),
+  );
+
+  await $`git rm --quiet helper.ts`.cwd(ctx.worktree).env(ctx.env);
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'refactor: remove the helper'}`.cwd(ctx.worktree).env(ctx.env);
+
+  // The push sends a tree without helper.ts, while the disk and the index hold it again.
+  await $`git checkout HEAD~1 -- helper.ts`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  const failedJobs = [...output.matchAll(/^🥊\s+(?<job>\S+)/gmu)].map(
+    (failure) => failure.groups?.['job'],
+  );
+
+  expect(result.exitCode).not.toBe(0);
+  expect(failedJobs).toStrictEqual(['uncommitted']);
+  expect(output).toMatch(/^helper\.ts$/mu);
+});
+
+test('it passes the push when only a file the branch leaves unchanged holds an uncommitted change', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.main, 'notes.md'), '# Notes\n');
+
+  await $`git add notes.md`.cwd(ctx.main).env(ctx.env);
+  await $`git commit --quiet -m ${'docs: add the notes'}`.cwd(ctx.main).env(ctx.env);
+  await $`git push --quiet origin main`.cwd(ctx.main).env(ctx.env);
+  await $`git merge --quiet --ff-only main`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.worktree, 'fixture.ts'), 'export {};\n');
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'true',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
+        'check:workflows': 'true',
+        'check:uncommitted': `bun ${join(import.meta.dir, 'run-uncommitted-check.ts')}`,
+        'memory-capped': 'exec',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(join(ctx.worktree, 'notes.md'), '# Notes\n\nA line in progress.\n');
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
+
+  expect(result.exitCode).toBe(0);
+});
+
 test('it fails the push on the shell job alone when a shell file the branch changes fails shellcheck', async () => {
   const ctx = await setupTest();
 
@@ -129,6 +345,7 @@ test('it fails the push on the shell job alone when a shell file the branch chan
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -182,6 +399,7 @@ test('it fails the push on the shell job alone when a shell file the branch chan
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -231,6 +449,7 @@ test('it passes the push when only a file the branch leaves unchanged fails the 
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -273,6 +492,7 @@ test('it passes the push when the branch changes a clean file whose name starts 
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -318,6 +538,7 @@ test('it hands every shell file the branch changes to the shell check when the b
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -373,6 +594,7 @@ test('it passes the push with a notice when the machine lacks shfmt', async () =
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -430,6 +652,7 @@ test('it passes the push with a notice when the machine lacks actionlint', async
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -485,6 +708,7 @@ test('it warns and passes the push when the workflow lint faults a workflow call
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': `bun ${join(import.meta.dir, 'run-workflows-check.ts')}`,
+        'check:uncommitted': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -537,6 +761,7 @@ test.skipIf(!canRunActionlint)(
           'check:test-timeouts': 'true',
           'check:dependency-gates': 'true',
           'check:workflows': 'true',
+          'check:uncommitted': 'true',
           'memory-capped': 'exec',
         },
       }),
@@ -597,6 +822,7 @@ test.skipIf(!canRunActionlint)(
           'check:test-timeouts': 'true',
           'check:dependency-gates': 'true',
           'check:workflows': 'true',
+          'check:uncommitted': 'true',
           'memory-capped': 'exec',
         },
       }),
@@ -660,6 +886,7 @@ test.skipIf(!canRunActionlint)(
           'check:test-timeouts': 'true',
           'check:dependency-gates': 'true',
           'check:workflows': 'true',
+          'check:uncommitted': 'true',
           'memory-capped': 'exec',
         },
       }),
@@ -708,6 +935,7 @@ test('it passes the docs job with a notice when the repo has no docs-writing scr
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -770,6 +998,7 @@ test('it fails the push on the docs job when the installed length script rejects
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -825,6 +1054,7 @@ test('it fails the push on the docs job when the installed link script finds a b
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -874,6 +1104,7 @@ test('it fails the push when a commit of the branch fails commitlint', async () 
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -917,6 +1148,7 @@ test('it fails the push when a commit of the branch adds the home directory', as
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -960,6 +1192,7 @@ test('it fails the push when a bunfig.toml raises the test timeout above 5 s', a
         'check:test-timeouts': `bun ${join(import.meta.dir, 'run-test-timeouts-check.ts')}`,
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -1014,6 +1247,7 @@ test('it fails the push when bunfig.toml holds an age-gate exclude past its remo
         'check:test-timeouts': 'true',
         'check:dependency-gates': `bun ${join(import.meta.dir, 'dependency-gates/run-dependency-gates-check.ts')}`,
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
         'memory-capped': 'exec',
       },
     }),
@@ -1194,6 +1428,7 @@ test('it skips the test job with the CI notice when the branch has more than 50 
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
         'memory-capped': `bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024`,
       },
     }),
@@ -1251,6 +1486,7 @@ test('it runs the related tests under the memory cap when the branch has 50 or f
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
 
         'memory-capped': `bash -c 'echo "$*" >> capped.txt; exec bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024 "$@"' memory-capped`,
       },
@@ -1315,6 +1551,7 @@ test('it runs no tests in the hook when the branch changes only lane files', asy
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
         'memory-capped': `bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024`,
       },
     }),
@@ -1364,6 +1601,7 @@ test('it passes the slow-host timeout to the tests when the host gets 1 worker',
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
+        'check:uncommitted': 'true',
         'memory-capped': `bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024`,
       },
     }),
