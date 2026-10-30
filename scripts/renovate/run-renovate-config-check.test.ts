@@ -1,6 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { firstPartyScopes } from '../../sync/pre-push/dependency-gates/first-party-scopes.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import type { CommandOptions, CommandResult } from '../ci/run-command.ts';
@@ -16,6 +17,11 @@ async function setupTest() {
 
   const writeWorkflow = (text: string) =>
     writeTreeFiles(directory, { '.github/workflows/renovate.yml': text });
+
+  const writePreset = (matchPackageNames: readonly string[]) =>
+    writeTreeFiles(directory, {
+      'default.json': JSON.stringify({ packageRules: [{ matchPackageNames }] }),
+    });
 
   // Runs the check; the validator, if it runs, answers with the given result.
   const runCheck = (validatorResult: Readonly<CommandResult>) =>
@@ -33,11 +39,13 @@ async function setupTest() {
       },
     });
 
-  return { directory, calls, errors, writeWorkflow, runCheck };
+  return { directory, calls, errors, writeWorkflow, writePreset, runCheck };
 }
 
 test('it validates default.json strictly at the pinned version and returns the validator exit code', async () => {
   const ctx = await setupTest();
+
+  await ctx.writePreset(firstPartyScopes.map((scope) => `${scope}**`));
 
   await ctx.writeWorkflow(
     'jobs:\n  renovate:\n    steps:\n      - with:\n          renovate-version: 44.1.0\n',
@@ -72,6 +80,8 @@ test('it validates default.json strictly at the pinned version and returns the v
 test('it fails on stderr and runs no validator when renovate.yml pins no single version', async () => {
   const ctx = await setupTest();
 
+  await ctx.writePreset(firstPartyScopes.map((scope) => `${scope}**`));
+
   await ctx.writeWorkflow(
     'jobs:\n  renovate:\n    steps:\n      - uses: renovatebot/github-action@def\n',
   );
@@ -82,6 +92,26 @@ test('it fails on stderr and runs no validator when renovate.yml pins no single 
 
   expect(ctx.errors).toStrictEqual([
     '.github/workflows/renovate.yml: the renovate job holds 0 renovate-version inputs; the check reads exactly one\n',
+  ]);
+
+  expect(ctx.calls).toBeEmpty();
+});
+
+test('it fails on stderr and runs no validator when the first-party rule and the check disagree', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePreset(['@zgeoff/**']);
+
+  await ctx.writeWorkflow(
+    'jobs:\n  renovate:\n    steps:\n      - with:\n          renovate-version: 44.1.0\n',
+  );
+
+  const exitCode = await ctx.runCheck({ exitCode: 0, stdout: '', stderr: '' });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.errors).toStrictEqual([
+    `default.json: the first-party rule matches @zgeoff/**, but the dependency-gates check treats ${firstPartyScopes.map((scope) => `${scope}**`).join(', ')} as first party\n`,
   ]);
 
   expect(ctx.calls).toBeEmpty();

@@ -26,6 +26,8 @@ jobs:
   # repo's renovate.json loads it. The validator takes its version from
   # renovate.yml's renovate-version, so the check reads the preset as the
   # scheduled run does.
+  # The check also fails when the preset's first-party rule and the
+  # dependency-gates check's first-party scopes differ.
   renovate-config:
     runs-on: ubuntu-latest
     timeout-minutes: 10

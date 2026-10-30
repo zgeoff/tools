@@ -1,8 +1,10 @@
 import { join } from 'node:path';
+import { firstPartyScopes } from '../../sync/pre-push/dependency-gates/first-party-scopes.ts';
 import type { FileSystem } from '../ci/file-system.ts';
 import { makeLoggedCommandRunner } from '../ci/make-logged-command-runner.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import type { RunCommand } from '../ci/run-command.ts';
+import { findFirstPartyScopeDrift } from './find-first-party-scope-drift.ts';
 import { parseRenovateVersion } from './parse-renovate-version.ts';
 
 export interface RenovateConfigCheck {
@@ -18,10 +20,19 @@ export interface RenovateConfigCheck {
   readonly writeError: (text: string) => void;
 }
 
-// Returns the validator's exit code, or 1 when renovate.yml pins no single exact version.
 export async function runRenovateConfigCheck(
   check: Readonly<RenovateConfigCheck>,
 ): Promise<number> {
+  const presetText = await check.fileSystem.readText(join(check.cwd, 'default.json'));
+
+  const drift = findFirstPartyScopeDrift(presetText, firstPartyScopes);
+
+  if (drift !== undefined) {
+    check.writeError(`${drift}\n`);
+
+    return 1;
+  }
+
   const workflowText = await check.fileSystem.readText(
     join(check.cwd, '.github/workflows/renovate.yml'),
   );
