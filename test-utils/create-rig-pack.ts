@@ -4,9 +4,8 @@ import { join } from 'node:path';
 import type { LaneContext, LaneStart } from '@zgeoff/rig';
 import { $ } from 'bun';
 import { buildBrowserRun } from '../packages/rig/src/browser/build-browser-run.ts';
+import { laneFiles } from '../packages/rig/src/browser/lane-files.ts';
 import { pickChromeDirs } from '../packages/rig/src/browser/pick-chrome-dirs.ts';
-import { readDirNames } from '../packages/rig/src/browser/read-dir-names.ts';
-import { removeExitedRunDirs } from '../packages/rig/src/browser/remove-exited-run-dirs.ts';
 import { removePath } from '../packages/rig/src/browser/remove-path.ts';
 import { buildRigPackRun } from './build-rig-pack-run.ts';
 import { createRigTarball } from './create-rig-tarball.ts';
@@ -14,6 +13,7 @@ import { fileLocks } from './file-locks.ts';
 import { rigE2EBinVariable } from './get-rig-e2e-bin.ts';
 import { parsePackageBin } from './parse-package-bin.ts';
 import { probeProcess } from './probe-process.ts';
+import { removeExitedRigPacks } from './remove-exited-rig-packs.ts';
 import { systemClock } from './system-clock.ts';
 
 // rig's bin runs from its source, so the tarball, shaped by the files list and the rewritten
@@ -22,10 +22,7 @@ export default async function createRigPack(context: LaneContext): Promise<LaneS
   const sourceDir = join(context.repoRoot, 'packages', 'rig');
   const run = buildRigPackRun(context.repoRoot, hostname(), context.runID);
 
-  await removeExitedRunDirs(run.runsDir, { readDirNames, removePath }, (runID) =>
-    Promise.resolve(probeProcess(Number(runID))),
-  );
-
+  await removeExitedRigPacks(run.runsDir, { files: laneFiles, probeProcess });
   await mkdir(run.runDir, { recursive: true });
 
   await createRigTarball(run.lockPath, {
