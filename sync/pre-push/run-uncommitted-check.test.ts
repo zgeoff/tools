@@ -39,6 +39,7 @@ test('it returns a file the push sends that holds an unstaged change', async () 
     env: ctx.env,
     files: ['guide.md'],
     runProgram,
+    probeFile: () => false,
   });
 
   expect(changed).toStrictEqual(['guide.md']);
@@ -58,6 +59,7 @@ test('it returns a file the push sends that holds a staged change', async () => 
     env: ctx.env,
     files: ['guide.md'],
     runProgram,
+    probeFile: () => false,
   });
 
   expect(changed).toStrictEqual(['guide.md']);
@@ -76,6 +78,7 @@ test('it returns a file the push deletes that is restored on disk', async () => 
     env: ctx.env,
     files: ['helper.ts'],
     runProgram,
+    probeFile: () => false,
   });
 
   expect(changed).toStrictEqual(['helper.ts']);
@@ -88,13 +91,14 @@ test('it returns a file the push deletes that is restored on disk and left untra
   await ctx.runGit('rm', '--quiet', 'helper.ts');
   await ctx.runGit('commit', '--quiet', '-m', 'remove the helper');
 
-  await writeFile(join(ctx.repo, 'helper.ts'), 'export {};\n');
+  const onDisk = new Set([join(ctx.repo, 'helper.ts')]);
 
   const changed = runUncommittedCheck({
     cwd: ctx.repo,
     env: ctx.env,
     files: ['helper.ts'],
     runProgram,
+    probeFile: (path) => onDisk.has(path),
   });
 
   expect(changed).toStrictEqual(['helper.ts']);
@@ -112,13 +116,14 @@ test('it returns a file the push deletes that is restored on disk under an ignor
   await ctx.runGit('rm', '--quiet', 'build.log');
   await ctx.runGit('commit', '--quiet', '-m', 'remove the log');
 
-  await writeFile(join(ctx.repo, 'build.log'), 'done\n');
+  const onDisk = new Set([join(ctx.repo, 'build.log')]);
 
   const changed = runUncommittedCheck({
     cwd: ctx.repo,
     env: ctx.env,
     files: ['build.log'],
     runProgram,
+    probeFile: (path) => onDisk.has(path),
   });
 
   expect(changed).toStrictEqual(['build.log']);
@@ -136,6 +141,7 @@ test('it returns nothing for a file the push deletes that stays off the disk', a
     env: ctx.env,
     files: ['helper.ts'],
     runProgram,
+    probeFile: () => false,
   });
 
   expect(changed).toStrictEqual([]);
@@ -157,6 +163,7 @@ test('it returns a file whose staged change the disk undoes', async () => {
     env: ctx.env,
     files: ['guide.md'],
     runProgram,
+    probeFile: () => false,
   });
 
   expect(changed).toStrictEqual(['guide.md']);
@@ -174,6 +181,7 @@ test('it returns a file whose name holds a byte past ASCII', async () => {
     env: ctx.env,
     files: ['café.md'],
     runProgram,
+    probeFile: () => false,
   });
 
   expect(changed).toStrictEqual(['café.md']);
@@ -191,6 +199,7 @@ test('it returns nothing when only a file outside the push holds a change', asyn
     env: ctx.env,
     files: ['guide.md'],
     runProgram,
+    probeFile: () => false,
   });
 
   expect(changed).toStrictEqual([]);
@@ -200,6 +209,12 @@ test('it throws the git error when the folder is not a repository', async () => 
   const ctx = await setupTest();
 
   expect(() =>
-    runUncommittedCheck({ cwd: ctx.directory, env: ctx.env, files: ['guide.md'], runProgram }),
+    runUncommittedCheck({
+      cwd: ctx.directory,
+      env: ctx.env,
+      files: ['guide.md'],
+      runProgram,
+      probeFile: () => false,
+    }),
   ).toThrow(/^git status failed: /u);
 });
