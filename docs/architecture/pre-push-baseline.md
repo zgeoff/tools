@@ -64,7 +64,9 @@ passes with a notice that CI runs the full suite, in two cases:
 The job passes `bun test` the [worker count](./memory-caps.md#the-worker-count) as `--parallel`.
 With one worker it also raises the per-test timeout, because a host with one worker runs each file
 slower than CI does. The runner holds that timeout as one constant, the only place a run may raise
-the timeout.
+the timeout. tools itself runs this job through `rig related`, which takes the lane suffixes from
+[rig's lane table](./rig.md#the-lane-table) and runs the unit lane in its own process, while the
+delivered runner keeps reading the `lanes` option.
 
 ## The delivered files
 

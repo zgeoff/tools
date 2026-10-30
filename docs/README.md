@@ -10,6 +10,8 @@ The docs of tools: how its shared files and packages work, and the steps a contr
   it delivers.
 - [Memory caps](./architecture/memory-caps.md): `@zgeoff/diet` and the synced script, which run a
   command inside a cgroup memory cap, and their modes.
+- [rig](./architecture/rig.md): `@zgeoff/rig`, the lane table, a lane's run, the browser lane, and
+  how the lint rules read the same limits.
 - [Dependency updates](./architecture/dependency-updates.md): the Renovate preset, the self-hosted
   Renovate run, and the audit-fix workflow.
 - [The Socket config](./architecture/socket-config.md): how the `socket` entry limits Socket's
@@ -33,8 +35,8 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 
 - [Writing skill-gate rules](./guides/skill-gate-rules.md): path gates, tool gates, and the mistakes
   in a rules file that the gate tolerates.
-- [Setting up a browser lane](./guides/browser-lane.md): the command, the preload, and the memory
-  cap of a repo's browser lane.
+- [Setting up the browser lane](./guides/browser-lane.md): adopt rig's browser lane, its build
+  script, page code and memory cap.
 - [Gating Codex edits](./guides/skill-gate-codex.md): register the skill gate as a Codex hook, and
   how the gate counts loads there.
 
