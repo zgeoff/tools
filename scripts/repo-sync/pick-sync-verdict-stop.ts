@@ -6,13 +6,6 @@ export interface SyncVerdictStop {
   readonly line: string;
 }
 
-export function pickSyncVerdictStop(
-  verdict: SyncCommitVerdict,
-  commit: string,
-): SyncVerdictStop | null {
-  return pickStopOf(verdict, commit);
-}
-
 type SyncCommitVerdictOf<Kind extends SyncCommitVerdict['kind']> = Extract<
   SyncCommitVerdict,
   { readonly kind: Kind }
@@ -35,7 +28,7 @@ const syncVerdictStopPickers: {
   }),
 };
 
-function pickStopOf<Kind extends SyncCommitVerdict['kind']>(
+export function pickSyncVerdictStop<Kind extends SyncCommitVerdict['kind']>(
   verdict: SyncCommitVerdictOf<Kind>,
   commit: string,
 ): SyncVerdictStop | null {
