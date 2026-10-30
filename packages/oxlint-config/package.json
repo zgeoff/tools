@@ -41,6 +41,8 @@
     "test-shape.js",
     "banned-test-calls.js",
     "is-bun-test-file.js",
+    "find-bun-test-name.js",
+    "find-chain-root.js",
     "import-zones.js",
     "import-zones-schema.js",
     "import-zones-entry.js",

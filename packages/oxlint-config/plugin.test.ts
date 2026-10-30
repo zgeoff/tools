@@ -860,7 +860,6 @@ test.each([
 });
 
 test.each([
-  ['an aliased bun:test import', "import { beforeEach as test } from 'bun:test';\n"],
   ['a default import', "import test from './runner';\n"],
   ['a namespace import', "import * as test from './runner';\n"],
   ['a function declaration', 'function test(callback: () => void) {\n  callback();\n}\n'],

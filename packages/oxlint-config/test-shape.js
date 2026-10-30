@@ -1,5 +1,7 @@
 import { basename } from 'node:path';
 import bannedTestCalls from './banned-test-calls.js';
+import findBunTestName from './find-bun-test-name.js';
+import findChainRoot from './find-chain-root.js';
 import getImportedName from './get-imported-name.js';
 import isBunTestFile from './is-bun-test-file.js';
 
@@ -32,7 +34,9 @@ const testShape = {
         emitCallShape(context, node);
       },
       "MemberExpression[computed=false][property.name='toEqual']"(node) {
-        context.report({ node: node.property, messageId: 'toEqual' });
+        if (isBunTestRoot(context, node.object, 'expect')) {
+          context.report({ node: node.property, messageId: 'toEqual' });
+        }
       },
       "ImportDeclaration[source.value='bun:test'][importKind!='type']"(node) {
         for (const specifier of node.specifiers) {
@@ -52,7 +56,8 @@ const titlePattern = /^(?:it |#\w+(?:\.\w+)* )/u;
 
 function emitCallShape(context, node) {
   const callee = node.callee;
-  const name = callee.type === 'CallExpression' ? undefined : findRootName(callee);
+  const root = callee.type === 'CallExpression' ? null : findChainRoot(callee, false);
+  const name = root === null ? null : findBunTestName(context, root);
 
   if (bannedTestCalls.has(name)) {
     const messageId = name === 'describe' || name === 'it' ? name : 'hook';
@@ -62,7 +67,7 @@ function emitCallShape(context, node) {
     return;
   }
 
-  if (!isTestCallee(callee)) {
+  if (!isBunTestRoot(context, callee, 'test')) {
     return;
   }
 
@@ -74,27 +79,10 @@ function emitCallShape(context, node) {
   }
 }
 
-function findRootName(callee) {
-  let current = callee;
+function isBunTestRoot(context, node, name) {
+  const root = findChainRoot(node, true);
 
-  while (current.type === 'MemberExpression' && !current.computed) {
-    current = current.object;
-  }
-
-  return current.type === 'Identifier' ? current.name : undefined;
-}
-
-function isTestCallee(callee) {
-  let current = callee;
-
-  while (
-    current.type === 'CallExpression' ||
-    (current.type === 'MemberExpression' && !current.computed)
-  ) {
-    current = current.type === 'CallExpression' ? current.callee : current.object;
-  }
-
-  return current.type === 'Identifier' && current.name === 'test';
+  return root !== null && findBunTestName(context, root) === name;
 }
 
 function findTitleStart(node) {

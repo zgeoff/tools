@@ -1,5 +1,7 @@
 import { basename } from 'node:path';
 import bannedTestCalls from './banned-test-calls.js';
+import findBunTestName from './find-bun-test-name.js';
+import findChainRoot from './find-chain-root.js';
 import getImportedName from './get-imported-name.js';
 import isBunTestFile from './is-bun-test-file.js';
 
@@ -33,7 +35,7 @@ const setupTestOnly = {
         }
 
         const testNames = collectTestNames(context, program);
-        const shapeCalls = isBunTestFile(program) ? bannedTestCalls : new Set();
+        const isBunTest = isBunTestFile(program);
         const constants = [];
         let hasSetupTest = false;
 
@@ -41,7 +43,7 @@ const setupTestOnly = {
           if (
             allowedStatementTypes.has(statement.type) ||
             isTestCall(statement, testNames) ||
-            isShapeCall(statement, shapeCalls)
+            (isBunTest && isShapeCall(context, statement))
           ) {
             continue;
           }
@@ -153,18 +155,14 @@ function isTestRunner(node, testNames) {
 }
 
 // zgeoff/test-shape reports these calls in a bun:test file with advice of its own
-function isShapeCall(statement, shapeCalls) {
+function isShapeCall(context, statement) {
   if (statement.type !== 'ExpressionStatement' || statement.expression.type !== 'CallExpression') {
     return false;
   }
 
-  let callee = statement.expression.callee;
+  const root = findChainRoot(statement.expression.callee, true);
 
-  while (callee.type === 'CallExpression' || callee.type === 'MemberExpression') {
-    callee = callee.type === 'CallExpression' ? callee.callee : callee.object;
-  }
-
-  return callee.type === 'Identifier' && shapeCalls.has(callee.name);
+  return root !== null && bannedTestCalls.has(findBunTestName(context, root));
 }
 
 const bannedModifiers = new Set(['concurrent', 'skip', 'todo', 'only', 'failing']);

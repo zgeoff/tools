@@ -58,6 +58,21 @@ test.each([
     'top-level `test()` call; `describe` is banned',
   ],
   [
+    'a describe call through a computed modifier',
+    "import { describe, test } from 'bun:test';\n\ndescribe['only']('kettle', () => {\n  test('it boils', () => {});\n});\n",
+    'top-level `test()` call; `describe` is banned',
+  ],
+  [
+    'a describe global that no import declares',
+    "import { test } from 'bun:test';\n\ndescribe('kettle', () => {\n  test('it boils', () => {});\n});\n",
+    'top-level `test()` call; `describe` is banned',
+  ],
+  [
+    'a hook called through an aliased import',
+    "import { beforeEach as test } from 'bun:test';\n\ntest(() => {});\n",
+    '`beforeEach` is banned',
+  ],
+  [
     'a toEqual matcher',
     "import { expect, test } from 'bun:test';\n\ntest('it boils', () => {\n  expect({ cups: 2 }).toEqual({ cups: 2 });\n});\n",
     '`toEqual` is banned',
@@ -145,6 +160,21 @@ test.each([
 
 test.each([
   [
+    'calls of a describe, an it and a hook that another module exports',
+    'kettle.test.ts',
+    "import { expect, test } from 'bun:test';\nimport { afterEach, describe, it } from './format';\n\ntest('it formats', () => {\n  expect(describe(2)).toBe('two');\n  expect(it('cup')).toBe('a cup');\n  expect(afterEach(1)).toBe(2);\n});\n",
+  ],
+  [
+    'a toEqual method of an object that expect did not make',
+    'kettle.test.ts',
+    "import { expect, test } from 'bun:test';\nimport { buildScale } from './scale';\n\ntest('it weighs', () => {\n  expect(buildScale().toEqual(2)).toBeTrue();\n});\n",
+  ],
+  [
+    'a title of a test function that another module exports',
+    'kettle.test.ts',
+    "import { expect } from 'bun:test';\nimport { test } from './probe';\n\nexpect(test('boils')).toBeTrue();\n",
+  ],
+  [
     'a test file of another runner',
     'kettle.test.ts',
     "import { describe, expect, it } from 'vitest';\n\ndescribe('kettle', () => {\n  it('boils', () => {\n    expect(2).toEqual(2);\n  });\n});\n",
@@ -173,6 +203,7 @@ test.each([
 });
 
 test.each([
+  ["describe['only']", "describe['only']('kettle', () => {});\n"],
   ['describe', "describe('kettle', () => {});\n"],
   ['describe.each', "describe.each([1])('kettle %d', () => {});\n"],
   ['it', "it('boils', () => {});\n"],
@@ -180,7 +211,7 @@ test.each([
 ])(
   'it leaves a module-level %s in a bun:test file to test-shape alone',
   async (name, statement) => {
-    const [root] = name.split('.');
+    const [root] = name.split(/[.[]/u);
     const source = `import { ${root}, test } from 'bun:test';\n\n${statement}\ntest('it boils', () => {});\n`;
 
     const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', {
@@ -196,6 +227,19 @@ test.each([
 test('it leaves setup-test-only to report a module-level describe in a mod check file', async () => {
   const source =
     "import { describe, test } from 'claude-code/testing';\n\ndescribe('kettle', () => {});\n\ntest('it boils', () => {});\n";
+
+  const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', {
+    'zgeoff/test-shape': 'error',
+    'zgeoff/setup-test-only': 'error',
+  });
+
+  expect(result.stdout).toInclude('zgeoff(setup-test-only)');
+  expect(result.stdout).not.toInclude('zgeoff(test-shape)');
+});
+
+test('it leaves setup-test-only to report a module-level call of a describe from another module', async () => {
+  const source =
+    "import { test } from 'bun:test';\nimport { describe } from './format';\n\ndescribe(2);\n\ntest('it boils', () => {});\n";
 
   const result = await runLintTree({ 'kettle.test.ts': source }, 'kettle.test.ts', {
     'zgeoff/test-shape': 'error',

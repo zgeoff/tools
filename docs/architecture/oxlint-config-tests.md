@@ -52,8 +52,10 @@ modifiers, reports with a message that names `test.skipIf(<condition>)`, the one
 skill allows. A call of `test.concurrent` reports with its own message too, because the tests that
 register cleanup with `onTestFinished` must run in order.
 
-In a file that imports `bun:test`, the rule leaves a call of `describe`, `it` or a hook to
-`zgeoff/test-shape`, so each such call gets one report, with the advice that fits it.
+In a file that imports `bun:test`, the rule leaves a call of Bun's `describe`, `it` or a hook,
+through any chain of modifiers, to `zgeoff/test-shape`, so each such call gets one report, with the
+advice that fits it. A call of a function with one of those names from another module still reports
+here.
 
 A module-level `const` passes only as a skip gate: a declarator that binds at least one name, each
 binding read, and read only at collection time, inside an argument of the test runner's `skipIf` or
@@ -149,12 +151,17 @@ the testing skill. oxlint's own jest and vitest rules match only their runners' 
 miss a `bun:test` file. The rule reports:
 
 - a call of `describe`, `it`, `beforeAll`, `beforeEach`, `afterAll` or `afterEach`, or of one of
-  their modifiers, such as `describe.each`;
-- a `toEqual` matcher;
+  their modifiers, such as `describe.each` or `describe['only']`;
+- a `toEqual` matcher on a value that `expect` made;
 - a `test()` title, in any modifier or `test.each` form, that starts with neither `it ` nor a
   `#<unit> ` prefix, where the unit may be a dotted path such as `#sessions.enrol`;
-- a `bun:test` import that renames a binding or takes the namespace, because the rule finds each
-  call by its name.
+- a `bun:test` import that renames a binding or takes the namespace, so each call reads as the name
+  that `bun:test` gives it.
+
+Each of these checks applies only to Bun's own function: the name at the root of the call resolves
+to an import from `bun:test`, or to a global that the file never declares, which Bun's runner
+provides. A `describe` imported from another module, or a `toEqual` method of another object,
+passes.
 
 A title held in a variable or built by a call passes, because the rule reads only a string or a
 template literal. A file that imports another runner, or only types from `bun:test`, is left alone.
