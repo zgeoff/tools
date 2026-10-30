@@ -71,6 +71,9 @@ The plugin is addressable on its own at `@zgeoff/oxlint-config/plugin` for confi
 - Test files: a test sits beside its module, holds only `setupTest()` and its tests, uses inline
   snapshots, keeps each timeout within its lane's limit, and waits on a condition, never a sleep.
   See [test-file rules](../../docs/architecture/oxlint-config-tests.md).
+- Require functions: `zgeoff/no-require` bans the `require` global and `createRequire`, and
+  `import/no-commonjs` bans CommonJS exports. See
+  [require functions](../../docs/architecture/oxlint-config.md#require-functions).
 - Import boundaries: `zgeoff/import-zones` fails an import that crosses a declared zone boundary.
   See [import zones](../../docs/architecture/oxlint-config-import-zones.md).
 

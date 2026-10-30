@@ -4,12 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runOxlint } from './test-utils/run-oxlint.ts';
 
-async function setupTest(fileName: string, source: string) {
+async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'oxlintrc-test-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
-
-  await writeFile(join(directory, fileName), source);
 
   return { directory };
 }
@@ -23,7 +21,9 @@ test.each([
 ])('it reports max-lines for a 501-line %s: %p', async (fileName, expected) => {
   const lines = Array.from({ length: 501 }, (_, index) => `export const value${index} = 0;`);
 
-  const ctx = await setupTest(fileName, `${lines.join('\n')}\n`);
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, fileName), `${lines.join('\n')}\n`);
 
   const run = await runOxlint(
     ['-c', join(import.meta.dir, 'oxlintrc.json'), fileName],
@@ -37,7 +37,9 @@ test('it reports a module-level helper in a test file', async () => {
   const source =
     "import { expect, test } from 'bun:test';\n\nconst cups = 2;\n\ntest('it pours', () => {\n  expect(cups).toBe(2);\n});\n";
 
-  const ctx = await setupTest('pot.test.ts', source);
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'pot.test.ts'), source);
 
   const run = await runOxlint(
     ['-c', join(import.meta.dir, 'oxlintrc.json'), 'pot.test.ts'],
@@ -48,7 +50,9 @@ test('it reports a module-level helper in a test file', async () => {
 });
 
 test.each(['kettle.ts', 'kettle.test.ts'])('it reports a class in %s', async (fileName) => {
-  const ctx = await setupTest(fileName, 'export class Kettle {}\n');
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, fileName), 'export class Kettle {}\n');
 
   const run = await runOxlint(
     ['-c', join(import.meta.dir, 'oxlintrc.json'), fileName],
@@ -62,7 +66,9 @@ test('it reports a switch and names ts-pattern', async () => {
   const source =
     "export function readTone(tone: 'warm' | 'cool'): number {\n  switch (tone) {\n    case 'warm': {\n      return 1;\n    }\n    default: {\n      return 2;\n    }\n  }\n}\n";
 
-  const ctx = await setupTest('tone.ts', source);
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'tone.ts'), source);
 
   const run = await runOxlint(
     ['-c', join(import.meta.dir, 'oxlintrc.json'), 'tone.ts'],
@@ -76,7 +82,9 @@ test('it reports a switch and names ts-pattern', async () => {
 test('it reports a declaration that lists two variables, but not their order', async () => {
   const source = 'export const width = 3, height = 4;\n';
 
-  const ctx = await setupTest('size.ts', source);
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'size.ts'), source);
 
   const run = await runOxlint(
     ['-c', join(import.meta.dir, 'oxlintrc.json'), 'size.ts'],
@@ -90,7 +98,9 @@ test('it reports a declaration that lists two variables, but not their order', a
 test('it accepts one declaration per variable', async () => {
   const source = 'export const width = 3;\nexport const height = 4;\n';
 
-  const ctx = await setupTest('size.ts', source);
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'size.ts'), source);
 
   const run = await runOxlint(
     ['-c', join(import.meta.dir, 'oxlintrc.json'), 'size.ts'],
@@ -104,7 +114,9 @@ test('it reports a file snapshot matcher', async () => {
   const source =
     "import { expect, test } from 'bun:test';\n\ntest('it renders the banner', () => {\n  expect('ready').toMatchSnapshot();\n});\n";
 
-  const ctx = await setupTest('banner.test.ts', source);
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'banner.test.ts'), source);
 
   const run = await runOxlint(
     ['-c', join(import.meta.dir, 'oxlintrc.json'), 'banner.test.ts'],
@@ -119,8 +131,9 @@ test('it reports a test file with a snapshot file in __snapshots__/', async () =
   const source =
     "import { expect, test } from 'bun:test';\n\ntest('it renders the banner', () => {\n  expect('ready').toBe('ready');\n});\n";
 
-  const ctx = await setupTest('banner.test.ts', source);
+  const ctx = await setupTest();
 
+  await writeFile(join(ctx.directory, 'banner.test.ts'), source);
   await mkdir(join(ctx.directory, '__snapshots__'));
 
   await writeFile(
@@ -153,7 +166,9 @@ test.each([
   ['a variable `mgr`', 'export const mgr = 1;\n', 'zgeoff(no-abbreviated-names)'],
   ['a variable `ms`', 'export const ms = 1;\n', 'zgeoff(no-abbreviated-names)'],
 ])('it reports %s', async (_label, source, rule) => {
-  const ctx = await setupTest('names.ts', source);
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'names.ts'), source);
 
   const run = await runOxlint(
     ['-c', join(import.meta.dir, 'oxlintrc.json'), 'names.ts'],
@@ -164,7 +179,9 @@ test.each([
 });
 
 test('it names `manager` when it reports `mgr`', async () => {
-  const ctx = await setupTest('names.ts', 'export const mgr = 1;\n');
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'names.ts'), 'export const mgr = 1;\n');
 
   const run = await runOxlint(
     ['-c', join(import.meta.dir, 'oxlintrc.json'), 'names.ts'],
@@ -177,7 +194,9 @@ test('it names `manager` when it reports `mgr`', async () => {
 test.each(['x', 'y', 'z', '$', '_', 'ctx', 'id', 'db', 'timeoutMs'])(
   'it accepts a variable `%s`',
   async (name) => {
-    const ctx = await setupTest('names.ts', `export const ${name} = 1;\n`);
+    const ctx = await setupTest();
+
+    await writeFile(join(ctx.directory, 'names.ts'), `export const ${name} = 1;\n`);
 
     const run = await runOxlint(
       ['-c', join(import.meta.dir, 'oxlintrc.json'), 'names.ts'],
@@ -192,7 +211,9 @@ test.each(['x', 'y', 'z', '$', '_', 'ctx', 'id', 'db', 'timeoutMs'])(
 test('it accepts a one-letter type parameter', async () => {
   const source = 'export function buildValue<T>(value: T): T {\n  return value;\n}\n';
 
-  const ctx = await setupTest('names.ts', source);
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'names.ts'), source);
 
   const run = await runOxlint(
     ['-c', join(import.meta.dir, 'oxlintrc.json'), 'names.ts'],
@@ -214,7 +235,9 @@ test.each([
   ['an array element', 'const [s] = [1];\n\nexport const value = s;\n'],
   ['an object key', 'export const value = { s: 1 };\n'],
 ])('it reports a one-letter name in %s', async (_label, source) => {
-  const ctx = await setupTest('names.ts', source);
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'names.ts'), source);
 
   const run = await runOxlint(
     ['-c', join(import.meta.dir, 'oxlintrc.json'), 'names.ts'],
@@ -235,7 +258,9 @@ test.each([
     'const input = Object.fromEntries([["s", 1]]);\nconst { s: session } = input;\n\nexport const value = session;\n',
   ],
 ])('it accepts %s', async (_label, source) => {
-  const ctx = await setupTest('names.ts', source);
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'names.ts'), source);
 
   const run = await runOxlint(
     ['-c', join(import.meta.dir, 'oxlintrc.json'), 'names.ts'],
@@ -279,7 +304,9 @@ test.each([
   ['msg', '`message`'],
   ['ms', 'a name for the value with `Ms` as its unit suffix, such as `timeoutMs`'],
 ] as const)('it reports `%s` as %s', async (name, replacement) => {
-  const ctx = await setupTest('names.ts', `export const ${name} = 1;\n`);
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'names.ts'), `export const ${name} = 1;\n`);
 
   const run = await runOxlint(
     ['-c', join(import.meta.dir, 'oxlintrc.json'), 'names.ts'],
@@ -294,7 +321,9 @@ test.each([
   ['an angle-bracket assertion', 'export const size = <number>JSON.parse("1");\n'],
   ['a double assertion', 'export const size = "1" as unknown as number;\n'],
 ])('it reports %s', async (_label, source) => {
-  const ctx = await setupTest('size.ts', source);
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'size.ts'), source);
 
   const run = await runOxlint(
     ['-c', join(import.meta.dir, 'oxlintrc.json'), 'size.ts'],
@@ -308,7 +337,9 @@ test.each([
   ['an as const assertion', "export const sizes = ['small', 'large'] as const;\n"],
   ['a satisfies check', "export const sizes = ['small', 'large'] satisfies string[];\n"],
 ])('it accepts %s', async (_label, source) => {
-  const ctx = await setupTest('size.ts', source);
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'size.ts'), source);
 
   const run = await runOxlint(
     ['-c', join(import.meta.dir, 'oxlintrc.json'), 'size.ts'],
@@ -319,7 +350,9 @@ test.each([
 });
 
 test('it reports a type argument on a sql tag', async () => {
-  const ctx = await setupTest('rows.ts', 'export const rows = sql<number>`select 1`;\n');
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'rows.ts'), 'export const rows = sql<number>`select 1`;\n');
 
   const run = await runOxlint(
     ['-c', join(import.meta.dir, 'oxlintrc.json'), 'rows.ts'],
@@ -327,4 +360,30 @@ test('it reports a type argument on a sql tag', async () => {
   );
 
   expect(run.stdout).toInclude('zgeoff(no-hidden-cast)');
+});
+
+test('it reports the require global under the node env', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'brew.ts'), "export const kettle = require('./kettle');\n");
+
+  const run = await runOxlint(
+    ['-c', join(import.meta.dir, 'oxlintrc.json'), 'brew.ts'],
+    ctx.directory,
+  );
+
+  expect(run.stdout).toInclude('zgeoff(no-require)');
+});
+
+test('it reports a CommonJS export', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'brew.ts'), 'module.exports = { cups: 2 };\n');
+
+  const run = await runOxlint(
+    ['-c', join(import.meta.dir, 'oxlintrc.json'), 'brew.ts'],
+    ctx.directory,
+  );
+
+  expect(run.stdout).toInclude('import(no-commonjs)');
 });

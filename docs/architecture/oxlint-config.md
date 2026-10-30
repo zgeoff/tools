@@ -2,9 +2,10 @@
 
 `@zgeoff/oxlint-config` is the shareable oxlint config of the zgeoff repos, with a bundled JS plugin
 of `zgeoff/*` rules for the shapes that no native oxlint rule can express. This doc covers the
-config's ban on type assertions, its comment rules, and `zgeoff/no-restricted-words`. Three more
-docs cover the plugin's other rules: [code style](./oxlint-config-code-style.md),
-[test files](./oxlint-config-tests.md) and [import zones](./oxlint-config-import-zones.md). The
+config's ban on type assertions, its comment rules, its ban on require functions, and
+`zgeoff/no-restricted-words`. Three more docs cover the plugin's other rules:
+[code style](./oxlint-config-code-style.md), [test files](./oxlint-config-tests.md) and
+[import zones](./oxlint-config-import-zones.md). The
 [package README](../../packages/oxlint-config/README.md) holds the install and the setup.
 
 The plugin's other rules each check one convention. `zgeoff/function-verb` bans the vague and
@@ -60,6 +61,19 @@ whitespace change.
 Every repo runs both rules as this config ships them. `zgeoff/no-comment-rule-override` reports a
 repo-root `.oxlintrc*.json` that sets either rule, once per lint run, so a repo cannot turn them off
 or loosen `max`.
+
+## Require functions
+
+A module loads another module through `import`, because a require function loads a module that the
+import rules never see: `import/no-cycle`, `zgeoff/import-zones` and a repo's
+`no-restricted-imports` all read import declarations only. `zgeoff/no-require` reports each read of
+the `require` global and each `createRequire` from `node:module` or `module`, whether imported by
+name, or read or destructured off a default or namespace import. `import/no-commonjs` reports
+`module.exports` and `exports`.
+
+The ban is a plugin rule rather than options of `no-restricted-imports` and `no-restricted-globals`,
+because oxlint replaces a rule's options when a repo config or an override sets the rule again. A
+repo that restricts its own imports would drop the shared ban without a warning.
 
 ## `zgeoff/no-restricted-words`
 

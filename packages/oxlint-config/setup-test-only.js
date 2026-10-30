@@ -1,4 +1,5 @@
 import { basename } from 'node:path';
+import getImportedName from './get-imported-name.js';
 
 const testFilePattern = /\.test\.tsx?$/u;
 
@@ -93,12 +94,6 @@ function collectTestNames(context, program) {
   }
 
   return new Set(names);
-}
-
-function getImportedName(specifier) {
-  return specifier.imported.type === 'Identifier'
-    ? specifier.imported.name
-    : specifier.imported.value;
 }
 
 // ESM puts module-level bindings in a module scope nested under the global one

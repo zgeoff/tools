@@ -1,5 +1,6 @@
 import { basename } from 'node:path';
 import findFunctionName from './find-function-name.js';
+import getImportedName from './get-imported-name.js';
 
 const testFilePattern = /\.test\.tsx?$/u;
 
@@ -98,12 +99,6 @@ function emitSleepReads(context, variable, names) {
       emitSleep(context, node);
     }
   }
-}
-
-function getImportedName(specifier) {
-  return specifier.imported.type === 'Identifier'
-    ? specifier.imported.name
-    : specifier.imported.value;
 }
 
 function isWrappedTimeout(call) {
