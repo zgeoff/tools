@@ -1,10 +1,10 @@
-import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { isRecord } from '@zgeoff/std';
 import type { Harness } from '../harness.ts';
 import { parseSkillGateRules } from '../skill-gate/parse-skill-gate-rules.ts';
 import { buildHookPlan } from './build-hook-plan.ts';
 import { buildHookSettings } from './build-hook-settings.ts';
+import type { InitFileSystem } from './types.ts';
 
 const SETTINGS_FILES: readonly { readonly harness: Harness; readonly file: string }[] = [
   { harness: 'claude-code', file: '.claude/settings.json' },
@@ -15,19 +15,24 @@ export type InitResult =
   | { readonly ok: true; readonly written: readonly string[] }
   | { readonly ok: false; readonly error: string };
 
-export async function runInit(projectDir: string): Promise<InitResult> {
-  const gatedTools = await readGatedTools(projectDir);
+export interface InitOptions {
+  readonly projectDir: string;
+  readonly fileSystem: InitFileSystem;
+}
+
+export async function runInit(options: InitOptions): Promise<InitResult> {
+  const gatedTools = await readGatedTools(options);
 
   if (typeof gatedTools === 'string') {
     return { ok: false, error: gatedTools };
   }
 
-  const updates: { readonly filePath: string; readonly text: string }[] = [];
+  const updates: { readonly file: string; readonly filePath: string; readonly text: string }[] = [];
 
   for (const entry of SETTINGS_FILES) {
-    const filePath = path.join(projectDir, entry.file);
+    const filePath = path.join(options.projectDir, entry.file);
 
-    const settings = await readSettings(filePath);
+    const settings = await readSettings(options.fileSystem, filePath);
 
     if (typeof settings === 'string') {
       return { ok: false, error: `${entry.file} ${settings}` };
@@ -39,26 +44,28 @@ export async function runInit(projectDir: string): Promise<InitResult> {
       return { ok: false, error: `${entry.file}: ${updated}` };
     }
 
-    updates.push({ filePath, text: `${JSON.stringify(updated, null, 2)}\n` });
+    updates.push({ file: entry.file, filePath, text: `${JSON.stringify(updated, null, 2)}\n` });
   }
 
   for (const update of updates) {
-    await mkdir(path.dirname(update.filePath), { recursive: true });
+    const error = await writeUpdate(options.fileSystem, update.filePath, update.text);
 
-    await Bun.write(update.filePath, update.text);
+    if (error !== null) {
+      return { ok: false, error: `${update.file} could not be written: ${error}` };
+    }
   }
 
   return { ok: true, written: SETTINGS_FILES.map((entry) => entry.file) };
 }
 
-async function readGatedTools(projectDir: string): Promise<readonly string[] | string> {
-  const rulesFile = Bun.file(path.join(projectDir, '.claude', 'skill-gate.json'));
+async function readGatedTools(options: InitOptions): Promise<readonly string[] | string> {
+  const rulesText = await options.fileSystem.readText(
+    path.join(options.projectDir, '.claude', 'skill-gate.json'),
+  );
 
-  if (!(await rulesFile.exists())) {
+  if (rulesText === null) {
     return [];
   }
-
-  const rulesText = await rulesFile.text();
 
   const parsed = parseSkillGateRules(rulesText);
 
@@ -69,14 +76,15 @@ async function readGatedTools(projectDir: string): Promise<readonly string[] | s
   return [...new Set(parsed.tools.map((gate) => gate.tool))];
 }
 
-async function readSettings(filePath: string): Promise<Readonly<Record<string, unknown>> | string> {
-  const file = Bun.file(filePath);
+async function readSettings(
+  fileSystem: InitFileSystem,
+  filePath: string,
+): Promise<Readonly<Record<string, unknown>> | string> {
+  const text = await fileSystem.readText(filePath);
 
-  if (!(await file.exists())) {
+  if (text === null) {
     return {};
   }
-
-  const text = await file.text();
 
   const value = parseJSON(text);
 
@@ -92,5 +100,19 @@ function parseJSON(text: string): unknown {
     return JSON.parse(text);
   } catch (error) {
     return error instanceof Error ? error : new Error(String(error));
+  }
+}
+
+async function writeUpdate(
+  fileSystem: InitFileSystem,
+  filePath: string,
+  text: string,
+): Promise<string | null> {
+  try {
+    await fileSystem.writeText(filePath, text);
+
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
   }
 }

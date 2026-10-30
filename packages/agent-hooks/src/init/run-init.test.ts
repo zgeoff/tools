@@ -1,7 +1,8 @@
-import { expect, onTestFinished, test } from 'bun:test';
+import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { bunFileSystem } from './bun-file-system.ts';
 import { runInit } from './run-init.ts';
 
 async function setupTest() {
@@ -28,7 +29,7 @@ test('it writes both settings files with a matcher for each gated tool', async (
     }),
   );
 
-  const result = await runInit(ctx.project);
+  const result = await runInit({ projectDir: ctx.project, fileSystem: bunFileSystem });
 
   expect(result).toStrictEqual({
     ok: true,
@@ -50,12 +51,12 @@ test('it writes both settings files with a matcher for each gated tool', async (
 test('it leaves both files byte for byte the same on a second run', async () => {
   const ctx = await setupTest();
 
-  await runInit(ctx.project);
+  await runInit({ projectDir: ctx.project, fileSystem: bunFileSystem });
 
   const firstClaude = await readFile(join(ctx.project, '.claude/settings.json'), 'utf8');
   const firstCodex = await readFile(join(ctx.project, '.codex/hooks.json'), 'utf8');
 
-  await runInit(ctx.project);
+  await runInit({ projectDir: ctx.project, fileSystem: bunFileSystem });
 
   const secondClaude = await readFile(join(ctx.project, '.claude/settings.json'), 'utf8');
   const secondCodex = await readFile(join(ctx.project, '.codex/hooks.json'), 'utf8');
@@ -69,7 +70,7 @@ test('it refuses a broken rules file and writes nothing', async () => {
 
   await writeFile(join(ctx.project, '.claude/skill-gate.json'), '{"gates": {}}');
 
-  const result = await runInit(ctx.project);
+  const result = await runInit({ projectDir: ctx.project, fileSystem: bunFileSystem });
 
   expect(result).toStrictEqual({
     ok: false,
@@ -87,7 +88,7 @@ test('it refuses a settings file that is not JSON and leaves both files alone', 
   await mkdir(join(ctx.project, '.codex'));
   await writeFile(join(ctx.project, '.codex/hooks.json'), '{ "hooks": ');
 
-  const result = await runInit(ctx.project);
+  const result = await runInit({ projectDir: ctx.project, fileSystem: bunFileSystem });
 
   expect(result).toStrictEqual({
     ok: false,
@@ -99,4 +100,23 @@ test('it refuses a settings file that is not JSON and leaves both files alone', 
 
   expect(claudeExists).toBeFalse();
   expect(codexText).toBe('{ "hooks": ');
+});
+
+test('it reports the settings file it could not write and stops before the next one', async () => {
+  const writeText = mock((filePath: string) =>
+    Promise.reject(new Error(`EACCES: permission denied, open '${filePath}'`)),
+  );
+
+  const result = await runInit({
+    projectDir: '/work/ledger',
+    fileSystem: { readText: () => Promise.resolve(null), writeText },
+  });
+
+  expect(result).toStrictEqual({
+    ok: false,
+    error:
+      ".claude/settings.json could not be written: EACCES: permission denied, open '/work/ledger/.claude/settings.json'",
+  });
+
+  expect(writeText).toHaveBeenCalledTimes(1);
 });
