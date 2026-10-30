@@ -1,5 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
@@ -7,6 +8,14 @@ import invariant from 'tiny-invariant';
 // Bun's skipIf takes a boolean at collection time, so the modes this host supports are probed once
 // here: a GitHub runner has the systemd-sudo mode, a root shell without systemd the cgroupfs one.
 const modesOutput = await $`bash ${join(import.meta.dir, 'diet.sh')} --modes`.text();
+
+// memory.peak needs Linux 5.19, and the root cgroup never has one, so the probe reads this
+// process's own cgroup.
+const membership = await readFile('/proc/self/cgroup', 'utf8');
+
+const hasMemoryPeak = existsSync(
+  join('/sys/fs/cgroup', membership.replace(/^0::/u, '').trim(), 'memory.peak'),
+);
 
 function setupTest() {
   const scriptPath = join(import.meta.dir, 'diet.sh');
@@ -347,6 +356,23 @@ test.each([['SIGHUP'], ['SIGINT'], ['SIGTERM']] as const)(
       exitCode: 0,
       stdout: `ready\ngot ${name}\n`,
     });
+  },
+);
+
+test.skipIf(modesOutput === '' || !hasMemoryPeak)(
+  'it reports the memory.peak of a run the kernel OOM-killed, above the sampled peak',
+  async () => {
+    const ctx = setupTest();
+
+    // The allocation reaches the cap well inside one 200 ms sample interval, so the sampled peak
+    // stays below it.
+    const result =
+      await $`bash ${ctx.scriptPath} --budget 128M -- ${ctx.bun} -e ${'Buffer.alloc(256 * 1024 * 1024, 1)'}`
+        .env(ctx.env)
+        .nothrow()
+        .quiet();
+
+    expect(result.stderr.toString()).toStartWith('diet: peaked at 128 MB of 128 MB\n');
   },
 );
 
