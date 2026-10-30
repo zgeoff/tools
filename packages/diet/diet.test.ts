@@ -457,10 +457,11 @@ test('it fails with the command exit status when the command fails under its bud
 test('it runs the command uncapped with a warning when DIET_MODE is none', async () => {
   const ctx = setupTest();
 
-  const result = await $`bash ${ctx.scriptPath} --budget 128M -- bash -c ${'echo done'}`
-    .env({ ...ctx.env, DIET_MODE: 'none' })
-    .nothrow()
-    .quiet();
+  const result =
+    await $`bash ${ctx.scriptPath} --budget 8M -- ${ctx.bun} -e ${"Buffer.alloc(32 * 1024 * 1024, 1); console.log('done')"}`
+      .env({ ...ctx.env, DIET_MODE: 'none' })
+      .nothrow()
+      .quiet();
 
   expect({
     exitCode: result.exitCode,
