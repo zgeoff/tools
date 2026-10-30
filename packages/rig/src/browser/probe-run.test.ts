@@ -1,16 +1,14 @@
 import { expect, mock, test } from 'bun:test';
-import { makeAnswerQueue } from '../../../../test-utils/make-answer-queue.ts';
+import { makeListingQueueStub } from '../../../../test-utils/make-listing-queue-stub.ts';
 import type { LaneFiles } from './lane-files.ts';
 import { probeRun } from './probe-run.ts';
 import type { ProcessGroups } from './process-groups.ts';
 
-function setupTest(listings: readonly [readonly string[], ...(readonly string[])[]]) {
-  const nextListing = makeAnswerQueue(listings);
-
+function setupTest(listings: readonly (readonly string[])[]) {
   return {
     options: {
       files: {
-        readDirNames: mock<LaneFiles['readDirNames']>(() => Promise.resolve(nextListing())),
+        readDirNames: makeListingQueueStub(listings),
         removePath: mock<LaneFiles['removePath']>(() => Promise.resolve()),
       },
       probeProcess: mock<(pid: number) => boolean>(() => false),
