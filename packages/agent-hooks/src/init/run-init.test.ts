@@ -1,7 +1,9 @@
-import { expect, mock, onTestFinished, test } from 'bun:test';
+import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { makeRejectingStub } from '../../../../test-utils/make-rejecting-stub.ts';
+import { makeResolvingStub } from '../../../../test-utils/make-resolving-stub.ts';
 import { writeTreeFiles } from '../../../../test-utils/write-tree-files.ts';
 import { bunFileSystem } from './bun-file-system.ts';
 import { runInit } from './run-init.ts';
@@ -75,8 +77,8 @@ test('it leaves both files byte for byte the same on a second run', async () => 
 });
 
 test('it reports the settings file it could not write and stops before the next one', async () => {
-  const writeText = mock((filePath: string) =>
-    Promise.reject(new Error(`EACCES: permission denied, open '${filePath}'`)),
+  const writeText = makeRejectingStub(
+    new Error("EACCES: permission denied, open '/work/ledger/.claude/settings.json'"),
   );
 
   const result = await runInit({
@@ -100,7 +102,7 @@ test('it reports the settings file it could not write and stops before the next 
 });
 
 test('it refuses to write the hook entries until the start-up stub exists', async () => {
-  const writeText = mock(() => Promise.resolve());
+  const writeText = makeResolvingStub(undefined);
 
   const result = await runInit({
     projectDir: '/work/ledger',
