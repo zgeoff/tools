@@ -62,6 +62,7 @@ test('it runs a repo lane under diet with its limit, its suffix filter and the s
   }
 
   ctx.startKiln.mockResolvedValue({ environment: { KILN_URL: 'http://localhost:7001' } });
+  ctx.trackedFiles.push('pkg/src/fire.kiln.test.ts');
 
   const exitCode = await runLane(
     { config: ctx.config, lane, extraArgs: ['--bail'] },
@@ -165,7 +166,7 @@ test('it runs only the lane files that a path selects, in place of the suffix fi
   ]);
 });
 
-test('it runs a lane with a suffix and no paths without the git file list, as outside a git repo', async () => {
+test('it says so and exits 0 before the start hook for a suffix lane that git tracks no test file of', async () => {
   const ctx = setupTest();
   const lane = ctx.findLane('kiln');
 
@@ -173,13 +174,18 @@ test('it runs a lane with a suffix and no paths without the git file list, as ou
     throw new Error('the config holds no kiln lane');
   }
 
-  const exitCode = await runLane({ config: ctx.config, lane, extraArgs: ['--seed=1'] }, ctx.run, {
-    ...ctx.deps,
-    readTrackedFiles: () => Promise.reject(new Error('not a git repository')),
-  });
+  ctx.trackedFiles.push('pkg/src/fire.test.ts', 'pkg/src/fire.kiln.ts');
+
+  const exitCode = await runLane(
+    { config: ctx.config, lane, extraArgs: ['--seed=1'] },
+    ctx.run,
+    ctx.deps,
+  );
 
   expect(exitCode).toBe(0);
-  expect(ctx.runCommand).toHaveBeenCalledOnce();
+  expect(ctx.output.out).toHaveBeenCalledExactlyOnceWith('rig: the kiln lane has no tests\n');
+  expect(ctx.startKiln).not.toHaveBeenCalled();
+  expect(ctx.runCommand).not.toHaveBeenCalled();
 });
 
 test('it names the paths and exits 1 when they select none of the lane files', async () => {
@@ -217,6 +223,7 @@ test('it runs the browser lane through its built-in hooks, with the lane memory 
   }
 
   ctx.browserHooks.run.mockResolvedValue(5);
+  ctx.trackedFiles.push('pkg/src/page.browser.test.ts');
 
   const exitCode = await runLane({ config: ctx.config, lane, extraArgs: [] }, ctx.run, ctx.deps);
 
@@ -271,6 +278,7 @@ test('it exits 1 when a signal arrives while the stop hook cleans up after passi
   }
 
   ctx.browserHooks.run.mockImplementation(() => Promise.resolve(0));
+  ctx.trackedFiles.push('pkg/src/page.browser.test.ts');
 
   ctx.browserHooks.stop.mockImplementation(() => {
     controller.abort();

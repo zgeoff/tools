@@ -14,6 +14,30 @@ test('it keeps the lane selection and the flags when no argument is a path', () 
   expect(selection).toStrictEqual({ kind: 'lane', flags: ['--seed=1', '--bail'] });
 });
 
+test('it finds a suffix lane empty when git tracks none of its test files', () => {
+  const selection = buildTestSelection({
+    config: defineRig({}),
+    lane: { name: 'docker', suffix: '.docker' },
+    repoRoot: '/repo',
+    trackedFiles: ['pkg/src/oven.test.ts', 'pkg/src/oven.host.test.ts', 'pkg/src/oven.docker.ts'],
+    args: { flags: ['--bail'], paths: [] },
+  });
+
+  expect(selection).toStrictEqual({ kind: 'empty' });
+});
+
+test('it finds the e2e lane empty when its folders hold no test file', () => {
+  const selection = buildTestSelection({
+    config: defineRig({}),
+    lane: { name: 'e2e', suffix: null },
+    repoRoot: '/repo',
+    trackedFiles: ['e2e/fixtures.ts', 'e2e/smoke.host.test.ts', 'src/a.test.ts'],
+    args: { flags: [], paths: [] },
+  });
+
+  expect(selection).toStrictEqual({ kind: 'empty' });
+});
+
 test('it selects nothing for a host run given the path of a unit test file', () => {
   const selection = buildTestSelection({
     config: defineRig({ lanes: { kiln: { limit: '15s' } } }),

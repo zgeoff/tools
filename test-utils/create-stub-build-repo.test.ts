@@ -2,6 +2,7 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readTrackedFiles } from '../packages/rig/src/read-tracked-files.ts';
 import { buildSteppingClock } from './build-stepping-clock.ts';
 import { createStubBuildRepo } from './create-stub-build-repo.ts';
 import { templateFiles } from './template-files.ts';
@@ -43,6 +44,16 @@ test("it writes a build:browser script that passes the marker file and the build
       ),
     },
   });
+});
+
+test('it makes a git repo that tracks its manifest and one browser test file', async () => {
+  const ctx = await setupTest();
+
+  await createStubBuildRepo(ctx.repoRoot, ctx.markerPath, ctx.processes, templateFiles);
+
+  const tracked = await readTrackedFiles(ctx.repoRoot);
+
+  expect(tracked).toIncludeSameMembers(['notes.browser.test.ts', 'package.json']);
 });
 
 test("it sends SIGKILL to the group of the process ID that the build's file holds", async () => {

@@ -31,7 +31,9 @@ data, so Node can import the config when oxlint loads its plugin.
 
 ## A lane's run
 
-`rig <lane>` runs three steps, and the last one always runs:
+`rig <lane>` first reads the files that git tracks. When the lane has no tracked test file and the
+arguments name no path, rig says so and exits 0 before any step, because `bun test` fails a filter
+that matches no file. Otherwise it runs three steps, and the last one always runs:
 
 1. `start` prepares what the tests need. A repo lane's `start` module default-exports a function
    that takes the lane context (repo root, lane, run ID and environment) and may return extra
@@ -42,8 +44,7 @@ data, so Node can import the config when oxlint loads its plugin.
    `-e2e` packages that git tracks. When the arguments name paths, rig narrows them to the lane's
    own tracked test files and hands `bun test` that exact list, because `bun test` runs any file a
    path names, whatever its lane. Paths that select none of the lane's files fail the run with exit
-   code 1, so a mistyped path never passes as a run with no tests. A lane with no test files and no
-   paths exits 0.
+   code 1, so a mistyped path never passes as a run with no tests.
 3. `stop` cleans up, whether the tests passed, failed or never started. When `start` or `run` fails
    and `stop` fails too, rig reports both errors, the first failure first.
 
@@ -55,10 +56,11 @@ exit code was. A command that exits on its own has the rest of its group stopped
 
 `rig unit` builds its `bun test` command from the same table: one path ignore for every lane suffix
 and for the `e2e` folders. A lane declared in `rig.config.ts` therefore leaves the unit run without
-any ignore list in `package.json`. `rig related` runs the unit lane in its own process on the tests
-beside the changed files, takes the lane suffixes from the table, and skips when the branch changes
-a shared test input or has more than 50 related files. `rig init` writes the package scripts for the
-lanes the repo has and a starter config, and a second run changes nothing.
+any ignore list in `package.json`. Like a lane, `rig unit` exits 0 when git tracks no unit test
+file. `rig related` runs the unit lane in its own process on the tests beside the changed files,
+takes the lane suffixes from the table, and skips when the branch changes a shared test input or has
+more than 50 related files. `rig init` writes the package scripts for the lanes the repo has and a
+starter config, and a second run changes nothing.
 
 ## The browser lane
 

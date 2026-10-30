@@ -39,11 +39,25 @@ test('it runs the unit tests with the worker count the host gets', async () => {
   const ctx = setupTest();
 
   ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 3 });
+  ctx.trackedFiles.push('pkg/src/oven.test.ts');
 
   const exitCode = await runUnit(defineRig({}), [], ctx.run, ctx.deps);
 
   expect(exitCode).toBe(0);
   expect(ctx.runCommand.mock.calls[0]?.[0]).toContain('--parallel=3');
+});
+
+test('it says so and exits 0 when git tracks no unit test file', async () => {
+  const ctx = setupTest();
+
+  ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 3 });
+  ctx.trackedFiles.push('pkg/src/oven.ts', 'pkg/src/oven.host.test.ts');
+
+  const exitCode = await runUnit(defineRig({}), ['--bail'], ctx.run, ctx.deps);
+
+  expect(exitCode).toBe(0);
+  expect(ctx.output.out).toHaveBeenCalledExactlyOnceWith('rig: the unit lane has no tests\n');
+  expect(ctx.runCommand).not.toHaveBeenCalled();
 });
 
 test('it runs only the unit files that a path selects', async () => {

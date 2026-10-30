@@ -60,6 +60,8 @@ test('it runs the unit lane for rig unit, with the paths after it', async () => 
 test('it passes a flag after rig unit on to bun test', async () => {
   const ctx = setupTest();
 
+  ctx.trackedFiles.push('src/a.test.ts');
+
   const exitCode = await runCLI(['unit', '--seed=1'], ctx.run, ctx.deps);
 
   expect(exitCode).toBe(0);
@@ -91,6 +93,8 @@ test.each([
 
 test('it runs a lane that the config declares for rig <lane>', async () => {
   const ctx = setupTest();
+
+  ctx.trackedFiles.push('src/a.kiln.test.ts');
 
   const exitCode = await runCLI(['kiln'], ctx.run, ctx.deps);
 

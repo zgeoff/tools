@@ -1,9 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { hostname, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { buildBrowserRun } from '../packages/rig/src/browser/build-browser-run.ts';
 import { pickChromeDirs } from '../packages/rig/src/browser/pick-chrome-dirs.ts';
+import { createTrackedRepo } from '../test-utils/create-tracked-repo.ts';
 import { getRigE2EBin } from '../test-utils/get-rig-e2e-bin.ts';
 import { stopProcessGroups } from '../test-utils/stop-process-groups.ts';
 import { testProcesses } from '../test-utils/test-processes.ts';
@@ -71,14 +72,9 @@ test("it runs the repo's build:browser script once, and gives the tests the fold
     `echo '<main>notes</main>' > "$RIG_BROWSER_BUILD_DIR/index.html"`,
   ].join(' && ');
 
-  await writeFile(
-    join(ctx.repoRoot, 'package.json'),
-    JSON.stringify({ scripts: { 'build:browser': buildScript } }),
-  );
-
-  await writeFile(
-    join(ctx.repoRoot, 'notes.browser.test.ts'),
-    [
+  await createTrackedRepo(ctx.repoRoot, {
+    'package.json': JSON.stringify({ scripts: { 'build:browser': buildScript } }),
+    'notes.browser.test.ts': [
       "import { expect, test } from 'bun:test';",
       '',
       "test('it reads the build', async () => {",
@@ -88,7 +84,7 @@ test("it runs the repo's build:browser script once, and gives the tests the fold
       '});',
       '',
     ].join('\n'),
-  );
+  });
 
   const lane = ctx.startLane();
 

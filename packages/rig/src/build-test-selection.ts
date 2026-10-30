@@ -6,6 +6,7 @@ import type { ResolvedLane, RigConfig } from './types.ts';
 
 export type TestSelection =
   | { readonly kind: 'lane'; readonly flags: readonly string[] }
+  | { readonly kind: 'empty' }
   | { readonly kind: 'files'; readonly files: readonly string[]; readonly flags: readonly string[] }
   | { readonly kind: 'none'; readonly paths: readonly string[] };
 
@@ -25,12 +26,11 @@ export interface TestSelectionRequest {
 // narrows the paths to the lane's own files and hands bun test that exact list.
 export function buildTestSelection(request: TestSelectionRequest): TestSelection {
   const split = request.args;
+  const laneFiles = collectLaneTestFiles(request.config, request.lane, request.trackedFiles);
 
   if (split.paths.length === 0) {
-    return { kind: 'lane', flags: split.flags };
+    return laneFiles.length === 0 ? { kind: 'empty' } : { kind: 'lane', flags: split.flags };
   }
-
-  const laneFiles = collectLaneTestFiles(request.config, request.lane, request.trackedFiles);
 
   const selectors = split.paths.map((path) =>
     buildSelector(path, request.repoRoot, request.trackedFiles),

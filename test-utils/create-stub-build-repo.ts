@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { hasErrorCode } from '../packages/rig/src/browser/has-error-code.ts';
+import { createTrackedRepo } from './create-tracked-repo.ts';
 import { killProcessGroups } from './kill-process-groups.ts';
 import { readStreamUntil } from './read-stream-until.ts';
 import type { StubBuildStart } from './stub-build-start.ts';
@@ -18,13 +19,14 @@ export interface StubBuildRepo {
 
 const stubBuildProgramPath = join(import.meta.dir, 'run-stub-build.ts');
 
-// A repo whose build:browser script runs the stub build program with the marker file and the
-// process ID file.
+// A git repo whose build:browser script runs the stub build program with the marker file and the
+// process ID file, and which tracks one browser test file, so the browser lane has a test to build
+// for.
 export async function createStubBuildRepo(
   repoRoot: string,
   markerPath: string,
   processes: Pick<TestProcesses, 'readGroupID' | 'signalGroup' | 'probeGroup' | 'now' | 'sleep'>,
-  files: Pick<TemplateFiles, 'createDirectories' | 'readFile' | 'writeFile'>,
+  files: Pick<TemplateFiles, 'readFile'>,
 ): Promise<StubBuildRepo> {
   const pidPath = join(repoRoot, 'build.pid');
 
@@ -32,12 +34,17 @@ export async function createStubBuildRepo(
     (word) => quoteShellWord(word),
   );
 
-  await files.createDirectories(repoRoot);
-
-  await files.writeFile(
-    join(repoRoot, 'package.json'),
-    JSON.stringify({ scripts: { 'build:browser': script.join(' ') } }),
-  );
+  await createTrackedRepo(repoRoot, {
+    'package.json': JSON.stringify({ scripts: { 'build:browser': script.join(' ') } }),
+    'notes.browser.test.ts': [
+      "import { expect, test } from 'bun:test';",
+      '',
+      "test('it opens the notes page', () => {",
+      '  expect(1).toBe(1);',
+      '});',
+      '',
+    ].join('\n'),
+  });
 
   return {
     readStart: async (stdout) => {

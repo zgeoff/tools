@@ -4,6 +4,7 @@ import type { BrowserLaneWiring } from './browser/wire-browser-lane-hooks.ts';
 import type { TestSelection } from './build-test-selection.ts';
 import { buildTestSelection } from './build-test-selection.ts';
 import { formatNoMatchMessage } from './format-no-match-message.ts';
+import { formatNoTestsMessage } from './format-no-tests-message.ts';
 import type { LaneHooks } from './lane-hooks.ts';
 import { makeRepoLaneHooks } from './make-repo-lane-hooks.ts';
 import { parseTestArgs } from './parse-test-args.ts';
@@ -39,18 +40,15 @@ export interface LaneRequest {
 // start or the tests fail.
 export async function runLane(request: LaneRequest, run: RigRun, deps: LaneDeps): Promise<number> {
   const lane = request.lane;
-  const args = parseTestArgs(request.extraArgs);
 
-  // A lane with a suffix and no paths needs no file list, so it runs outside a git repo too.
-  const needsTrackedFiles = lane.suffix === null || args.paths.length > 0;
-  const trackedFiles = needsTrackedFiles ? await deps.readTrackedFiles(run.repoRoot) : [];
+  const trackedFiles = await deps.readTrackedFiles(run.repoRoot);
 
   const selection = buildTestSelection({
     config: request.config,
     lane,
     repoRoot: run.repoRoot,
     trackedFiles,
-    args,
+    args: parseTestArgs(request.extraArgs),
   });
 
   if (selection.kind === 'none') {
@@ -59,13 +57,13 @@ export async function runLane(request: LaneRequest, run: RigRun, deps: LaneDeps)
     return 1;
   }
 
-  const testArgs = pickLaneTestArgs(request.config, lane, selection, trackedFiles);
-
-  if (testArgs === null) {
-    deps.output.out(`rig: the ${lane.name} lane has no tests\n`);
+  if (selection.kind === 'empty') {
+    deps.output.out(formatNoTestsMessage(lane.name));
 
     return 0;
   }
+
+  const testArgs = pickLaneTestArgs(request.config, lane, selection, trackedFiles);
 
   const hooks = await wireLaneHooks(lane, run, deps);
   const exitCode = await runLaneHooks(testArgs, hooks);
@@ -77,25 +75,19 @@ export async function runLane(request: LaneRequest, run: RigRun, deps: LaneDeps)
 function pickLaneTestArgs(
   config: RigConfig,
   lane: ResolvedLane,
-  selection: Exclude<TestSelection, { kind: 'none' }>,
+  selection: Extract<TestSelection, { kind: 'files' | 'lane' }>,
   trackedFiles: readonly string[],
-): readonly string[] | null {
+): readonly string[] {
   const timeoutArg = `--timeout=${lane.limitMs}`;
 
   return match(selection)
     .with({ kind: 'files' }, (files) => [timeoutArg, ...files.files, ...files.flags])
-    .with({ kind: 'lane' }, (laneRun) => {
-      const laneSelection = pickLaneSelection(lane, pickE2EDirs(trackedFiles));
-
-      return laneSelection.length === 0
-        ? null
-        : [
-            timeoutArg,
-            ...laneSelection,
-            ...pickOtherLaneIgnoreArgs(config, lane),
-            ...laneRun.flags,
-          ];
-    })
+    .with({ kind: 'lane' }, (laneRun) => [
+      timeoutArg,
+      ...pickLaneSelection(lane, pickE2EDirs(trackedFiles)),
+      ...pickOtherLaneIgnoreArgs(config, lane),
+      ...laneRun.flags,
+    ])
     .exhaustive();
 }
 
