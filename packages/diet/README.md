@@ -43,7 +43,8 @@ diet: peaked at 1.2 GB of 4 GB
   budget: its total memory, or the tightest cgroup cap above the process when that is lower.
 - A cap through a systemd scope, with or without sudo, or through a cgroup that `diet` writes
   itself, as [the modes](../../docs/architecture/memory-caps.md#the-modes) describe.
-- The peak anonymous memory of the run, which the kernel cannot take back under the cap.
+- The peak anonymous memory of the run, which the kernel cannot take back under the cap. After an
+  OOM kill, the peak is the cgroup's `memory.peak` when that is higher, which counts page cache too.
 - An error annotation for an OOM kill in GitHub Actions.
 - Signals to `diet` go on to the command, so the report still prints when a run is stopped.
 
