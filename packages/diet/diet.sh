@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Runs a command inside a cgroup capped at a memory budget with no swap, then
-# prints the command's peak anonymous memory and any OOM kills. Fails when the
-# command fails or the kernel OOM-killed a process in the cgroup.
-# DIET_MODE picks a mode; unset, the first mode --modes prints wins.
 set -euo pipefail
 
 modes=(systemd-sudo systemd-user cgroupfs)
@@ -47,8 +43,6 @@ find_cgroupfs_parent() {
   echo "$parent"
 }
 
-# A size is a whole number of bytes, or of KiB, MiB or GiB with a K, M or G
-# suffix, as systemd's MemoryMax reads it.
 parse_size() {
   [[ "$1" =~ ^([1-9][0-9]*)([KMG]?)$ ]] || return 1
   local power=0
@@ -60,8 +54,6 @@ parse_size() {
   echo "$((BASH_REMATCH[1] << power))"
 }
 
-# The host's total memory, or the tightest cap on this process's cgroup and
-# its ancestors when that is lower.
 read_default_budget() {
   local budget path cap
   budget=$(($(sed -n 's/^MemTotal: *\([0-9]*\) kB$/\1/p' /proc/meminfo) * 1024))
@@ -82,7 +74,6 @@ read_default_budget() {
   echo "$budget"
 }
 
-# Prints a byte count in the largest binary unit it fills, to one decimal place.
 format_size() {
   local bytes=$1 unit=B scale=1
   if [ "$bytes" -ge $((1 << 30)) ]; then
@@ -108,8 +99,6 @@ forward_signal() {
   fi
 }
 
-# Runs the command in the cgroup that holds this shell, as <user> when one is
-# given, and sets status to the exit status diet ends with.
 run_and_report() {
   local cgroup=$1 user=$2
   shift 2
