@@ -1,8 +1,9 @@
 # oxlint-config test-file rules
 
-Six rules of the `zgeoff/*` plugin in `@zgeoff/oxlint-config` check test files.
+Seven rules of the `zgeoff/*` plugin in `@zgeoff/oxlint-config` check test files.
 `zgeoff/test-beside-module` keeps each test file beside the module it tests,
 `zgeoff/setup-test-only` keeps a test file's module level to `setupTest()` and its tests,
+`zgeoff/test-shape` keeps a `bun:test` file to flat `test()` calls with titled behaviour,
 `zgeoff/no-file-snapshot` bans file snapshots, `zgeoff/max-test-timeout` keeps each test within the
 time limit of its lane, `zgeoff/test-timeout-exception-ticket` makes each disable of that rule name
 a ticket or a floor, and `zgeoff/no-test-sleep` bans a fixed delay in a test file. The
@@ -42,9 +43,12 @@ as the testing skill requires. At module level the rule allows imports, `type` a
 declarations, one `setupTest` function declaration, and statements that call `test`, `test.each`,
 `test.skipIf` or `test.if`, or a chain of them, with `test` under its local alias when the
 `bun:test` or `claude-code/testing` import renames it. It reports every other statement: a `let`, a
-`var`, a class, an enum, a second function, an export, and a call such as `beforeEach(...)`. The
-message holds the three ways out of a helper: inline it, swap it for a registered matcher, or move
-it to the shared test utils with tests of its own.
+`var`, a class, an enum, a second function, an export, and a call such as `expect(...)`. The message
+holds the three ways out of a helper: inline it, swap it for a registered matcher, or move it to the
+shared test utils with tests of its own.
+
+In a file that imports `bun:test`, the rule leaves a call of `describe`, `it` or a hook to
+`zgeoff/test-shape`, so each such call gets one report, with the advice that fits it.
 
 A module-level `const` passes only as a skip gate: a declarator that binds at least one name, each
 binding read, and read only at collection time, inside an argument of the test runner's `skipIf` or
@@ -132,6 +136,23 @@ lanes from the `lanes` option of `zgeoff/max-test-timeout` in the root `.oxlintr
 same standard lanes as the rule. The check keeps its own copy of the standard limits, because the
 shared pull-request checks download it without the oxlint config package, and a test pins both
 copies to the skill's table.
+
+## `zgeoff/test-shape`
+
+A `<name>.test.ts` or `<name>.test.tsx` file that imports `bun:test` keeps the structure rules of
+the testing skill. oxlint's own jest and vitest rules match only their runners' imports, so they
+miss a `bun:test` file. The rule reports:
+
+- a call of `describe`, `it`, `beforeAll`, `beforeEach`, `afterAll` or `afterEach`, or of one of
+  their modifiers, such as `describe.each`;
+- a `toEqual` matcher;
+- a `test()` title, in any modifier or `test.each` form, that starts with neither `it ` nor a
+  `#<unit> ` prefix, where the unit may be a dotted path such as `#sessions.enrol`;
+- a `bun:test` import that renames a binding or takes the namespace, because the rule finds each
+  call by its name.
+
+A title held in a variable or built by a call passes, because the rule reads only a string or a
+template literal. A file that imports another runner, or only types from `bun:test`, is left alone.
 
 ## `zgeoff/test-timeout-exception-ticket`
 

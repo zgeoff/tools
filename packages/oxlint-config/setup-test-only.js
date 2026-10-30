@@ -1,5 +1,7 @@
 import { basename } from 'node:path';
+import bannedTestCalls from './banned-test-calls.js';
 import getImportedName from './get-imported-name.js';
+import isBunTestFile from './is-bun-test-file.js';
 
 const testFilePattern = /\.test\.tsx?$/u;
 
@@ -28,11 +30,16 @@ const setupTestOnly = {
         }
 
         const testNames = collectTestNames(context, program);
+        const shapeCalls = isBunTestFile(program) ? bannedTestCalls : new Set();
         const constants = [];
         let hasSetupTest = false;
 
         for (const statement of program.body) {
-          if (allowedStatementTypes.has(statement.type) || isTestCall(statement, testNames)) {
+          if (
+            allowedStatementTypes.has(statement.type) ||
+            isTestCall(statement, testNames) ||
+            isShapeCall(statement, shapeCalls)
+          ) {
             continue;
           }
 
@@ -132,6 +139,21 @@ function isTestRunner(node, testNames) {
   }
 
   return testNames.has(current.name);
+}
+
+// zgeoff/test-shape reports these calls in a bun:test file with advice of its own
+function isShapeCall(statement, shapeCalls) {
+  if (statement.type !== 'ExpressionStatement' || statement.expression.type !== 'CallExpression') {
+    return false;
+  }
+
+  let callee = statement.expression.callee;
+
+  while (callee.type === 'CallExpression' || callee.type === 'MemberExpression') {
+    callee = callee.type === 'CallExpression' ? callee.callee : callee.object;
+  }
+
+  return callee.type === 'Identifier' && shapeCalls.has(callee.name);
 }
 
 function emitReport(context, statement, declarators) {

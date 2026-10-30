@@ -7,14 +7,14 @@ test('it returns edits sorted last-to-first', () => {
   const edits = buildEditsFromAST(source, parseSourceOrThrow(source));
 
   expect(edits).toHaveLength(3);
-  expect(edits.map((edit) => edit.start)).toEqual([33, 20, 12]);
+  expect(edits.map((edit) => edit.start)).toStrictEqual([33, 20, 12]);
 });
 
 test('it collects edits from statement lists nested inside functions and blocks', () => {
   const source = 'function f() {\n  if (x) {\n    const a = 1;\n    use(a);\n  }\n}\n';
   const edits = buildEditsFromAST(source, parseSourceOrThrow(source));
 
-  expect(edits).toEqual([{ start: 42, end: 47, replacement: '\n\n    ' }]);
+  expect(edits).toStrictEqual([{ start: 42, end: 47, replacement: '\n\n    ' }]);
 });
 
 test('it returns no edits for already-compliant source', () => {
@@ -39,14 +39,14 @@ test('it pads between the last import and the first statement', () => {
   const source = "import {\n  a,\n  b,\n} from 'x';\nuse(a);\n";
   const edits = buildEditsFromAST(source, parseSourceOrThrow(source));
 
-  expect(edits).toEqual([{ start: 30, end: 31, replacement: '\n\n' }]);
+  expect(edits).toStrictEqual([{ start: 30, end: 31, replacement: '\n\n' }]);
 });
 
 test('it plans a collapse for a blank line no rule requires', () => {
   const source = 'use(a);\n\nuse(b);\n';
   const edits = buildEditsFromAST(source, parseSourceOrThrow(source));
 
-  expect(edits).toEqual([{ start: 7, end: 9, replacement: '\n' }]);
+  expect(edits).toStrictEqual([{ start: 7, end: 9, replacement: '\n' }]);
 });
 
 test('it does not collapse a blank line between adjacent imports', () => {
@@ -65,7 +65,7 @@ test('it pads between a single-line import and a flush first statement', () => {
   const source = "import { a } from 'x';\nuse(a);\n";
   const edits = buildEditsFromAST(source, parseSourceOrThrow(source));
 
-  expect(edits).toEqual([{ start: 22, end: 23, replacement: '\n\n' }]);
+  expect(edits).toStrictEqual([{ start: 22, end: 23, replacement: '\n\n' }]);
 });
 
 test('it does not collapse around a multiline statement', () => {

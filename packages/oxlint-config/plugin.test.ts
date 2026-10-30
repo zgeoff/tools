@@ -806,11 +806,10 @@ test('it names the three ways out of a module-level declaration', async () => {
 });
 
 test.each([
-  ['a hook call', 'beforeEach(() => {});\n'],
   ['an exported const', 'export const cups = 2;\n'],
   ['an exported type', 'export type Cups = number;\n'],
 ])('it flags %s at module level', async (_, statement) => {
-  const source = `import { beforeEach, test } from 'bun:test';\n\n${statement}\ntest('it pours', () => {});\n`;
+  const source = `import { test } from 'bun:test';\n\n${statement}\ntest('it pours', () => {});\n`;
 
   const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', {
     'zgeoff/setup-test-only': 'error',

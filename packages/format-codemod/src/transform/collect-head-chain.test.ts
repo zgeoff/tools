@@ -6,7 +6,7 @@ test('it walks call and member wrappers down to the head identifier', () => {
   const callee = { type: 'MemberExpression', object: head };
   const call = { type: 'CallExpression', callee };
 
-  expect(collectHeadChain(call)).toEqual([call, callee, head]);
+  expect(collectHeadChain(call)).toStrictEqual([call, callee, head]);
 });
 
 test('it steps through an await on the way to the head', () => {
@@ -15,18 +15,18 @@ test('it steps through an await on the way to the head', () => {
   const awaited = { type: 'AwaitExpression', argument: inner };
   const member = { type: 'MemberExpression', object: awaited };
 
-  expect(collectHeadChain(member)).toEqual([member, awaited, inner, head]);
+  expect(collectHeadChain(member)).toStrictEqual([member, awaited, inner, head]);
 });
 
 test('it stops at a node without a head property', () => {
   const head = { type: 'NewExpression', callee: { type: 'Identifier' } };
   const member = { type: 'MemberExpression', object: head };
 
-  expect(collectHeadChain(member)).toEqual([member, head]);
+  expect(collectHeadChain(member)).toStrictEqual([member, head]);
 });
 
 test('it returns a wrapperless expression alone', () => {
   const literal = { type: 'Literal' };
 
-  expect(collectHeadChain(literal)).toEqual([literal]);
+  expect(collectHeadChain(literal)).toStrictEqual([literal]);
 });

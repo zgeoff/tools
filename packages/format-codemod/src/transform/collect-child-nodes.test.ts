@@ -8,7 +8,7 @@ test('it collects nodes from object and array properties', () => {
     arguments: [{ type: 'Identifier', name: 'b' }, 1],
   };
 
-  expect(collectChildNodes(node)).toEqual([
+  expect(collectChildNodes(node)).toStrictEqual([
     { type: 'Identifier', name: 'a' },
     { type: 'Identifier', name: 'b' },
   ]);
