@@ -11,10 +11,11 @@ import { buildSyncRowSplit } from './build-sync-row-split.ts';
 import { isWorkflowPath } from './is-workflow-path.ts';
 import type { SyncEntry } from './parse-sync-entries.ts';
 import { parseSyncEntries } from './parse-sync-entries.ts';
+import { pickSyncCommitVerdict } from './pick-sync-commit-verdict.ts';
 import { pickSyncVerdictStop } from './pick-sync-verdict-stop.ts';
 import type { RetiredFileRemoval, SyncedEntry } from './plan-retired-file-removal.ts';
 import { planRetiredFileRemoval, retiredFilesName } from './plan-retired-file-removal.ts';
-import { readSyncCommitVerdict } from './read-sync-commit-verdict.ts';
+import { readSyncCommitFacts } from './read-sync-commit-facts.ts';
 import { renderSyncPullRequestTitle } from './render-sync-pull-request-title.ts';
 import { selectSyncFiles } from './select-sync-files.ts';
 import { writeCopyPlan } from './write-copy-plan.ts';
@@ -83,12 +84,13 @@ export async function syncEntries(options: Readonly<SyncEntriesOptions>): Promis
     writeOutput: options.writeOutput,
   };
 
-  const verdict = await readSyncCommitVerdict(context, {
+  const facts = await readSyncCommitFacts(context, {
     commit: context.commit,
     branch: context.branch,
     base: context.base,
   });
 
+  const verdict = pickSyncCommitVerdict(facts);
   const stop = pickSyncVerdictStop(verdict, context.commit);
 
   if (stop !== null) {

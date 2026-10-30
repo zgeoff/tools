@@ -1,4 +1,4 @@
-import type { SyncCommitVerdict } from './read-sync-commit-verdict.ts';
+import type { SyncCommitVerdict } from './pick-sync-commit-verdict.ts';
 
 // What a run writes and how it exits when the verdict ends it; null lets the sync go on.
 export interface SyncVerdictStop {
