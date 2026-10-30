@@ -192,6 +192,8 @@ test.each([
   'git diff',
   'git diff --no-ext-diff',
   'git diff --no-ext-diff --no-textconv --ext-diff',
+  'git diff --no-ext-diff --no-textconv --ext-dif --no-index notes.txt guide.md',
+  'git diff --no-ext-diff --no-textconv --stat',
   'git status',
   'cat "$(echo guide.md)"',
 ])('it refuses the Bash command %s when the install fails', async (command) => {
@@ -206,7 +208,6 @@ test.each([
 test.each([
   'bun install',
   'bun install --frozen-lockfile',
-  'git diff --no-ext-diff --no-textconv --stat',
   'ls -la src',
   'cat package.json',
   'pwd',

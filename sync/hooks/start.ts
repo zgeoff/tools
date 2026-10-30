@@ -159,9 +159,9 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-// A shell can build a path from a variable, a glob or a substitution, and git config can make
-// `git diff` or `git status` run a program, so a command passes only as plain words, and git only as
-// a diff with its external programs turned off.
+// A shell can build a path from a variable, a glob or a substitution, so a command passes only as
+// plain words. Git is left out: its config can make even a `git diff` with external diffs and
+// textconv off run an fsmonitor program or a clean filter.
 function isReadOnlyCommand(command: string): boolean {
   const [program, ...rest] = command.trim().split(/\s+/u);
 
@@ -175,15 +175,9 @@ function isReadOnlyCommand(command: string): boolean {
 
   const [subcommand, ...options] = rest;
 
-  if (program === 'bun' && subcommand === 'install') {
-    return options.every((option) => option === '--frozen-lockfile');
-  }
-
   return (
-    program === 'git' &&
-    subcommand === 'diff' &&
-    options.includes('--no-ext-diff') &&
-    options.includes('--no-textconv') &&
-    options.every((option) => !/^--(?:output|ext-diff|textconv)/u.test(option))
+    program === 'bun' &&
+    subcommand === 'install' &&
+    options.every((option) => option === '--frozen-lockfile')
   );
 }
