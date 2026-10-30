@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.4](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.3.3...@zgeoff/format-codemod@0.3.4) (2026-10-30)
+
+### Features
+
+- **oxlint-config:** add the test-shape rule for bun:test files
+  ([#384](https://github.com/zgeoff/tools/issues/384))
+  ([c35150f](https://github.com/zgeoff/tools/commit/c35150ff41183949dcfd24eb1c3145d2bef3c4f7))
+
 ## [0.3.3](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.3.2...@zgeoff/format-codemod@0.3.3) (2026-10-26)
 
 ### Bug Fixes
