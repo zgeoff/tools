@@ -56,3 +56,20 @@ export interface LaneStart {
   // Added to the environment of the lane's test process.
   readonly environment?: Readonly<Record<string, string>>;
 }
+
+// The process a command runs in: its repo, environment and abort signal.
+export interface RigRun {
+  readonly repoRoot: string;
+
+  readonly environment: Readonly<Record<string, string | undefined>>;
+
+  readonly signal: AbortSignal;
+
+  readonly runID: string;
+}
+
+export interface RigOutput {
+  readonly out: (text: string) => void;
+
+  readonly err: (text: string) => void;
+}
