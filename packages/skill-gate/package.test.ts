@@ -1,80 +1,131 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
+import { fileLocks } from '../../test-utils/file-locks.ts';
+import { probeProcess } from '../../test-utils/probe-process.ts';
+import { systemClock } from '../../test-utils/system-clock.ts';
+import { templateFiles } from '../../test-utils/template-files.ts';
+import { withPerRunTemplate } from '../../test-utils/with-per-run-template.ts';
 
 async function setupTest() {
+  // The real HOME keeps bun install on the shared cache.
+  const env = { PATH: process.env['PATH'], HOME: process.env['HOME'] };
+  const repoRoot = join(import.meta.dir, '../..');
+
+  // The bundle takes in @zgeoff/std, and the declaration build extends the base tsconfig.
+  const sourcePaths = await Array.fromAsync(
+    new Bun.Glob('packages/{skill-gate,std}/src/**').scan({ cwd: repoRoot, absolute: true }),
+  );
+
   const directory = await mkdtemp(join(tmpdir(), 'skill-gate-package-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  // The real HOME keeps bun install on the shared cache.
-  const env = { PATH: process.env['PATH'], HOME: process.env['HOME'] };
-  const unpacked = join(directory, 'unpacked');
-  const packed = join(directory, 'packed');
   const project = join(directory, 'project');
+  const packageManifestPath = join(directory, 'package.json');
 
-  await Promise.all([
-    mkdir(unpacked),
-    mkdir(packed),
-    mkdir(join(project, '.claude/hooks/skill-gate'), { recursive: true }),
-  ]);
+  const readTemplate = async (templateDirectory: string) => {
+    await cp(join(templateDirectory, 'project'), project, {
+      recursive: true,
+      verbatimSymlinks: true,
+    });
 
-  // prepare's build writes the shared dist, which an overlapping run would race, so the pack skips
-  // it and the bundle builds into the unpacked copy instead.
-  await $`bun pm pack --ignore-scripts --destination ${directory}`
-    .cwd(import.meta.dir)
-    .env(env)
-    .quiet();
+    await cp(join(templateDirectory, 'unpacked/package/package.json'), packageManifestPath);
+  };
 
-  const entries = await readdir(directory);
+  // Packing, building and installing the package costs more than a test, so each run builds it
+  // once and each test copies the installed project.
+  await withPerRunTemplate(
+    {
+      cacheDirectory: join(repoRoot, 'node_modules/.cache/test-templates'),
+      name: 'skill-gate-package',
+      inputPaths: [
+        ...sourcePaths,
+        join(import.meta.dir, 'package.json'),
+        join(import.meta.dir, 'tsconfig.json'),
+        join(import.meta.dir, 'tsconfig.build.json'),
+        join(repoRoot, 'bun.lock'),
+        join(repoRoot, 'tsconfig.base.json'),
+      ],
+      files: templateFiles,
+      locks: fileLocks,
+      clock: systemClock,
+      probeProcess,
+      processID: process.pid,
+      writeTemplate: async (buildDirectory) => {
+        const unpacked = join(buildDirectory, 'unpacked');
+        const packed = join(buildDirectory, 'packed');
+        const templateProject = join(buildDirectory, 'project');
 
-  const manifest = entries.find((name) => name.endsWith('.tgz'));
+        await Promise.all([
+          mkdir(unpacked),
+          mkdir(packed),
+          mkdir(join(templateProject, '.claude/hooks/skill-gate'), { recursive: true }),
+        ]);
 
-  invariant(manifest !== undefined, 'bun pm pack wrote no tarball');
+        // prepare's build writes the shared dist, which an overlapping run would race, so the pack
+        // skips it and the bundle builds into the unpacked copy instead.
+        await $`bun pm pack --ignore-scripts --destination ${buildDirectory}`
+          .cwd(import.meta.dir)
+          .env(env)
+          .quiet();
 
-  await $`tar -xzf ${join(directory, manifest)} -C ${unpacked}`.env(env).quiet();
+        const entries = await readdir(buildDirectory);
 
-  await rm(join(unpacked, 'package/dist'), { recursive: true, force: true });
+        const manifest = entries.find((name) => name.endsWith('.tgz'));
 
-  await $`bun run build:outdir ${join(unpacked, 'package/dist')}`
-    .cwd(import.meta.dir)
-    .env(env)
-    .quiet();
+        invariant(manifest !== undefined, 'bun pm pack wrote no tarball');
 
-  await $`bun pm pack --ignore-scripts --destination ${packed}`
-    .cwd(join(unpacked, 'package'))
-    .env(env)
-    .quiet();
+        await $`tar -xzf ${join(buildDirectory, manifest)} -C ${unpacked}`.env(env).quiet();
 
-  const [tarball, ...extra] = await readdir(packed);
+        await rm(join(unpacked, 'package/dist'), { recursive: true, force: true });
 
-  invariant(tarball !== undefined && extra.length === 0, 'bun pm pack must write one tarball');
+        await $`bun run build:outdir ${join(unpacked, 'package/dist')}`
+          .cwd(import.meta.dir)
+          .env(env)
+          .quiet();
 
-  await writeFile(
-    join(project, 'package.json'),
-    JSON.stringify({
-      name: 'project',
-      private: true,
-      devDependencies: { '@zgeoff/skill-gate': `file:${join(packed, tarball)}` },
-    }),
+        await $`bun pm pack --ignore-scripts --destination ${packed}`
+          .cwd(join(unpacked, 'package'))
+          .env(env)
+          .quiet();
+
+        const [tarball, ...extra] = await readdir(packed);
+
+        invariant(
+          tarball !== undefined && extra.length === 0,
+          'bun pm pack must write one tarball',
+        );
+
+        await writeFile(
+          join(templateProject, 'package.json'),
+          JSON.stringify({
+            name: 'project',
+            private: true,
+            devDependencies: { '@zgeoff/skill-gate': `file:${join(packed, tarball)}` },
+          }),
+        );
+
+        await writeFile(
+          join(templateProject, '.claude/hooks/skill-gate/skill-gate.ts'),
+          "import { runSkillGate } from '@zgeoff/skill-gate';\n\nawait runSkillGate();\n",
+        );
+
+        await $`bun install`.cwd(templateProject).env(env).quiet();
+      },
+    },
+    readTemplate,
   );
-
-  await writeFile(
-    join(project, '.claude/hooks/skill-gate/skill-gate.ts'),
-    "import { runSkillGate } from '@zgeoff/skill-gate';\n\nawait runSkillGate();\n",
-  );
-
-  await $`bun install`.cwd(project).env(env).quiet();
 
   return {
     project,
     env,
-    tscPath: join(import.meta.dir, '../../node_modules/.bin/tsc'),
+    tscPath: join(repoRoot, 'node_modules/.bin/tsc'),
     hookPath: join(project, '.claude/hooks/skill-gate/skill-gate.ts'),
-    packageManifestPath: join(unpacked, 'package/package.json'),
+    packageManifestPath,
   };
 }
 
