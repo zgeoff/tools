@@ -122,8 +122,9 @@
       "automerge": true
     },
     {
-      "description": "A bump of @zgeoff/agent-hooks runs its init, so the pull request carries the wiring the new version writes. bun run --if-present skips a version that has no agent-hooks bin. The task replaces the catalog rule's, so it runs bun install itself, and the self-hosted run must allow both commands.",
+      "description": "A bump of @zgeoff/agent-hooks runs its init, so the pull request carries the wiring the new version writes. bun run --if-present skips a version that has no agent-hooks bin. The task replaces the catalog rule's, so it runs bun install itself, and the self-hosted run must allow both commands. Renovate merges the pull request itself, because the platform's native auto-merge waits only for the checks a repo requires, and would merge a branch whose init failed.",
       "matchPackageNames": ["@zgeoff/agent-hooks"],
+      "platformAutomerge": false,
       "postUpgradeTasks": {
         "commands": [
           "bun install --ignore-scripts",
@@ -139,6 +140,7 @@
     {
       "description": "A bump of @zgeoff/chex runs its init, as the agent-hooks rule does.",
       "matchPackageNames": ["@zgeoff/chex"],
+      "platformAutomerge": false,
       "postUpgradeTasks": {
         "commands": [
           "bun install --ignore-scripts",
@@ -154,6 +156,7 @@
     {
       "description": "A bump of @zgeoff/rig runs its init, as the agent-hooks rule does.",
       "matchPackageNames": ["@zgeoff/rig"],
+      "platformAutomerge": false,
       "postUpgradeTasks": {
         "commands": [
           "bun install --ignore-scripts",

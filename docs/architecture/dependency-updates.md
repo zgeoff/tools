@@ -81,10 +81,14 @@ wiring merge together on green checks. `bun run --if-present` exits 0 when the b
 version that ships no such bin opens its pull request as any bump does. `bun x` would fetch a
 missing bin from the registry instead. A package with no rule gets no `init` run.
 
-A failed command, a bin that exists without an `init` subcommand among them, makes Renovate fail the
-branch's `renovate/artifacts` status and comment the error on the pull request, so the bump waits
-for a person. A package rule's post-upgrade task replaces the catalog rule's, which is why each rule
-runs `bun install` itself.
+A failed command, a bin that exists without an `init` subcommand among them, is an artifact error to
+Renovate. Renovate opens no pull request for the bump until the release is two hours old, then opens
+it with a failed `renovate/artifacts` status and a comment that holds the error. The platform's
+native auto-merge waits only for the checks a repo's ruleset requires, and would merge that branch
+without its wiring, so each rule turns it off. Renovate then merges the pull request itself on its
+first run after every status on the branch passes, and a failed `init` leaves the bump for a person.
+A package rule's post-upgrade task replaces the catalog rule's, which is why each rule runs
+`bun install` itself.
 
 The preset runs `init` for these packages:
 
