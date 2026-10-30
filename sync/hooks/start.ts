@@ -11,7 +11,7 @@ const AFTER_INSTALL = '--after-install';
 
 const READ_ONLY_PROGRAMS = new Set(['cat', 'ls', 'pwd']);
 
-const PLAIN_WORD = /^[\w./@:=+,-]+$/u;
+const PLAIN_WORDS = /^[\w./@:=+,-]+(?: [\w./@:=+,-]+)*$/u;
 const root = path.resolve(import.meta.dirname, '../..');
 const args = process.argv.slice(2);
 const harness = parseHarness(args.filter((arg) => arg !== AFTER_INSTALL));
@@ -159,13 +159,17 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-// A shell can build a path from a variable, a glob or a substitution, so a command passes only as
-// plain words. Git is left out: its config can make even a `git diff` with external diffs and
-// textconv off run an fsmonitor program or a clean filter.
+// A shell can build a path from a variable, a glob or a substitution, and runs a second command
+// after a line break, so a command passes only as plain words between single spaces. Git is left
+// out: its config can make even a `git diff` with external diffs off run an fsmonitor program.
 function isReadOnlyCommand(command: string): boolean {
-  const [program, ...rest] = command.trim().split(/\s+/u);
+  if (!PLAIN_WORDS.test(command)) {
+    return false;
+  }
 
-  if (program === undefined || ![program, ...rest].every((word) => PLAIN_WORD.test(word))) {
+  const [program, ...rest] = command.split(' ');
+
+  if (program === undefined) {
     return false;
   }
 

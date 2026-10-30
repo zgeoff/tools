@@ -52,9 +52,9 @@ package. It exits 2 before every tool call with `To work here, run bun install.`
 a Bash command on a short read-only list: `bun install`, `ls`, `cat` and `pwd`. The list leaves out
 git, because git config can make any git command run a program, even a `git diff` with its external
 diff and textconv programs turned off: an fsmonitor program or a clean filter. A listed command must
-be one command of plain words. A shell can build a gated path that no parser sees, as in
-`ext=ts; printf x > src/sample.$ext`, so the stub refuses a command with a variable, a quote, a
-glob, a redirect or a second command.
+be one command of plain words between single spaces. A shell can build a gated path that no parser
+sees, as in `ext=ts; printf x > src/sample.$ext`, so the stub refuses a command with any other
+character, such as a variable, a quote, a glob, a redirect, a line break or a control character.
 
 On any other event the stub exits 0. After a tool call there is nothing left to block, and a blocked
 prompt would stop a person from asking the agent to run the install.

@@ -206,6 +206,28 @@ test.each([
 });
 
 test.each([
+  { label: 'a line break', command: 'pwd\nls' },
+  { label: 'a carriage return', command: 'pwd\rls' },
+  { label: 'a tab', command: 'ls\tsrc' },
+  { label: 'a semicolon', command: 'pwd;ls' },
+  { label: 'an ampersand', command: 'pwd&ls' },
+  { label: 'a pipe', command: 'ls|cat' },
+  { label: 'a backtick', command: 'cat `ls`' },
+  { label: 'a command substitution', command: 'cat $(ls)' },
+  { label: 'an output redirect', command: 'ls >listing.txt' },
+  { label: 'an input redirect', command: 'cat <package.json' },
+  { label: 'a control character', command: 'pwd\u0007' },
+  { label: 'a leading space', command: ' pwd' },
+])('it refuses a Bash command with $label when the install fails', async (row) => {
+  const ctx = await setupTest('fails');
+
+  const result = ctx.runStub(ctx.buildPayload('Bash', { command: row.command }));
+
+  expect(result.status).toBe(2);
+  expect(result.stderr).toEndWith('To work here, run bun install.\n');
+});
+
+test.each([
   'bun install',
   'bun install --frozen-lockfile',
   'ls -la src',
