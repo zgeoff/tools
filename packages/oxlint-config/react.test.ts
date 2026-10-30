@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runOxlint } from './test-utils/run-oxlint.ts';
 
-async function setupTest(source: string) {
+async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'react-overlay-test-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
@@ -22,8 +22,6 @@ async function setupTest(source: string) {
     JSON.stringify({ extends: [baseConfig, overlay] }),
   );
 
-  await writeFile(join(directory, 'panel.tsx'), source);
-
   return { directory };
 }
 
@@ -40,7 +38,10 @@ test.each([
 ])(
   'it turns off react/%s, which the react plugin reports without the overlay',
   async (rule, source) => {
-    const ctx = await setupTest(source);
+    const ctx = await setupTest();
+
+    await writeFile(join(ctx.directory, 'panel.tsx'), source);
+
     const bareRun = await runOxlint(['-c', 'bare.json', 'panel.tsx'], ctx.directory);
     const layeredRun = await runOxlint(['-c', 'layered.json', 'panel.tsx'], ctx.directory);
 
@@ -53,7 +54,10 @@ test('it turns on the react plugin', async () => {
   const source =
     "export function Panel() {\n  return ['tea', 'milk'].map((name) => <span>{name}</span>);\n}\n";
 
-  const ctx = await setupTest(source);
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'panel.tsx'), source);
+
   const run = await runOxlint(['-c', 'layered.json', 'panel.tsx'], ctx.directory);
 
   expect(run.stdout).toInclude('react(jsx-key)');
