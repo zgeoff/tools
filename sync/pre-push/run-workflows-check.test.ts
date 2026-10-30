@@ -211,7 +211,7 @@ test('it reports a checks workflow that never cancels, and a group that holds a 
       path: '.github/workflows/checks.yml',
       line: 1,
       message:
-        'a checks workflow, which runs on pull_request or push, sets concurrency with cancel-in-progress: true',
+        'a checks workflow, which runs on pull_request or push, sets concurrency with cancel-in-progress: true; a gate that runs only on a push to main may instead group by github.sha and never cancel',
     },
     {
       path: '.github/workflows/main.yml',
@@ -305,6 +305,143 @@ test.each([
       message: `the concurrency group holds ${value}, so no newer run cancels this one`,
     })),
   );
+});
+
+test.each([
+  [
+    'passes a gate on main that groups by commit sha and sets cancel-in-progress: false',
+    ['  push:', '    branches: [main]'],
+    'false',
+    [],
+  ],
+  [
+    'passes a gate on main that groups by commit sha and leaves cancel-in-progress out',
+    ['  push:', '    branches: [main]'],
+    undefined,
+    [],
+  ],
+  [
+    'reports a gate on main that groups by commit sha and cancels',
+    ['  push:', '    branches: [main]'],
+    'true',
+    [
+      {
+        line: 4,
+        message: 'the concurrency group holds github.sha, so no newer run cancels this one',
+      },
+    ],
+  ],
+  [
+    'reports a commit sha group on a push to every branch',
+    ['  push:'],
+    'false',
+    [
+      {
+        line: 1,
+        message:
+          'a checks workflow, which runs on pull_request or push, sets concurrency with cancel-in-progress: true; a gate that runs only on a push to main may instead group by github.sha and never cancel',
+      },
+      {
+        line: 3,
+        message: 'the concurrency group holds github.sha, so no newer run cancels this one',
+      },
+    ],
+  ],
+  [
+    'reports a commit sha group on a push to main and a release branch',
+    ['  push:', "    branches: [main, 'release/**']"],
+    'false',
+    [
+      {
+        line: 1,
+        message:
+          'a checks workflow, which runs on pull_request or push, sets concurrency with cancel-in-progress: true; a gate that runs only on a push to main may instead group by github.sha and never cancel',
+      },
+      {
+        line: 4,
+        message: 'the concurrency group holds github.sha, so no newer run cancels this one',
+      },
+    ],
+  ],
+  [
+    'reports a commit sha group in a workflow that runs on pull requests too',
+    ['  pull_request:', '  push:', '    branches: [main]'],
+    'false',
+    [
+      {
+        line: 1,
+        message:
+          'a checks workflow, which runs on pull_request or push, sets concurrency with cancel-in-progress: true; a gate that runs only on a push to main may instead group by github.sha and never cancel',
+      },
+      {
+        line: 5,
+        message: 'the concurrency group holds github.sha, so no newer run cancels this one',
+      },
+    ],
+  ],
+])('it %s', async (_name, triggers, cancel, expected) => {
+  const ctx = await setupTest();
+
+  await ctx.commitFiles({
+    '.github/workflows/gate.yml': [
+      'on:',
+      ...triggers,
+      'concurrency:',
+      `  group: gate-\${{ github.sha }}`,
+      ...(cancel === undefined ? [] : [`  cancel-in-progress: ${cancel}`]),
+      'jobs:',
+      '  gate:',
+      '    runs-on: ubuntu-latest',
+      '    timeout-minutes: 5',
+      '    steps:',
+      '      - run: bun run check',
+      '',
+    ].join('\n'),
+  });
+
+  const findings = runWorkflowsCheck({
+    cwd: ctx.directory,
+    env: ctx.env,
+    paths: [],
+    profile: undefined,
+    runProgram,
+  });
+
+  expect(findings).toStrictEqual(
+    expected.map((finding) => ({ path: '.github/workflows/gate.yml', ...finding })),
+  );
+});
+
+test('it passes a gate on main whose every job groups by commit sha', async () => {
+  const ctx = await setupTest();
+
+  await ctx.commitFiles({
+    '.github/workflows/gate.yml': [
+      'on:',
+      '  push:',
+      '    branches: [main]',
+      'jobs:',
+      '  gate:',
+      '    runs-on: ubuntu-latest',
+      '    timeout-minutes: 5',
+      '    concurrency:',
+      `      group: gate-\${{ github.sha }}`,
+      '      cancel-in-progress: false',
+      '    steps:',
+      '      - run: bun run check',
+      '',
+    ].join('\n'),
+  });
+
+  const findings = runWorkflowsCheck({
+    cwd: ctx.directory,
+    env: ctx.env,
+    paths: [],
+    profile: undefined,
+    runProgram,
+  });
+
+  expect(findings).toStrictEqual([]);
 });
 
 test('it reports a release or deploy job that a newer run can cancel', async () => {
@@ -565,42 +702,59 @@ test('it leaves a heavy check alone in a public run', async () => {
   expect(findings).toStrictEqual([]);
 });
 
-test('it reports actions/cache in a Bun job', async () => {
-  const ctx = await setupTest();
+test.each([
+  ['~/.bun/install/cache', '~/.bun/install/cache'],
+  ['node_modules', 'node_modules'],
+  ['/nix/store\n**/node_modules/\n', '**/node_modules/'],
+  ['/nix/store', undefined],
+  ['node_modules_backup\n.bun/install/cache-old', undefined],
+  ['/nix/store\n!node_modules', undefined],
+])(
+  'it reads an actions/cache step in a Bun job with the path %p as caching %p',
+  async (path, cached) => {
+    const ctx = await setupTest();
 
-  await ctx.commitFiles({
-    '.github/workflows/tidy.yml': [
-      'on: workflow_dispatch',
-      'jobs:',
-      '  tidy:',
-      '    runs-on: ubuntu-latest',
-      '    timeout-minutes: 5',
-      '    steps:',
-      '      - uses: oven-sh/setup-bun@v2',
-      '      - name: Restore the install cache',
-      '        uses: actions/cache/restore@v4',
-      '      - run: bun install --frozen-lockfile',
-      '',
-    ].join('\n'),
-  });
+    await ctx.commitFiles({
+      '.github/workflows/tidy.yml': [
+        'on: workflow_dispatch',
+        'jobs:',
+        '  tidy:',
+        '    runs-on: ubuntu-latest',
+        '    timeout-minutes: 5',
+        '    steps:',
+        '      - uses: oven-sh/setup-bun@v2',
+        '      - name: Restore the cache',
+        '        uses: actions/cache/restore@v4',
+        '        with:',
+        `          path: ${JSON.stringify(path)}`,
+        '          key: tidy',
+        '      - run: bun install --frozen-lockfile',
+        '',
+      ].join('\n'),
+    });
 
-  const findings = runWorkflowsCheck({
-    cwd: ctx.directory,
-    env: ctx.env,
-    paths: [],
-    profile: undefined,
-    runProgram,
-  });
+    const findings = runWorkflowsCheck({
+      cwd: ctx.directory,
+      env: ctx.env,
+      paths: [],
+      profile: undefined,
+      runProgram,
+    });
 
-  expect(findings).toStrictEqual([
-    {
-      path: '.github/workflows/tidy.yml',
-      line: 3,
-      message:
-        'job tidy, step "Restore the install cache": a Bun job uses actions/cache/restore@v4; bun install --frozen-lockfile runs faster than the cache restore',
-    },
-  ]);
-});
+    const expected =
+      cached === undefined
+        ? []
+        : [
+            {
+              path: '.github/workflows/tidy.yml',
+              line: 3,
+              message: `job tidy, step "Restore the cache": a Bun job caches ${cached} with actions/cache/restore@v4; bun install --frozen-lockfile runs faster than the cache restore`,
+            },
+          ];
+
+    expect(findings).toStrictEqual(expected);
+  },
+);
 
 test('it reports a full-history checkout that states no filter', async () => {
   const ctx = await setupTest();

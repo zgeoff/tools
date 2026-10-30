@@ -359,6 +359,10 @@
         "target": "scripts/collect-command-names.ts"
       },
       {
+        "source": "sync/pre-push/collect-expression-references.ts",
+        "target": "scripts/collect-expression-references.ts"
+      },
+      {
         "source": "sync/pre-push/dependency-gates/collect-stale-age-gate-excludes.ts",
         "target": "scripts/dependency-gates/collect-stale-age-gate-excludes.ts"
       },

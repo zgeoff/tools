@@ -1,5 +1,6 @@
 import { parseArgs } from 'node:util';
 import { collectCommandNames } from './collect-command-names.ts';
+import { collectExpressionReferences } from './collect-expression-references.ts';
 import { parseShellWords } from './parse-shell-words.ts';
 import type { RunProgram } from './run-program.ts';
 import { runProgram } from './run-program.ts';
@@ -289,25 +290,45 @@ function findHeavyRunner(runsOn: unknown): string | undefined {
 const setupBunPattern = /^oven-sh\/setup-bun(?:@|$)/u;
 const cachePattern = /^actions\/cache(?:\/(?:restore|save))?(?:@|$)/u;
 
+// A path segment, so `node_modules_backup` and `.bun/install/cache-old` are other folders.
+const installCachePattern = /(?:^|\/)(?:node_modules|\.bun\/install\/cache)(?:\/|$)/u;
+
 function collectCacheFindings(context: WorkflowContext, job: Job): WorkflowFinding[] {
   const steps = collectSteps(job);
-  const uses = steps.map((step) => findMember(step, 'uses'));
+  const isBunJob = steps.some((step) => isStepUsing(step, setupBunPattern));
 
-  const isBunJob = uses.some(
-    (action) => typeof action === 'string' && setupBunPattern.test(action),
-  );
+  return steps.flatMap((step, index) => {
+    const action = findMember(step, 'uses');
+    const cached = isStepUsing(step, cachePattern) ? findInstallCachePath(step) : undefined;
 
-  return uses.flatMap((action, index) =>
-    isBunJob && typeof action === 'string' && cachePattern.test(action)
+    return isBunJob && typeof action === 'string' && cached !== undefined
       ? [
           {
             path: context.path,
             line: job.line,
-            message: `job ${job.id}, ${formatStepLabel(steps[index], index)}: a Bun job uses ${action}; bun install --frozen-lockfile runs faster than the cache restore`,
+            message: `job ${job.id}, ${formatStepLabel(step, index)}: a Bun job caches ${cached} with ${action}; bun install --frozen-lockfile runs faster than the cache restore`,
           },
         ]
-      : [],
-  );
+      : [];
+  });
+}
+
+function isStepUsing(step: unknown, pattern: RegExp): boolean {
+  const action = findMember(step, 'uses');
+
+  return typeof action === 'string' && pattern.test(action);
+}
+
+// actions/cache reads one path per line, and a line that starts with `!` leaves that path out.
+function findInstallCachePath(step: unknown): string | undefined {
+  const paths = findMember(findMember(step, 'with'), 'path');
+
+  return typeof paths === 'string'
+    ? paths
+        .split('\n')
+        .map((path) => path.trim())
+        .find((path) => !path.startsWith('!') && installCachePattern.test(path))
+    : undefined;
 }
 
 const checkoutPattern = /^actions\/checkout(?:@|$)/u;
@@ -410,11 +431,11 @@ function collectChecksFindings(
 ): WorkflowFinding[] {
   const otherJobs = context.jobs.filter((job) => !deployJobs.includes(job));
 
-  const isEveryJobCancelling =
+  const isEveryJobCovered =
     otherJobs.length > 0 &&
-    otherJobs.every((job) => isCancelling(findMember(job.definition, 'concurrency')));
+    otherJobs.every((job) => isChecksGroup(context, findMember(job.definition, 'concurrency')));
 
-  const isCovered = isCancelling(workflowConcurrency) || isEveryJobCancelling;
+  const isCovered = isChecksGroup(context, workflowConcurrency) || isEveryJobCovered;
 
   const workflowFindings =
     deployJobs.length > 0 || isCovered
@@ -424,7 +445,7 @@ function collectChecksFindings(
             path: context.path,
             line: getTopLevelLine(context.lines, 'on'),
             message:
-              'a checks workflow, which runs on pull_request or push, sets concurrency with cancel-in-progress: true',
+              'a checks workflow, which runs on pull_request or push, sets concurrency with cancel-in-progress: true; a gate that runs only on a push to main may instead group by github.sha and never cancel',
           },
         ];
 
@@ -432,7 +453,7 @@ function collectChecksFindings(
     deployJobs.length === 0
       ? []
       : otherJobs
-          .filter((job) => !isCancelling(findMember(job.definition, 'concurrency')))
+          .filter((job) => !isChecksGroup(context, findMember(job.definition, 'concurrency')))
           .map((job) => ({
             path: context.path,
             line: job.line,
@@ -453,6 +474,34 @@ function collectChecksFindings(
   ];
 }
 
+function isChecksGroup(context: WorkflowContext, concurrency: unknown): boolean {
+  return isCancelling(concurrency) || isGateGroup(context, concurrency);
+}
+
+function isGateGroup(context: WorkflowContext, concurrency: unknown): boolean {
+  const group = findMember(concurrency, 'group');
+  const cancel = findMember(concurrency, 'cancel-in-progress');
+
+  return (
+    isMainGate(context) &&
+    typeof group === 'string' &&
+    collectExpressionReferences(group).includes('github.sha') &&
+    (cancel === undefined || cancel === false)
+  );
+}
+
+// A gate on main runs once for each commit, so a newer commit must not cancel the older run.
+function isMainGate(context: WorkflowContext): boolean {
+  const push = findMember(findMember(context.workflow, 'on'), 'push');
+  const branches = [findMember(push, 'branches')].flat();
+
+  return (
+    !pullRequestTriggers.some((name) => context.triggers.has(name)) &&
+    branches.length > 0 &&
+    branches.every((branch) => branch === 'main')
+  );
+}
+
 // A value that differs between two runs on the same branch gives each run its own group, which no
 // later run cancels.
 const perRunValues = ['github.sha', 'github.run_id', 'github.run_number', 'github.run_attempt'];
@@ -464,7 +513,8 @@ function collectPerRunGroupFindings(
 ): WorkflowFinding[] {
   const group = findMember(concurrency, 'group');
   const references = typeof group === 'string' ? collectExpressionReferences(group) : [];
-  const perRun = perRunValues.find((value) => references.includes(value));
+  const allowed = isGateGroup(context, concurrency) ? 'github.sha' : undefined;
+  const perRun = perRunValues.find((value) => value !== allowed && references.includes(value));
 
   return perRun === undefined
     ? []
@@ -475,24 +525,6 @@ function collectPerRunGroupFindings(
           message: `the concurrency group holds ${perRun}, so no newer run cancels this one`,
         },
       ];
-}
-
-// A string literal in an expression may hold `}}`, so the end of an expression is found past them.
-const expressionPattern = /\$\{\{(?<body>(?:'(?:[^']|'')*'|[^'])*?)\}\}/gsu;
-const indexPattern = /\[\s*'(?<name>[A-Za-z_][\w-]*)'\s*\]/gu;
-const stringPattern = /'(?:[^']|'')*'/gu;
-const referencePattern = /[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)+/gu;
-
-// Only a context reference inside an expression changes between runs: the same words outside one,
-// or in one of its string literals, are text. `github['sha']` reads the same value as `github.sha`.
-function collectExpressionReferences(text: string): string[] {
-  return [...text.matchAll(expressionPattern)].flatMap((expression) => {
-    const body = (expression.groups?.['body'] ?? '')
-      .replaceAll(indexPattern, '.$<name>')
-      .replaceAll(stringPattern, "''");
-
-    return [...body.matchAll(referencePattern)].map((reference) => reference[0]);
-  });
 }
 
 function collectWorkflowRunFindings(context: WorkflowContext): WorkflowFinding[] {
