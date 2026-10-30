@@ -46,12 +46,15 @@ test("it runs the repo's build:browser script once, and gives the tests the fold
     ].join('\n'),
   );
 
-  const lane = Bun.spawn([process.execPath, join(import.meta.dir, 'cli.ts'), 'browser'], {
-    cwd: ctx.repoRoot,
-    env: { ...process.env, TMPDIR: ctx.laneTmpdir },
-    stdout: 'ignore',
-    stderr: 'ignore',
-  });
+  const lane = Bun.spawn(
+    [process.execPath, join(import.meta.dir, '..', 'packages', 'rig', 'src', 'cli.ts'), 'browser'],
+    {
+      cwd: ctx.repoRoot,
+      env: { ...process.env, TMPDIR: ctx.laneTmpdir },
+      stdout: 'ignore',
+      stderr: 'ignore',
+    },
+  );
 
   onTestFinished(async () => {
     if (lane.exitCode === null && lane.signalCode === null) {
@@ -64,5 +67,6 @@ test("it runs the repo's build:browser script once, and gives the tests the fold
   const exitCode = await lane.exited;
   const invocations = await readFile(invocationsPath, 'utf8');
 
-  expect({ exitCode, invocations }).toStrictEqual({ exitCode: 0, invocations: 'built\n' });
+  expect(exitCode).toBe(0);
+  expect(invocations).toBe('built\n');
 });
