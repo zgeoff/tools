@@ -15,7 +15,8 @@ async function setupTest() {
   const env = { PATH: process.env['PATH'], HOME: process.env['HOME'] };
   const repoRoot = join(import.meta.dir, '../..');
 
-  // The bundle takes in @zgeoff/std, and the declaration build extends the base tsconfig.
+  // The bundle takes in @zgeoff/std, the declaration build extends the base tsconfig, and this
+  // file holds the recipe that writes the template.
   const sourcePaths = await Array.fromAsync(
     new Bun.Glob('packages/{skill-gate,std}/src/**').scan({ cwd: repoRoot, absolute: true }),
   );
@@ -44,6 +45,7 @@ async function setupTest() {
       name: 'skill-gate-package',
       inputPaths: [
         ...sourcePaths,
+        import.meta.path,
         join(import.meta.dir, 'package.json'),
         join(import.meta.dir, 'tsconfig.json'),
         join(import.meta.dir, 'tsconfig.build.json'),
