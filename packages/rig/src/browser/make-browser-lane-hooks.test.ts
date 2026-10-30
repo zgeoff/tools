@@ -260,6 +260,42 @@ test('it fails with the exit code of a failed build, runs no tests and removes i
   expect(chromeTmpdirs).toStrictEqual([]);
 });
 
+test('it fails, and removes its folders, when an abort arrives as the tests exit 0', async () => {
+  const ctx = await setupTest();
+
+  const controller = new AbortController();
+
+  const runTests = mock<BrowserLaneOptions['runTests']>(() => {
+    controller.abort();
+
+    return Promise.resolve(0);
+  });
+
+  const exitCode = await runLaneHooks(
+    ['.browser.test.ts'],
+    makeBrowserLaneHooks({
+      run: ctx.run,
+      chromeDirs: ctx.chromeDirs,
+      userID: ctx.userID,
+      preloadPath: '/work/notes-app/scripts/browser-lane/browser-preload.ts',
+      files: laneFiles,
+      probeProcess: ctx.probeProcess,
+      groups: ctx.groups,
+      reportCleanupError: makeRecordingStub(),
+      environment: {},
+      signal: controller.signal,
+      runBuild: null,
+      runTests,
+    }),
+  );
+
+  const runs = await readdir(ctx.run.runsDir);
+
+  expect(exitCode).toBe(1);
+  expect(runTests).toHaveBeenCalledOnce();
+  expect(runs).toStrictEqual([]);
+});
+
 test('it waits for an aborted build to exit, then removes its folders and starts no tests', async () => {
   const ctx = await setupTest();
 

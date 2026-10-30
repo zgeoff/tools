@@ -6,6 +6,7 @@ import { buildLaneEnvironments } from './build-lane-environments.ts';
 import { findPrivateDirProblem } from './find-private-dir-problem.ts';
 import type { LaneFiles } from './lane-files.ts';
 import type { ChromeDirs } from './pick-chrome-dirs.ts';
+import { pickExitCodeAfterTests } from './pick-exit-code-after-tests.ts';
 import { pickStepAfterBuild } from './pick-step-after-build.ts';
 import { pendingRecordPrefix, probeRun } from './probe-run.ts';
 import type { ProcessGroups } from './process-groups.ts';
@@ -188,12 +189,14 @@ async function runBrowserTests(
 ): Promise<number> {
   const testsRecord = await createPendingRecord(options.run.groupsDir, 'tests', options.files);
 
-  return options.runTests(
+  const testsExitCode = await options.runTests(
     ['--parallel=1', '--preload', options.preloadPath, ...testArgs],
     environment,
     options.signal,
     testsRecord,
   );
+
+  return pickExitCodeAfterTests(testsExitCode, options.signal.aborted);
 }
 
 async function stopBrowserLane(
