@@ -96,6 +96,7 @@ test("it runs the repo's build:browser script once, and gives the tests the fold
       "import { appendFileSync } from 'node:fs';",
       "test('it reads the build', async () => {",
       `  appendFileSync('${phasesPath}', \`test-body \${Date.now()}\\n\`);`,
+      `  appendFileSync('${phasesPath}.ps', Bun.spawnSync(['ps', '-eo', 'pid,etimes,args']).stdout.toString().split('\\n').filter((line) => /^\\s*\\d+\\s+\\d+\\s+\\S*chrom/i.test(line)).join('\\n'));`,
       "  const page = await Bun.file(process.env['RIG_BROWSER_BUILD_DIR'] + '/index.html').text();",
       '',
       String.raw`  expect(page).toBe('<main>notes</main>\n');`,
@@ -118,6 +119,10 @@ test("it runs the repo's build:browser script once, and gives the tests the fold
     .map((line) => line.split(' '));
 
   const startMs = Number(phases[0]?.[1]);
+
+  const psText = await readFile(`${phasesPath}.ps`, 'utf8');
+
+  console.log(`PS ${psText}`);
 
   console.log(
     `PHASES ${phases.map((phase) => `${phase[0]}=+${Number(phase[1]) - startMs}`).join(' ')}`,

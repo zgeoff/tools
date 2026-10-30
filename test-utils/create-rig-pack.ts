@@ -30,6 +30,15 @@ export default async function createRigPack(context: LaneContext): Promise<LaneS
 
   const binPath = await readPackedBin(run.packageDir);
 
+  for (const attempt of ['1', '2']) {
+    const startedMs = Date.now();
+    const probeCode = `const view = new Bun.WebView({ backend: { type: 'chrome', url: false, argv: ['--no-sandbox', '--disable-dev-shm-usage'] }, dataStore: { directory: ${JSON.stringify(join(run.runDir, `warm-${attempt}`))} } }); await view.navigate('about:blank'); view.close();`;
+
+    await $`${process.execPath} -e ${probeCode}`;
+
+    console.error(`WARM chrome launch ${attempt}: ${Date.now() - startedMs} ms`);
+  }
+
   return { environment: { [rigE2EBinVariable]: binPath } };
 }
 
