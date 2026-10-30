@@ -16,7 +16,12 @@ jobs:
       pull-requests: write
     uses: ./.github/workflows/bun-checks.yml
     with:
-      scripts: check:sync check:release-workflow format:check lint:full typecheck test
+      scripts:
+        check:sync check:release-workflow format:check lint:full typecheck test test:browser
+        test:e2e test:host
+      # oxlint runs its JS plugin under Node, which reads rig.config.ts and
+      # strips its types from Node 22.18.
+      node-version: 24
       # The tests of the check steps and the pre-push jobs run shfmt and
       # actionlint, in the test job, which runs no check step.
       setup-shfmt: true
