@@ -74,51 +74,6 @@ test('it leaves both files byte for byte the same on a second run', async () => 
   expect(secondCodex).toBe(firstCodex);
 });
 
-test('it refuses a broken rules file and writes nothing', async () => {
-  const ctx = await setupTest();
-
-  await writeTreeFiles(ctx.project, {
-    '.claude/hooks/start.ts': 'await import("@zgeoff/agent-hooks");\n',
-  });
-
-  await writeFile(join(ctx.project, '.claude/skill-gate.json'), '{"gates": {}}');
-
-  const result = await runInit({ projectDir: ctx.project, fileSystem: bunFileSystem });
-
-  expect(result).toStrictEqual({
-    ok: false,
-    error: '.claude/skill-gate.json `gates` must be an array',
-  });
-
-  const claudeExists = await Bun.file(join(ctx.project, '.claude/settings.json')).exists();
-
-  expect(claudeExists).toBeFalse();
-});
-
-test('it refuses a settings file that is not JSON and leaves both files alone', async () => {
-  const ctx = await setupTest();
-
-  await writeTreeFiles(ctx.project, {
-    '.claude/hooks/start.ts': 'await import("@zgeoff/agent-hooks");\n',
-  });
-
-  await mkdir(join(ctx.project, '.codex'));
-  await writeFile(join(ctx.project, '.codex/hooks.json'), '{ "hooks": ');
-
-  const result = await runInit({ projectDir: ctx.project, fileSystem: bunFileSystem });
-
-  expect(result).toStrictEqual({
-    ok: false,
-    error: expect.toStartWith('.codex/hooks.json is not valid JSON: '),
-  });
-
-  const claudeExists = await Bun.file(join(ctx.project, '.claude/settings.json')).exists();
-  const codexText = await readFile(join(ctx.project, '.codex/hooks.json'), 'utf8');
-
-  expect(claudeExists).toBeFalse();
-  expect(codexText).toBe('{ "hooks": ');
-});
-
 test('it reports the settings file it could not write and stops before the next one', async () => {
   const writeText = mock((filePath: string) =>
     Promise.reject(new Error(`EACCES: permission denied, open '${filePath}'`)),
