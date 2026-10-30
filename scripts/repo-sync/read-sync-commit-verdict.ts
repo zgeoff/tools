@@ -47,7 +47,13 @@ export async function readSyncCommitVerdict(
     };
   }
 
-  const basePin = await readPin(context, 'HEAD');
+  // A run can wait in its queue while a newer sync pull request merges, so the checkout's own head
+  // can be older than the base.
+  const fetchedBase = await runProbe(context, ['git', 'fetch', '-q', 'origin', request.base]);
+
+  const baseTree = fetchedBase.exitCode === 0 ? 'FETCH_HEAD' : 'HEAD';
+
+  const basePin = await readPin(context, baseTree);
   const isBaseNewer = await probeNewerPin(context, request.commit, basePin);
 
   if (isBaseNewer && basePin !== null) {

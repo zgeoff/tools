@@ -63,12 +63,19 @@ async function setupTest() {
     return head.trim();
   };
 
-  const runSync = async (entries: unknown[], extraEnv: Readonly<Record<string, string>> = {}) => {
+  // The afterClone callback runs between the caller's checkout and the sync, as a merge that lands
+  // while the run waits in its queue does.
+  const runSync = async (
+    entries: unknown[],
+    extraEnv: Readonly<Record<string, string>> = {},
+    afterClone: () => Promise<void> = () => Promise.resolve(),
+  ) => {
     const toolsRef = await writeToolsCommit();
     const caller = await mkdtemp(join(directory, 'caller-'));
 
     await $`git clone -q ${origin} ${caller}`.env(env).quiet();
 
+    await afterClone();
     await cp(tools, join(caller, '.repo-sync'), { recursive: true });
 
     return syncEntries({
@@ -1378,6 +1385,44 @@ test('it fetches a newer pin that the tools checkout lacks before it compares th
   );
 
   const exitCode = await ctx.runSync([entry], { TOOLS_REF: older });
+  const branches = await ctx.readBranchNames();
+
+  expect(exitCode).toBe(0);
+  expect(branches).toStrictEqual(['main']);
+
+  expect(ctx.output).toContain(
+    `main already pins ${newer}, which is newer than ${older}; nothing to do.\n`,
+  );
+});
+
+test('it reads the pin of the base as the remote holds it when a newer pin merges after the checkout', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  const entry = {
+    name: 'editorconfig',
+    description: 'The editor config',
+    files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+  };
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const older = await ctx.writeToolsCommit();
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n\n[*]\nindent_style = space\n');
+
+  const newer = await ctx.writeToolsCommit();
+
+  const exitCode = await ctx.runSync([entry], { TOOLS_REF: older }, async () => {
+    await ctx.writeBranch(
+      'main',
+      '.github/workflows/repo-sync.yml',
+      `jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@${newer} # main\n`,
+    );
+  });
+
   const branches = await ctx.readBranchNames();
 
   expect(exitCode).toBe(0);
