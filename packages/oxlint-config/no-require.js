@@ -66,20 +66,18 @@ function findCreateRequireRead(object) {
     return isCreateRequireKey(parent.property, parent.computed) ? parent : null;
   }
 
-  if (
-    parent.type === 'VariableDeclarator' &&
-    parent.init === object &&
-    parent.id.type === 'ObjectPattern'
-  ) {
-    return (
-      parent.id.properties.find(
-        (property) =>
-          property.type === 'Property' && isCreateRequireKey(property.key, property.computed),
-      ) ?? null
-    );
+  const pattern = findDestructuringPattern(parent, object);
+
+  if (pattern?.type !== 'ObjectPattern') {
+    return null;
   }
 
-  return null;
+  return (
+    pattern.properties.find(
+      (property) =>
+        property.type === 'Property' && isCreateRequireKey(property.key, property.computed),
+    ) ?? null
+  );
 }
 
 function isCreateRequireKey(key, isComputed) {
@@ -87,6 +85,18 @@ function isCreateRequireKey(key, isComputed) {
     (key.type === 'Literal' && key.value === 'createRequire') ||
     (!isComputed && key.type === 'Identifier' && key.name === 'createRequire')
   );
+}
+
+function findDestructuringPattern(parent, object) {
+  if (parent.type === 'VariableDeclarator' && parent.init === object) {
+    return parent.id;
+  }
+
+  if (parent.type === 'AssignmentExpression' && parent.right === object) {
+    return parent.left;
+  }
+
+  return null;
 }
 
 // `env.node` declares `require` as a global, so a read resolves to that variable; without it,

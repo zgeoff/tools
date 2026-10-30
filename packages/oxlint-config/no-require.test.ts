@@ -37,6 +37,11 @@ test.each([
     "import * as nodeModule from 'node:module';\n\nconst { createRequire: makeLoader } = nodeModule;\n\nexport const load = makeLoader(import.meta.url);\n",
     'createRequire',
   ],
+  [
+    'createRequire destructured in an assignment',
+    "import nodeModule from 'node:module';\n\nlet load;\n({ createRequire: load } = nodeModule);\n\nexport const loader = load;\n",
+    'createRequire',
+  ],
   ['a call to the require global', "export const kettle = require('./kettle');\n", 'require'],
   ['a read of the require global', 'export const load = require;\n', 'require'],
 ])('it reports %s', async (_, source, word) => {
@@ -71,6 +76,10 @@ test.each([
     "export function brew(require: (name: string) => string) {\n  return require('kettle');\n}\n",
   ],
   ['a property named require', 'export const settings = { require: true };\n'],
+  [
+    'another member destructured in an assignment from a node:module import',
+    "import nodeModule from 'node:module';\n\nlet names;\n({ builtinModules: names } = nodeModule);\n\nexport const known = names;\n",
+  ],
   [
     'another member destructured from a node:module import',
     "import nodeModule from 'node:module';\n\nconst { builtinModules } = nodeModule;\n\nexport const names = builtinModules;\n",
