@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { hasErrorCode } from '../packages/rig/src/browser/has-error-code.ts';
+import { killProcessGroups } from './kill-process-groups.ts';
 import { readStreamUntil } from './read-stream-until.ts';
 import type { StubBuildStart } from './stub-build-start.ts';
 import { stubBuildStartSchema } from './stub-build-start.ts';
@@ -10,7 +11,8 @@ export interface StubBuildRepo {
   // Reads the lane's output until the build reports that it started.
   readonly readStart: (stdout: ReadableStream<Uint8Array>) => Promise<StubBuildStart>;
 
-  // Stops the process group of a build that started, whether or not it reported its start.
+  // Stops the process group of a build that started, whether or not it reported its start, and
+  // waits until no member of the group runs.
   readonly stop: () => Promise<void>;
 }
 
@@ -21,7 +23,7 @@ const stubBuildProgramPath = join(import.meta.dir, 'run-stub-build.ts');
 export async function createStubBuildRepo(
   repoRoot: string,
   markerPath: string,
-  processes: Pick<TestProcesses, 'readGroupID' | 'signalGroup'>,
+  processes: Pick<TestProcesses, 'readGroupID' | 'signalGroup' | 'probeGroup' | 'now' | 'sleep'>,
   files: Pick<TemplateFiles, 'createDirectories' | 'readFile' | 'writeFile'>,
 ): Promise<StubBuildRepo> {
   const pidPath = join(repoRoot, 'build.pid');
@@ -61,7 +63,7 @@ export async function createStubBuildRepo(
       const groupID = processes.readGroupID(Number(pidFile));
 
       if (groupID !== null) {
-        processes.signalGroup(groupID, 'SIGKILL');
+        await killProcessGroups([groupID], processes);
       }
     },
   };

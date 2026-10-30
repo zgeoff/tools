@@ -7,16 +7,20 @@ import { probeProcess } from '../../../test-utils/probe-process.ts';
 import { runCommand } from './run-command.ts';
 
 async function setupTest() {
+  const stack = new AsyncDisposableStack();
+
+  onTestFinished(() => stack.disposeAsync());
+
   const directory = await mkdtemp(join(tmpdir(), 'rig-run-command-'));
 
-  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+  stack.defer(() => rm(directory, { recursive: true, force: true }));
 
   // A read of a FIFO waits until the command writes to it, so the test needs no poll.
   const pidFIFO = join(directory, 'sleep.pid');
 
   await $`mkfifo ${pidFIFO}`;
 
-  return { pidFIFO };
+  return { pidFIFO, stack };
 }
 
 test('it returns the exit code of the command', async () => {
@@ -60,23 +64,22 @@ test('it stops a process that the command started when the run aborts', async ()
 
   const controller = new AbortController();
 
-  onTestFinished(() => {
-    controller.abort();
-  });
-
   const running = runCommand(['sh', '-c', 'sleep 60 & echo $! > "$PID_FIFO"; wait'], {
     cwd: import.meta.dir,
     environment: { PATH: process.env['PATH'], PID_FIFO: ctx.pidFIFO },
     signal: controller.signal,
   });
 
+  // The abort stops the command's whole group, and the run settles once no member of it runs.
+  ctx.stack.defer(async () => {
+    controller.abort();
+
+    await running;
+  });
+
   const pidText = await Bun.file(ctx.pidFIFO).text();
 
   const sleepPID = Number(pidText.trim());
-
-  onTestFinished(() => {
-    Bun.spawnSync(['kill', '-KILL', String(sleepPID)]);
-  });
 
   controller.abort();
 
@@ -89,19 +92,23 @@ test('it stops a process that the command started when the run aborts', async ()
 test('it stops a process that the command leaves running when it exits', async () => {
   const ctx = await setupTest();
 
+  const controller = new AbortController();
+
   const running = runCommand(['sh', '-c', 'sleep 60 & echo $! > "$PID_FIFO"; exit 4'], {
     cwd: import.meta.dir,
     environment: { PATH: process.env['PATH'], PID_FIFO: ctx.pidFIFO },
-    signal: new AbortController().signal,
+    signal: controller.signal,
+  });
+
+  ctx.stack.defer(async () => {
+    controller.abort();
+
+    await running;
   });
 
   const pidText = await Bun.file(ctx.pidFIFO).text();
 
   const sleepPID = Number(pidText.trim());
-
-  onTestFinished(() => {
-    Bun.spawnSync(['kill', '-KILL', String(sleepPID)]);
-  });
 
   const exitCode = await running;
 

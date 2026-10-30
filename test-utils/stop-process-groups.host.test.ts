@@ -1,10 +1,11 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { killProcessGroups } from './kill-process-groups.ts';
 import { probeProcess } from './probe-process.ts';
 import { readStreamUntil } from './read-stream-until.ts';
 import { stopProcessGroups } from './stop-process-groups.ts';
 import { testProcesses } from './test-processes.ts';
 
-test('it stops a process and the detached child that leads a group of its own', async () => {
+test('it stops a process and the detached child that leads a group of its own, and waits for both', async () => {
   const parent = Bun.spawn(
     [
       process.execPath,
@@ -14,32 +15,24 @@ test('it stops a process and the detached child that leads a group of its own', 
     { detached: true, stdout: 'pipe' },
   );
 
-  const startedPids = [parent.pid];
+  const startedGroupIDs = [parent.pid];
 
-  onTestFinished(() => {
-    for (const pid of startedPids) {
-      try {
-        process.kill(pid, 'SIGKILL');
-      } catch {
-        // The process has already exited.
-      }
-    }
+  onTestFinished(async () => {
+    await killProcessGroups(startedGroupIDs, testProcesses);
+    await parent.exited;
   });
 
   const output = await readStreamUntil(parent.stdout, '\n');
 
   const childPid = Number(/child (?<pid>\d+)/u.exec(output)?.groups?.['pid']);
 
-  startedPids.push(childPid);
+  startedGroupIDs.push(childPid);
 
-  stopProcessGroups(parent.pid, testProcesses);
-
-  await parent.exited;
-
-  const child = Bun.spawnSync(['ps', '-o', 'stat=', '-p', String(childPid)]).stdout.toString();
+  await stopProcessGroups(parent.pid, testProcesses);
 
   expect(childPid).toBeGreaterThan(0);
-  expect(child.trim()).toBeOneOf(['', 'Z']);
+  expect(testProcesses.probeGroup(parent.pid)).toBeFalse();
+  expect(probeProcess(childPid)).toBeFalse();
 });
 
 test('it stops nothing, and fails nothing, when the process has exited', async () => {
@@ -47,9 +40,5 @@ test('it stops nothing, and fails nothing, when the process has exited', async (
 
   await exited.exited;
 
-  expect(() => {
-    stopProcessGroups(exited.pid, testProcesses);
-  }).not.toThrow();
-
-  expect(probeProcess(exited.pid)).toBeFalse();
+  expect(stopProcessGroups(exited.pid, testProcesses)).resolves.toBeUndefined();
 });

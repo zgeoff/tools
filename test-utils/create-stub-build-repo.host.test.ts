@@ -9,9 +9,13 @@ import { templateFiles } from './template-files.ts';
 import { testProcesses } from './test-processes.ts';
 
 async function setupTest() {
+  const stack = new AsyncDisposableStack();
+
+  onTestFinished(() => stack.disposeAsync());
+
   const directory = await mkdtemp(join(tmpdir(), 'stub-build-repo-'));
 
-  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+  stack.defer(() => rm(directory, { recursive: true, force: true }));
 
   const runDir = join(directory, 'run');
 
@@ -21,6 +25,7 @@ async function setupTest() {
     repoRoot: join(directory, 'notes-app'),
     markerPath: join(directory, 'marker.txt'),
     runDir,
+    stack,
   };
 }
 
@@ -41,8 +46,9 @@ test('it runs a build that reports its process IDs and, on SIGTERM, writes wheth
     detached: true,
   });
 
-  onTestFinished(() => {
-    stopProcessGroups(build.pid, testProcesses);
+  ctx.stack.defer(async () => {
+    await stopProcessGroups(build.pid, testProcesses);
+    await build.exited;
   });
 
   const start = await repo.readStart(build.stdout);
@@ -75,8 +81,9 @@ test('it stops the process group of a build that started, from the process ID th
     detached: true,
   });
 
-  onTestFinished(() => {
-    stopProcessGroups(runner.pid, testProcesses);
+  ctx.stack.defer(async () => {
+    await stopProcessGroups(runner.pid, testProcesses);
+    await runner.exited;
   });
 
   const output = await readStreamUntil(runner.stdout, '"event":"build-started"');

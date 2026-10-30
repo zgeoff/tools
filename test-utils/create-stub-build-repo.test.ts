@@ -1,9 +1,12 @@
 import { expect, mock, test } from 'bun:test';
+import { buildSteppingClock } from './build-stepping-clock.ts';
 import { createStubBuildRepo } from './create-stub-build-repo.ts';
 import type { TemplateFiles } from './template-files.ts';
 import type { TestProcesses } from './test-processes.ts';
 
 function setupTest(readFile: TemplateFiles['readFile']) {
+  const clock = buildSteppingClock();
+
   return {
     files: {
       createDirectories: mock<TemplateFiles['createDirectories']>(() => Promise.resolve()),
@@ -13,6 +16,9 @@ function setupTest(readFile: TemplateFiles['readFile']) {
     processes: {
       readGroupID: mock<TestProcesses['readGroupID']>(() => 5120),
       signalGroup: mock<TestProcesses['signalGroup']>(() => {}),
+      probeGroup: mock<TestProcesses['probeGroup']>(() => false),
+      now: clock.now,
+      sleep: clock.sleep,
     },
   };
 }
@@ -52,6 +58,7 @@ test("it sends SIGKILL to the group of the process ID that the build's file hold
   expect(ctx.files.readFile).toHaveBeenCalledExactlyOnceWith('/work/notes-app/build.pid');
   expect(ctx.processes.readGroupID).toHaveBeenCalledExactlyOnceWith(4417);
   expect(ctx.processes.signalGroup).toHaveBeenCalledExactlyOnceWith(5120, 'SIGKILL');
+  expect(ctx.processes.probeGroup).toHaveBeenCalledExactlyOnceWith(5120);
 });
 
 test('it stops nothing when no build wrote its process ID file', async () => {

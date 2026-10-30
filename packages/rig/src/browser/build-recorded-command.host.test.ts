@@ -7,13 +7,17 @@ import { buildRecordedCommand } from './build-recorded-command.ts';
 import { processGroups } from './process-groups.ts';
 
 async function setupTest() {
+  const stack = new AsyncDisposableStack();
+
+  onTestFinished(() => stack.disposeAsync());
+
   const directory = await mkdtemp(join(tmpdir(), 'recorded-command-'));
 
-  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+  stack.defer(() => rm(directory, { recursive: true, force: true }));
 
   const groupsDir = join(directory, 'groups');
 
-  return { groupsDir, pendingRecord: join(groupsDir, 'pending-tests') };
+  return { groupsDir, pendingRecord: join(groupsDir, 'pending-tests'), stack };
 }
 
 test('it moves the pending record to the group ID before the command runs, as the group leader', async () => {
@@ -30,7 +34,7 @@ test('it moves the pending record to the group ID before the command runs, as th
 
   const leader = Bun.spawn([...command], { stdout: 'pipe', detached: true });
 
-  onTestFinished(async () => {
+  ctx.stack.defer(async () => {
     if (leader.exitCode === null && leader.signalCode === null) {
       processGroups.signalGroup(leader.pid, 'SIGKILL');
     }
@@ -56,7 +60,7 @@ test('it returns the exit code of the command', async () => {
 
   const leader = Bun.spawn([...command], { detached: true });
 
-  onTestFinished(async () => {
+  ctx.stack.defer(async () => {
     if (leader.exitCode === null && leader.signalCode === null) {
       processGroups.signalGroup(leader.pid, 'SIGKILL');
     }

@@ -27,8 +27,10 @@ async function setupTest() {
   onTestFinished(async () => {
     for (const lane of started.lanes) {
       if (lane.exitCode === null && lane.signalCode === null) {
-        stopProcessGroups(lane.pid, testProcesses);
+        await stopProcessGroups(lane.pid, testProcesses);
       }
+
+      await lane.exited;
     }
 
     await started.repo?.stop();

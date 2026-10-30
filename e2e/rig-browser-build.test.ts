@@ -1,19 +1,67 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
+import { buildBrowserRun } from '../packages/rig/src/browser/build-browser-run.ts';
+import { pickChromeDirs } from '../packages/rig/src/browser/pick-chrome-dirs.ts';
+import { stopProcessGroups } from '../test-utils/stop-process-groups.ts';
+import { testProcesses } from '../test-utils/test-processes.ts';
 
 async function setupTest() {
-  const repoRoot = await mkdtemp(join(tmpdir(), 'rig-browser-cli-'));
+  const stack = new AsyncDisposableStack();
 
-  onTestFinished(() => rm(repoRoot, { recursive: true, force: true }));
+  onTestFinished(() => stack.disposeAsync());
 
-  // Chrome's socket path must fit a Unix socket address, so the lane gets a short TMPDIR.
+  const repoRoot = await mkdtemp(join(tmpdir(), 'rig-browser-build-'));
+
+  stack.defer(() => rm(repoRoot, { recursive: true, force: true }));
+
+  // Chrome's socket path must fit a Unix socket address, so the lane gets a TMPDIR of its own,
+  // and the test asks the lane's own rule where the Chrome folder goes. A long TMPDIR sends that
+  // folder to the /tmp that every user shares, which the removal of laneTmpdir does not reach.
   const laneTmpdir = await mkdtemp(join(tmpdir(), 'rb-'));
 
-  onTestFinished(() => rm(laneTmpdir, { recursive: true, force: true }));
+  stack.defer(() => rm(laneTmpdir, { recursive: true, force: true }));
 
-  return { repoRoot, laneTmpdir };
+  const chromeRunsDir = pickChromeDirs(
+    laneTmpdir,
+    userInfo().uid,
+    buildBrowserRun(repoRoot, hostname(), '0'),
+  ).runsDir;
+
+  stack.defer(() => rm(chromeRunsDir, { recursive: true, force: true }));
+
+  return {
+    repoRoot,
+    startLane: () => {
+      const lane = Bun.spawn(
+        [
+          process.execPath,
+          join(import.meta.dir, '..', 'packages', 'rig', 'src', 'cli.ts'),
+          'browser',
+        ],
+        {
+          cwd: repoRoot,
+          env: { ...process.env, TMPDIR: laneTmpdir },
+          stdout: 'ignore',
+          stderr: 'ignore',
+          detached: true,
+        },
+      );
+
+      // rig starts its build and its tests in process groups of their own, so the cleanup stops
+      // those groups and rig's, and waits for them, before the folders go.
+      stack.defer(async () => {
+        if (lane.exitCode === null && lane.signalCode === null) {
+          await stopProcessGroups(lane.pid, testProcesses);
+        }
+
+        await lane.exited;
+      });
+
+      return lane;
+    },
+  };
 }
 
 test("it runs the repo's build:browser script once, and gives the tests the folder the build wrote", async () => {
@@ -46,23 +94,7 @@ test("it runs the repo's build:browser script once, and gives the tests the fold
     ].join('\n'),
   );
 
-  const lane = Bun.spawn(
-    [process.execPath, join(import.meta.dir, '..', 'packages', 'rig', 'src', 'cli.ts'), 'browser'],
-    {
-      cwd: ctx.repoRoot,
-      env: { ...process.env, TMPDIR: ctx.laneTmpdir },
-      stdout: 'ignore',
-      stderr: 'ignore',
-    },
-  );
-
-  onTestFinished(async () => {
-    if (lane.exitCode === null && lane.signalCode === null) {
-      lane.kill('SIGKILL');
-    }
-
-    await lane.exited;
-  });
+  const lane = ctx.startLane();
 
   const exitCode = await lane.exited;
   const invocations = await readFile(invocationsPath, 'utf8');
