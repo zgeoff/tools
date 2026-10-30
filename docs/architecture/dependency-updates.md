@@ -79,7 +79,12 @@ package rule for each such package, whose post-upgrade task runs two commands in
 Renovate commits each file the task adds or changes into the same pull request, so the bump and its
 wiring merge together on green checks. `bun run --if-present` exits 0 when the bin is absent, so a
 version that ships no such bin opens its pull request as any bump does. `bun x` would fetch a
-missing bin from the registry instead. A package with no rule gets no `init` run.
+missing bin from the registry instead. `bun run` runs the bin as JavaScript, so a package's bin is a
+JavaScript file. A package with no rule gets no `init` run.
+
+Renovate forces the security-fix task over every package rule's, so that task holds each package's
+`init` command too, inside a `{{#if}}` block that names the package. The block compiles to an empty
+string for any other package, and Renovate skips an empty command.
 
 A failed command, a bin that exists without an `init` subcommand among them, is an artifact error to
 Renovate. Renovate opens no pull request for the bump until the release is two hours old, then opens
@@ -102,10 +107,12 @@ To add a package, from the first version that ships its `init`:
 
 1. Copy the `@zgeoff/chex` rule in [`default.json`](../../default.json), and change the package name
    and the bin.
-2. Add the bin to the `init` pattern in the `RENOVATE_ALLOWED_COMMANDS` value of
+2. Copy the `@zgeoff/chex` command in the `vulnerabilityAlerts` task of `default.json`, and change
+   the package name and the bin.
+3. Add the bin to the `init` pattern in the `RENOVATE_ALLOWED_COMMANDS` value of
    [`renovate.yml`](../../.github/workflows/renovate.yml).
-3. Add a row to the table above.
-4. Run `bun run check:renovate-config`. Expect exit 0. The check fails with
+4. Add a row to the table above.
+5. Run `bun run check:renovate-config`. Expect exit 0. The check fails with
    `no RENOVATE_ALLOWED_COMMANDS pattern in .github/workflows/renovate.yml allows '<command>'` when
    a preset command has no pattern that allows it.
 

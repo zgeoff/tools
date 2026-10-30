@@ -10,12 +10,18 @@
   "internalChecksFilter": "strict",
   "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
+    "description": "Renovate forces this task over every package rule's, so it also runs the init of a package whose rule runs one. Each init command compiles to an empty string, which Renovate skips, for any other package. The task runs once per update, so depName names one package.",
     "addLabels": ["security"],
     "automerge": true,
     "postUpgradeTasks": {
-      "commands": ["bun install --ignore-scripts --minimum-release-age=0"],
-      "fileFilters": ["**/bun.lock"],
-      "executionMode": "branch",
+      "commands": [
+        "bun install --ignore-scripts --minimum-release-age=0",
+        "{{#if (equals depName '@zgeoff/agent-hooks')}}bun run --if-present node_modules/.bin/agent-hooks init{{/if}}",
+        "{{#if (equals depName '@zgeoff/chex')}}bun run --if-present node_modules/.bin/chex init{{/if}}",
+        "{{#if (equals depName '@zgeoff/rig')}}bun run --if-present node_modules/.bin/rig init{{/if}}"
+      ],
+      "fileFilters": ["**/*"],
+      "executionMode": "update",
       "installTools": {
         "bun": {}
       }

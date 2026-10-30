@@ -12,7 +12,9 @@ export function findDisallowedPostUpgradeCommands(
     return 'default.json is not valid JSON';
   }
 
-  const commands = [...new Set(collectPostUpgradeCommands(preset))];
+  const commands = [
+    ...new Set(collectPostUpgradeCommands(preset).map((command) => toUnguardedCommand(command))),
+  ];
 
   if (commands.length === 0) {
     return undefined;
@@ -67,6 +69,14 @@ function collectPostUpgradeCommands(value: unknown): string[] {
       .filter(([key]) => key !== 'postUpgradeTasks')
       .flatMap(([, member]) => collectPostUpgradeCommands(member)),
   ];
+}
+
+// Renovate skips a command that compiles to an empty string, so a command inside one {{#if}} block
+// runs only when the condition holds, and the allowed patterns match the text inside the block.
+const guardedCommandPattern = /^\{\{#if [^}]*\}\}(?<command>.*)\{\{\/if\}\}$/u;
+
+function toUnguardedCommand(command: string): string {
+  return guardedCommandPattern.exec(command)?.groups?.['command'] ?? command;
 }
 
 type AllowedCommandsResult =

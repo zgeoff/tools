@@ -105,3 +105,22 @@ test('it refuses a RENOVATE_ALLOWED_COMMANDS pattern that is not a valid regular
     ".github/workflows/renovate.yml: RENOVATE_ALLOWED_COMMANDS holds '^(widget init$', which is not a valid regular expression",
   );
 });
+
+test('it checks the command inside an if block, which Renovate runs only when the condition holds', () => {
+  const preset = JSON.stringify({
+    vulnerabilityAlerts: {
+      postUpgradeTasks: {
+        commands: [
+          "{{#if (equals depName '@acme/widget')}}widget init{{/if}}",
+          "{{#if (equals depName '@acme/gadget')}}gadget init{{/if}}",
+        ],
+      },
+    },
+  });
+
+  const workflow = `jobs:\n  renovate:\n    steps:\n      - env:\n          RENOVATE_ALLOWED_COMMANDS: '["^widget init$"]'\n`;
+
+  expect(findDisallowedPostUpgradeCommands(preset, workflow)).toBe(
+    "default.json: no RENOVATE_ALLOWED_COMMANDS pattern in .github/workflows/renovate.yml allows 'gadget init'",
+  );
+});
