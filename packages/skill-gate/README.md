@@ -20,7 +20,10 @@ the reason on stderr, which Claude Code and Codex both take as a block.
 
 ## Install
 
-Install `@zgeoff/agent-hooks` instead, and run its start-up stub, as its README describes:
+Install `@zgeoff/agent-hooks` instead, and run its start-up stub, as its README describes. First
+take the `hook-start` entry of repo-sync and merge its pull request, so that the repo holds the stub
+at `.claude/hooks/start.ts`. `agent-hooks init` refuses to run without the stub, and it replaces the
+skill gate's older hook entries. Then run these commands at the repo root:
 
 ```sh
 bun remove @zgeoff/skill-gate

@@ -22,17 +22,19 @@ load, the stub refuses each tool call but a read-only command.
 
 ## Install
 
+Take the `hook-start` entry of repo-sync first, which delivers the start-up stub to
+`.claude/hooks/start.ts`. Then run these commands at the repo root:
+
 ```sh
 bun add -d @zgeoff/agent-hooks
 bunx agent-hooks init
 ```
 
 Install the package at the repo root, so that Bun resolves it from `.claude/hooks/`. The package
-runs on Bun. The `hook-start` entry of repo-sync delivers the stub to `.claude/hooks/start.ts`.
-`agent-hooks init` writes one stub entry for each event into `.claude/settings.json` and
-`.codex/hooks.json`, with a `PreToolUse` matcher that names each tool a tool gate names. Run it
-again after you change the tool gates. It keeps every other hook, and it replaces an entry for the
-stub or for the skill gate's older entry point.
+runs on Bun. `agent-hooks init` refuses to run until the stub exists. It writes one stub entry for
+each event into `.claude/settings.json` and `.codex/hooks.json`, with a `PreToolUse` matcher that
+names each tool a tool gate names. Run it again after you change the tool gates. It keeps every
+other hook, and it replaces an entry for the stub or for the skill gate's older entry point.
 
 Codex runs a repo's hooks only after you trust each hook definition: open `/hooks` in the Codex CLI
 and trust the entries.

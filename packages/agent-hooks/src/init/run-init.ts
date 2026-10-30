@@ -15,12 +15,23 @@ export type InitResult =
   | { readonly ok: true; readonly written: readonly string[] }
   | { readonly ok: false; readonly error: string };
 
+const STUB_FILE = '.claude/hooks/start.ts';
+
 export interface InitOptions {
   readonly projectDir: string;
   readonly fileSystem: InitFileSystem;
 }
 
 export async function runInit(options: InitOptions): Promise<InitResult> {
+  const stub = await options.fileSystem.readText(path.join(options.projectDir, STUB_FILE));
+
+  if (stub === null) {
+    return {
+      ok: false,
+      error: `${STUB_FILE} is missing. Take the hook-start entry of repo-sync and merge its pull request, then run agent-hooks init again.`,
+    };
+  }
+
   const gatedTools = await readGatedTools(options);
 
   if (typeof gatedTools === 'string') {

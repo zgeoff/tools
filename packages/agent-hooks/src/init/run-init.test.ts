@@ -2,6 +2,7 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { writeTreeFiles } from '../../../../test-utils/write-tree-files.ts';
 import { bunFileSystem } from './bun-file-system.ts';
 import { runInit } from './run-init.ts';
 
@@ -17,6 +18,10 @@ async function setupTest() {
 
 test('it writes both settings files with a matcher for each gated tool', async () => {
   const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.project, {
+    '.claude/hooks/start.ts': 'await import("@zgeoff/agent-hooks");\n',
+  });
 
   await writeFile(
     join(ctx.project, '.claude/skill-gate.json'),
@@ -51,6 +56,10 @@ test('it writes both settings files with a matcher for each gated tool', async (
 test('it leaves both files byte for byte the same on a second run', async () => {
   const ctx = await setupTest();
 
+  await writeTreeFiles(ctx.project, {
+    '.claude/hooks/start.ts': 'await import("@zgeoff/agent-hooks");\n',
+  });
+
   await runInit({ projectDir: ctx.project, fileSystem: bunFileSystem });
 
   const firstClaude = await readFile(join(ctx.project, '.claude/settings.json'), 'utf8');
@@ -68,6 +77,10 @@ test('it leaves both files byte for byte the same on a second run', async () => 
 test('it refuses a broken rules file and writes nothing', async () => {
   const ctx = await setupTest();
 
+  await writeTreeFiles(ctx.project, {
+    '.claude/hooks/start.ts': 'await import("@zgeoff/agent-hooks");\n',
+  });
+
   await writeFile(join(ctx.project, '.claude/skill-gate.json'), '{"gates": {}}');
 
   const result = await runInit({ projectDir: ctx.project, fileSystem: bunFileSystem });
@@ -84,6 +97,10 @@ test('it refuses a broken rules file and writes nothing', async () => {
 
 test('it refuses a settings file that is not JSON and leaves both files alone', async () => {
   const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.project, {
+    '.claude/hooks/start.ts': 'await import("@zgeoff/agent-hooks");\n',
+  });
 
   await mkdir(join(ctx.project, '.codex'));
   await writeFile(join(ctx.project, '.codex/hooks.json'), '{ "hooks": ');
@@ -109,7 +126,13 @@ test('it reports the settings file it could not write and stops before the next 
 
   const result = await runInit({
     projectDir: '/work/ledger',
-    fileSystem: { readText: () => Promise.resolve(null), writeText },
+    fileSystem: {
+      readText: (filePath) =>
+        Promise.resolve(
+          new Map([['/work/ledger/.claude/hooks/start.ts', '']]).get(filePath) ?? null,
+        ),
+      writeText,
+    },
   });
 
   expect(result).toStrictEqual({
@@ -119,4 +142,21 @@ test('it reports the settings file it could not write and stops before the next 
   });
 
   expect(writeText).toHaveBeenCalledTimes(1);
+});
+
+test('it refuses to write the hook entries until the start-up stub exists', async () => {
+  const writeText = mock(() => Promise.resolve());
+
+  const result = await runInit({
+    projectDir: '/work/ledger',
+    fileSystem: { readText: () => Promise.resolve(null), writeText },
+  });
+
+  expect(result).toStrictEqual({
+    ok: false,
+    error:
+      '.claude/hooks/start.ts is missing. Take the hook-start entry of repo-sync and merge its pull request, then run agent-hooks init again.',
+  });
+
+  expect(writeText).not.toHaveBeenCalled();
 });

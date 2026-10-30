@@ -41,17 +41,19 @@ baseline need changes in the repo beyond the `include` line, which repo-sync nev
 
 ## Opting in to the agent hooks
 
-A repo opts in to the `hook-start` entry with four changes, plus a fifth for a repo that uses Codex.
-Repo-sync touches none of them:
+A repo opts in to the `hook-start` entry in five steps, plus a sixth for a repo that uses Codex.
+`agent-hooks init` refuses to run until the stub exists, so the stub arrives first:
 
 1. Add `hook-start` to `include` in `.github/workflows/repo-sync.yml`.
-2. Run `bun add -d @zgeoff/agent-hooks` at the repo root. Expect `bun.lock` to list the package.
-3. Write the skill gate's rules in `.claude/skill-gate.json`, as
+2. Dispatch repo-sync with `gh workflow run repo-sync.yml -R zgeoff/<repo>`, and merge its pull
+   request. Expect the default branch to hold `.claude/hooks/start.ts`.
+3. Run `bun add -d @zgeoff/agent-hooks` at the repo root. Expect `bun.lock` to list the package.
+4. Write the skill gate's rules in `.claude/skill-gate.json`, as
    [Writing skill-gate rules](../guides/skill-gate-rules.md) describes. A repo without this file has
    no gate.
-4. Run `bunx agent-hooks init` at the repo root. Expect
+5. Run `bunx agent-hooks init` at the repo root. Expect
    `agent-hooks init wrote .claude/settings.json and .codex/hooks.json`.
-5. For a repo that also uses Codex, trust the hook definitions in the Codex CLI with `/hooks`. Codex
+6. For a repo that also uses Codex, trust the hook definitions in the Codex CLI with `/hooks`. Codex
    reads skills from `.agents/skills`, so link it to `.claude/skills`.
 
 ## Opting in to the pre-push baseline
