@@ -10,11 +10,13 @@ for the suites themselves.
 ## Adopt the lane
 
 1. Add the package: `bun add -d @zgeoff/rig`.
-2. Run `bunx rig init`. The command adds `test:browser` as `rig browser` to the repo's
-   `package.json` once git tracks a `.browser.test.ts` file, and writes a starter `rig.config.ts`.
-3. Write a suite named `<module>.browser.test.ts` beside its module. The suite opens its views with
+2. Write a suite named `<module>.browser.test.ts` beside its module. The suite opens its views with
    `new Bun.WebView({ backend: 'chrome' })`, and gets the Chrome that the lane's preload started.
-4. Run `bun run test:browser` and check that the run prints no error from the preload.
+3. Track the suite with git: `git add <module>.browser.test.ts`. `rig init` adds the browser lane's
+   script only when git tracks a `.browser.test.ts` file.
+4. Run `bunx rig init`. Expect `test:browser` as `rig browser` in the repo's `package.json`, and a
+   starter `rig.config.ts` when the repo has none.
+5. Run `bun run test:browser` and check that the run prints no error from the preload.
 
 ## Build what the suites load
 

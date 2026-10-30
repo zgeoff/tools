@@ -49,6 +49,24 @@ test('it writes the test scripts and a starter rig.config.ts', async () => {
   );
 });
 
+test('it writes the browser lane script when git tracks a browser suite', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.repoRoot, { 'package.json': JSON.stringify({ name: 'kettle' }) });
+
+  await runInit(ctx.repoRoot, defineRig({}), {
+    ...ctx.deps,
+    readTrackedFiles: () => Promise.resolve(['src/spout.browser.test.ts']),
+  });
+
+  const manifest: unknown = await Bun.file(join(ctx.repoRoot, 'package.json')).json();
+
+  expect(manifest).toStrictEqual({
+    name: 'kettle',
+    scripts: { test: 'rig unit', 'test:related': 'rig related', 'test:browser': 'rig browser' },
+  });
+});
+
 test('it changes nothing on a second run', async () => {
   const ctx = await setupTest();
 
