@@ -11,6 +11,7 @@ import { buildSyncRowSplit } from './build-sync-row-split.ts';
 import { isWorkflowPath } from './is-workflow-path.ts';
 import type { SyncEntry } from './parse-sync-entries.ts';
 import { parseSyncEntries } from './parse-sync-entries.ts';
+import { pickSyncVerdictStop } from './pick-sync-verdict-stop.ts';
 import type { RetiredFileRemoval, SyncedEntry } from './plan-retired-file-removal.ts';
 import { planRetiredFileRemoval, retiredFilesName } from './plan-retired-file-removal.ts';
 import { readSyncCommitVerdict } from './read-sync-commit-verdict.ts';
@@ -88,18 +89,12 @@ export async function syncEntries(options: Readonly<SyncEntriesOptions>): Promis
     base: context.base,
   });
 
-  if (verdict.kind === 'refused') {
-    options.writeOutput(`::error::${verdict.message}\n`);
+  const stop = pickSyncVerdictStop(verdict, context.commit);
 
-    return 1;
-  }
+  if (stop !== null) {
+    options.writeOutput(stop.line);
 
-  if (verdict.kind === 'superseded') {
-    options.writeOutput(
-      `${verdict.holder} already pins ${verdict.pin}, which is newer than ${context.commit}; nothing to do.\n`,
-    );
-
-    return 0;
+    return stop.exitCode;
   }
 
   const committed = await commitEntries(context);
