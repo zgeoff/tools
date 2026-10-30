@@ -40,7 +40,8 @@ push to the repo can send a dispatch, and GitHub serves a fork's commit through 
 
 The sync pull request also moves every call to a tools workflow in the repo's `.github/workflows/`
 to that commit, so its merge leaves the repo on one commit. A run with nothing to sync opens no pull
-request and moves no pin. Renovate never moves these refs: the shared preset turns its updates off,
+request and moves no pin, and a delivered workflow that differs from its source only by its pin
+counts as nothing to sync. Renovate never moves these refs: the shared preset turns its updates off,
 because it would read the commit as a digest of `main` to bump.
 
 A run from any other trigger, the stub's daily run, a push that changes the stub, or a manual run,

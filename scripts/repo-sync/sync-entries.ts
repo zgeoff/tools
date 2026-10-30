@@ -1,14 +1,13 @@
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import type { FileSystem } from '../ci/file-system.ts';
 import { makeLoggedCommandRunner } from '../ci/make-logged-command-runner.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { CommandResult, RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
-import type { CopyPlan, ExistingWorkflow, SyncFileRow } from './build-copy-plan.ts';
+import type { ExistingWorkflow, SyncFileRow } from './build-copy-plan.ts';
 import { buildCopyPlan } from './build-copy-plan.ts';
 import { buildSyncRowSplit } from './build-sync-row-split.ts';
-import { buildToolsPin } from './build-tools-pin.ts';
 import { isWorkflowPath } from './is-workflow-path.ts';
 import type { SyncEntry } from './parse-sync-entries.ts';
 import { parseSyncEntries } from './parse-sync-entries.ts';
@@ -17,6 +16,7 @@ import { planRetiredFileRemoval, retiredFilesName } from './plan-retired-file-re
 import { readSyncCommitVerdict } from './read-sync-commit-verdict.ts';
 import { renderSyncPullRequestTitle } from './render-sync-pull-request-title.ts';
 import { selectSyncFiles } from './select-sync-files.ts';
+import { writeCopyPlan } from './write-copy-plan.ts';
 import { writeSyncAutoMerge } from './write-sync-auto-merge.ts';
 import { writeToolsPins } from './write-tools-pins.ts';
 
@@ -321,7 +321,7 @@ async function copyEntryFiles(context: SyncContext, entry: SyncEntry): Promise<s
     return null;
   }
 
-  await applyCopyPlan(context, plan);
+  await writeCopyPlan(context, plan);
 
   return plan.copies.map((copy) => copy.target);
 }
@@ -352,37 +352,6 @@ async function readExistingWorkflows(
   }
 
   return workflows;
-}
-
-async function applyCopyPlan(context: SyncContext, plan: CopyPlan): Promise<void> {
-  for (const copy of plan.copies) {
-    await context.fileSystem.createDirectory(join(context.cwd, dirname(copy.target)));
-
-    await runSyncCommand(context, [
-      'install',
-      '-m',
-      copy.mode,
-      `.repo-sync/${copy.source}`,
-      copy.target,
-    ]);
-
-    if (copy.isPinned) {
-      const path = join(context.cwd, copy.target);
-
-      const text = await context.fileSystem.readText(path);
-
-      await context.fileSystem.writeText(path, buildToolsPin(text, context.commit));
-    }
-  }
-
-  for (const target of plan.strippedTargets) {
-    await runSyncCommand(context, [
-      'bash',
-      '.repo-sync/scripts/remove-excluded-blocks.sh',
-      target,
-      ...plan.excluded,
-    ]);
-  }
 }
 
 function runProbeCommand(context: SyncContext, argv: readonly string[]): Promise<CommandResult> {

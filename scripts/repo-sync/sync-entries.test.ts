@@ -795,7 +795,7 @@ test('it overwrites a workflow of the repo that calls the same shared workflow',
   await ctx.writeBranch(
     'main',
     '.github/workflows/pr.yml',
-    'jobs:\n  pr:\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@0123456789abcdef0123456789abcdef01234567 # main\n',
+    'name: Own PR checks\njobs:\n  pr:\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@0123456789abcdef0123456789abcdef01234567 # main\n',
   );
 
   await ctx.writeSource(
@@ -1431,4 +1431,42 @@ test('it reads the pin of the base as the remote holds it when a newer pin merge
   expect(ctx.output).toContain(
     `main already pins ${newer}, which is newer than ${older}; nothing to do.\n`,
   );
+});
+
+test('it opens no pull request when a delivered workflow differs from its source only by the pin', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  await ctx.writeBranch(
+    'main',
+    '.github/workflows/repo-sync-guard.yml',
+    'jobs:\n  guard:\n    uses: zgeoff/tools/.github/workflows/repo-sync-guard.yml@0123456789abcdef0123456789abcdef01234567 # main\n',
+  );
+
+  await ctx.writeSource(
+    'sync/workflow-callers/repo-sync-guard.yml',
+    'jobs:\n  guard:\n    uses: zgeoff/tools/.github/workflows/repo-sync-guard.yml@main\n',
+  );
+
+  const exitCode = await ctx.runSync([
+    {
+      name: 'workflow-repo-sync-guard',
+      description: 'The repo-sync guard',
+      files: [
+        {
+          source: 'sync/workflow-callers/repo-sync-guard.yml',
+          target: '.github/workflows/repo-sync-guard.yml',
+        },
+      ],
+    },
+  ]);
+
+  const branches = await ctx.readBranchNames();
+  const pulls = await ctx.readPullRequests();
+
+  expect(exitCode).toBe(0);
+  expect(branches).toStrictEqual(['main']);
+  expect(pulls).toStrictEqual([]);
 });
