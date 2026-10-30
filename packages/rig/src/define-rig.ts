@@ -90,10 +90,22 @@ function assertDirectoryLaneDeclaration(
 
 const suffixPattern = /^\.[a-z0-9][a-z0-9-]*$/u;
 
+const directoryLaneNames = standardLanes
+  .filter((standard) => standard.suffix === null)
+  .map((standard) => standard.name);
+
 function readSuffix(lane: string, suffix: string): string {
   if (!suffixPattern.test(suffix)) {
     throw new Error(
       `rig.config.ts: lane "${lane}" has the suffix "${suffix}", which must be a dot and then lowercase letters, digits and dashes`,
+    );
+  }
+
+  const directoryLane = directoryLaneNames.find((name) => suffix === `.${name}`);
+
+  if (directoryLane !== undefined) {
+    throw new Error(
+      `rig.config.ts: lane "${lane}" has the suffix "${suffix}", which the ${directoryLane} lane reserves, because the lint rules key that lane by its name`,
     );
   }
 

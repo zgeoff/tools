@@ -124,6 +124,7 @@ test.each([
   ['evals/kettle.model-api.test.ts', 120_000],
   ['e2e/kettle.model-api.test.ts', 120_000],
   ['e2e/kettle.browser.test.ts', 10_000],
+  ['src/kettle.e2e.test.ts', 5000],
 ])(
   'it accepts a timeout at the limit of the lane file %s and reports one above it',
   async (path, limitMs) => {

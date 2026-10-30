@@ -25,6 +25,12 @@ refuses the field:
 - `e2e` takes no `suffix`, because its folders select its tests.
 - `browser` takes no `start` or `stop`, because its hooks are built in.
 
+No lane takes the suffix `.unit` or `.e2e`, and no two lanes share a suffix. The lint rules key each
+lane's limit by its suffix without the dot, and the e2e lane by its name, so a `.e2e` lane would
+replace the e2e lane's limit there while rig kept its own. The unit lane holds no key, and lint
+names a file without a lane after it, so a `.unit` lane's files would be reported under the unit
+lane's name.
+
 A refused field or a bad value throws an error that holds the lane and the field, because a config
 file is outside input and a lane with a wrong limit would otherwise run unnoticed. The table is
 data, so Node can import the config when oxlint loads its plugin.

@@ -78,7 +78,8 @@ const laneTestPattern = /\.(?<lane>[^.]+)\.test\.tsx?$/u;
 function resolveLane(root, filename, limits) {
   const lane = laneTestPattern.exec(basename(filename))?.groups?.lane;
 
-  if (lane !== undefined && limits.has(lane)) {
+  // the e2e lane is a directory, so a `.e2e` suffix outside it leaves the file in the unit run
+  if (lane !== undefined && lane !== 'e2e' && limits.has(lane)) {
     return lane;
   }
 

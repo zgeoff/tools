@@ -128,6 +128,15 @@ test.each([
   [{ browser: { start: 'start.ts' } }, 'lane "browser" declares a start or a stop'],
   [{ browser: { stop: 'stop.ts' } }, 'lane "browser" declares a start or a stop'],
   [{ kiln: { limit: '15s', suffix: '.docker' } }, 'both use the suffix ".docker"'],
+  [
+    { smoke: { limit: '60s', suffix: '.e2e' } },
+    'lane "smoke" has the suffix ".e2e", which the e2e lane reserves',
+  ],
+  [
+    { smoke: { limit: '60s', suffix: '.unit' } },
+    'lane "smoke" has the suffix ".unit", which the unit lane reserves',
+  ],
+  [{ host: { suffix: '.e2e' } }, 'lane "host" has the suffix ".e2e", which the e2e lane reserves'],
 ])('it refuses the declaration %j', (lanes, message) => {
   expect(() => defineRig({ lanes })).toThrow(message);
 });

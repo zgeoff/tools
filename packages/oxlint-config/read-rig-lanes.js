@@ -41,8 +41,11 @@ async function importConfig(configPath) {
   try {
     return await import(pathToFileURL(configPath).href);
   } catch (error) {
+    // oxlint prints a plugin's load error without its cause, so the message carries the cause's.
+    const reason = error instanceof Error ? error.message : String(error);
+
     throw new Error(
-      `cannot load ${configPath}: reading a TypeScript config needs Node >= 22.18 or Bun`,
+      `cannot load ${configPath}: ${reason} (reading a TypeScript config needs Node >= 22.18 or Bun)`,
       { cause: error },
     );
   }

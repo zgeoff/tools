@@ -35,6 +35,20 @@ test('it reads the limit that rig.config.ts gives a built-in lane', async () => 
   expect(e2eAbove.stdout).toInclude('above the 15000 ms limit of the e2e lane');
 });
 
+test('it fails the plugin load for a lane whose suffix would take the place of the e2e lane limit', async () => {
+  const files = {
+    'rig.config.ts': buildRigConfigSource("{ lanes: { smoke: { suffix: '.e2e', limit: '60s' } } }"),
+    'e2e/bake.test.ts': buildTimeoutSource(60_000),
+  };
+
+  const result = await runLintTree(files, 'e2e/bake.test.ts', {
+    'zgeoff/max-test-timeout': 'error',
+  });
+
+  expect(result.exitCode).not.toBe(0);
+  expect(result.stdout).toInclude('the suffix ".e2e", which the e2e lane reserves');
+});
+
 test('it keeps a lane test beside its module under the suffix that rig.config.ts declares', async () => {
   const files = {
     'rig.config.ts': buildRigConfigSource("{ lanes: { kiln: { limit: '15s' } } }"),
