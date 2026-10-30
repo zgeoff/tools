@@ -8,6 +8,8 @@
     "catalog": {
       "@actions/expressions": "0.3.61",
       "@commitlint/cli": "21.2.4",
+      "@commitlint/lint": "21.2.4",
+      "@commitlint/load": "21.2.4",
       "@happy-dom/global-registrator": "21.0.4",
       "@maschwenk/tsrslint": "0.1.6",
       "@stylistic/eslint-plugin": "5.10.0",

@@ -23,6 +23,8 @@
   },
   "devDependencies": {
     "@commitlint/cli": "catalog:",
+    "@commitlint/lint": "catalog:",
+    "@commitlint/load": "catalog:",
     "@types/bun": "catalog:",
     "tsrs": "catalog:",
     "typescript": "catalog:"
