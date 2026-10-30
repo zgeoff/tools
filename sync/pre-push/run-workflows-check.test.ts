@@ -709,6 +709,8 @@ test.each([
   ['/nix/store', undefined],
   ['node_modules_backup\n.bun/install/cache-old', undefined],
   ['/nix/store\n!node_modules', undefined],
+  [`\${{ inputs.cache-root }}/node_modules`, undefined],
+  [`\${{ inputs.cache-root }}\nnode_modules`, 'node_modules'],
 ])(
   'it reads an actions/cache step in a Bun job with the path %p as caching %p',
   async (path, cached) => {

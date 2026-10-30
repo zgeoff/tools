@@ -355,8 +355,9 @@ A Bun job runs `bun install --frozen-lockfile` with no `actions/cache` step for
 `~/.bun/install/cache` or `node_modules`. On a GitHub-hosted runner, a restore of that cache takes
 longer than the install it replaces, and a job that misses the cache spends more time to save one.
 The rule leaves a cache of any other path alone, such as a Nix store, which `bun install` does not
-replace. Each job pays for its own runner, checkout and install, which [Two profiles](#two-profiles)
-weighs against wall time.
+replace. The lint skips a path line that holds a `${{ }}` expression, because GitHub resolves it
+only when the job runs. Each job pays for its own runner, checkout and install, which
+[Two profiles](#two-profiles) weighs against wall time.
 
 ## Checkout depth
 

@@ -363,6 +363,10 @@
         "target": "scripts/collect-expression-references.ts"
       },
       {
+        "source": "sync/pre-push/find-install-cache-path.ts",
+        "target": "scripts/find-install-cache-path.ts"
+      },
+      {
         "source": "sync/pre-push/dependency-gates/collect-stale-age-gate-excludes.ts",
         "target": "scripts/dependency-gates/collect-stale-age-gate-excludes.ts"
       },

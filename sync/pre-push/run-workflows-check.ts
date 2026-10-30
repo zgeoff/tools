@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util';
 import { collectCommandNames } from './collect-command-names.ts';
 import { collectExpressionReferences } from './collect-expression-references.ts';
+import { findInstallCachePath } from './find-install-cache-path.ts';
 import { parseShellWords } from './parse-shell-words.ts';
 import type { RunProgram } from './run-program.ts';
 import { runProgram } from './run-program.ts';
@@ -290,16 +291,16 @@ function findHeavyRunner(runsOn: unknown): string | undefined {
 const setupBunPattern = /^oven-sh\/setup-bun(?:@|$)/u;
 const cachePattern = /^actions\/cache(?:\/(?:restore|save))?(?:@|$)/u;
 
-// A path segment, so `node_modules_backup` and `.bun/install/cache-old` are other folders.
-const installCachePattern = /(?:^|\/)(?:node_modules|\.bun\/install\/cache)(?:\/|$)/u;
-
 function collectCacheFindings(context: WorkflowContext, job: Job): WorkflowFinding[] {
   const steps = collectSteps(job);
   const isBunJob = steps.some((step) => isStepUsing(step, setupBunPattern));
 
   return steps.flatMap((step, index) => {
     const action = findMember(step, 'uses');
-    const cached = isStepUsing(step, cachePattern) ? findInstallCachePath(step) : undefined;
+
+    const cached = isStepUsing(step, cachePattern)
+      ? findInstallCachePath(findMember(findMember(step, 'with'), 'path'))
+      : undefined;
 
     return isBunJob && typeof action === 'string' && cached !== undefined
       ? [
@@ -317,18 +318,6 @@ function isStepUsing(step: unknown, pattern: RegExp): boolean {
   const action = findMember(step, 'uses');
 
   return typeof action === 'string' && pattern.test(action);
-}
-
-// actions/cache reads one path per line, and a line that starts with `!` leaves that path out.
-function findInstallCachePath(step: unknown): string | undefined {
-  const paths = findMember(findMember(step, 'with'), 'path');
-
-  return typeof paths === 'string'
-    ? paths
-        .split('\n')
-        .map((path) => path.trim())
-        .find((path) => !path.startsWith('!') && installCachePattern.test(path))
-    : undefined;
 }
 
 const checkoutPattern = /^actions\/checkout(?:@|$)/u;

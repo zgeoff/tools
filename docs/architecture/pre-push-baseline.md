@@ -100,8 +100,8 @@ The entry delivers these files, and their tests stay in tools:
   `scripts/read-pushed-refs-input.ts`, `scripts/parse-added-lines.ts`,
   `scripts/pick-merge-blobs-command.ts`, `scripts/parse-shell-words.ts`,
   `scripts/shell-escape-parsers.ts`, `scripts/collect-command-names.ts`,
-  `scripts/collect-expression-references.ts`, `scripts/parse-lane-limits.ts` and
-  `scripts/run-program.ts` — the modules these scripts import.
+  `scripts/collect-expression-references.ts`, `scripts/find-install-cache-path.ts`,
+  `scripts/parse-lane-limits.ts` and `scripts/run-program.ts` — the modules these scripts import.
 
 The check scripts exit 0 when clean or skipped, 1 with a problem, and 2 when they cannot run, such
 as in a clone without origin's default branch. One exception: the workflow lint exits 0 with a
