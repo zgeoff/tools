@@ -4,11 +4,11 @@ import type { LaneFiles } from './lane-files.ts';
 import { probeRun } from './probe-run.ts';
 import type { ProcessGroups } from './process-groups.ts';
 
-function setupTest(listings: readonly (readonly string[])[]) {
+function setupTest() {
   return {
     options: {
       files: {
-        readDirNames: makeListingQueueStub(listings),
+        readDirNames: mock<LaneFiles['readDirNames']>(),
         removePath: mock<LaneFiles['removePath']>(() => Promise.resolve()),
       },
       probeProcess: mock<(pid: number) => boolean>(() => false),
@@ -18,7 +18,7 @@ function setupTest(listings: readonly (readonly string[])[]) {
 }
 
 test('it finds a run live while its lane runs, and touches none of its records', async () => {
-  const ctx = setupTest([['pending-tests']]);
+  const ctx = setupTest();
 
   ctx.options.probeProcess.mockReturnValue(true);
 
@@ -31,8 +31,9 @@ test('it finds a run live while its lane runs, and touches none of its records',
 });
 
 test('it finds a run live while a group it recorded still runs', async () => {
-  const ctx = setupTest([['5120'], ['5120']]);
+  const ctx = setupTest();
 
+  ctx.options.files.readDirNames.mockImplementation(makeListingQueueStub([['5120'], ['5120']]));
   ctx.options.groups.probeGroup.mockImplementation((groupID) => groupID === 5120);
 
   const isLive = await probeRun('4417', '/runs/4417/groups', ctx.options);
@@ -41,7 +42,11 @@ test('it finds a run live while a group it recorded still runs', async () => {
 });
 
 test('it removes the pending records of an exited lane, so no command can record a group after the probe', async () => {
-  const ctx = setupTest([['pending-build', '5120', 'pending-tests'], ['5120']]);
+  const ctx = setupTest();
+
+  ctx.options.files.readDirNames.mockImplementation(
+    makeListingQueueStub([['pending-build', '5120', 'pending-tests'], ['5120']]),
+  );
 
   const isLive = await probeRun('4417', '/runs/4417/groups', ctx.options);
 
@@ -56,8 +61,12 @@ test('it removes the pending records of an exited lane, so no command can record
 });
 
 test('it finds a run live when a command records its group just before the sweep removes its pending record', async () => {
+  const ctx = setupTest();
+
   // The command moves its pending record to its group ID between the two reads of the folder.
-  const ctx = setupTest([['pending-tests'], ['6230']]);
+  ctx.options.files.readDirNames.mockImplementation(
+    makeListingQueueStub([['pending-tests'], ['6230']]),
+  );
 
   ctx.options.groups.probeGroup.mockImplementation((groupID) => groupID === 6230);
 
@@ -67,10 +76,14 @@ test('it finds a run live when a command records its group just before the sweep
 });
 
 test('it finds a run exited when its lane and every group it recorded have exited', async () => {
-  const ctx = setupTest([
-    ['5120', '6230'],
-    ['5120', '6230'],
-  ]);
+  const ctx = setupTest();
+
+  ctx.options.files.readDirNames.mockImplementation(
+    makeListingQueueStub([
+      ['5120', '6230'],
+      ['5120', '6230'],
+    ]),
+  );
 
   const isLive = await probeRun('4417', '/runs/4417/groups', ctx.options);
 
@@ -79,9 +92,10 @@ test('it finds a run exited when its lane and every group it recorded have exite
 });
 
 test('it fails when it cannot remove a pending record', async () => {
-  const ctx = setupTest([['pending-tests']]);
+  const ctx = setupTest();
   const denied = Object.assign(new Error('permission denied'), { code: 'EACCES' });
 
+  ctx.options.files.readDirNames.mockImplementation(makeListingQueueStub([['pending-tests']]));
   ctx.options.files.removePath.mockRejectedValue(denied);
 
   const failure = await probeRun('4417', '/runs/4417/groups', ctx.options).then(

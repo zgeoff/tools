@@ -27,11 +27,11 @@ async function setupTest() {
     chromeDirs: {
       privateDir: join(directory, 'chrome'),
       runsDir: join(directory, 'chrome', 'notes-app'),
-      runDir: join(directory, 'chrome', 'notes-app', String(process.pid)),
+      runDir: join(directory, 'chrome', 'notes-app', '7310'),
     },
-    run: buildBrowserRun(join(directory, 'repo'), 'build-box', String(process.pid)),
+    run: buildBrowserRun(join(directory, 'repo'), 'build-box', '7310'),
     userID: userInfo().uid,
-    probeProcess: mock<(pid: number) => boolean>((pid) => pid === process.pid),
+    probeProcess: mock<(pid: number) => boolean>((pid) => pid === 7310),
     groups: { probeGroup: mock<ProcessGroups['probeGroup']>(() => false) },
   };
 }

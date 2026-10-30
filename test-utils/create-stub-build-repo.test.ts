@@ -4,13 +4,13 @@ import { createStubBuildRepo } from './create-stub-build-repo.ts';
 import type { TemplateFiles } from './template-files.ts';
 import type { TestProcesses } from './test-processes.ts';
 
-function setupTest(readFile: TemplateFiles['readFile']) {
+function setupTest() {
   const clock = buildSteppingClock();
 
   return {
     files: {
       createDirectories: mock<TemplateFiles['createDirectories']>(() => Promise.resolve()),
-      readFile: mock(readFile),
+      readFile: mock<TemplateFiles['readFile']>(),
       writeFile: mock<TemplateFiles['writeFile']>(() => Promise.resolve()),
     },
     processes: {
@@ -24,7 +24,7 @@ function setupTest(readFile: TemplateFiles['readFile']) {
 }
 
 test("it writes a build:browser script that passes the marker file and the build's process ID file", async () => {
-  const ctx = setupTest(() => Promise.reject(new Error('no read expected')));
+  const ctx = setupTest();
 
   await createStubBuildRepo('/work/notes-app', '/work/marker.txt', ctx.processes, ctx.files);
 
@@ -44,7 +44,9 @@ test("it writes a build:browser script that passes the marker file and the build
 });
 
 test("it sends SIGKILL to the group of the process ID that the build's file holds", async () => {
-  const ctx = setupTest(() => Promise.resolve(new TextEncoder().encode('4417')));
+  const ctx = setupTest();
+
+  ctx.files.readFile.mockResolvedValue(new TextEncoder().encode('4417'));
 
   const repo = await createStubBuildRepo(
     '/work/notes-app',
@@ -63,7 +65,9 @@ test("it sends SIGKILL to the group of the process ID that the build's file hold
 
 test('it stops nothing when no build wrote its process ID file', async () => {
   const missing = Object.assign(new Error('no such file'), { code: 'ENOENT' });
-  const ctx = setupTest(() => Promise.reject(missing));
+  const ctx = setupTest();
+
+  ctx.files.readFile.mockRejectedValue(missing);
 
   const repo = await createStubBuildRepo(
     '/work/notes-app',
@@ -79,8 +83,9 @@ test('it stops nothing when no build wrote its process ID file', async () => {
 });
 
 test('it stops nothing when the process of the ID has exited', async () => {
-  const ctx = setupTest(() => Promise.resolve(new TextEncoder().encode('4417')));
+  const ctx = setupTest();
 
+  ctx.files.readFile.mockResolvedValue(new TextEncoder().encode('4417'));
   ctx.processes.readGroupID.mockReturnValue(null);
 
   const repo = await createStubBuildRepo(
@@ -97,7 +102,9 @@ test('it stops nothing when the process of the ID has exited', async () => {
 
 test('it fails when it cannot read the process ID file', async () => {
   const denied = Object.assign(new Error('permission denied'), { code: 'EACCES' });
-  const ctx = setupTest(() => Promise.reject(denied));
+  const ctx = setupTest();
+
+  ctx.files.readFile.mockRejectedValue(denied);
 
   const repo = await createStubBuildRepo(
     '/work/notes-app',
@@ -115,7 +122,7 @@ test('it fails when it cannot read the process ID file', async () => {
 });
 
 test('it fails to read a start that the build never reports', async () => {
-  const ctx = setupTest(() => Promise.reject(new Error('no read expected')));
+  const ctx = setupTest();
 
   const repo = await createStubBuildRepo(
     '/work/notes-app',

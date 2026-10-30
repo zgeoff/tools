@@ -5,9 +5,7 @@ import type { WorkerCount } from './read-worker-count.ts';
 import type { CommandOptions } from './run-command.ts';
 import { runRelatedTests } from './run-related-tests.ts';
 
-function setupTest(workers?: WorkerCount) {
-  const defaultWorkers: WorkerCount = { kind: 'count', count: 2 };
-
+function setupTest() {
   const run = {
     repoRoot: '/repo',
     environment: { PATH: '/usr/bin' },
@@ -20,16 +18,18 @@ function setupTest(workers?: WorkerCount) {
   );
 
   const output = { out: makeRecordingStub(), err: makeRecordingStub() };
+  const readWorkerCount = mock<() => Promise<WorkerCount>>();
 
   return {
     run,
     runCommand,
+    readWorkerCount,
     output,
     deps: {
       dietScript: '/diet.sh',
       readTrackedFiles: () => Promise.resolve([]),
       sources: { cwd: '/repo', probeFile: () => true },
-      readWorkerCount: () => Promise.resolve(workers ?? defaultWorkers),
+      readWorkerCount,
       runCommand,
       output,
     },
@@ -39,6 +39,7 @@ function setupTest(workers?: WorkerCount) {
 test('it runs the unit lane on the related test and returns its exit code', async () => {
   const ctx = setupTest();
 
+  ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 2 });
   ctx.runCommand.mockResolvedValue(1);
 
   const exitCode = await runRelatedTests(['src/a.ts'], defineRig({}), ctx.run, ctx.deps);
@@ -63,6 +64,8 @@ test('it runs the unit lane on the related test and returns its exit code', asyn
 test('it leaves every lane out of the run, as the unit run does', async () => {
   const ctx = setupTest();
 
+  ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 2 });
+
   await runRelatedTests(
     ['src/a.ts'],
     defineRig({ lanes: { kiln: { limit: '9s' } } }),
@@ -77,7 +80,9 @@ test('it leaves every lane out of the run, as the unit run does', async () => {
 });
 
 test('it adds the slow-host timeout when the host gets 1 worker', async () => {
-  const ctx = setupTest({ kind: 'count', count: 1 });
+  const ctx = setupTest();
+
+  ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 1 });
 
   await runRelatedTests(['src/a.ts'], defineRig({}), ctx.run, ctx.deps);
 
@@ -91,6 +96,8 @@ test('it adds the slow-host timeout when the host gets 1 worker', async () => {
 test('it says so and exits 0 when no path has a related test', async () => {
   const ctx = setupTest();
 
+  ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 2 });
+
   ctx.deps.sources.probeFile = () => false;
 
   const exitCode = await runRelatedTests(['src/a.ts'], defineRig({}), ctx.run, ctx.deps);
@@ -102,6 +109,9 @@ test('it says so and exits 0 when no path has a related test', async () => {
 
 test('it runs 50 related test files, the default cap', async () => {
   const ctx = setupTest();
+
+  ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 2 });
+
   const paths = Array.from({ length: 50 }, (_, index) => `src/t${index}.test.ts`);
 
   const exitCode = await runRelatedTests(paths, defineRig({}), ctx.run, ctx.deps);
@@ -115,6 +125,9 @@ test('it runs 50 related test files, the default cap', async () => {
 
 test('it skips with the CI notice past 50 related test files', async () => {
   const ctx = setupTest();
+
+  ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 2 });
+
   const paths = Array.from({ length: 51 }, (_, index) => `src/t${index}.test.ts`);
 
   const exitCode = await runRelatedTests(paths, defineRig({}), ctx.run, ctx.deps);
@@ -137,6 +150,8 @@ test.each([
   async (shared) => {
     const ctx = setupTest();
 
+    ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 2 });
+
     const exitCode = await runRelatedTests(['src/a.ts', shared], defineRig({}), ctx.run, ctx.deps);
 
     expect(exitCode).toBe(0);
@@ -151,6 +166,9 @@ test.each([
 
 test('it names the shared test input over the file cap when the branch changes both', async () => {
   const ctx = setupTest();
+
+  ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 2 });
+
   const paths = Array.from({ length: 51 }, (_, index) => `src/t${index}.test.ts`);
 
   await runRelatedTests([...paths, 'bunfig.toml'], defineRig({}), ctx.run, ctx.deps);
@@ -165,6 +183,8 @@ test.each([['--max-files=2'], ['--max-file=2']])(
   async (option) => {
     const ctx = setupTest();
 
+    ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 2 });
+
     const exitCode = await runRelatedTests([option, 'src/a.ts'], defineRig({}), ctx.run, ctx.deps);
 
     expect(exitCode).toBe(2);
@@ -178,7 +198,9 @@ test.each([['--max-files=2'], ['--max-file=2']])(
 );
 
 test('it exits 2 with the reason and runs no test for a worker count it refuses', async () => {
-  const ctx = setupTest({
+  const ctx = setupTest();
+
+  ctx.readWorkerCount.mockResolvedValue({
     kind: 'invalid',
     message: 'TEST_WORKERS is four; set it to a whole number above 0',
   });

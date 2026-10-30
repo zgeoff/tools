@@ -5,17 +5,19 @@ import type { WorkerCount } from './read-worker-count.ts';
 import type { CommandOptions } from './run-command.ts';
 import { runUnit } from './run-unit.ts';
 
-function setupTest(workers: WorkerCount) {
+function setupTest() {
   const runCommand = mock<(command: readonly string[], options: CommandOptions) => Promise<number>>(
     () => Promise.resolve(0),
   );
 
   const output = { out: makeRecordingStub(), err: makeRecordingStub() };
   const trackedFiles: string[] = [];
+  const readWorkerCount = mock<() => Promise<WorkerCount>>();
 
   return {
     runCommand,
     trackedFiles,
+    readWorkerCount,
     output,
     run: {
       repoRoot: '/repo',
@@ -28,13 +30,15 @@ function setupTest(workers: WorkerCount) {
       readTrackedFiles: () => Promise.resolve(trackedFiles),
       runCommand,
       output,
-      readWorkerCount: () => Promise.resolve(workers),
+      readWorkerCount,
     },
   };
 }
 
 test('it runs the unit tests with the worker count the host gets', async () => {
-  const ctx = setupTest({ kind: 'count', count: 3 });
+  const ctx = setupTest();
+
+  ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 3 });
 
   const exitCode = await runUnit(defineRig({}), [], ctx.run, ctx.deps);
 
@@ -43,8 +47,9 @@ test('it runs the unit tests with the worker count the host gets', async () => {
 });
 
 test('it runs only the unit files that a path selects', async () => {
-  const ctx = setupTest({ kind: 'count', count: 3 });
+  const ctx = setupTest();
 
+  ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 3 });
   ctx.trackedFiles.push('pkg/src/oven.test.ts', 'pkg/src/oven.host.test.ts');
 
   await runUnit(defineRig({}), ['--bail', './pkg/src/'], ctx.run, ctx.deps);
@@ -58,8 +63,9 @@ test('it runs only the unit files that a path selects', async () => {
 });
 
 test('it names the path, exits 1 and runs nothing for a unit run given only the path of a host test file', async () => {
-  const ctx = setupTest({ kind: 'count', count: 3 });
+  const ctx = setupTest();
 
+  ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 3 });
   ctx.trackedFiles.push('pkg/src/oven.test.ts', 'pkg/src/oven.host.test.ts');
 
   const exitCode = await runUnit(defineRig({}), ['./pkg/src/oven.host.test.ts'], ctx.run, ctx.deps);
@@ -74,7 +80,9 @@ test('it names the path, exits 1 and runs nothing for a unit run given only the 
 });
 
 test('it exits 2 with the reason and runs no test for a worker count it refuses', async () => {
-  const ctx = setupTest({
+  const ctx = setupTest();
+
+  ctx.readWorkerCount.mockResolvedValue({
     kind: 'invalid',
     message: 'TEST_WORKERS is four; set it to a whole number above 0',
   });
