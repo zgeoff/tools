@@ -306,6 +306,21 @@ test('it installs over a lock that a stopped hook left behind', async () => {
   expect(result.stderr).toBe(`fake install started\n${ctx.gateReason}`);
 });
 
+test.each([
+  { label: 'empty', contents: '' },
+  { label: 'not a process id', contents: 'install' },
+])('it installs over a lock whose contents are $label', async (row) => {
+  const ctx = await setupTest('installs');
+
+  await mkdir(join(ctx.project, 'node_modules'));
+  await writeFile(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), row.contents);
+
+  const result = ctx.runStub(ctx.gatedEdit);
+
+  expect(result.status).toBe(2);
+  expect(result.stderr).toBe(`fake install started\n${ctx.gateReason}`);
+});
+
 test('it refuses a harness it does not know', async () => {
   const ctx = await setupTest('installs');
 

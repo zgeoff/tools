@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
@@ -89,13 +89,20 @@ async function runInstallOnce(lockPath: string): Promise<void> {
   }
 }
 
+// A hard link fails when the lock exists and makes the lock appear with its process id already in
+// it, so a waiter never reads a lock that is still empty.
 function tryLock(lockPath: string): boolean {
+  const draftPath = `${lockPath}.${process.pid}`;
+
   try {
-    writeFileSync(lockPath, String(process.pid), { flag: 'wx' });
+    writeFileSync(draftPath, String(process.pid));
+    linkSync(draftPath, lockPath);
 
     return true;
   } catch {
     return false;
+  } finally {
+    rmSync(draftPath, { force: true });
   }
 }
 
@@ -103,7 +110,13 @@ function tryLock(lockPath: string): boolean {
 // the process that wrote it runs.
 function probeLockHeld(lockPath: string): boolean {
   try {
-    process.kill(Number(readFileSync(lockPath, 'utf8')), 0);
+    const pid = Number(readFileSync(lockPath, 'utf8'));
+
+    if (!Number.isSafeInteger(pid) || pid <= 0) {
+      return false;
+    }
+
+    process.kill(pid, 0);
 
     return true;
   } catch (error) {

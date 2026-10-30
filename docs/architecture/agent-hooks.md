@@ -38,12 +38,12 @@ process because Bun can keep a failed package lookup for the life of the process
 installs, so a failed install ends in the refusal below.
 
 Several hook calls start at once, such as the hooks for parallel tool calls, so the install runs
-under a lock file in `node_modules`. The first stub creates the lock and writes its process id into
-it. A stub that finds the lock waits until the lock goes, then imports the package without an
-install. A harness kills a hook that runs past its timeout, so a lock counts only while the process
-that wrote it runs. The next stub removes a lock whose process is gone and runs the install. The
-lock does not cover an install that outlives its killed hook, and a second install can then start
-beside it.
+under a lock file in `node_modules`. The first stub creates the lock with its process id already in
+it, so no other stub reads an empty lock. A stub that finds the lock waits until the lock goes, then
+imports the package without an install. A harness kills a hook that runs past its timeout, so a lock
+counts only while it names a process that runs. The next stub removes any other lock, such as one
+whose process is gone or one with no process id, and runs the install. The lock does not cover an
+install that outlives its killed hook, and a second install can then start beside it.
 
 ## Failing closed
 
