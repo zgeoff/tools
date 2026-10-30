@@ -56,6 +56,43 @@ test('it reads the tightest cap among the cgroup and its ancestors', async () =>
   expect(budget).toBe(3 * 1024 ** 3);
 });
 
+test('it reads the cap of an ancestor above a cgroup with no cap and one with no memory.max', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'proc/self/cgroup': '12:memory:/legacy\n0::/fleet.slice/agents.slice/agent-7.scope\n',
+    'cgroup/fleet.slice/memory.max': `${2 * 1024 ** 3}\n`,
+    'cgroup/fleet.slice/agents.slice/agent-7.scope/memory.max': 'max\n',
+  });
+
+  const budget = await readMemoryBudget({
+    totalMemory: 8 * 1024 ** 3,
+    procRoot: ctx.procRoot,
+    cgroupRoot: ctx.cgroupRoot,
+    readText: readOptionalText,
+  });
+
+  expect(budget).toBe(2 * 1024 ** 3);
+});
+
+test('it reads the cap at the root of a container cgroup namespace', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'proc/self/cgroup': '0::/\n',
+    'cgroup/memory.max': `${1024 ** 3}\n`,
+  });
+
+  const budget = await readMemoryBudget({
+    totalMemory: 8 * 1024 ** 3,
+    procRoot: ctx.procRoot,
+    cgroupRoot: ctx.cgroupRoot,
+    readText: readOptionalText,
+  });
+
+  expect(budget).toBe(1024 ** 3);
+});
+
 test('it reads the total memory when every cgroup cap is above it', async () => {
   const ctx = await setupTest();
 

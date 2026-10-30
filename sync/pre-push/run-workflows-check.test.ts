@@ -890,3 +890,57 @@ test('it reports the git error and exits 2 when HEAD has no commit', async () =>
       'workflows: git ls-tree -r -z --name-only HEAD failed: fatal: Not a valid object name HEAD\n',
   });
 });
+
+test.each([
+  [
+    'private',
+    [
+      '.github/workflows/checks.yml:6: job macos is a heavy check, because it runs on macos-latest, in a workflow that runs on pull_request; a private repo runs a heavy check nightly or on dispatch, never on each pull request',
+      'workflows: 1 warning; the workflow lint warns and does not fail yet',
+      '',
+    ].join('\n'),
+  ],
+  ['public', ''],
+])(
+  'it reads the profile from CHECKS_PROFILE=%s when run as a script on the paths it is given',
+  async (profile, stdout) => {
+    const ctx = await setupTest();
+
+    await ctx.commitFiles({
+      '.github/workflows/checks.yml': [
+        'on: [pull_request]',
+        'concurrency:',
+        `  group: checks-\${{ github.ref }}`,
+        '  cancel-in-progress: true',
+        'jobs:',
+        '  macos:',
+        '    runs-on: macos-latest',
+        '    timeout-minutes: 5',
+        '    steps:',
+        '      - run: bun run test:host',
+        '',
+      ].join('\n'),
+      '.github/workflows/tidy.yml': [
+        'on: workflow_dispatch',
+        'jobs:',
+        '  tidy:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        '      - run: bun run tidy',
+        '',
+      ].join('\n'),
+    });
+
+    const result =
+      await $`bun ${join(import.meta.dir, 'run-workflows-check.ts')} .github/workflows/checks.yml`
+        .cwd(ctx.directory)
+        .env({ ...ctx.env, CHECKS_PROFILE: profile, GITHUB_ACTIONS: '' })
+        .nothrow()
+        .quiet();
+
+    expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+      exitCode: 0,
+      stdout,
+    });
+  },
+);
