@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
+import { firstPartyScopes } from './first-party-scopes.ts';
 import { isRecord } from './is-record.ts';
 import type { DependencyGateFinding } from './types.ts';
-
-const firstPartyScope = '@zgeoff/';
 
 export function collectStaleAgeGateExcludes(
   bunfig: string,
@@ -11,7 +10,7 @@ export function collectStaleAgeGateExcludes(
   const removalDates = collectRemovalDates(bunfig);
 
   return parseAgeGateExcludes(bunfig)
-    .filter((name) => !name.startsWith(firstPartyScope))
+    .filter((name) => !firstPartyScopes.some((scope) => name.startsWith(scope)))
     .flatMap((name) => {
       const removalDate = removalDates.get(name);
 

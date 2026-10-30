@@ -371,6 +371,10 @@
         "target": "scripts/dependency-gates/collect-unneeded-overrides.ts"
       },
       {
+        "source": "sync/pre-push/dependency-gates/first-party-scopes.ts",
+        "target": "scripts/dependency-gates/first-party-scopes.ts"
+      },
+      {
         "source": "sync/pre-push/dependency-gates/is-record.ts",
         "target": "scripts/dependency-gates/is-record.ts"
       },
