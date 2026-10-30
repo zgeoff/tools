@@ -7,6 +7,8 @@ export interface BrowserRun {
 
   readonly runDir: string;
 
+  readonly groupsDir: string;
+
   readonly buildDir: string;
 
   readonly profilesDir: string;
@@ -23,6 +25,7 @@ export function buildBrowserRun(repoRoot: string, hostName: string, runID: strin
     runID,
     runsDir,
     runDir,
+    groupsDir: join(runDir, 'groups'),
     buildDir: join(runDir, 'build'),
     profilesDir: join(runDir, 'profiles'),
   };

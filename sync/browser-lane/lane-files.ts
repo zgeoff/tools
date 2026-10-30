@@ -1,4 +1,5 @@
 import { lstat, mkdir, readdir } from 'node:fs/promises';
+import { hasErrorCode } from './has-error-code.ts';
 import { removePath } from './remove-path.ts';
 
 export interface PathStatus {
@@ -62,7 +63,3 @@ export const laneFiles: LaneFiles = {
   },
   removePath,
 };
-
-function hasErrorCode(error: unknown, code: string): boolean {
-  return error instanceof Error && 'code' in error && error.code === code;
-}

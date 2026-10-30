@@ -431,12 +431,20 @@
         "target": "scripts/browser-lane/build-browser-run.ts"
       },
       {
+        "source": "sync/browser-lane/should-keep-run-folders.ts",
+        "target": "scripts/browser-lane/should-keep-run-folders.ts"
+      },
+      {
         "source": "sync/browser-lane/pick-step-after-build.ts",
         "target": "scripts/browser-lane/pick-step-after-build.ts"
       },
       {
         "source": "sync/browser-lane/build-lane-environments.ts",
         "target": "scripts/browser-lane/build-lane-environments.ts"
+      },
+      {
+        "source": "sync/browser-lane/build-recorded-command.ts",
+        "target": "scripts/browser-lane/build-recorded-command.ts"
       },
       {
         "source": "sync/browser-lane/find-browser-run.ts",
@@ -451,6 +459,10 @@
         "target": "scripts/browser-lane/pick-chrome-dirs.ts"
       },
       {
+        "source": "sync/browser-lane/remove-exited-run-dirs.ts",
+        "target": "scripts/browser-lane/remove-exited-run-dirs.ts"
+      },
+      {
         "source": "sync/browser-lane/run-browser-lane.ts",
         "target": "scripts/browser-lane/run-browser-lane.ts"
       },
@@ -463,8 +475,56 @@
         "target": "scripts/browser-lane/lane-files.ts"
       },
       {
+        "source": "sync/browser-lane/probe-process.ts",
+        "target": "scripts/browser-lane/probe-process.ts"
+      },
+      {
         "source": "sync/browser-lane/remove-path.ts",
         "target": "scripts/browser-lane/remove-path.ts"
+      },
+      {
+        "source": "sync/browser-lane/process-groups.ts",
+        "target": "scripts/browser-lane/process-groups.ts"
+      },
+      {
+        "source": "sync/browser-lane/start-process-group.ts",
+        "target": "scripts/browser-lane/start-process-group.ts"
+      },
+      {
+        "source": "sync/browser-lane/process-group-still-running-error.ts",
+        "target": "scripts/browser-lane/process-group-still-running-error.ts"
+      },
+      {
+        "source": "sync/browser-lane/has-error-code.ts",
+        "target": "scripts/browser-lane/has-error-code.ts"
+      },
+      {
+        "source": "sync/browser-lane/process-group-stop-error.ts",
+        "target": "scripts/browser-lane/process-group-stop-error.ts"
+      },
+      {
+        "source": "sync/browser-lane/pick-stop-step.ts",
+        "target": "scripts/browser-lane/pick-stop-step.ts"
+      },
+      {
+        "source": "sync/browser-lane/probe-run.ts",
+        "target": "scripts/browser-lane/probe-run.ts"
+      },
+      {
+        "source": "sync/browser-lane/system-clock.ts",
+        "target": "scripts/browser-lane/system-clock.ts"
+      },
+      {
+        "source": "sync/browser-lane/is-zombie-state.ts",
+        "target": "scripts/browser-lane/is-zombie-state.ts"
+      },
+      {
+        "source": "sync/browser-lane/pick-exit-code-after-tests.ts",
+        "target": "scripts/browser-lane/pick-exit-code-after-tests.ts"
+      },
+      {
+        "source": "sync/browser-lane/process-runtime.ts",
+        "target": "scripts/browser-lane/process-runtime.ts"
       },
       {
         "source": "sync/browser-lane/start-browser.ts",

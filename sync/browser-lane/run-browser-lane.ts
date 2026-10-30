@@ -3,14 +3,25 @@ import { join } from 'node:path';
 import { match } from 'ts-pattern';
 import type { BrowserRun } from './build-browser-run.ts';
 import { buildBrowserRun } from './build-browser-run.ts';
+import type { LaneEnvironments } from './build-lane-environments.ts';
 import { buildLaneEnvironments } from './build-lane-environments.ts';
+import { buildRecordedCommand } from './build-recorded-command.ts';
 import { findPrivateDirProblem } from './find-private-dir-problem.ts';
 import { hasBrowserBuildScript } from './has-browser-build-script.ts';
 import type { LaneFiles } from './lane-files.ts';
 import { laneFiles } from './lane-files.ts';
 import type { ChromeDirs } from './pick-chrome-dirs.ts';
 import { pickChromeDirs } from './pick-chrome-dirs.ts';
+import { pickExitCodeAfterTests } from './pick-exit-code-after-tests.ts';
 import { pickStepAfterBuild } from './pick-step-after-build.ts';
+import { probeProcess } from './probe-process.ts';
+import { pendingRecordPrefix, probeRun } from './probe-run.ts';
+import type { ProcessGroups } from './process-groups.ts';
+import { processGroups } from './process-groups.ts';
+import { processRuntime } from './process-runtime.ts';
+import { removeExitedRunDirs } from './remove-exited-run-dirs.ts';
+import { shouldKeepRunFolders } from './should-keep-run-folders.ts';
+import { startProcessGroup } from './start-process-group.ts';
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -25,13 +36,26 @@ export interface BrowserLaneOptions {
 
   readonly environment: Environment;
 
+  readonly signal: AbortSignal;
+
   readonly files: LaneFiles;
 
-  readonly runBuild: ((environment: Environment) => Promise<number>) | null;
+  readonly probeProcess: (pid: number) => boolean;
+
+  readonly groups: Pick<ProcessGroups, 'probeGroup'>;
+
+  readonly runBuild:
+    | ((environment: Environment, signal: AbortSignal, pendingRecord: string) => Promise<number>)
+    | null;
 
   readonly reportCleanupError: (error: unknown) => void;
 
-  readonly runTests: (testArgs: readonly string[], environment: Environment) => Promise<number>;
+  readonly runTests: (
+    testArgs: readonly string[],
+    environment: Environment,
+    signal: AbortSignal,
+    pendingRecord: string,
+  ) => Promise<number>;
 }
 
 // `bun test --parallel=1` isolates each file, so the preload runs again for each one, and the
@@ -60,6 +84,14 @@ export async function runBrowserLane(
     throw new Error(privateDirProblem);
   }
 
+  const probeOlderRun = (runID: string) =>
+    probeRun(runID, join(run.runsDir, runID, 'groups'), options);
+
+  await Promise.all([
+    removeExitedRunDirs(run.runsDir, files, probeOlderRun),
+    removeExitedRunDirs(chromeDirs.runsDir, files, probeOlderRun),
+  ]);
+
   const environments = buildLaneEnvironments(
     options.environment,
     run,
@@ -67,25 +99,46 @@ export async function runBrowserLane(
     options.runBuild !== null,
   );
 
+  const cleanup = { keepsFolders: false };
+
   try {
-    await createDirs([run.profilesDir, chromeDirs.runDir], files);
+    await createDirs([run.profilesDir, run.groupsDir, chromeDirs.runDir], files);
 
     const buildExitCode =
-      options.runBuild === null ? null : await options.runBuild(environments.buildEnvironment);
+      options.runBuild === null ? null : await runBuild(options.runBuild, environments, options);
 
-    const step = pickStepAfterBuild(buildExitCode);
+    const step = pickStepAfterBuild(buildExitCode, options.signal.aborted);
 
     return await match(step)
       .with({ kind: 'finish' }, (finish) => finish.exitCode)
-      .with({ kind: 'run-tests' }, () =>
-        options.runTests(
+      .with({ kind: 'run-tests' }, async () => {
+        const testsRecord = await createPendingRecord(run.groupsDir, 'tests', files);
+
+        const testsExitCode = await options.runTests(
           ['--parallel=1', '--preload', options.preloadPath, ...testArgs],
           environments.testsEnvironment,
-        ),
-      )
+          options.signal,
+          testsRecord,
+        );
+
+        return pickExitCodeAfterTests(testsExitCode, options.signal.aborted);
+      })
       .exhaustive();
+  } catch (error) {
+    cleanup.keepsFolders = shouldKeepRunFolders(error);
+
+    if (cleanup.keepsFolders) {
+      throw new Error(
+        'the browser lane keeps its run folders, because it could not stop a process group',
+        { cause: error },
+      );
+    }
+
+    throw error;
   } finally {
-    await removeDirs([run.runDir, chromeDirs.runDir], files, options.reportCleanupError);
+    if (!cleanup.keepsFolders) {
+      await removeDirs([run.runDir, chromeDirs.runDir], files, options.reportCleanupError);
+    }
   }
 }
 
@@ -103,6 +156,30 @@ async function createDirs(paths: readonly string[], files: LaneFiles): Promise<v
   }
 }
 
+async function runBuild(
+  build: NonNullable<BrowserLaneOptions['runBuild']>,
+  environments: LaneEnvironments,
+  options: BrowserLaneOptions,
+): Promise<number> {
+  const buildRecord = await createPendingRecord(options.run.groupsDir, 'build', options.files);
+
+  return build(environments.buildEnvironment, options.signal, buildRecord);
+}
+
+// The lane makes each command's pending record before the command starts, so a sweep never sees a
+// run whose lane has exited and whose command can still record its group.
+async function createPendingRecord(
+  groupsDir: string,
+  commandName: string,
+  files: LaneFiles,
+): Promise<string> {
+  const pendingRecord = join(groupsDir, `${pendingRecordPrefix}${commandName}`);
+
+  await files.createDirs(pendingRecord);
+
+  return pendingRecord;
+}
+
 // A throw from the cleanup would hide the lane's own error, so the lane reports a removal that fails and goes on.
 async function removeDirs(
   paths: readonly string[],
@@ -118,6 +195,9 @@ async function removeDirs(
   }
 }
 
+// A build or a test process gets this long to exit after SIGTERM before the lane sends SIGKILL.
+const stopDeadlineMs = 10_000;
+
 if (import.meta.main) {
   // `bun run` starts a package script in the folder of the package that defines it.
   const repoRoot = process.cwd();
@@ -126,12 +206,37 @@ if (import.meta.main) {
 
   const manifest: unknown = await Bun.file(join(repoRoot, 'package.json')).json();
 
-  const runCommand = (command: readonly string[], environment: Environment) =>
-    Bun.spawn([...command], {
+  const startCommand = (
+    command: readonly string[],
+    environment: Environment,
+    signal: AbortSignal,
+    pendingRecord: string,
+  ) => {
+    const group = startProcessGroup(buildRecordedCommand(run.groupsDir, pendingRecord, command), {
       cwd: repoRoot,
-      env: environment,
-      stdio: ['inherit', 'inherit', 'inherit'],
-    }).exited;
+      environment,
+      signal,
+      stdout: 'inherit',
+      stopDeadlineMs,
+      groups: processGroups,
+      runtime: processRuntime,
+    });
+
+    return group.exited;
+  };
+
+  // The memory-cap script stops the lane with a signal. The abort stops the build or the test
+  // process, and the lane waits for it to exit before it removes its folders.
+  const controller = new AbortController();
+
+  const handleSignal = () => {
+    controller.abort();
+  };
+
+  // The memory-cap script forwards each of these signals to the lane.
+  process.on('SIGINT', handleSignal);
+  process.on('SIGTERM', handleSignal);
+  process.on('SIGHUP', handleSignal);
 
   process.exitCode = await runBrowserLane(process.argv.slice(2), {
     run,
@@ -139,14 +244,23 @@ if (import.meta.main) {
     userID,
     preloadPath: join(import.meta.dir, 'browser-preload.ts'),
     environment: process.env,
+    signal: controller.signal,
     files: laneFiles,
+    probeProcess,
+    groups: processGroups,
     reportCleanupError: (error) => {
       console.error('the browser lane could not remove a folder:', error);
     },
     runBuild: hasBrowserBuildScript(manifest)
-      ? (environment) => runCommand([process.execPath, 'run', 'build:browser'], environment)
+      ? (environment, signal, pendingRecord) =>
+          startCommand(
+            [process.execPath, 'run', 'build:browser'],
+            environment,
+            signal,
+            pendingRecord,
+          )
       : null,
-    runTests: (testArgs, environment) =>
-      runCommand([process.execPath, 'test', ...testArgs], environment),
+    runTests: (testArgs, environment, signal, pendingRecord) =>
+      startCommand([process.execPath, 'test', ...testArgs], environment, signal, pendingRecord),
   });
 }

@@ -28,5 +28,5 @@ test("it starts Chrome on a profile folder inside the run's folder", async () =>
 });
 
 test('it runs the file under the TMPDIR the lane picks for Chrome', () => {
-  expect(process.env['TMPDIR']).toMatch(/\/browser-lane-chrome-\d+\/\d+$/u);
+  expect(process.env['TMPDIR']).toMatch(/\/browser-lane-chrome-\d+\/[\da-f]{8}\/\d+$/u);
 });

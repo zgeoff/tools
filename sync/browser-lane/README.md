@@ -14,20 +14,26 @@ The repo's `test:browser` script runs the lane script under the memory cap. The 
 ts-pattern, so a repo that takes the entry lists ts-pattern in its dev dependencies. The lane script
 does these steps in order:
 
-1. It makes the run ID from its own process ID and passes it to the test processes in an environment
+1. It removes the run folders of older runs whose lane process and recorded process groups have all
+   exited, as the testing skill's [Per-run templates](../skills/testing/SKILL.md#per-run-templates)
+   describes for every per-run folder. Each command starts only after it claims a pending record
+   that the lane made for it, and the sweep removes an exited lane's pending records before it reads
+   the groups, so no older command starts after the sweep has read its run.
+2. It makes the run ID from its own process ID and passes it to the test processes in an environment
    variable. The preload runs again in each file's process, so an ID that the preload made would
    differ in each file.
-2. It runs the repo's `build:browser` script once for the run, when the repo defines one, with the
+3. It runs the repo's `build:browser` script once for the run, when the repo defines one, with the
    path of the run's build folder in `BROWSER_LANE_BUILD_DIR`. A build in the preload would run
    again in each file's process, because `--parallel=1` isolates each file. The suites read the
    build from the same variable.
-3. It sets a short `TMPDIR` for the test processes, inside a private folder of the user's own, which
+4. It sets a short `TMPDIR` for the test processes, inside a private folder of the user's own, which
    the lane checks before it writes there. Chrome stops at startup when its socket path under
    `TMPDIR` is too long for a Unix socket, and the suites then fail with
    `Chrome process closed the pipe`.
-4. It runs `bun test --parallel=1` with the preload over the arguments it takes, then removes the
-   run's folders, whether the tests pass or fail. A failed build ends the run before the tests. A
-   run that a signal stops leaves its folders behind.
+5. It runs `bun test --parallel=1` with the preload over the arguments it takes, then removes the
+   run's folders, whether the tests pass or fail, or SIGINT, SIGTERM or SIGHUP stops the run. A run
+   that another signal stops, such as SIGKILL, leaves its folders for the next run's sweep. So does
+   a run with a process group that the lane could not stop, because the group can still write there.
 
 ## The preload
 

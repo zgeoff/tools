@@ -1,5 +1,7 @@
-import { readdir, rename } from 'node:fs/promises';
+import { rename } from 'node:fs/promises';
 import { nodeFileSystem } from '../scripts/ci/node-file-system.ts';
+import { hasErrorCode } from '../sync/browser-lane/has-error-code.ts';
+import { laneFiles } from '../sync/browser-lane/lane-files.ts';
 
 export interface TemplateFiles {
   readonly readFile: (path: string) => Promise<Uint8Array>;
@@ -19,17 +21,7 @@ export interface TemplateFiles {
 
 export const templateFiles: TemplateFiles = {
   readFile: nodeFileSystem.readBytes,
-  readDirectoryNames: async (path) => {
-    try {
-      return await readdir(path);
-    } catch (error) {
-      if (hasErrorCode(error, 'ENOENT')) {
-        return [];
-      }
-
-      throw error;
-    }
-  },
+  readDirectoryNames: laneFiles.readDirNames,
   createDirectories: nodeFileSystem.createDirectory,
   writeFile: nodeFileSystem.writeText,
   removePath: nodeFileSystem.removePath,
@@ -47,7 +39,3 @@ export const templateFiles: TemplateFiles = {
     }
   },
 };
-
-function hasErrorCode(error: unknown, code: string): boolean {
-  return error instanceof Error && 'code' in error && error.code === code;
-}

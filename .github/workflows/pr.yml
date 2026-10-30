@@ -16,7 +16,9 @@ jobs:
       pull-requests: write
     uses: ./.github/workflows/bun-checks.yml
     with:
-      scripts: check:sync check:release-workflow format:check lint:full typecheck test test:browser
+      scripts:
+        check:sync check:release-workflow format:check lint:full typecheck test test:browser
+        test:e2e test:host
       # The tests of the check steps and the pre-push jobs run shfmt and
       # actionlint, in the test job, which runs no check step.
       setup-shfmt: true
