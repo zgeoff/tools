@@ -26,16 +26,6 @@ async function setupTest() {
   await mkdir(packageDir);
   await copyFile(join(import.meta.dir, 'start.ts'), stubPath);
 
-  await writeFile(
-    join(packageDir, 'package.json'),
-    JSON.stringify({ name: '@zgeoff/agent-hooks', type: 'module', exports: './index.ts' }),
-  );
-
-  await writeFile(
-    join(packageDir, 'index.ts'),
-    `export * from ${JSON.stringify(join(import.meta.dir, '../../packages/agent-hooks/src/index.ts'))};\n`,
-  );
-
   const env = {
     PATH: `${fakeBin}:${process.env['PATH'] ?? ''}`,
     HOME: process.env['HOME'] ?? '',
@@ -89,6 +79,7 @@ async function setupTest() {
     project,
     fakeBin,
     packageDir,
+    agentHooksSource: join(import.meta.dir, '../../packages/agent-hooks/src/index.ts'),
     installLog,
     buildPayload,
     runStub,
@@ -103,6 +94,15 @@ test('it installs the missing package in a fresh worktree, then blocks a gated e
   await createStubInstall(ctx.fakeBin, {
     log: ctx.installLog,
     outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+  });
+
+  await writeTreeFiles(ctx.packageDir, {
+    'package.json': JSON.stringify({
+      name: '@zgeoff/agent-hooks',
+      type: 'module',
+      exports: './index.ts',
+    }),
+    'index.ts': `export * from ${JSON.stringify(ctx.agentHooksSource)};\n`,
   });
 
   await writeTreeFiles(ctx.project, {
@@ -137,6 +137,15 @@ test('it allows an ungated edit after the install with no output', async () => {
     outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
   });
 
+  await writeTreeFiles(ctx.packageDir, {
+    'package.json': JSON.stringify({
+      name: '@zgeoff/agent-hooks',
+      type: 'module',
+      exports: './index.ts',
+    }),
+    'index.ts': `export * from ${JSON.stringify(ctx.agentHooksSource)};\n`,
+  });
+
   await writeTreeFiles(ctx.project, {
     '.claude/skill-gate.json': JSON.stringify({
       gates: [{ match: '**/*.md', skills: ['docs-writing'] }],
@@ -159,6 +168,15 @@ test('it runs no install when the package loads', async () => {
   await createStubInstall(ctx.fakeBin, {
     log: ctx.installLog,
     outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+  });
+
+  await writeTreeFiles(ctx.packageDir, {
+    'package.json': JSON.stringify({
+      name: '@zgeoff/agent-hooks',
+      type: 'module',
+      exports: './index.ts',
+    }),
+    'index.ts': `export * from ${JSON.stringify(ctx.agentHooksSource)};\n`,
   });
 
   await writeTreeFiles(ctx.project, {
@@ -303,6 +321,15 @@ test('it runs one install for two parallel hook calls in one worktree', async ()
     releasePath,
   });
 
+  await writeTreeFiles(ctx.packageDir, {
+    'package.json': JSON.stringify({
+      name: '@zgeoff/agent-hooks',
+      type: 'module',
+      exports: './index.ts',
+    }),
+    'index.ts': `export * from ${JSON.stringify(ctx.agentHooksSource)};\n`,
+  });
+
   await writeTreeFiles(ctx.project, {
     '.claude/skill-gate.json': JSON.stringify({
       gates: [{ match: '**/*.md', skills: ['docs-writing'] }],
@@ -349,6 +376,15 @@ test('it installs over a lock that a stopped hook left behind', async () => {
     outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
   });
 
+  await writeTreeFiles(ctx.packageDir, {
+    'package.json': JSON.stringify({
+      name: '@zgeoff/agent-hooks',
+      type: 'module',
+      exports: './index.ts',
+    }),
+    'index.ts': `export * from ${JSON.stringify(ctx.agentHooksSource)};\n`,
+  });
+
   await writeTreeFiles(ctx.project, {
     '.claude/skill-gate.json': JSON.stringify({
       gates: [{ match: '**/*.md', skills: ['docs-writing'] }],
@@ -384,6 +420,15 @@ test.each([
     outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
   });
 
+  await writeTreeFiles(ctx.packageDir, {
+    'package.json': JSON.stringify({
+      name: '@zgeoff/agent-hooks',
+      type: 'module',
+      exports: './index.ts',
+    }),
+    'index.ts': `export * from ${JSON.stringify(ctx.agentHooksSource)};\n`,
+  });
+
   await writeTreeFiles(ctx.project, {
     '.claude/skill-gate.json': JSON.stringify({
       gates: [{ match: '**/*.md', skills: ['docs-writing'] }],
@@ -412,6 +457,15 @@ test('it waits while another hook holds the guard on the install lock, then inst
   await createStubInstall(ctx.fakeBin, {
     log: ctx.installLog,
     outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+  });
+
+  await writeTreeFiles(ctx.packageDir, {
+    'package.json': JSON.stringify({
+      name: '@zgeoff/agent-hooks',
+      type: 'module',
+      exports: './index.ts',
+    }),
+    'index.ts': `export * from ${JSON.stringify(ctx.agentHooksSource)};\n`,
   });
 
   await writeTreeFiles(ctx.project, {
@@ -491,6 +545,15 @@ test('it runs one install for two hook calls that both find a stale lock', async
     log: ctx.installLog,
     outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
     releasePath,
+  });
+
+  await writeTreeFiles(ctx.packageDir, {
+    'package.json': JSON.stringify({
+      name: '@zgeoff/agent-hooks',
+      type: 'module',
+      exports: './index.ts',
+    }),
+    'index.ts': `export * from ${JSON.stringify(ctx.agentHooksSource)};\n`,
   });
 
   await writeTreeFiles(ctx.project, {
