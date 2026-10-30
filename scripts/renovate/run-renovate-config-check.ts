@@ -4,6 +4,7 @@ import type { FileSystem } from '../ci/file-system.ts';
 import { makeLoggedCommandRunner } from '../ci/make-logged-command-runner.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import type { RunCommand } from '../ci/run-command.ts';
+import { findDisallowedPostUpgradeCommands } from './find-disallowed-post-upgrade-commands.ts';
 import { findFirstPartyScopeDrift } from './find-first-party-scope-drift.ts';
 import { parseRenovateVersion } from './parse-renovate-version.ts';
 
@@ -36,6 +37,14 @@ export async function runRenovateConfigCheck(
   const workflowText = await check.fileSystem.readText(
     join(check.cwd, '.github/workflows/renovate.yml'),
   );
+
+  const disallowed = findDisallowedPostUpgradeCommands(presetText, workflowText);
+
+  if (disallowed !== undefined) {
+    check.writeError(`${disallowed}\n`);
+
+    return 1;
+  }
 
   const parsed = parseRenovateVersion(workflowText);
 
