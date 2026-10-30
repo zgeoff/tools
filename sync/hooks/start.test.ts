@@ -403,6 +403,131 @@ test.each([
   );
 });
 
+test('it waits while another hook holds the guard on the install lock, then installs over a stale lock', async () => {
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+  });
+
+  await writeTreeFiles(ctx.project, {
+    '.claude/skill-gate.json': JSON.stringify({
+      gates: [{ match: '**/*.md', skills: ['docs-writing'] }],
+    }),
+    '.claude/skills/docs-writing/SKILL.md': '# Docs writing\n',
+    'transcript.jsonl': '',
+  });
+
+  const stopped = spawnSync('true');
+
+  await writeTreeFiles(ctx.project, {
+    'node_modules/.agent-hooks-install.lock': String(stopped.pid),
+    'node_modules/.agent-hooks-install.lock.guard': String(process.pid),
+  });
+
+  const hook = ctx.startStub(
+    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+  );
+
+  const waiting = await readStreamUntil(hook.stderr, 'waits its turn');
+  const installLogWhileGuarded = await ctx.readInstallLog();
+
+  await rm(join(ctx.project, 'node_modules/.agent-hooks-install.lock.guard'));
+
+  const decided = await readStreamUntil(hook.stderr, 'lists the skills each path needs.');
+  const status = await hook.exited;
+
+  expect(installLogWhileGuarded).toBe('');
+  expect(status).toBe(2);
+
+  expect(`${waiting}${decided}`).toBe(
+    `Another agent hook claims the install lock here, so this one waits its turn.\nstub install started\nLoad the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
+
+  const installLog = await ctx.readInstallLog();
+
+  expect(installLog).toBe(`bun install --frozen-lockfile in ${ctx.project}\n`);
+});
+
+test('it skips the install and refuses when a stopped hook left the guard behind', async () => {
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+  });
+
+  const stopped = spawnSync('true');
+
+  await writeTreeFiles(ctx.project, {
+    'node_modules/.agent-hooks-install.lock.guard': String(stopped.pid),
+  });
+
+  const result = ctx.runStub(
+    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+  );
+
+  expect(result.status).toBe(2);
+
+  expect(result.stderr).toBe(
+    `A stopped agent hook left ${join(ctx.project, 'node_modules/.agent-hooks-install.lock.guard')} behind, so this one skips the install. Remove that file.\nTo work here, run bun install.\n`,
+  );
+
+  const installLog = await ctx.readInstallLog();
+
+  expect(installLog).toBe('');
+});
+
+test('it runs one install for two hook calls that both find a stale lock', async () => {
+  const ctx = await setupTest();
+
+  const releasePath = join(ctx.directory, 'release');
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+    releasePath,
+  });
+
+  await writeTreeFiles(ctx.project, {
+    '.claude/skill-gate.json': JSON.stringify({
+      gates: [{ match: '**/*.md', skills: ['docs-writing'] }],
+    }),
+    '.claude/skills/docs-writing/SKILL.md': '# Docs writing\n',
+    'transcript.jsonl': '',
+  });
+
+  const stopped = spawnSync('true');
+
+  await writeTreeFiles(ctx.project, {
+    'node_modules/.agent-hooks-install.lock': String(stopped.pid),
+  });
+
+  const first = ctx.startStub(
+    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+  );
+
+  await readStreamUntil(first.stderr, 'stub install started');
+
+  const second = ctx.startStub(
+    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+  );
+
+  await readStreamUntil(second.stderr, 'Another agent hook runs bun install here');
+  await writeFile(releasePath, '');
+
+  const firstStatus = await first.exited;
+  const secondStatus = await second.exited;
+
+  expect(firstStatus).toBe(2);
+  expect(secondStatus).toBe(2);
+
+  const installLog = await ctx.readInstallLog();
+
+  expect(installLog).toBe(`bun install --frozen-lockfile in ${ctx.project}\n`);
+});
+
 test('it refuses a harness it does not know', async () => {
   const ctx = await setupTest();
 

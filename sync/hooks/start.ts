@@ -8,6 +8,7 @@ import { parseArgs } from 'node:util';
 // that fails would let the call through. This file therefore imports only Node builtins.
 const REFUSAL = 'To work here, run bun install.';
 const AFTER_INSTALL = '--after-install';
+const GUARD_SUFFIX = '.guard';
 
 const READ_ONLY_PROGRAMS = new Set(['cat', 'ls', 'pwd']);
 
@@ -64,22 +65,24 @@ function parseHarness(harnessArgs: readonly string[]): 'claude-code' | 'codex' {
 async function runInstallOnce(lockPath: string): Promise<void> {
   mkdirSync(path.dirname(lockPath), { recursive: true });
 
-  if (!tryLock(lockPath)) {
-    if (probeLockHeld(lockPath)) {
-      console.error('Another agent hook runs bun install here, so this one waits for it.');
+  const claim = await claimInstallLock(lockPath);
 
-      while (probeLockHeld(lockPath)) {
-        await setTimeout(100);
-      }
+  if (claim === 'stuck') {
+    console.error(
+      `A stopped agent hook left ${lockPath}${GUARD_SUFFIX} behind, so this one skips the install. Remove that file.`,
+    );
 
-      return;
+    return;
+  }
+
+  if (claim === 'waiter') {
+    console.error('Another agent hook runs bun install here, so this one waits for it.');
+
+    while (readLockState(lockPath) === 'held') {
+      await setTimeout(100);
     }
 
-    rmSync(lockPath, { force: true });
-
-    if (!tryLock(lockPath)) {
-      return;
-    }
+    return;
   }
 
   try {
@@ -89,8 +92,44 @@ async function runInstallOnce(lockPath: string): Promise<void> {
   }
 }
 
+// Two hooks can both find the install lock stale, so every change to it happens under a guard lock;
+// without the guard, one hook could remove the lock that another hook has just taken.
+async function claimInstallLock(lockPath: string): Promise<'owner' | 'waiter' | 'stuck'> {
+  const guardPath = `${lockPath}${GUARD_SUFFIX}`;
+
+  for (let attempt = 0; !tryLock(guardPath); attempt += 1) {
+    const guardState = readLockState(guardPath);
+
+    if (guardState === 'stale') {
+      return 'stuck';
+    }
+
+    if (guardState === 'held') {
+      if (attempt === 0) {
+        console.error(
+          'Another agent hook claims the install lock here, so this one waits its turn.',
+        );
+      }
+
+      await setTimeout(10);
+    }
+  }
+
+  try {
+    if (readLockState(lockPath) === 'held') {
+      return 'waiter';
+    }
+
+    rmSync(lockPath, { force: true });
+
+    return tryLock(lockPath) ? 'owner' : 'waiter';
+  } finally {
+    rmSync(guardPath, { force: true });
+  }
+}
+
 // A hard link fails when the lock exists and makes the lock appear with its process id already in
-// it, so a waiter never reads a lock that is still empty.
+// it, so a hook never reads a lock that is still empty.
 function tryLock(lockPath: string): boolean {
   const draftPath = `${lockPath}.${process.pid}`;
 
@@ -106,21 +145,35 @@ function tryLock(lockPath: string): boolean {
   }
 }
 
-// A hook that the harness killed mid-install leaves its lock behind, so a lock counts only while
-// the process that wrote it runs.
-function probeLockHeld(lockPath: string): boolean {
+// A hook that the harness killed leaves its lock behind, so a lock counts as held only while the
+// process it names runs.
+function readLockState(lockPath: string): 'absent' | 'held' | 'stale' {
+  const text = readLockText(lockPath);
+
+  if (text === null) {
+    return 'absent';
+  }
+
+  const pid = Number(text);
+
+  if (!Number.isSafeInteger(pid) || pid <= 0) {
+    return 'stale';
+  }
+
   try {
-    const pid = Number(readFileSync(lockPath, 'utf8'));
-
-    if (!Number.isSafeInteger(pid) || pid <= 0) {
-      return false;
-    }
-
     process.kill(pid, 0);
 
-    return true;
+    return 'held';
   } catch (error) {
-    return error instanceof Error && 'code' in error && error.code === 'EPERM';
+    return error instanceof Error && 'code' in error && error.code === 'EPERM' ? 'held' : 'stale';
+  }
+}
+
+function readLockText(lockPath: string): string | null {
+  try {
+    return readFileSync(lockPath, 'utf8');
+  } catch (error) {
+    return error instanceof Error && 'code' in error && error.code === 'ENOENT' ? null : '';
   }
 }
 

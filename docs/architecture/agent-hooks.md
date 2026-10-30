@@ -41,9 +41,11 @@ Several hook calls start at once, such as the hooks for parallel tool calls, so 
 under a lock file in `node_modules`. The first stub creates the lock with its process id already in
 it, so no other stub reads an empty lock. A stub that finds the lock waits until the lock goes, then
 imports the package without an install. A harness kills a hook that runs past its timeout, so a lock
-counts only while it names a process that runs. The next stub removes any other lock, such as one
-whose process is gone or one with no process id, and runs the install. The lock does not cover an
-install that outlives its killed hook, and a second install can then start beside it.
+counts only while it names a process that runs. Two stubs can both find a lock stale, so a stub
+takes, checks or replaces the lock only while it holds a second lock, the guard. The guard's holder
+removes the guard itself. When a stopped stub leaves the guard behind, a stub skips the install and
+names the guard file to remove. The lock does not cover an install that outlives its killed hook,
+and a second install can then start beside it.
 
 ## Failing closed
 
