@@ -50,7 +50,8 @@ drops the others, so a dispatch can be lost, and the next daily run delivers wha
 the Actions API fails or lists no green run, the run warns and syncs the commit the repo pins, so
 that day's run delivers nothing and the lost change waits for a run that reads the API. A run whose
 commit is older than the commit that the repo's `main` or its open sync pull request pins changes
-nothing, so dispatches may arrive in any order.
+nothing, so dispatches may arrive in any order. A run that cannot read the repo's `main` from the
+remote fails rather than guess, and the next run tries again.
 
 The step scripts of a run come from the pinned commit, never from `ref`, so a change to the scripts
 reaches a repo once its next sync pull request merges.

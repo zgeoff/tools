@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { chmod, cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
 import { createStubPullRequestGH } from '../../test-utils/create-stub-pull-request-gh.ts';
@@ -1127,28 +1127,33 @@ test('it syncs the other files of an entry whose excepted workflow target is a f
   expect(ctx.output).not.toContain(expect.stringContaining('::error::'));
 });
 
-test("it fails the run with git's error when the remote branch probe cannot reach the remote", async () => {
+test("it refuses the commit with git's error when it cannot read the base from the remote", async () => {
   const ctx = await setupTest();
 
   await ctx.writeMainCommit('README.md', '# app\n');
   await ctx.writeManifestCommit([]);
-  await ctx.writeSource('sync/readme.md', '# app\n');
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
 
-  // The entry matches the caller, so the probe for the sync branch is the run's first remote call.
-  const syncing = ctx.runSync(
+  const exitCode = await ctx.runSync(
     [
       {
-        name: 'readme',
-        description: 'The readme',
-        files: [{ source: 'sync/readme.md', target: 'README.md' }],
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
       },
     ],
     { GIT_ALLOW_PROTOCOL: 'https' },
   );
 
-  expect(syncing).rejects.toThrow(
-    "git ls-remote --exit-code --heads origin repo-sync/zgeoff-tools exited with 128: fatal: transport 'file' not allowed",
-  );
+  const toolsHead = await ctx.readToolsHead();
+  const branches = await ctx.readBranchNames();
+
+  expect(exitCode).toBe(1);
+  expect(branches).toStrictEqual(['main']);
+
+  expect(ctx.output).toStrictEqual([
+    `::error::Cannot read main from the remote, so the run cannot tell whether ${toolsHead} is older than its pin; the next run tries again: fatal: transport 'file' not allowed\n`,
+  ]);
 });
 
 test('it turns auto-merge off before it pushes a later release to the sync branch', async () => {
@@ -1323,6 +1328,7 @@ test('it leaves auto-merge off when the open pull request merges into another br
 
   await ctx.runSync(entries);
   await ctx.writeSource('sync/editorconfig', 'root = false\n');
+  await ctx.writeBranch('feature', 'README.md', '# app on a feature branch\n');
 
   const exitCode = await ctx.runSync(entries, { BASE: 'feature' });
   const pulls = await ctx.readPullRequests();
@@ -1487,38 +1493,4 @@ test('it opens no pull request when a delivered workflow differs from its source
   expect(exitCode).toBe(0);
   expect(branches).toStrictEqual(['main']);
   expect(pulls).toStrictEqual([]);
-});
-
-test('it refuses the commit and pushes nothing when it cannot read the base from the remote', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writeMainCommit('README.md', '# app\n');
-  await ctx.writeManifestCommit([]);
-  await ctx.writeSource('sync/editorconfig', 'root = true\n');
-
-  const moved = `${ctx.origin}.moved`;
-
-  const exitCode = await ctx.runSync(
-    [
-      {
-        name: 'editorconfig',
-        description: 'The editor config',
-        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
-      },
-    ],
-    {},
-    () => rename(ctx.origin, moved),
-  );
-
-  await rename(moved, ctx.origin);
-
-  const toolsHead = await ctx.readToolsHead();
-  const branches = await ctx.readBranchNames();
-
-  expect(exitCode).toBe(1);
-  expect(branches).toStrictEqual(['main']);
-
-  expect(ctx.output).toStrictEqual([
-    `::error::Cannot read main from the remote, so the run cannot tell whether ${toolsHead} is older than its pin; the next run tries again.\n`,
-  ]);
 });
