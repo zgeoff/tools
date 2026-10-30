@@ -30,24 +30,24 @@ test('it names each command that no allowed pattern matches, once', () => {
   );
 });
 
-test('it applies each pattern as written, as Renovate does, so only an anchored one refuses a longer command', () => {
+test('it lets an unanchored pattern allow a longer command, as Renovate does', () => {
   const preset = JSON.stringify({
     packageRules: [{ postUpgradeTasks: { commands: ['widget init --force'] } }],
   });
 
-  expect(
-    findDisallowedPostUpgradeCommands(
-      preset,
-      `jobs:\n  renovate:\n    steps:\n      - env:\n          RENOVATE_ALLOWED_COMMANDS: '["widget init"]'\n`,
-    ),
-  ).toBeUndefined();
+  const workflow = `jobs:\n  renovate:\n    steps:\n      - env:\n          RENOVATE_ALLOWED_COMMANDS: '["widget init"]'\n`;
 
-  expect(
-    findDisallowedPostUpgradeCommands(
-      preset,
-      `jobs:\n  renovate:\n    steps:\n      - env:\n          RENOVATE_ALLOWED_COMMANDS: '["^widget init$"]'\n`,
-    ),
-  ).toBe(
+  expect(findDisallowedPostUpgradeCommands(preset, workflow)).toBeUndefined();
+});
+
+test('it refuses a longer command that an anchored pattern does not match', () => {
+  const preset = JSON.stringify({
+    packageRules: [{ postUpgradeTasks: { commands: ['widget init --force'] } }],
+  });
+
+  const workflow = `jobs:\n  renovate:\n    steps:\n      - env:\n          RENOVATE_ALLOWED_COMMANDS: '["^widget init$"]'\n`;
+
+  expect(findDisallowedPostUpgradeCommands(preset, workflow)).toBe(
     "default.json: no RENOVATE_ALLOWED_COMMANDS pattern in .github/workflows/renovate.yml allows 'widget init --force'",
   );
 });
