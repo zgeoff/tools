@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "@zgeoff/diet": "workspace:*",
+    "@zgeoff/std": "workspace:*",
     "gunshi": "catalog:",
     "ts-pattern": "catalog:"
   },

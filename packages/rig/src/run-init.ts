@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { isRecord } from '@zgeoff/std';
 import { buildInitScripts } from './build-init-scripts.ts';
 import type { InitFiles } from './init-files.ts';
 import type { RigConfig, RigOutput } from './types.ts';
@@ -55,10 +56,6 @@ export async function runInit(
   }
 
   return 0;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function readScripts(scripts: unknown): Record<string, string> {
