@@ -4,7 +4,7 @@ import { hostname, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { buildBrowserRun } from '../packages/rig/src/browser/build-browser-run.ts';
 import { pickChromeDirs } from '../packages/rig/src/browser/pick-chrome-dirs.ts';
-import { readPackageBin } from '../test-utils/read-package-bin.ts';
+import { getRigE2EBin } from '../test-utils/get-rig-e2e-bin.ts';
 import { stopProcessGroups } from '../test-utils/stop-process-groups.ts';
 import { testProcesses } from '../test-utils/test-processes.ts';
 
@@ -13,9 +13,8 @@ async function setupTest() {
 
   onTestFinished(() => stack.disposeAsync());
 
-  // The journey runs rig through the bin that its package declares, so a wrong bin entry fails it,
-  // which a run of the CLI's source file would miss.
-  const rigBin = await readPackageBin(join(import.meta.dir, '..', 'packages', 'rig'), 'rig');
+  const rigBin = getRigE2EBin(process.env);
+
   const repoRoot = await mkdtemp(join(tmpdir(), 'rig-browser-build-'));
 
   stack.defer(() => rm(repoRoot, { recursive: true, force: true }));

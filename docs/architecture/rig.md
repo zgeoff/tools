@@ -125,3 +125,14 @@ from version 22.18, and rig's package therefore ships a built Node entry that th
 `rig.config.ts` that also sets the rules' `lanes` option gets one config error from each rule, and a
 repo without the file keeps the rules' own table. The plugin fails to load, with the import error as
 its cause, when Node cannot read the file.
+
+## The journeys that test rig
+
+rig's own e2e journeys run the package that npm publishes, not its source. This repo's
+`rig.config.ts` gives the e2e lane a start hook that builds rig once per run, packs it with
+`bun pm pack`, unpacks the tarball, and hands the tests the unpacked bin in `RIG_E2E_BIN`. A broken
+build, a `files` list that drops a module the CLI loads, or a bin that the tarball lacks therefore
+fails the lane. The pack sits in a cache folder under rig's own `node_modules`, because the repo's
+isolated linker links rig's dependencies there and not at the repo root. The stop hook removes the
+run's pack, and the next run's start removes any pack whose run has exited. A journey that runs
+outside the lane fails at once, because nothing set `RIG_E2E_BIN`.
