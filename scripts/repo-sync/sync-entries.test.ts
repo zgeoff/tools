@@ -63,6 +63,24 @@ async function setupTest() {
     return head.trim();
   };
 
+  // Commits the manifest on a side branch of the tools checkout and returns to main, so the commit
+  // exists and main never holds it.
+  const writeSideCommit = async (manifest: unknown[]) => {
+    await $`git -C ${tools} switch -q -c side`.env(env).quiet();
+
+    await writeFile(join(tools, 'sync', 'manifest.json'), JSON.stringify(manifest));
+
+    await $`git -C ${tools} add -A && git -C ${tools} commit -q -m ${'chore: change the manifest on a side branch'}`
+      .env(env)
+      .quiet();
+
+    const head = await $`git -C ${tools} rev-parse HEAD`.text();
+
+    await $`git -C ${tools} switch -q -`.env(env).quiet();
+
+    return head.trim();
+  };
+
   // The afterClone callback runs between the caller's checkout and the sync, as a merge that lands
   // while the run waits in its queue does.
   const runSync = async (
@@ -213,6 +231,7 @@ async function setupTest() {
     readBranchHead,
     readToolsHead,
     writeToolsCommit,
+    writeSideCommit,
     writeRemoteOnlyCommit,
     readBranchNames,
     readCommitSubjects,
@@ -977,27 +996,21 @@ test('it refuses a commit that is not on main of zgeoff/tools and pushes nothing
   await ctx.writeManifestCommit([]);
   await ctx.writeSource('sync/editorconfig', 'root = true\n');
 
-  const exitCode = await ctx.runSync(
-    [
-      {
-        name: 'editorconfig',
-        description: 'The editor config',
-        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
-      },
-    ],
-    { TOOLS_REF: 'fedcba9876543210fedcba9876543210fedcba98' },
-  );
+  const entry = {
+    name: 'editorconfig',
+    description: 'The editor config',
+    files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+  };
 
+  const side = await ctx.writeSideCommit([entry]);
+  const exitCode = await ctx.runSync([entry], { TOOLS_REF: side });
   const branches = await ctx.readBranchNames();
   const pulls = await ctx.readPullRequests();
 
   expect(exitCode).toBe(1);
   expect(branches).toStrictEqual(['main']);
   expect(pulls).toStrictEqual([]);
-
-  expect(ctx.output).toStrictEqual([
-    '::error::fedcba9876543210fedcba9876543210fedcba98 is not a commit on main of zgeoff/tools\n',
-  ]);
+  expect(ctx.output).toStrictEqual([`::error::${side} is not a commit on main of zgeoff/tools\n`]);
 });
 
 test('it reports the path and cause of a copy that fails before it leaves the entry out', async () => {
