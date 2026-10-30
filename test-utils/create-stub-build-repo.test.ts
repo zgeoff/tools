@@ -1,18 +1,22 @@
-import { expect, mock, test } from 'bun:test';
+import { expect, mock, onTestFinished, test } from 'bun:test';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { buildSteppingClock } from './build-stepping-clock.ts';
 import { createStubBuildRepo } from './create-stub-build-repo.ts';
-import type { TemplateFiles } from './template-files.ts';
+import { templateFiles } from './template-files.ts';
 import type { TestProcesses } from './test-processes.ts';
 
-function setupTest() {
+async function setupTest() {
+  const directory = await mkdtemp(join(tmpdir(), 'stub-build-repo-'));
+
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+
   const clock = buildSteppingClock();
 
   return {
-    files: {
-      createDirectories: mock<TemplateFiles['createDirectories']>(() => Promise.resolve()),
-      readFile: mock<TemplateFiles['readFile']>(),
-      writeFile: mock<TemplateFiles['writeFile']>(() => Promise.resolve()),
-    },
+    repoRoot: join(directory, 'notes-app'),
+    markerPath: join(directory, 'marker.txt'),
     processes: {
       readGroupID: mock<TestProcesses['readGroupID']>(() => 5120),
       signalGroup: mock<TestProcesses['signalGroup']>(() => {}),
@@ -24,56 +28,50 @@ function setupTest() {
 }
 
 test("it writes a build:browser script that passes the marker file and the build's process ID file", async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
-  await createStubBuildRepo('/work/notes-app', '/work/marker.txt', ctx.processes, ctx.files);
+  await createStubBuildRepo(ctx.repoRoot, ctx.markerPath, ctx.processes, templateFiles);
 
-  const [path, text] = ctx.files.writeFile.mock.calls[0] ?? [];
-  const manifest: unknown = JSON.parse(text ?? 'null');
+  const manifestText = await readFile(join(ctx.repoRoot, 'package.json'), 'utf8');
 
-  expect(ctx.files.createDirectories).toHaveBeenCalledExactlyOnceWith('/work/notes-app');
-  expect(path).toBe('/work/notes-app/package.json');
+  const manifest: unknown = JSON.parse(manifestText);
 
   expect(manifest).toStrictEqual({
     scripts: {
-      'build:browser': expect.stringMatching(
-        /'--marker' '\/work\/marker\.txt' '--pid-file' '\/work\/notes-app\/build\.pid'$/u,
+      'build:browser': expect.toEndWith(
+        `'--marker' '${ctx.markerPath}' '--pid-file' '${join(ctx.repoRoot, 'build.pid')}'`,
       ),
     },
   });
 });
 
 test("it sends SIGKILL to the group of the process ID that the build's file holds", async () => {
-  const ctx = setupTest();
-
-  ctx.files.readFile.mockResolvedValue(new TextEncoder().encode('4417'));
+  const ctx = await setupTest();
 
   const repo = await createStubBuildRepo(
-    '/work/notes-app',
-    '/work/marker.txt',
+    ctx.repoRoot,
+    ctx.markerPath,
     ctx.processes,
-    ctx.files,
+    templateFiles,
   );
+
+  await writeFile(join(ctx.repoRoot, 'build.pid'), '4417');
 
   await repo.stop();
 
-  expect(ctx.files.readFile).toHaveBeenCalledExactlyOnceWith('/work/notes-app/build.pid');
   expect(ctx.processes.readGroupID).toHaveBeenCalledExactlyOnceWith(4417);
   expect(ctx.processes.signalGroup).toHaveBeenCalledExactlyOnceWith(5120, 'SIGKILL');
   expect(ctx.processes.probeGroup).toHaveBeenCalledExactlyOnceWith(5120);
 });
 
 test('it stops nothing when no build wrote its process ID file', async () => {
-  const missing = Object.assign(new Error('no such file'), { code: 'ENOENT' });
-  const ctx = setupTest();
-
-  ctx.files.readFile.mockRejectedValue(missing);
+  const ctx = await setupTest();
 
   const repo = await createStubBuildRepo(
-    '/work/notes-app',
-    '/work/marker.txt',
+    ctx.repoRoot,
+    ctx.markerPath,
     ctx.processes,
-    ctx.files,
+    templateFiles,
   );
 
   await repo.stop();
@@ -83,17 +81,18 @@ test('it stops nothing when no build wrote its process ID file', async () => {
 });
 
 test('it stops nothing when the process of the ID has exited', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
-  ctx.files.readFile.mockResolvedValue(new TextEncoder().encode('4417'));
   ctx.processes.readGroupID.mockReturnValue(null);
 
   const repo = await createStubBuildRepo(
-    '/work/notes-app',
-    '/work/marker.txt',
+    ctx.repoRoot,
+    ctx.markerPath,
     ctx.processes,
-    ctx.files,
+    templateFiles,
   );
+
+  await writeFile(join(ctx.repoRoot, 'build.pid'), '4417');
 
   await repo.stop();
 
@@ -101,34 +100,34 @@ test('it stops nothing when the process of the ID has exited', async () => {
 });
 
 test('it fails when it cannot read the process ID file', async () => {
-  const denied = Object.assign(new Error('permission denied'), { code: 'EACCES' });
-  const ctx = setupTest();
-
-  ctx.files.readFile.mockRejectedValue(denied);
+  const ctx = await setupTest();
 
   const repo = await createStubBuildRepo(
-    '/work/notes-app',
-    '/work/marker.txt',
+    ctx.repoRoot,
+    ctx.markerPath,
     ctx.processes,
-    ctx.files,
+    templateFiles,
   );
+
+  await mkdir(join(ctx.repoRoot, 'build.pid'));
 
   const failure = await repo.stop().then(
     () => null,
     (error: unknown) => error,
   );
 
-  expect(failure).toBe(denied);
+  expect(failure).toMatchObject({ code: 'EISDIR' });
+  expect(ctx.processes.signalGroup).not.toHaveBeenCalled();
 });
 
 test('it fails to read a start that the build never reports', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
   const repo = await createStubBuildRepo(
-    '/work/notes-app',
-    '/work/marker.txt',
+    ctx.repoRoot,
+    ctx.markerPath,
     ctx.processes,
-    ctx.files,
+    templateFiles,
   );
 
   const failure = await repo
