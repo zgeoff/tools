@@ -37,7 +37,8 @@ its plugin.
    path names, whatever its lane. Paths that select none of the lane's files fail the run with exit
    code 1, so a mistyped path never passes as a run with no tests. A lane with no test files and no
    paths exits 0.
-3. `stop` cleans up, whether the tests passed, failed or never started.
+3. `stop` cleans up, whether the tests passed, failed or never started. When `start` or `run` fails
+   and `stop` fails too, rig reports both errors, the first failure first.
 
 `rig` turns SIGINT, SIGTERM and SIGHUP into an abort. Every command rig starts runs in a process
 group of its own, because a test can start a process that a signal to `bun test` alone leaves

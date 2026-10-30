@@ -99,3 +99,45 @@ test('it stops when start fails', async () => {
   expect(failure).toHaveProperty('message', expect.stringContaining('the kiln did not start'));
   expect(ctx.calls).toStrictEqual(['start', 'stop']);
 });
+
+test('it keeps the start failure first, beside the stop failure, when both fail', async () => {
+  const ctx = setupTest();
+
+  const startFailure = new Error('the kiln did not start');
+  const stopFailure = new Error('the kiln did not cool down');
+
+  ctx.hooks.start.mockRejectedValue(startFailure);
+  ctx.hooks.stop.mockRejectedValue(stopFailure);
+
+  const failure = await runLaneHooks([], ctx.hooks).catch((error: unknown) => error);
+
+  expect(failure).toBeInstanceOf(AggregateError);
+  expect(failure).toHaveProperty('errors', [startFailure, stopFailure]);
+});
+
+test('it keeps the run failure first, beside the stop failure, when both fail', async () => {
+  const ctx = setupTest();
+
+  const runFailure = new Error('the process group still runs');
+  const stopFailure = new Error('the kiln did not cool down');
+
+  ctx.hooks.run.mockRejectedValue(runFailure);
+  ctx.hooks.stop.mockRejectedValue(stopFailure);
+
+  const failure = await runLaneHooks([], ctx.hooks).catch((error: unknown) => error);
+
+  expect(failure).toBeInstanceOf(AggregateError);
+  expect(failure).toHaveProperty('errors', [runFailure, stopFailure]);
+});
+
+test('it fails with the stop failure alone when the tests ran', async () => {
+  const ctx = setupTest();
+
+  const stopFailure = new Error('the kiln did not cool down');
+
+  ctx.hooks.stop.mockRejectedValue(stopFailure);
+
+  const failure = await runLaneHooks([], ctx.hooks).catch((error: unknown) => error);
+
+  expect(failure).toBe(stopFailure);
+});
