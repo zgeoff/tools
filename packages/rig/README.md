@@ -29,7 +29,9 @@ bunx rig init
 ```
 
 `rig` runs under Bun. It runs each command under [`@zgeoff/diet`](../diet/README.md), a dependency,
-so a run that outgrows its memory budget fails alone.
+so a run that outgrows its memory budget fails alone when `diet` finds a
+[cap mode](../../docs/architecture/memory-caps.md#the-modes) that the host supports. With
+`DIET_MODE=none`, or on a host with no supported mode, the command runs uncapped.
 
 ## Commands
 

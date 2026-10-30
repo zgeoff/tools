@@ -46,7 +46,9 @@ actionlint or actionlint fails, and it prints each fault as a warning and passes
 
 Each job that calls a package script runs it through the `memory-capped` script, which the entry's
 build points at the [memory-cap script](./memory-caps.md) with the host's memory budget as the cap.
-A job that outgrows the host then fails alone, and every job prints its peak memory.
+In a [mode](./memory-caps.md#the-modes) that caps, a job that outgrows the host fails alone, and
+every job prints its peak memory. With `MEMORY_CAP_MODE=none`, or on a host with no supported mode,
+the job runs uncapped.
 
 ## The related tests
 
