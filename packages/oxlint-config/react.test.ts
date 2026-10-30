@@ -9,19 +9,6 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const baseConfig = join(import.meta.dir, 'oxlintrc.json');
-  const overlay = join(import.meta.dir, 'react.json');
-
-  await writeFile(
-    join(directory, 'bare.json'),
-    JSON.stringify({ extends: [baseConfig], plugins: ['react'] }),
-  );
-
-  await writeFile(
-    join(directory, 'layered.json'),
-    JSON.stringify({ extends: [baseConfig, overlay] }),
-  );
-
   return { directory };
 }
 
@@ -40,6 +27,18 @@ test.each([
   async (rule, source) => {
     const ctx = await setupTest();
 
+    const baseConfig = join(import.meta.dir, 'oxlintrc.json');
+
+    await writeFile(
+      join(ctx.directory, 'bare.json'),
+      JSON.stringify({ extends: [baseConfig], plugins: ['react'] }),
+    );
+
+    await writeFile(
+      join(ctx.directory, 'layered.json'),
+      JSON.stringify({ extends: [baseConfig, join(import.meta.dir, 'react.json')] }),
+    );
+
     await writeFile(join(ctx.directory, 'panel.tsx'), source);
 
     const bareRun = await runOxlint(['-c', 'bare.json', 'panel.tsx'], ctx.directory);
@@ -55,6 +54,13 @@ test('it turns on the react plugin', async () => {
     "export function Panel() {\n  return ['tea', 'milk'].map((name) => <span>{name}</span>);\n}\n";
 
   const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'layered.json'),
+    JSON.stringify({
+      extends: [join(import.meta.dir, 'oxlintrc.json'), join(import.meta.dir, 'react.json')],
+    }),
+  );
 
   await writeFile(join(ctx.directory, 'panel.tsx'), source);
 
