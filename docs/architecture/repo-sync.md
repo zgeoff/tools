@@ -23,10 +23,12 @@ flowchart LR
 ```
 
 A green `main` is the release gate. When a `Main` push run on `main` passes, the
-[sync-dispatch workflow](../../.github/workflows/sync-dispatch.yml) compares the commit with the
-last green commit before it. When the change touches the manifest or a source that either manifest
-lists, the workflow sends a `repository_dispatch` event, `zgeoff-tools-sync`, to every repo that the
-sync App can reach, with the commit in `client_payload.sha`. A `zgeoff-skills-sync` event from
+[sync-dispatch workflow](../../.github/workflows/sync-dispatch.yml) diffs `main` from the green
+commit before that run's commit up to the newest green commit. When the diff touches the manifest or
+a source that either manifest lists, the workflow sends a `repository_dispatch` event,
+`zgeoff-tools-sync`, to every repo that the sync App can reach, with the newest green commit in
+`client_payload.sha`. Two green runs that finish in either order cover every commit between them,
+because each run checks from the commit before its own. A `zgeoff-skills-sync` event from
 zgeoff/skills sends the newest green commit with no check. The dispatch needs only the App's
 contents write.
 
@@ -42,8 +44,10 @@ request and moves no pin. Renovate never moves these refs: the shared preset tur
 because it would read the commit as a digest of `main` to bump.
 
 A run from any other trigger, the stub's daily run, a push that changes the stub, or a manual run,
-syncs the pinned commit. Runs of one repo queue rather than cancel, and a run whose commit is older
-than the commit the open sync pull request pins leaves that pull request alone.
+syncs the newest green commit on `main`. GitHub keeps one pending run per concurrency group and
+drops the others, so a dispatch can be lost, and the next daily run delivers what it carried. A run
+whose commit is older than the commit that the repo's `main` or its open sync pull request pins
+changes nothing, so dispatches may arrive in any order.
 
 The step scripts of a run come from the pinned commit, never from `ref`, so a change to the scripts
 reaches a repo once its next sync pull request merges.

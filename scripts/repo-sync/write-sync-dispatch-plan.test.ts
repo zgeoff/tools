@@ -169,10 +169,10 @@ test('it sends the newest green commit for a dispatch from another repo', async 
   expect(outputs).toBe(`send=true\ncommit=${commit}\n`);
 });
 
-test('it sends nothing for a run whose commit a newer green commit replaces', async () => {
+test('it sends the newest green commit from the run of an older one that changed a synced source', async () => {
   const ctx = await setupTest();
 
-  const older = await ctx.writeToolsCommit({
+  const first = await ctx.writeToolsCommit({
     'sync/manifest.json': JSON.stringify([
       {
         name: 'skill-demo',
@@ -180,13 +180,15 @@ test('it sends nothing for a run whose commit a newer green commit replaces', as
         files: [{ source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' }],
       },
     ]),
+    'sync/skills/demo/SKILL.md': '# Demo\n',
   });
 
-  const newer = await ctx.writeToolsCommit({ 'sync/manifest.json': '[]' });
+  const synced = await ctx.writeToolsCommit({ 'sync/skills/demo/SKILL.md': '# Demo, changed\n' });
+  const unrelated = await ctx.writeToolsCommit({ 'packages/std/README.md': '# std\n' });
 
-  await ctx.plan('workflow_run', older, [newer, older]);
+  await ctx.plan('workflow_run', synced, [unrelated, synced, first]);
 
   const outputs = await ctx.readOutputs();
 
-  expect(outputs).toBe('send=false\ncommit=\n');
+  expect(outputs).toBe(`send=true\ncommit=${unrelated}\n`);
 });

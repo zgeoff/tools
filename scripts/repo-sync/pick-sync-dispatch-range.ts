@@ -15,7 +15,8 @@ export type SyncDispatchRange =
   | { readonly kind: 'range'; readonly commit: string; readonly previous: string | null };
 
 // A newer push cancels the checks of an older one, so a commit can land with no green run of its
-// own. The range from the last green commit before the run covers every commit in between.
+// own. Each run checks from the green commit before its own up to the newest one, so the runs of
+// two green commits cover every commit between them in whatever order they finish.
 export function pickSyncDispatchRange(facts: Readonly<SyncDispatchFacts>): SyncDispatchRange {
   const [newest] = facts.greenCommits;
 
@@ -31,14 +32,9 @@ export function pickSyncDispatchRange(facts: Readonly<SyncDispatchFacts>): SyncD
 
   const position = facts.greenCommits.indexOf(facts.runCommit);
 
-  if (position > 0) {
-    return {
-      kind: 'skip',
-      reason: `${newest} is a newer green commit than ${facts.runCommit}, and its run dispatches`,
-    };
+  if (position === -1 || newest === undefined) {
+    return { kind: 'range', commit: facts.runCommit, previous: newest ?? null };
   }
 
-  const previous = facts.greenCommits.find((commit) => commit !== facts.runCommit) ?? null;
-
-  return { kind: 'range', commit: facts.runCommit, previous };
+  return { kind: 'range', commit: newest, previous: facts.greenCommits[position + 1] ?? null };
 }

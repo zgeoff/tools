@@ -11,8 +11,8 @@
 # that changes a synced file sends this repository a repository_dispatch event
 # with its commit, and the run syncs that commit's files. The sync pull request
 # moves the pin to that commit, and merges on green checks. A run from any other
-# trigger syncs the pinned commit. The daily run also opens an issue when the
-# sync pull request is red for more than a day.
+# trigger syncs the newest green commit on main there. Each run also opens an
+# issue when the sync pull request is red for more than a day.
 name: Repo sync
 
 on:
@@ -26,11 +26,11 @@ on:
     - cron: 0 6 * * *
   workflow_dispatch:
 
-# Runs queue rather than cancel, so a scheduled run never cancels the run of a
-# dispatch. A run from an older commit leaves the pull request of a newer one
-# alone.
+# No run cancels another, so a scheduled run never cancels the run of a
+# dispatch. A run from an older commit than this repository already pins, on
+# main or in the open sync pull request, changes nothing.
 concurrency:
-  group: repo-sync-caller-${{ github.ref }}
+  group: repo-sync-caller-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:

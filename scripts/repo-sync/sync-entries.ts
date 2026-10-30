@@ -85,6 +85,7 @@ export async function syncEntries(options: Readonly<SyncEntriesOptions>): Promis
   const verdict = await readSyncCommitVerdict(context, {
     commit: context.commit,
     branch: context.branch,
+    base: context.base,
   });
 
   if (verdict.kind === 'refused') {
@@ -95,7 +96,7 @@ export async function syncEntries(options: Readonly<SyncEntriesOptions>): Promis
 
   if (verdict.kind === 'superseded') {
     options.writeOutput(
-      `Pull request #${verdict.number} already syncs ${verdict.pin}, which is newer than ${context.commit}; nothing to do.\n`,
+      `${verdict.holder} already pins ${verdict.pin}, which is newer than ${context.commit}; nothing to do.\n`,
     );
 
     return 0;

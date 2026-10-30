@@ -10,11 +10,13 @@
 # one more commit, as docs/architecture/repo-sync.md describes.
 #
 # Callers pin this workflow to a commit on main, and the run syncs the files of
-# the commit that `ref` names, or of the pinned commit when `ref` is empty. The
+# the commit that `ref` names, or of the newest green commit on main when `ref`
+# is empty, so a dispatch that GitHub drops still arrives with the next run. The
 # sync-dispatch workflow here sends each caller a repository_dispatch event with
 # the commit of each green main that changes a synced source, and the caller
 # passes that commit as `ref`. The run refuses a commit that is not on main, and
-# leaves alone an open pull request that syncs a newer commit. The pull request
+# leaves the repo alone when its main or its open pull request already pins a
+# newer commit. The pull request
 # pins every call to a workflow here, in the caller's own workflows too, to the
 # commit it syncs from.
 #
@@ -45,7 +47,7 @@ on:
     inputs:
       ref:
         description:
-          Commit on main of zgeoff/tools to sync from; empty reads the commit of this workflow
+          Commit on main of zgeoff/tools to sync from; empty reads the newest green commit
         type: string
         required: false
         default: ''
@@ -74,15 +76,8 @@ jobs:
       contents: read
     outputs:
       entries: ${{ steps.manifest.outputs.entries }}
+      ref: ${{ steps.ref.outputs.ref }}
     steps:
-      - name: Check out the manifest
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: zgeoff/tools
-          ref: ${{ inputs.ref || job.workflow_sha }}
-          sparse-checkout: sync/manifest.json
-          sparse-checkout-cone-mode: false
-
       # The step scripts download from the commit of this workflow, whatever
       # ref names, so the run syncs through the scripts of the caller's pin.
       # actionlint does not know job.workflow_repository or job.workflow_sha,
@@ -108,6 +103,22 @@ jobs:
       - name: Download the sync scripts
         env: *tools-url
         run: bun "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts" repo-sync
+
+      - name: Pick the commit to sync
+        id: ref
+        env:
+          REF: ${{ inputs.ref }}
+          WORKFLOW_COMMIT: ${{ job.workflow_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/write-sync-ref.ts"
+
+      - name: Check out the manifest
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: zgeoff/tools
+          ref: ${{ steps.ref.outputs.ref }}
+          sparse-checkout: sync/manifest.json
+          sparse-checkout-cone-mode: false
 
       - name: Drop the skipped and the unrequested entries
         id: manifest
@@ -153,7 +164,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: zgeoff/tools
-          ref: ${{ inputs.ref || job.workflow_sha }}
+          ref: ${{ needs.prepare.outputs.ref }}
           path: .repo-sync
           persist-credentials: false
           # The earlier manifests in the history name the files to delete, and
@@ -214,7 +225,7 @@ jobs:
           ENTRIES: ${{ needs.prepare.outputs.entries }}
           BRANCH: repo-sync/zgeoff-tools
           MARKER: repo-sync delivers this file from zgeoff/tools
-          TOOLS_REF: ${{ inputs.ref || job.workflow_sha }}
+          TOOLS_REF: ${{ needs.prepare.outputs.ref }}
           REPO: ${{ github.repository }}
           SKIP: ${{ inputs.skip }}
           BASE: ${{ github.ref_name }}

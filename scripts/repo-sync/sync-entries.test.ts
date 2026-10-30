@@ -915,7 +915,7 @@ test('it leaves the open pull request alone when it already syncs a newer commit
   expect(headAfter).toBe(headBefore);
 
   expect(ctx.output).toContain(
-    `Pull request #1 already syncs ${newer}, which is newer than ${older}; nothing to do.\n`,
+    `Pull request #1 already pins ${newer}, which is newer than ${older}; nothing to do.\n`,
   );
 });
 
@@ -1290,5 +1290,44 @@ test('it leaves auto-merge off when the open pull request merges into another br
 
   expect(ctx.output).toContain(
     '::warning::Pull request #1 merges into main, not feature, which the run synced from, so it waits for review.\n',
+  );
+});
+
+test('it leaves the repo alone when its own pin is newer than the commit it was sent', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  const entry = {
+    name: 'editorconfig',
+    description: 'The editor config',
+    files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+  };
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const older = await ctx.writeToolsCommit();
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n\n[*]\nindent_style = space\n');
+
+  const newer = await ctx.writeToolsCommit();
+
+  await ctx.writeBranch(
+    'main',
+    '.github/workflows/repo-sync.yml',
+    `jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@${newer} # main\n`,
+  );
+
+  const exitCode = await ctx.runSync([entry], { TOOLS_REF: older });
+  const branches = await ctx.readBranchNames();
+  const pulls = await ctx.readPullRequests();
+
+  expect(exitCode).toBe(0);
+  expect(branches).toStrictEqual(['main']);
+  expect(pulls).toStrictEqual([]);
+
+  expect(ctx.output).toContain(
+    `main already pins ${newer}, which is newer than ${older}; nothing to do.\n`,
   );
 });

@@ -8,12 +8,21 @@ export interface SyncCommitRequest {
 
   // The sync branch, whose open pull request may already sync a newer commit.
   readonly branch: string;
+
+  // The branch the caller checked out, whose workflows may already pin a newer commit.
+  readonly base: string;
 }
 
 export type SyncCommitVerdict =
   | { readonly kind: 'current' }
   | { readonly kind: 'refused'; readonly message: string }
-  | { readonly kind: 'superseded'; readonly number: string; readonly pin: string };
+  | {
+      readonly kind: 'superseded';
+
+      // The base branch or the open pull request that already pins the newer commit.
+      readonly holder: string;
+      readonly pin: string;
+    };
 
 // Anyone who can push to the caller can send a dispatch, and GitHub serves a fork's commit through
 // this repository, so only a commit on main may run its manifest's builds.
@@ -36,6 +45,13 @@ export async function readSyncCommitVerdict(
       kind: 'refused',
       message: `${request.commit} is not a commit on main of zgeoff/tools`,
     };
+  }
+
+  const basePin = await readPin(context, 'HEAD');
+  const isBaseNewer = await probeNewerPin(context, request.commit, basePin);
+
+  if (isBaseNewer && basePin !== null) {
+    return { kind: 'superseded', holder: request.base, pin: basePin };
   }
 
   const listed = await runCheckedCommand(
@@ -62,10 +78,48 @@ export async function readSyncCommitVerdict(
     return { kind: 'current' };
   }
 
-  const pin = await readBranchPin(context, request.branch);
+  const fetched = await runProbe(context, ['git', 'fetch', '-q', 'origin', request.branch]);
 
-  if (pin === null || pin === request.commit) {
-    return { kind: 'current' };
+  const branchPin = fetched.exitCode === 0 ? await readPin(context, 'FETCH_HEAD') : null;
+
+  const isBranchNewer = await probeNewerPin(context, request.commit, branchPin);
+
+  return isBranchNewer && branchPin !== null
+    ? { kind: 'superseded', holder: `Pull request #${number}`, pin: branchPin }
+    : { kind: 'current' };
+}
+
+function runProbe(context: SyncCommandContext, argv: readonly string[]): Promise<CommandResult> {
+  return context.runCommand(argv, { cwd: context.cwd, env: context.env });
+}
+
+// The commit that the tree's zgeoff/tools workflow calls pin, or null when it pins none.
+async function readPin(context: SyncCommandContext, tree: string): Promise<string | null> {
+  const found = await runProbe(context, [
+    'git',
+    'grep',
+    '-h',
+    '-o',
+    '-E',
+    String.raw`zgeoff/tools/\.github/workflows/[^@[:space:]]+@[0-9a-f]{40}`,
+    tree,
+    '--',
+    '.github/workflows',
+  ]);
+
+  const pin = /@(?<commit>[0-9a-f]{40})/u.exec(found.stdout)?.groups?.['commit'];
+
+  return pin ?? null;
+}
+
+// Whether the pin is a commit of zgeoff/tools that holds the commit and is not the commit itself.
+async function probeNewerPin(
+  context: SyncCommandContext,
+  commit: string,
+  pin: string | null,
+): Promise<boolean> {
+  if (pin === null || pin === commit) {
+    return false;
   }
 
   const older = await runProbe(context, [
@@ -74,39 +128,9 @@ export async function readSyncCommitVerdict(
     '.repo-sync',
     'merge-base',
     '--is-ancestor',
-    request.commit,
+    commit,
     pin,
   ]);
 
-  return older.exitCode === 0 ? { kind: 'superseded', number, pin } : { kind: 'current' };
-}
-
-function runProbe(context: SyncCommandContext, argv: readonly string[]): Promise<CommandResult> {
-  return context.runCommand(argv, { cwd: context.cwd, env: context.env });
-}
-
-// The commit that the open sync branch pins its zgeoff/tools workflow calls to, or null when the
-// branch pins none.
-async function readBranchPin(context: SyncCommandContext, branch: string): Promise<string | null> {
-  const fetched = await runProbe(context, ['git', 'fetch', '-q', 'origin', branch]);
-
-  if (fetched.exitCode !== 0) {
-    return null;
-  }
-
-  const found = await runProbe(context, [
-    'git',
-    'grep',
-    '-h',
-    '-o',
-    '-E',
-    String.raw`zgeoff/tools/\.github/workflows/[^@[:space:]]+@[0-9a-f]{40}`,
-    'FETCH_HEAD',
-    '--',
-    '.github/workflows',
-  ]);
-
-  const pin = /@(?<commit>[0-9a-f]{40})/u.exec(found.stdout)?.groups?.['commit'];
-
-  return pin ?? null;
+  return older.exitCode === 0;
 }

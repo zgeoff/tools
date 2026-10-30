@@ -3,11 +3,12 @@
 # repo-sync caller then syncs the files of that commit, as
 # docs/architecture/repo-sync.md describes.
 #
-# A green Main push run on main sends its commit when a synced source changed
-# since the last green commit. A zgeoff-skills-sync event, which zgeoff/skills
-# sends here, sends the newest green commit with no check. The job mints the
-# sync App's token from the REPO_SYNC_APP_CLIENT_ID and REPO_SYNC_APP_PRIVATE_KEY
-# secrets, and a dispatch needs only its contents write.
+# A green Main push run on main sends the newest green commit when a synced
+# source changed between the green commit before its own and that commit. A
+# zgeoff-skills-sync event, which zgeoff/skills sends here, sends the newest
+# green commit with no check. The job mints the sync App's token from the
+# REPO_SYNC_APP_CLIENT_ID and REPO_SYNC_APP_PRIVATE_KEY secrets, and a dispatch
+# needs only its contents write.
 name: Sync dispatch
 
 on:
@@ -30,10 +31,9 @@ jobs:
       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Dispatches go out in the order of the commits they send.
-    concurrency:
-      group: sync-dispatch
-      cancel-in-progress: false
+    # No concurrency group: GitHub keeps one pending run per group and drops the
+    # others, and a dropped run's range would go unchecked. A repo skips a commit
+    # older than one it already pins, so the order of the dispatches is free.
     permissions:
       contents: read
       actions: read

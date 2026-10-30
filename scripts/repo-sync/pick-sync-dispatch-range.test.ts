@@ -50,19 +50,21 @@ test('it ranges from no commit when main has no other green commit', () => {
   });
 });
 
-test('it skips a run whose commit a newer green commit replaces', () => {
+test('it ranges from the green commit before the run up to the newest green commit', () => {
   const range = pickSyncDispatchRange({
     event: 'workflow_run',
     runCommit: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     greenCommits: [
       'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
       'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      '9999999999999999999999999999999999999999',
     ],
   });
 
   expect(range).toStrictEqual({
-    kind: 'skip',
-    reason: `bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb is a newer green commit than aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, and its run dispatches`,
+    kind: 'range',
+    commit: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    previous: '9999999999999999999999999999999999999999',
   });
 });
 
