@@ -46,9 +46,11 @@ because it would read the commit as a digest of `main` to bump.
 
 A run from any other trigger, the stub's daily run, a push that changes the stub, or a manual run,
 syncs the newest green commit on `main`. GitHub keeps one pending run per concurrency group and
-drops the others, so a dispatch can be lost, and the next daily run delivers what it carried. A run
-whose commit is older than the commit that the repo's `main` or its open sync pull request pins
-changes nothing, so dispatches may arrive in any order.
+drops the others, so a dispatch can be lost, and the next daily run delivers what it carried. When
+the Actions API fails or lists no green run, the run warns and syncs the commit the repo pins, so
+that day's run delivers nothing and the lost change waits for a run that reads the API. A run whose
+commit is older than the commit that the repo's `main` or its open sync pull request pins changes
+nothing, so dispatches may arrive in any order.
 
 The step scripts of a run come from the pinned commit, never from `ref`, so a change to the scripts
 reaches a repo once its next sync pull request merges.
