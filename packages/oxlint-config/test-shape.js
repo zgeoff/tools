@@ -2,6 +2,7 @@ import { basename } from 'node:path';
 import bannedTestCalls from './banned-test-calls.js';
 import findBunTestName from './find-bun-test-name.js';
 import findChainRoot from './find-chain-root.js';
+import findStaticKey from './find-static-key.js';
 import getImportedName from './get-imported-name.js';
 import isBunTestFile from './is-bun-test-file.js';
 
@@ -33,8 +34,8 @@ const testShape = {
       CallExpression(node) {
         emitCallShape(context, node);
       },
-      "MemberExpression[computed=false][property.name='toEqual']"(node) {
-        if (isBunTestRoot(context, node.object, 'expect')) {
+      MemberExpression(node) {
+        if (findStaticKey(node) === 'toEqual' && isBunTestRoot(context, node.object, 'expect')) {
           context.report({ node: node.property, messageId: 'toEqual' });
         }
       },

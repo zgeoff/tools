@@ -43,6 +43,7 @@
     "is-bun-test-file.js",
     "find-bun-test-name.js",
     "find-chain-root.js",
+    "find-static-key.js",
     "import-zones.js",
     "import-zones-schema.js",
     "import-zones-entry.js",

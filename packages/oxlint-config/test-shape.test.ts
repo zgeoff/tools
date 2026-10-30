@@ -78,6 +78,16 @@ test.each([
     '`toEqual` is banned',
   ],
   [
+    'a toEqual matcher read by a string key',
+    "import { expect, test } from 'bun:test';\n\ntest('it boils', () => {\n  expect({ cups: 2 })['toEqual']({ cups: 2 });\n});\n",
+    '`toEqual` is banned',
+  ],
+  [
+    'a toEqual matcher read by a template key',
+    "import { expect, test } from 'bun:test';\n\ntest('it boils', () => {\n  expect({ cups: 2 })[`toEqual`]({ cups: 2 });\n});\n",
+    '`toEqual` is banned',
+  ],
+  [
     'a negated toEqual matcher',
     "import { expect, test } from 'bun:test';\n\ntest('it boils', () => {\n  expect({ cups: 2 }).not.toEqual({ cups: 3 });\n});\n",
     '`toEqual` is banned',
@@ -143,6 +153,10 @@ test.each([
   [
     'a toStrictEqual matcher',
     "test('it boils', () => {\n  expect({ cups: 2 }).toStrictEqual({ cups: 2 });\n});\n",
+  ],
+  [
+    'a matcher read by a computed key',
+    "const matcher = 'toEqual';\n\ntest('it boils', () => {\n  expect({ cups: 2 })[matcher]({ cups: 2 });\n});\n",
   ],
   [
     'a toMatchObject matcher',

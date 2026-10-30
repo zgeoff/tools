@@ -677,6 +677,16 @@ test('it flags a negated and a computed file snapshot matcher', async () => {
   expect(result.stdout).toInclude('sample.ts:5:19');
 });
 
+test('it flags a file snapshot matcher read by a template key', async () => {
+  const source =
+    "import { expect, test } from 'bun:test';\n\ntest('it renders the banner', () => {\n  expect('ready')[`toMatchSnapshot`]();\n});\n";
+
+  const result = await runLint(source, { 'zgeoff/no-file-snapshot': 'error' });
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('sample.ts:4:19');
+});
+
 test('it accepts inline snapshot matchers', async () => {
   const source =
     "import { expect, test } from 'bun:test';\n\ntest('it renders the banner', () => {\n  expect('ready').toMatchInlineSnapshot(`\"ready\"`);\n  expect(() => {\n    throw new Error('late');\n  }).toThrowErrorMatchingInlineSnapshot(`\"late\"`);\n});\n";

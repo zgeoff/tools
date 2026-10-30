@@ -152,7 +152,8 @@ miss a `bun:test` file. The rule reports:
 
 - a call of `describe`, `it`, `beforeAll`, `beforeEach`, `afterAll` or `afterEach`, or of one of
   their modifiers, such as `describe.each` or `describe['only']`;
-- a `toEqual` matcher on a value that `expect` made;
+- a `toEqual` matcher on a value that `expect` made, read by name or by a string key such as
+  `['toEqual']`;
 - a `test()` title, in any modifier or `test.each` form, that starts with neither `it ` nor a
   `#<unit> ` prefix, where the unit may be a dotted path such as `#sessions.enrol`;
 - a `bun:test` import that renames a binding or takes the namespace, so each call reads as the name
