@@ -103,7 +103,8 @@ removes a run folder only when the run's process and every group it recorded hav
 pending records make that decision sound: the sweep removes an exited run's pending records before
 it reads the groups, and a command starts only after it claims its record, so no command of an
 exited run can record a group after the sweep has read the run. A zombie counts as exited, because a
-host whose first process never reaps its orphans keeps them forever.
+host whose first process never reaps its orphans keeps them forever. A process or group that `ps`
+fails to list counts as live, so a failed listing never lets the sweep remove a run.
 
 The lane runs under `diet`, and never under `ulimit -v`. Chrome's V8 sandbox reserves far more
 address space than it uses and stops when it cannot, and no flag turns the sandbox off, so Chrome

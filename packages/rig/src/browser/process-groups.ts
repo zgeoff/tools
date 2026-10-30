@@ -1,5 +1,6 @@
 import { hasErrorCode } from './has-error-code.ts';
 import { isZombieState } from './is-zombie-state.ts';
+import { readProcessTable } from './read-process-table.ts';
 
 export interface ProcessGroups {
   readonly signalGroup: (groupID: number, signal: NodeJS.Signals) => void;
@@ -32,19 +33,13 @@ export const processGroups: ProcessGroups = {
 };
 
 // A signal of 0 also reaches a zombie, which a host whose first process never reaps its orphans
-// keeps forever, so the group counts as live only while a member that is no zombie runs.
+// keeps forever, so the group counts as live only while a member that is no zombie runs. A failed
+// listing leaves the group's state unknown, so it counts as live.
 function probeLiveMember(groupID: number): boolean {
-  const listing = Bun.spawnSync(['ps', '-A', '-o', 'pgid=,stat=']);
+  const table = readProcessTable();
 
-  if (listing.exitCode !== 0) {
-    return true;
-  }
-
-  return listing.stdout
-    .toString()
-    .split('\n')
-    .map((line) => line.trim().split(/\s+/u))
-    .some(
-      ([pgid, state]) => Number(pgid) === groupID && state !== undefined && !isZombieState(state),
-    );
+  return (
+    table === null ||
+    table.some((entry) => entry.groupID === groupID && !isZombieState(entry.state))
+  );
 }
