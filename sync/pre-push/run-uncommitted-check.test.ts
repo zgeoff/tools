@@ -91,12 +91,14 @@ test('it returns a file the push deletes that is restored on disk and left untra
   await ctx.runGit('rm', '--quiet', 'helper.ts');
   await ctx.runGit('commit', '--quiet', '-m', 'remove the helper');
 
+  const onDisk = new Set([join(ctx.repo, 'helper.ts')]);
+
   const changed = runUncommittedCheck({
     cwd: ctx.repo,
     env: ctx.env,
     files: ['helper.ts'],
     runProgram,
-    probeFile: (path) => path === join(ctx.repo, 'helper.ts'),
+    probeFile: (path) => onDisk.has(path),
   });
 
   expect(changed).toStrictEqual(['helper.ts']);
@@ -114,12 +116,14 @@ test('it returns a file the push deletes that is restored on disk under an ignor
   await ctx.runGit('rm', '--quiet', 'build.log');
   await ctx.runGit('commit', '--quiet', '-m', 'remove the log');
 
+  const onDisk = new Set([join(ctx.repo, 'build.log')]);
+
   const changed = runUncommittedCheck({
     cwd: ctx.repo,
     env: ctx.env,
     files: ['build.log'],
     runProgram,
-    probeFile: (path) => path === join(ctx.repo, 'build.log'),
+    probeFile: (path) => onDisk.has(path),
   });
 
   expect(changed).toStrictEqual(['build.log']);
