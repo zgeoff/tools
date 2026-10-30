@@ -8,16 +8,16 @@ test('it splits the flags from the paths, each in its order', () => {
   });
 });
 
-test('it reads the argument after an option that takes a value as that value, not as a path', () => {
-  expect(parseTestArgs(['-t', 'heats up', '--seed', '7', './a.test.ts'])).toStrictEqual({
-    flags: ['-t', 'heats up', '--seed', '7'],
-    paths: ['./a.test.ts'],
+test('it keeps a value joined to its option with = in the flag', () => {
+  expect(parseTestArgs(['--test-name-pattern=heats up', '--timeout=9000'])).toStrictEqual({
+    flags: ['--test-name-pattern=heats up', '--timeout=9000'],
+    paths: [],
   });
 });
 
-test('it reads the word after --bail as a path, because --bail takes its value only after =', () => {
-  expect(parseTestArgs(['--bail', './a.test.ts'])).toStrictEqual({
-    flags: ['--bail'],
-    paths: ['./a.test.ts'],
+test('it reads a word after an option as a path, whatever the option', () => {
+  expect(parseTestArgs(['--seed', '7', '--bail', './a.test.ts'])).toStrictEqual({
+    flags: ['--seed', '--bail'],
+    paths: ['7', './a.test.ts'],
   });
 });
