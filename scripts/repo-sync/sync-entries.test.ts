@@ -1,5 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { chmod, cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
 import { createStubPullRequestGH } from '../../test-utils/create-stub-pull-request-gh.ts';
@@ -989,17 +990,20 @@ test('it refuses a ref that is not a full commit ID and pushes nothing', async (
   expect(ctx.output).toStrictEqual(["::error::the tools ref 'main' is not a full commit ID\n"]);
 });
 
-test('it refuses a commit that is not on main of zgeoff/tools and pushes nothing', async () => {
+test('it refuses a commit that is not on main of zgeoff/tools before any build and pushes nothing', async () => {
   const ctx = await setupTest();
 
   await ctx.writeMainCommit('README.md', '# app\n');
   await ctx.writeManifestCommit([]);
   await ctx.writeSource('sync/editorconfig', 'root = true\n');
 
+  const marker = join(dirname(ctx.origin), 'build-ran');
+
   const entry = {
     name: 'editorconfig',
     description: 'The editor config',
     files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+    build: `touch '${marker}'`,
   };
 
   const side = await ctx.writeSideCommit([entry]);
@@ -1010,6 +1014,7 @@ test('it refuses a commit that is not on main of zgeoff/tools and pushes nothing
   expect(exitCode).toBe(1);
   expect(branches).toStrictEqual(['main']);
   expect(pulls).toStrictEqual([]);
+  expect(existsSync(marker)).toBeFalse();
   expect(ctx.output).toStrictEqual([`::error::${side} is not a commit on main of zgeoff/tools\n`]);
 });
 
@@ -1482,4 +1487,38 @@ test('it opens no pull request when a delivered workflow differs from its source
   expect(exitCode).toBe(0);
   expect(branches).toStrictEqual(['main']);
   expect(pulls).toStrictEqual([]);
+});
+
+test('it refuses the commit and pushes nothing when it cannot read the base from the remote', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const moved = `${ctx.origin}.moved`;
+
+  const exitCode = await ctx.runSync(
+    [
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+      },
+    ],
+    {},
+    () => rename(ctx.origin, moved),
+  );
+
+  await rename(moved, ctx.origin);
+
+  const toolsHead = await ctx.readToolsHead();
+  const branches = await ctx.readBranchNames();
+
+  expect(exitCode).toBe(1);
+  expect(branches).toStrictEqual(['main']);
+
+  expect(ctx.output).toStrictEqual([
+    `::error::Cannot read main from the remote, so the run cannot tell whether ${toolsHead} is older than its pin; the next run tries again.\n`,
+  ]);
 });
