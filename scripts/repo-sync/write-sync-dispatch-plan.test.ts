@@ -2,8 +2,8 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
+import { buildCommandStub } from '../../test-utils/build-command-stub.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
-import type { CommandOptions, CommandResult } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { writeSyncDispatchPlan } from './write-sync-dispatch-plan.ts';
 
@@ -50,8 +50,33 @@ async function setupTest() {
     return head.trim();
   };
 
-  // gh answers with the green commits; git runs for real in the job's checkout.
-  const plan = (event: string, runCommit: string, greenCommits: readonly string[]) =>
+  // git runs for real in the job's checkout, and each test answers the query for green runs.
+  const commands = buildCommandStub({ program: 'git', runCommand });
+
+  const answerGreenCommits = (greenCommits: readonly string[]) => {
+    commands.answer(
+      [
+        'gh',
+        'api',
+        '-X',
+        'GET',
+        'repos/example/tools/actions/workflows/main.yml/runs',
+        '-f',
+        'branch=main',
+        '-f',
+        'event=push',
+        '-f',
+        'status=success',
+        '-f',
+        'per_page=50',
+        '--jq',
+        '.workflow_runs[].head_sha',
+      ],
+      { exitCode: 0, stdout: greenCommits.map((commit) => `${commit}\n`).join(''), stderr: '' },
+    );
+  };
+
+  const plan = (event: string, runCommit: string) =>
     writeSyncDispatchPlan({
       cwd: checkout,
       env,
@@ -60,19 +85,7 @@ async function setupTest() {
       repo: 'example/tools',
       outputPath,
       fileSystem: nodeFileSystem,
-      runCommand: (argv: readonly string[], options: Readonly<CommandOptions>) => {
-        if (argv[0] === 'gh') {
-          const result: CommandResult = {
-            exitCode: 0,
-            stdout: greenCommits.map((commit) => `${commit}\n`).join(''),
-            stderr: '',
-          };
-
-          return Promise.resolve(result);
-        }
-
-        return runCommand(argv, options);
-      },
+      runCommand: commands.runCommand,
       writeOutput: (text) => {
         output.push(text);
       },
@@ -80,7 +93,7 @@ async function setupTest() {
 
   const readOutputs = () => readFile(outputPath, 'utf8');
 
-  return { output, writeToolsCommit, plan, readOutputs };
+  return { output, writeToolsCommit, answerGreenCommits, plan, readOutputs };
 }
 
 test('it sends the run commit when a synced source changed since the last green commit', async () => {
@@ -98,7 +111,10 @@ test('it sends the run commit when a synced source changed since the last green 
   });
 
   const commit = await ctx.writeToolsCommit({ 'sync/skills/demo/SKILL.md': '# Demo, changed\n' });
-  const exitCode = await ctx.plan('workflow_run', commit, [commit, previous]);
+
+  ctx.answerGreenCommits([commit, previous]);
+
+  const exitCode = await ctx.plan('workflow_run', commit);
   const outputs = await ctx.readOutputs();
 
   expect(exitCode).toBe(0);
@@ -120,7 +136,10 @@ test('it sends nothing when only files outside the manifest changed', async () =
   });
 
   const commit = await ctx.writeToolsCommit({ 'packages/std/README.md': '# std\n' });
-  const exitCode = await ctx.plan('workflow_run', commit, [commit, previous]);
+
+  ctx.answerGreenCommits([commit, previous]);
+
+  const exitCode = await ctx.plan('workflow_run', commit);
   const outputs = await ctx.readOutputs();
 
   expect(exitCode).toBe(0);
@@ -147,7 +166,9 @@ test('it sends when a commit drops an entry, so the repos remove the retired cop
 
   const commit = await ctx.writeToolsCommit({ 'sync/manifest.json': '[]' });
 
-  await ctx.plan('workflow_run', commit, [commit, previous]);
+  ctx.answerGreenCommits([commit, previous]);
+
+  await ctx.plan('workflow_run', commit);
 
   const outputs = await ctx.readOutputs();
 
@@ -167,7 +188,9 @@ test('it sends the newest green commit for a dispatch from another repo', async 
     ]),
   });
 
-  await ctx.plan('repository_dispatch', '', [commit]);
+  ctx.answerGreenCommits([commit]);
+
+  await ctx.plan('repository_dispatch', '');
 
   const outputs = await ctx.readOutputs();
 
@@ -191,7 +214,9 @@ test('it sends the newest green commit from the run of an older one that changed
   const synced = await ctx.writeToolsCommit({ 'sync/skills/demo/SKILL.md': '# Demo, changed\n' });
   const unrelated = await ctx.writeToolsCommit({ 'packages/std/README.md': '# std\n' });
 
-  await ctx.plan('workflow_run', synced, [unrelated, synced, first]);
+  ctx.answerGreenCommits([unrelated, synced, first]);
+
+  await ctx.plan('workflow_run', synced);
 
   const outputs = await ctx.readOutputs();
 
