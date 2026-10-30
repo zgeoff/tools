@@ -52,7 +52,44 @@ test('it denies a gated edit through the delivered entry point', async () => {
   });
 });
 
-test('it blocks a gated edit and names the load failure when the repo lacks @zgeoff/skill-gate', async () => {
+test.each([
+  ['a Write to a gated path', 'Write', { file_path: 'guide.md', content: '# Guide\n' }],
+  [
+    'an Edit to a path that no gate matches',
+    'Edit',
+    { file_path: 'notes.txt', old_string: 'draft', new_string: 'final' },
+  ],
+  ['a Write outside the project', 'Write', { file_path: '../notes/guide.md', content: 'x' }],
+  ['a Bash command that writes a gated path', 'Bash', { command: 'echo hello > guide.md' }],
+  [
+    'a Bash command that builds a gated path from a variable',
+    'Bash',
+    { command: 'ext=ts; printf x > packages/core/src/sample.$ext' },
+  ],
+  ['a read-only command chained to a write', 'Bash', { command: 'pwd && rm guide.md' }],
+  ['a read-only command on a line before a write', 'Bash', { command: 'ls\nrm guide.md' }],
+  [
+    'git diff that writes its output to a file',
+    'Bash',
+    { command: 'git diff --no-ext-diff --no-textconv --output=changes.patch' },
+  ],
+  ['bun install that adds a package', 'Bash', { command: 'bun install left-pad' }],
+  ['a plain git diff', 'Bash', { command: 'git diff' }],
+  ['git status', 'Bash', { command: 'git status' }],
+  [
+    'git diff that turns the external diff program back on',
+    'Bash',
+    { command: 'git diff --no-ext-diff --no-textconv --ext-diff' },
+  ],
+  [
+    'git diff that turns the textconv drivers back on',
+    'Bash',
+    { command: 'git diff --no-ext-diff --no-textconv --textconv' },
+  ],
+  ['cat with a glob', 'Bash', { command: 'cat docs/*.md' }],
+  ['cat with a quoted path', 'Bash', { command: "cat 'docs/guide.md'" }],
+  ['a call to a tool with no gate', 'mcp__tracker__read_ticket', { id: 'ENG-12' }],
+])('it blocks %s when the gate cannot load', async (_label, toolName, toolInput) => {
   const ctx = await setupTest();
 
   const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
@@ -63,28 +100,121 @@ test('it blocks a gated edit and names the load failure when the repo lacks @zge
 
   await writeFile(
     join(ctx.directory, '.claude/skill-gate.json'),
-    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
+    JSON.stringify({
+      gates: [
+        { match: '**/*.md', skills: ['docs-writing'] },
+        { match: '**/*.ts', skills: ['code-style'] },
+      ],
+    }),
   );
 
-  const result = spawnSync('bun', [copiedHookPath], {
+  const result = spawnSync('bun', ['--no-install', copiedHookPath], {
     encoding: 'utf8',
     env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
     input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
       cwd: ctx.directory,
       transcript_path: join(ctx.directory, 'transcript.jsonl'),
-      tool_input: { file_path: join(ctx.directory, 'guide.md') },
+      tool_name: toolName,
+      tool_input: toolInput,
     }),
   });
 
-  expect(result.status).toBe(2);
-  expect(result.stdout).toBe('');
+  expect({ status: result.status, stdout: result.stdout }).toStrictEqual({ status: 2, stdout: '' });
 
   expect(result.stderr).toContain(
-    `The skill gate cannot load, so it blocks this edit to ${join(ctx.directory, 'guide.md')}: Cannot find package '@zgeoff/skill-gate'`,
+    `The skill gate cannot load, so it blocks this call to ${toolName}: Cannot find package '@zgeoff/skill-gate'`,
+  );
+
+  expect(result.stderr).toContain('To work here, run bun install.');
+});
+
+test.each([
+  'bun install',
+  'bun install --frozen-lockfile',
+  'git diff --no-ext-diff --no-textconv --stat',
+  'ls packages',
+  'cat package.json',
+  'pwd',
+])('it lets the read-only command %p run when the gate cannot load', async (command) => {
+  const ctx = await setupTest();
+
+  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
+
+  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await mkdir(join(ctx.directory, 'node_modules'));
+  await copyFile(ctx.hookPath, copiedHookPath);
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({
+      gates: [
+        { match: '**/*.md', skills: ['docs-writing'] },
+        { match: '**/*.ts', skills: ['code-style'] },
+      ],
+    }),
+  );
+
+  const result = spawnSync('bun', ['--no-install', copiedHookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      cwd: ctx.directory,
+      transcript_path: join(ctx.directory, 'transcript.jsonl'),
+      tool_name: 'Bash',
+      tool_input: { command },
+    }),
+  });
+
+  expect({ status: result.status, stdout: result.stdout }).toStrictEqual({ status: 1, stdout: '' });
+
+  expect(result.stderr).toContain(
+    "The skill gate cannot load: Cannot find package '@zgeoff/skill-gate'",
   );
 });
 
-test('it blocks a gated edit when the hook command passes --no-install and the repo has no node_modules', async () => {
+test.each(['PostToolUse', 'PostToolUseFailure', 'UserPromptSubmit'])(
+  'it lets a %s event through when the gate cannot load',
+  async (event) => {
+    const ctx = await setupTest();
+
+    const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
+
+    await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+    await mkdir(join(ctx.directory, 'node_modules'));
+    await copyFile(ctx.hookPath, copiedHookPath);
+
+    await writeFile(
+      join(ctx.directory, '.claude/skill-gate.json'),
+      JSON.stringify({
+        gates: [
+          { match: '**/*.md', skills: ['docs-writing'] },
+          { match: '**/*.ts', skills: ['code-style'] },
+        ],
+      }),
+    );
+
+    const result = spawnSync('bun', ['--no-install', copiedHookPath], {
+      encoding: 'utf8',
+      env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+      input: JSON.stringify({
+        hook_event_name: event,
+        cwd: ctx.directory,
+        transcript_path: join(ctx.directory, 'transcript.jsonl'),
+        tool_name: 'Bash',
+        tool_input: { command: 'echo hello > guide.md' },
+      }),
+    });
+
+    expect({ status: result.status, stdout: result.stdout }).toStrictEqual({
+      status: 0,
+      stdout: '',
+    });
+  },
+);
+
+test('it blocks an edit when the hook command passes --no-install and the repo has no node_modules', async () => {
   const ctx = await setupTest();
 
   const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
@@ -94,7 +224,12 @@ test('it blocks a gated edit when the hook command passes --no-install and the r
 
   await writeFile(
     join(ctx.directory, '.claude/skill-gate.json'),
-    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
+    JSON.stringify({
+      gates: [
+        { match: '**/*.md', skills: ['docs-writing'] },
+        { match: '**/*.ts', skills: ['code-style'] },
+      ],
+    }),
   );
 
   const result = spawnSync('bun', ['--no-install', copiedHookPath], {
@@ -103,50 +238,19 @@ test('it blocks a gated edit when the hook command passes --no-install and the r
     input: JSON.stringify({
       cwd: ctx.directory,
       transcript_path: join(ctx.directory, 'transcript.jsonl'),
-      tool_input: { file_path: join(ctx.directory, 'guide.md') },
+      tool_name: 'Write',
+      tool_input: { file_path: join(ctx.directory, 'guide.md'), content: '# Guide\n' },
     }),
   });
 
-  expect(result.status).toBe(2);
-  expect(result.stdout).toBe('');
+  expect({ status: result.status, stdout: result.stdout }).toStrictEqual({ status: 2, stdout: '' });
 
   expect(result.stderr).toContain(
-    `The skill gate cannot load, so it blocks this edit to ${join(ctx.directory, 'guide.md')}: Cannot find package '@zgeoff/skill-gate'`,
+    "The skill gate cannot load, so it blocks this call to Write: Cannot find package '@zgeoff/skill-gate'",
   );
 });
 
-test('it blocks a gated edit to a path relative to cwd when the gate cannot load', async () => {
-  const ctx = await setupTest();
-
-  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
-
-  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
-  await mkdir(join(ctx.directory, 'node_modules'));
-  await copyFile(ctx.hookPath, copiedHookPath);
-
-  await writeFile(
-    join(ctx.directory, '.claude/skill-gate.json'),
-    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
-  );
-
-  const result = spawnSync('bun', [copiedHookPath], {
-    encoding: 'utf8',
-    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
-    input: JSON.stringify({
-      cwd: join(ctx.directory, 'docs'),
-      transcript_path: join(ctx.directory, 'transcript.jsonl'),
-      tool_input: { file_path: 'guide.md' },
-    }),
-  });
-
-  expect(result.status).toBe(2);
-
-  expect(result.stderr).toContain(
-    `The skill gate cannot load, so it blocks this edit to ${join(ctx.directory, 'docs/guide.md')}: Cannot find package '@zgeoff/skill-gate'`,
-  );
-});
-
-test('it blocks a gated edit and names the load failure when a dependency of @zgeoff/skill-gate is missing', async () => {
+test('it blocks an edit and names the load failure when a dependency of @zgeoff/skill-gate is missing', async () => {
   const ctx = await setupTest();
 
   const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
@@ -168,193 +272,11 @@ test('it blocks a gated edit and names the load failure when a dependency of @zg
 
   await writeFile(
     join(ctx.directory, '.claude/skill-gate.json'),
-    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
-  );
-
-  const result = spawnSync('bun', [copiedHookPath], {
-    encoding: 'utf8',
-    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
-    input: JSON.stringify({
-      cwd: ctx.directory,
-      transcript_path: join(ctx.directory, 'transcript.jsonl'),
-      tool_input: { file_path: join(ctx.directory, 'guide.md') },
-    }),
-  });
-
-  expect(result.status).toBe(2);
-  expect(result.stdout).toBe('');
-
-  expect(result.stderr).toContain(
-    `The skill gate cannot load, so it blocks this edit to ${join(ctx.directory, 'guide.md')}: Cannot find package '@zgeoff/std'`,
-  );
-});
-
-test('it blocks an edit inside the project when the gate cannot load and the rules file does not parse', async () => {
-  const ctx = await setupTest();
-
-  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
-
-  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
-  await mkdir(join(ctx.directory, 'node_modules'));
-  await copyFile(ctx.hookPath, copiedHookPath);
-  await writeFile(join(ctx.directory, '.claude/skill-gate.json'), '{ "gates": [');
-
-  const result = spawnSync('bun', [copiedHookPath], {
-    encoding: 'utf8',
-    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
-    input: JSON.stringify({
-      cwd: ctx.directory,
-      transcript_path: join(ctx.directory, 'transcript.jsonl'),
-      tool_input: { file_path: join(ctx.directory, 'src/index.ts') },
-    }),
-  });
-
-  expect(result.status).toBe(2);
-  expect(result.stderr).toContain("Cannot find package '@zgeoff/skill-gate'");
-});
-
-test('it blocks an edit inside the project when the gate cannot load and a gate names no skills', async () => {
-  const ctx = await setupTest();
-
-  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
-
-  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
-  await mkdir(join(ctx.directory, 'node_modules'));
-  await copyFile(ctx.hookPath, copiedHookPath);
-
-  await writeFile(
-    join(ctx.directory, '.claude/skill-gate.json'),
-    JSON.stringify({ gates: [{ match: '**/*.md', skills: [] }] }),
-  );
-
-  const result = spawnSync('bun', [copiedHookPath], {
-    encoding: 'utf8',
-    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
-    input: JSON.stringify({
-      cwd: ctx.directory,
-      transcript_path: join(ctx.directory, 'transcript.jsonl'),
-      tool_input: { file_path: join(ctx.directory, 'src/index.ts') },
-    }),
-  });
-
-  expect(result.status).toBe(2);
-  expect(result.stderr).toContain("Cannot find package '@zgeoff/skill-gate'");
-});
-
-test('it blocks an edit inside the project and names both errors when the gate cannot load or read the rules file', async () => {
-  const ctx = await setupTest();
-
-  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
-  const rulesPath = join(ctx.directory, '.claude/skill-gate.json');
-
-  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
-  await mkdir(join(ctx.directory, 'node_modules'));
-  await copyFile(ctx.hookPath, copiedHookPath);
-
-  // A folder in the file's place fails the read for root too, which a chmod does not.
-  await mkdir(rulesPath);
-
-  const result = spawnSync('bun', [copiedHookPath], {
-    encoding: 'utf8',
-    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
-    input: JSON.stringify({
-      cwd: ctx.directory,
-      transcript_path: join(ctx.directory, 'transcript.jsonl'),
-      tool_input: { file_path: join(ctx.directory, 'src/index.ts') },
-    }),
-  });
-
-  expect(result.status).toBe(2);
-  expect(result.stderr).toContain('The skill gate cannot read .claude/skill-gate.json:');
-
-  expect(result.stderr).toContain(
-    `The skill gate cannot load, so it blocks this edit to ${join(ctx.directory, 'src/index.ts')}: Cannot find package '@zgeoff/skill-gate'`,
-  );
-});
-
-test.each([
-  ['a path that no gate matches', { file_path: 'src/index.ts' }],
-  ['a path that holds an ignore segment', { file_path: 'dist/guide.md' }],
-  ['a path outside the project', { file_path: '../notes/guide.md' }],
-  ['a Bash command that writes a gated path', { command: 'echo hello > guide.md' }],
-])(
-  'it lets %s run with the load error on stderr when the gate cannot load',
-  async (_label, toolInput) => {
-    const ctx = await setupTest();
-
-    const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
-
-    await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
-    await mkdir(join(ctx.directory, 'node_modules'));
-    await copyFile(ctx.hookPath, copiedHookPath);
-
-    await writeFile(
-      join(ctx.directory, '.claude/skill-gate.json'),
-      JSON.stringify({
-        ignore: ['dist/'],
-        gates: [{ match: '**/*.md', skills: ['docs-writing'] }],
-      }),
-    );
-
-    const result = spawnSync('bun', [copiedHookPath], {
-      encoding: 'utf8',
-      env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
-      input: JSON.stringify({
-        cwd: ctx.directory,
-        transcript_path: join(ctx.directory, 'transcript.jsonl'),
-        tool_input: toolInput,
-      }),
-    });
-
-    expect(result.status).toBe(1);
-    expect(result.stdout).toBe('');
-
-    expect(result.stderr).toContain(
-      "The skill gate cannot load: Cannot find package '@zgeoff/skill-gate'",
-    );
-  },
-);
-
-test('it lets an edit run with the load error on stderr when the gate cannot load in a repo with no rules file', async () => {
-  const ctx = await setupTest();
-
-  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
-
-  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
-  await mkdir(join(ctx.directory, 'node_modules'));
-  await copyFile(ctx.hookPath, copiedHookPath);
-
-  const result = spawnSync('bun', [copiedHookPath], {
-    encoding: 'utf8',
-    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
-    input: JSON.stringify({
-      cwd: ctx.directory,
-      transcript_path: join(ctx.directory, 'transcript.jsonl'),
-      tool_input: { file_path: join(ctx.directory, 'guide.md') },
-    }),
-  });
-
-  expect(result.status).toBe(1);
-
-  expect(result.stderr).toContain(
-    "The skill gate cannot load: Cannot find package '@zgeoff/skill-gate'",
-  );
-});
-
-test('it blocks a gated tool call and names the load failure when the repo lacks @zgeoff/skill-gate', async () => {
-  const ctx = await setupTest();
-
-  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
-
-  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
-  await mkdir(join(ctx.directory, 'node_modules'));
-  await copyFile(ctx.hookPath, copiedHookPath);
-
-  await writeFile(
-    join(ctx.directory, '.claude/skill-gate.json'),
     JSON.stringify({
-      gates: [],
-      tools: [{ tool: 'mcp__tracker__update_ticket', skills: ['ticket-review'] }],
+      gates: [
+        { match: '**/*.md', skills: ['docs-writing'] },
+        { match: '**/*.ts', skills: ['code-style'] },
+      ],
     }),
   );
 
@@ -362,85 +284,18 @@ test('it blocks a gated tool call and names the load failure when the repo lacks
     encoding: 'utf8',
     env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
     input: JSON.stringify({
-      hook_event_name: 'PreToolUse',
-      tool_name: 'mcp__tracker__update_ticket',
       cwd: ctx.directory,
       transcript_path: join(ctx.directory, 'transcript.jsonl'),
-      tool_input: { title: 'Rotate the staging keys' },
+      tool_name: 'Write',
+      tool_input: { file_path: join(ctx.directory, 'guide.md'), content: '# Guide\n' },
     }),
   });
 
-  expect(result.status).toBe(2);
+  expect({ status: result.status, stdout: result.stdout }).toStrictEqual({ status: 2, stdout: '' });
 
   expect(result.stderr).toContain(
-    "The skill gate cannot load, so it blocks this call to mcp__tracker__update_ticket: Cannot find package '@zgeoff/skill-gate'",
+    "The skill gate cannot load, so it blocks this call to Write: Cannot find package '@zgeoff/std'",
   );
-});
-
-test('it lets a tool call that no tool gate names run when the gate cannot load', async () => {
-  const ctx = await setupTest();
-
-  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
-
-  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
-  await mkdir(join(ctx.directory, 'node_modules'));
-  await copyFile(ctx.hookPath, copiedHookPath);
-
-  await writeFile(
-    join(ctx.directory, '.claude/skill-gate.json'),
-    JSON.stringify({
-      gates: [],
-      tools: [{ tool: 'mcp__tracker__update_ticket', skills: ['ticket-review'] }],
-    }),
-  );
-
-  const result = spawnSync('bun', [copiedHookPath], {
-    encoding: 'utf8',
-    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
-    input: JSON.stringify({
-      hook_event_name: 'PreToolUse',
-      tool_name: 'mcp__tracker__read_ticket',
-      cwd: ctx.directory,
-      transcript_path: join(ctx.directory, 'transcript.jsonl'),
-      tool_input: { id: 'ENG-12' },
-    }),
-  });
-
-  expect(result.status).toBe(1);
-
-  expect(result.stderr).toContain(
-    "The skill gate cannot load: Cannot find package '@zgeoff/skill-gate'",
-  );
-});
-
-test('it blocks a tool call when the gate cannot load and the tools list does not parse', async () => {
-  const ctx = await setupTest();
-
-  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
-
-  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
-  await mkdir(join(ctx.directory, 'node_modules'));
-  await copyFile(ctx.hookPath, copiedHookPath);
-
-  await writeFile(
-    join(ctx.directory, '.claude/skill-gate.json'),
-    JSON.stringify({ gates: [], tools: [{ skills: ['ticket-review'] }] }),
-  );
-
-  const result = spawnSync('bun', [copiedHookPath], {
-    encoding: 'utf8',
-    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
-    input: JSON.stringify({
-      hook_event_name: 'PreToolUse',
-      tool_name: 'mcp__tracker__read_ticket',
-      cwd: ctx.directory,
-      transcript_path: join(ctx.directory, 'transcript.jsonl'),
-      tool_input: { id: 'ENG-12' },
-    }),
-  });
-
-  expect(result.status).toBe(2);
-  expect(result.stderr).toContain("Cannot find package '@zgeoff/skill-gate'");
 });
 
 test('it denies a gated apply_patch edit through the entry point when given --harness codex', async () => {
@@ -479,73 +334,41 @@ test('it denies a gated apply_patch edit through the entry point when given --ha
   });
 });
 
-test('it blocks a gated apply_patch edit when the gate cannot load and the harness is codex', async () => {
-  const ctx = await setupTest();
+test.each([
+  ['apply_patch', { command: '*** Begin Patch\n*** Add File: notes.txt\n+x\n*** End Patch' }],
+  ['Bash', { command: 'echo hello > guide.md' }],
+])(
+  'it blocks the %s call when the gate cannot load and the harness is codex',
+  async (toolName, toolInput) => {
+    const ctx = await setupTest();
 
-  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
+    const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
 
-  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
-  await mkdir(join(ctx.directory, 'node_modules'));
-  await copyFile(ctx.hookPath, copiedHookPath);
+    await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+    await mkdir(join(ctx.directory, 'node_modules'));
+    await copyFile(ctx.hookPath, copiedHookPath);
 
-  await writeFile(
-    join(ctx.directory, '.claude/skill-gate.json'),
-    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
-  );
+    const result = spawnSync('bun', ['--no-install', copiedHookPath, '--harness', 'codex'], {
+      encoding: 'utf8',
+      env: { PATH: process.env['PATH'] },
+      input: JSON.stringify({
+        hook_event_name: 'PreToolUse',
+        cwd: ctx.directory,
+        tool_name: toolName,
+        tool_input: toolInput,
+      }),
+    });
 
-  const result = spawnSync('bun', [copiedHookPath, '--harness', 'codex'], {
-    encoding: 'utf8',
-    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
-    input: JSON.stringify({
-      hook_event_name: 'PreToolUse',
-      cwd: join(ctx.directory, 'docs'),
-      tool_name: 'apply_patch',
-      tool_input: {
-        command:
-          '*** Begin Patch\n*** Add File: src/a.ts\n+x\n*** Update File: guide.md\n@@\n-a\n+b\n*** End Patch',
-      },
-    }),
-  });
+    expect({ status: result.status, stdout: result.stdout }).toStrictEqual({
+      status: 2,
+      stdout: '',
+    });
 
-  expect(result.status).toBe(2);
-  expect(result.stdout).toBe('');
-
-  expect(result.stderr).toContain(
-    `The skill gate cannot load, so it blocks this edit to ${join(ctx.directory, 'docs/guide.md')}: Cannot find package '@zgeoff/skill-gate'`,
-  );
-});
-
-test('it finds the project from the git top level when the gate cannot load and CLAUDE_PROJECT_DIR is unset', async () => {
-  const ctx = await setupTest();
-
-  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
-
-  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
-  await mkdir(join(ctx.directory, 'docs'), { recursive: true });
-  await mkdir(join(ctx.directory, 'node_modules'));
-  await copyFile(ctx.hookPath, copiedHookPath);
-
-  await writeFile(
-    join(ctx.directory, '.claude/skill-gate.json'),
-    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
-  );
-
-  spawnSync('git', ['init', '--quiet'], { cwd: ctx.directory });
-
-  const result = spawnSync('bun', [copiedHookPath, '--harness', 'codex'], {
-    encoding: 'utf8',
-    env: { PATH: process.env['PATH'] },
-    input: JSON.stringify({
-      hook_event_name: 'PreToolUse',
-      cwd: join(ctx.directory, 'docs'),
-      tool_name: 'apply_patch',
-      tool_input: { command: '*** Begin Patch\n*** Add File: ../README.md\n+x\n*** End Patch' },
-    }),
-  });
-
-  expect(result.status).toBe(2);
-  expect(result.stderr).toContain('so it blocks this edit to');
-});
+    expect(result.stderr).toContain(
+      `The skill gate cannot load, so it blocks this call to ${toolName}: Cannot find package '@zgeoff/skill-gate'`,
+    );
+  },
+);
 
 test('it refuses a harness it does not know', async () => {
   const ctx = await setupTest();
@@ -612,7 +435,7 @@ test.each([
   expect(result.stderr).toStartWith(`The skill gate cannot read its arguments: ${fault}`);
 });
 
-test('it lets a call run with the load error on stderr when the gate cannot load and the payload is not JSON', async () => {
+test('it blocks a call when the gate cannot load and the payload is not JSON', async () => {
   const ctx = await setupTest();
 
   const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
@@ -632,84 +455,9 @@ test('it lets a call run with the load error on stderr when the gate cannot load
     input: 'not a payload',
   });
 
-  expect({ status: result.status, stdout: result.stdout }).toStrictEqual({ status: 1, stdout: '' });
-
-  expect(result.stderr).toContain(
-    "The skill gate cannot load: Cannot find package '@zgeoff/skill-gate'",
-  );
-});
-
-test('it takes the working directory as the project outside a git repo when the gate cannot load and the harness is codex', async () => {
-  const ctx = await setupTest();
-
-  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
-
-  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
-  await mkdir(join(ctx.directory, 'node_modules'));
-  await copyFile(ctx.hookPath, copiedHookPath);
-
-  await writeFile(
-    join(ctx.directory, '.claude/skill-gate.json'),
-    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
-  );
-
-  const result = spawnSync('bun', [copiedHookPath, '--harness', 'codex'], {
-    encoding: 'utf8',
-    env: { PATH: process.env['PATH'] },
-    input: JSON.stringify({
-      hook_event_name: 'PreToolUse',
-      cwd: ctx.directory,
-      tool_name: 'apply_patch',
-      tool_input: { command: '*** Begin Patch\n*** Add File: guide.md\n+x\n*** End Patch' },
-    }),
-  });
-
   expect({ status: result.status, stdout: result.stdout }).toStrictEqual({ status: 2, stdout: '' });
 
   expect(result.stderr).toContain(
-    `The skill gate cannot load, so it blocks this edit to ${join(ctx.directory, 'guide.md')}: Cannot find package '@zgeoff/skill-gate'`,
-  );
-});
-
-test('it blocks the paths that a CRLF patch deletes and moves to when the gate cannot load and the harness is codex', async () => {
-  const ctx = await setupTest();
-
-  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
-
-  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
-  await mkdir(join(ctx.directory, 'node_modules'));
-  await copyFile(ctx.hookPath, copiedHookPath);
-
-  await writeFile(
-    join(ctx.directory, '.claude/skill-gate.json'),
-    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
-  );
-
-  const result = spawnSync('bun', [copiedHookPath, '--harness', 'codex'], {
-    encoding: 'utf8',
-    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
-    input: JSON.stringify({
-      hook_event_name: 'PreToolUse',
-      cwd: ctx.directory,
-      tool_name: 'apply_patch',
-      tool_input: {
-        command: [
-          '*** Begin Patch',
-          '*** Delete File: old-guide.md',
-          '*** Update File: src/a.ts',
-          '*** Move to: docs/guide.md',
-          '@@',
-          '-a',
-          '+b',
-          '*** End Patch',
-        ].join('\r\n'),
-      },
-    }),
-  });
-
-  expect({ status: result.status, stdout: result.stdout }).toStrictEqual({ status: 2, stdout: '' });
-
-  expect(result.stderr).toContain(
-    `The skill gate cannot load, so it blocks this edit to ${join(ctx.directory, 'old-guide.md')}, ${join(ctx.directory, 'docs/guide.md')}: Cannot find package '@zgeoff/skill-gate'`,
+    "The skill gate cannot load, so it blocks this call: Cannot find package '@zgeoff/skill-gate'",
   );
 });
