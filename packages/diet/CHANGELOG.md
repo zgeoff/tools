@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/zgeoff/tools/compare/@zgeoff/diet@0.1.0...@zgeoff/diet@0.1.1) (2026-10-30)
+
+### Bug Fixes
+
+- **diet:** publish with provenance ([#400](https://github.com/zgeoff/tools/issues/400))
+  ([7a9a29a](https://github.com/zgeoff/tools/commit/7a9a29a4750c875ff8f0b94aa44b49f2a6012e92))
+
 ## 0.1.0 (2026-10-30)
 
 ### Features
