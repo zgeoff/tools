@@ -79,7 +79,7 @@ print_delivered_hashes() {
 to_delivered_form() {
   local target=$1
   if [[ "$target" == .github/workflows/* ]]; then
-    sed -E "s|(zgeoff/tools/\.github/workflows/[^]@[:space:]\"'{},]+)@[A-Za-z0-9._/-]+( # main)?|\1@main|g"
+    sed -E "s|(zgeoff/tools/\.github/workflows/[^]@[:space:]\"'{},]+)@[A-Za-z0-9._/-]+([\"']?)( # main)?|\1@main\2|g"
   else
     cat
   fi

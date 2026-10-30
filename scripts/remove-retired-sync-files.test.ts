@@ -583,3 +583,42 @@ test('it keeps the edited old copy of a renamed file when the run did not sync i
 
   expect(existsSync(join(ctx.caller, 'scripts/list-files.ts'))).toBeTrue();
 });
+
+test('it deletes a retired workflow whose quoted call the sync pinned to a commit', async () => {
+  const ctx = await setupTest();
+
+  await createGitCommit(ctx.tools, ctx.env, {
+    'sync/workflow-callers/lint.yml':
+      "jobs:\n  lint:\n    uses: 'zgeoff/tools/.github/workflows/lint.yml@main'\n",
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'workflow-lint',
+        files: [{ source: 'sync/workflow-callers/lint.yml', target: '.github/workflows/lint.yml' }],
+      },
+    ]),
+  });
+
+  await createGitCommit(ctx.tools, ctx.env, { 'sync/manifest.json': '[]' });
+
+  await writeTreeFiles(ctx.caller, {
+    '.github/workflows/lint.yml':
+      "jobs:\n  lint:\n    uses: 'zgeoff/tools/.github/workflows/lint.yml@0123456789abcdef0123456789abcdef01234567' # main\n",
+  });
+
+  const result = await $`bash ${ctx.scriptPath} ${ctx.tools} ${''}`
+    .cwd(ctx.caller)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: '.github/workflows/lint.yml\n',
+    stderr: '',
+  });
+
+  expect(existsSync(join(ctx.caller, '.github/workflows/lint.yml'))).toBeFalse();
+});
