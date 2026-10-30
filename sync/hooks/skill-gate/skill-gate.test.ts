@@ -75,6 +75,16 @@ test.each([
   ],
   ['bun install that adds a package', 'Bash', { command: 'bun install left-pad' }],
   ['a plain git diff', 'Bash', { command: 'git diff' }],
+  [
+    'git diff with both flags that turn config programs off',
+    'Bash',
+    { command: 'git diff --no-ext-diff --no-textconv --stat' },
+  ],
+  [
+    'git diff with an abbreviated external diff flag',
+    'Bash',
+    { command: 'git diff --no-ext-diff --no-textconv --ext-dif' },
+  ],
   ['git status', 'Bash', { command: 'git status' }],
   [
     'git diff that turns the external diff program back on',
@@ -132,7 +142,6 @@ test.each([
 test.each([
   'bun install',
   'bun install --frozen-lockfile',
-  'git diff --no-ext-diff --no-textconv --stat',
   'ls packages',
   'cat package.json',
   'pwd',
