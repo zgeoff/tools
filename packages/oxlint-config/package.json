@@ -34,6 +34,7 @@
     "max-test-timeout.js",
     "test-timeout-exception-ticket.js",
     "build-lane-limits.js",
+    "read-rig-lanes.js",
     "resolve-suite-directory.js",
     "no-test-sleep.js",
     "no-require.js",
