@@ -3,7 +3,11 @@ import { existsSync } from 'node:fs';
 import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
+import { createSideGitCommit } from '../../test-utils/create-side-git-commit.ts';
 import { createStubPullRequestGH } from '../../test-utils/create-stub-pull-request-gh.ts';
+import { createTrackedGitCommit } from '../../test-utils/create-tracked-git-commit.ts';
+import { moveGitCommitToRemote } from '../../test-utils/move-git-commit-to-remote.ts';
+import { readGitHead } from '../../test-utils/read-git-head.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { syncEntries } from './sync-entries.ts';
@@ -52,35 +56,15 @@ async function setupTest() {
 
   // Runs the sync job's step in a fresh clone of the caller, with the env the step sets.
   // Commits the tools sources and marks the commit as main, so the run syncs from a commit on main.
-  const writeToolsCommit = async () => {
-    await $`git -C ${tools} add -A && git -C ${tools} commit -q --allow-empty -m ${'chore: change the sources'}`
-      .env(env)
-      .quiet();
-
-    await $`git -C ${tools} update-ref refs/remotes/origin/main HEAD`.env(env).quiet();
-
-    const head = await $`git -C ${tools} rev-parse HEAD`.text();
-
-    return head.trim();
-  };
+  const writeToolsCommit = () => createTrackedGitCommit(tools, env, {});
 
   // Commits the manifest on a side branch of the tools checkout and returns to main, so the commit
   // exists and main never holds it.
-  const writeSideCommit = async (manifest: unknown[]) => {
-    await $`git -C ${tools} switch -q -c side`.env(env).quiet();
-
-    await writeFile(join(tools, 'sync', 'manifest.json'), JSON.stringify(manifest));
-
-    await $`git -C ${tools} add -A && git -C ${tools} commit -q -m ${'chore: change the manifest on a side branch'}`
-      .env(env)
-      .quiet();
-
-    const head = await $`git -C ${tools} rev-parse HEAD`.text();
-
-    await $`git -C ${tools} switch -q -`.env(env).quiet();
-
-    return head.trim();
-  };
+  const writeSideCommit = (manifest: unknown[]) =>
+    createSideGitCommit(tools, env, {
+      branch: 'side',
+      files: { 'sync/manifest.json': JSON.stringify(manifest) },
+    });
 
   // The afterClone callback runs between the caller's checkout and the sync, as a merge that lands
   // while the run waits in its queue does.
@@ -150,27 +134,16 @@ async function setupTest() {
     return files.split('\n').filter((file) => file !== '');
   };
 
-  const readToolsHead = async () => {
-    const head = await $`git -C ${tools} rev-parse HEAD`.text();
-
-    return head.trim();
-  };
+  const readToolsHead = () => readGitHead(tools, env);
 
   // Moves the commit to a remote of the tools checkout and drops it locally, so a run must fetch
   // it to know it.
-  const writeRemoteOnlyCommit = async (commit: string, keep: string) => {
-    const remote = join(directory, 'tools-remote.git');
-
-    await $`git init -q --bare -b main ${remote}`.env(env).quiet();
-    await $`git -C ${tools} remote add origin ${remote}`.env(env).quiet();
-    await $`git -C ${tools} push -q origin ${`${commit}:refs/heads/main`}`.env(env).quiet();
-    await $`git -C ${tools} reset -q --hard ${keep}`.env(env).quiet();
-    await $`git -C ${tools} update-ref -d refs/remotes/origin/main`.env(env).quiet();
-
-    await $`git -C ${tools} reflog expire --expire=now --all && git -C ${tools} gc -q --prune=now`
-      .env(env)
-      .quiet();
-  };
+  const writeRemoteOnlyCommit = (commit: string, keep: string) =>
+    moveGitCommitToRemote(tools, env, {
+      commit,
+      keep,
+      remote: join(directory, 'tools-remote.git'),
+    });
 
   const readBranchHead = async (branch: string) => {
     const head = await $`git -C ${origin} rev-parse ${branch}`.text();

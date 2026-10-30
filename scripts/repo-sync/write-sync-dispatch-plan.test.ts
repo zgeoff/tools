@@ -3,8 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { buildCommandStub } from '../../test-utils/build-command-stub.ts';
-import { createGitCommit } from '../../test-utils/create-git-commit.ts';
-import { runGit } from '../../test-utils/run-git.ts';
+import { createPushedGitCommit } from '../../test-utils/create-pushed-git-commit.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { writeSyncDispatchPlan } from './write-sync-dispatch-plan.ts';
@@ -37,14 +36,8 @@ async function setupTest() {
 
   const output: string[] = [];
 
-  const writeToolsCommit = async (files: Readonly<Record<string, string>>) => {
-    await createGitCommit(tools, env, files);
-    await runGit(tools, env, ['push', '-q', 'origin', 'HEAD:main']);
-
-    const head = await $`git -C ${tools} rev-parse HEAD`.text();
-
-    return head.trim();
-  };
+  const writeToolsCommit = (files: Readonly<Record<string, string>>) =>
+    createPushedGitCommit(tools, env, files);
 
   // git runs for real in the job's checkout, and each test answers the query for green runs.
   const commands = buildCommandStub({ program: 'git', runCommand });
