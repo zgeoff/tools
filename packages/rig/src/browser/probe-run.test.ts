@@ -114,7 +114,10 @@ test('it finds a run exited when its lane and every group it recorded have exite
   });
 
   expect(isLive).toBeFalse();
-  expect(ctx.groups.probeGroup.mock.calls.toSorted()).toStrictEqual([[5120], [6230]]);
+
+  expect(
+    ctx.groups.probeGroup.mock.calls.toSorted(([left], [right]) => left - right),
+  ).toStrictEqual([[5120], [6230]]);
 });
 
 test('it fails when it cannot remove a pending record', async () => {
