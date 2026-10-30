@@ -36,8 +36,9 @@ test.skipIf(modesOutput === '')(
     }).toStrictEqual({
       exitCode: 1,
       stdout: '',
-      stderr:
-        'diet: peaked at 256 MB of 256 MB\ndiet: the command went over its 256 MB budget, and the kernel OOM-killed 1 process\n',
+      stderr: expect.stringMatching(
+        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 256 MB\ndiet: the command went over its 256 MB budget, and the kernel OOM-killed 1 process\n$/u,
+      ),
     });
   },
 );
@@ -106,8 +107,9 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
     }).toStrictEqual({
       exitCode: 1,
       stdout: '',
-      stderr:
-        'diet: peaked at 128 MB of 128 MB\ndiet: the command went over its 128 MB budget, and the kernel OOM-killed 1 process\n',
+      stderr: expect.stringMatching(
+        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 128 MB\ndiet: the command went over its 128 MB budget, and the kernel OOM-killed 1 process\n$/u,
+      ),
     });
   },
 );
@@ -153,8 +155,9 @@ test.skipIf(!modesOutput.includes('systemd-user'))(
     }).toStrictEqual({
       exitCode: 1,
       stdout: '',
-      stderr:
-        'diet: peaked at 128 MB of 128 MB\ndiet: the command went over its 128 MB budget, and the kernel OOM-killed 1 process\n',
+      stderr: expect.stringMatching(
+        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 128 MB\ndiet: the command went over its 128 MB budget, and the kernel OOM-killed 1 process\n$/u,
+      ),
     });
   },
 );
@@ -200,8 +203,9 @@ test.skipIf(!modesOutput.includes('cgroupfs'))(
     }).toStrictEqual({
       exitCode: 1,
       stdout: '',
-      stderr:
-        'diet: peaked at 128 MB of 128 MB\ndiet: the command went over its 128 MB budget, and the kernel OOM-killed 1 process\n',
+      stderr: expect.stringMatching(
+        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 128 MB\ndiet: the command went over its 128 MB budget, and the kernel OOM-killed 1 process\n$/u,
+      ),
     });
   },
 );
