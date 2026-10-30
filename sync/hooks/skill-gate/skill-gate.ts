@@ -89,11 +89,11 @@ async function reportLoadFailure(loadError: string): Promise<never> {
 // runs only as one of these read-only commands, or as the `bun install` that repairs the gate,
 // written as one simple command in plain words.
 function isAllowedCommand(command: unknown): boolean {
-  if (typeof command !== 'string' || !/^[\w \t./@=:,+-]+$/u.test(command)) {
+  if (typeof command !== 'string' || !/^[\w ./@=:,+-]+$/u.test(command)) {
     return false;
   }
 
-  const words = command.trim().split(/[ \t]+/u);
+  const words = command.trim().split(/ +/u);
   const [program, subcommand, ...rest] = words;
 
   if (program === 'ls' || program === 'cat' || program === 'pwd') {
