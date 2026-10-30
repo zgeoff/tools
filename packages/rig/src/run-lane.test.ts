@@ -130,6 +130,76 @@ test('it says so and exits 0 for the e2e lane of a repo with no e2e folder', asy
   expect(ctx.runCommand).not.toHaveBeenCalled();
 });
 
+test('it runs only the lane files that a path selects, in place of the suffix filter', async () => {
+  const ctx = setupTest(['pkg/src/fire.kiln.test.ts', 'pkg/src/fire.test.ts', 'pkg/src/fire.ts']);
+  const lane = ctx.findLane('kiln');
+
+  if (lane === undefined) {
+    throw new Error('the config holds no kiln lane');
+  }
+
+  await runLane(
+    { config: ctx.config, lane, extraArgs: ['./pkg/src', '--seed=1'] },
+    ctx.run,
+    ctx.deps,
+  );
+
+  expect(ctx.runCommand.mock.calls[0]?.[0]).toStrictEqual([
+    'bash',
+    '/diet.sh',
+    '--budget',
+    '8G',
+    '--',
+    'bun',
+    'test',
+    '--parallel=1',
+    '--timeout=15000',
+    './pkg/src/fire.kiln.test.ts',
+    '--seed=1',
+  ]);
+});
+
+test('it runs a lane with a suffix and no paths without the git file list, as outside a git repo', async () => {
+  const ctx = setupTest();
+  const lane = ctx.findLane('kiln');
+
+  if (lane === undefined) {
+    throw new Error('the config holds no kiln lane');
+  }
+
+  const exitCode = await runLane({ config: ctx.config, lane, extraArgs: ['--seed=1'] }, ctx.run, {
+    ...ctx.deps,
+    readTrackedFiles: () => Promise.reject(new Error('not a git repository')),
+  });
+
+  expect(exitCode).toBe(0);
+  expect(ctx.runCommand).toHaveBeenCalledOnce();
+});
+
+test('it says so and exits 0 when the paths select none of the lane files', async () => {
+  const ctx = setupTest(['pkg/src/fire.kiln.test.ts', 'pkg/src/fire.test.ts']);
+  const lane = ctx.findLane('kiln');
+
+  if (lane === undefined) {
+    throw new Error('the config holds no kiln lane');
+  }
+
+  const exitCode = await runLane(
+    { config: ctx.config, lane, extraArgs: ['./pkg/src/fire.test.ts'] },
+    ctx.run,
+    ctx.deps,
+  );
+
+  expect(exitCode).toBe(0);
+
+  expect(ctx.output.out).toHaveBeenCalledExactlyOnceWith(
+    'rig: the kiln lane has no tests that match the paths\n',
+  );
+
+  expect(ctx.runCommand).not.toHaveBeenCalled();
+  expect(ctx.startKiln).not.toHaveBeenCalled();
+});
+
 test('it runs the browser lane through its built-in hooks, with the lane memory and the run ID', async () => {
   const ctx = setupTest();
   const lane = ctx.findLane('browser');

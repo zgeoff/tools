@@ -40,7 +40,10 @@ so a run that outgrows its memory budget fails alone.
 - `rig init` writes the `test`, `test:related` and `test:<lane>` scripts and a starter config.
 
 Every argument after the command goes on to `bun test`, so `bun run test --seed=1` replays a run's
-order. rig drops one `--` among those arguments.
+order, and rig drops one `--` among them. A path keeps only the lane's own files that it selects: a
+file, the files under a folder, or, for a bare word, the files whose path holds it. So
+`rig unit ./src/oven.host.test.ts` runs nothing. Give `--bail` or `--changed` a value with `=`,
+because rig reads a word after either one as a path, as `bun test` does.
 
 ## Configuration
 

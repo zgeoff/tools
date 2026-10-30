@@ -32,7 +32,9 @@ its plugin.
 2. `run` starts `bun test` under `diet`, with the lane's limit as `--timeout`, its process count as
    `--parallel`, and its memory as `diet`'s budget. The lane's suffix filter or its `e2e` folders
    select the files. The folders are the `e2e` folders at the repo root or an app root and the
-   `-e2e` packages that git tracks.
+   `-e2e` packages that git tracks. When the arguments name paths, rig narrows them to the lane's
+   own tracked test files and hands `bun test` that exact list, because `bun test` runs any file a
+   path names, whatever its lane.
 3. `stop` cleans up, whether the tests passed, failed or never started.
 
 `rig` turns SIGINT, SIGTERM and SIGHUP into an abort. The abort stops the running command, the run

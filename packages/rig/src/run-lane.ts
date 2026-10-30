@@ -1,7 +1,11 @@
+import { match } from 'ts-pattern';
 import { pickExitCodeAfterTests } from './browser/pick-exit-code-after-tests.ts';
 import type { BrowserLaneWiring } from './browser/wire-browser-lane-hooks.ts';
+import type { TestSelection } from './build-test-selection.ts';
+import { buildTestSelection } from './build-test-selection.ts';
 import type { LaneHooks } from './lane-hooks.ts';
 import { makeRepoLaneHooks } from './make-repo-lane-hooks.ts';
+import { parseTestArgs } from './parse-test-args.ts';
 import { pickE2EDirs } from './pick-e2e-dirs.ts';
 import { pickLaneSelection } from './pick-lane-selection.ts';
 import type { CommandOptions } from './run-command.ts';
@@ -34,28 +38,80 @@ export interface LaneRequest {
 // start or the tests fail.
 export async function runLane(request: LaneRequest, run: RigRun, deps: LaneDeps): Promise<number> {
   const lane = request.lane;
-  const trackedFiles = lane.suffix === null ? await deps.readTrackedFiles(run.repoRoot) : [];
-  const selection = pickLaneSelection(lane, pickE2EDirs(trackedFiles));
+  const args = parseTestArgs(request.extraArgs);
 
-  if (selection.length === 0) {
-    deps.output.out(`rig: the ${lane.name} lane has no tests\n`);
+  // A lane with a suffix and no paths needs no file list, so it runs outside a git repo too.
+  const needsTrackedFiles = lane.suffix === null || args.paths.length > 0;
+  const trackedFiles = needsTrackedFiles ? await deps.readTrackedFiles(run.repoRoot) : [];
+
+  const selection = buildTestSelection({
+    config: request.config,
+    lane,
+    repoRoot: run.repoRoot,
+    trackedFiles,
+    args,
+  });
+
+  const testArgs = pickLaneTestArgs(request.config, lane, selection, trackedFiles);
+
+  if (testArgs === null) {
+    const message =
+      selection.kind === 'none'
+        ? `rig: the ${lane.name} lane has no tests that match the paths\n`
+        : `rig: the ${lane.name} lane has no tests\n`;
+
+    deps.output.out(message);
 
     return 0;
   }
 
   const hooks = await wireLaneHooks(lane, run, deps);
-
-  const testArgs = [
-    `--timeout=${lane.limitMs}`,
-    ...selection,
-    ...pickOtherLaneIgnoreArgs(request.config, lane),
-    ...request.extraArgs,
-  ];
-
   const exitCode = await runLaneHooks(testArgs, hooks);
 
   // A signal that arrives while the stop hook cleans up still fails the run.
   return pickExitCodeAfterTests(exitCode, run.signal.aborted);
+}
+
+function pickLaneTestArgs(
+  config: RigConfig,
+  lane: ResolvedLane,
+  selection: TestSelection,
+  trackedFiles: readonly string[],
+): readonly string[] | null {
+  const timeoutArg = `--timeout=${lane.limitMs}`;
+
+  return match(selection)
+    .with({ kind: 'none' }, () => null)
+    .with({ kind: 'files' }, (files) => [timeoutArg, ...files.files, ...files.flags])
+    .with({ kind: 'lane' }, (laneRun) => {
+      const laneSelection = pickLaneSelection(lane, pickE2EDirs(trackedFiles));
+
+      return laneSelection.length === 0
+        ? null
+        : [
+            timeoutArg,
+            ...laneSelection,
+            ...pickOtherLaneIgnoreArgs(config, lane),
+            ...laneRun.flags,
+          ];
+    })
+    .exhaustive();
+}
+
+// A folder selection takes every test file under it, so the e2e lane leaves out the files that
+// belong to a lane with a suffix.
+function pickOtherLaneIgnoreArgs(config: RigConfig, lane: ResolvedLane): readonly string[] {
+  if (lane.suffix !== null) {
+    return [];
+  }
+
+  return config.lanes.flatMap((other) =>
+    other.suffix === null
+      ? []
+      : [`**/*${other.suffix}.test.ts`, `**/*${other.suffix}.test.tsx`].map(
+          (pattern) => `--path-ignore-patterns=${pattern}`,
+        ),
+  );
 }
 
 function wireLaneHooks(lane: ResolvedLane, run: RigRun, deps: LaneDeps): Promise<LaneHooks> {
@@ -85,21 +141,5 @@ function wireLaneHooks(lane: ResolvedLane, run: RigRun, deps: LaneDeps): Promise
       importModule: deps.importModule,
       runCommand: deps.runCommand,
     }),
-  );
-}
-
-// A folder selection takes every test file under it, so the e2e lane leaves out the files that
-// belong to a lane with a suffix.
-function pickOtherLaneIgnoreArgs(config: RigConfig, lane: ResolvedLane): readonly string[] {
-  if (lane.suffix !== null) {
-    return [];
-  }
-
-  return config.lanes.flatMap((other) =>
-    other.suffix === null
-      ? []
-      : [`**/*${other.suffix}.test.ts`, `**/*${other.suffix}.test.tsx`].map(
-          (pattern) => `--path-ignore-patterns=${pattern}`,
-        ),
   );
 }

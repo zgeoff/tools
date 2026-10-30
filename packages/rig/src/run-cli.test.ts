@@ -10,9 +10,11 @@ function setupTest() {
   );
 
   const output = { out: makeRecordingStub(), err: makeRecordingStub() };
+  const trackedFiles: string[] = [];
 
   return {
     runCommand,
+    trackedFiles,
     output,
     run: {
       repoRoot: '/repo',
@@ -25,7 +27,7 @@ function setupTest() {
       output,
       sources: { cwd: '/repo', probeFile: () => true },
       readConfig: () => Promise.resolve(defineRig({ lanes: { kiln: { limit: '15s' } } })),
-      readTrackedFiles: () => Promise.resolve([]),
+      readTrackedFiles: () => Promise.resolve(trackedFiles),
       readWorkerCount: () => Promise.resolve({ kind: 'count' as const, count: 2 }),
       importModule: () => Promise.resolve({}),
       runCommand,
@@ -36,6 +38,8 @@ function setupTest() {
 
 test('it runs the unit lane for rig unit, with the paths after it', async () => {
   const ctx = setupTest();
+
+  ctx.trackedFiles.push('src/a.test.ts');
 
   const exitCode = await runCLI(['unit', './src/a.test.ts'], ctx.run, ctx.deps);
 

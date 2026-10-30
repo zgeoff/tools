@@ -11,9 +11,11 @@ function setupTest(workers: WorkerCount) {
   );
 
   const output = { out: makeRecordingStub(), err: makeRecordingStub() };
+  const trackedFiles: string[] = [];
 
   return {
     runCommand,
+    trackedFiles,
     output,
     run: {
       repoRoot: '/repo',
@@ -23,7 +25,7 @@ function setupTest(workers: WorkerCount) {
     },
     deps: {
       dietScript: '/diet.sh',
-      readTrackedFiles: () => Promise.resolve([]),
+      readTrackedFiles: () => Promise.resolve(trackedFiles),
       runCommand,
       output,
       readWorkerCount: () => Promise.resolve(workers),
@@ -38,6 +40,37 @@ test('it runs the unit tests with the worker count the host gets', async () => {
 
   expect(exitCode).toBe(0);
   expect(ctx.runCommand.mock.calls[0]?.[0]).toContain('--parallel=3');
+});
+
+test('it runs only the unit files that a path selects', async () => {
+  const ctx = setupTest({ kind: 'count', count: 3 });
+
+  ctx.trackedFiles.push('pkg/src/oven.test.ts', 'pkg/src/oven.host.test.ts');
+
+  await runUnit(defineRig({}), ['--bail', './pkg/src/'], ctx.run, ctx.deps);
+
+  expect(ctx.runCommand.mock.calls[0]?.[0]).toIncludeAllMembers([
+    './pkg/src/oven.test.ts',
+    '--bail',
+  ]);
+
+  expect(ctx.runCommand.mock.calls[0]?.[0]).not.toContain('./pkg/src/oven.host.test.ts');
+});
+
+test('it says so and runs nothing for a unit run given only the path of a host test file', async () => {
+  const ctx = setupTest({ kind: 'count', count: 3 });
+
+  ctx.trackedFiles.push('pkg/src/oven.test.ts', 'pkg/src/oven.host.test.ts');
+
+  const exitCode = await runUnit(defineRig({}), ['./pkg/src/oven.host.test.ts'], ctx.run, ctx.deps);
+
+  expect(exitCode).toBe(0);
+
+  expect(ctx.output.out).toHaveBeenCalledExactlyOnceWith(
+    'rig: the unit lane has no tests that match the paths\n',
+  );
+
+  expect(ctx.runCommand).not.toHaveBeenCalled();
 });
 
 test('it exits 2 with the reason and runs no test for a worker count it refuses', async () => {
