@@ -11,14 +11,14 @@ export function buildHookSettings(
     return '`hooks` must hold a JSON object';
   }
 
-  const kept: Record<string, unknown> = {};
+  const kept: Record<string, readonly unknown[]> = {};
 
   for (const [event, groups] of Object.entries(hooks)) {
     if (!Array.isArray(groups)) {
       return `\`hooks.${event}\` must be an array`;
     }
 
-    const remaining = groups.flatMap((group: unknown) => dropOwnedHooks(group));
+    const remaining: readonly unknown[] = groups.flatMap((group: unknown) => dropOwnedHooks(group));
 
     if (remaining.length > 0) {
       kept[event] = remaining;
@@ -31,9 +31,7 @@ export function buildHookSettings(
       hooks: [{ type: 'command', command: plan.command }],
     };
 
-    const existing = kept[entry.event];
-
-    kept[entry.event] = Array.isArray(existing) ? [...existing, group] : [group];
+    kept[entry.event] = [...(kept[entry.event] ?? []), group];
   }
 
   return { ...settings, hooks: kept };
@@ -44,7 +42,7 @@ function dropOwnedHooks(group: unknown): readonly unknown[] {
     return [group];
   }
 
-  const hooks = group['hooks'].filter((hook: unknown) => !isOwnedHook(hook));
+  const hooks: readonly unknown[] = group['hooks'].filter((hook: unknown) => !isOwnedHook(hook));
 
   return hooks.length === 0 ? [] : [{ ...group, hooks }];
 }
