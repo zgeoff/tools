@@ -387,3 +387,20 @@ test('it reports a CommonJS export', async () => {
 
   expect(run.stdout).toInclude('import(no-commonjs)');
 });
+
+test.each([
+  ["import * as z from 'zod';\n\nexport const name = z.string();\n", false],
+  ["import * as mini from 'zod/mini';\n\nexport const name = mini.string();\n", false],
+  ["import * as path from 'node:path';\n\nexport const separator = path.sep;\n", true],
+])('it reports the namespace import in %p: %p', async (source, expected) => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'schema.ts'), source);
+
+  const run = await runOxlint(
+    ['-c', join(import.meta.dir, 'oxlintrc.json'), 'schema.ts'],
+    ctx.directory,
+  );
+
+  expect(run.stdout.includes('import(no-namespace)')).toBe(expected);
+});

@@ -109,6 +109,8 @@
     "typescript/no-unsafe-type-assertion": "off",
     "import/no-cycle": "error",
     "import/no-commonjs": "error",
+    // zod's documented import form is `import * as z from 'zod'`
+    "import/no-namespace": ["error", { "ignore": ["zod", "zod/*"] }],
 
     "no-shadow": "error",
 
