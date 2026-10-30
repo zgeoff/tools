@@ -1,4 +1,4 @@
-import { isAbsolute, relative } from 'node:path';
+import { posix } from 'node:path';
 import { match } from 'ts-pattern';
 import type { TestArgs } from './parse-test-args.ts';
 import { pickE2EDirs } from './pick-e2e-dirs.ts';
@@ -7,7 +7,7 @@ import type { ResolvedLane, RigConfig } from './types.ts';
 export type TestSelection =
   | { readonly kind: 'lane'; readonly flags: readonly string[] }
   | { readonly kind: 'files'; readonly files: readonly string[]; readonly flags: readonly string[] }
-  | { readonly kind: 'none' };
+  | { readonly kind: 'none'; readonly paths: readonly string[] };
 
 export interface TestSelectionRequest {
   readonly config: RigConfig;
@@ -41,7 +41,7 @@ export function buildTestSelection(request: TestSelectionRequest): TestSelection
   );
 
   return files.length === 0
-    ? { kind: 'none' }
+    ? { kind: 'none', paths: split.paths }
     : { kind: 'files', files: files.map((file) => `./${file}`), flags: split.flags };
 }
 
@@ -84,13 +84,17 @@ type Selector =
   | { readonly kind: 'filter'; readonly text: string }
   | { readonly kind: 'missing' };
 
-// A path names a tracked file or a folder that holds one. A bare word that names neither is bun
-// test's filter on the path, and a `./` or absolute path that names neither selects nothing.
+// A path names a tracked file or a folder that holds one, read against the repo root. A bare word
+// that names neither is bun test's filter on the path, and a `./`, `../` or absolute path that
+// names neither, or a path outside the repo, selects nothing.
 function buildSelector(path: string, repoRoot: string, trackedFiles: readonly string[]): Selector {
-  const relativePath = isAbsolute(path) ? relative(repoRoot, path) : path;
-  const normalized = relativePath.replace(/^(?:\.\/)+/u, '').replace(/\/+$/u, '');
+  const normalized = posix.relative(repoRoot, posix.resolve(repoRoot, path));
 
-  if (normalized === '' || normalized === '.') {
+  if (normalized === '..' || normalized.startsWith('../') || posix.isAbsolute(normalized)) {
+    return { kind: 'missing' };
+  }
+
+  if (normalized === '') {
     return { kind: 'directory', path: '' };
   }
 
@@ -102,9 +106,9 @@ function buildSelector(path: string, repoRoot: string, trackedFiles: readonly st
     return { kind: 'directory', path: normalized };
   }
 
-  const isPathLike = path.startsWith('./') || path.startsWith('../') || isAbsolute(path);
+  const isPathLike = path.startsWith('./') || path.startsWith('../') || posix.isAbsolute(path);
 
-  return isPathLike ? { kind: 'missing' } : { kind: 'filter', text: path };
+  return isPathLike ? { kind: 'missing' } : { kind: 'filter', text: normalized };
 }
 
 function isSelected(file: string, selector: Selector): boolean {

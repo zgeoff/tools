@@ -1,5 +1,6 @@
 import { match } from 'ts-pattern';
 import { buildTestSelection } from './build-test-selection.ts';
+import { formatNoMatchMessage } from './format-no-match-message.ts';
 import { parseTestArgs } from './parse-test-args.ts';
 import type { WorkerCount } from './read-worker-count.ts';
 import type { UnitRunDeps } from './run-unit-tests.ts';
@@ -41,10 +42,10 @@ export async function runUnit(
   });
 
   return match(selection)
-    .with({ kind: 'none' }, () => {
-      deps.output.out('rig: the unit lane has no tests that match the paths\n');
+    .with({ kind: 'none' }, (none) => {
+      deps.output.err(formatNoMatchMessage('unit', none.paths));
 
-      return 0;
+      return 1;
     })
     .with({ kind: 'files' }, (files) =>
       runUnitTests(

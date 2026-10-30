@@ -41,9 +41,11 @@ so a run that outgrows its memory budget fails alone.
 
 Every argument after the command goes on to `bun test`, so `bun run test --seed=1` replays a run's
 order, and rig drops one `--` among them. A path keeps only the lane's own files that it selects: a
-file, the files under a folder, or, for a bare word, the files whose path holds it. So
-`rig unit ./src/oven.host.test.ts` runs nothing. Give `--bail` or `--changed` a value with `=`,
-because rig reads a word after either one as a path, as `bun test` does.
+file, the files under a folder, or, for a bare word, the files whose path holds it. rig reads a path
+against the repo root, after its `.` and `..` segments, and a path outside the repo selects nothing.
+When the paths select no file of the lane, as `rig unit ./src/oven.host.test.ts` does, rig names
+them and exits 1. Give `--bail` or `--changed` a value with `=`, because rig reads a word after
+either one as a path, as `bun test` does.
 
 ## Configuration
 

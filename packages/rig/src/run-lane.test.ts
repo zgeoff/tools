@@ -176,7 +176,7 @@ test('it runs a lane with a suffix and no paths without the git file list, as ou
   expect(ctx.runCommand).toHaveBeenCalledOnce();
 });
 
-test('it says so and exits 0 when the paths select none of the lane files', async () => {
+test('it names the paths and exits 1 when they select none of the lane files', async () => {
   const ctx = setupTest(['pkg/src/fire.kiln.test.ts', 'pkg/src/fire.test.ts']);
   const lane = ctx.findLane('kiln');
 
@@ -190,10 +190,10 @@ test('it says so and exits 0 when the paths select none of the lane files', asyn
     ctx.deps,
   );
 
-  expect(exitCode).toBe(0);
+  expect(exitCode).toBe(1);
 
-  expect(ctx.output.out).toHaveBeenCalledExactlyOnceWith(
-    'rig: the kiln lane has no tests that match the paths\n',
+  expect(ctx.output.err).toHaveBeenCalledExactlyOnceWith(
+    'rig: the kiln lane has no tests that match ./pkg/src/fire.test.ts\n',
   );
 
   expect(ctx.runCommand).not.toHaveBeenCalled();

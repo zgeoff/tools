@@ -23,7 +23,7 @@ test('it selects nothing for a host run given the path of a unit test file', () 
     args: { flags: [], paths: ['./pkg/src/oven.test.ts'] },
   });
 
-  expect(selection).toStrictEqual({ kind: 'none' });
+  expect(selection).toStrictEqual({ kind: 'none', paths: ['./pkg/src/oven.test.ts'] });
 });
 
 test('it selects nothing for a unit run given the path of a host test file', () => {
@@ -35,7 +35,7 @@ test('it selects nothing for a unit run given the path of a host test file', () 
     args: { flags: ['--bail'], paths: ['./pkg/src/oven.host.test.ts'] },
   });
 
-  expect(selection).toStrictEqual({ kind: 'none' });
+  expect(selection).toStrictEqual({ kind: 'none', paths: ['./pkg/src/oven.host.test.ts'] });
 });
 
 test('it selects the one lane file that a file path names, and keeps the flags', () => {
@@ -117,7 +117,7 @@ test('it selects nothing for a ./ path that names no tracked file or folder', ()
     args: { flags: [], paths: ['./oven'] },
   });
 
-  expect(selection).toStrictEqual({ kind: 'none' });
+  expect(selection).toStrictEqual({ kind: 'none', paths: ['./oven'] });
 });
 
 test('it gives the e2e lane the test files under its folders and leaves out a suffixed lane file', () => {
@@ -156,5 +156,40 @@ test('it gives the unit lane every test file outside the e2e folders and the suf
     kind: 'files',
     files: ['./pkg/src/oven.test.ts', './pkg/src/view.test.tsx'],
     flags: [],
+  });
+});
+
+test.each([
+  ['./pkg/src/../src/oven.test.ts'],
+  ['pkg/./src/oven.test.ts'],
+  ['/repo/pkg/src/oven.test.ts/'],
+])('it selects the lane file that the path %s names once its . and .. segments resolve', (path) => {
+  const selection = buildTestSelection({
+    config: defineRig({}),
+    lane: { name: 'unit', suffix: null },
+    repoRoot: '/repo',
+    trackedFiles: ['pkg/src/oven.test.ts', 'pkg/src/door.test.ts'],
+    args: { flags: [], paths: [path] },
+  });
+
+  expect(selection).toStrictEqual({
+    kind: 'files',
+    files: ['./pkg/src/oven.test.ts'],
+    flags: [],
+  });
+});
+
+test('it selects nothing for a path outside the repo, even one that ends in a tracked path', () => {
+  const selection = buildTestSelection({
+    config: defineRig({}),
+    lane: { name: 'unit', suffix: null },
+    repoRoot: '/repo',
+    trackedFiles: ['pkg/src/oven.test.ts'],
+    args: { flags: [], paths: ['../elsewhere/pkg/src/oven.test.ts'] },
+  });
+
+  expect(selection).toStrictEqual({
+    kind: 'none',
+    paths: ['../elsewhere/pkg/src/oven.test.ts'],
   });
 });

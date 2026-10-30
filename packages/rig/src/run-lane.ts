@@ -3,6 +3,7 @@ import { pickExitCodeAfterTests } from './browser/pick-exit-code-after-tests.ts'
 import type { BrowserLaneWiring } from './browser/wire-browser-lane-hooks.ts';
 import type { TestSelection } from './build-test-selection.ts';
 import { buildTestSelection } from './build-test-selection.ts';
+import { formatNoMatchMessage } from './format-no-match-message.ts';
 import type { LaneHooks } from './lane-hooks.ts';
 import { makeRepoLaneHooks } from './make-repo-lane-hooks.ts';
 import { parseTestArgs } from './parse-test-args.ts';
@@ -52,15 +53,16 @@ export async function runLane(request: LaneRequest, run: RigRun, deps: LaneDeps)
     args,
   });
 
+  if (selection.kind === 'none') {
+    deps.output.err(formatNoMatchMessage(lane.name, selection.paths));
+
+    return 1;
+  }
+
   const testArgs = pickLaneTestArgs(request.config, lane, selection, trackedFiles);
 
   if (testArgs === null) {
-    const message =
-      selection.kind === 'none'
-        ? `rig: the ${lane.name} lane has no tests that match the paths\n`
-        : `rig: the ${lane.name} lane has no tests\n`;
-
-    deps.output.out(message);
+    deps.output.out(`rig: the ${lane.name} lane has no tests\n`);
 
     return 0;
   }
@@ -75,13 +77,12 @@ export async function runLane(request: LaneRequest, run: RigRun, deps: LaneDeps)
 function pickLaneTestArgs(
   config: RigConfig,
   lane: ResolvedLane,
-  selection: TestSelection,
+  selection: Exclude<TestSelection, { kind: 'none' }>,
   trackedFiles: readonly string[],
 ): readonly string[] | null {
   const timeoutArg = `--timeout=${lane.limitMs}`;
 
   return match(selection)
-    .with({ kind: 'none' }, () => null)
     .with({ kind: 'files' }, (files) => [timeoutArg, ...files.files, ...files.flags])
     .with({ kind: 'lane' }, (laneRun) => {
       const laneSelection = pickLaneSelection(lane, pickE2EDirs(trackedFiles));

@@ -57,17 +57,17 @@ test('it runs only the unit files that a path selects', async () => {
   expect(ctx.runCommand.mock.calls[0]?.[0]).not.toContain('./pkg/src/oven.host.test.ts');
 });
 
-test('it says so and runs nothing for a unit run given only the path of a host test file', async () => {
+test('it names the path, exits 1 and runs nothing for a unit run given only the path of a host test file', async () => {
   const ctx = setupTest({ kind: 'count', count: 3 });
 
   ctx.trackedFiles.push('pkg/src/oven.test.ts', 'pkg/src/oven.host.test.ts');
 
   const exitCode = await runUnit(defineRig({}), ['./pkg/src/oven.host.test.ts'], ctx.run, ctx.deps);
 
-  expect(exitCode).toBe(0);
+  expect(exitCode).toBe(1);
 
-  expect(ctx.output.out).toHaveBeenCalledExactlyOnceWith(
-    'rig: the unit lane has no tests that match the paths\n',
+  expect(ctx.output.err).toHaveBeenCalledExactlyOnceWith(
+    'rig: the unit lane has no tests that match ./pkg/src/oven.host.test.ts\n',
   );
 
   expect(ctx.runCommand).not.toHaveBeenCalled();

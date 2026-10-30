@@ -34,7 +34,9 @@ its plugin.
    select the files. The folders are the `e2e` folders at the repo root or an app root and the
    `-e2e` packages that git tracks. When the arguments name paths, rig narrows them to the lane's
    own tracked test files and hands `bun test` that exact list, because `bun test` runs any file a
-   path names, whatever its lane.
+   path names, whatever its lane. Paths that select none of the lane's files fail the run with exit
+   code 1, so a mistyped path never passes as a run with no tests. A lane with no test files and no
+   paths exits 0.
 3. `stop` cleans up, whether the tests passed, failed or never started.
 
 `rig` turns SIGINT, SIGTERM and SIGHUP into an abort. Every command rig starts runs in a process
