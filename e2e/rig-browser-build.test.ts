@@ -4,6 +4,7 @@ import { hostname, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { buildBrowserRun } from '../packages/rig/src/browser/build-browser-run.ts';
 import { pickChromeDirs } from '../packages/rig/src/browser/pick-chrome-dirs.ts';
+import { readPackageBin } from '../test-utils/read-package-bin.ts';
 import { stopProcessGroups } from '../test-utils/stop-process-groups.ts';
 import { testProcesses } from '../test-utils/test-processes.ts';
 
@@ -12,6 +13,9 @@ async function setupTest() {
 
   onTestFinished(() => stack.disposeAsync());
 
+  // The journey runs rig through the bin that its package declares, so a wrong bin entry fails it,
+  // which a run of the CLI's source file would miss.
+  const rigBin = await readPackageBin(join(import.meta.dir, '..', 'packages', 'rig'), 'rig');
   const repoRoot = await mkdtemp(join(tmpdir(), 'rig-browser-build-'));
 
   stack.defer(() => rm(repoRoot, { recursive: true, force: true }));
@@ -34,20 +38,13 @@ async function setupTest() {
   return {
     repoRoot,
     startLane: () => {
-      const lane = Bun.spawn(
-        [
-          process.execPath,
-          join(import.meta.dir, '..', 'packages', 'rig', 'src', 'cli.ts'),
-          'browser',
-        ],
-        {
-          cwd: repoRoot,
-          env: { ...process.env, TMPDIR: laneTmpdir },
-          stdout: 'ignore',
-          stderr: 'ignore',
-          detached: true,
-        },
-      );
+      const lane = Bun.spawn([rigBin, 'browser'], {
+        cwd: repoRoot,
+        env: { ...process.env, TMPDIR: laneTmpdir },
+        stdout: 'ignore',
+        stderr: 'ignore',
+        detached: true,
+      });
 
       // rig starts its build and its tests in process groups of their own, so the cleanup stops
       // those groups and rig's, and waits for them, before the folders go.

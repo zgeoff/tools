@@ -7,11 +7,16 @@ import { pickChromeDirs } from '../packages/rig/src/browser/pick-chrome-dirs.ts'
 import type { StubBuildRepo } from '../test-utils/create-stub-build-repo.ts';
 import { createStubBuildRepo } from '../test-utils/create-stub-build-repo.ts';
 import { probeProcess } from '../test-utils/probe-process.ts';
+import { readPackageBin } from '../test-utils/read-package-bin.ts';
 import { stopProcessGroups } from '../test-utils/stop-process-groups.ts';
 import { templateFiles } from '../test-utils/template-files.ts';
 import { testProcesses } from '../test-utils/test-processes.ts';
 
 async function setupTest() {
+  // The journey runs rig through the bin that its package declares, so a wrong bin entry fails it,
+  // which a run of the CLI's source file would miss.
+  const rigBin = await readPackageBin(join(import.meta.dir, '..', 'packages', 'rig'), 'rig');
+
   // The build's process ID file sits in the repo, so one cleanup stops the processes before it
   // removes the repo.
   const repoParent = await mkdtemp(join(tmpdir(), 'rig-browser-repo-'));
@@ -78,20 +83,13 @@ async function setupTest() {
     laneTmpdir,
     chromeRunsDir,
     startLane: () => {
-      const lane = Bun.spawn(
-        [
-          process.execPath,
-          join(import.meta.dir, '..', 'packages', 'rig', 'src', 'cli.ts'),
-          'browser',
-        ],
-        {
-          cwd: repoRoot,
-          env: { ...process.env, TMPDIR: laneTmpdir },
-          stdout: 'pipe',
-          stderr: 'ignore',
-          detached: true,
-        },
-      );
+      const lane = Bun.spawn([rigBin, 'browser'], {
+        cwd: repoRoot,
+        env: { ...process.env, TMPDIR: laneTmpdir },
+        stdout: 'pipe',
+        stderr: 'ignore',
+        detached: true,
+      });
 
       started.lanes.push(lane);
 
