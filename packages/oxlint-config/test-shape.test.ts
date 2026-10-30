@@ -98,6 +98,11 @@ test.each([
     'Start a test title with `it `',
   ],
   [
+    'a test.skipIf(…).each title with no prefix',
+    "import { test } from 'bun:test';\n\ntest.skipIf(false).each([1, 2])('%d cups boil', () => {});\n",
+    'Start a test title with `it `',
+  ],
+  [
     'a unit prefix with no space after it',
     "import { test } from 'bun:test';\n\ntest('#brew', () => {});\n",
     'Start a test title with `it `',

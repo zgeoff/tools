@@ -87,11 +87,14 @@ function findRootName(callee) {
 function isTestCallee(callee) {
   let current = callee;
 
-  while (current.type === 'CallExpression') {
-    current = current.callee;
+  while (
+    current.type === 'CallExpression' ||
+    (current.type === 'MemberExpression' && !current.computed)
+  ) {
+    current = current.type === 'CallExpression' ? current.callee : current.object;
   }
 
-  return findRootName(current) === 'test';
+  return current.type === 'Identifier' && current.name === 'test';
 }
 
 function findTitleStart(node) {
