@@ -56,7 +56,9 @@ test('it reports an exclude with no removal comment', () => {
 });
 
 test('it never reports a first-party exclude', () => {
-  const bunfig = ['[install]', 'minimumReleaseAgeExcludes = ["@zgeoff/std"]'].join('\n');
+  const bunfig = ['[install]', 'minimumReleaseAgeExcludes = ["@zgeoff/std", "@impz/client"]'].join(
+    '\n',
+  );
 
   expect(collectStaleAgeGateExcludes(bunfig, '2026-03-01')).toStrictEqual([]);
 });

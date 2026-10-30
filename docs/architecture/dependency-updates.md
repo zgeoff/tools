@@ -128,8 +128,8 @@ working tree, and fails on each entry the repo can remove:
 
 - An age-gate exclude whose removal comment, in the form the audit-fix workflow writes, names a day
   before today. An exclude with no such comment fails too, because the audit-fix workflow never
-  removes it. An exclude of a `@zgeoff/` package never fails: the Renovate preset bumps those
-  packages as soon as they publish, so each one keeps its exclude.
+  removes it. An exclude of a `@zgeoff/` or `@impz/` package never fails: the Renovate preset bumps
+  those packages as soon as they publish, so each one keeps its exclude.
 - A root override that every range in `bun.lock` admits, or one of a package that nothing in
   `bun.lock` depends on. An override that pins the version the root `workspaces.catalog` holds
   stays, because without it a dependent's range can resolve to a newer release than the catalog's.
