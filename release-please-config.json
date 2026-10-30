@@ -48,6 +48,10 @@
     "packages/skill-gate": {
       "component": "@zgeoff/skill-gate",
       "initial-version": "0.1.0"
+    },
+    "packages/diet": {
+      "component": "@zgeoff/diet",
+      "initial-version": "0.1.0"
     }
   }
 }

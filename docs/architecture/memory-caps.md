@@ -2,10 +2,12 @@
 
 A test run or a type check that outgrows its host takes the host down with it: on a small machine
 shared by parallel agents, the kernel's OOM killer then picks a process from any session. The
-memory-cap script runs a command inside a cgroup with a memory cap and no swap, so the kernel kills
-that command first, and it reports how close the run came. The `memory-cap` entry delivers it to
-every repo as `scripts/run-memory-capped.sh`, from
-[`sync/pre-push/run-memory-capped.sh`](../../sync/pre-push/run-memory-capped.sh).
+[`@zgeoff/diet`](../../packages/diet/README.md) runs a command inside a cgroup with a memory cap and
+no swap, so the kernel kills that command first, and it reports how close the run came. tools runs
+its pre-push jobs under `diet`. The `memory-cap` entry delivers a script with the same modes to
+every repo, as `scripts/run-memory-capped.sh`. The script takes its cap in MiB as its first
+argument, and the baseline's `memory-capped` package script passes it the memory budget that
+`scripts/read-memory-budget.ts` prints.
 
 ## Why a cgroup and not ulimit
 
@@ -15,15 +17,16 @@ counts the pages a process uses, so a cap there fails only a run that uses too m
 
 ## The modes
 
-The script tries each mode in order and uses the first the host supports. `--modes` prints the
-supported ones, and `MEMORY_CAP_MODE` picks one by name.
+`diet` tries each mode in order and uses the first the host supports. `diet --modes` prints the
+supported ones, and `DIET_MODE` picks one by name. The synced script reads `MEMORY_CAP_MODE`
+instead.
 
 | Mode           | Host                                                                    | How it caps                                                                              |
 | -------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | `systemd-sudo` | systemd and a passwordless sudo, such as a GitHub runner                | a transient scope from `sudo systemd-run`, which drops back to the caller with `setpriv` |
 | `systemd-user` | a desktop whose user manager has the memory controller                  | a transient scope from `systemd-run --user`                                              |
-| `cgroupfs`     | a writable cgroup v2 tree with no systemd, such as a root shell in a VM | a sibling cgroup that the script writes and removes itself                               |
-| `none`         | any other host                                                          | no cap: the script prints a warning and runs the command                                 |
+| `cgroupfs`     | a writable cgroup v2 tree with no systemd, such as a root shell in a VM | a sibling cgroup that `diet` writes and removes itself                                   |
+| `none`         | any other host                                                          | no cap: `diet` prints a warning and runs the command                                     |
 
 cgroup v2 lets a cgroup below the root either hold processes or enable a controller for its
 children, never both. The `cgroupfs` mode therefore makes its cgroup beside the one that holds the
@@ -32,13 +35,19 @@ into it.
 
 ## What a run reports
 
-In a mode that applies a cap, the script prints three lines on stderr after the command ends: the
-cap and the swap cap it set, the peak anonymous memory and `memory.peak`, and the count of OOM kills
-in the cgroup. `memory.peak` counts the page cache, which the kernel takes back under the cap, so
-the script also samples the anonymous memory, which the kernel cannot take back, at a short
-interval. It exits with the command's status, or 1 when the kernel OOM-killed a process in the
-cgroup. In GitHub Actions, the OOM line is an error annotation. The `none` mode prints only its
-warning, before the command starts, and exits with the command's status.
+The budget is the `--budget` size, or by default the host's memory budget, which
+[the worker count](#the-worker-count) defines. `diet` refuses a budget too small for its own shell
+and sampler, which run under the cap, because the kernel would kill them and the report with them.
+In a mode that applies a cap, `diet` prints its peak and the budget on stderr after the command
+ends. `memory.peak` counts the page cache, which the kernel takes back under the cap, so `diet`
+samples the anonymous memory, which the kernel cannot take back, at a short interval, and reports
+the highest sample. A command that the kernel kills can climb to the cap between two samples, so
+after an OOM kill `diet` reports `memory.peak` when it is higher, and prints a second line with the
+count of OOM kills.
+
+`diet` exits with the command's status, or 1 when the kernel OOM-killed a process in the cgroup. In
+GitHub Actions, the OOM line is an error annotation. The `none` mode prints only its warning, before
+the command starts, and exits with the command's status.
 
 ## The worker count
 

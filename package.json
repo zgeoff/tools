@@ -70,7 +70,7 @@
     "check:dependency-gates": "bun sync/pre-push/dependency-gates/run-dependency-gates-check.ts",
     "check:workflows": "bun sync/pre-push/run-workflows-check.ts",
     "check:uncommitted": "bun sync/pre-push/run-uncommitted-check.ts",
-    "memory-capped": "bash sync/pre-push/run-memory-capped.sh \"$(bun sync/pre-push/read-memory-budget.ts)\""
+    "memory-capped": "diet --"
   },
   "devDependencies": {
     "@actions/expressions": "catalog:",
@@ -81,6 +81,7 @@
     "@zgeoff/bun-test-extended": "workspace:*",
     "@zgeoff/bun-test-react": "workspace:*",
     "@zgeoff/commitlint-config": "workspace:*",
+    "@zgeoff/diet": "workspace:*",
     "@zgeoff/format-codemod": "workspace:*",
     "@zgeoff/oxfmt-config": "workspace:*",
     "@zgeoff/oxlint-config": "workspace:*",

@@ -1,0 +1,34 @@
+{
+  "name": "@zgeoff/diet",
+  "version": "0.1.0",
+  "description": "Run a command inside a cgroup memory cap with no swap, and report its peak memory and any OOM kills",
+  "keywords": [
+    "cgroup",
+    "memory",
+    "oom"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zgeoff/tools.git",
+    "directory": "packages/diet"
+  },
+  "bin": {
+    "diet": "./diet.sh"
+  },
+  "files": [
+    "diet.sh"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "typecheck": "tsrs"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "tiny-invariant": "catalog:",
+    "tsrs": "catalog:",
+    "typescript": "catalog:"
+  }
+}

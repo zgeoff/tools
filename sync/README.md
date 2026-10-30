@@ -27,8 +27,8 @@ holds and how a run delivers, updates and retires the files.
 - [The pre-push baseline](../docs/architecture/pre-push-baseline.md): what the baseline runs and the
   files it delivers.
 - [Sync tags](../docs/architecture/sync-tags.md): why a repo syncs at a tag, never at `main`.
-- [Memory caps](../docs/architecture/memory-caps.md): the script that runs a command inside a cgroup
-  memory cap, and its modes.
+- [Memory caps](../docs/architecture/memory-caps.md): `@zgeoff/diet` and the synced script, which
+  run a command inside a cgroup memory cap, and their modes.
 - [Dependency updates](../docs/architecture/dependency-updates.md): the Renovate preset, the
   self-hosted Renovate run, and the audit-fix workflow.
 - [The Socket config](../docs/architecture/socket-config.md): how the `socket` entry limits Socket's
