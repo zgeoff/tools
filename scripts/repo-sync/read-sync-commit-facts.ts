@@ -101,8 +101,24 @@ async function readTreePins(context: SyncCommandContext, commit: string): Promis
     '.github/workflows',
   ]);
 
-  const pin = /@(?<commit>[0-9a-f]{40})/u.exec(found.stdout)?.groups?.['commit'];
-  const pins = pin === undefined ? [] : [await readPinOrder(context, commit, pin)];
+  // git grep exits 1 when nothing matches and above 1 when it cannot read the tree.
+  if (found.exitCode > 1) {
+    return { kind: 'unreadable', reason: found.stderr.trim() };
+  }
+
+  const pinned = [...found.stdout.matchAll(/@(?<commit>[0-9a-f]{40})/gu)].flatMap((match) => {
+    const pin = match.groups?.['commit'];
+
+    return pin === undefined ? [] : [pin];
+  });
+
+  const pins: PinOrder[] = [];
+
+  for (const pin of new Set(pinned)) {
+    const order = await readPinOrder(context, commit, pin);
+
+    pins.push(order);
+  }
 
   return { kind: 'read', pins };
 }
@@ -129,7 +145,14 @@ async function readPinOrder(
     pin,
   ]);
 
-  return { pin, order: older.exitCode === 0 ? 'newer' : 'not-newer' };
+  // merge-base exits 1 when the commit is not an ancestor and above 1 when it lacks an object.
+  if (older.exitCode > 1) {
+    return { pin, order: 'unknown', reason: older.stderr.trim() };
+  }
+
+  const order = older.exitCode === 0 ? 'newer' : 'not-newer';
+
+  return { pin, order };
 }
 
 async function readBranchPins(

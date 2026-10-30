@@ -812,10 +812,13 @@ test('it overwrites a workflow of the repo that calls the same shared workflow',
   await ctx.writeMainCommit('README.md', '# app\n');
   await ctx.writeManifestCommit([]);
 
+  // An older commit of zgeoff/tools, so the run can order the pin against the one it syncs.
+  const pinned = await ctx.writeToolsCommit();
+
   await ctx.writeBranch(
     'main',
     '.github/workflows/pr.yml',
-    'name: Own PR checks\njobs:\n  pr:\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@0123456789abcdef0123456789abcdef01234567 # main\n',
+    `name: Own PR checks\njobs:\n  pr:\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@${pinned} # main\n`,
   );
 
   await ctx.writeSource(
@@ -847,10 +850,13 @@ test("it pins the repo's own calls to zgeoff/tools in the sync pull request, whi
   await ctx.writeMainCommit('README.md', '# app\n');
   await ctx.writeManifestCommit([]);
 
+  // An older commit of zgeoff/tools, so the run can order the pin against the one it syncs.
+  const pinned = await ctx.writeToolsCommit();
+
   await ctx.writeBranch(
     'main',
     '.github/workflows/repo-sync.yml',
-    'jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@0123456789abcdef0123456789abcdef01234567 # main\n',
+    `jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@${pinned} # main\n`,
   );
 
   await ctx.writeSource('sync/editorconfig', 'root = true\n');
@@ -901,10 +907,13 @@ test('it leaves the pin alone and opens no pull request when every entry matches
   await ctx.writeMainCommit('README.md', '# app\n');
   await ctx.writeManifestCommit([]);
 
+  // An older commit of zgeoff/tools, so the run can order the pin against the one it syncs.
+  const pinned = await ctx.writeToolsCommit();
+
   await ctx.writeBranch(
     'main',
     '.github/workflows/repo-sync.yml',
-    'jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@0123456789abcdef0123456789abcdef01234567 # main\n',
+    `jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@${pinned} # main\n`,
   );
 
   await ctx.writeSource('sync/readme.md', '# app\n');
@@ -931,10 +940,13 @@ test('it leaves the open pull request alone when it already syncs a newer commit
   await ctx.writeMainCommit('README.md', '# app\n');
   await ctx.writeManifestCommit([]);
 
+  // An older commit of zgeoff/tools, so the run can order the pin against the one it syncs.
+  const pinned = await ctx.writeToolsCommit();
+
   await ctx.writeBranch(
     'main',
     '.github/workflows/repo-sync.yml',
-    'jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@0123456789abcdef0123456789abcdef01234567 # main\n',
+    `jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@${pinned} # main\n`,
   );
 
   const entry = {
@@ -1463,10 +1475,13 @@ test('it opens no pull request when a delivered workflow differs from its source
   await ctx.writeMainCommit('README.md', '# app\n');
   await ctx.writeManifestCommit([]);
 
+  // An older commit of zgeoff/tools, so the run can order the pin against the one it syncs.
+  const pinned = await ctx.writeToolsCommit();
+
   await ctx.writeBranch(
     'main',
     '.github/workflows/repo-sync-guard.yml',
-    'jobs:\n  guard:\n    uses: zgeoff/tools/.github/workflows/repo-sync-guard.yml@0123456789abcdef0123456789abcdef01234567 # main\n',
+    `jobs:\n  guard:\n    uses: zgeoff/tools/.github/workflows/repo-sync-guard.yml@${pinned} # main\n`,
   );
 
   await ctx.writeSource(
@@ -1493,4 +1508,83 @@ test('it opens no pull request when a delivered workflow differs from its source
   expect(exitCode).toBe(0);
   expect(branches).toStrictEqual(['main']);
   expect(pulls).toStrictEqual([]);
+});
+
+test('it leaves the repo alone when any workflow on main pins a newer commit than the one it was sent', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  const entry = {
+    name: 'editorconfig',
+    description: 'The editor config',
+    files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+  };
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const first = await ctx.writeToolsCommit();
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n\n[*]\nindent_size = 2\n');
+
+  const delayed = await ctx.writeToolsCommit();
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n\n[*]\nindent_size = 4\n');
+
+  const newest = await ctx.writeToolsCommit();
+
+  await ctx.writeBranch(
+    'main',
+    '.github/workflows/a-checks.yml',
+    `jobs:\n  checks:\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@${first} # main\n`,
+  );
+
+  await ctx.writeBranch(
+    'main',
+    '.github/workflows/repo-sync.yml',
+    `jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@${newest} # main\n`,
+  );
+
+  const exitCode = await ctx.runSync([entry], { TOOLS_REF: delayed });
+  const branches = await ctx.readBranchNames();
+
+  expect(exitCode).toBe(0);
+  expect(branches).toStrictEqual(['main']);
+
+  expect(ctx.output).toContain(
+    `main already pins ${newest}, which is newer than ${delayed}; nothing to do.\n`,
+  );
+});
+
+test('it stops and pushes nothing when main pins a commit that zgeoff/tools does not have', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  await ctx.writeBranch(
+    'main',
+    '.github/workflows/repo-sync.yml',
+    'jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@0123456789abcdef0123456789abcdef01234567 # main\n',
+  );
+
+  const exitCode = await ctx.runSync([
+    {
+      name: 'editorconfig',
+      description: 'The editor config',
+      files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+    },
+  ]);
+
+  const toolsHead = await ctx.readToolsHead();
+  const branches = await ctx.readBranchNames();
+
+  expect(exitCode).toBe(1);
+  expect(branches).toStrictEqual(['main']);
+
+  expect(ctx.output).toStrictEqual([
+    `::error::Cannot tell whether ${toolsHead} is older than the pin 0123456789abcdef0123456789abcdef01234567 on main, so the run stops; the next run tries again: fatal: Not a valid commit name 0123456789abcdef0123456789abcdef01234567\n`,
+  ]);
 });
