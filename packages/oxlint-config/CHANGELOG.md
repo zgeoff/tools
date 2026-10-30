@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.2](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.7.1...@zgeoff/oxlint-config@0.7.2) (2026-10-30)
+
+### Features
+
+- **oxlint-config:** add a react overlay and a zod namespace exception
+  ([#383](https://github.com/zgeoff/tools/issues/383))
+  ([c536793](https://github.com/zgeoff/tools/commit/c5367934a597f0231b83ad9610b49a06c1d31fb0))
+- **oxlint-config:** ban require functions and module.exports
+  ([#382](https://github.com/zgeoff/tools/issues/382))
+  ([65263ac](https://github.com/zgeoff/tools/commit/65263ac0a8fced3399f917e404aeb3ee9efdff9f))
+
 ## [0.7.1](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.7.0...@zgeoff/oxlint-config@0.7.1) (2026-10-28)
 
 ### Features
