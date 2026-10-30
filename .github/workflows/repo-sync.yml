@@ -236,6 +236,12 @@ jobs:
     name: Raise a red sync pull request
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # The job reads the open issues and then opens one, so two runs at once
+    # could both open it. A waiting run that a newer one replaces loses
+    # nothing, since each run checks the same pull request.
+    concurrency:
+      group: repo-sync-alarm-${{ github.repository }}
+      cancel-in-progress: false
     permissions:
       contents: read
       issues: write
