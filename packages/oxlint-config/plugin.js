@@ -15,6 +15,7 @@ import noTestSleep from './no-test-sleep.js';
 import resolveRepoRoot from './resolve-repo-root.js';
 import setupTestOnly from './setup-test-only.js';
 import testBesideModule from './test-beside-module.js';
+import testShape from './test-shape.js';
 import testTimeoutExceptionTicket from './test-timeout-exception-ticket.js';
 import verbContract from './verb-contract.js';
 
@@ -112,6 +113,7 @@ const plugin = {
     'test-timeout-exception-ticket': testTimeoutExceptionTicket,
     'no-test-sleep': noTestSleep,
     'no-require': noRequire,
+    'test-shape': testShape,
     'import-zones': importZones,
   },
 };

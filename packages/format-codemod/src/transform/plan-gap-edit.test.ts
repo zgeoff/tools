@@ -11,7 +11,7 @@ test('it plans a splice that widens a single-newline gap to one blank line', () 
     pad: true,
   });
 
-  expect(edit).toEqual({ start: 12, end: 13, replacement: '\n\n' });
+  expect(edit).toStrictEqual({ start: 12, end: 13, replacement: '\n\n' });
 });
 
 test('it returns null when the gap already holds exactly one blank line', () => {
@@ -37,7 +37,7 @@ test('it preserves the next statement indentation in the replacement', () => {
     pad: true,
   });
 
-  expect(edit).toEqual({ start: 16, end: 19, replacement: '\n\n  ' });
+  expect(edit).toStrictEqual({ start: 16, end: 19, replacement: '\n\n  ' });
 });
 
 test('it returns null when the statements share a physical line', () => {
@@ -76,7 +76,7 @@ test('it keeps a trailing same-line comment attached to the previous statement',
     pad: true,
   });
 
-  expect(edit).toEqual({ start: 20, end: 21, replacement: '\n\n' });
+  expect(edit).toStrictEqual({ start: 20, end: 21, replacement: '\n\n' });
 });
 
 test('it keeps multiple same-line trailing comments together on the previous line', () => {
@@ -95,7 +95,7 @@ test('it keeps multiple same-line trailing comments together on the previous lin
     pad: true,
   });
 
-  expect(edit).toEqual({ start: 28, end: 29, replacement: '\n\n' });
+  expect(edit).toStrictEqual({ start: 28, end: 29, replacement: '\n\n' });
 });
 
 test('it puts the blank line before a leading comment of the next statement', () => {
@@ -108,7 +108,7 @@ test('it puts the blank line before a leading comment of the next statement', ()
     pad: true,
   });
 
-  expect(edit).toEqual({ start: 12, end: 13, replacement: '\n\n' });
+  expect(edit).toStrictEqual({ start: 12, end: 13, replacement: '\n\n' });
 });
 
 test('it returns null when a leading comment is already preceded by a blank line', () => {
@@ -134,7 +134,7 @@ test('it plans a splice that collapses a one-blank-line gap to flush', () => {
     pad: false,
   });
 
-  expect(edit).toEqual({ start: 7, end: 9, replacement: '\n' });
+  expect(edit).toStrictEqual({ start: 7, end: 9, replacement: '\n' });
 });
 
 test('it collapses several blank lines to flush in one splice', () => {
@@ -147,7 +147,7 @@ test('it collapses several blank lines to flush in one splice', () => {
     pad: false,
   });
 
-  expect(edit).toEqual({ start: 7, end: 11, replacement: '\n' });
+  expect(edit).toStrictEqual({ start: 7, end: 11, replacement: '\n' });
 });
 
 test('it preserves the next statement indentation when collapsing', () => {
@@ -160,7 +160,7 @@ test('it preserves the next statement indentation when collapsing', () => {
     pad: false,
   });
 
-  expect(edit).toEqual({ start: 11, end: 15, replacement: '\n  ' });
+  expect(edit).toStrictEqual({ start: 11, end: 15, replacement: '\n  ' });
 });
 
 test('it returns null when a flush target is already flush', () => {

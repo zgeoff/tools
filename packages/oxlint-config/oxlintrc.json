@@ -41,6 +41,7 @@
     "zgeoff/test-timeout-exception-ticket": "error",
     "zgeoff/no-test-sleep": "error",
     "zgeoff/no-require": "error",
+    "zgeoff/test-shape": "error",
 
     // name a value for what it holds, in full words: one letter only for a
     // coordinate, zod's `z`, Bun's shell `$` or an unread `_` placeholder, and

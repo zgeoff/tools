@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { collectASTNodes } from './collect-ast-nodes.ts';
 
 test('it wraps a lone node in an array', () => {
-  expect(collectASTNodes({ type: 'Identifier', name: 'x' })).toEqual([
+  expect(collectASTNodes({ type: 'Identifier', name: 'x' })).toStrictEqual([
     { type: 'Identifier', name: 'x' },
   ]);
 });
@@ -16,7 +16,7 @@ test('it returns nothing for a non-node value', () => {
 test('it keeps only the node elements of a mixed array', () => {
   const value = [{ type: 'A' }, 3, null, { type: 'B' }, 'text'];
 
-  expect(collectASTNodes(value)).toEqual([{ type: 'A' }, { type: 'B' }]);
+  expect(collectASTNodes(value)).toStrictEqual([{ type: 'A' }, { type: 'B' }]);
 });
 
 test('it returns nothing for an empty array', () => {

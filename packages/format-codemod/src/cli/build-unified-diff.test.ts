@@ -37,7 +37,7 @@ test('it finds the minimal diff when lines repeat', () => {
   const diff = buildUnifiedDiff('x\na\nx\n', 'a\nx\n', 'x.ts');
   const changed = diff.split('\n').filter((line) => line.startsWith('-') || line.startsWith('+'));
 
-  expect(changed).toEqual(['--- x.ts', '+++ x.ts', '-x']);
+  expect(changed).toStrictEqual(['--- x.ts', '+++ x.ts', '-x']);
 });
 
 test('it anchors a pure insertion hunk to the line before it', () => {

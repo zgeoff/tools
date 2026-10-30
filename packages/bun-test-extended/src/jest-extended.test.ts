@@ -218,8 +218,8 @@ test('it orders mock calls with toHaveBeenCalledBefore and toHaveBeenCalledAfter
   expect(second).toHaveBeenCalledAfter(first);
 });
 
-test('it works asymmetrically inside toEqual', () => {
-  expect({ status: 'active', count: 4 }).toEqual({
+test('it works asymmetrically inside toStrictEqual', () => {
+  expect({ status: 'active', count: 4 }).toStrictEqual({
     status: expect.toBeOneOf(['active', 'inactive']),
     count: expect.toBeEven(),
   });

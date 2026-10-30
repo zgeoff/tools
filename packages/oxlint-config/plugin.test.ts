@@ -677,6 +677,16 @@ test('it flags a negated and a computed file snapshot matcher', async () => {
   expect(result.stdout).toInclude('sample.ts:5:19');
 });
 
+test('it flags a file snapshot matcher read by a template key', async () => {
+  const source =
+    "import { expect, test } from 'bun:test';\n\ntest('it renders the banner', () => {\n  expect('ready')[`toMatchSnapshot`]();\n});\n";
+
+  const result = await runLint(source, { 'zgeoff/no-file-snapshot': 'error' });
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('sample.ts:4:19');
+});
+
 test('it accepts inline snapshot matchers', async () => {
   const source =
     "import { expect, test } from 'bun:test';\n\ntest('it renders the banner', () => {\n  expect('ready').toMatchInlineSnapshot(`\"ready\"`);\n  expect(() => {\n    throw new Error('late');\n  }).toThrowErrorMatchingInlineSnapshot(`\"late\"`);\n});\n";
@@ -806,11 +816,10 @@ test('it names the three ways out of a module-level declaration', async () => {
 });
 
 test.each([
-  ['a hook call', 'beforeEach(() => {});\n'],
   ['an exported const', 'export const cups = 2;\n'],
   ['an exported type', 'export type Cups = number;\n'],
 ])('it flags %s at module level', async (_, statement) => {
-  const source = `import { beforeEach, test } from 'bun:test';\n\n${statement}\ntest('it pours', () => {});\n`;
+  const source = `import { test } from 'bun:test';\n\n${statement}\ntest('it pours', () => {});\n`;
 
   const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', {
     'zgeoff/setup-test-only': 'error',
@@ -821,7 +830,46 @@ test.each([
 });
 
 test.each([
-  ['an aliased bun:test import', "import { beforeEach as test } from 'bun:test';\n"],
+  ['skip', "test.skip('it pours', () => {});\n"],
+  ['todo', "test.todo('it pours');\n"],
+  ['only', "test.only('it pours', () => {});\n"],
+  ['failing', "test.failing('it pours', () => {});\n"],
+  ['skip', "test.skip.each([1])('it pours %d cups', () => {});\n"],
+])('it points a module-level test.%s at skipIf', async (modifier, statement) => {
+  const source = `import { test } from 'bun:test';\n\n${statement}`;
+
+  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
+
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout).toInclude(
+    `\`test.${modifier}\` is banned: use \`test.skipIf(<condition>)\` for a skip.`,
+  );
+
+  expect(result.stdout).not.toInclude('Move this statement into a test');
+});
+
+test.each([
+  ["test.concurrent('it pours', () => {});\n"],
+  ["test.concurrent.each([1])('it pours %d cups', () => {});\n"],
+  ["test.skip.concurrent('it pours', () => {});\n"],
+])('it tells a module-level %p that tests run in order', async (statement) => {
+  const source = `import { test } from 'bun:test';\n\n${statement}`;
+
+  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
+
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout).toInclude(
+    '`test.concurrent` is banned: tests that use `onTestFinished` run in order.',
+  );
+});
+
+test.each([
   ['a default import', "import test from './runner';\n"],
   ['a namespace import', "import * as test from './runner';\n"],
   ['a function declaration', 'function test(callback: () => void) {\n  callback();\n}\n'],

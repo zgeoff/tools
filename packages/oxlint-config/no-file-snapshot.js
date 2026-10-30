@@ -1,7 +1,8 @@
 import { statSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
+import findStaticKey from './find-static-key.js';
 
-const fileMatchers = ['toMatchSnapshot', 'toThrowErrorMatchingSnapshot'];
+const fileMatchers = new Set(['toMatchSnapshot', 'toThrowErrorMatchingSnapshot']);
 
 const noFileSnapshot = {
   meta: {
@@ -14,19 +15,14 @@ const noFileSnapshot = {
     schema: [],
   },
   create(context) {
-    const entries = fileMatchers
-      .flatMap((matcher) => [
-        `MemberExpression[computed=false] > Identifier.property[name='${matcher}']`,
-        `MemberExpression[computed=true] > Literal.property[value='${matcher}']`,
-      ])
-      .map((selector) => [
-        selector,
-        (node) =>
-          context.report({ node, messageId: 'matcher', data: { matcher: getMatcherName(node) } }),
-      ]);
-
     return {
-      ...Object.fromEntries(entries),
+      MemberExpression(node) {
+        const matcher = findStaticKey(node);
+
+        if (fileMatchers.has(matcher)) {
+          context.report({ node: node.property, messageId: 'matcher', data: { matcher } });
+        }
+      },
       Program() {
         const filename = context.physicalFilename;
         const name = `${basename(filename)}.snap`;
@@ -44,10 +40,6 @@ const noFileSnapshot = {
     };
   },
 };
-
-function getMatcherName(node) {
-  return node.type === 'Identifier' ? node.name : node.value;
-}
 
 function probeFile(path) {
   return statSync(path, { throwIfNoEntry: false })?.isFile() ?? false;
