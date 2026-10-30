@@ -541,6 +541,25 @@ test('it refuses a mode it does not know', async () => {
   });
 });
 
+test.each([['1'], ['7M']])('it refuses a budget of %s, which leaves diet no room', async (size) => {
+  const ctx = setupTest();
+
+  const result = await $`bash ${ctx.scriptPath} --budget ${size} -- true`
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr: 'diet: a budget under 8 MB leaves no room for diet itself\n',
+  });
+});
+
 test.each([
   ['a budget that is not a whole number', ['--budget', '1.5G', '--', 'true']],
   ['a budget of zero', ['--budget', '0', '--', 'true']],

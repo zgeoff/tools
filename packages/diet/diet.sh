@@ -243,6 +243,14 @@ if [ "${1:-}" != -- ] || [ "$#" -lt 2 ]; then
 fi
 shift
 
+# diet's own shell and sampler run inside the cap, and the kernel OOM-killed
+# them, with no report and the scope left behind, under 3 MiB.
+min_budget=$((8 << 20))
+if [ -n "$budget" ] && [ "$budget" -lt "$min_budget" ]; then
+  echo "diet: a budget under $(format_size "$min_budget") leaves no room for diet itself" >&2
+  exit 2
+fi
+
 mode=${DIET_MODE:-}
 if [ -z "$mode" ]; then
   mode=none

@@ -36,12 +36,14 @@ into it.
 ## What a run reports
 
 The budget is the `--budget` size, or by default the host's memory budget, which
-[the worker count](#the-worker-count) defines. In a mode that applies a cap, `diet` prints its peak
-and the budget on stderr after the command ends. `memory.peak` counts the page cache, which the
-kernel takes back under the cap, so `diet` samples the anonymous memory, which the kernel cannot
-take back, at a short interval, and reports the highest sample. A command that the kernel kills can
-climb to the cap between two samples, so after an OOM kill `diet` reports `memory.peak` when it is
-higher, and prints a second line with the count of OOM kills.
+[the worker count](#the-worker-count) defines. `diet` refuses a budget too small for its own shell
+and sampler, which run under the cap, because the kernel would kill them and the report with them.
+In a mode that applies a cap, `diet` prints its peak and the budget on stderr after the command
+ends. `memory.peak` counts the page cache, which the kernel takes back under the cap, so `diet`
+samples the anonymous memory, which the kernel cannot take back, at a short interval, and reports
+the highest sample. A command that the kernel kills can climb to the cap between two samples, so
+after an OOM kill `diet` reports `memory.peak` when it is higher, and prints a second line with the
+count of OOM kills.
 
 `diet` exits with the command's status, or 1 when the kernel OOM-killed a process in the cgroup. In
 GitHub Actions, the OOM line is an error annotation. The `none` mode prints only its warning, before
