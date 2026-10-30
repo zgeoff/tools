@@ -80,6 +80,7 @@
     "@maschwenk/tsrslint": "catalog:",
     "@tsconfig/strictest": "catalog:",
     "@types/bun": "catalog:",
+    "@zgeoff/agent-hooks": "workspace:*",
     "@zgeoff/bun-test-extended": "workspace:*",
     "@zgeoff/bun-test-react": "workspace:*",
     "@zgeoff/commitlint-config": "workspace:*",

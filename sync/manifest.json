@@ -251,6 +251,17 @@
     ]
   },
   {
+    "name": "hook-start",
+    "description": "The agent hooks' start-up stub, which every hook entry runs: it runs the hooks from the @zgeoff/agent-hooks package, runs bun install --frozen-lockfile once under a lock when the package is missing, and refuses each tool call but a read-only Bash command with exit 2 when the package still cannot load; the repo installs the package and writes its hook entries with agent-hooks init",
+    "optIn": true,
+    "files": [
+      {
+        "source": "sync/hooks/start.ts",
+        "target": ".claude/hooks/start.ts"
+      }
+    ]
+  },
+  {
     "name": "memory-cap",
     "description": "The script that runs a command inside a cgroup memory cap with no swap, and prints the run's peak memory and OOM kills; every repo takes it, because the pre-push baseline runs its jobs under it",
     "files": [

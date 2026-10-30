@@ -10,6 +10,7 @@
         "@maschwenk/tsrslint": "catalog:",
         "@tsconfig/strictest": "catalog:",
         "@types/bun": "catalog:",
+        "@zgeoff/agent-hooks": "workspace:*",
         "@zgeoff/bun-test-extended": "workspace:*",
         "@zgeoff/bun-test-react": "workspace:*",
         "@zgeoff/commitlint-config": "workspace:*",
@@ -27,6 +28,26 @@
         "ts-pattern": "catalog:",
         "tsrs": "catalog:",
         "typescript": "catalog:",
+      },
+    },
+    "packages/agent-hooks": {
+      "name": "@zgeoff/agent-hooks",
+      "version": "0.1.0",
+      "bin": {
+        "agent-hooks": "./dist/cli.js",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "@types/picomatch": "catalog:",
+        "@zgeoff/std": "workspace:*",
+        "gunshi": "catalog:",
+        "picomatch": "catalog:",
+        "simple-git": "catalog:",
+        "tiny-invariant": "catalog:",
+        "ts-pattern": "catalog:",
+        "tsrs": "catalog:",
+        "typescript": "catalog:",
+        "zod": "catalog:",
       },
     },
     "packages/bun-test-extended": {
@@ -168,17 +189,13 @@
     "packages/skill-gate": {
       "name": "@zgeoff/skill-gate",
       "version": "0.2.10",
+      "dependencies": {
+        "@zgeoff/agent-hooks": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "catalog:",
-        "@types/picomatch": "catalog:",
-        "@zgeoff/std": "workspace:*",
-        "picomatch": "catalog:",
-        "simple-git": "catalog:",
-        "tiny-invariant": "catalog:",
-        "ts-pattern": "catalog:",
         "tsrs": "catalog:",
         "typescript": "catalog:",
-        "zod": "catalog:",
       },
     },
     "packages/std": {
@@ -579,6 +596,8 @@
     "@typescript/typescript-win32-arm64": ["@typescript/typescript-win32-arm64@7.0.2", "", { "os": "win32", "cpu": "arm64" }, "sha512-Gyl1Vy6OsWesLzmq+EP0Fb7b4Nid5232AvcA2SFcdYreldpNtYFFofPjnt62y9hQy7VTaZp65ICJjuAQRaVcIQ=="],
 
     "@typescript/typescript-win32-x64": ["@typescript/typescript-win32-x64@7.0.2", "", { "os": "win32", "cpu": "x64" }, "sha512-0BQ3HkAHHlKLSp1qRvf3SUhGpGsDuhB/jgFw75guyqbxJqEaS0Cw/VFO8i2nHglJUzQCRtMMR/IBAKE3ETMC4g=="],
+
+    "@zgeoff/agent-hooks": ["@zgeoff/agent-hooks@workspace:packages/agent-hooks"],
 
     "@zgeoff/bun-test-extended": ["@zgeoff/bun-test-extended@workspace:packages/bun-test-extended"],
 

@@ -1,7 +1,7 @@
 import { match } from 'ts-pattern';
+import type { Harness } from '../harness.ts';
 import { buildPatchGateOutput } from './build-patch-gate-output.ts';
 import { buildSkillGateOutput } from './build-skill-gate-output.ts';
-import type { Harness } from './harness.ts';
 import type { EditEntry, SkillGateHookOutput, SkillGateOutputContext } from './types.ts';
 
 export function buildEditOutput(

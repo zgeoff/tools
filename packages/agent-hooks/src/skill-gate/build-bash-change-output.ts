@@ -1,6 +1,6 @@
 import { match } from 'ts-pattern';
+import type { Harness } from '../harness.ts';
 import { formatSkillList } from './format-skill-list.ts';
-import type { Harness } from './harness.ts';
 import { pickHarnessWording } from './pick-harness-wording.ts';
 import type { BashChangeHookOutput, PostToolEvent } from './types.ts';
 

@@ -1,0 +1,54 @@
+{
+  "name": "@zgeoff/agent-hooks",
+  "version": "0.1.0",
+  "description": "The Claude Code and Codex CLI hooks for a zgeoff repo, run from one entry point: the skill gate, which denies an edit or a gated tool call until the session loads the skills it needs",
+  "keywords": [
+    "claude-code",
+    "codex",
+    "hook",
+    "skills"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zgeoff/tools.git",
+    "directory": "packages/agent-hooks"
+  },
+  "bin": {
+    "agent-hooks": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && bun run build:outdir dist",
+    "build:outdir": "sh -c 'bun build src/index.ts src/cli.ts --target bun --outdir \"$0\" && tsc -p tsconfig.build.json --outDir \"$0\"'",
+    "typecheck": "tsrs"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@types/picomatch": "catalog:",
+    "@zgeoff/std": "workspace:*",
+    "gunshi": "catalog:",
+    "picomatch": "catalog:",
+    "simple-git": "catalog:",
+    "tiny-invariant": "catalog:",
+    "ts-pattern": "catalog:",
+    "tsrs": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
+  },
+  "engines": {
+    "bun": ">=1.3"
+  }
+}

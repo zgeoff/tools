@@ -1,0 +1,296 @@
+import { expect, onTestFinished, test } from 'bun:test';
+import { spawnSync } from 'node:child_process';
+import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { readStreamUntil } from '../../test-utils/read-stream-until.ts';
+
+type InstallStub = 'installs' | 'fails' | 'installs-on-release';
+
+// The stub installs with the bun on PATH and runs the retry with its own runtime, so a fake bun
+// first on PATH stands in for the install alone. Its installed package re-exports this repo's
+// source, so the gate that runs after the install is the real one.
+async function setupTest(installStub: InstallStub) {
+  const directory = await mkdtemp(join(tmpdir(), 'agent-hooks-start-'));
+
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+
+  const project = join(directory, 'project');
+  const fakeBin = join(directory, 'bin');
+  const packageDir = join(directory, 'package');
+  const installLog = join(directory, 'install.log');
+  const releasePath = join(directory, 'release');
+  const stubPath = join(project, '.claude/hooks/start.ts');
+
+  await mkdir(join(project, '.claude/hooks'), { recursive: true });
+  await mkdir(join(project, '.claude/skills/docs-writing'), { recursive: true });
+  await mkdir(fakeBin);
+  await mkdir(packageDir);
+  await copyFile(join(import.meta.dir, 'start.ts'), stubPath);
+  await writeFile(join(project, '.claude/skills/docs-writing/SKILL.md'), '# Docs writing\n');
+  await writeFile(join(project, 'transcript.jsonl'), '');
+
+  await writeFile(
+    join(project, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
+  );
+
+  await writeFile(
+    join(packageDir, 'package.json'),
+    JSON.stringify({ name: '@zgeoff/agent-hooks', type: 'module', exports: './index.ts' }),
+  );
+
+  await writeFile(
+    join(packageDir, 'index.ts'),
+    `export * from ${JSON.stringify(join(import.meta.dir, '../../packages/agent-hooks/src/index.ts'))};\n`,
+  );
+
+  const installSteps = {
+    installs: [
+      `mkdir -p node_modules/@zgeoff`,
+      `ln -s '${packageDir}' node_modules/@zgeoff/agent-hooks`,
+    ],
+    fails: ['exit 1'],
+    'installs-on-release': [
+      `while [ ! -e '${releasePath}' ]; do sleep 0.05; done`,
+      `mkdir -p node_modules/@zgeoff`,
+      `ln -s '${packageDir}' node_modules/@zgeoff/agent-hooks`,
+    ],
+  }[installStub];
+
+  await writeFile(
+    join(fakeBin, 'bun'),
+    [
+      '#!/bin/sh',
+      `echo "bun $* in $PWD" >> '${installLog}'`,
+      'echo "fake install started" >&2',
+      ...installSteps,
+      '',
+    ].join('\n'),
+  );
+
+  await chmod(join(fakeBin, 'bun'), 0o755);
+
+  const env = {
+    PATH: `${fakeBin}:${process.env['PATH'] ?? ''}`,
+    HOME: process.env['HOME'] ?? '',
+    CLAUDE_PROJECT_DIR: project,
+  };
+
+  const buildPayload = (toolName: string, toolInput: Readonly<Record<string, unknown>>) =>
+    JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      cwd: project,
+      transcript_path: join(project, 'transcript.jsonl'),
+      tool_name: toolName,
+      tool_input: toolInput,
+    });
+
+  const runStub = (payload: string, args: readonly string[] = []) =>
+    spawnSync(process.execPath, ['--no-install', stubPath, ...args], {
+      encoding: 'utf8',
+      env,
+      input: payload,
+    });
+
+  const startStub = (payload: string) => {
+    const child = Bun.spawn([process.execPath, '--no-install', stubPath], {
+      env,
+      stdin: new Blob([payload]),
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+
+    onTestFinished(() => {
+      child.kill();
+    });
+
+    return child;
+  };
+
+  const readInstallLog = async () => {
+    try {
+      return await readFile(installLog, 'utf8');
+    } catch {
+      return '';
+    }
+  };
+
+  const gatedEdit = buildPayload('Write', { file_path: join(project, 'guide.md') });
+  const gateReason = `Load the \`docs-writing\` skill with the Skill tool before editing ${join(project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`;
+
+  return {
+    project,
+    releasePath,
+    buildPayload,
+    runStub,
+    startStub,
+    readInstallLog,
+    gatedEdit,
+    gateReason,
+  };
+}
+
+test('it installs the missing package in a fresh worktree, then blocks a gated edit with the gate reason', async () => {
+  const ctx = await setupTest('installs');
+
+  const result = ctx.runStub(ctx.gatedEdit);
+
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
+  expect(result.stderr).toBe(`fake install started\n${ctx.gateReason}`);
+
+  const installLog = await ctx.readInstallLog();
+
+  expect(installLog).toBe(`bun install --frozen-lockfile in ${ctx.project}\n`);
+});
+
+test('it allows an ungated edit after the install with no output', async () => {
+  const ctx = await setupTest('installs');
+
+  const result = ctx.runStub(
+    ctx.buildPayload('Write', { file_path: join(ctx.project, 'main.ts') }),
+  );
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});
+
+test('it runs no install when the package loads', async () => {
+  const ctx = await setupTest('installs');
+
+  ctx.runStub(ctx.gatedEdit);
+
+  const result = ctx.runStub(ctx.gatedEdit);
+
+  expect(result.status).toBe(2);
+  expect(result.stderr).toBe(ctx.gateReason);
+
+  const installLog = await ctx.readInstallLog();
+
+  expect(installLog).toBe(`bun install --frozen-lockfile in ${ctx.project}\n`);
+});
+
+test('it refuses a gated edit with the install message when the install fails', async () => {
+  const ctx = await setupTest('fails');
+
+  const result = ctx.runStub(ctx.gatedEdit);
+
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
+  expect(result.stderr).toBe('fake install started\nTo work here, run bun install.\n');
+});
+
+// A parser cannot see a gated path that the shell builds, so any shell syntax refuses the command.
+test.each([
+  'ext=ts; printf x > packages/core/src/sample.$ext',
+  'printf x > guide.md',
+  'cat notes.txt | tee guide.md',
+  'cp notes.txt guide.md',
+  'bun install left-pad',
+  'git diff --output=guide.md',
+  'git diff',
+  'git diff --no-ext-diff',
+  'git diff --no-ext-diff --no-textconv --ext-diff',
+  'git status',
+  'cat "$(echo guide.md)"',
+])('it refuses the Bash command %s when the install fails', async (command) => {
+  const ctx = await setupTest('fails');
+
+  const result = ctx.runStub(ctx.buildPayload('Bash', { command }));
+
+  expect(result.status).toBe(2);
+  expect(result.stderr).toEndWith('To work here, run bun install.\n');
+});
+
+test.each([
+  'bun install',
+  'bun install --frozen-lockfile',
+  'git diff --no-ext-diff --no-textconv --stat',
+  'ls -la src',
+  'cat package.json',
+  'pwd',
+])('it allows the read-only Bash command %s when the install fails', async (command) => {
+  const ctx = await setupTest('fails');
+
+  const result = ctx.runStub(ctx.buildPayload('Bash', { command }));
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});
+
+test('it refuses a gated tool call when the install fails', async () => {
+  const ctx = await setupTest('fails');
+
+  const result = ctx.runStub(ctx.buildPayload('mcp__tracker__update_ticket', { title: 'Draft' }));
+
+  expect(result.status).toBe(2);
+  expect(result.stderr).toEndWith('To work here, run bun install.\n');
+});
+
+test('it lets a prompt through when the install fails, so a person can still ask for the install', async () => {
+  const ctx = await setupTest('fails');
+
+  const result = ctx.runStub(
+    JSON.stringify({ hook_event_name: 'UserPromptSubmit', cwd: ctx.project, prompt: 'Install it' }),
+    ['--harness', 'codex'],
+  );
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});
+
+test('it runs one install for two parallel hook calls in one worktree', async () => {
+  const ctx = await setupTest('installs-on-release');
+
+  const first = ctx.startStub(ctx.gatedEdit);
+
+  await readStreamUntil(first.stderr, 'fake install started');
+
+  const second = ctx.startStub(ctx.gatedEdit);
+
+  const waiting = await readStreamUntil(second.stderr, 'Another agent hook runs bun install here');
+
+  await writeFile(ctx.releasePath, '');
+
+  const decided = await readStreamUntil(second.stderr, 'lists the skills each path needs.');
+  const firstStatus = await first.exited;
+  const secondStatus = await second.exited;
+
+  expect(firstStatus).toBe(2);
+  expect(secondStatus).toBe(2);
+
+  expect(`${waiting}${decided}`).toBe(
+    `Another agent hook runs bun install here, so this one waits for it.\n${ctx.gateReason}`,
+  );
+
+  const installLog = await ctx.readInstallLog();
+
+  expect(installLog).toBe(`bun install --frozen-lockfile in ${ctx.project}\n`);
+});
+
+test('it installs over a lock that a stopped hook left behind', async () => {
+  const ctx = await setupTest('installs');
+
+  const stopped = spawnSync('true');
+
+  await mkdir(join(ctx.project, 'node_modules'));
+  await writeFile(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), String(stopped.pid));
+
+  const result = ctx.runStub(ctx.gatedEdit);
+
+  expect(result.status).toBe(2);
+  expect(result.stderr).toBe(`fake install started\n${ctx.gateReason}`);
+});
+
+test('it refuses a harness it does not know', async () => {
+  const ctx = await setupTest('installs');
+
+  const result = ctx.runStub(ctx.gatedEdit, ['--harness', 'cursor']);
+
+  expect(result.status).toBe(2);
+
+  expect(result.stderr).toBe(
+    'The agent hook does not know the harness cursor. Use codex or claude-code.\n',
+  );
+});
