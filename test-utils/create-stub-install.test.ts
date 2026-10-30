@@ -76,10 +76,13 @@ test('it links the package only once the release path exists', async () => {
   const install = Bun.spawn([join(ctx.bin, 'bun'), 'install'], {
     cwd: ctx.project,
     stderr: 'pipe',
+    detached: true,
   });
 
+  // A test that fails before it releases the install leaves its wait loop running, so the cleanup
+  // stops the whole process group, which detached gives the install.
   onTestFinished(() => {
-    install.kill();
+    Bun.spawnSync(['kill', '-KILL', '--', `-${install.pid}`]);
   });
 
   await readStreamUntil(install.stderr, 'stub install started');

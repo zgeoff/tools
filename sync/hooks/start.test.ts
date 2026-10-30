@@ -64,10 +64,13 @@ async function setupTest() {
       stdin: new Blob([payload]),
       stdout: 'pipe',
       stderr: 'pipe',
+      detached: true,
     });
 
+    // A test that fails before it releases an install leaves the install waiting under the hook, so
+    // the cleanup stops the whole process group, which detached gives the hook.
     onTestFinished(() => {
-      child.kill();
+      Bun.spawnSync(['kill', '-KILL', '--', `-${child.pid}`]);
     });
 
     return child;
