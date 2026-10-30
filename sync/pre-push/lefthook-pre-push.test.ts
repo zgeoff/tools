@@ -1489,7 +1489,7 @@ test('it fails the push when a bunfig.toml raises the test timeout above 5 s', a
   expect(result.exitCode).not.toBe(0);
 
   expect(output).toInclude(
-    'bunfig.toml: [test] timeout = 30000 raises every test above the 5000 ms limit of the unit lane',
+    'bunfig.toml: [test] timeout = 30000 applies to every test, above the 5000 ms limit of the unit lane',
   );
 });
 

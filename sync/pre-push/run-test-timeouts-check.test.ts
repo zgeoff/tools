@@ -375,7 +375,29 @@ test('it reports a bunfig.toml whose test timeout is above 5 s', async () => {
     {
       path: 'libs/db/bunfig.toml',
       message:
-        '[test] timeout = 30000 raises every test above the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it',
+        '[test] timeout = 30000 applies to every test, above the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it',
+    },
+  ]);
+});
+
+test('it reports a bunfig.toml whose test timeout of 0 turns the timeout off, and passes one within the limit', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, 'libs/db'), { recursive: true });
+  await writeFile(join(ctx.directory, 'libs/db/bunfig.toml'), '[test]\ntimeout = 0\n');
+  await mkdir(join(ctx.directory, 'libs/api'), { recursive: true });
+  await writeFile(join(ctx.directory, 'libs/api/bunfig.toml'), '[test]\ntimeout = 4000\n');
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'libs/db/bunfig.toml',
+      message:
+        '[test] timeout = 0 applies to every test, which turns the timeout off, past the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it',
     },
   ]);
 });
@@ -399,7 +421,7 @@ test('it reads a bunfig.toml in an e2e/ directory against the e2e limit', async 
     {
       path: 'apps/web-e2e/bunfig.toml',
       message:
-        '[test] timeout = 20000 raises every test above the 15000 ms limit of the e2e lane; find its cause in the "Slow tests" section of the testing skill and fix it',
+        '[test] timeout = 20000 applies to every test, above the 15000 ms limit of the e2e lane; find its cause in the "Slow tests" section of the testing skill and fix it',
     },
   ]);
 });
@@ -419,7 +441,7 @@ test('it reads a bunfig.toml in an evals/ directory against the unit limit', asy
     {
       path: 'evals/bunfig.toml',
       message:
-        '[test] timeout = 6000 raises every test above the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it',
+        '[test] timeout = 6000 applies to every test, above the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it',
     },
   ]);
 });
@@ -608,7 +630,7 @@ test('it exits 1 and prints each finding when run as a script', async () => {
   expect(result.exitCode).toBe(1);
 
   expect(result.stdout.toString()).toBe(
-    'bunfig.toml: [test] timeout = 30000 raises every test above the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it\n',
+    'bunfig.toml: [test] timeout = 30000 applies to every test, above the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it\n',
   );
 });
 
