@@ -71,7 +71,14 @@ test('it refuses a start module that default-exports no function', async () => {
 
   ctx.hookModules.set('/repo/test-utils/start-kiln.ts', { default: 'start' });
 
-  await expect(ctx.hooks.start()).rejects.toThrow('test-utils/start-kiln.ts must default-export');
+  const failure = await ctx.hooks.start().catch((error: unknown) => error);
+
+  expect(failure).toBeInstanceOf(Error);
+
+  expect(failure).toHaveProperty(
+    'message',
+    expect.stringContaining('test-utils/start-kiln.ts must default-export'),
+  );
 });
 
 test('it runs bun test under diet with the lane budget, one process per file, and the arguments it gets', async () => {

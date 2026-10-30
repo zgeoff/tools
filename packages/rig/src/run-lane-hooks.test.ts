@@ -72,7 +72,14 @@ test('it stops when the tests fail to run', async () => {
     return Promise.reject(new Error('the process group still runs'));
   });
 
-  await expect(runLaneHooks([], ctx.hooks)).rejects.toThrow('the process group still runs');
+  const failure = await runLaneHooks([], ctx.hooks).catch((error: unknown) => error);
+
+  expect(failure).toBeInstanceOf(Error);
+
+  expect(failure).toHaveProperty(
+    'message',
+    expect.stringContaining('the process group still runs'),
+  );
 
   expect(ctx.calls).toStrictEqual(['start', 'run', 'stop']);
 });
@@ -86,7 +93,9 @@ test('it stops when start fails', async () => {
     return Promise.reject(new Error('the kiln did not start'));
   });
 
-  await expect(runLaneHooks([], ctx.hooks)).rejects.toThrow('the kiln did not start');
+  const failure = await runLaneHooks([], ctx.hooks).catch((error: unknown) => error);
 
+  expect(failure).toBeInstanceOf(Error);
+  expect(failure).toHaveProperty('message', expect.stringContaining('the kiln did not start'));
   expect(ctx.calls).toStrictEqual(['start', 'stop']);
 });

@@ -24,13 +24,13 @@ function parseResolvedLane(value: unknown): ResolvedLane | null {
     return null;
   }
 
-  const name = Reflect.get(value, 'name');
-  const suffix = Reflect.get(value, 'suffix');
-  const limitMs = Reflect.get(value, 'limitMs');
-  const parallel = Reflect.get(value, 'parallel');
-  const memory = Reflect.get(value, 'memory');
-  const start = Reflect.get(value, 'start');
-  const stop = Reflect.get(value, 'stop');
+  const name: unknown = Reflect.get(value, 'name');
+  const suffix: unknown = Reflect.get(value, 'suffix');
+  const limitMs: unknown = Reflect.get(value, 'limitMs');
+  const parallel: unknown = Reflect.get(value, 'parallel');
+  const memory: unknown = Reflect.get(value, 'memory');
+  const start: unknown = Reflect.get(value, 'start');
+  const stop: unknown = Reflect.get(value, 'stop');
 
   if (
     typeof name !== 'string' ||

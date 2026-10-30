@@ -28,6 +28,8 @@ test('it reads the limit of a lane that rig.config.ts declares', async () => {
 
 test('it fails for a lane the config does not hold', async () => {
   const ctx = await setupTest();
+  const failure = await readRigLaneLimit(ctx.repoRoot, 'kiln').catch((error: unknown) => error);
 
-  await expect(readRigLaneLimit(ctx.repoRoot, 'kiln')).rejects.toThrow('has no lane kiln');
+  expect(failure).toBeInstanceOf(Error);
+  expect(failure).toHaveProperty('message', expect.stringContaining('has no lane kiln'));
 });

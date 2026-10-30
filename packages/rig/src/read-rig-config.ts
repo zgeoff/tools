@@ -11,9 +11,9 @@ export async function readRigConfig(repoRoot: string): Promise<RigConfig> {
     return defineRig({});
   }
 
-  const loaded: unknown = await import(path);
+  const loaded = await import(path).then((module: unknown) => module);
 
-  const defaultExport =
+  const defaultExport: unknown =
     typeof loaded === 'object' && loaded !== null ? Reflect.get(loaded, 'default') : null;
 
   const config = parseRigConfig(defaultExport);

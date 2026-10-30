@@ -38,7 +38,12 @@ test('it refuses a rig.config.ts whose default export is no rig config', async (
 
   await writeTreeFiles(ctx.repoRoot, { 'rig.config.ts': 'export default { lanes: 3 };\n' });
 
-  await expect(readRigConfig(ctx.repoRoot)).rejects.toThrow(
-    'must default-export the result of defineRig',
+  const failure = await readRigConfig(ctx.repoRoot).catch((error: unknown) => error);
+
+  expect(failure).toBeInstanceOf(Error);
+
+  expect(failure).toHaveProperty(
+    'message',
+    expect.stringContaining('must default-export the result of defineRig'),
   );
 });

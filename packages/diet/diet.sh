@@ -271,11 +271,12 @@ fi
 
 self=$(readlink -f "$0")
 case "$mode" in
-  # sudo keeps the environment, and PATH, which its secure_path resets;
-  # OOMPolicy=continue keeps the scope, and its report, alive when the kernel
-  # kills the command.
+  # sudo keeps the environment, and PATH, which its secure_path resets, and
+  # TMPDIR, which glibc drops from the environment of a setuid program like
+  # sudo; OOMPolicy=continue keeps the scope, and its report, alive when the
+  # kernel kills the command.
   systemd-sudo)
-    exec sudo --preserve-env env "PATH=$PATH" systemd-run --scope --quiet --collect \
+    exec sudo --preserve-env env "PATH=$PATH" ${TMPDIR+"TMPDIR=$TMPDIR"} systemd-run --scope --quiet --collect \
       --unit="diet-$$" \
       -p MemoryMax="$budget" -p MemorySwapMax=0 -p OOMPolicy=continue \
       -- bash "$self" --inside "$(id -un)" "$@"
