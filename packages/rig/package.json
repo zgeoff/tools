@@ -1,17 +1,54 @@
 {
   "name": "@zgeoff/rig",
   "version": "0.0.1",
-  "description": "Run a repo's test lanes, the browser lane included, under one command",
+  "description": "Run every test lane of a repo from one declaration of its limits, with a browser lane built in",
+  "keywords": [
+    "bun",
+    "lanes",
+    "test"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zgeoff/tools.git",
     "directory": "packages/rig"
   },
+  "bin": {
+    "rig": "./src/cli.ts"
+  },
   "files": [
-    "README.md"
+    "src",
+    "!src/**/*.test.ts",
+    "dist"
   ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "bun": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "publishConfig": {
     "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && bun build src/index.ts --outdir dist --target node --packages external && tsc -p tsconfig.build.json",
+    "typecheck": "tsrs"
+  },
+  "dependencies": {
+    "@zgeoff/diet": "workspace:*",
+    "gunshi": "catalog:",
+    "ts-pattern": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "tiny-invariant": "catalog:",
+    "tsrs": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
+  },
+  "engines": {
+    "bun": ">=1.3"
   }
 }

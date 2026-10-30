@@ -18,6 +18,7 @@
         "@zgeoff/format-codemod": "workspace:*",
         "@zgeoff/oxfmt-config": "workspace:*",
         "@zgeoff/oxlint-config": "workspace:*",
+        "@zgeoff/rig": "workspace:*",
         "@zgeoff/skill-gate": "workspace:*",
         "@zgeoff/tsconfig": "workspace:*",
         "lefthook": "catalog:",
@@ -193,6 +194,21 @@
     "packages/rig": {
       "name": "@zgeoff/rig",
       "version": "0.0.1",
+      "bin": {
+        "rig": "./src/cli.ts",
+      },
+      "dependencies": {
+        "@zgeoff/diet": "workspace:*",
+        "gunshi": "catalog:",
+        "ts-pattern": "catalog:",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "tiny-invariant": "catalog:",
+        "tsrs": "catalog:",
+        "typescript": "catalog:",
+        "zod": "catalog:",
+      },
     },
     "packages/skill-gate": {
       "name": "@zgeoff/skill-gate",

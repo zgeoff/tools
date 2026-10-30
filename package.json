@@ -88,6 +88,7 @@
     "@zgeoff/format-codemod": "workspace:*",
     "@zgeoff/oxfmt-config": "workspace:*",
     "@zgeoff/oxlint-config": "workspace:*",
+    "@zgeoff/rig": "workspace:*",
     "@zgeoff/skill-gate": "workspace:*",
     "@zgeoff/tsconfig": "workspace:*",
     "lefthook": "catalog:",
