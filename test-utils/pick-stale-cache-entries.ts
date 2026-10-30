@@ -1,3 +1,6 @@
+import { match } from 'ts-pattern';
+import { parseCacheEntry } from './parse-cache-entry.ts';
+
 export interface CacheListing {
   readonly name: string;
 
@@ -13,16 +16,21 @@ export interface CacheListing {
 // from a build that failed or died. A template stays while a reader uses it, with its readers.
 export function pickStaleCacheEntries(listing: CacheListing): readonly string[] {
   return listing.entries.filter((entry) => {
-    if (!entry.startsWith(`${listing.name}-`)) {
+    const cacheEntry = parseCacheEntry(listing.name, entry);
+
+    if (cacheEntry === null) {
       return false;
     }
 
-    if (entry.includes('.building-')) {
-      return true;
-    }
-
-    const templateName = entry.endsWith('.readers') ? entry.slice(0, -'.readers'.length) : entry;
-
-    return templateName !== listing.templateName && !listing.readTemplateNames.has(templateName);
+    return match(cacheEntry.kind)
+      .with('build', () => true)
+      .with(
+        'template',
+        'readers',
+        () =>
+          cacheEntry.templateName !== listing.templateName &&
+          !listing.readTemplateNames.has(cacheEntry.templateName),
+      )
+      .exhaustive();
   });
 }

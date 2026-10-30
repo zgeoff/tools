@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import type { FileLocks } from './file-locks.ts';
+import { parseCacheEntry } from './parse-cache-entry.ts';
 import { pickStaleCacheEntries } from './pick-stale-cache-entries.ts';
 import type { Clock } from './system-clock.ts';
 import type { TemplateFiles } from './template-files.ts';
@@ -101,7 +102,13 @@ async function removeStaleEntries(
 
   const readTemplateNames = new Set<string>();
 
-  for (const entry of entries.filter((name) => name.endsWith('.readers'))) {
+  for (const entry of entries) {
+    const cacheEntry = parseCacheEntry(options.name, entry);
+
+    if (cacheEntry?.kind !== 'readers') {
+      continue;
+    }
+
     const readersDirectory = join(options.cacheDirectory, entry);
 
     const readers = await options.files.readDirectoryNames(readersDirectory);
@@ -115,7 +122,7 @@ async function removeStaleEntries(
     );
 
     if (exitedReaders.length < readers.length) {
-      readTemplateNames.add(entry.slice(0, -'.readers'.length));
+      readTemplateNames.add(cacheEntry.templateName);
     }
   }
 

@@ -212,3 +212,55 @@ test('it fails when the template appears while the build holds the lock', async 
 
   expect(reader).not.toHaveBeenCalled();
 });
+
+test('it leaves the lock, the build and the readers of a name that starts with its own name alone', async () => {
+  const ctx = await setupTest();
+
+  const otherLockPath = join(ctx.cacheDirectory, 'notes-bundle-extra.lock');
+  const exitedReader = Bun.spawn(['true']);
+
+  await exitedReader.exited;
+
+  await mkdir(join(ctx.cacheDirectory, 'notes-bundle-extra-0123456789abcdef.building-active'), {
+    recursive: true,
+  });
+
+  await mkdir(join(ctx.cacheDirectory, 'notes-bundle-extra-0123456789abcdef.readers'));
+
+  await writeFile(
+    join(
+      ctx.cacheDirectory,
+      'notes-bundle-extra-0123456789abcdef.readers',
+      `${exitedReader.pid}-leftover`,
+    ),
+    '',
+  );
+
+  await writeFile(ctx.inputPath, 'export const greeting = "hello";\n');
+
+  const otherLock = await fileLocks.openLockFile(otherLockPath);
+
+  onTestFinished(() => fileLocks.closeLockFile(otherLock));
+
+  const isOtherLocked = fileLocks.tryLock(otherLock);
+
+  await withPerRunTemplate(
+    { ...ctx.options, writeTemplate: makeFileWritingStub('bundle.js', 'built\n') },
+    makeResolvingStub(undefined),
+  );
+
+  const entries = await readdir(ctx.cacheDirectory);
+
+  const otherReaders = await readdir(
+    join(ctx.cacheDirectory, 'notes-bundle-extra-0123456789abcdef.readers'),
+  );
+
+  expect(isOtherLocked).toBeTrue();
+
+  expect(entries).toIncludeAllMembers([
+    'notes-bundle-extra.lock',
+    'notes-bundle-extra-0123456789abcdef.building-active',
+  ]);
+
+  expect(otherReaders).toStrictEqual([`${exitedReader.pid}-leftover`]);
+});
