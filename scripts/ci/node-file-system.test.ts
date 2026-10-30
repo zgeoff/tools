@@ -1,6 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { removePath } from '../../packages/rig/src/browser/remove-path.ts';
 import { nodeFileSystem } from './node-file-system.ts';
 
 async function setupTest() {
@@ -45,12 +46,6 @@ test('it lists a folder it created and probes a path before and after its remova
   expect(after).toBeFalse();
 });
 
-test('it removes a missing path with no error', async () => {
-  const ctx = await setupTest();
-
-  await nodeFileSystem.removePath(join(ctx.directory, 'teapot'));
-
-  const exists = await nodeFileSystem.probePath(join(ctx.directory, 'teapot'));
-
-  expect(exists).toBeFalse();
+test("it removes a path with rig's removePath", () => {
+  expect(nodeFileSystem.removePath).toBe(removePath);
 });
