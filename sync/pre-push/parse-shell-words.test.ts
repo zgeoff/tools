@@ -1,5 +1,4 @@
 import { expect, test } from 'bun:test';
-import type { ShellActionHandlers, ShellContextTable } from './parse-shell-words.ts';
 import { parseShellWords } from './parse-shell-words.ts';
 
 test.each([
@@ -148,41 +147,4 @@ test.each([
   const words = parseShellWords(command);
 
   expect(words.filter((word) => !word.isOperator).map((word) => word.text)).toStrictEqual(texts);
-});
-
-test('it fails the type check on a context table or a handler table that misses a key', () => {
-  const rules: ShellContextTable['plain'] = {
-    pickAction: () => ({ kind: 'break' }),
-    parseEscape: () => ({ text: '', length: 1, isQuoting: false }),
-    isTopLevel: false,
-    isQuote: false,
-  };
-
-  // @ts-expect-error: the context table lacks the parameter context
-  const contexts: ShellContextTable = {
-    plain: rules,
-    substitution: rules,
-    group: rules,
-    backtick: rules,
-    'quoted-backtick': rules,
-    'single-quote': rules,
-    'ansi-c-quote': rules,
-    'double-quote': rules,
-    'quoted-parameter': rules,
-    arithmetic: rules,
-    'arithmetic-group': rules,
-  };
-
-  // @ts-expect-error: the handler table lacks the comment action
-  const handlers: ShellActionHandlers = {
-    text: () => 1,
-    redirect: () => 1,
-    escape: () => 2,
-    open: () => 1,
-    close: () => 1,
-    break: () => 1,
-    operator: () => 1,
-  };
-
-  expect([Object.keys(contexts).length, Object.keys(handlers).length]).toStrictEqual([11, 7]);
 });

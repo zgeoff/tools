@@ -10,7 +10,7 @@ export interface ShellWord {
   readonly isAssignment: boolean;
 }
 
-export type ShellContext =
+type ShellContext =
   | 'plain'
   | 'substitution'
   | 'group'
@@ -78,7 +78,7 @@ interface ShellContextRules {
 
 // Every decision that depends on the context lives in this table, which is typed over every
 // context, so a context without its rules fails the type check.
-export type ShellContextTable = Readonly<Record<ShellContext, ShellContextRules>>;
+type ShellContextTable = Readonly<Record<ShellContext, ShellContextRules>>;
 
 const contextTable: ShellContextTable = {
   plain: {
@@ -419,7 +419,7 @@ function getContext(state: ParserState): ShellContext {
 
 // Each handler returns how many characters its action consumed. The table is typed over every
 // action kind, so an action without a handler fails the type check.
-export type ShellActionHandlers = {
+type ShellActionHandlers = {
   readonly [Kind in keyof ShellActionFields]: (
     state: ParserState,
     action: ShellActionOf<Kind>,

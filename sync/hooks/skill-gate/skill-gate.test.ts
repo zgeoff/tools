@@ -559,3 +559,157 @@ test('it refuses a harness it does not know', async () => {
   expect(result.status).toBe(1);
   expect(result.stderr).toContain('does not know the harness cursor');
 });
+
+test('it reads --harness=codex in the joined form', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, '.claude/skills/docs-writing'), { recursive: true });
+  await writeFile(join(ctx.directory, '.claude/skills/docs-writing/SKILL.md'), '# Docs writing\n');
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
+  );
+
+  const result = spawnSync('bun', [ctx.hookPath, '--harness=codex'], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      session_id: 'session-1',
+      transcript_path: join(ctx.directory, 'rollout.jsonl'),
+      cwd: ctx.directory,
+      tool_name: 'apply_patch',
+      tool_use_id: 'call-1',
+      tool_input: { command: '*** Begin Patch\n*** Add File: guide.md\n+# Guide\n*** End Patch' },
+    }),
+  });
+
+  expect(result.status).toBe(0);
+
+  expect(JSON.parse(result.stdout)).toMatchObject({
+    hookSpecificOutput: {
+      permissionDecisionReason: expect.stringContaining(
+        `${join(ctx.directory, 'guide.md')} needs the \`docs-writing\` skill`,
+      ),
+    },
+  });
+});
+
+test.each([
+  [['--harness'], "Option '--harness <value>' argument missing"],
+  [['--harnes', 'codex'], "Unknown option '--harnes'"],
+])('it refuses the arguments %p and names the fault', async (args, fault) => {
+  const ctx = await setupTest();
+
+  const result = spawnSync('bun', [ctx.hookPath, ...args], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'] },
+    input: '{}',
+  });
+
+  expect({ status: result.status, stdout: result.stdout }).toStrictEqual({ status: 1, stdout: '' });
+  expect(result.stderr).toStartWith(`The skill gate cannot read its arguments: ${fault}`);
+});
+
+test('it lets a call run with the load error on stderr when the gate cannot load and the payload is not JSON', async () => {
+  const ctx = await setupTest();
+
+  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
+
+  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await mkdir(join(ctx.directory, 'node_modules'));
+  await copyFile(ctx.hookPath, copiedHookPath);
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
+  );
+
+  const result = spawnSync('bun', [copiedHookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: 'not a payload',
+  });
+
+  expect({ status: result.status, stdout: result.stdout }).toStrictEqual({ status: 1, stdout: '' });
+
+  expect(result.stderr).toContain(
+    "The skill gate cannot load: Cannot find package '@zgeoff/skill-gate'",
+  );
+});
+
+test('it takes the working directory as the project outside a git repo when the gate cannot load and the harness is codex', async () => {
+  const ctx = await setupTest();
+
+  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
+
+  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await mkdir(join(ctx.directory, 'node_modules'));
+  await copyFile(ctx.hookPath, copiedHookPath);
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
+  );
+
+  const result = spawnSync('bun', [copiedHookPath, '--harness', 'codex'], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'] },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      cwd: ctx.directory,
+      tool_name: 'apply_patch',
+      tool_input: { command: '*** Begin Patch\n*** Add File: guide.md\n+x\n*** End Patch' },
+    }),
+  });
+
+  expect({ status: result.status, stdout: result.stdout }).toStrictEqual({ status: 2, stdout: '' });
+
+  expect(result.stderr).toContain(
+    `The skill gate cannot load, so it blocks this edit to ${join(ctx.directory, 'guide.md')}: Cannot find package '@zgeoff/skill-gate'`,
+  );
+});
+
+test('it blocks the paths that a CRLF patch deletes and moves to when the gate cannot load and the harness is codex', async () => {
+  const ctx = await setupTest();
+
+  const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
+
+  await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+  await mkdir(join(ctx.directory, 'node_modules'));
+  await copyFile(ctx.hookPath, copiedHookPath);
+
+  await writeFile(
+    join(ctx.directory, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
+  );
+
+  const result = spawnSync('bun', [copiedHookPath, '--harness', 'codex'], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+    input: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      cwd: ctx.directory,
+      tool_name: 'apply_patch',
+      tool_input: {
+        command: [
+          '*** Begin Patch',
+          '*** Delete File: old-guide.md',
+          '*** Update File: src/a.ts',
+          '*** Move to: docs/guide.md',
+          '@@',
+          '-a',
+          '+b',
+          '*** End Patch',
+        ].join('\r\n'),
+      },
+    }),
+  });
+
+  expect({ status: result.status, stdout: result.stdout }).toStrictEqual({ status: 2, stdout: '' });
+
+  expect(result.stderr).toContain(
+    `The skill gate cannot load, so it blocks this edit to ${join(ctx.directory, 'old-guide.md')}, ${join(ctx.directory, 'docs/guide.md')}: Cannot find package '@zgeoff/skill-gate'`,
+  );
+});
