@@ -28,6 +28,11 @@ function setupTest() {
       sources: { cwd: '/repo', probeFile: () => true },
       readConfig: () => Promise.resolve(defineRig({ lanes: { kiln: { limit: '15s' } } })),
       readTrackedFiles: () => Promise.resolve(trackedFiles),
+      initFiles: {
+        readJSON: () => Promise.reject(new Error('no init here')),
+        writeText: () => Promise.reject(new Error('no init here')),
+        probeFile: () => Promise.reject(new Error('no init here')),
+      },
       readWorkerCount: () => Promise.resolve({ kind: 'count' as const, count: 2 }),
       importModule: () => Promise.resolve({}),
       runCommand,

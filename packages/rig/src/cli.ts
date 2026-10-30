@@ -2,6 +2,7 @@
 import { existsSync } from 'node:fs';
 import { availableParallelism, totalmem } from 'node:os';
 import { wireBrowserLaneHooks } from './browser/wire-browser-lane-hooks.ts';
+import { initFiles } from './init-files.ts';
 import { readOptionalText } from './read-memory-budget.ts';
 import { readRigConfig } from './read-rig-config.ts';
 import { readTrackedFiles } from './read-tracked-files.ts';
@@ -49,6 +50,7 @@ try {
       sources: { cwd: repoRoot, probeFile: existsSync },
       readConfig: readRigConfig,
       readTrackedFiles,
+      initFiles,
       readWorkerCount: () =>
         readWorkerCount({
           env: process.env,

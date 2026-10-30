@@ -1,10 +1,12 @@
-import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildInitScripts } from './build-init-scripts.ts';
+import type { InitFiles } from './init-files.ts';
 import type { RigConfig, RigOutput } from './types.ts';
 
 export interface InitDeps {
   readonly readTrackedFiles: (repoRoot: string) => Promise<readonly string[]>;
+
+  readonly initFiles: InitFiles;
 
   readonly output: RigOutput;
 }
@@ -22,7 +24,7 @@ export async function runInit(
 ): Promise<number> {
   const manifestPath = join(repoRoot, 'package.json');
 
-  const manifest: unknown = await Bun.file(manifestPath).json();
+  const manifest = await deps.initFiles.readJSON(manifestPath);
 
   if (!isRecord(manifest)) {
     deps.output.err(`rig init: ${manifestPath} must hold a JSON object\n`);
@@ -36,7 +38,7 @@ export async function runInit(
   const newScripts = buildInitScripts(oldScripts, config, trackedFiles);
 
   if (JSON.stringify(oldScripts) !== JSON.stringify(newScripts)) {
-    await Bun.write(
+    await deps.initFiles.writeText(
       manifestPath,
       `${JSON.stringify({ ...manifest, scripts: newScripts }, null, 2)}\n`,
     );
@@ -46,8 +48,8 @@ export async function runInit(
 
   const configPath = join(repoRoot, 'rig.config.ts');
 
-  if (!existsSync(configPath)) {
-    await Bun.write(configPath, starterConfig);
+  if (!(await deps.initFiles.probeFile(configPath))) {
+    await deps.initFiles.writeText(configPath, starterConfig);
 
     deps.output.out('rig init: wrote rig.config.ts\n');
   }

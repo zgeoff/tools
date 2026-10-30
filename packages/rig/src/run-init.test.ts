@@ -1,65 +1,79 @@
-import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { expect, mock, test } from 'bun:test';
 import { makeRecordingStub } from '../../../test-utils/make-recording-stub.ts';
-import { writeTreeFiles } from '../../../test-utils/write-tree-files.ts';
 import { defineRig } from './define-rig.ts';
+import type { InitFiles } from './init-files.ts';
 import { runInit } from './run-init.ts';
 
-async function setupTest() {
-  const repoRoot = await mkdtemp(join(tmpdir(), 'rig-init-test-'));
-
-  onTestFinished(() => rm(repoRoot, { recursive: true, force: true }));
-
+function setupTest() {
   const output = { out: makeRecordingStub(), err: makeRecordingStub() };
 
+  const initFiles = {
+    readJSON: mock<InitFiles['readJSON']>(() => Promise.resolve({})),
+    writeText: mock<InitFiles['writeText']>(() => Promise.resolve()),
+    probeFile: mock<InitFiles['probeFile']>(() => Promise.resolve(false)),
+  };
+
   return {
-    repoRoot,
     output,
-    deps: { readTrackedFiles: () => Promise.resolve(['src/clock.host.test.ts']), output },
+    initFiles,
+    deps: {
+      readTrackedFiles: mock<(repoRoot: string) => Promise<readonly string[]>>(() =>
+        Promise.resolve([]),
+      ),
+      initFiles,
+      output,
+    },
   };
 }
 
 test('it writes the test scripts and a starter rig.config.ts', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
-  await writeTreeFiles(ctx.repoRoot, {
-    'package.json': JSON.stringify({ name: 'notes', scripts: { lint: 'oxlint' } }),
-  });
+  ctx.initFiles.readJSON.mockResolvedValue({ name: 'notes', scripts: { lint: 'oxlint' } });
+  ctx.deps.readTrackedFiles.mockResolvedValue(['src/clock.host.test.ts']);
 
-  const exitCode = await runInit(ctx.repoRoot, defineRig({}), ctx.deps);
-  const manifest: unknown = await Bun.file(join(ctx.repoRoot, 'package.json')).json();
-  const config = await readFile(join(ctx.repoRoot, 'rig.config.ts'), 'utf8');
+  const exitCode = await runInit('/repo', defineRig({}), ctx.deps);
 
   expect(exitCode).toBe(0);
+  expect(ctx.initFiles.readJSON).toHaveBeenCalledExactlyOnceWith('/repo/package.json');
 
-  expect(manifest).toStrictEqual({
-    name: 'notes',
-    scripts: {
-      lint: 'oxlint',
-      test: 'rig unit',
-      'test:related': 'rig related',
-      'test:host': 'rig host',
-    },
-  });
-
-  expect(config).toBe(
-    "import { defineRig } from '@zgeoff/rig';\n\nexport default defineRig({ lanes: {} });\n",
-  );
+  expect(ctx.initFiles.writeText.mock.calls).toStrictEqual([
+    [
+      '/repo/package.json',
+      `${JSON.stringify(
+        {
+          name: 'notes',
+          scripts: {
+            lint: 'oxlint',
+            test: 'rig unit',
+            'test:related': 'rig related',
+            'test:host': 'rig host',
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    ],
+    [
+      '/repo/rig.config.ts',
+      "import { defineRig } from '@zgeoff/rig';\n\nexport default defineRig({ lanes: {} });\n",
+    ],
+  ]);
 });
 
 test('it writes the browser lane script when git tracks a browser suite', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
-  await writeTreeFiles(ctx.repoRoot, { 'package.json': JSON.stringify({ name: 'kettle' }) });
+  ctx.initFiles.readJSON.mockResolvedValue({ name: 'kettle' });
+  ctx.initFiles.probeFile.mockResolvedValue(true);
+  ctx.deps.readTrackedFiles.mockResolvedValue(['src/spout.browser.test.ts']);
 
-  await runInit(ctx.repoRoot, defineRig({}), {
-    ...ctx.deps,
-    readTrackedFiles: () => Promise.resolve(['src/spout.browser.test.ts']),
-  });
+  await runInit('/repo', defineRig({}), ctx.deps);
 
-  const manifest: unknown = await Bun.file(join(ctx.repoRoot, 'package.json')).json();
+  const [path, text] = ctx.initFiles.writeText.mock.calls[0] ?? [];
+  const manifest: unknown = JSON.parse(text ?? 'null');
+
+  expect(path).toBe('/repo/package.json');
 
   expect(manifest).toStrictEqual({
     name: 'kettle',
@@ -67,49 +81,47 @@ test('it writes the browser lane script when git tracks a browser suite', async 
   });
 });
 
-test('it changes nothing on a second run', async () => {
-  const ctx = await setupTest();
+test('it writes nothing when the scripts and the config are in place', async () => {
+  const ctx = setupTest();
 
-  await writeTreeFiles(ctx.repoRoot, { 'package.json': JSON.stringify({ scripts: {} }) });
-  await runInit(ctx.repoRoot, defineRig({}), ctx.deps);
+  ctx.initFiles.readJSON.mockResolvedValue({
+    scripts: { test: 'rig unit', 'test:related': 'rig related' },
+  });
 
-  const manifestBefore = await readFile(join(ctx.repoRoot, 'package.json'), 'utf8');
-  const configStatBefore = await stat(join(ctx.repoRoot, 'rig.config.ts'));
+  ctx.initFiles.probeFile.mockResolvedValue(true);
 
-  ctx.output.out.mockClear();
-
-  const exitCode = await runInit(ctx.repoRoot, defineRig({}), ctx.deps);
-  const manifestAfter = await readFile(join(ctx.repoRoot, 'package.json'), 'utf8');
-  const configStatAfter = await stat(join(ctx.repoRoot, 'rig.config.ts'));
+  const exitCode = await runInit('/repo', defineRig({}), ctx.deps);
 
   expect(exitCode).toBe(0);
-  expect(manifestAfter).toBe(manifestBefore);
-  expect(configStatAfter.mtimeMs).toBe(configStatBefore.mtimeMs);
+  expect(ctx.initFiles.probeFile).toHaveBeenCalledExactlyOnceWith('/repo/rig.config.ts');
+  expect(ctx.initFiles.writeText).not.toHaveBeenCalled();
   expect(ctx.output.out).not.toHaveBeenCalled();
 });
 
 test('it keeps a rig.config.ts that the repo already has', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
-  await writeTreeFiles(ctx.repoRoot, {
-    'package.json': '{}',
-    'rig.config.ts': "export default 'mine';\n",
-  });
+  ctx.initFiles.probeFile.mockResolvedValue(true);
 
-  await runInit(ctx.repoRoot, defineRig({}), ctx.deps);
+  await runInit('/repo', defineRig({}), ctx.deps);
 
-  const config = await readFile(join(ctx.repoRoot, 'rig.config.ts'), 'utf8');
+  const paths = ctx.initFiles.writeText.mock.calls.map(([path]) => path);
 
-  expect(config).toBe("export default 'mine';\n");
+  expect(paths).toStrictEqual(['/repo/package.json']);
 });
 
-test('it refuses a package.json that holds no object', async () => {
-  const ctx = await setupTest();
+test('it refuses a package.json that holds no object, and writes nothing', async () => {
+  const ctx = setupTest();
 
-  await writeTreeFiles(ctx.repoRoot, { 'package.json': '[]' });
+  ctx.initFiles.readJSON.mockResolvedValue([]);
 
-  const exitCode = await runInit(ctx.repoRoot, defineRig({}), ctx.deps);
+  const exitCode = await runInit('/repo', defineRig({}), ctx.deps);
 
   expect(exitCode).toBe(2);
-  expect(ctx.output.err).toHaveBeenCalledTimes(1);
+
+  expect(ctx.output.err).toHaveBeenCalledExactlyOnceWith(
+    'rig init: /repo/package.json must hold a JSON object\n',
+  );
+
+  expect(ctx.initFiles.writeText).not.toHaveBeenCalled();
 });
