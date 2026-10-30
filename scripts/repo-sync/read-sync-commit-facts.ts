@@ -58,7 +58,7 @@ export async function readSyncCommitFacts(
       : {
           number,
           branch: request.branch,
-          pins: await readBranchPins(context, request.commit, request.branch),
+          pins: await readRemotePins(context, request.commit, request.branch),
         };
 
   return {
@@ -153,14 +153,4 @@ async function readPinOrder(
   const order = older.exitCode === 0 ? 'newer' : 'not-newer';
 
   return { pin, order };
-}
-
-async function readBranchPins(
-  context: SyncCommandContext,
-  commit: string,
-  branch: string,
-): Promise<PinsReading> {
-  const fetched = await runProbe(context, ['git', 'fetch', '-q', 'origin', branch]);
-
-  return fetched.exitCode === 0 ? readTreePins(context, commit) : { kind: 'read', pins: [] };
 }

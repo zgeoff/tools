@@ -1588,3 +1588,36 @@ test('it stops and pushes nothing when main pins a commit that zgeoff/tools does
     `::error::Cannot tell whether ${toolsHead} is older than the pin 0123456789abcdef0123456789abcdef01234567 on main, so the run stops; the next run tries again: fatal: Not a valid commit name 0123456789abcdef0123456789abcdef01234567\n`,
   ]);
 });
+
+test('it stops and pushes nothing when it cannot read the branch of the open pull request', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  const entry = {
+    name: 'editorconfig',
+    description: 'The editor config',
+    files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+  };
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const older = await ctx.writeToolsCommit();
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n\n[*]\nindent_style = space\n');
+  await ctx.runSync([entry]);
+
+  // The pull request stays open while its branch cannot be fetched, as in a transient failure.
+  await $`git -C ${ctx.origin} branch -D repo-sync/zgeoff-tools`.quiet();
+
+  const exitCode = await ctx.runSync([entry], { TOOLS_REF: older });
+  const branches = await ctx.readBranchNames();
+
+  expect(exitCode).toBe(1);
+  expect(branches).toStrictEqual(['main']);
+
+  expect(ctx.output.at(-1)).toStartWith(
+    `::error::Cannot read repo-sync/zgeoff-tools from the remote, so the run cannot tell whether ${older} is older than its pin; the next run tries again: fatal: couldn't find remote ref repo-sync/zgeoff-tools`,
+  );
+});
