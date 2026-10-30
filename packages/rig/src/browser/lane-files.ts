@@ -1,5 +1,6 @@
-import { lstat, mkdir, readdir } from 'node:fs/promises';
+import { lstat, mkdir } from 'node:fs/promises';
 import { hasErrorCode } from './has-error-code.ts';
+import { readDirNames } from './read-dir-names.ts';
 import { removePath } from './remove-path.ts';
 
 export interface PathStatus {
@@ -50,16 +51,6 @@ export const laneFiles: LaneFiles = {
           mode: stats.mode,
         };
   },
-  readDirNames: async (path) => {
-    try {
-      return await readdir(path);
-    } catch (error) {
-      if (hasErrorCode(error, 'ENOENT')) {
-        return [];
-      }
-
-      throw error;
-    }
-  },
+  readDirNames,
   removePath,
 };

@@ -3,6 +3,7 @@ import { mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { laneFiles } from './lane-files.ts';
+import { readDirNames } from './read-dir-names.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'rig-browser-files-'));
@@ -51,31 +52,13 @@ test('it reports the status of a link itself, never of its target', async () => 
   expect(status).toMatchObject({ isDirectory: false });
 });
 
-test('it reports no status, and no names, for a path where nothing exists', async () => {
+test('it reports no status for a path where nothing exists', async () => {
   const ctx = await setupTest();
-
-  const path = join(ctx.directory, 'missing');
-
-  const status = await laneFiles.readStatus(path);
-  const names = await laneFiles.readDirNames(path);
+  const status = await laneFiles.readStatus(join(ctx.directory, 'missing'));
 
   expect(status).toBeNull();
-  expect(names).toStrictEqual([]);
 });
 
-test('it fails to read the names in a path that is no folder', async () => {
-  const ctx = await setupTest();
-
-  const path = join(ctx.directory, 'notes.txt');
-
-  await Bun.write(path, 'buy milk');
-
-  const names = laneFiles.readDirNames(path);
-
-  const failure = await names.then(
-    () => null,
-    (error: unknown) => error,
-  );
-
-  expect(failure).toMatchObject({ code: 'ENOTDIR' });
+test('it reads the names in a folder with the shared folder reader', () => {
+  expect(laneFiles.readDirNames).toBe(readDirNames);
 });
