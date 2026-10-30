@@ -251,11 +251,18 @@ test.skipIf(!modesOutput.includes('cgroupfs'))(
         '-c',
         'echo $$; cat /proc/self/cgroup; exec sleep 30',
       ],
-      { env: { ...ctx.env, DIET_MODE: 'cgroupfs' }, stdout: 'pipe', stderr: 'pipe' },
+      {
+        env: { ...ctx.env, DIET_MODE: 'cgroupfs' },
+        stdout: 'pipe',
+        stderr: 'pipe',
+        detached: true,
+      },
     );
 
+    // A test that fails before its signal lands leaves the command and the sampler running, so the
+    // cleanup stops the whole process group, which detached gives the run.
     onTestFinished(() => {
-      run.kill('SIGKILL');
+      Bun.spawnSync(['kill', '-KILL', '--', `-${run.pid}`]);
     });
 
     const reader = run.stdout.getReader();
@@ -317,11 +324,13 @@ test.each([['SIGHUP'], ['SIGINT'], ['SIGTERM']] as const)(
         '-e',
         `process.on('${signal}', () => { console.log('got ${name}'); process.exit(0); }); console.log('ready'); setInterval(() => {}, 1000);`,
       ],
-      { env: ctx.env, stdout: 'pipe', stderr: 'pipe' },
+      { env: ctx.env, stdout: 'pipe', stderr: 'pipe', detached: true },
     );
 
+    // A test that fails before its signal lands leaves the command and the sampler running, so the
+    // cleanup stops the whole process group, which detached gives the run.
     onTestFinished(() => {
-      run.kill('SIGKILL');
+      Bun.spawnSync(['kill', '-KILL', '--', `-${run.pid}`]);
     });
 
     const reader = run.stdout.getReader();
