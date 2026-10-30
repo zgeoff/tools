@@ -40,8 +40,8 @@ async function setupTest() {
       const lane = Bun.spawn([rigBin, 'browser'], {
         cwd: repoRoot,
         env: { ...process.env, TMPDIR: laneTmpdir },
-        stdout: 'inherit',
-        stderr: 'inherit',
+        stdout: 'ignore',
+        stderr: 'ignore',
         detached: true,
       });
 
@@ -64,24 +64,12 @@ test("it runs the repo's build:browser script once, and gives the tests the fold
   const ctx = await setupTest();
 
   const invocationsPath = join(ctx.repoRoot, 'build-invocations.txt');
-  const phasesPath = join(ctx.repoRoot, 'phases.txt');
-
-  await writeFile(phasesPath, `spawn ${Date.now()}\n`);
 
   const buildScript = [
-    `echo "build-start $(date +%s%3N)" >> '${phasesPath}'`,
     'mkdir -p "$RIG_BROWSER_BUILD_DIR"',
     `echo built >> '${invocationsPath}'`,
     `echo '<main>notes</main>' > "$RIG_BROWSER_BUILD_DIR/index.html"`,
-    `echo "build-end $(date +%s%3N)" >> '${phasesPath}'`,
   ].join(' && ');
-
-  await writeFile(join(ctx.repoRoot, 'bunfig.toml'), '[test]\npreload = ["./first.ts"]\n');
-
-  await writeFile(
-    join(ctx.repoRoot, 'first.ts'),
-    `import { appendFileSync } from 'node:fs';\nappendFileSync('${phasesPath}', \`test-process \${Date.now()}\\n\`);\n`,
-  );
 
   await writeFile(
     join(ctx.repoRoot, 'package.json'),
@@ -93,10 +81,7 @@ test("it runs the repo's build:browser script once, and gives the tests the fold
     [
       "import { expect, test } from 'bun:test';",
       '',
-      "import { appendFileSync } from 'node:fs';",
       "test('it reads the build', async () => {",
-      `  appendFileSync('${phasesPath}', \`test-body \${Date.now()}\\n\`);`,
-      `  appendFileSync('${phasesPath}.ps', Bun.spawnSync(['ps', '-eo', 'pid,etimes,args']).stdout.toString().split('\\n').filter((line) => /^\\s*\\d+\\s+\\d+\\s+\\S*chrom/i.test(line)).join('\\n'));`,
       "  const page = await Bun.file(process.env['RIG_BROWSER_BUILD_DIR'] + '/index.html').text();",
       '',
       String.raw`  expect(page).toBe('<main>notes</main>\n');`,
@@ -108,26 +93,6 @@ test("it runs the repo's build:browser script once, and gives the tests the fold
   const lane = ctx.startLane();
 
   const exitCode = await lane.exited;
-
-  await writeFile(phasesPath, `rig-exit ${Date.now()}\n`, { flag: 'a' });
-
-  const phasesText = await readFile(phasesPath, 'utf8');
-
-  const phases = phasesText
-    .trim()
-    .split('\n')
-    .map((line) => line.split(' '));
-
-  const startMs = Number(phases[0]?.[1]);
-
-  const psText = await readFile(`${phasesPath}.ps`, 'utf8');
-
-  console.log(`PS ${psText}`);
-
-  console.log(
-    `PHASES ${phases.map((phase) => `${phase[0]}=+${Number(phase[1]) - startMs}`).join(' ')}`,
-  );
-
   const invocations = await readFile(invocationsPath, 'utf8');
 
   expect(exitCode).toBe(0);
