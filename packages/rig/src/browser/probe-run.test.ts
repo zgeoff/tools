@@ -1,4 +1,5 @@
 import { expect, mock, test } from 'bun:test';
+import { buildStubProcessProbe } from '../../../../test-utils/build-stub-process-probe.ts';
 import { makeListingQueueStub } from '../../../../test-utils/make-listing-queue-stub.ts';
 import type { LaneFiles } from './lane-files.ts';
 import { probeRun } from './probe-run.ts';
@@ -34,7 +35,7 @@ test('it finds a run live while a group it recorded still runs', async () => {
   const ctx = setupTest();
 
   ctx.options.files.readDirNames.mockImplementation(makeListingQueueStub([['5120'], ['5120']]));
-  ctx.options.groups.probeGroup.mockImplementation((groupID) => groupID === 5120);
+  ctx.options.groups.probeGroup.mockImplementation(buildStubProcessProbe([5120]));
 
   const isLive = await probeRun('4417', '/runs/4417/groups', ctx.options);
 
@@ -68,7 +69,7 @@ test('it finds a run live when a command records its group just before the sweep
     makeListingQueueStub([['pending-tests'], ['6230']]),
   );
 
-  ctx.options.groups.probeGroup.mockImplementation((groupID) => groupID === 6230);
+  ctx.options.groups.probeGroup.mockImplementation(buildStubProcessProbe([6230]));
 
   const isLive = await probeRun('4417', '/runs/4417/groups', ctx.options);
 

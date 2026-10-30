@@ -2,7 +2,10 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { chmod, mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises';
 import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
+import { buildStubProcessProbe } from '../../../../test-utils/build-stub-process-probe.ts';
+import { createListingStubKit } from '../../../../test-utils/create-listing-stub-kit.ts';
 import { createStubBuild } from '../../../../test-utils/create-stub-build.ts';
+import { makeAbortingRunStub } from '../../../../test-utils/make-aborting-run-stub.ts';
 import { makeBlockingTestRun } from '../../../../test-utils/make-blocking-test-run.ts';
 import { makeRecordingStub } from '../../../../test-utils/make-recording-stub.ts';
 import { makeRejectingStub } from '../../../../test-utils/make-rejecting-stub.ts';
@@ -10,7 +13,6 @@ import { makeResolvingStub } from '../../../../test-utils/make-resolving-stub.ts
 import { runLaneHooks } from '../run-lane-hooks.ts';
 import { buildBrowserRun } from './build-browser-run.ts';
 import { laneFiles } from './lane-files.ts';
-import type { BrowserLaneOptions } from './make-browser-lane-hooks.ts';
 import { makeBrowserLaneHooks } from './make-browser-lane-hooks.ts';
 import { ProcessGroupStillRunningError } from './process-group-still-running-error.ts';
 import { ProcessGroupStopError } from './process-group-stop-error.ts';
@@ -31,7 +33,7 @@ async function setupTest() {
     },
     run: buildBrowserRun(join(directory, 'repo'), 'build-box', '7310'),
     userID: userInfo().uid,
-    probeProcess: mock<(pid: number) => boolean>((pid) => pid === 7310),
+    probeProcess: buildStubProcessProbe([7310]),
     groups: { probeGroup: mock<ProcessGroups['probeGroup']>(() => false) },
   };
 }
@@ -265,11 +267,7 @@ test('it fails, and removes its folders, when an abort arrives as the tests exit
 
   const controller = new AbortController();
 
-  const runTests = mock<BrowserLaneOptions['runTests']>(() => {
-    controller.abort();
-
-    return Promise.resolve(0);
-  });
+  const runTests = makeAbortingRunStub(controller, 0);
 
   const exitCode = await runLaneHooks(
     ['.browser.test.ts'],
@@ -541,18 +539,7 @@ test("it leaves every folder in place, and runs no build or tests, when the Chro
 test('it makes the pending record of each command before the command starts, and passes its path', async () => {
   const ctx = await setupTest();
 
-  const recordsAtStart: (readonly string[])[] = [];
-
-  const readRecords = async () => {
-    const records = await readdir(ctx.run.groupsDir);
-
-    recordsAtStart.push(records.toSorted());
-
-    return 0;
-  };
-
-  const runBuild = mock<NonNullable<BrowserLaneOptions['runBuild']>>(readRecords);
-  const runTests = mock<BrowserLaneOptions['runTests']>(readRecords);
+  const commands = createListingStubKit(ctx.run.groupsDir);
 
   await runLaneHooks(
     ['.browser.test.ts'],
@@ -567,14 +554,14 @@ test('it makes the pending record of each command before the command starts, and
       reportCleanupError: makeRecordingStub(),
       environment: {},
       signal: new AbortController().signal,
-      runBuild,
-      runTests,
+      runBuild: commands.stub,
+      runTests: commands.stub,
     }),
   );
 
-  expect(recordsAtStart).toStrictEqual([['pending-build'], ['pending-build', 'pending-tests']]);
-  expect(runBuild.mock.calls[0]?.[2]).toBe(join(ctx.run.groupsDir, 'pending-build'));
-  expect(runTests.mock.calls[0]?.[3]).toBe(join(ctx.run.groupsDir, 'pending-tests'));
+  expect(commands.listings).toStrictEqual([['pending-build'], ['pending-build', 'pending-tests']]);
+  expect(commands.stub.mock.calls[0]?.[2]).toBe(join(ctx.run.groupsDir, 'pending-build'));
+  expect(commands.stub.mock.calls[1]?.[3]).toBe(join(ctx.run.groupsDir, 'pending-tests'));
 });
 
 test("it keeps a build folder that the caller's environment names away from the tests when the repo has no build", async () => {
@@ -648,7 +635,7 @@ test('it keeps the folders of an older run whose lane has exited while a group i
 
   await mkdir(join(olderRun.groupsDir, '6230'), { recursive: true });
 
-  ctx.groups.probeGroup.mockImplementation((groupID) => groupID === 6230);
+  ctx.groups.probeGroup.mockImplementation(buildStubProcessProbe([6230]));
 
   const olderChromeTmpdir = join(ctx.chromeDirs.runsDir, olderRunID);
 
