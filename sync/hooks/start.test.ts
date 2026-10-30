@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createStubInstall } from '../../test-utils/create-stub-install.ts';
 import { readStreamUntil } from '../../test-utils/read-stream-until.ts';
+import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 
 // The stub installs with the bun on PATH and runs the retry with its own runtime, so a stand-in bun
 // first on PATH stands in for the install alone. Its installed package re-exports this repo's
@@ -21,17 +22,9 @@ async function setupTest() {
   const stubPath = join(project, '.claude/hooks/start.ts');
 
   await mkdir(join(project, '.claude/hooks'), { recursive: true });
-  await mkdir(join(project, '.claude/skills/docs-writing'), { recursive: true });
   await mkdir(fakeBin);
   await mkdir(packageDir);
   await copyFile(join(import.meta.dir, 'start.ts'), stubPath);
-  await writeFile(join(project, '.claude/skills/docs-writing/SKILL.md'), '# Docs writing\n');
-  await writeFile(join(project, 'transcript.jsonl'), '');
-
-  await writeFile(
-    join(project, '.claude/skill-gate.json'),
-    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
-  );
 
   await writeFile(
     join(packageDir, 'package.json'),
@@ -88,9 +81,6 @@ async function setupTest() {
     }
   };
 
-  const gatedEdit = buildPayload('Write', { file_path: join(project, 'guide.md') });
-  const gateReason = `Load the \`docs-writing\` skill with the Skill tool before editing ${join(project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`;
-
   return {
     directory,
     project,
@@ -101,8 +91,6 @@ async function setupTest() {
     runStub,
     startStub,
     readInstallLog,
-    gatedEdit,
-    gateReason,
   };
 }
 
@@ -114,11 +102,24 @@ test('it installs the missing package in a fresh worktree, then blocks a gated e
     outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
   });
 
-  const result = ctx.runStub(ctx.gatedEdit);
+  await writeTreeFiles(ctx.project, {
+    '.claude/skill-gate.json': JSON.stringify({
+      gates: [{ match: '**/*.md', skills: ['docs-writing'] }],
+    }),
+    '.claude/skills/docs-writing/SKILL.md': '# Docs writing\n',
+    'transcript.jsonl': '',
+  });
+
+  const result = ctx.runStub(
+    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+  );
 
   expect(result.status).toBe(2);
   expect(result.stdout).toBe('');
-  expect(result.stderr).toBe(`stub install started\n${ctx.gateReason}`);
+
+  expect(result.stderr).toBe(
+    `stub install started\nLoad the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 
   const installLog = await ctx.readInstallLog();
 
@@ -131,6 +132,14 @@ test('it allows an ungated edit after the install with no output', async () => {
   await createStubInstall(ctx.fakeBin, {
     log: ctx.installLog,
     outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+  });
+
+  await writeTreeFiles(ctx.project, {
+    '.claude/skill-gate.json': JSON.stringify({
+      gates: [{ match: '**/*.md', skills: ['docs-writing'] }],
+    }),
+    '.claude/skills/docs-writing/SKILL.md': '# Docs writing\n',
+    'transcript.jsonl': '',
   });
 
   const result = ctx.runStub(
@@ -149,24 +158,39 @@ test('it runs no install when the package loads', async () => {
     outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
   });
 
-  ctx.runStub(ctx.gatedEdit);
+  await writeTreeFiles(ctx.project, {
+    '.claude/skill-gate.json': JSON.stringify({
+      gates: [{ match: '**/*.md', skills: ['docs-writing'] }],
+    }),
+    '.claude/skills/docs-writing/SKILL.md': '# Docs writing\n',
+    'transcript.jsonl': '',
+  });
 
-  const result = ctx.runStub(ctx.gatedEdit);
+  ctx.runStub(ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }));
+
+  const result = ctx.runStub(
+    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+  );
 
   expect(result.status).toBe(2);
-  expect(result.stderr).toBe(ctx.gateReason);
+
+  expect(result.stderr).toBe(
+    `Load the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 
   const installLog = await ctx.readInstallLog();
 
   expect(installLog).toBe(`bun install --frozen-lockfile in ${ctx.project}\n`);
 });
 
-test('it refuses a gated edit with the install message when the install fails', async () => {
+test('it refuses an edit with the install message when the install fails', async () => {
   const ctx = await setupTest();
 
   await createStubInstall(ctx.fakeBin, { log: ctx.installLog, outcome: { kind: 'fails' } });
 
-  const result = ctx.runStub(ctx.gatedEdit);
+  const result = ctx.runStub(
+    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+  );
 
   expect(result.status).toBe(2);
   expect(result.stdout).toBe('');
@@ -276,11 +300,23 @@ test('it runs one install for two parallel hook calls in one worktree', async ()
     releasePath,
   });
 
-  const first = ctx.startStub(ctx.gatedEdit);
+  await writeTreeFiles(ctx.project, {
+    '.claude/skill-gate.json': JSON.stringify({
+      gates: [{ match: '**/*.md', skills: ['docs-writing'] }],
+    }),
+    '.claude/skills/docs-writing/SKILL.md': '# Docs writing\n',
+    'transcript.jsonl': '',
+  });
+
+  const first = ctx.startStub(
+    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+  );
 
   await readStreamUntil(first.stderr, 'stub install started');
 
-  const second = ctx.startStub(ctx.gatedEdit);
+  const second = ctx.startStub(
+    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+  );
 
   const waiting = await readStreamUntil(second.stderr, 'Another agent hook runs bun install here');
 
@@ -294,7 +330,7 @@ test('it runs one install for two parallel hook calls in one worktree', async ()
   expect(secondStatus).toBe(2);
 
   expect(`${waiting}${decided}`).toBe(
-    `Another agent hook runs bun install here, so this one waits for it.\n${ctx.gateReason}`,
+    `Another agent hook runs bun install here, so this one waits for it.\nLoad the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
   );
 
   const installLog = await ctx.readInstallLog();
@@ -310,15 +346,28 @@ test('it installs over a lock that a stopped hook left behind', async () => {
     outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
   });
 
+  await writeTreeFiles(ctx.project, {
+    '.claude/skill-gate.json': JSON.stringify({
+      gates: [{ match: '**/*.md', skills: ['docs-writing'] }],
+    }),
+    '.claude/skills/docs-writing/SKILL.md': '# Docs writing\n',
+    'transcript.jsonl': '',
+  });
+
   const stopped = spawnSync('true');
 
   await mkdir(join(ctx.project, 'node_modules'));
   await writeFile(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), String(stopped.pid));
 
-  const result = ctx.runStub(ctx.gatedEdit);
+  const result = ctx.runStub(
+    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+  );
 
   expect(result.status).toBe(2);
-  expect(result.stderr).toBe(`stub install started\n${ctx.gateReason}`);
+
+  expect(result.stderr).toBe(
+    `stub install started\nLoad the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test.each([
@@ -332,19 +381,35 @@ test.each([
     outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
   });
 
+  await writeTreeFiles(ctx.project, {
+    '.claude/skill-gate.json': JSON.stringify({
+      gates: [{ match: '**/*.md', skills: ['docs-writing'] }],
+    }),
+    '.claude/skills/docs-writing/SKILL.md': '# Docs writing\n',
+    'transcript.jsonl': '',
+  });
+
   await mkdir(join(ctx.project, 'node_modules'));
   await writeFile(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), row.contents);
 
-  const result = ctx.runStub(ctx.gatedEdit);
+  const result = ctx.runStub(
+    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+  );
 
   expect(result.status).toBe(2);
-  expect(result.stderr).toBe(`stub install started\n${ctx.gateReason}`);
+
+  expect(result.stderr).toBe(
+    `stub install started\nLoad the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test('it refuses a harness it does not know', async () => {
   const ctx = await setupTest();
 
-  const result = ctx.runStub(ctx.gatedEdit, ['--harness', 'cursor']);
+  const result = ctx.runStub(
+    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+    ['--harness', 'cursor'],
+  );
 
   expect(result.status).toBe(2);
 
