@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/zgeoff/tools/compare/@zgeoff/bun-test-extended@0.2.1...@zgeoff/bun-test-extended@0.2.2) (2026-10-30)
+
+
+### Features
+
+* **oxlint-config:** add the test-shape rule for bun:test files ([#384](https://github.com/zgeoff/tools/issues/384)) ([c35150f](https://github.com/zgeoff/tools/commit/c35150ff41183949dcfd24eb1c3145d2bef3c4f7))
+
 ## [0.2.1](https://github.com/zgeoff/tools/compare/@zgeoff/bun-test-extended@0.2.0...@zgeoff/bun-test-extended@0.2.1) (2026-10-20)
 
 ### Features
