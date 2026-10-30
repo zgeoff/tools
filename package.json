@@ -62,6 +62,8 @@
     "check:renovate-config": "bun scripts/renovate/run-renovate-config-check.ts",
     "ci:install-tool": "bun scripts/ci/run-pinned-tool-step.ts",
     "ci:dispatch-publish": "bun scripts/publish/dispatch-release-publish.ts",
+    "ci:plan-sync-dispatch": "bun scripts/repo-sync/write-sync-dispatch-plan.ts",
+    "ci:send-sync-dispatches": "bun scripts/repo-sync/write-sync-dispatches.ts",
     "ci:publish-packages": "bun scripts/publish/publish-packages.ts",
     "files:branch": "bun sync/pre-push/read-branch-files.ts",
     "check:commits": "bun sync/pre-push/run-commits-check.ts",

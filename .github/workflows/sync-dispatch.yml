@@ -1,0 +1,80 @@
+# Sends each repo that the sync App can reach a repository_dispatch event,
+# zgeoff-tools-sync, with a commit on main in client_payload.sha. Each repo's
+# repo-sync caller then syncs the files of that commit, as
+# docs/architecture/repo-sync.md describes.
+#
+# A green Main push run on main sends its commit when a synced source changed
+# since the last green commit. A zgeoff-skills-sync event, which zgeoff/skills
+# sends here, sends the newest green commit with no check. The job mints the
+# sync App's token from the REPO_SYNC_APP_CLIENT_ID and REPO_SYNC_APP_PRIVATE_KEY
+# secrets, and a dispatch needs only its contents write.
+name: Sync dispatch
+
+on:
+  workflow_run:
+    workflows: [Main]
+    types: [completed]
+    branches: [main]
+  repository_dispatch:
+    types: [zgeoff-skills-sync]
+
+jobs:
+  dispatch:
+    name: Dispatch the sync
+    # The run holds an App token, so it starts only from a green push to main
+    # of this repository, never from a fork's run or a republish.
+    if: >-
+      github.event_name == 'repository_dispatch' || ( github.event.workflow_run.conclusion ==
+      'success' && github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Dispatches go out in the order of the commits they send.
+    concurrency:
+      group: sync-dispatch
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      # The plan diffs main between two green commits and reads the manifest of
+      # each.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+          no-cache: true
+
+      - name: Plan the dispatch
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          RUN_COMMIT: ${{ github.event.workflow_run.head_sha }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: bun run --silent ci:plan-sync-dispatch
+
+      - name: Mint the sync App token
+        if: ${{ steps.plan.outputs.send == 'true' }}
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          client-id: ${{ secrets.REPO_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.REPO_SYNC_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+
+      - name: Send the dispatch to each repo
+        if: ${{ steps.plan.outputs.send == 'true' }}
+        env:
+          COMMIT: ${{ steps.plan.outputs.commit }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: bun run --silent ci:send-sync-dispatches

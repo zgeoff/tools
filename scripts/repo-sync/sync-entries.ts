@@ -8,13 +8,17 @@ import { runCommand } from '../ci/run-command.ts';
 import type { CopyPlan, ExistingWorkflow, SyncFileRow } from './build-copy-plan.ts';
 import { buildCopyPlan } from './build-copy-plan.ts';
 import { buildSyncRowSplit } from './build-sync-row-split.ts';
+import { buildToolsPin } from './build-tools-pin.ts';
 import { isWorkflowPath } from './is-workflow-path.ts';
 import type { SyncEntry } from './parse-sync-entries.ts';
 import { parseSyncEntries } from './parse-sync-entries.ts';
 import type { RetiredFileRemoval, SyncedEntry } from './plan-retired-file-removal.ts';
 import { planRetiredFileRemoval, retiredFilesName } from './plan-retired-file-removal.ts';
+import { readSyncCommitVerdict } from './read-sync-commit-verdict.ts';
+import { renderSyncPullRequestTitle } from './render-sync-pull-request-title.ts';
 import { selectSyncFiles } from './select-sync-files.ts';
 import { writeSyncAutoMerge } from './write-sync-auto-merge.ts';
+import { writeToolsPins } from './write-tools-pins.ts';
 
 export interface SyncEntriesOptions {
   readonly cwd: string;
@@ -41,10 +45,9 @@ interface SyncSettings {
   readonly entries: readonly SyncEntry[];
   readonly branch: string;
   readonly marker: string;
-  readonly pin: string;
+  readonly commit: string;
   readonly repo: string;
   readonly skip: string;
-  readonly workflows: boolean;
   readonly base: string;
 }
 
@@ -79,6 +82,25 @@ export async function syncEntries(options: Readonly<SyncEntriesOptions>): Promis
     writeOutput: options.writeOutput,
   };
 
+  const verdict = await readSyncCommitVerdict(context, {
+    commit: context.commit,
+    branch: context.branch,
+  });
+
+  if (verdict.kind === 'refused') {
+    options.writeOutput(`::error::${verdict.message}\n`);
+
+    return 1;
+  }
+
+  if (verdict.kind === 'superseded') {
+    options.writeOutput(
+      `Pull request #${verdict.number} already syncs ${verdict.pin}, which is newer than ${context.commit}; nothing to do.\n`,
+    );
+
+    return 0;
+  }
+
   const committed = await commitEntries(context);
 
   if (committed.synced.length > 0) {
@@ -109,12 +131,12 @@ export async function syncEntries(options: Readonly<SyncEntriesOptions>): Promis
 type SyncSettingsResult = SyncSettings | { readonly kind: 'refused'; readonly message: string };
 
 function parseSyncSettings(env: Readonly<Record<string, string | undefined>>): SyncSettingsResult {
-  const pin = buildPin(env['TOOLS_REF'] ?? '', env['WORKFLOW_REF'] ?? '');
+  const commit = env['TOOLS_REF'] ?? '';
 
-  if (!/^[A-Za-z0-9._/-]+$/u.test(pin)) {
+  if (!isCommitID(commit)) {
     return {
       kind: 'refused',
-      message: `cannot pin delivered workflows to the ref '${pin.replaceAll(':', ' ')}'`,
+      message: `the tools ref '${commit.replaceAll(':', ' ')}' is not a full commit ID`,
     };
   }
 
@@ -132,23 +154,15 @@ function parseSyncSettings(env: Readonly<Record<string, string | undefined>>): S
     entries,
     branch: env['BRANCH'] ?? '',
     marker: env['MARKER'] ?? '',
-    pin,
+    commit,
     repo: env['REPO'] ?? '',
     skip: env['SKIP'] ?? '',
-    workflows: env['WORKFLOWS'] === 'true',
     base: env['BASE'] ?? '',
   };
 }
 
-// A delivered workflow calls this repository at the ref this run syncs from, so a caller pinned to
-// a tag never runs the shared jobs of main.
-function buildPin(toolsRef: string, workflowRef: string): string {
-  const ref = toolsRef === '' ? workflowRef.slice(workflowRef.lastIndexOf('@') + 1) : toolsRef;
-  const withoutTags = ref.startsWith('refs/tags/') ? ref.slice('refs/tags/'.length) : ref;
-
-  return withoutTags.startsWith('refs/heads/')
-    ? withoutTags.slice('refs/heads/'.length)
-    : withoutTags;
+function isCommitID(ref: string): boolean {
+  return /^[0-9a-f]{40}$/u.test(ref);
 }
 
 interface CommittedEntries {
@@ -228,15 +242,24 @@ async function commitEntries(context: SyncContext): Promise<CommittedEntries> {
 
   const retired = await removeRetiredFiles(context, taken, copied);
 
-  return retired.kind === 'failed'
-    ? { synced, failed: [...failed, retiredFilesName], start, delivered: copied, scripts }
-    : {
-        synced: [...synced, ...retired.synced],
-        failed,
-        start,
-        delivered: [...copied, ...retired.paths],
-        scripts,
-      };
+  const committed: CommittedEntries =
+    retired.kind === 'failed'
+      ? { synced, failed: [...failed, retiredFilesName], start, delivered: copied, scripts }
+      : {
+          synced: [...synced, ...retired.synced],
+          failed,
+          start,
+          delivered: [...copied, ...retired.paths],
+          scripts,
+        };
+
+  if (committed.synced.length === 0) {
+    return committed;
+  }
+
+  const pinned = await writeToolsPins(context, context.commit);
+
+  return { ...committed, delivered: [...committed.delivered, ...pinned] };
 }
 
 function runSyncCommand(context: SyncContext, argv: readonly string[]): Promise<CommandResult> {
@@ -347,7 +370,7 @@ async function applyCopyPlan(context: SyncContext, plan: CopyPlan): Promise<void
 
       const text = await context.fileSystem.readText(path);
 
-      await context.fileSystem.writeText(path, buildPinnedWorkflow(text, context.pin));
+      await context.fileSystem.writeText(path, buildToolsPin(text, context.commit));
     }
   }
 
@@ -359,18 +382,6 @@ async function applyCopyPlan(context: SyncContext, plan: CopyPlan): Promise<void
       ...plan.excluded,
     ]);
   }
-}
-
-function buildPinnedWorkflow(text: string, pin: string): string {
-  return text
-    .split('\n')
-    .map((line) =>
-      line.replaceAll(
-        /(?<call>zgeoff\/tools\/\.github\/workflows\/[^\]@\s"'{},]+)@main(?<after>[\]{},\s"']|$)/gu,
-        `$<call>@${pin}$<after>`,
-      ),
-    )
-    .join('\n');
 }
 
 function runProbeCommand(context: SyncContext, argv: readonly string[]): Promise<CommandResult> {
@@ -414,11 +425,7 @@ async function removeRetiredFiles(
 
   context.writeOutput(result.stderr);
 
-  const removal = planRetiredFileRemoval({
-    exitCode: result.exitCode,
-    removedText: result.stdout,
-    workflows: context.workflows,
-  });
+  const removal = planRetiredFileRemoval({ exitCode: result.exitCode, removedText: result.stdout });
 
   return applyRetiredFileRemoval(removal, context);
 }
@@ -445,10 +452,6 @@ const retiredFileRemovalAppliers: {
     return { kind: 'failed' };
   },
   removed: async (removal, context) => {
-    if (removal.restoresWorkflows) {
-      await runSyncCommand(context, ['git', 'checkout', '-q', '--', '.github/workflows']);
-    }
-
     if (removal.synced.length > 0) {
       await runSyncCommand(context, ['git', 'add', '-A']);
 
@@ -534,8 +537,8 @@ async function writePullRequest(
   context: SyncContext,
   synced: readonly SyncedEntry[],
 ): Promise<string> {
-  const title = `chore: sync zgeoff/tools ${context.pin}`;
-  const body = renderPullRequestBody(context.pin, synced);
+  const title = renderSyncPullRequestTitle(synced);
+  const body = renderPullRequestBody(context.commit, synced);
 
   const listed = await runSyncCommand(context, [
     'gh',
@@ -583,10 +586,10 @@ async function writePullRequest(
   return url.slice(url.lastIndexOf('/') + 1);
 }
 
-function renderPullRequestBody(pin: string, synced: readonly SyncedEntry[]): string {
+function renderPullRequestBody(commit: string, synced: readonly SyncedEntry[]): string {
   const lines = synced.map((entry) => `- \`${entry.name}\`: ${entry.description}`);
 
-  return `Copied from zgeoff/tools at ${pin} by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry:\n\n${lines.join('\n')}`;
+  return `Copied from zgeoff/tools at ${commit} by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry or pins the calls to zgeoff/tools workflows to that commit:\n\n${lines.join('\n')}`;
 }
 
 async function removeEntryBranches(

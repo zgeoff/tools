@@ -293,7 +293,7 @@ test('it fails on a shallow checkout of tools', async () => {
   });
 });
 
-test('it deletes a retired workflow whose calls the sync pinned to a tag', async () => {
+test('it deletes a retired workflow whose calls the sync pinned to a commit', async () => {
   const ctx = await setupTest();
 
   await createGitCommit(ctx.tools, ctx.env, {
@@ -311,7 +311,7 @@ test('it deletes a retired workflow whose calls the sync pinned to a tag', async
 
   await writeTreeFiles(ctx.caller, {
     '.github/workflows/lint.yml':
-      'jobs:\n  lint:\n    uses: zgeoff/tools/.github/workflows/lint.yml@sync-v7\n',
+      'jobs:\n  lint:\n    uses: zgeoff/tools/.github/workflows/lint.yml@0123456789abcdef0123456789abcdef01234567 # main\n',
   });
 
   const result = await $`bash ${ctx.scriptPath} ${ctx.tools} ${''}`

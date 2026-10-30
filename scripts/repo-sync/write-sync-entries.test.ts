@@ -23,47 +23,6 @@ async function setupTest() {
   return { directory, manifestPath, outputPath, output, writeOutput };
 }
 
-test.each([
-  ['true when a selected entry', 'workflow-demo', 'true'],
-  ['false when only a filtered-out entry', '', 'false'],
-])('it outputs workflows %s targets a workflow', async (_label, include, expected) => {
-  const ctx = await setupTest();
-
-  await writeFile(
-    ctx.manifestPath,
-    JSON.stringify([
-      {
-        name: 'editorconfig',
-        description: 'The editor config',
-        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
-      },
-      {
-        name: 'workflow-demo',
-        description: 'The demo workflow',
-        optIn: true,
-        files: [{ source: 'sync/workflow-demo.yml', target: '.github/workflows/demo.yml' }],
-      },
-    ]),
-  );
-
-  await writeFile(ctx.outputPath, '');
-
-  const exitCode = await writeSyncEntries({
-    cwd: ctx.directory,
-    skip: '',
-    include,
-    outputPath: ctx.outputPath,
-    fileSystem: nodeFileSystem,
-    writeOutput: ctx.writeOutput,
-  });
-
-  const outputs = await readFile(ctx.outputPath, 'utf8');
-
-  expect(exitCode).toBe(0);
-  expect(outputs).toEndWith(`\nworkflows=${expected}\n`);
-  expect(ctx.output).toStrictEqual([]);
-});
-
 test('it outputs the entries it keeps as compact JSON in the sync entry contract', async () => {
   const ctx = await setupTest();
 
@@ -113,7 +72,7 @@ test('it outputs the entries it keeps as compact JSON in the sync entry contract
   ];
 
   expect(exitCode).toBe(0);
-  expect(outputs).toBe(`entries=${JSON.stringify(entries)}\nworkflows=true\n`);
+  expect(outputs).toBe(`entries=${JSON.stringify(entries)}\n`);
   expect(ctx.output).toStrictEqual([]);
 });
 

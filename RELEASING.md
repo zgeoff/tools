@@ -5,16 +5,16 @@ Releases are fully automated off `main` via
 publish step in `.github/workflows/main.yml`. No npm tokens live in CI. Decision record:
 [#8](https://github.com/zgeoff/tools/issues/8).
 
-The shared files under `sync/` ship by hand-pushed `sync-vN` tags instead, which
-[sync tags](./docs/architecture/sync-tags.md) describes.
+The shared files under `sync/` reach each repo on every green `main` instead, as
+[repo sync](./docs/architecture/repo-sync.md#delivery) describes.
 
 ## Flow
 
 1. A `feat:`/`fix:` PR touching `packages/<pkg>` merges to `main`.
 2. `main.yml`'s release job calls the shared
    [`release-please.yml`](./.github/workflows/release-please.yml) with `merge: true`. Other repos
-   call it at a sync tag too, and its `merge` input is off by default. In a repo with `merge` off, a
-   person merges the release PR, and the run of that merge's push tags the release. It runs
+   call it at a pinned commit too, and its `merge` input is off by default. In a repo with `merge`
+   off, a person merges the release PR, and the run of that merge's push tags the release. It runs
    release-please, which opens (or updates) a release PR for the affected packages: version bump per
    conventional-commit type, `CHANGELOG.md`, manifest update. The job syncs `bun.lock` on the PR
    branch (versions are recorded there too) and merges the PR when every check on its head passes in

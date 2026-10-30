@@ -42,8 +42,8 @@ here=$(dirname "${BASH_SOURCE[0]}")
 
 # Prints the hash of each form in which a sync run could deliver the blob to
 # the target. A workflow's calls to a zgeoff/tools workflow name the ref of the
-# run, so every such call reads @main in the hash, and the copy is hashed the
-# same way. A Markdown file loses the blocks that need a file the repo does
+# run and a `# main` comment, so every such call reads @main with no comment in
+# the hash, and the copy is hashed the same way. A Markdown file loses the blocks that need a file the repo does
 # not receive, so each subset of the needed paths gives one form. A file that
 # needs more than 8 paths gets only its unchanged form, which keeps the copy
 # rather than hash 2^n forms.
@@ -79,7 +79,7 @@ print_delivered_hashes() {
 to_delivered_form() {
   local target=$1
   if [[ "$target" == .github/workflows/* ]]; then
-    sed -E "s#(zgeoff/tools/\.github/workflows/[^]@[:space:]\"'{},]+)@[A-Za-z0-9._/-]+#\1@main#g"
+    sed -E "s|(zgeoff/tools/\.github/workflows/[^]@[:space:]\"'{},]+)@[A-Za-z0-9._/-]+( # main)?|\1@main|g"
   else
     cat
   fi

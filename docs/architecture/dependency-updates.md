@@ -23,7 +23,6 @@ The preset sorts each update by its kind:
 | Major                 | the gate         | one per package, opened weekly               | after review    |
 | `@zgeoff/*` package   | none             | one per package, at any level                | on green checks |
 | `@impz/*` package     | none             | one per package, at any level                | on green checks |
-| zgeoff/tools sync tag | none             | one per tag                                  | on green checks |
 | Lock-file maintenance | none             | weekly, for the dependencies of dependencies | on green checks |
 
 A TanStack router release, React Start among its packages, reaches a repo as one pull request for
@@ -35,11 +34,11 @@ one's exact version, so their patch and minor bumps reach a repo as one pull req
 `wringer packages` group, and the packages never mix versions. The group opens at any time, as the
 TanStack group does. A major bump of one of them gets its own pull request, as any major does.
 
-A `@zgeoff/*` or `@impz/*` bump and a sync-tag bump ignore Renovate's concurrent limit of 10 update
-branches per repo. A busy repo keeps more than 10 update branches open, and Renovate would hold a
-new sync tag on its Dependency Dashboard under Rate-Limited until a person closed some of them. The
-two rules set `prConcurrentLimit` and `branchConcurrentLimit` to 0, which Renovate reads as no limit
-for a branch that holds their updates.
+A `@zgeoff/*` or `@impz/*` bump ignores Renovate's concurrent limit of 10 update branches per repo.
+A busy repo keeps more than 10 update branches open, and Renovate would hold such a bump on its
+Dependency Dashboard under Rate-Limited until a person closed some of them. The two rules set
+`prConcurrentLimit` and `branchConcurrentLimit` to 0, which Renovate reads as no limit for a branch
+that holds their updates.
 
 The release-age wait matches the `minimumReleaseAge = 604800` gate in each repo's `bunfig.toml`, so
 Renovate proposes no version that `bun install` would refuse. Security fixes come from OSV, through

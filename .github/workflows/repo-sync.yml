@@ -2,17 +2,21 @@
 # in the caller. For each manifest entry, the sync job copies the entry's files
 # from this repository to their target paths, runs the entry's `build` command
 # when it has one, and commits the result. The commits go on one branch,
-# repo-sync/zgeoff-tools, and one pull request carries them, so a release of
-# this repository reaches each repo as one pull request. A later run while that
-# pull request is open force-pushes the branch and updates the same pull
-# request. A new shared file is a manifest entry here with no change downstream.
+# repo-sync/zgeoff-tools, and one pull request carries them, so a change to
+# main of this repository reaches each repo as one pull request. A later run
+# while that pull request is open force-pushes the branch and updates the same
+# pull request. A new shared file is a manifest entry here with no change downstream.
 # A file that an earlier manifest delivered and the current one drops goes in
 # one more commit, as docs/architecture/repo-sync.md describes.
 #
-# Callers pin this workflow to a sync tag, such as `@sync-v1`, and the run syncs
-# the files that tag holds: both checkouts of this repository read the commit of
-# the called workflow, unless `tools-ref` names another ref. A delivered caller
-# of another workflow here is pinned to the same ref on the way out.
+# Callers pin this workflow to a commit on main, and the run syncs the files of
+# the commit that `ref` names, or of the pinned commit when `ref` is empty. The
+# sync-dispatch workflow here sends each caller a repository_dispatch event with
+# the commit of each green main that changes a synced source, and the caller
+# passes that commit as `ref`. The run refuses a commit that is not on main, and
+# leaves alone an open pull request that syncs a newer commit. The pull request
+# pins every call to a workflow here, in the caller's own workflows too, to the
+# commit it syncs from.
 #
 # Callers install sync/repo-sync.yml as .github/workflows/repo-sync.yml and set
 # the REPO_SYNC_APP_CLIENT_ID and REPO_SYNC_APP_PRIVATE_KEY secrets. The job
@@ -26,6 +30,10 @@
 # auto-merge off before each push, and the repo-sync guard that the manifest
 # delivers turns it off after a push by anyone else.
 #
+# The alarm job opens an issue in the caller when the open sync pull request has
+# a failing check and is more than a day old, so it needs the caller's
+# issues: write, pull-requests: read, checks: read and statuses: read.
+#
 # A manifest entry marked `"optIn": true` reaches a caller only when the caller
 # lists its name in the `include` input. `include` fails the run on a name that
 # is not an opt-in entry, because listing it has no effect. `skip` leaves out
@@ -35,8 +43,9 @@ name: Repo sync (reusable)
 on:
   workflow_call:
     inputs:
-      tools-ref:
-        description: Ref of zgeoff/tools to sync from; empty reads the commit of this workflow
+      ref:
+        description:
+          Commit on main of zgeoff/tools to sync from; empty reads the commit of this workflow
         type: string
         required: false
         default: ''
@@ -65,18 +74,17 @@ jobs:
       contents: read
     outputs:
       entries: ${{ steps.manifest.outputs.entries }}
-      workflows: ${{ steps.manifest.outputs.workflows }}
     steps:
       - name: Check out the manifest
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: zgeoff/tools
-          ref: ${{ inputs.tools-ref || job.workflow_sha }}
+          ref: ${{ inputs.ref || job.workflow_sha }}
           sparse-checkout: sync/manifest.json
           sparse-checkout-cone-mode: false
 
       # The step scripts download from the commit of this workflow, whatever
-      # tools-ref names, so an older ref still syncs through current scripts.
+      # ref names, so the run syncs through the scripts of the caller's pin.
       # actionlint does not know job.workflow_repository or job.workflow_sha,
       # so the step reads them through toJSON.
       - name: Download the step script downloader
@@ -115,9 +123,9 @@ jobs:
     if: ${{ success() }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Two runs at once could push one release's files and then write the other
-    # release's title and body. The group names only the caller, so runs from
-    # every ref and every sync tag wait for each other.
+    # Two runs at once could push one commit's files and then write the other
+    # commit's title and body. The group names only the caller, so runs of every
+    # ref wait for each other.
     concurrency:
       group: repo-sync-${{ github.repository }}
       cancel-in-progress: false
@@ -132,10 +140,9 @@ jobs:
           private-key: ${{ secrets.REPO_SYNC_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
-          # Contents write alone cannot push a file under .github/workflows/.
-          # The token asks for workflows write only when an entry has such a
-          # target.
-          permission-workflows: ${{ needs.prepare.outputs.workflows == 'true' && 'write' || '' }}
+          # Contents write alone cannot push a file under .github/workflows/,
+          # and the pin of the caller's own workflows is such a change.
+          permission-workflows: write
 
       - name: Check out the caller
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -146,7 +153,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: zgeoff/tools
-          ref: ${{ inputs.tools-ref || job.workflow_sha }}
+          ref: ${{ inputs.ref || job.workflow_sha }}
           path: .repo-sync
           persist-credentials: false
           # The earlier manifests in the history name the files to delete, and
@@ -156,7 +163,7 @@ jobs:
           filter: ''
 
       # The step scripts download from the commit of this workflow, whatever
-      # tools-ref names, so an older ref still syncs through current scripts.
+      # ref names, so the run syncs through the scripts of the caller's pin.
       # actionlint does not know job.workflow_repository or job.workflow_sha,
       # so the step reads them through toJSON.
       - name: Download the step script downloader
@@ -207,11 +214,44 @@ jobs:
           ENTRIES: ${{ needs.prepare.outputs.entries }}
           BRANCH: repo-sync/zgeoff-tools
           MARKER: repo-sync delivers this file from zgeoff/tools
-          TOOLS_REF: ${{ inputs.tools-ref }}
-          WORKFLOW_REF: ${{ job.workflow_ref }}
+          TOOLS_REF: ${{ inputs.ref || job.workflow_sha }}
           REPO: ${{ github.repository }}
           SKIP: ${{ inputs.skip }}
-          WORKFLOWS: ${{ needs.prepare.outputs.workflows }}
           BASE: ${{ github.ref_name }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/sync-entries.ts"
+
+  alarm:
+    name: Raise a red sync pull request
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      checks: read
+      statuses: read
+    steps:
+      - name: Download the step script downloader
+        env: *tools-url
+        run:
+          curl -fsSL --retry 3 --retry-all-errors --create-dirs -o "$RUNNER_TEMP/tools/.bun-version"
+          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/ci/download-step-scripts.ts"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: ${{ runner.temp }}/tools/.bun-version
+          no-cache: true
+
+      - name: Download the sync scripts
+        env: *tools-url
+        run: bun "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts" repo-sync
+
+      - name: Open an issue for a sync pull request red for more than a day
+        env:
+          BRANCH: repo-sync/zgeoff-tools
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/write-sync-alarm.ts"

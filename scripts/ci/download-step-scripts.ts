@@ -21,7 +21,11 @@ export const stepScriptSets = {
     'sync/pre-push/dependency-gates/run-dependency-gates-check.ts',
   ],
   'paths-changed': ['scripts/paths-changed/run-changed-files-step.ts'],
-  'repo-sync': ['scripts/repo-sync/write-sync-entries.ts', 'scripts/repo-sync/sync-entries.ts'],
+  'repo-sync': [
+    'scripts/repo-sync/write-sync-entries.ts',
+    'scripts/repo-sync/sync-entries.ts',
+    'scripts/repo-sync/write-sync-alarm.ts',
+  ],
   'repo-sync-guard': ['scripts/repo-sync/hold-hand-pushed-sync.ts'],
   'audit-fix': [
     'scripts/audit-fix/fix-advisories.ts',

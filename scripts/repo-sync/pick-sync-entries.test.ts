@@ -51,17 +51,5 @@ test('it leaves out a skipped entry and an opt-in entry that include does not li
     include: '',
   });
 
-  expect(picked).toStrictEqual({ kind: 'picked', entries: [editorconfig], workflows: false });
-});
-
-test('it reports workflows when a picked entry targets a workflow', () => {
-  const workflowDemo = buildMockSyncEntry({
-    name: 'workflow-demo',
-    files: [{ source: 'sync/demo.yml', target: '.github/workflows/demo.yml' }],
-    optIn: true,
-  });
-
-  const picked = pickSyncEntries({ manifest: [workflowDemo], skip: '', include: 'workflow-demo' });
-
-  expect(picked).toStrictEqual({ kind: 'picked', entries: [workflowDemo], workflows: true });
+  expect(picked).toStrictEqual({ kind: 'picked', entries: [editorconfig] });
 });
