@@ -1,7 +1,7 @@
 # Runs self-hosted Renovate over every repository where the Renovate GitHub App
 # is installed. The shared preset in default.json needs a self-hosted run: its
-# postUpgradeTasks refresh bun.lock with `bun install`, and only the admin's
-# allowedCommands lets Renovate run that command.
+# postUpgradeTasks refresh bun.lock with `bun install` and run a package's
+# `init`, and only the admin's allowedCommands lets Renovate run them.
 #
 # A repository opts in with a renovate.json that extends the preset; one with
 # no config is skipped, and gets no onboarding pull request. The run every two
@@ -72,5 +72,7 @@ jobs:
           RENOVATE_ONBOARDING: 'false'
           RENOVATE_USERNAME: ${{ steps.app-token.outputs.app-slug }}[bot]
           RENOVATE_GIT_AUTHOR: ${{ steps.bot.outputs.git-author }}
-          RENOVATE_ALLOWED_COMMANDS: '["^bun install --ignore-scripts( --minimum-release-age=0)?$"]'
+          RENOVATE_ALLOWED_COMMANDS: >-
+            ["^bun install --ignore-scripts( --minimum-release-age=0)?$", "^bun run --if-present
+            node_modules/\\.bin/(agent-hooks|chex|rig) init$"]
           RENOVATE_DRY_RUN: ${{ inputs.dry-run != 'off' && inputs.dry-run || '' }}

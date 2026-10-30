@@ -122,6 +122,51 @@
       "automerge": true
     },
     {
+      "description": "A bump of @zgeoff/agent-hooks runs its init, so the pull request carries the wiring the new version writes. bun run --if-present skips a version that has no agent-hooks bin. The task replaces the catalog rule's, so it runs bun install itself, and the self-hosted run must allow both commands.",
+      "matchPackageNames": ["@zgeoff/agent-hooks"],
+      "postUpgradeTasks": {
+        "commands": [
+          "bun install --ignore-scripts",
+          "bun run --if-present node_modules/.bin/agent-hooks init"
+        ],
+        "fileFilters": ["**/*"],
+        "executionMode": "update",
+        "installTools": {
+          "bun": {}
+        }
+      }
+    },
+    {
+      "description": "A bump of @zgeoff/chex runs its init, as the agent-hooks rule does.",
+      "matchPackageNames": ["@zgeoff/chex"],
+      "postUpgradeTasks": {
+        "commands": [
+          "bun install --ignore-scripts",
+          "bun run --if-present node_modules/.bin/chex init"
+        ],
+        "fileFilters": ["**/*"],
+        "executionMode": "update",
+        "installTools": {
+          "bun": {}
+        }
+      }
+    },
+    {
+      "description": "A bump of @zgeoff/rig runs its init, as the agent-hooks rule does.",
+      "matchPackageNames": ["@zgeoff/rig"],
+      "postUpgradeTasks": {
+        "commands": [
+          "bun install --ignore-scripts",
+          "bun run --if-present node_modules/.bin/rig init"
+        ],
+        "fileFilters": ["**/*"],
+        "executionMode": "update",
+        "installTools": {
+          "bun": {}
+        }
+      }
+    },
+    {
       "description": "The zgeoff/tools workflow refs move to the newest sync tag as soon as it is cut, and merge on green CI. The tags are sync-v1, sync-v2 and so on, which are not semver. A limit of 0 lets the branch open while the repo's other update branches fill the concurrent limit.",
       "matchManagers": ["github-actions"],
       "matchDepNames": ["zgeoff/tools"],

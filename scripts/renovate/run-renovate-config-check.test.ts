@@ -99,6 +99,45 @@ test('it fails on stderr and runs no validator when renovate.yml pins no single 
   expect(ctx.calls).toBeEmpty();
 });
 
+test('it fails on stderr and runs no validator when renovate.yml does not allow a post-upgrade command', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'default.json': JSON.stringify({
+      packageRules: [
+        {
+          matchPackageNames: firstPartyScopes.map((scope) => `${scope}**`),
+          minimumReleaseAge: null,
+        },
+        { postUpgradeTasks: { commands: ['bun run --if-present node_modules/.bin/gadget init'] } },
+      ],
+    }),
+  });
+
+  await ctx.writeWorkflow(
+    [
+      'jobs:',
+      '  renovate:',
+      '    steps:',
+      '      - with:',
+      '          renovate-version: 44.1.0',
+      '        env:',
+      `          RENOVATE_ALLOWED_COMMANDS: '["^bun run --if-present node_modules/\\\\.bin/widget init$"]'`,
+      '',
+    ].join('\n'),
+  );
+
+  const exitCode = await ctx.runCheck({ exitCode: 0, stdout: '', stderr: '' });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.errors).toStrictEqual([
+    "default.json: no RENOVATE_ALLOWED_COMMANDS pattern in .github/workflows/renovate.yml allows 'bun run --if-present node_modules/.bin/gadget init'\n",
+  ]);
+
+  expect(ctx.calls).toBeEmpty();
+});
+
 test('it fails on stderr and runs no validator when the first-party rule and the check disagree', async () => {
   const ctx = await setupTest();
 

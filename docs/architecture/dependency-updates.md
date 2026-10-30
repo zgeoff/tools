@@ -61,11 +61,49 @@ manager in the preset finds each `catalog` entry in `package.json`. A regex-mana
 updates. A `postUpgradeTasks` step therefore runs `bun install` and commits `bun.lock` in the same
 pull request. Renovate runs that command only when the admin's `allowedCommands` allows it. The free
 Mend-hosted app allows no such command, so on that app every catalog bump fails
-`bun install --frozen-lockfile`. The preset needs self-hosted Renovate with `allowedCommands` set to
-`["^bun install --ignore-scripts( --minimum-release-age=0)?$"]`, which
-[Running Renovate](#running-renovate) sets. The step installs the newest Bun, not the version in
-`.bun-version`, as Renovate's own bun manager does. Remove the regex manager once the bun manager
-reads catalogs.
+`bun install --frozen-lockfile`. The preset needs self-hosted Renovate whose `allowedCommands`
+allows each command, which [Running Renovate](#running-renovate) sets. The step installs the newest
+Bun, not the version in `.bun-version`, as Renovate's own bun manager does. Remove the regex manager
+once the bun manager reads catalogs.
+
+## Running a package's init after a bump
+
+A `@zgeoff/*` package that a repo wires in, through `package.json` scripts, the lefthook `extends`
+line, or hook entries in `.claude/settings.json` and `.codex/hooks.json`, writes that wiring with an
+idempotent `init` subcommand. A version bump changes only the version, so the preset holds one
+package rule for each such package, whose post-upgrade task runs two commands in the bump's branch:
+
+1. `bun install --ignore-scripts` installs the new version.
+2. `bun run --if-present node_modules/.bin/<bin> init` runs the package's `init`.
+
+Renovate commits each file the task adds or changes into the same pull request, so the bump and its
+wiring merge together on green checks. `bun run --if-present` exits 0 when the bin is absent, so a
+version that ships no such bin opens its pull request as any bump does. `bun x` would fetch a
+missing bin from the registry instead. A package with no rule gets no `init` run.
+
+A failed command, a bin that exists without an `init` subcommand among them, makes Renovate fail the
+branch's `renovate/artifacts` status and comment the error on the pull request, so the bump waits
+for a person. A package rule's post-upgrade task replaces the catalog rule's, which is why each rule
+runs `bun install` itself.
+
+The preset runs `init` for these packages:
+
+| Package               | Command                                                   |
+| --------------------- | --------------------------------------------------------- |
+| `@zgeoff/agent-hooks` | `bun run --if-present node_modules/.bin/agent-hooks init` |
+| `@zgeoff/chex`        | `bun run --if-present node_modules/.bin/chex init`        |
+| `@zgeoff/rig`         | `bun run --if-present node_modules/.bin/rig init`         |
+
+To add a package, from the first version that ships its `init`:
+
+1. Copy the `@zgeoff/chex` rule in [`default.json`](../../default.json), and change the package name
+   and the bin.
+2. Add the bin to the `init` pattern in the `RENOVATE_ALLOWED_COMMANDS` value of
+   [`renovate.yml`](../../.github/workflows/renovate.yml).
+3. Add a row to the table above.
+4. Run `bun run check:renovate-config`. Expect exit 0. The check fails with
+   `no RENOVATE_ALLOWED_COMMANDS pattern in .github/workflows/renovate.yml allows '<command>'` when
+   a preset command has no pattern that allows it.
 
 ## Running Renovate
 
