@@ -133,6 +133,9 @@ test.each([
   ['a file filter after the option terminator', "bun test -- '--timeout=30000'"],
   ['a quoted value under the limit', 'bun test --timeout="5000"'],
   ['a single-quoted value under the limit', "bun test --timeout '4000'"],
+  ['an empty value, which Bun runs with the default timeout', 'bun test --timeout= src'],
+  ['a value that Bun refuses', 'bun test --timeout=1e5'],
+  ['a spaced value of an option before the subcommand', 'bun --cwd packages test --timeout=30000'],
 ])('it leaves %s alone', async (_, command) => {
   const ctx = await setupTest();
 
@@ -157,6 +160,9 @@ test.each([
   ['its whole flag is quoted', `bun test "--timeout=30000"`],
   ['its flag is escaped', String.raw`bun test \--timeout=30000`],
   ['its flag follows a name pattern', 'bun test -t slow --timeout=30000'],
+  ['an option comes before its subcommand', 'bun --no-env-file test --timeout=30000'],
+  ['options with values come before its subcommand', 'bun --cwd=pkg --smol test --timeout=30000'],
+  ['a newline ends the echo before it', 'echo prepare\nbun test --timeout=30000'],
 ])('it reports a bun test when %s', async (_, command) => {
   const ctx = await setupTest();
 
@@ -177,6 +183,35 @@ test.each([
         'script "test" passes --timeout=30000 to bun test, above the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it',
     },
   ]);
+});
+
+test.each([
+  [
+    'bun test "--timeout=20000"',
+    'script "test" passes --timeout=20000 to bun test, above the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it',
+  ],
+  [
+    'bun test --timeout=0',
+    'script "test" passes --timeout=0 to bun test, which turns the timeout off, past the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it',
+  ],
+  [
+    'bun test --timeout 0_0 src',
+    'script "test" passes --timeout=0 to bun test, which turns the timeout off, past the 5000 ms limit of the unit lane; find its cause in the "Slow tests" section of the testing skill and fix it',
+  ],
+])('it reports the script %p', async (command, message) => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { test: command } }),
+  );
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+
+  expect(findings).toStrictEqual([{ path: 'package.json', message }]);
 });
 
 test('it exempts test:related', async () => {

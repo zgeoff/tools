@@ -114,10 +114,12 @@ oxlint lints only JavaScript and TypeScript files, so it cannot read a `package.
 holds them, as the `test-timeouts` job before a push and the `Check test timeouts` step of the
 shared pull-request checks. It reports:
 
-- each `--timeout` above the script's limit, in either the `--timeout 20000` or the
-  `--timeout=20000` form, among the words after `bun test` in a `package.json` script, where a
-  quoted or escaped word is a value and never a flag, and a command named `echo` or `printf`, quoted
-  or bare, runs no `bun test`;
+- each `--timeout` above the script's limit, and each `--timeout` of 0, which Bun reads as no
+  timeout, in either the `--timeout 20000` or the `--timeout=20000` form. The check reads the words
+  that a `bun test` command in a `package.json` script hands Bun after the shell removes quotes and
+  escapes, up to `--`. Options may come before `test` in the `--name=value` form, as in
+  `bun --no-env-file test`. A newline or an operator such as `&&` ends a command, and a command
+  named `echo` or `printf`, quoted or bare, runs no `bun test`;
 - each `bunfig.toml` whose `[test] timeout` is above the limit of its directory's lane;
 - each setting in an oxlint config, at any depth of the tree, that turns `zgeoff/max-test-timeout`
   or `zgeoff/test-timeout-exception-ticket` off or down to a warning, unless a comment on its line,

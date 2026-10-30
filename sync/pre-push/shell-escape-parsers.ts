@@ -1,4 +1,4 @@
-export interface ShellEscape {
+interface ShellEscape {
   readonly text: string;
   readonly length: number;
   readonly isQuoting: boolean;

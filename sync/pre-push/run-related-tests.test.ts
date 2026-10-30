@@ -338,3 +338,82 @@ test.each([
     });
   },
 );
+
+test('#runRelatedTests exits 2 with the reason and runs no test for a TEST_WORKERS it refuses', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { test: 'echo test-args' } }),
+  );
+
+  await writeFile(join(ctx.directory, 'src/a.test.ts'), '');
+
+  const result = await $`bun ${join(import.meta.dir, 'run-related-tests.ts')} src/a.ts`
+    .cwd(ctx.directory)
+    .env({ PATH: process.env['PATH'] ?? '', TEST_WORKERS: 'four' })
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr: 'run-related-tests: TEST_WORKERS is four; set it to a whole number above 0\n',
+  });
+});
+
+test('#runRelatedTests runs no test of a lane that the oxlint config declares', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { test: 'echo test-args' } }),
+  );
+
+  await writeFile(
+    join(ctx.directory, '.oxlintrc.json'),
+    JSON.stringify({ rules: { 'zgeoff/max-test-timeout': ['error', { lanes: ['kvm'] }] } }),
+  );
+
+  await writeFile(join(ctx.directory, 'src/boot.kvm.test.ts'), '');
+
+  const result = await $`bun ${join(import.meta.dir, 'run-related-tests.ts')} src/boot.kvm.ts`
+    .cwd(ctx.directory)
+    .env({ PATH: process.env['PATH'] ?? '', TEST_WORKERS: '2' })
+    .nothrow()
+    .quiet();
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'run-related-tests: no related tests\n',
+  });
+});
+
+test('#runRelatedTests names the shared test input over the file cap when the branch changes both', async () => {
+  const ctx = await setupTest();
+
+  const tests = Array.from({ length: 51 }, (_, index) => `src/t${index}.test.ts`);
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { test: 'echo test-args' } }),
+  );
+
+  await Promise.all(tests.map((path) => writeFile(join(ctx.directory, path), '')));
+
+  const result = await $`bun ${join(import.meta.dir, 'run-related-tests.ts')} ${tests} bunfig.toml`
+    .cwd(ctx.directory)
+    .env({ PATH: process.env['PATH'] ?? '', TEST_WORKERS: '2' })
+    .nothrow()
+    .quiet();
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'run-related-tests: skipped, because the branch changes bunfig.toml, a shared test helper or config; CI runs the full suite\n',
+  });
+});

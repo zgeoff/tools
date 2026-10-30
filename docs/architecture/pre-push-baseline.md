@@ -83,7 +83,7 @@ The entry delivers these files, and their tests stay in tools:
   home directory of whoever runs it, followed by a slash, or the machine's host name as a whole
   word. A home of `/` and the host `localhost` are left out.
 - `scripts/run-test-timeouts-check.ts` — fails each `bun test --timeout` above the default timeout
-  in a `package.json` script, and each `bunfig.toml` whose `[test] timeout` is above it, as
+  or of 0 in a `package.json` script, and each `bunfig.toml` whose `[test] timeout` is above it, as
   [the test timeout check](./oxlint-config-tests.md#the-test-timeout-check) describes.
 - `scripts/run-uncommitted-check.ts` — the uncommitted check, which reads `git status` for each file
   the branch changes and looks on disk for each file it deletes.
@@ -98,9 +98,9 @@ The entry delivers these files, and their tests stay in tools:
 - `scripts/read-branch-base.ts`, `scripts/read-pushed-ranges.ts`, `scripts/parse-pushed-refs.ts`,
   `scripts/read-range-commits.ts`, `scripts/format-commit-lines.ts`,
   `scripts/read-pushed-refs-input.ts`, `scripts/parse-added-lines.ts`,
-  `scripts/parse-shell-words.ts`, `scripts/shell-escape-parsers.ts`,
-  `scripts/collect-command-names.ts`, `scripts/parse-lane-limits.ts` and `scripts/run-program.ts` —
-  the modules these scripts import.
+  `scripts/pick-merge-blobs-command.ts`, `scripts/parse-shell-words.ts`,
+  `scripts/shell-escape-parsers.ts`, `scripts/collect-command-names.ts`,
+  `scripts/parse-lane-limits.ts` and `scripts/run-program.ts` — the modules these scripts import.
 
 The check scripts exit 0 when clean or skipped, 1 with a problem, and 2 when they cannot run, such
 as in a clone without origin's default branch. One exception: the workflow lint exits 0 with a

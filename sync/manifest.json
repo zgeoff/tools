@@ -307,6 +307,10 @@
         "target": "scripts/parse-added-lines.ts"
       },
       {
+        "source": "sync/pre-push/pick-merge-blobs-command.ts",
+        "target": "scripts/pick-merge-blobs-command.ts"
+      },
+      {
         "source": "sync/pre-push/run-program.ts",
         "target": "scripts/run-program.ts"
       },

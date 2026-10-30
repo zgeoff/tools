@@ -265,6 +265,59 @@ test('it reports a line that a later commit of the branch removes', async () => 
   ]);
 });
 
+test('it reports each commit of two pushed ranges once, though both ranges hold it', async () => {
+  const ctx = await setupTest();
+
+  await $`git commit --quiet --allow-empty -m ${'chore: start the repo'}`
+    .cwd(ctx.directory)
+    .env(ctx.env);
+
+  const baseText = await $`git rev-parse HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  await writeFile(join(ctx.directory, 'greet.txt'), `cache: ${ctx.directory}/.cache/greeting\n`);
+
+  await $`git add greet.txt`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'feat: add the greeting'}`.cwd(ctx.directory).env(ctx.env);
+
+  const sharedText = await $`git rev-parse --short HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  await $`git switch --quiet -c farewell`.cwd(ctx.directory).env(ctx.env);
+
+  await writeFile(join(ctx.directory, 'farewell.txt'), `log: ${ctx.directory}/farewell.log\n`);
+
+  await $`git add farewell.txt`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'feat: add the farewell'}`.cwd(ctx.directory).env(ctx.env);
+
+  const farewellText = await $`git rev-parse --short HEAD`.cwd(ctx.directory).env(ctx.env).text();
+
+  await $`git switch --quiet -`.cwd(ctx.directory).env(ctx.env);
+
+  await writeFile(join(ctx.directory, 'greet.txt'), 'cache: ~/.cache/greeting\n');
+
+  await $`git commit --quiet -am ${'fix: drop the local path'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = runLocalPathsCheck({
+    cwd: ctx.directory,
+    runProgram,
+    ranges: [[`${baseText.trim()}..HEAD`], [`${baseText.trim()}..farewell`]],
+    env: ctx.env,
+    host: 'greeter-box',
+  });
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'greet.txt',
+      line: 1,
+      message: `commit ${sharedText.trim()} adds the home directory ${ctx.directory}/; remove it before you push`,
+    },
+    {
+      path: 'farewell.txt',
+      line: 1,
+      message: `commit ${farewellText.trim()} adds the home directory ${ctx.directory}/; remove it before you push`,
+    },
+  ]);
+});
+
 test('it reports nothing for a file that the branch only renames', async () => {
   const ctx = await setupTest();
 
