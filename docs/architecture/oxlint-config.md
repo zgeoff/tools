@@ -2,8 +2,8 @@
 
 `@zgeoff/oxlint-config` is the shareable oxlint config of the zgeoff repos, with a bundled JS plugin
 of `zgeoff/*` rules for the shapes that no native oxlint rule can express. This doc covers the
-config's ban on type assertions, its comment rules, its ban on require functions, and
-`zgeoff/no-restricted-words`. Three more docs cover the plugin's other rules:
+config's ban on type assertions, its comment rules, its ban on require functions, the React overlay,
+and `zgeoff/no-restricted-words`. Three more docs cover the plugin's other rules:
 [code style](./oxlint-config-code-style.md), [test files](./oxlint-config-tests.md) and
 [import zones](./oxlint-config-import-zones.md). The
 [package README](../../packages/oxlint-config/README.md) holds the install and the setup.
@@ -74,6 +74,23 @@ name, or read or destructured off a default or namespace import. `import/no-comm
 The ban is a plugin rule rather than options of `no-restricted-imports` and `no-restricted-globals`,
 because oxlint replaces a rule's options when a repo config or an override sets the rule again. A
 repo that restricts its own imports would drop the shared ban without a warning.
+
+## The React overlay
+
+`react.json` is a second config that a repo with React extends after the base config. It turns on
+oxlint's `react` plugin and turns off three of its rules: `react/react-in-jsx-scope`, which the JSX
+runtime of React 17 and later makes wrong, `react/jsx-props-no-spreading` and `react/jsx-max-depth`.
+
+```jsonc
+{
+  "extends": [
+    "./node_modules/@zgeoff/oxlint-config/oxlintrc.json",
+    "./node_modules/@zgeoff/oxlint-config/react.json",
+  ],
+}
+```
+
+oxlint takes no `extends` inside `overrides`, so the overlay applies to the whole repo.
 
 ## `zgeoff/no-restricted-words`
 

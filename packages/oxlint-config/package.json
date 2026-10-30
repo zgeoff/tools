@@ -10,6 +10,7 @@
   },
   "files": [
     "oxlintrc.json",
+    "react.json",
     "plugin.js",
     "function-verb.js",
     "verb-contract.js",
@@ -57,6 +58,7 @@
   "exports": {
     ".": "./index.js",
     "./oxlintrc.json": "./oxlintrc.json",
+    "./react.json": "./react.json",
     "./plugin": "./plugin.js",
     "./import-zones": {
       "types": "./import-zones-entry.d.ts",

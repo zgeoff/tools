@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+  "plugins": ["react"],
+  "rules": {
+    // React 17's JSX runtime and later need no React in scope
+    "react/react-in-jsx-scope": "off",
+    // forwarding a whole props object is how a component wraps another, more so with
+    // zgeoff/no-destructured-params in force
+    "react/jsx-props-no-spreading": "off",
+    // form and layout composition nests deeper than any fixed limit
+    "react/jsx-max-depth": "off"
+  }
+}

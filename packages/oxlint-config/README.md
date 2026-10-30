@@ -43,6 +43,10 @@ Or import the config object in `oxlint.config.ts`:
 import config from '@zgeoff/oxlint-config';
 ```
 
+A repo with React extends `./node_modules/@zgeoff/oxlint-config/react.json` after the base config.
+[The React overlay](../../docs/architecture/oxlint-config.md#the-react-overlay) says what it
+changes.
+
 The plugin is addressable on its own at `@zgeoff/oxlint-config/plugin` for configs that want the
 `zgeoff/*` rules without the rest.
 
