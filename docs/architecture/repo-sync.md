@@ -7,9 +7,59 @@ one pull request on the branch `repo-sync/zgeoff-tools`, with one commit for eac
 changed. A run while that pull request is open updates it, and the pull request merges on green
 checks with no review, as [Auto-merge](#auto-merge) describes.
 [`repo-sync.yml`](../../sync/repo-sync.yml) is the stub a downstream repo installs to call it. A
-downstream repo calls the workflow at a sync tag, as [Sync tags](./sync-tags.md) describes. The stub
-runs the workflow when a push to `main` changes the stub, such as the merge of Renovate's bump to a
-newer tag, so the tag's files reach the repo without waiting for the stub's weekly run.
+merge to `main` here that changes a synced file reaches each repo as that pull request once `main`
+is green, as [Delivery](#delivery) describes.
+
+## Delivery
+
+```mermaid
+flowchart LR
+  merge[merge to tools main] --> main[Main run green]
+  main --> dispatch[sync-dispatch]
+  skills[zgeoff/skills] -. zgeoff-skills-sync .-> dispatch
+  dispatch -- zgeoff-tools-sync with the commit --> caller[repo-sync stub in each repo]
+  caller --> run[repo-sync run at that commit]
+  run --> pr[sync pull request that merges on green]
+```
+
+A green `main` is the release gate. When a `Main` push run on `main` passes, the
+[sync-dispatch workflow](../../.github/workflows/sync-dispatch.yml) diffs `main` from the green
+commit before that run's commit up to the newest green commit. When the diff touches the manifest or
+a source that either manifest lists, the workflow sends a `repository_dispatch` event,
+`zgeoff-tools-sync`, to every repo that the sync App can reach, with the newest green commit in
+`client_payload.sha`. Two green runs that finish in either order cover every commit between them,
+because each run checks from the commit before its own. A `zgeoff-skills-sync` event from
+zgeoff/skills sends the newest green commit with no check. The dispatch needs only the App's
+contents write.
+
+Each repo pins every call to a tools workflow to one commit on `main`, with a `# main` comment, and
+never at `main` itself, so a run of a test or doc audit never sees the shared files change under it.
+The stub passes the dispatched commit as the workflow's `ref` input, and the run syncs the files of
+that commit. The run refuses a `ref` that is not a commit on `main` of tools, because anyone who can
+push to the repo can send a dispatch, and GitHub serves a fork's commit through this repository.
+
+The sync pull request also moves every call to a tools workflow in the repo's `.github/workflows/`
+to that commit, so its merge leaves the repo on one commit. A run with nothing to sync opens no pull
+request and moves no pin, and a delivered workflow that differs from its source only by its pin
+counts as nothing to sync. Renovate never moves these refs: the shared preset turns its updates off,
+because it would read the commit as a digest of `main` to bump.
+
+A run from any other trigger, the stub's daily run, a push that changes the stub, or a manual run,
+syncs the newest green commit on `main`. GitHub keeps one pending run per concurrency group and
+drops the others, so a dispatch can be lost, and the next daily run delivers what it carried. When
+the Actions API fails or lists no green run, the run warns and syncs the commit the repo pins, so
+that day's run delivers nothing and the lost change waits for a run that reads the API. A run whose
+commit is older than any commit that a workflow on the repo's `main` or on its open sync pull
+request pins changes nothing, so dispatches may arrive in any order. A run that cannot read those
+pins, or cannot tell whether one is newer, fails rather than guess, and the next run tries again.
+
+The step scripts of a run come from the pinned commit, never from `ref`, so a change to the scripts
+reaches a repo once its next sync pull request merges.
+
+When the open sync pull request has a failing check and is more than a day old, the workflow's alarm
+job opens one issue for it in the repo, so a red sync never waits unseen. The alarm runs with the
+repo's own token, which is why the stub grants `issues: write`, `pull-requests: read`,
+`checks: read` and `statuses: read`.
 
 ## Manifest entries
 
@@ -20,8 +70,8 @@ An entry holds:
 - `files` — `source` (a path in this repo), `target` (a path in the downstream repo), an optional
   `mode` such as `0755`, and an optional `except`, the `owner/repo` names of the repos that never
   receive the file. The workflow copies each file verbatim, except that a workflow target's calls to
-  `zgeoff/tools` workflows at `@main` move to the ref the run syncs from, and a Markdown target
-  loses the blocks that need a file the repo does not receive.
+  `zgeoff/tools` workflows move to the commit the run syncs from, and a Markdown target loses the
+  blocks that need a file the repo does not receive.
 - `optIn` (optional) — `true` delivers the entry only to a repo whose stub lists it in `include`.
 - `build` (optional) — a bash command the workflow runs in the downstream checkout after the copy,
   for a file that is generated from a copied one. The runner has bash, git and jq, and nothing from
@@ -99,15 +149,13 @@ copy matches a version of a source that tools delivered to that path, so a file 
 itself or edited after the sync stays. A renamed file is the exception: when its source moved to a
 source that the same entry still delivers, and the run wrote the new target, the old copy goes even
 when the repo edited it, since the sync overwrites the file at its new path. git's rename detection
-finds the move in this repo's history, so a repo that skipped the tags since the move loses the old
-copy too.
+finds the move in this repo's history, so a repo that missed syncs since the move loses the old copy
+too.
 
 A retired file also stays while its entry is still in the manifest and the run did not sync that
 entry, because the entry's current files can still need it. That covers an entry the repo skips or
 leaves out of `include`, and an entry that failed. A retired file of an entry that the manifest no
-longer holds stays when the repo lists that entry in `skip`. A retired workflow file stays while the
-repo takes no entry with a workflow target, because the run's token then cannot push a change under
-`.github/workflows/`.
+longer holds stays when the repo lists that entry in `skip`.
 [`scripts/remove-retired-sync-files.sh`](../../scripts/remove-retired-sync-files.sh) reads the
 earlier manifests from this repo's history, so the workflow checks out the full history.
 

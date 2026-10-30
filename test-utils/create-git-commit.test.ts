@@ -1,13 +1,12 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createGitCommit } from './create-git-commit.ts';
 import { readGitEnv } from './read-git-env.ts';
 import { runGit } from './run-git.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'create-git-commit-'));
+  const directory = await mkdtemp(join(import.meta.dir, '.test-create-git-commit-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
@@ -51,4 +50,14 @@ test('it records a file removed since the last commit', async () => {
   });
 
   expect(result.stdout.toString()).toBe('M\tnotes.md\nD\tplans.md\n');
+});
+
+test('it returns the new commit, and commits even when nothing changed', async () => {
+  const ctx = await setupTest();
+  const first = await createGitCommit(ctx.directory, ctx.env, { 'notes.md': '# Notes\n' });
+  const second = await createGitCommit(ctx.directory, ctx.env, {});
+
+  const result = Bun.spawnSync(['git', 'rev-list', 'HEAD'], { cwd: ctx.directory, env: ctx.env });
+
+  expect(result.stdout.toString()).toBe(`${second}\n${first}\n`);
 });

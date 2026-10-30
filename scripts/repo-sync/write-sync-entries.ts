@@ -40,7 +40,6 @@ export async function writeSyncEntries(
 
   await writeStepOutputs(options.fileSystem, options.outputPath, {
     entries: JSON.stringify(picked.entries),
-    workflows: String(picked.workflows),
   });
 
   return 0;

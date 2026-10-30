@@ -4,9 +4,8 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 
 ## Architecture
 
-- [Repo sync](./architecture/repo-sync.md): manifest entries, each kind of entry, retired files, and
-  the sync branch.
-- [Sync tags](./architecture/sync-tags.md): why a repo syncs at a tag, never at `main`.
+- [Repo sync](./architecture/repo-sync.md): how a merge to `main` reaches each repo, manifest
+  entries, each kind of entry, retired files, and the sync branch.
 - [The pre-push baseline](./architecture/pre-push-baseline.md): what the baseline runs and the files
   it delivers.
 - [Memory caps](./architecture/memory-caps.md): `@zgeoff/diet` and the synced script, which run a
@@ -41,5 +40,3 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 
 - [Setting up a downstream repo](./runbooks/downstream-repo-setup.md): wire a repo up, and opt in to
   the skill gate and the pre-push baseline.
-- [Releasing the sync files](./runbooks/releasing-sync-files.md): push a new sync tag and move each
-  repo to it.

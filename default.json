@@ -106,7 +106,7 @@
       "schedule": ["* 0-5 * * 1"]
     },
     {
-      "description": "Each major bump gets its own PR and waits for review. Majors open weekly, so they get reviewed in one sitting. The zgeoff, impz and sync-tag rules below override the schedule.",
+      "description": "Each major bump gets its own PR and waits for review. Majors open weekly, so they get reviewed in one sitting. The zgeoff and impz rules below override the schedule.",
       "matchUpdateTypes": ["major"],
       "automerge": false,
       "schedule": ["* 0-5 * * 1"]
@@ -176,16 +176,10 @@
       }
     },
     {
-      "description": "The zgeoff/tools workflow refs move to the newest sync tag as soon as it is cut, and merge on green CI. The tags are sync-v1, sync-v2 and so on, which are not semver. A limit of 0 lets the branch open while the repo's other update branches fill the concurrent limit.",
+      "description": "Renovate never moves a zgeoff/tools workflow ref. Each ref pins a commit on main with a # main comment, which Renovate would read as a digest to bump, and the repo-sync pull request moves every ref to the commit it syncs.",
       "matchManagers": ["github-actions"],
       "matchDepNames": ["zgeoff/tools"],
-      "versioning": "regex:^sync-v(?<major>\\d+)$",
-      "minimumReleaseAge": null,
-      "prConcurrentLimit": 0,
-      "branchConcurrentLimit": 0,
-      "schedule": ["at any time"],
-      "groupName": null,
-      "automerge": true
+      "enabled": false
     }
   ]
 }

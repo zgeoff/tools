@@ -36,10 +36,9 @@ sync/               the sources that repo-sync delivers, listed in sync/manifest
   docs-vision/      the vision doc check, which docs-writing's check-length runs in a repo that
                     takes it
 scripts/            the step scripts that this repo's workflows run, one folder per area, the
-                    shell scripts that repo-sync and the release job run, and the manual ones
-                    that pin a repo to a sync tag and do a package's first npm publish; tests sit
-                    beside them
-.github/workflows/  this repo's CI and release, and the reusable workflows that other repos call:
+                    shell scripts that repo-sync and the release job run, and the manual one
+                    that does a package's first npm publish; tests sit beside them
+.github/workflows/  this repo's CI, release and sync dispatch, and the reusable workflows that other repos call:
                     bun-checks, repo-sync and its guard, audit-fix, release-please and the
                     paths-changed gate
 .claude/skills/     the code-style skill, which is both this repo's skill and the shared base

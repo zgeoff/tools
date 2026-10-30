@@ -29,7 +29,7 @@ export interface PlannedCopy {
   readonly target: string;
   readonly mode: string;
 
-  // A workflow target's calls of tools workflows at main move to the ref the run syncs from.
+  // A workflow target's calls of tools workflows move to the commit the run syncs from.
   readonly isPinned: boolean;
 }
 

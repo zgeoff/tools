@@ -17,7 +17,7 @@ async function setupTest() {
 
   await $`git init --quiet`.cwd(directory).env(env);
 
-  const commitFiles = (files: Readonly<Record<string, string>>): Promise<void> =>
+  const commitFiles = (files: Readonly<Record<string, string>>): Promise<string> =>
     createGitCommit(directory, env, files);
 
   return { directory, env, commitFiles };

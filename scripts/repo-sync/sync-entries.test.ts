@@ -1,8 +1,13 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { existsSync } from 'node:fs';
 import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
+import { createSideGitCommit } from '../../test-utils/create-side-git-commit.ts';
 import { createStubPullRequestGH } from '../../test-utils/create-stub-pull-request-gh.ts';
+import { createTrackedGitCommit } from '../../test-utils/create-tracked-git-commit.ts';
+import { moveGitCommitToRemote } from '../../test-utils/move-git-commit-to-remote.ts';
+import { readGitHead } from '../../test-utils/read-git-head.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { syncEntries } from './sync-entries.ts';
@@ -50,16 +55,30 @@ async function setupTest() {
   const output: string[] = [];
 
   // Runs the sync job's step in a fresh clone of the caller, with the env the step sets.
+  // Commits the tools sources and marks the commit as main, so the run syncs from a commit on main.
+  const writeToolsCommit = () => createTrackedGitCommit(tools, env, {});
+
+  // Commits the manifest on a side branch of the tools checkout and returns to main, so the commit
+  // exists and main never holds it.
+  const writeSideCommit = (manifest: unknown[]) =>
+    createSideGitCommit(tools, env, {
+      branch: 'side',
+      files: { 'sync/manifest.json': JSON.stringify(manifest) },
+    });
+
+  // The afterClone callback runs between the caller's checkout and the sync, as a merge that lands
+  // while the run waits in its queue does.
   const runSync = async (
     entries: unknown[],
-    toolsRef: string,
-    workflows = 'false',
     extraEnv: Readonly<Record<string, string>> = {},
+    afterClone: () => Promise<void> = () => Promise.resolve(),
   ) => {
+    const toolsRef = await writeToolsCommit();
     const caller = await mkdtemp(join(directory, 'caller-'));
 
     await $`git clone -q ${origin} ${caller}`.env(env).quiet();
 
+    await afterClone();
     await cp(tools, join(caller, '.repo-sync'), { recursive: true });
 
     return syncEntries({
@@ -77,10 +96,8 @@ async function setupTest() {
         BRANCH: 'repo-sync/zgeoff-tools',
         MARKER: 'repo-sync delivers this file from zgeoff/tools',
         TOOLS_REF: toolsRef,
-        WORKFLOW_REF: 'zgeoff/tools/.github/workflows/repo-sync.yml@refs/tags/sync-v1',
         REPO: 'example/app',
         SKIP: '',
-        WORKFLOWS: workflows,
         BASE: 'main',
         ...extraEnv,
       },
@@ -116,6 +133,17 @@ async function setupTest() {
 
     return files.split('\n').filter((file) => file !== '');
   };
+
+  const readToolsHead = () => readGitHead(tools, env);
+
+  // Moves the commit to a remote of the tools checkout and drops it locally, so a run must fetch
+  // it to know it.
+  const writeRemoteOnlyCommit = (commit: string, keep: string) =>
+    moveGitCommitToRemote(tools, env, {
+      commit,
+      keep,
+      remote: join(directory, 'tools-remote.git'),
+    });
 
   const readBranchHead = async (branch: string) => {
     const head = await $`git -C ${origin} rev-parse ${branch}`.text();
@@ -175,6 +203,10 @@ async function setupTest() {
     readBranch,
     readBranchFiles,
     readBranchHead,
+    readToolsHead,
+    writeToolsCommit,
+    writeSideCommit,
+    writeRemoteOnlyCommit,
     readBranchNames,
     readCommitSubjects,
     readPullRequests,
@@ -191,27 +223,24 @@ test('it opens one pull request that carries every changed file of every entry',
   await ctx.writeSource('sync/skills/demo/SKILL.md', '# Demo\n');
   await ctx.writeSource('sync/skills/demo/references/more.md', '# More\n');
 
-  const exitCode = await ctx.runSync(
-    [
-      {
-        name: 'editorconfig',
-        description: 'The editor config',
-        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
-      },
-      {
-        name: 'skill-demo',
-        description: 'The demo skill',
-        files: [
-          { source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' },
-          {
-            source: 'sync/skills/demo/references/more.md',
-            target: '.claude/skills/demo/references/more.md',
-          },
-        ],
-      },
-    ],
-    'sync-v7',
-  );
+  const exitCode = await ctx.runSync([
+    {
+      name: 'editorconfig',
+      description: 'The editor config',
+      files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+    },
+    {
+      name: 'skill-demo',
+      description: 'The demo skill',
+      files: [
+        { source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' },
+        {
+          source: 'sync/skills/demo/references/more.md',
+          target: '.claude/skills/demo/references/more.md',
+        },
+      ],
+    },
+  ]);
 
   const branches = await ctx.readBranchNames();
   const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
@@ -225,6 +254,7 @@ test('it opens one pull request that carries every changed file of every entry',
 
   const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
   const pulls = await ctx.readPullRequests();
+  const commit = await ctx.readToolsHead();
   const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
 
   expect(exitCode).toBe(0);
@@ -251,9 +281,9 @@ test('it opens one pull request that carries every changed file of every entry',
       number: 1,
       base: 'main',
       head: 'repo-sync/zgeoff-tools',
-      title: 'chore: sync zgeoff/tools sync-v7',
+      title: 'chore(sync): update the editorconfig and the demo skill',
       body:
-        'Copied from zgeoff/tools at sync-v7 by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry:\n\n' +
+        `Copied from zgeoff/tools at ${commit} by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry or pins the calls to zgeoff/tools workflows to that commit:\n\n` +
         '- `editorconfig`: The editor config\n' +
         '- `skill-demo`: The demo skill',
       state: 'open',
@@ -283,14 +313,15 @@ test('it updates the open pull request when a later release syncs before it merg
 
   await ctx.writeSource('sync/editorconfig', 'root = true\n');
   await ctx.writeSource('sync/socket.yml', 'version: 2\n');
-  await ctx.runSync(entries, 'sync-v7');
+  await ctx.runSync(entries);
   await ctx.writeSource('sync/editorconfig', 'root = true\n\n[*]\nindent_style = space\n');
 
-  const exitCode = await ctx.runSync(entries, 'sync-v8');
+  const exitCode = await ctx.runSync(entries);
   const branches = await ctx.readBranchNames();
   const editorconfig = await ctx.readBranch('repo-sync/zgeoff-tools', '.editorconfig');
   const socket = await ctx.readBranch('repo-sync/zgeoff-tools', 'socket.yml');
   const pulls = await ctx.readPullRequests();
+  const commit = await ctx.readToolsHead();
   const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
 
   expect(exitCode).toBe(0);
@@ -303,9 +334,9 @@ test('it updates the open pull request when a later release syncs before it merg
       number: 1,
       base: 'main',
       head: 'repo-sync/zgeoff-tools',
-      title: 'chore: sync zgeoff/tools sync-v8',
+      title: 'chore(sync): update the editorconfig and the socket',
       body:
-        'Copied from zgeoff/tools at sync-v8 by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry:\n\n' +
+        `Copied from zgeoff/tools at ${commit} by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry or pins the calls to zgeoff/tools workflows to that commit:\n\n` +
         '- `editorconfig`: The editor config\n' +
         '- `socket`: The Socket config',
       state: 'open',
@@ -322,16 +353,13 @@ test('it deletes the sync/<name> branch of each entry it syncs', async () => {
   await ctx.writeBranch('sync/editorconfig', '.editorconfig', 'root = false\n');
   await ctx.writeSource('sync/editorconfig', 'root = true\n');
 
-  await ctx.runSync(
-    [
-      {
-        name: 'editorconfig',
-        description: 'The editor config',
-        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
-      },
-    ],
-    'sync-v7',
-  );
+  await ctx.runSync([
+    {
+      name: 'editorconfig',
+      description: 'The editor config',
+      files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+    },
+  ]);
 
   const branches = await ctx.readBranchNames();
 
@@ -346,16 +374,13 @@ test('it deletes the sync branch and opens no pull request when every entry matc
   await ctx.writeBranch('repo-sync/zgeoff-tools', '.editorconfig', 'root = false\n');
   await ctx.writeSource('sync/readme.md', '# app\n');
 
-  const exitCode = await ctx.runSync(
-    [
-      {
-        name: 'readme',
-        description: 'The readme',
-        files: [{ source: 'sync/readme.md', target: 'README.md' }],
-      },
-    ],
-    'sync-v7',
-  );
+  const exitCode = await ctx.runSync([
+    {
+      name: 'readme',
+      description: 'The readme',
+      files: [{ source: 'sync/readme.md', target: 'README.md' }],
+    },
+  ]);
 
   const branches = await ctx.readBranchNames();
   const pulls = await ctx.readPullRequests();
@@ -373,26 +398,24 @@ test('it leaves a failing entry out, syncs the others, and fails the run', async
   await ctx.writeSource('sync/editorconfig', 'root = true\n');
   await ctx.writeSource('sync/socket.yml', 'version: 2\n');
 
-  const exitCode = await ctx.runSync(
-    [
-      {
-        name: 'socket',
-        description: 'The Socket config',
-        files: [{ source: 'sync/socket.yml', target: 'socket.yml' }],
-        build: 'echo broken > socket.yml && exit 3',
-      },
-      {
-        name: 'editorconfig',
-        description: 'The editor config',
-        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
-      },
-    ],
-    'sync-v7',
-  );
+  const exitCode = await ctx.runSync([
+    {
+      name: 'socket',
+      description: 'The Socket config',
+      files: [{ source: 'sync/socket.yml', target: 'socket.yml' }],
+      build: 'echo broken > socket.yml && exit 3',
+    },
+    {
+      name: 'editorconfig',
+      description: 'The editor config',
+      files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+    },
+  ]);
 
   const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
   const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
   const pulls = await ctx.readPullRequests();
+  const commit = await ctx.readToolsHead();
   const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
 
   expect(exitCode).toBe(1);
@@ -404,9 +427,9 @@ test('it leaves a failing entry out, syncs the others, and fails the run', async
       number: 1,
       base: 'main',
       head: 'repo-sync/zgeoff-tools',
-      title: 'chore: sync zgeoff/tools sync-v7',
+      title: 'chore(sync): update the editorconfig',
       body:
-        'Copied from zgeoff/tools at sync-v7 by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry:\n\n' +
+        `Copied from zgeoff/tools at ${commit} by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry or pins the calls to zgeoff/tools workflows to that commit:\n\n` +
         '- `editorconfig`: The editor config',
       state: 'open',
       autoMerge: { method: 'squash', head },
@@ -424,22 +447,19 @@ test('it keeps the sync/<name> branch of a failed entry and deletes the others',
   await ctx.writeSource('sync/editorconfig', 'root = true\n');
   await ctx.writeSource('sync/socket.yml', 'version: 2\n');
 
-  await ctx.runSync(
-    [
-      {
-        name: 'socket',
-        description: 'The Socket config',
-        files: [{ source: 'sync/socket.yml', target: 'socket.yml' }],
-        build: 'exit 3',
-      },
-      {
-        name: 'editorconfig',
-        description: 'The editor config',
-        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
-      },
-    ],
-    'sync-v7',
-  );
+  await ctx.runSync([
+    {
+      name: 'socket',
+      description: 'The Socket config',
+      files: [{ source: 'sync/socket.yml', target: 'socket.yml' }],
+      build: 'exit 3',
+    },
+    {
+      name: 'editorconfig',
+      description: 'The editor config',
+      files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+    },
+  ]);
 
   const branches = await ctx.readBranchNames();
 
@@ -455,22 +475,19 @@ test('it keeps every sync/<name> branch when no pull request publishes', async (
   await ctx.writeSource('sync/readme.md', '# app\n');
   await ctx.writeSource('sync/socket.yml', 'version: 2\n');
 
-  const exitCode = await ctx.runSync(
-    [
-      {
-        name: 'socket',
-        description: 'The Socket config',
-        files: [{ source: 'sync/socket.yml', target: 'socket.yml' }],
-        build: 'exit 3',
-      },
-      {
-        name: 'readme',
-        description: 'The readme',
-        files: [{ source: 'sync/readme.md', target: 'README.md' }],
-      },
-    ],
-    'sync-v7',
-  );
+  const exitCode = await ctx.runSync([
+    {
+      name: 'socket',
+      description: 'The Socket config',
+      files: [{ source: 'sync/socket.yml', target: 'socket.yml' }],
+      build: 'exit 3',
+    },
+    {
+      name: 'readme',
+      description: 'The readme',
+      files: [{ source: 'sync/readme.md', target: 'README.md' }],
+    },
+  ]);
 
   const branches = await ctx.readBranchNames();
   const pulls = await ctx.readPullRequests();
@@ -490,24 +507,21 @@ test('it leaves out every file of an entry whose workflow conflicts, syncs the o
   await ctx.writeSource('sync/ci.yml', 'name: Shared CI\n');
   await ctx.writeSource('sync/editorconfig', 'root = true\n');
 
-  const exitCode = await ctx.runSync(
-    [
-      {
-        name: 'workflow-ci',
-        description: 'The CI workflow',
-        files: [
-          { source: 'sync/notes.md', target: 'docs/notes.md' },
-          { source: 'sync/ci.yml', target: '.github/workflows/ci.yml' },
-        ],
-      },
-      {
-        name: 'editorconfig',
-        description: 'The editor config',
-        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
-      },
-    ],
-    'sync-v7',
-  );
+  const exitCode = await ctx.runSync([
+    {
+      name: 'workflow-ci',
+      description: 'The CI workflow',
+      files: [
+        { source: 'sync/notes.md', target: 'docs/notes.md' },
+        { source: 'sync/ci.yml', target: '.github/workflows/ci.yml' },
+      ],
+    },
+    {
+      name: 'editorconfig',
+      description: 'The editor config',
+      files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+    },
+  ]);
 
   const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
   const workflow = await ctx.readBranch('repo-sync/zgeoff-tools', '.github/workflows/ci.yml');
@@ -532,10 +546,13 @@ test('it keeps the sync branch and its pull request when every entry of a later 
   };
 
   await ctx.writeSource('sync/editorconfig', 'root = true\n');
-  await ctx.runSync([entry], 'sync-v7');
+  await ctx.runSync([entry]);
+
+  const commit = await ctx.readToolsHead();
+
   await ctx.writeSource('sync/editorconfig', 'root = false\n');
 
-  const exitCode = await ctx.runSync([{ ...entry, build: 'exit 3' }], 'sync-v8');
+  const exitCode = await ctx.runSync([{ ...entry, build: 'exit 3' }]);
   const editorconfig = await ctx.readBranch('repo-sync/zgeoff-tools', '.editorconfig');
   const pulls = await ctx.readPullRequests();
   const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
@@ -548,9 +565,9 @@ test('it keeps the sync branch and its pull request when every entry of a later 
       number: 1,
       base: 'main',
       head: 'repo-sync/zgeoff-tools',
-      title: 'chore: sync zgeoff/tools sync-v7',
+      title: 'chore(sync): update the editorconfig',
       body:
-        'Copied from zgeoff/tools at sync-v7 by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry:\n\n' +
+        `Copied from zgeoff/tools at ${commit} by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry or pins the calls to zgeoff/tools workflows to that commit:\n\n` +
         '- `editorconfig`: The editor config',
       state: 'open',
       autoMerge: { method: 'squash', head },
@@ -577,14 +594,14 @@ test('it deletes a file that tools no longer syncs in a commit of its own', asyn
   await ctx.writeManifestCommit([{ name: 'skill-demo', files: [skill] }]);
   await ctx.writeBranch('main', check.target, 'echo check\n');
 
-  const exitCode = await ctx.runSync(
-    [{ name: 'skill-demo', description: 'The demo skill', files: [skill] }],
-    'sync-v7',
-  );
+  const exitCode = await ctx.runSync([
+    { name: 'skill-demo', description: 'The demo skill', files: [skill] },
+  ]);
 
   const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
   const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
   const pulls = await ctx.readPullRequests();
+  const commit = await ctx.readToolsHead();
   const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
 
   expect(exitCode).toBe(0);
@@ -600,9 +617,9 @@ test('it deletes a file that tools no longer syncs in a commit of its own', asyn
       number: 1,
       base: 'main',
       head: 'repo-sync/zgeoff-tools',
-      title: 'chore: sync zgeoff/tools sync-v7',
+      title: 'chore(sync): update the demo skill and the retired files',
       body:
-        'Copied from zgeoff/tools at sync-v7 by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry:\n\n' +
+        `Copied from zgeoff/tools at ${commit} by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry or pins the calls to zgeoff/tools workflows to that commit:\n\n` +
         '- `skill-demo`: The demo skill\n' +
         '- `retired-files`: The copies of files zgeoff/tools no longer syncs: `.claude/skills/demo/scripts/check.sh`',
       state: 'open',
@@ -630,10 +647,9 @@ test('it keeps a file the repo owns outside the synced paths', async () => {
   await ctx.writeManifestCommit([{ name: 'skill-demo', files: [skill] }]);
   await ctx.writeBranch('main', 'scripts/check.sh', 'echo check\n');
 
-  const exitCode = await ctx.runSync(
-    [{ name: 'skill-demo', description: 'The demo skill', files: [skill] }],
-    'sync-v7',
-  );
+  const exitCode = await ctx.runSync([
+    { name: 'skill-demo', description: 'The demo skill', files: [skill] },
+  ]);
 
   const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
   const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
@@ -651,16 +667,13 @@ test('it syncs from a tools ref that has no retired-file cleanup', async () => {
   await ctx.removeSource('scripts/remove-retired-sync-files.sh');
   await ctx.writeSource('sync/editorconfig', 'root = true\n');
 
-  const exitCode = await ctx.runSync(
-    [
-      {
-        name: 'editorconfig',
-        description: 'The editor config',
-        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
-      },
-    ],
-    'sync-v15',
-  );
+  const exitCode = await ctx.runSync([
+    {
+      name: 'editorconfig',
+      description: 'The editor config',
+      files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+    },
+  ]);
 
   const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
 
@@ -681,7 +694,7 @@ test('it removes a retired file when the run syncs no entry', async () => {
   await ctx.writeManifestCommit([]);
   await ctx.writeBranch('main', agents.target, '# Shared\n');
 
-  const exitCode = await ctx.runSync([], 'sync-v7');
+  const exitCode = await ctx.runSync([]);
   const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
   const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
 
@@ -712,13 +725,10 @@ test('it keeps the retired files of an entry that fails', async () => {
 
   await ctx.writeBranch('main', helper.target, 'export {};\n');
 
-  const exitCode = await ctx.runSync(
-    [
-      { name: 'hook-demo', description: 'The demo hook', files: [run], build: 'exit 3' },
-      { name: 'editorconfig', description: 'The editor config', files: [editorconfig] },
-    ],
-    'sync-v7',
-  );
+  const exitCode = await ctx.runSync([
+    { name: 'hook-demo', description: 'The demo hook', files: [run], build: 'exit 3' },
+    { name: 'editorconfig', description: 'The editor config', files: [editorconfig] },
+  ]);
 
   const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
   const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
@@ -728,58 +738,7 @@ test('it keeps the retired files of an entry that fails', async () => {
   expect(subjects).toStrictEqual(['chore: sync editorconfig from zgeoff/tools']);
 });
 
-test('it keeps a retired workflow and removes the rest when the token lacks workflows write', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writeMainCommit('README.md', '# app\n');
-  await ctx.writeManifestCommit([]);
-
-  const workflow = {
-    source: 'sync/workflow-callers/lint.yml',
-    target: '.github/workflows/lint.yml',
-  };
-
-  const script = { source: 'sync/scripts/lint.sh', target: 'scripts/lint.sh' };
-  const editorconfig = { source: 'sync/editorconfig', target: '.editorconfig' };
-
-  await ctx.writeSource(workflow.source, 'jobs: {}\n');
-  await ctx.writeSource(script.source, 'echo lint\n');
-  await ctx.writeSource(editorconfig.source, 'root = true\n');
-  await ctx.writeManifestCommit([{ name: 'lint', files: [workflow, script] }]);
-  await ctx.writeManifestCommit([{ name: 'editorconfig', files: [editorconfig] }]);
-  await ctx.writeBranch('main', workflow.target, 'jobs: {}\n');
-  await ctx.writeBranch('main', script.target, 'echo lint\n');
-
-  const exitCode = await ctx.runSync(
-    [{ name: 'editorconfig', description: 'The editor config', files: [editorconfig] }],
-    'sync-v7',
-    'false',
-  );
-
-  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
-  const pulls = await ctx.readPullRequests();
-  const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
-
-  expect(exitCode).toBe(0);
-  expect(files).toStrictEqual(['.editorconfig', '.github/workflows/lint.yml', 'README.md']);
-
-  expect(pulls).toStrictEqual([
-    {
-      number: 1,
-      base: 'main',
-      head: 'repo-sync/zgeoff-tools',
-      title: 'chore: sync zgeoff/tools sync-v7',
-      body:
-        'Copied from zgeoff/tools at sync-v7 by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry:\n\n' +
-        '- `editorconfig`: The editor config\n' +
-        '- `retired-files`: The copies of files zgeoff/tools no longer syncs: `scripts/lint.sh`',
-      state: 'open',
-      autoMerge: { method: 'squash', head },
-    },
-  ]);
-});
-
-test('it pins each call of a shared workflow at main to the ref of the workflow it runs', async () => {
+test('it pins each call of a shared workflow in a delivered caller to the commit it syncs from', async () => {
   const ctx = await setupTest();
 
   await ctx.writeMainCommit('README.md', '# app\n');
@@ -792,25 +751,20 @@ test('it pins each call of a shared workflow at main to the ref of the workflow 
       '  pr:',
       '    uses: zgeoff/tools/.github/workflows/bun-checks.yml@main',
       "  gate: { uses: 'zgeoff/tools/.github/workflows/paths-changed.yml@main' }",
-      '  other:',
-      '    uses: zgeoff/tools/.github/workflows/bun-checks.yml@main-next',
       '',
     ].join('\n'),
   );
 
-  const exitCode = await ctx.runSync(
-    [
-      {
-        name: 'workflow-pr',
-        description: 'The PR workflow',
-        files: [{ source: 'sync/workflow-callers/pr.yml', target: '.github/workflows/pr.yml' }],
-      },
-    ],
-    '',
-    'true',
-  );
+  const exitCode = await ctx.runSync([
+    {
+      name: 'workflow-pr',
+      description: 'The PR workflow',
+      files: [{ source: 'sync/workflow-callers/pr.yml', target: '.github/workflows/pr.yml' }],
+    },
+  ]);
 
   const workflow = await ctx.readBranch('repo-sync/zgeoff-tools', '.github/workflows/pr.yml');
+  const commit = await ctx.readToolsHead();
 
   expect(exitCode).toBe(0);
 
@@ -818,10 +772,8 @@ test('it pins each call of a shared workflow at main to the ref of the workflow 
     [
       'jobs:',
       '  pr:',
-      '    uses: zgeoff/tools/.github/workflows/bun-checks.yml@sync-v1',
-      "  gate: { uses: 'zgeoff/tools/.github/workflows/paths-changed.yml@sync-v1' }",
-      '  other:',
-      '    uses: zgeoff/tools/.github/workflows/bun-checks.yml@main-next',
+      `    uses: zgeoff/tools/.github/workflows/bun-checks.yml@${commit} # main`,
+      `  gate: { uses: 'zgeoff/tools/.github/workflows/paths-changed.yml@${commit}' }`,
       '',
     ].join('\n'),
   );
@@ -833,10 +785,13 @@ test('it overwrites a workflow of the repo that calls the same shared workflow',
   await ctx.writeMainCommit('README.md', '# app\n');
   await ctx.writeManifestCommit([]);
 
+  // An older commit of zgeoff/tools, so the run can order the pin against the one it syncs.
+  const pinned = await ctx.writeToolsCommit();
+
   await ctx.writeBranch(
     'main',
     '.github/workflows/pr.yml',
-    'jobs:\n  pr:\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@sync-v0\n',
+    `name: Own PR checks\njobs:\n  pr:\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@${pinned} # main\n`,
   );
 
   await ctx.writeSource(
@@ -844,28 +799,156 @@ test('it overwrites a workflow of the repo that calls the same shared workflow',
     'jobs:\n  pr:\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@main\n',
   );
 
-  const exitCode = await ctx.runSync(
-    [
-      {
-        name: 'workflow-pr',
-        description: 'The PR workflow',
-        files: [{ source: 'sync/workflow-callers/pr.yml', target: '.github/workflows/pr.yml' }],
-      },
-    ],
-    'sync-v7',
-    'true',
-  );
+  const exitCode = await ctx.runSync([
+    {
+      name: 'workflow-pr',
+      description: 'The PR workflow',
+      files: [{ source: 'sync/workflow-callers/pr.yml', target: '.github/workflows/pr.yml' }],
+    },
+  ]);
 
   const workflow = await ctx.readBranch('repo-sync/zgeoff-tools', '.github/workflows/pr.yml');
+  const commit = await ctx.readToolsHead();
 
   expect(exitCode).toBe(0);
 
   expect(workflow).toBe(
-    'jobs:\n  pr:\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@sync-v7\n',
+    `jobs:\n  pr:\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@${commit} # main\n`,
   );
 });
 
-test('it refuses a ref it cannot pin a workflow to and pushes nothing', async () => {
+test("it pins the repo's own calls to zgeoff/tools in the sync pull request, which still merges on its own", async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  // An older commit of zgeoff/tools, so the run can order the pin against the one it syncs.
+  const pinned = await ctx.writeToolsCommit();
+
+  await ctx.writeBranch(
+    'main',
+    '.github/workflows/repo-sync.yml',
+    `jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@${pinned} # main\n`,
+  );
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const exitCode = await ctx.runSync([
+    {
+      name: 'editorconfig',
+      description: 'The editor config',
+      files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+    },
+  ]);
+
+  const caller = await ctx.readBranch('repo-sync/zgeoff-tools', '.github/workflows/repo-sync.yml');
+  const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
+  const pulls = await ctx.readPullRequests();
+  const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
+  const commit = await ctx.readToolsHead();
+
+  expect(exitCode).toBe(0);
+
+  expect(caller).toBe(
+    `jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@${commit} # main\n`,
+  );
+
+  expect(subjects).toStrictEqual([
+    'chore: sync editorconfig from zgeoff/tools',
+    `chore: pin the zgeoff/tools workflows to ${commit}`,
+  ]);
+
+  expect(pulls).toStrictEqual([
+    {
+      number: 1,
+      base: 'main',
+      head: 'repo-sync/zgeoff-tools',
+      title: 'chore(sync): update the editorconfig',
+      body:
+        `Copied from zgeoff/tools at ${commit} by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry or pins the calls to zgeoff/tools workflows to that commit:\n\n` +
+        '- `editorconfig`: The editor config',
+      state: 'open',
+      autoMerge: { method: 'squash', head },
+    },
+  ]);
+});
+
+test('it leaves the pin alone and opens no pull request when every entry matches', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  // An older commit of zgeoff/tools, so the run can order the pin against the one it syncs.
+  const pinned = await ctx.writeToolsCommit();
+
+  await ctx.writeBranch(
+    'main',
+    '.github/workflows/repo-sync.yml',
+    `jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@${pinned} # main\n`,
+  );
+
+  await ctx.writeSource('sync/readme.md', '# app\n');
+
+  const exitCode = await ctx.runSync([
+    {
+      name: 'readme',
+      description: 'The readme',
+      files: [{ source: 'sync/readme.md', target: 'README.md' }],
+    },
+  ]);
+
+  const branches = await ctx.readBranchNames();
+  const pulls = await ctx.readPullRequests();
+
+  expect(exitCode).toBe(0);
+  expect(branches).toStrictEqual(['main']);
+  expect(pulls).toStrictEqual([]);
+});
+
+test('it leaves the open pull request alone when it already syncs a newer commit', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  // An older commit of zgeoff/tools, so the run can order the pin against the one it syncs.
+  const pinned = await ctx.writeToolsCommit();
+
+  await ctx.writeBranch(
+    'main',
+    '.github/workflows/repo-sync.yml',
+    `jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@${pinned} # main\n`,
+  );
+
+  const entry = {
+    name: 'editorconfig',
+    description: 'The editor config',
+    files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+  };
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const older = await ctx.writeToolsCommit();
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n\n[*]\nindent_style = space\n');
+  await ctx.runSync([entry]);
+
+  const newer = await ctx.readToolsHead();
+  const headBefore = await ctx.readBranchHead('repo-sync/zgeoff-tools');
+  const exitCode = await ctx.runSync([entry], { TOOLS_REF: older });
+  const headAfter = await ctx.readBranchHead('repo-sync/zgeoff-tools');
+
+  expect(exitCode).toBe(0);
+  expect(headAfter).toBe(headBefore);
+
+  expect(ctx.output).toContain(
+    `Pull request #1 already pins ${newer}, which is newer than ${older}; nothing to do.\n`,
+  );
+});
+
+test('it refuses a ref that is not a full commit ID and pushes nothing', async () => {
   const ctx = await setupTest();
 
   await ctx.writeMainCommit('README.md', '# app\n');
@@ -880,7 +963,7 @@ test('it refuses a ref it cannot pin a workflow to and pushes nothing', async ()
         files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
       },
     ],
-    'sync v7',
+    { TOOLS_REF: 'main' },
   );
 
   const branches = await ctx.readBranchNames();
@@ -889,6 +972,35 @@ test('it refuses a ref it cannot pin a workflow to and pushes nothing', async ()
   expect(exitCode).toBe(1);
   expect(branches).toStrictEqual(['main']);
   expect(pulls).toStrictEqual([]);
+  expect(ctx.output).toStrictEqual(["::error::the tools ref 'main' is not a full commit ID\n"]);
+});
+
+test('it refuses a commit that is not on main of zgeoff/tools before any build and pushes nothing', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const marker = join(dirname(ctx.origin), 'build-ran');
+
+  const entry = {
+    name: 'editorconfig',
+    description: 'The editor config',
+    files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+    build: `touch '${marker}'`,
+  };
+
+  const side = await ctx.writeSideCommit([entry]);
+  const exitCode = await ctx.runSync([entry], { TOOLS_REF: side });
+  const branches = await ctx.readBranchNames();
+  const pulls = await ctx.readPullRequests();
+
+  expect(exitCode).toBe(1);
+  expect(branches).toStrictEqual(['main']);
+  expect(pulls).toStrictEqual([]);
+  expect(existsSync(marker)).toBeFalse();
+  expect(ctx.output).toStrictEqual([`::error::${side} is not a commit on main of zgeoff/tools\n`]);
 });
 
 test('it reports the path and cause of a copy that fails before it leaves the entry out', async () => {
@@ -899,16 +1011,13 @@ test('it reports the path and cause of a copy that fails before it leaves the en
   await ctx.writeBranch('main', 'config', 'a file where the entry needs a folder\n');
   await ctx.writeSource('sync/editor.json', '{}\n');
 
-  const exitCode = await ctx.runSync(
-    [
-      {
-        name: 'editor',
-        description: 'The editor settings',
-        files: [{ source: 'sync/editor.json', target: 'config/editor.json' }],
-      },
-    ],
-    'sync-v7',
-  );
+  const exitCode = await ctx.runSync([
+    {
+      name: 'editor',
+      description: 'The editor settings',
+      files: [{ source: 'sync/editor.json', target: 'config/editor.json' }],
+    },
+  ]);
 
   expect(exitCode).toBe(1);
 
@@ -943,23 +1052,20 @@ test('it leaves out a file excepted for the caller and drops the Markdown block 
 
   await ctx.writeSource('sync/skills/demo/references/rust.md', '# Rust\n');
 
-  const exitCode = await ctx.runSync(
-    [
-      {
-        name: 'skill-demo',
-        description: 'The demo skill',
-        files: [
-          { source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' },
-          {
-            source: 'sync/skills/demo/references/rust.md',
-            target: '.claude/skills/demo/references/rust.md',
-            except: ['Example/App'],
-          },
-        ],
-      },
-    ],
-    'sync-v7',
-  );
+  const exitCode = await ctx.runSync([
+    {
+      name: 'skill-demo',
+      description: 'The demo skill',
+      files: [
+        { source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' },
+        {
+          source: 'sync/skills/demo/references/rust.md',
+          target: '.claude/skills/demo/references/rust.md',
+          except: ['Example/App'],
+        },
+      ],
+    },
+  ]);
 
   const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
   const skill = await ctx.readBranch('repo-sync/zgeoff-tools', '.claude/skills/demo/SKILL.md');
@@ -978,23 +1084,20 @@ test('it syncs the other files of an entry whose excepted workflow target is a f
   await ctx.writeSource('sync/editorconfig', 'root = true\n');
   await ctx.writeSource('sync/workflow-callers/demo.yml', 'on: push\n');
 
-  const exitCode = await ctx.runSync(
-    [
-      {
-        name: 'editorconfig',
-        description: 'The editor config',
-        files: [
-          { source: 'sync/editorconfig', target: '.editorconfig' },
-          {
-            source: 'sync/workflow-callers/demo.yml',
-            target: '.github/workflows/demo.yml',
-            except: ['example/app'],
-          },
-        ],
-      },
-    ],
-    'sync-v7',
-  );
+  const exitCode = await ctx.runSync([
+    {
+      name: 'editorconfig',
+      description: 'The editor config',
+      files: [
+        { source: 'sync/editorconfig', target: '.editorconfig' },
+        {
+          source: 'sync/workflow-callers/demo.yml',
+          target: '.github/workflows/demo.yml',
+          except: ['example/app'],
+        },
+      ],
+    },
+  ]);
 
   const editorconfig = await ctx.readBranch('repo-sync/zgeoff-tools', '.editorconfig');
 
@@ -1009,30 +1112,33 @@ test('it syncs the other files of an entry whose excepted workflow target is a f
   expect(ctx.output).not.toContain(expect.stringContaining('::error::'));
 });
 
-test("it fails the run with git's error when the remote branch probe cannot reach the remote", async () => {
+test("it refuses the commit with git's error when it cannot read the base from the remote", async () => {
   const ctx = await setupTest();
 
   await ctx.writeMainCommit('README.md', '# app\n');
   await ctx.writeManifestCommit([]);
-  await ctx.writeSource('sync/readme.md', '# app\n');
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
 
-  // The entry matches the caller, so the probe for the sync branch is the run's first remote call.
-  const syncing = ctx.runSync(
+  const exitCode = await ctx.runSync(
     [
       {
-        name: 'readme',
-        description: 'The readme',
-        files: [{ source: 'sync/readme.md', target: 'README.md' }],
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
       },
     ],
-    'sync-v7',
-    'false',
     { GIT_ALLOW_PROTOCOL: 'https' },
   );
 
-  expect(syncing).rejects.toThrow(
-    "git ls-remote --exit-code --heads origin repo-sync/zgeoff-tools exited with 128: fatal: transport 'file' not allowed",
-  );
+  const toolsHead = await ctx.readToolsHead();
+  const branches = await ctx.readBranchNames();
+
+  expect(exitCode).toBe(1);
+  expect(branches).toStrictEqual(['main']);
+
+  expect(ctx.output).toStrictEqual([
+    `::error::Cannot read main from the remote, so the run cannot tell whether ${toolsHead} is older than its pin; the next run tries again: fatal: transport 'file' not allowed\n`,
+  ]);
 });
 
 test('it turns auto-merge off before it pushes a later release to the sync branch', async () => {
@@ -1050,7 +1156,7 @@ test('it turns auto-merge off before it pushes a later release to the sync branc
     },
   ];
 
-  await ctx.runSync(entries, 'sync-v7');
+  await ctx.runSync(entries);
   await ctx.writeSource('sync/editorconfig', 'root = false\n');
 
   // The remote refuses a push to the sync branch while its pull request has auto-merge on.
@@ -1072,7 +1178,7 @@ test('it turns auto-merge off before it pushes a later release to the sync branc
 
   await chmod(hook, 0o755);
 
-  const exitCode = await ctx.runSync(entries, 'sync-v8');
+  const exitCode = await ctx.runSync(entries);
   const pulls = await ctx.readPullRequests();
   const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
   const editorconfig = await ctx.readBranch('repo-sync/zgeoff-tools', '.editorconfig');
@@ -1089,17 +1195,14 @@ test('it leaves auto-merge off when a build writes a file the manifest does not 
   await ctx.writeManifestCommit([]);
   await ctx.writeSource('sync/editorconfig', 'root = true\n');
 
-  const exitCode = await ctx.runSync(
-    [
-      {
-        name: 'editorconfig',
-        description: 'The editor config',
-        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
-        build: 'echo stray > notes.txt',
-      },
-    ],
-    'sync-v7',
-  );
+  const exitCode = await ctx.runSync([
+    {
+      name: 'editorconfig',
+      description: 'The editor config',
+      files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+      build: 'echo stray > notes.txt',
+    },
+  ]);
 
   const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
   const pulls = await ctx.readPullRequests();
@@ -1126,10 +1229,10 @@ test('it turns auto-merge off when a later run carries a file the manifest does 
     files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
   };
 
-  await ctx.runSync([entry], 'sync-v7');
+  await ctx.runSync([entry]);
   await ctx.writeSource('sync/editorconfig', 'root = false\n');
 
-  const exitCode = await ctx.runSync([{ ...entry, build: 'echo stray > notes.txt' }], 'sync-v8');
+  const exitCode = await ctx.runSync([{ ...entry, build: 'echo stray > notes.txt' }]);
   const pulls = await ctx.readPullRequests();
 
   expect(exitCode).toBe(0);
@@ -1147,19 +1250,16 @@ test('it turns auto-merge on when a build changes package.json only by the scrip
   await ctx.writeManifestCommit([]);
   await ctx.writeSource('sync/check-demo.ts', 'export {};\n');
 
-  const exitCode = await ctx.runSync(
-    [
-      {
-        name: 'check-demo',
-        description: 'The demo check',
-        files: [{ source: 'sync/check-demo.ts', target: 'scripts/check-demo.ts' }],
-        build:
-          'jq \'.scripts["check:demo"] = "bun scripts/check-demo.ts"\' package.json > package.json.tmp && mv package.json.tmp package.json',
-        scripts: { 'check:demo': 'bun scripts/check-demo.ts' },
-      },
-    ],
-    'sync-v7',
-  );
+  const exitCode = await ctx.runSync([
+    {
+      name: 'check-demo',
+      description: 'The demo check',
+      files: [{ source: 'sync/check-demo.ts', target: 'scripts/check-demo.ts' }],
+      build:
+        'jq \'.scripts["check:demo"] = "bun scripts/check-demo.ts"\' package.json > package.json.tmp && mv package.json.tmp package.json',
+      scripts: { 'check:demo': 'bun scripts/check-demo.ts' },
+    },
+  ]);
 
   const pulls = await ctx.readPullRequests();
   const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
@@ -1183,8 +1283,6 @@ test('it warns and passes when the repo refuses auto-merge', async () => {
         files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
       },
     ],
-    'sync-v7',
-    'false',
     { STUB_GH_AUTO_MERGE_REFUSAL: 'GraphQL: Auto merge is not allowed for this repository' },
   );
 
@@ -1213,10 +1311,11 @@ test('it leaves auto-merge off when the open pull request merges into another br
     },
   ];
 
-  await ctx.runSync(entries, 'sync-v7');
+  await ctx.runSync(entries);
   await ctx.writeSource('sync/editorconfig', 'root = false\n');
+  await ctx.writeBranch('feature', 'README.md', '# app on a feature branch\n');
 
-  const exitCode = await ctx.runSync(entries, 'sync-v8', 'false', { BASE: 'feature' });
+  const exitCode = await ctx.runSync(entries, { BASE: 'feature' });
   const pulls = await ctx.readPullRequests();
 
   expect(exitCode).toBe(0);
@@ -1224,5 +1323,274 @@ test('it leaves auto-merge off when the open pull request merges into another br
 
   expect(ctx.output).toContain(
     '::warning::Pull request #1 merges into main, not feature, which the run synced from, so it waits for review.\n',
+  );
+});
+
+test('it leaves the repo alone when its own pin is newer than the commit it was sent', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  const entry = {
+    name: 'editorconfig',
+    description: 'The editor config',
+    files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+  };
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const older = await ctx.writeToolsCommit();
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n\n[*]\nindent_style = space\n');
+
+  const newer = await ctx.writeToolsCommit();
+
+  await ctx.writeBranch(
+    'main',
+    '.github/workflows/repo-sync.yml',
+    `jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@${newer} # main\n`,
+  );
+
+  const exitCode = await ctx.runSync([entry], { TOOLS_REF: older });
+  const branches = await ctx.readBranchNames();
+  const pulls = await ctx.readPullRequests();
+
+  expect(exitCode).toBe(0);
+  expect(branches).toStrictEqual(['main']);
+  expect(pulls).toStrictEqual([]);
+
+  expect(ctx.output).toContain(
+    `main already pins ${newer}, which is newer than ${older}; nothing to do.\n`,
+  );
+});
+
+test('it fetches a newer pin that the tools checkout lacks before it compares the commits', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  const entry = {
+    name: 'editorconfig',
+    description: 'The editor config',
+    files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+  };
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const older = await ctx.writeToolsCommit();
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n\n[*]\nindent_style = space\n');
+
+  const newer = await ctx.writeToolsCommit();
+
+  await ctx.writeRemoteOnlyCommit(newer, older);
+
+  await ctx.writeBranch(
+    'main',
+    '.github/workflows/repo-sync.yml',
+    `jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@${newer} # main\n`,
+  );
+
+  const exitCode = await ctx.runSync([entry], { TOOLS_REF: older });
+  const branches = await ctx.readBranchNames();
+
+  expect(exitCode).toBe(0);
+  expect(branches).toStrictEqual(['main']);
+
+  expect(ctx.output).toContain(
+    `main already pins ${newer}, which is newer than ${older}; nothing to do.\n`,
+  );
+});
+
+test('it reads the pin of the base as the remote holds it when a newer pin merges after the checkout', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  const entry = {
+    name: 'editorconfig',
+    description: 'The editor config',
+    files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+  };
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const older = await ctx.writeToolsCommit();
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n\n[*]\nindent_style = space\n');
+
+  const newer = await ctx.writeToolsCommit();
+
+  const exitCode = await ctx.runSync([entry], { TOOLS_REF: older }, async () => {
+    await ctx.writeBranch(
+      'main',
+      '.github/workflows/repo-sync.yml',
+      `jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@${newer} # main\n`,
+    );
+  });
+
+  const branches = await ctx.readBranchNames();
+
+  expect(exitCode).toBe(0);
+  expect(branches).toStrictEqual(['main']);
+
+  expect(ctx.output).toContain(
+    `main already pins ${newer}, which is newer than ${older}; nothing to do.\n`,
+  );
+});
+
+test('it opens no pull request when a delivered workflow differs from its source only by the pin', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  // An older commit of zgeoff/tools, so the run can order the pin against the one it syncs.
+  const pinned = await ctx.writeToolsCommit();
+
+  await ctx.writeBranch(
+    'main',
+    '.github/workflows/repo-sync-guard.yml',
+    `jobs:\n  guard:\n    uses: zgeoff/tools/.github/workflows/repo-sync-guard.yml@${pinned} # main\n`,
+  );
+
+  await ctx.writeSource(
+    'sync/workflow-callers/repo-sync-guard.yml',
+    'jobs:\n  guard:\n    uses: zgeoff/tools/.github/workflows/repo-sync-guard.yml@main\n',
+  );
+
+  const exitCode = await ctx.runSync([
+    {
+      name: 'workflow-repo-sync-guard',
+      description: 'The repo-sync guard',
+      files: [
+        {
+          source: 'sync/workflow-callers/repo-sync-guard.yml',
+          target: '.github/workflows/repo-sync-guard.yml',
+        },
+      ],
+    },
+  ]);
+
+  const branches = await ctx.readBranchNames();
+  const pulls = await ctx.readPullRequests();
+
+  expect(exitCode).toBe(0);
+  expect(branches).toStrictEqual(['main']);
+  expect(pulls).toStrictEqual([]);
+});
+
+test('it leaves the repo alone when any workflow on main pins a newer commit than the one it was sent', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  const entry = {
+    name: 'editorconfig',
+    description: 'The editor config',
+    files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+  };
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const first = await ctx.writeToolsCommit();
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n\n[*]\nindent_size = 2\n');
+
+  const delayed = await ctx.writeToolsCommit();
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n\n[*]\nindent_size = 4\n');
+
+  const newest = await ctx.writeToolsCommit();
+
+  await ctx.writeBranch(
+    'main',
+    '.github/workflows/a-checks.yml',
+    `jobs:\n  checks:\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@${first} # main\n`,
+  );
+
+  await ctx.writeBranch(
+    'main',
+    '.github/workflows/repo-sync.yml',
+    `jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@${newest} # main\n`,
+  );
+
+  const exitCode = await ctx.runSync([entry], { TOOLS_REF: delayed });
+  const branches = await ctx.readBranchNames();
+
+  expect(exitCode).toBe(0);
+  expect(branches).toStrictEqual(['main']);
+
+  expect(ctx.output).toContain(
+    `main already pins ${newest}, which is newer than ${delayed}; nothing to do.\n`,
+  );
+});
+
+test('it stops and pushes nothing when main pins a commit that zgeoff/tools does not have', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  await ctx.writeBranch(
+    'main',
+    '.github/workflows/repo-sync.yml',
+    'jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@0123456789abcdef0123456789abcdef01234567 # main\n',
+  );
+
+  const exitCode = await ctx.runSync([
+    {
+      name: 'editorconfig',
+      description: 'The editor config',
+      files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+    },
+  ]);
+
+  const toolsHead = await ctx.readToolsHead();
+  const branches = await ctx.readBranchNames();
+
+  expect(exitCode).toBe(1);
+  expect(branches).toStrictEqual(['main']);
+
+  expect(ctx.output).toStrictEqual([
+    `::error::Cannot tell whether ${toolsHead} is older than the pin 0123456789abcdef0123456789abcdef01234567 on main, so the run stops; the next run tries again: fatal: Not a valid commit name 0123456789abcdef0123456789abcdef01234567\n`,
+  ]);
+});
+
+test('it stops and pushes nothing when it cannot read the branch of the open pull request', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  const entry = {
+    name: 'editorconfig',
+    description: 'The editor config',
+    files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+  };
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const older = await ctx.writeToolsCommit();
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n\n[*]\nindent_style = space\n');
+  await ctx.runSync([entry]);
+
+  // The pull request stays open while its branch cannot be fetched, as in a transient failure.
+  await $`git -C ${ctx.origin} branch -D repo-sync/zgeoff-tools`.quiet();
+
+  const exitCode = await ctx.runSync([entry], { TOOLS_REF: older });
+  const branches = await ctx.readBranchNames();
+
+  expect(exitCode).toBe(1);
+  expect(branches).toStrictEqual(['main']);
+
+  expect(ctx.output.at(-1)).toStartWith(
+    `::error::Cannot read repo-sync/zgeoff-tools from the remote, so the run cannot tell whether ${older} is older than its pin; the next run tries again: fatal: couldn't find remote ref repo-sync/zgeoff-tools`,
   );
 });

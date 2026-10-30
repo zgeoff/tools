@@ -15,8 +15,18 @@ baseline need changes in the repo beyond the `include` line, which repo-sync nev
    op read 'op://zgeoff/repo-sync-github-app/private-key' | gh secret set REPO_SYNC_APP_PRIVATE_KEY -R zgeoff/<repo>
    ```
 
-2. Copy [`repo-sync.yml`](../../sync/repo-sync.yml) to `.github/workflows/repo-sync.yml`, and pin it
-   to the newest sync tag with `scripts/pin-tools-ref.sh`.
+2. Copy [`repo-sync.yml`](../../sync/repo-sync.yml) to `.github/workflows/repo-sync.yml`, and pin
+   its `uses:` line to the newest commit on `main` of tools whose `Main` run passed. A commit whose
+   run failed or still runs is newer than every green one, so a repo pinned to it skips the sync
+   until a newer commit turns green. Print the newest green commit:
+
+   ```sh
+   gh api -X GET repos/zgeoff/tools/actions/workflows/main.yml/runs -f branch=main -f event=push -f status=success -f per_page=1 --jq '.workflow_runs[0].head_sha'
+   ```
+
+   Replace `@main` on the `uses:` line with `@<commit> # main`, where `<commit>` is the printed
+   commit.
+
 3. Allow auto-merge in the repo, so a sync pull request merges on green checks:
 
    ```sh
@@ -26,7 +36,8 @@ baseline need changes in the repo beyond the `include` line, which repo-sync nev
    Expect: `true`.
 
 4. Dispatch it once: `gh workflow run repo-sync.yml -R zgeoff/<repo>`. Expect one pull request that
-   carries every entry the repo is behind on.
+   carries every entry the repo is behind on. From then on, each merge to `main` of tools that
+   changes a synced file opens or updates that pull request.
 
 ## Opting in to the skill gate
 

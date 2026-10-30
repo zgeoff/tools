@@ -140,7 +140,7 @@ test('it overwrites a workflow of the repo that calls the same shared workflow a
         '.github/workflows/pr.yml',
         {
           targetText:
-            'jobs:\n  pr:\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@sync-v0\n',
+            'jobs:\n  pr:\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@0123456789abcdef0123456789abcdef01234567 # main\n',
           sourceText:
             'jobs:\n  pr:\n    uses: zgeoff/tools/.github/workflows/bun-checks.yml@main\n',
         },
