@@ -99,7 +99,7 @@ async function captureFailure(
     const failure =
       error instanceof Error
         ? error
-        : new Error('the browser lane could not stop a process group', { cause: error });
+        : new Error('rig could not stop a process group', { cause: error });
 
     onFailure(failure);
 
@@ -116,11 +116,9 @@ async function stopGroup(groupID: number, options: ProcessGroupOptions): Promise
       throw error;
     }
 
-    throw new ProcessGroupStopError(
-      groupID,
-      `the browser lane could not stop the process group ${groupID}`,
-      { cause: error },
-    );
+    throw new ProcessGroupStopError(groupID, `rig could not stop the process group ${groupID}`, {
+      cause: error,
+    });
   }
 }
 

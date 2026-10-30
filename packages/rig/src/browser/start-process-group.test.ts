@@ -102,7 +102,7 @@ test('it rejects with the cause when a signal to the group fails', async () => {
   expect(failure).toBeInstanceOf(ProcessGroupStopError);
 
   expect(failure).toMatchObject({
-    message: 'the browser lane could not stop the process group 4417',
+    message: 'rig could not stop the process group 4417',
     groupID: 4417,
     cause: denied,
   });

@@ -37,9 +37,11 @@ its plugin.
    path names, whatever its lane.
 3. `stop` cleans up, whether the tests passed, failed or never started.
 
-`rig` turns SIGINT, SIGTERM and SIGHUP into an abort. The abort stops the running command, the run
-waits for it to exit so that `stop` can clean up, and an aborted run exits 1 whatever the tests'
-exit code was.
+`rig` turns SIGINT, SIGTERM and SIGHUP into an abort. Every command rig starts runs in a process
+group of its own, because a test can start a process that a signal to `bun test` alone leaves
+running. The abort sends the group SIGTERM, then SIGKILL after a deadline, and the run waits until
+no member of the group runs, so that `stop` can clean up. An aborted run exits 1 whatever the tests'
+exit code was. A command that exits on its own has the rest of its group stopped the same way.
 
 `rig unit` builds its `bun test` command from the same table: one path ignore for every lane suffix
 and for the `e2e` folders. A lane declared in `rig.config.ts` therefore leaves the unit run without

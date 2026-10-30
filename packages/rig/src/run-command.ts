@@ -1,3 +1,7 @@
+import { processGroups } from './browser/process-groups.ts';
+import { processRuntime } from './browser/process-runtime.ts';
+import { startProcessGroup } from './browser/start-process-group.ts';
+
 export interface CommandOptions {
   readonly cwd: string;
 
@@ -6,35 +10,27 @@ export interface CommandOptions {
   readonly signal: AbortSignal;
 }
 
-// An abort sends SIGTERM to the command, which diet passes on to the process it caps. An aborted
-// run fails, whatever the command's exit code.
+// A command gets this long to exit after SIGTERM before its group gets SIGKILL.
+const stopDeadlineMs = 10_000;
+
+// A test can start a process of its own, such as a `sleep` or a server, that a signal to the
+// command alone leaves running, so the command runs in a process group that an abort stops whole.
+// An aborted run fails, whatever the command's exit code.
 export async function runCommand(
   command: readonly string[],
   options: CommandOptions,
 ): Promise<number> {
-  const child = Bun.spawn([...command], {
+  const group = startProcessGroup(command, {
     cwd: options.cwd,
-    env: options.environment,
-    stdin: 'inherit',
+    environment: options.environment,
+    signal: options.signal,
     stdout: 'inherit',
-    stderr: 'inherit',
+    stopDeadlineMs,
+    groups: processGroups,
+    runtime: processRuntime,
   });
 
-  const handleAbort = () => {
-    child.kill('SIGTERM');
-  };
+  const exitCode = await group.exited;
 
-  options.signal.addEventListener('abort', handleAbort, { once: true });
-
-  if (options.signal.aborted) {
-    handleAbort();
-  }
-
-  try {
-    const exitCode = await child.exited;
-
-    return options.signal.aborted ? 1 : exitCode;
-  } finally {
-    options.signal.removeEventListener('abort', handleAbort);
-  }
+  return options.signal.aborted ? 1 : exitCode;
 }
