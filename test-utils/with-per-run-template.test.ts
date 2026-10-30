@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { createBlockingStubKit } from './create-blocking-stub-kit.ts';
 import { fileLocks } from './file-locks.ts';
 import { makeFileWritingStub } from './make-file-writing-stub.ts';
@@ -183,4 +183,32 @@ test('it removes its reader record once the reader is done, even when the reader
 
   expect(outcome).toBe(failure);
   expect(readers).toStrictEqual([]);
+});
+
+test('it fails when the template appears while the build holds the lock', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(ctx.inputPath, 'export const greeting = "hello";\n');
+
+  // A writer that ignores the lock puts the template in place before the build moves its own.
+  const writeTemplate = async (buildDirectory: string) => {
+    const [templateName = 'missing'] = basename(buildDirectory).split('.building-');
+    const templateDirectory = join(ctx.cacheDirectory, templateName);
+
+    await mkdir(templateDirectory);
+    await writeFile(join(templateDirectory, 'bundle.js'), 'other\n');
+  };
+
+  const reader = makeResolvingStub(undefined);
+
+  const outcome = await withPerRunTemplate({ ...ctx.options, writeTemplate }, reader).then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(outcome).toMatchObject({
+    message: expect.stringMatching(/^the template .+ appeared while the cache's lock was held$/u),
+  });
+
+  expect(reader).not.toHaveBeenCalled();
 });

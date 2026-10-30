@@ -54,3 +54,24 @@ test('it removes a folder with its files, and a path that does not exist', async
 
   expect(entries).toStrictEqual([]);
 });
+
+test('it fails to list the names of a path that is a file', async () => {
+  const ctx = await setupTest();
+
+  const path = join(ctx.directory, 'bundle.js');
+
+  await writeFile(path, 'built\n');
+
+  expect(templateFiles.readDirectoryNames(path)).rejects.toMatchObject({ code: 'ENOTDIR' });
+});
+
+test('it fails to move a folder that does not exist', async () => {
+  const ctx = await setupTest();
+
+  expect(
+    templateFiles.moveDirectory(
+      join(ctx.directory, 'missing'),
+      join(ctx.directory, 'notes-bundle'),
+    ),
+  ).rejects.toMatchObject({ code: 'ENOENT' });
+});

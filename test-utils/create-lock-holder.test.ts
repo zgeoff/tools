@@ -30,3 +30,19 @@ test('it holds the lock until it is killed', async () => {
   expect(isLockedWhileHeld).toBeFalse();
   expect(fileLocks.tryLock(lockFile)).toBeTrue();
 });
+
+test('it fails when another holder keeps the lock', async () => {
+  const ctx = await setupTest();
+  const lockFile = await fileLocks.openLockFile(ctx.lockPath);
+
+  onTestFinished(() => fileLocks.closeLockFile(lockFile));
+
+  const isLocked = fileLocks.tryLock(lockFile);
+
+  expect(isLocked).toBeTrue();
+
+  expect(createLockHolder(ctx.lockPath)).rejects.toThrowWithMessage(
+    Error,
+    `the lock holder could not take the lock ${ctx.lockPath}: busy\n`,
+  );
+});
