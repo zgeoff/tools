@@ -188,10 +188,8 @@ test.each([
       'zgeoff/setup-test-only': 'error',
     });
 
-    const reports = result.stdout.trim().split('\n');
-
-    expect(reports).toHaveLength(1);
-    expect(reports[0]).toInclude('zgeoff(test-shape)');
+    expect(result.stdout.split('zgeoff(test-shape)')).toHaveLength(2);
+    expect(result.stdout).not.toInclude('zgeoff(setup-test-only)');
   },
 );
 
