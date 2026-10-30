@@ -366,7 +366,7 @@ test('it runs the command uncapped with a warning when MEMORY_CAP_MODE is none',
   const ctx = setupTest();
 
   const result =
-    await $`bash ${ctx.scriptPath} 128 ${ctx.bun} -e ${"Buffer.alloc(192 * 1024 * 1024, 1); console.log('done')"}`
+    await $`bash ${ctx.scriptPath} 8 ${ctx.bun} -e ${"Buffer.alloc(32 * 1024 * 1024, 1); console.log('done')"}`
       .env({ ...ctx.env, MEMORY_CAP_MODE: 'none' })
       .nothrow()
       .quiet();
