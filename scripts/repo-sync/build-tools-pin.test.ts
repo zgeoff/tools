@@ -50,3 +50,14 @@ test('it leaves a call to another owner and every other line alone', () => {
 
   expect(pinned).toBe(text);
 });
+
+test('it pins every call on a line that holds several', () => {
+  const pinned = buildToolsPin(
+    "jobs: {a: {uses: zgeoff/tools/.github/workflows/a.yml@v1}, b: {uses: 'zgeoff/tools/.github/workflows/b.yml@main'}}\n",
+    '3f9c2e1a7b0d4c6e8f1a2b3c4d5e6f7a8b9c0d1e',
+  );
+
+  expect(pinned).toBe(
+    "jobs: {a: {uses: zgeoff/tools/.github/workflows/a.yml@3f9c2e1a7b0d4c6e8f1a2b3c4d5e6f7a8b9c0d1e}, b: {uses: 'zgeoff/tools/.github/workflows/b.yml@3f9c2e1a7b0d4c6e8f1a2b3c4d5e6f7a8b9c0d1e'}}\n",
+  );
+});
