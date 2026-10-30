@@ -3,7 +3,7 @@ import { buildUnitCommand } from './build-unit-command.ts';
 import { defineRig } from './define-rig.ts';
 
 test('it runs the unit tests in random order with the worker count and leaves every lane out', () => {
-  const command = buildUnitCommand(defineRig({}), 3, []);
+  const command = buildUnitCommand(defineRig({}), ['e2e', 'apps/shop/e2e'], 3, []);
 
   expect(command).toStrictEqual([
     'bun',
@@ -20,8 +20,8 @@ test('it runs the unit tests in random order with the worker count and leaves ev
     '--path-ignore-patterns=**/*.agent-sdk.test.tsx',
     '--path-ignore-patterns=**/*.model-api.test.ts',
     '--path-ignore-patterns=**/*.model-api.test.tsx',
-    '--path-ignore-patterns=**/e2e/**',
-    '--path-ignore-patterns=**/*-e2e/**',
+    '--path-ignore-patterns=e2e/**',
+    '--path-ignore-patterns=apps/shop/e2e/**',
   ]);
 });
 
@@ -30,7 +30,7 @@ test('it leaves out the files of a lane that the config declares', () => {
     lanes: { kiln: { limit: '15s' }, oven: { limit: '9s', suffix: '.bake' } },
   });
 
-  const command = buildUnitCommand(config, 1, []);
+  const command = buildUnitCommand(config, [], 1, []);
 
   expect(command).toIncludeAllMembers([
     '--path-ignore-patterns=**/*.kiln.test.ts',
@@ -41,7 +41,13 @@ test('it leaves out the files of a lane that the config declares', () => {
 });
 
 test('it ends with the arguments the caller passes', () => {
-  const command = buildUnitCommand(defineRig({}), 2, ['--timeout=15000', './src/a.test.ts']);
+  const command = buildUnitCommand(defineRig({}), [], 2, ['--timeout=15000', './src/a.test.ts']);
 
   expect(command.slice(-2)).toStrictEqual(['--timeout=15000', './src/a.test.ts']);
+});
+
+test('it leaves out only the folders that the e2e lane selects', () => {
+  const command = buildUnitCommand(defineRig({}), [], 1, []);
+
+  expect(command.filter((argument) => argument.includes('e2e'))).toBeEmpty();
 });

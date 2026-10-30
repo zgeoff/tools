@@ -17,7 +17,7 @@ function setupTest(trackedFiles: readonly string[] = []) {
     () => Promise.resolve(0),
   );
 
-  const browserHooks: LaneHooks = {
+  const browserHooks = {
     start: mock<LaneHooks['start']>(() => Promise.resolve({ kind: 'proceed', environment: {} })),
     run: mock<LaneHooks['run']>(() => Promise.resolve(5)),
     stop: mock<LaneHooks['stop']>(() => Promise.resolve()),
@@ -62,7 +62,11 @@ test('it runs a repo lane under diet with its limit, its suffix filter and the s
     throw new Error('the config holds no kiln lane');
   }
 
-  const exitCode = await runLane(lane, ['--bail'], ctx.run, ctx.deps);
+  const exitCode = await runLane(
+    { config: ctx.config, lane, extraArgs: ['--bail'] },
+    ctx.run,
+    ctx.deps,
+  );
 
   expect(exitCode).toBe(0);
 
@@ -102,9 +106,9 @@ test('it runs the e2e lane on the e2e folders that git tracks', async () => {
     throw new Error('the config holds no e2e lane');
   }
 
-  await runLane(lane, [], ctx.run, ctx.deps);
+  await runLane({ config: ctx.config, lane, extraArgs: [] }, ctx.run, ctx.deps);
 
-  expect(ctx.runCommand.mock.calls[0]?.[0].slice(-3)).toStrictEqual([
+  expect(ctx.runCommand.mock.calls[0]?.[0]).toIncludeAllMembers([
     '--timeout=15000',
     './apps/shop/e2e/',
     './e2e/',
@@ -119,7 +123,7 @@ test('it says so and exits 0 for the e2e lane of a repo with no e2e folder', asy
     throw new Error('the config holds no e2e lane');
   }
 
-  const exitCode = await runLane(lane, [], ctx.run, ctx.deps);
+  const exitCode = await runLane({ config: ctx.config, lane, extraArgs: [] }, ctx.run, ctx.deps);
 
   expect(exitCode).toBe(0);
   expect(ctx.output.out).toHaveBeenCalledExactlyOnceWith('rig: the e2e lane has no tests\n');
@@ -134,7 +138,7 @@ test('it runs the browser lane through its built-in hooks, with the lane memory 
     throw new Error('the config holds no browser lane');
   }
 
-  const exitCode = await runLane(lane, [], ctx.run, ctx.deps);
+  const exitCode = await runLane({ config: ctx.config, lane, extraArgs: [] }, ctx.run, ctx.deps);
 
   expect(exitCode).toBe(5);
 
@@ -154,4 +158,49 @@ test('it runs the browser lane through its built-in hooks, with the lane memory 
 
   expect(ctx.browserHooks.stop).toHaveBeenCalledTimes(1);
   expect(ctx.runCommand).not.toHaveBeenCalled();
+});
+
+test('it leaves the files of the other lanes out of the e2e run', async () => {
+  const ctx = setupTest(['e2e/login.test.ts', 'e2e/live.model-api.test.ts']);
+  const lane = ctx.findLane('e2e');
+
+  if (lane === undefined) {
+    throw new Error('the config holds no e2e lane');
+  }
+
+  await runLane({ config: ctx.config, lane, extraArgs: [] }, ctx.run, ctx.deps);
+
+  expect(ctx.runCommand.mock.calls[0]?.[0]).toIncludeAllMembers([
+    './e2e/',
+    '--path-ignore-patterns=**/*.model-api.test.ts',
+    '--path-ignore-patterns=**/*.kiln.test.ts',
+  ]);
+});
+
+test('it exits 1 when a signal arrives while the stop hook cleans up after passing tests', async () => {
+  const ctx = setupTest();
+
+  const controller = new AbortController();
+
+  const lane = ctx.findLane('browser');
+
+  if (lane === undefined) {
+    throw new Error('the config holds no browser lane');
+  }
+
+  ctx.browserHooks.run.mockImplementation(() => Promise.resolve(0));
+
+  ctx.browserHooks.stop.mockImplementation(() => {
+    controller.abort();
+
+    return Promise.resolve();
+  });
+
+  const exitCode = await runLane(
+    { config: ctx.config, lane, extraArgs: [] },
+    { ...ctx.run, signal: controller.signal },
+    ctx.deps,
+  );
+
+  expect(exitCode).toBe(1);
 });

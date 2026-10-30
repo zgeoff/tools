@@ -3,7 +3,7 @@ import { defineRig } from './define-rig.ts';
 import type { CommandOptions } from './run-command.ts';
 import { runUnitTests } from './run-unit-tests.ts';
 
-function setupTest() {
+function setupTest(trackedFiles: readonly string[] = []) {
   const signal = new AbortController().signal;
 
   const runCommand = mock<(command: readonly string[], options: CommandOptions) => Promise<number>>(
@@ -14,7 +14,11 @@ function setupTest() {
     signal,
     runCommand,
     run: { repoRoot: '/repo', environment: { PATH: '/usr/bin' }, signal, runID: '4417' },
-    deps: { dietScript: '/diet.sh', runCommand },
+    deps: {
+      dietScript: '/diet.sh',
+      runCommand,
+      readTrackedFiles: () => Promise.resolve(trackedFiles),
+    },
   };
 }
 
@@ -68,4 +72,15 @@ test('it gives diet the memory that the config declares for the unit lane', asyn
     '4G',
     '--',
   ]);
+});
+
+test('it leaves out the e2e folders that git tracks and runs a src/e2e folder that is no e2e folder', async () => {
+  const ctx = setupTest(['e2e/login.test.ts', 'src/e2e/codec.test.ts']);
+
+  await runUnitTests(defineRig({}), { workerCount: 1, extraArgs: [] }, ctx.run, ctx.deps);
+
+  const command = ctx.runCommand.mock.calls[0]?.[0] ?? [];
+
+  expect(command).toContain('--path-ignore-patterns=e2e/**');
+  expect(command).not.toContain('--path-ignore-patterns=src/e2e/**');
 });

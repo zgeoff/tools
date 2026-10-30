@@ -34,7 +34,7 @@ export async function runCLI(argv: readonly string[], run: RigRun, deps: CLIDeps
 
       return lane === undefined
         ? reportUsage(config, deps, command)
-        : runLane(lane, args.extraArgs, run, deps);
+        : runLane({ config, lane, extraArgs: args.extraArgs }, run, deps);
     });
 }
 

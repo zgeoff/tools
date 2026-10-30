@@ -23,6 +23,7 @@ function setupTest(workers: WorkerCount) {
     },
     deps: {
       dietScript: '/diet.sh',
+      readTrackedFiles: () => Promise.resolve([]),
       runCommand,
       output,
       readWorkerCount: () => Promise.resolve(workers),

@@ -27,6 +27,7 @@ function setupTest(workers?: WorkerCount) {
     output,
     deps: {
       dietScript: '/diet.sh',
+      readTrackedFiles: () => Promise.resolve([]),
       sources: { cwd: '/repo', probeFile: () => true },
       readWorkerCount: () => Promise.resolve(workers ?? defaultWorkers),
       runCommand,
