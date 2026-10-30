@@ -39,7 +39,8 @@ so a run that outgrows its memory budget fails alone.
   lane the repo declares.
 - `rig init` writes the `test`, `test:related` and `test:<lane>` scripts and a starter config.
 
-Paths after the command go on to `bun test`, and flags go after `--`.
+Every argument after the command goes on to `bun test`, so `bun run test --seed=1` replays a run's
+order. rig drops one `--` among those arguments.
 
 ## Configuration
 

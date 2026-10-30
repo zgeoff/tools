@@ -48,6 +48,15 @@ test('it runs the unit lane for rig unit, with the paths after it', async () => 
   ]);
 });
 
+test('it passes a flag after rig unit on to bun test', async () => {
+  const ctx = setupTest();
+
+  const exitCode = await runCLI(['unit', '--seed=1'], ctx.run, ctx.deps);
+
+  expect(exitCode).toBe(0);
+  expect(ctx.runCommand.mock.calls[0]?.[0]).toContain('--seed=1');
+});
+
 test('it runs a lane that the config declares for rig <lane>', async () => {
   const ctx = setupTest();
 

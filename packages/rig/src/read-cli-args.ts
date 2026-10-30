@@ -4,12 +4,15 @@ import { define } from 'gunshi/definition';
 export interface CLIArgs {
   readonly command: string;
 
-  // Paths and, after `--`, the flags that the command passes on to `bun test`.
+  // Every argument after the command, flags and paths alike, which the command passes on to
+  // `bun test`.
   readonly extraArgs: readonly string[];
 }
 
 const argSchema = { command: { type: 'positional' } } as const;
 
+// The parser reads only the command, because `bun run <script> -- --seed=1` drops the `--` before
+// rig starts, so a flag meant for `bun test` arrives with nothing to mark it.
 export async function readCLIArgs(argv: readonly string[]): Promise<CLIArgs | string> {
   let parsed: CLIArgs | null = null;
 
@@ -23,18 +26,24 @@ export async function readCLIArgs(argv: readonly string[]): Promise<CLIArgs | st
 
       parsed = {
         command: ctx.values.command,
-        extraArgs: [...ctx.positionals.slice(1), ...ctx.rest],
+        extraArgs: dropFirstSeparator(argv.slice(1)),
       };
     },
   });
 
   try {
-    await cli([...argv], command, { strict: true });
+    await cli(argv.slice(0, 1), command, { strict: true });
   } catch (error) {
     return formatParseError(error);
   }
 
   return parsed ?? 'the command line could not be parsed';
+}
+
+function dropFirstSeparator(args: readonly string[]): readonly string[] {
+  const separator = args.indexOf('--');
+
+  return separator === -1 ? args : args.toSpliced(separator, 1);
 }
 
 // The parser throws one error that holds every reason the command line is refused, so each reason
