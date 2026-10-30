@@ -95,6 +95,8 @@ test.each([
   [{ kiln: { limit: '15s', start: '/abs/start.ts' } }, 'lane "kiln" has the start "/abs/start.ts"'],
   [{ kiln: { limit: '15s', stop: '' } }, 'lane "kiln" has the stop ""'],
   [{ Kiln: { limit: '15s' } }, 'the lane name "Kiln"'],
+  [{ init: { limit: '15s' } }, 'the lane name "init" is a rig command'],
+  [{ related: { limit: '15s' } }, 'the lane name "related" is a rig command'],
   [{ unit: { limit: '9s' } }, 'lane "unit" declares limit'],
   [{ e2e: { suffix: '.e2e' } }, 'lane "e2e" declares suffix'],
   [{ browser: { start: 'start.ts' } }, 'lane "browser" declares a start or a stop'],

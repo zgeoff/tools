@@ -1,3 +1,4 @@
+import { isCommandName } from './is-command-name.ts';
 import { parseDuration } from './parse-duration.ts';
 import { standardLanes } from './standard-lanes.ts';
 import type { StandardLane } from './standard-lanes.ts';
@@ -13,6 +14,12 @@ export function defineRig(declaration: RigDeclaration): RigConfig {
     if (!laneNamePattern.test(name)) {
       throw new Error(
         `rig.config.ts: the lane name "${name}" must be lowercase letters, digits and dashes, starting with a letter`,
+      );
+    }
+
+    if (isCommandName(name)) {
+      throw new Error(
+        `rig.config.ts: the lane name "${name}" is a rig command, so \`rig ${name}\` could never run the lane`,
       );
     }
   }
