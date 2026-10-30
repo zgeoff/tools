@@ -1,4 +1,5 @@
 import { hasErrorCode } from './has-error-code.ts';
+import { isZombieState } from './is-zombie-state.ts';
 
 export interface ProcessGroups {
   readonly signalGroup: (groupID: number, signal: NodeJS.Signals) => void;
@@ -44,6 +45,6 @@ function probeLiveMember(groupID: number): boolean {
     .split('\n')
     .map((line) => line.trim().split(/\s+/u))
     .some(
-      ([pgid, state]) => Number(pgid) === groupID && state !== undefined && !state.startsWith('Z'),
+      ([pgid, state]) => Number(pgid) === groupID && state !== undefined && !isZombieState(state),
     );
 }
