@@ -16,11 +16,18 @@ process count. Every lane but unit runs one process per file, because each needs
 two files cannot share, and the unit lane runs as many workers as the host's worker count allows.
 
 A repo changes the table in `rig.config.ts`. `defineRig` merges the declared lanes over the built-in
-ones and returns the resolved table, so a declaration overrides a built-in lane's limit, memory
-budget and hooks, and adds a lane with its own suffix and limit. A bad value throws an error that
-holds the lane and the field, because a config file is outside input and a lane with a wrong limit
-would otherwise run unnoticed. The table is data, so Node can import the config when oxlint loads
-its plugin.
+ones and returns the resolved table. A declaration adds a lane with its own suffix and limit, or
+sets a built-in lane's `suffix`, `limit`, `memory`, `start` and `stop`, except where the lane
+refuses the field:
+
+- `unit` takes only `memory`. It runs the files that every other lane leaves, under the unit limit,
+  with no hooks.
+- `e2e` takes no `suffix`, because its folders select its tests.
+- `browser` takes no `start` or `stop`, because its hooks are built in.
+
+A refused field or a bad value throws an error that holds the lane and the field, because a config
+file is outside input and a lane with a wrong limit would otherwise run unnoticed. The table is
+data, so Node can import the config when oxlint loads its plugin.
 
 ## A lane's run
 

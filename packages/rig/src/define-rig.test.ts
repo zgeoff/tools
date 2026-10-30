@@ -86,6 +86,29 @@ test('it lets the unit lane take a memory budget', () => {
   ).toBe('4G');
 });
 
+test('it lets the e2e lane take a limit, a memory budget and hooks', () => {
+  const config = defineRig({
+    lanes: {
+      e2e: {
+        limit: '20s',
+        memory: '2G',
+        start: 'test-utils/pack.ts',
+        stop: 'test-utils/unpack.ts',
+      },
+    },
+  });
+
+  expect(config.lanes.find((lane) => lane.name === 'e2e')).toStrictEqual({
+    name: 'e2e',
+    suffix: null,
+    limitMs: 20_000,
+    parallel: 1,
+    memory: '2G',
+    start: 'test-utils/pack.ts',
+    stop: 'test-utils/unpack.ts',
+  });
+});
+
 test.each([
   [{ kiln: {} }, 'lane "kiln" needs a limit'],
   [{ kiln: { limit: '15' } }, 'lane "kiln" has the limit "15"'],
@@ -97,9 +120,13 @@ test.each([
   [{ Kiln: { limit: '15s' } }, 'the lane name "Kiln"'],
   [{ init: { limit: '15s' } }, 'the lane name "init" is a rig command'],
   [{ related: { limit: '15s' } }, 'the lane name "related" is a rig command'],
+  [{ unit: { suffix: '.unit' } }, 'lane "unit" declares suffix'],
   [{ unit: { limit: '9s' } }, 'lane "unit" declares limit'],
+  [{ unit: { start: 'start.ts' } }, 'lane "unit" declares start'],
+  [{ unit: { stop: 'stop.ts' } }, 'lane "unit" declares stop'],
   [{ e2e: { suffix: '.e2e' } }, 'lane "e2e" declares suffix'],
   [{ browser: { start: 'start.ts' } }, 'lane "browser" declares a start or a stop'],
+  [{ browser: { stop: 'stop.ts' } }, 'lane "browser" declares a start or a stop'],
   [{ kiln: { limit: '15s', suffix: '.docker' } }, 'both use the suffix ".docker"'],
 ])('it refuses the declaration %j', (lanes, message) => {
   expect(() => defineRig({ lanes })).toThrow(message);
