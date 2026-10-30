@@ -29,6 +29,7 @@
         "ts-pattern": "catalog:",
         "tsrs": "catalog:",
         "typescript": "catalog:",
+        "zod": "catalog:",
       },
     },
     "packages/agent-hooks": {
