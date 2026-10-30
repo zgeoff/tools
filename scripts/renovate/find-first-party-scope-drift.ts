@@ -13,22 +13,20 @@ export function findFirstPartyScopeDrift(
 
   const rules = isRecord(preset) ? preset['packageRules'] : undefined;
 
-  const ruleNames = Array.isArray(rules)
-    ? rules.map((rule: unknown) => parseMatchPackageNames(rule))
+  const exemptScopes = Array.isArray(rules)
+    ? [...new Set(rules.flatMap((rule: unknown) => collectAgeExemptScopes(rule)))]
     : [];
 
-  const firstPartyNames = ruleNames.find((names) => names.some((name) => expected.includes(name)));
-
-  if (firstPartyNames === undefined) {
-    return `default.json: no package rule matches a first-party scope (${expected.join(', ')})`;
+  if (exemptScopes.length === 0) {
+    return `default.json: no package rule lifts the release-age wait for a scope (${expected.join(', ')})`;
   }
 
   const isSameList =
-    firstPartyNames.length === expected.length &&
-    expected.every((name) => firstPartyNames.includes(name));
+    exemptScopes.length === expected.length &&
+    expected.every((name) => exemptScopes.includes(name));
 
   if (!isSameList) {
-    return `default.json: the first-party rule matches ${firstPartyNames.join(', ')}, but the dependency-gates check treats ${expected.join(', ')} as first party`;
+    return `default.json: the rules that lift the release-age wait match ${exemptScopes.join(', ')}, but the dependency-gates check treats ${expected.join(', ')} as first party`;
   }
 
   return undefined;
@@ -44,10 +42,22 @@ function parsePreset(text: string): unknown {
   }
 }
 
-function parseMatchPackageNames(rule: unknown): string[] {
-  const names = isRecord(rule) ? rule['matchPackageNames'] : undefined;
+const scopePattern = /^@[^/]+\/\*\*$/u;
 
-  return Array.isArray(names)
-    ? names.filter((name: unknown): name is string => typeof name === 'string')
-    : [];
+function collectAgeExemptScopes(rule: unknown): string[] {
+  if (!isRecord(rule) || rule['minimumReleaseAge'] !== null) {
+    return [];
+  }
+
+  const names: unknown = rule['matchPackageNames'];
+
+  if (!Array.isArray(names)) {
+    return [];
+  }
+
+  const scopes = names.filter(
+    (name: unknown): name is string => typeof name === 'string' && scopePattern.test(name),
+  );
+
+  return scopes.length > 0 && scopes.length === names.length ? scopes : [];
 }

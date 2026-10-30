@@ -20,7 +20,9 @@ async function setupTest() {
 
   const writePreset = (matchPackageNames: readonly string[]) =>
     writeTreeFiles(directory, {
-      'default.json': JSON.stringify({ packageRules: [{ matchPackageNames }] }),
+      'default.json': JSON.stringify({
+        packageRules: [{ matchPackageNames, minimumReleaseAge: null }],
+      }),
     });
 
   // Runs the check; the validator, if it runs, answers with the given result.
@@ -111,7 +113,7 @@ test('it fails on stderr and runs no validator when the first-party rule and the
   expect(exitCode).toBe(1);
 
   expect(ctx.errors).toStrictEqual([
-    `default.json: the first-party rule matches @zgeoff/**, but the dependency-gates check treats ${firstPartyScopes.map((scope) => `${scope}**`).join(', ')} as first party\n`,
+    `default.json: the rules that lift the release-age wait match @zgeoff/**, but the dependency-gates check treats ${firstPartyScopes.map((scope) => `${scope}**`).join(', ')} as first party\n`,
   ]);
 
   expect(ctx.calls).toBeEmpty();
