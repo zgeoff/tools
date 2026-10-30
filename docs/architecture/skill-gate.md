@@ -1,26 +1,20 @@
 # Skill gate
 
-The skill gate is the Claude Code and Codex CLI hook that
-[`@zgeoff/skill-gate`](../../packages/skill-gate/README.md) ships. It denies an edit, or a call to a
-gated tool, until the session has loaded the skills and read the references that the repo's
-[rules](../../packages/skill-gate/README.md#rules) name for it. The gate counts only the loads of
-the session that makes the call, and only those since the last compaction. It judges a Bash command
-by what the command changed in the git work tree, and it blocks after the command when a changed
-gated file needs a skill the session lacks.
+The skill gate is a handler of the [agent hooks](./agent-hooks.md), which
+[`@zgeoff/agent-hooks`](../../packages/agent-hooks/README.md) ships. It denies an edit, or a call to
+a gated tool, until the session has loaded the skills and read the references that the repo's
+[rules](../guides/skill-gate-rules.md) name for it. The gate counts only the loads of the session
+that makes the call, and only those since the last compaction. It judges a Bash command by what the
+command changed in the git work tree, and it blocks after the command when a changed gated file
+needs a skill the session lacks.
 
 ## Failing closed
 
-The hook runs the [entry point](../../packages/skill-gate/README.md#entry-point), a file in the repo
-that calls the package. The entry point fails closed. The hook command turns off Bun's auto-install,
-so a checkout with no `node_modules` cannot load the package either, and Bun never fetches it from
-npm. When the package cannot load, the entry point cannot tell what a call changes, because the
-shell builds a path in more ways than a parser can follow. It then blocks every call before it runs,
-and its error names the load failure and asks for `bun install`. The one exception is a Bash command
-from a fixed read-only list, written as one simple command in plain words: `bun install`, with
-`--frozen-lockfile` at most, `ls`, `cat` and `pwd`. That command runs, and the hook reports the load
-failure as a non-blocking error. Every git command blocks, because git can run a program that the
-repo's config names, such as a file-system monitor or a clean filter. A call after a tool ran, and a
-lifecycle event, pass with no error.
+The gate runs only once the package loads. Until then the start-up stub refuses every edit, gated
+tool call and Bash command but a read-only one, as [Failing closed](./agent-hooks.md#failing-closed)
+in the agent hooks doc describes. Once the gate runs, a rules file that does not parse makes it warn
+rather than deny, as
+[Mistakes the gate tolerates](../guides/skill-gate-rules.md#mistakes-the-gate-tolerates) describes.
 
 ## Which loads count
 
@@ -39,11 +33,10 @@ skills and reads the references again, and its denial says so.
 
 Under `--harness codex` the gate reads the Codex payload and counts loads from its own ledger,
 because Codex has no Skill tool or Read tool and its transcript format is unstable for hooks. The
-[package README](../../packages/skill-gate/README.md#codex) lists the events that write the ledger.
-An edit arrives as an `apply_patch` call, and the gate gates each path its headers name, so a patch
-is denied when any one path lacks skills. The entry point fails closed for `apply_patch` as it does
-for an `Edit`. Everything else, such as the rules, the Bash check and the tool gates, works as under
-Claude Code.
+[Codex guide](../guides/skill-gate-codex.md#how-codex-loads-count) lists the events that write the
+ledger. An edit arrives as an `apply_patch` call, and the gate gates each path its headers name, so
+a patch is denied when any one path lacks skills. Everything else, such as the rules, the Bash check
+and the tool gates, works as under Claude Code.
 
 ## Bash commands
 
@@ -59,9 +52,9 @@ When the session that ran the command lacks a skill that a changed file needs, t
 agent gets a reason that names the skills to load and asks it to review what the command changed.
 The same load check as an edit applies, with its compaction and subagent rules.
 
-Claude Code runs a `PostToolUse` hook after the command, so a block cannot undo the change. It stops
-the agent's next step and puts the reason beside the command's output, as the
-[hooks reference](https://code.claude.com/docs/en/hooks#posttooluse-decision-control) describes. A
+Claude Code runs a `PostToolUse` hook after the command, so a block cannot undo the change. The hook
+exits 2, and Claude Code shows the reason to the agent beside the command's output, as the
+[hooks reference](https://code.claude.com/docs/en/hooks#exit-code-2-behavior-per-event) describes. A
 command that exits with an error fires `PostToolUseFailure`, which cannot block, so the hook adds
 the same reason as context.
 

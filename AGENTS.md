@@ -32,7 +32,7 @@ sync/               the sources that repo-sync delivers, listed in sync/manifest
                     lefthook.yml extends too
   workflow-callers/ workflow stubs that call this repo's reusable workflows, all opt-in but the
                     repo-sync guard
-  hooks/            the skill-gate hook
+  hooks/            the agent hooks' start-up stub and the skill gate's older entry point
   docs-vision/      the vision doc check, which docs-writing's check-length runs in a repo that
                     takes it
 scripts/            the step scripts that this repo's workflows run, one folder per area, the
