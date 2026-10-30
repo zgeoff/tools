@@ -1,4 +1,5 @@
 import { match } from 'ts-pattern';
+import { findTimeoutArg } from './find-timeout-arg.ts';
 import { commandNames, isCommandName } from './is-command-name.ts';
 import { readCLIArgs } from './read-cli-args.ts';
 import { runInit } from './run-init.ts';
@@ -35,14 +36,26 @@ export async function runCLI(argv: readonly string[], run: RigRun, deps: CLIDeps
       .exhaustive();
   }
 
-  if (command === 'unit') {
-    return runUnit(config, args.extraArgs, run, deps);
-  }
-
   const lane = config.lanes.find((candidate) => candidate.name === command);
 
-  return lane === undefined
-    ? reportUsage(config, deps, command)
+  if (lane === undefined) {
+    return reportUsage(config, deps, command);
+  }
+
+  // A forwarded timeout would override the lane's limit, and the pre-push timeout check reads only
+  // `bun test` scripts, so a `rig <lane> --timeout=<n>` script would pass it unseen.
+  const timeoutArg = findTimeoutArg(args.extraArgs);
+
+  if (timeoutArg !== undefined) {
+    deps.output.err(
+      `rig: rig ${command} refuses ${timeoutArg}, because the lane limit lives in rig.config.ts\n`,
+    );
+
+    return 2;
+  }
+
+  return lane.name === 'unit'
+    ? runUnit(config, args.extraArgs, run, deps)
     : runLane({ config, lane, extraArgs: args.extraArgs }, run, deps);
 }
 

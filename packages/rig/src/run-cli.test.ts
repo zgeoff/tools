@@ -66,6 +66,29 @@ test('it passes a flag after rig unit on to bun test', async () => {
   expect(ctx.runCommand.mock.calls[0]?.[0]).toContain('--seed=1');
 });
 
+test.each([
+  ['unit', '--timeout=90000', ['--timeout=90000']],
+  ['kiln', '--timeout=90000', ['--bail', '--timeout=90000']],
+  ['browser', '--timeout', ['--timeout', '90000']],
+])(
+  'it exits 2 and runs nothing for rig %s given %s, because the lane limit lives in the config',
+  async (command, timeoutArg, extraArgs) => {
+    const ctx = setupTest();
+
+    ctx.trackedFiles.push('src/a.test.ts', 'src/a.kiln.test.ts', 'src/a.browser.test.ts');
+
+    const exitCode = await runCLI([command, ...extraArgs], ctx.run, ctx.deps);
+
+    expect(exitCode).toBe(2);
+
+    expect(ctx.output.err).toHaveBeenCalledExactlyOnceWith(
+      `rig: rig ${command} refuses ${timeoutArg}, because the lane limit lives in rig.config.ts\n`,
+    );
+
+    expect(ctx.runCommand).not.toHaveBeenCalled();
+  },
+);
+
 test('it runs a lane that the config declares for rig <lane>', async () => {
   const ctx = setupTest();
 

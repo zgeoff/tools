@@ -42,16 +42,18 @@ so a run that outgrows its memory budget fails alone when `diet` finds a
 - `rig init` writes the `test`, `test:related` and `test:<lane>` scripts and a starter config.
 
 `rig unit` and the lane commands pass every argument after the command on to `bun test`, so
-`bun run test --seed=1` replays a run's order, and rig drops one `--` among them. `rig related`
-takes changed file paths only, and exits 2 on an option.
+`bun run test --seed=1` replays a run's order, and rig drops one `--` among them. The exception is
+`--timeout`: the lane's limit in `rig.config.ts` is its one per-test timeout, so rig exits 2 on a
+`--timeout` or `--timeout=<ms>` argument and runs nothing. `rig related` takes changed file paths
+only, and exits 2 on an option.
 
 Among those arguments, a path keeps only the lane's own files that it selects: a file, the files
 under a folder, or, for a bare word, the files whose path holds it. rig resolves a path, with its
 `.` and `..` segments, against the repo root, and a path outside the repo selects nothing. When the
 paths select no file of the lane, as `rig unit ./src/oven.host.test.ts` does, rig names them and
-exits 1. An option takes its value after `=`, as in `--timeout=9000`, because rig reads every
-argument that does not start with `-` as a path. So `--timeout 9000` makes `9000` a path, which
-selects no file and fails the run.
+exits 1. An option takes its value after `=`, as in `--rerun-each=2`, because rig reads every
+argument that does not start with `-` as a path. So `--rerun-each 2` makes `2` a path, which selects
+no file and fails the run.
 
 ## Configuration
 
