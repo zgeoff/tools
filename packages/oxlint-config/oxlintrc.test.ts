@@ -328,3 +328,25 @@ test('it reports a type argument on a sql tag', async () => {
 
   expect(run.stdout).toInclude('zgeoff(no-hidden-cast)');
 });
+
+test('it reports the require global under the node env', async () => {
+  const ctx = await setupTest('brew.ts', "export const kettle = require('./kettle');\n");
+
+  const run = await runOxlint(
+    ['-c', join(import.meta.dir, 'oxlintrc.json'), 'brew.ts'],
+    ctx.directory,
+  );
+
+  expect(run.stdout).toInclude('zgeoff(no-require)');
+});
+
+test('it reports a CommonJS export', async () => {
+  const ctx = await setupTest('brew.ts', 'module.exports = { cups: 2 };\n');
+
+  const run = await runOxlint(
+    ['-c', join(import.meta.dir, 'oxlintrc.json'), 'brew.ts'],
+    ctx.directory,
+  );
+
+  expect(run.stdout).toInclude('import(no-commonjs)');
+});

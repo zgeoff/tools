@@ -1,5 +1,6 @@
 import { basename } from 'node:path';
 import buildLaneLimits from './build-lane-limits.js';
+import getImportedName from './get-imported-name.js';
 import resolveSuiteDirectory from './resolve-suite-directory.js';
 
 const runnerNames = new Set(['test', 'it', 'describe']);
@@ -123,12 +124,6 @@ function findVariable(context, identifier) {
   }
 
   return null;
-}
-
-function getImportedName(specifier) {
-  return specifier.imported.type === 'Identifier'
-    ? specifier.imported.name
-    : specifier.imported.value;
 }
 
 function emitTimeouts(context, args, limit) {

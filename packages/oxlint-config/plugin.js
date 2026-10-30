@@ -9,6 +9,7 @@ import noCommentRuleOverride from './no-comment-rule-override.js';
 import noFileSnapshot from './no-file-snapshot.js';
 import noHiddenCast from './no-hidden-cast.js';
 import noJSDoc from './no-jsdoc.js';
+import noRequire from './no-require.js';
 import noRestrictedWords from './no-restricted-words.js';
 import noTestSleep from './no-test-sleep.js';
 import resolveRepoRoot from './resolve-repo-root.js';
@@ -110,6 +111,7 @@ const plugin = {
     'max-test-timeout': buildMaxTestTimeout(resolveRepoRoot),
     'test-timeout-exception-ticket': testTimeoutExceptionTicket,
     'no-test-sleep': noTestSleep,
+    'no-require': noRequire,
     'import-zones': importZones,
   },
 };
