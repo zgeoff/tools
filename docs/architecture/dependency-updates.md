@@ -18,6 +18,7 @@ The preset sorts each update by its kind:
 | Patch                 | the gate         | the weekly `patch updates` group             | on green checks |
 | Dev-tool minor        | the gate         | the weekly `dev tools` group                 | on green checks |
 | TanStack router       | the gate         | the `tanstack-router monorepo` group         | on green checks |
+| `@wringer/*` package  | the gate         | the `wringer packages` group                 | on green checks |
 | Other minor           | the gate         | one per package                              | on green checks |
 | Major                 | the gate         | one per package, opened weekly               | after review    |
 | `@zgeoff/*` package   | none             | one per package, at any level                | on green checks |
@@ -28,6 +29,11 @@ The preset sorts each update by its kind:
 A TanStack router release, React Start among its packages, reaches a repo as one pull request for
 its patch and minor bumps, so the router and React Start never ship at different versions. That
 group opens at any time, as other minor bumps do.
+
+Each `@wringer/*` driver peer-depends on `@wringer/core`, and a repo that builds on them pins each
+one's exact version, so their patch and minor bumps reach a repo as one pull request, the
+`wringer packages` group, and the packages never mix versions. The group opens at any time, as the
+TanStack group does. A major bump of one of them gets its own pull request, as any major does.
 
 A `@zgeoff/*` or `@impz/*` bump and a sync-tag bump ignore Renovate's concurrent limit of 10 update
 branches per repo. A busy repo keeps more than 10 update branches open, and Renovate would hold a
