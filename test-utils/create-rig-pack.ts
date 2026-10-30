@@ -1,8 +1,10 @@
-import { mkdir } from 'node:fs/promises';
-import { hostname } from 'node:os';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { hostname, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import type { LaneContext, LaneStart } from '@zgeoff/rig';
 import { $ } from 'bun';
+import { buildBrowserRun } from '../packages/rig/src/browser/build-browser-run.ts';
+import { pickChromeDirs } from '../packages/rig/src/browser/pick-chrome-dirs.ts';
 import { readDirNames } from '../packages/rig/src/browser/read-dir-names.ts';
 import { removeExitedRunDirs } from '../packages/rig/src/browser/remove-exited-run-dirs.ts';
 import { removePath } from '../packages/rig/src/browser/remove-path.ts';
@@ -30,6 +32,8 @@ export default async function createRigPack(context: LaneContext): Promise<LaneS
 
   const binPath = await readPackedBin(run.packageDir);
 
+  await runBrowserWarmUp(binPath, join(run.runDir, 'warm-up'));
+
   return { environment: { [rigE2EBinVariable]: binPath } };
 }
 
@@ -51,4 +55,30 @@ async function readPackedBin(packageDir: string): Promise<string> {
   }
 
   return absolutePath;
+}
+
+// A fresh CI runner's first Chrome start took 0.9 to 13 s and its second 0.3 s, so a journey
+// that started the runner's first Chrome ran past the e2e limit.
+async function runBrowserWarmUp(binPath: string, repoRoot: string): Promise<void> {
+  // rig removes its run's Chrome folder and keeps the repo's folder above it, which can sit in the
+  // /tmp that every user shares.
+  const chromeRunsDir = pickChromeDirs(
+    tmpdir(),
+    userInfo().uid,
+    buildBrowserRun(repoRoot, hostname(), '0'),
+  ).runsDir;
+
+  await mkdir(repoRoot, { recursive: true });
+  await writeFile(join(repoRoot, 'package.json'), '{}\n');
+
+  await writeFile(
+    join(repoRoot, 'warm-up.browser.test.ts'),
+    "import { test } from 'bun:test';\n\ntest('it starts Chrome', () => {});\n",
+  );
+
+  try {
+    await $`${binPath} browser`.cwd(repoRoot).quiet();
+  } finally {
+    await removePath(chromeRunsDir);
+  }
 }

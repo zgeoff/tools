@@ -136,3 +136,7 @@ fails the lane. The pack sits in a cache folder under rig's own `node_modules`, 
 isolated linker links rig's dependencies there and not at the repo root. The stop hook removes the
 run's pack, and the next run's start removes any pack whose run has exited. A journey that runs
 outside the lane fails at once, because nothing set `RIG_E2E_BIN`.
+
+After it unpacks the bin, the start hook runs the packed bin's browser lane once, on a repo with one
+empty suite. A fresh CI runner's first Chrome start is the slow one, so the journeys that start
+Chrome never pay for it.
