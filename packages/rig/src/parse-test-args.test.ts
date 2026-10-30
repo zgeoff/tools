@@ -15,6 +15,13 @@ test('it keeps a value joined to its option with = in the flag', () => {
   });
 });
 
+test('it keeps a path joined to its option with = in the flag, not in the paths', () => {
+  expect(parseTestArgs(['--preload=./src/kiln-setup.ts', './oven.test.ts'])).toStrictEqual({
+    flags: ['--preload=./src/kiln-setup.ts'],
+    paths: ['./oven.test.ts'],
+  });
+});
+
 test('it reads a word after an option as a path, whatever the option', () => {
   expect(parseTestArgs(['--seed', '7', '--bail', './a.test.ts'])).toStrictEqual({
     flags: ['--seed', '--bail'],
