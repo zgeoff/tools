@@ -99,6 +99,9 @@ async function probeSyncedChange(
     return true;
   }
 
+  // A commit that turned green after the job's checkout is not in the checkout yet.
+  await runPlanCommand(options, ['git', 'fetch', '-q', 'origin', range.previous, range.commit]);
+
   const diff = await runPlanCommand(options, [
     'git',
     'diff',

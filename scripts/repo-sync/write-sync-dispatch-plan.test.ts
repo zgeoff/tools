@@ -12,7 +12,9 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
+  const origin = join(directory, 'origin.git');
   const tools = join(directory, 'tools');
+  const checkout = join(directory, 'checkout');
   const outputPath = join(directory, 'output');
 
   const env = {
@@ -23,10 +25,13 @@ async function setupTest() {
     GIT_COMMITTER_EMAIL: 'test@example.com',
   };
 
-  await mkdir(tools);
   await writeFile(outputPath, '');
 
-  await $`git -C ${tools} init -q`.env(env);
+  await $`git init -q --bare -b main ${origin}`.env(env);
+  await $`git clone -q ${origin} ${tools}`.env(env).quiet();
+
+  // The job's checkout is cloned before any commit lands, so a commit reaches it only by a fetch.
+  await $`git clone -q ${origin} ${checkout}`.env(env).quiet();
 
   const output: string[] = [];
 
@@ -36,7 +41,7 @@ async function setupTest() {
       await writeFile(join(tools, path), content);
     }
 
-    await $`git -C ${tools} add -A && git -C ${tools} commit -q --allow-empty -m change`
+    await $`git -C ${tools} add -A && git -C ${tools} commit -q --allow-empty -m change && git -C ${tools} push -q origin HEAD:main`
       .env(env)
       .quiet();
 
@@ -45,10 +50,10 @@ async function setupTest() {
     return head.trim();
   };
 
-  // gh answers with the green commits; git runs for real in the tools checkout.
+  // gh answers with the green commits; git runs for real in the job's checkout.
   const plan = (event: string, runCommit: string, greenCommits: readonly string[]) =>
     writeSyncDispatchPlan({
-      cwd: tools,
+      cwd: checkout,
       env,
       event,
       runCommit,

@@ -130,6 +130,22 @@ async function setupTest() {
     return head.trim();
   };
 
+  // Moves the commit to a remote of the tools checkout and drops it locally, so a run must fetch
+  // it to know it.
+  const writeRemoteOnlyCommit = async (commit: string, keep: string) => {
+    const remote = join(directory, 'tools-remote.git');
+
+    await $`git init -q --bare -b main ${remote}`.env(env).quiet();
+    await $`git -C ${tools} remote add origin ${remote}`.env(env).quiet();
+    await $`git -C ${tools} push -q origin ${`${commit}:refs/heads/main`}`.env(env).quiet();
+    await $`git -C ${tools} reset -q --hard ${keep}`.env(env).quiet();
+    await $`git -C ${tools} update-ref -d refs/remotes/origin/main`.env(env).quiet();
+
+    await $`git -C ${tools} reflog expire --expire=now --all && git -C ${tools} gc -q --prune=now`
+      .env(env)
+      .quiet();
+  };
+
   const readBranchHead = async (branch: string) => {
     const head = await $`git -C ${origin} rev-parse ${branch}`.text();
 
@@ -190,6 +206,7 @@ async function setupTest() {
     readBranchHead,
     readToolsHead,
     writeToolsCommit,
+    writeRemoteOnlyCommit,
     readBranchNames,
     readCommitSubjects,
     readPullRequests,
@@ -1326,6 +1343,45 @@ test('it leaves the repo alone when its own pin is newer than the commit it was 
   expect(exitCode).toBe(0);
   expect(branches).toStrictEqual(['main']);
   expect(pulls).toStrictEqual([]);
+
+  expect(ctx.output).toContain(
+    `main already pins ${newer}, which is newer than ${older}; nothing to do.\n`,
+  );
+});
+
+test('it fetches a newer pin that the tools checkout lacks before it compares the commits', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  const entry = {
+    name: 'editorconfig',
+    description: 'The editor config',
+    files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+  };
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const older = await ctx.writeToolsCommit();
+
+  await ctx.writeSource('sync/editorconfig', 'root = true\n\n[*]\nindent_style = space\n');
+
+  const newer = await ctx.writeToolsCommit();
+
+  await ctx.writeRemoteOnlyCommit(newer, older);
+
+  await ctx.writeBranch(
+    'main',
+    '.github/workflows/repo-sync.yml',
+    `jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@${newer} # main\n`,
+  );
+
+  const exitCode = await ctx.runSync([entry], { TOOLS_REF: older });
+  const branches = await ctx.readBranchNames();
+
+  expect(exitCode).toBe(0);
+  expect(branches).toStrictEqual(['main']);
 
   expect(ctx.output).toContain(
     `main already pins ${newer}, which is newer than ${older}; nothing to do.\n`,

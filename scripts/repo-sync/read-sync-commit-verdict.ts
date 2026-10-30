@@ -122,6 +122,9 @@ async function probeNewerPin(
     return false;
   }
 
+  // A pin newer than the checkout of zgeoff/tools is unknown to it until fetched.
+  await runProbe(context, ['git', '-C', '.repo-sync', 'fetch', '-q', 'origin', pin]);
+
   const older = await runProbe(context, [
     'git',
     '-C',
