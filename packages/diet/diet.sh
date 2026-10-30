@@ -44,14 +44,16 @@ find_cgroupfs_parent() {
 }
 
 parse_size() {
-  [[ "$1" =~ ^([1-9][0-9]*)([KMG]?)$ ]] || return 1
-  local power=0
+  [[ "$1" =~ ^([1-9][0-9]{0,17})([KMG]?)$ ]] || return 1
+  local count=${BASH_REMATCH[1]} power=0
   case "${BASH_REMATCH[2]}" in
     K) power=10 ;;
     M) power=20 ;;
     G) power=30 ;;
   esac
-  echo "$((BASH_REMATCH[1] << power))"
+  # bash arithmetic wraps at 2^63, and a wrapped budget can come out as 0.
+  [ "$count" -le $((9223372036854775807 >> power)) ] || return 1
+  echo "$((count << power))"
 }
 
 read_default_budget() {
@@ -83,11 +85,15 @@ format_size() {
   elif [ "$bytes" -ge $((1 << 10)) ]; then
     unit=KB scale=$((1 << 10))
   fi
-  local tenths=$(((bytes * 10 + scale / 2) / scale))
-  if [ $((tenths % 10)) = 0 ]; then
-    echo "$((tenths / 10)) $unit"
+  # bytes * 10 wraps past 2^63 for a budget near the largest one diet takes.
+  local whole=$((bytes / scale)) tenth=$((((bytes % scale) * 10 + scale / 2) / scale))
+  if [ "$tenth" = 10 ]; then
+    whole=$((whole + 1)) tenth=0
+  fi
+  if [ "$tenth" = 0 ]; then
+    echo "$whole $unit"
   else
-    echo "$((tenths / 10)).$((tenths % 10)) $unit"
+    echo "$whole.$tenth $unit"
   fi
 }
 

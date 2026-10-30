@@ -408,6 +408,20 @@ test.skipIf(modesOutput === '')(
   },
 );
 
+test.skipIf(modesOutput === '')(
+  'it reports the largest budget it takes without wrapping it',
+  async () => {
+    const ctx = setupTest();
+
+    const result = await $`bash ${ctx.scriptPath} --budget 8589934591G -- true`
+      .env(ctx.env)
+      .nothrow()
+      .quiet();
+
+    expect(result.stderr.toString()).toMatch(/ of 8589934591 GB\n$/u);
+  },
+);
+
 test.skipIf(modesOutput === '')('it uses the first mode the host supports', async () => {
   const ctx = setupTest();
 
@@ -531,6 +545,11 @@ test.each([
   ['a budget that is not a whole number', ['--budget', '1.5G', '--', 'true']],
   ['a budget of zero', ['--budget', '0', '--', 'true']],
   ['a budget with an unknown unit', ['--budget', '256MB', '--', 'true']],
+  ['a budget that overflows once its unit applies', ['--budget', '17179869184G', '--', 'true']],
+  [
+    'a budget with more digits than a 64-bit count holds',
+    ['--budget', '99999999999999999999', '--', 'true'],
+  ],
   ['a budget flag with no size', ['--budget']],
   ['no -- before the command', ['true']],
   ['no command', ['--']],
