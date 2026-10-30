@@ -14,6 +14,8 @@ holds and how a run delivers, updates and retires the files.
 - [`workflow-callers/`](./workflow-callers/) — workflows that each call a reusable workflow in this
   repo, all opt-in but the repo-sync guard.
 - [`skills/`](./skills/) — the shared base of each Claude skill, with its scripts' tests.
+- [`docs-vision/`](./docs-vision/) — the vision doc check, which docs-writing's `check-length.sh`
+  runs in a repo that takes it, with its test.
 - [`hooks/`](./hooks/) — Claude Code hooks, such as the skill gate's entry point, with their tests.
 - [`pre-push/`](./pre-push/) — the [pre-push baseline](../docs/architecture/pre-push-baseline.md)
   and the [memory-cap script](../docs/architecture/memory-caps.md), with their tests.
