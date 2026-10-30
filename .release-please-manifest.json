@@ -9,6 +9,6 @@
   "packages/release-manifest": "0.1.0",
   "packages/std": "0.3.0",
   "packages/kysely-bun-sqlite": "0.3.0",
-  "packages/skill-gate": "0.2.9",
+  "packages/skill-gate": "0.2.10",
   "packages/diet": "0.1.0"
 }

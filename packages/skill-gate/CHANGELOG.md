@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.10](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.9...@zgeoff/skill-gate@0.2.10) (2026-10-30)
+
+
+### Bug Fixes
+
+* **skill-gate:** block every call but a read-only list without the gate ([#396](https://github.com/zgeoff/tools/issues/396)) ([5ce2b20](https://github.com/zgeoff/tools/commit/5ce2b201cc0e2a9f6b600eb4ebaaf6b36caab9b1))
+
 ## [0.2.9](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.8...@zgeoff/skill-gate@0.2.9) (2026-10-26)
 
 ### Bug Fixes

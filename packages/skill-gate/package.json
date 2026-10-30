@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/skill-gate",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "A Claude Code and Codex CLI hook that denies an edit or a gated tool call until the session loads the skills and reads the reference files it needs, and blocks after a Bash command that changed a gated file without them",
   "keywords": [
     "claude-code",
