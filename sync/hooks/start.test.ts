@@ -1,16 +1,15 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';
-import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createStubInstall } from '../../test-utils/create-stub-install.ts';
 import { readStreamUntil } from '../../test-utils/read-stream-until.ts';
 
-type InstallStub = 'installs' | 'fails' | 'installs-on-release';
-
-// The stub installs with the bun on PATH and runs the retry with its own runtime, so a fake bun
+// The stub installs with the bun on PATH and runs the retry with its own runtime, so a stand-in bun
 // first on PATH stands in for the install alone. Its installed package re-exports this repo's
 // source, so the gate that runs after the install is the real one.
-async function setupTest(installStub: InstallStub) {
+async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'agent-hooks-start-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
@@ -19,7 +18,6 @@ async function setupTest(installStub: InstallStub) {
   const fakeBin = join(directory, 'bin');
   const packageDir = join(directory, 'package');
   const installLog = join(directory, 'install.log');
-  const releasePath = join(directory, 'release');
   const stubPath = join(project, '.claude/hooks/start.ts');
 
   await mkdir(join(project, '.claude/hooks'), { recursive: true });
@@ -44,32 +42,6 @@ async function setupTest(installStub: InstallStub) {
     join(packageDir, 'index.ts'),
     `export * from ${JSON.stringify(join(import.meta.dir, '../../packages/agent-hooks/src/index.ts'))};\n`,
   );
-
-  const installSteps = {
-    installs: [
-      `mkdir -p node_modules/@zgeoff`,
-      `ln -s '${packageDir}' node_modules/@zgeoff/agent-hooks`,
-    ],
-    fails: ['exit 1'],
-    'installs-on-release': [
-      `while [ ! -e '${releasePath}' ]; do sleep 0.05; done`,
-      `mkdir -p node_modules/@zgeoff`,
-      `ln -s '${packageDir}' node_modules/@zgeoff/agent-hooks`,
-    ],
-  }[installStub];
-
-  await writeFile(
-    join(fakeBin, 'bun'),
-    [
-      '#!/bin/sh',
-      `echo "bun $* in $PWD" >> '${installLog}'`,
-      'echo "fake install started" >&2',
-      ...installSteps,
-      '',
-    ].join('\n'),
-  );
-
-  await chmod(join(fakeBin, 'bun'), 0o755);
 
   const env = {
     PATH: `${fakeBin}:${process.env['PATH'] ?? ''}`,
@@ -120,8 +92,11 @@ async function setupTest(installStub: InstallStub) {
   const gateReason = `Load the \`docs-writing\` skill with the Skill tool before editing ${join(project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`;
 
   return {
+    directory,
     project,
-    releasePath,
+    fakeBin,
+    packageDir,
+    installLog,
     buildPayload,
     runStub,
     startStub,
@@ -132,13 +107,18 @@ async function setupTest(installStub: InstallStub) {
 }
 
 test('it installs the missing package in a fresh worktree, then blocks a gated edit with the gate reason', async () => {
-  const ctx = await setupTest('installs');
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+  });
 
   const result = ctx.runStub(ctx.gatedEdit);
 
   expect(result.status).toBe(2);
   expect(result.stdout).toBe('');
-  expect(result.stderr).toBe(`fake install started\n${ctx.gateReason}`);
+  expect(result.stderr).toBe(`stub install started\n${ctx.gateReason}`);
 
   const installLog = await ctx.readInstallLog();
 
@@ -146,7 +126,12 @@ test('it installs the missing package in a fresh worktree, then blocks a gated e
 });
 
 test('it allows an ungated edit after the install with no output', async () => {
-  const ctx = await setupTest('installs');
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+  });
 
   const result = ctx.runStub(
     ctx.buildPayload('Write', { file_path: join(ctx.project, 'main.ts') }),
@@ -157,7 +142,12 @@ test('it allows an ungated edit after the install with no output', async () => {
 });
 
 test('it runs no install when the package loads', async () => {
-  const ctx = await setupTest('installs');
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+  });
 
   ctx.runStub(ctx.gatedEdit);
 
@@ -172,13 +162,15 @@ test('it runs no install when the package loads', async () => {
 });
 
 test('it refuses a gated edit with the install message when the install fails', async () => {
-  const ctx = await setupTest('fails');
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, { log: ctx.installLog, outcome: { kind: 'fails' } });
 
   const result = ctx.runStub(ctx.gatedEdit);
 
   expect(result.status).toBe(2);
   expect(result.stdout).toBe('');
-  expect(result.stderr).toBe('fake install started\nTo work here, run bun install.\n');
+  expect(result.stderr).toBe('stub install started\nTo work here, run bun install.\n');
 });
 
 // A parser cannot see a gated path that the shell builds, so any shell syntax refuses the command.
@@ -197,7 +189,9 @@ test.each([
   'git status',
   'cat "$(echo guide.md)"',
 ])('it refuses the Bash command %s when the install fails', async (command) => {
-  const ctx = await setupTest('fails');
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, { log: ctx.installLog, outcome: { kind: 'fails' } });
 
   const result = ctx.runStub(ctx.buildPayload('Bash', { command }));
 
@@ -219,7 +213,9 @@ test.each([
   { label: 'a control character', command: 'pwd\u0007' },
   { label: 'a leading space', command: ' pwd' },
 ])('it refuses a Bash command with $label when the install fails', async (row) => {
-  const ctx = await setupTest('fails');
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, { log: ctx.installLog, outcome: { kind: 'fails' } });
 
   const result = ctx.runStub(ctx.buildPayload('Bash', { command: row.command }));
 
@@ -234,7 +230,9 @@ test.each([
   'cat package.json',
   'pwd',
 ])('it allows the read-only Bash command %s when the install fails', async (command) => {
-  const ctx = await setupTest('fails');
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, { log: ctx.installLog, outcome: { kind: 'fails' } });
 
   const result = ctx.runStub(ctx.buildPayload('Bash', { command }));
 
@@ -243,7 +241,9 @@ test.each([
 });
 
 test('it refuses a gated tool call when the install fails', async () => {
-  const ctx = await setupTest('fails');
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, { log: ctx.installLog, outcome: { kind: 'fails' } });
 
   const result = ctx.runStub(ctx.buildPayload('mcp__tracker__update_ticket', { title: 'Draft' }));
 
@@ -252,7 +252,9 @@ test('it refuses a gated tool call when the install fails', async () => {
 });
 
 test('it lets a prompt through when the install fails, so a person can still ask for the install', async () => {
-  const ctx = await setupTest('fails');
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, { log: ctx.installLog, outcome: { kind: 'fails' } });
 
   const result = ctx.runStub(
     JSON.stringify({ hook_event_name: 'UserPromptSubmit', cwd: ctx.project, prompt: 'Install it' }),
@@ -264,17 +266,25 @@ test('it lets a prompt through when the install fails, so a person can still ask
 });
 
 test('it runs one install for two parallel hook calls in one worktree', async () => {
-  const ctx = await setupTest('installs-on-release');
+  const ctx = await setupTest();
+
+  const releasePath = join(ctx.directory, 'release');
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+    releasePath,
+  });
 
   const first = ctx.startStub(ctx.gatedEdit);
 
-  await readStreamUntil(first.stderr, 'fake install started');
+  await readStreamUntil(first.stderr, 'stub install started');
 
   const second = ctx.startStub(ctx.gatedEdit);
 
   const waiting = await readStreamUntil(second.stderr, 'Another agent hook runs bun install here');
 
-  await writeFile(ctx.releasePath, '');
+  await writeFile(releasePath, '');
 
   const decided = await readStreamUntil(second.stderr, 'lists the skills each path needs.');
   const firstStatus = await first.exited;
@@ -293,7 +303,12 @@ test('it runs one install for two parallel hook calls in one worktree', async ()
 });
 
 test('it installs over a lock that a stopped hook left behind', async () => {
-  const ctx = await setupTest('installs');
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+  });
 
   const stopped = spawnSync('true');
 
@@ -303,14 +318,19 @@ test('it installs over a lock that a stopped hook left behind', async () => {
   const result = ctx.runStub(ctx.gatedEdit);
 
   expect(result.status).toBe(2);
-  expect(result.stderr).toBe(`fake install started\n${ctx.gateReason}`);
+  expect(result.stderr).toBe(`stub install started\n${ctx.gateReason}`);
 });
 
 test.each([
   { label: 'empty', contents: '' },
   { label: 'not a process id', contents: 'install' },
 ])('it installs over a lock whose contents are $label', async (row) => {
-  const ctx = await setupTest('installs');
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+  });
 
   await mkdir(join(ctx.project, 'node_modules'));
   await writeFile(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), row.contents);
@@ -318,11 +338,11 @@ test.each([
   const result = ctx.runStub(ctx.gatedEdit);
 
   expect(result.status).toBe(2);
-  expect(result.stderr).toBe(`fake install started\n${ctx.gateReason}`);
+  expect(result.stderr).toBe(`stub install started\n${ctx.gateReason}`);
 });
 
 test('it refuses a harness it does not know', async () => {
-  const ctx = await setupTest('installs');
+  const ctx = await setupTest();
 
   const result = ctx.runStub(ctx.gatedEdit, ['--harness', 'cursor']);
 
