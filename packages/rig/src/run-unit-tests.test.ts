@@ -3,16 +3,19 @@ import { defineRig } from './define-rig.ts';
 import type { CommandOptions } from './run-command.ts';
 import { runUnitTests } from './run-unit-tests.ts';
 
-function setupTest(trackedFiles: readonly string[] = []) {
+function setupTest() {
   const signal = new AbortController().signal;
 
   const runCommand = mock<(command: readonly string[], options: CommandOptions) => Promise<number>>(
     () => Promise.resolve(0),
   );
 
+  const trackedFiles: string[] = [];
+
   return {
     signal,
     runCommand,
+    trackedFiles,
     run: { repoRoot: '/repo', environment: { PATH: '/usr/bin' }, signal, runID: '4417' },
     deps: {
       dietScript: '/diet.sh',
@@ -75,7 +78,9 @@ test('it gives diet the memory that the config declares for the unit lane', asyn
 });
 
 test('it leaves out the e2e folders that git tracks and runs a src/e2e folder that is no e2e folder', async () => {
-  const ctx = setupTest(['e2e/login.test.ts', 'src/e2e/codec.test.ts']);
+  const ctx = setupTest();
+
+  ctx.trackedFiles.push('e2e/login.test.ts', 'src/e2e/codec.test.ts');
 
   await runUnitTests(defineRig({}), { workerCount: 1, extraArgs: [] }, ctx.run, ctx.deps);
 
