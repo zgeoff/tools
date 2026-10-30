@@ -820,6 +820,46 @@ test.each([
 });
 
 test.each([
+  ['skip', "test.skip('it pours', () => {});\n"],
+  ['todo', "test.todo('it pours');\n"],
+  ['only', "test.only('it pours', () => {});\n"],
+  ['failing', "test.failing('it pours', () => {});\n"],
+  ['skip', "test.skip.each([1])('it pours %d cups', () => {});\n"],
+])('it points a module-level test.%s at skipIf', async (modifier, statement) => {
+  const source = `import { test } from 'bun:test';\n\n${statement}`;
+
+  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
+
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout).toInclude(
+    `\`test.${modifier}\` is banned: use \`test.skipIf(<condition>)\` for a skip.`,
+  );
+
+  expect(result.stdout).not.toInclude('Move this statement into a test');
+});
+
+test.each([
+  ["test.concurrent('it pours', () => {});\n"],
+  ["test.concurrent.each([1])('it pours %d cups', () => {});\n"],
+  ["test.skip.concurrent('it pours', () => {});\n"],
+])('it tells a module-level %p that tests run in order', async (statement) => {
+  const source = `import { test } from 'bun:test';\n\n${statement}`;
+
+  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
+
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout).toInclude(
+    '`test.concurrent` is banned: tests that use `onTestFinished` run in order.',
+  );
+});
+
+test.each([
   ['an aliased bun:test import', "import { beforeEach as test } from 'bun:test';\n"],
   ['a default import', "import test from './runner';\n"],
   ['a namespace import', "import * as test from './runner';\n"],

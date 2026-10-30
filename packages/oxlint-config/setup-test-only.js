@@ -19,6 +19,9 @@ const setupTestOnly = {
         'Remove the module-level `{{name}}`: a test file declares one function, `setupTest()`, and nothing else. Inline it where it is used, swap it for a registered matcher, or move it to the shared test utils with tests of its own. A module-level `const` stays only as a skip gate that `skipIf(...)` arguments alone read.',
       statement:
         'Move this statement into a test or `setupTest()`: at module level a test file holds only imports, types, `setupTest()` and `test` calls.',
+      modifier:
+        '`test.{{modifier}}` is banned: use `test.skipIf(<condition>)` for a skip. Committed `skip`, `todo`, `only` and `failing` tests are not allowed.',
+      concurrent: '`test.concurrent` is banned: tests that use `onTestFinished` run in order.',
     },
     schema: [],
   },
@@ -59,7 +62,15 @@ const setupTestOnly = {
             continue;
           }
 
-          emitReport(context, statement);
+          const modifier = findBannedModifier(statement, testNames);
+
+          if (modifier === null) {
+            emitReport(context, statement);
+          } else {
+            const messageId = modifier === 'concurrent' ? 'concurrent' : 'modifier';
+
+            context.report({ node: statement, messageId, data: { modifier } });
+          }
         }
 
         const gates = collectSkipGates(context, constants, testNames);
@@ -154,6 +165,37 @@ function isShapeCall(statement, shapeCalls) {
   }
 
   return callee.type === 'Identifier' && shapeCalls.has(callee.name);
+}
+
+const bannedModifiers = new Set(['concurrent', 'skip', 'todo', 'only', 'failing']);
+
+function findBannedModifier(statement, testNames) {
+  if (statement.type !== 'ExpressionStatement' || statement.expression.type !== 'CallExpression') {
+    return null;
+  }
+
+  const modifiers = [];
+  let current = statement.expression.callee;
+
+  while (current.type === 'CallExpression' || current.type === 'MemberExpression') {
+    if (current.type === 'CallExpression') {
+      current = current.callee;
+    } else {
+      if (!current.computed) {
+        modifiers.push(current.property.name);
+      }
+
+      current = current.object;
+    }
+  }
+
+  if (current.type !== 'Identifier' || !testNames.has(current.name)) {
+    return null;
+  }
+
+  return modifiers.includes('concurrent')
+    ? 'concurrent'
+    : (modifiers.find((modifier) => bannedModifiers.has(modifier)) ?? null);
 }
 
 function emitReport(context, statement, declarators) {

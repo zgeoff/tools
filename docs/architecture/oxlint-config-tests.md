@@ -47,6 +47,11 @@ declarations, one `setupTest` function declaration, and statements that call `te
 holds the three ways out of a helper: inline it, swap it for a registered matcher, or move it to the
 shared test utils with tests of its own.
 
+A module-level call of `test.skip`, `test.todo`, `test.only` or `test.failing`, in any chain of
+modifiers, reports with a message that names `test.skipIf(<condition>)`, the one skip the testing
+skill allows. A call of `test.concurrent` reports with its own message too, because the tests that
+register cleanup with `onTestFinished` must run in order.
+
 In a file that imports `bun:test`, the rule leaves a call of `describe`, `it` or a hook to
 `zgeoff/test-shape`, so each such call gets one report, with the advice that fits it.
 
