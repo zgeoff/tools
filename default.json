@@ -75,6 +75,13 @@
       "schedule": ["at any time"]
     },
     {
+      "description": "Each @wringer/* driver peer-depends on @wringer/core and a repo pins their exact versions, so their patch and minor bumps arrive in one pull request and the packages never mix versions. The rule sits after the patch rule, which would otherwise take their patch bumps. The group opens at any time, as a minor bump does.",
+      "matchPackageNames": ["@wringer/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "wringer packages",
+      "schedule": ["at any time"]
+    },
+    {
       "description": "Dev-tool minor bumps go in one weekly PR. Their patch bumps go in the patch group.",
       "matchPackageNames": [
         "@commitlint/**",
