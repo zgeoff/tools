@@ -8,7 +8,7 @@ import { hasBrowserBuildScript } from './has-browser-build-script.ts';
 import { laneFiles } from './lane-files.ts';
 import { makeBrowserLaneHooks } from './make-browser-lane-hooks.ts';
 import { pickChromeDirs } from './pick-chrome-dirs.ts';
-import { probeProcess } from './probe-process.ts';
+import { probeHostProcess } from './probe-host-process.ts';
 import { processGroups } from './process-groups.ts';
 import { processRuntime } from './process-runtime.ts';
 import { startProcessGroup } from './start-process-group.ts';
@@ -68,7 +68,7 @@ export async function wireBrowserLaneHooks(wiring: BrowserLaneWiring): Promise<L
     environment: wiring.environment,
     signal: wiring.signal,
     files: laneFiles,
-    probeProcess,
+    probeProcess: probeHostProcess,
     groups: processGroups,
     reportCleanupError: (error) => {
       console.error('the browser lane could not remove a folder:', error);

@@ -1,1 +1,1 @@
-export { probeProcess } from '../packages/rig/src/browser/probe-process.ts';
+export { probeHostProcess as probeProcess } from '../packages/rig/src/browser/probe-host-process.ts';

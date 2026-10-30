@@ -1,9 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { readStreamUntil } from '../../../../test-utils/read-stream-until.ts';
-import { probeProcess } from './probe-process.ts';
+import { probeHostProcess } from './probe-host-process.ts';
 
 test('it finds a process that runs', () => {
-  expect(probeProcess(process.pid)).toBeTrue();
+  expect(probeHostProcess(process.pid)).toBeTrue();
 });
 
 test('it finds no process once the process has exited', async () => {
@@ -11,7 +11,7 @@ test('it finds no process once the process has exited', async () => {
 
   await exited.exited;
 
-  expect(probeProcess(exited.pid)).toBeFalse();
+  expect(probeHostProcess(exited.pid)).toBeFalse();
 });
 
 test('it finds no process for a zombie that its parent never reaps', async () => {
@@ -49,5 +49,5 @@ test('it finds no process for a zombie that its parent never reaps', async () =>
   })();
 
   expect(isSignalled).toBeTrue();
-  expect(probeProcess(zombiePID)).toBeFalse();
+  expect(probeHostProcess(zombiePID)).toBeFalse();
 });
