@@ -1,3 +1,6 @@
+import type { Clock } from '../system-clock.ts';
+import { systemClock } from '../system-clock.ts';
+
 export interface SpawnedProcess {
   readonly pid: number;
 
@@ -14,11 +17,7 @@ export interface SpawnOptions {
   readonly stdout: 'inherit' | 'pipe';
 }
 
-export interface ProcessRuntime {
-  readonly now: () => number;
-
-  readonly sleep: (durationMs: number) => Promise<void>;
-
+export interface ProcessRuntime extends Clock {
   // Starts the command as the leader of a process group of its own.
   readonly spawn: (command: readonly string[], options: SpawnOptions) => SpawnedProcess;
 }
@@ -36,6 +35,6 @@ export const processRuntime: ProcessRuntime = {
 
     return { pid: child.pid, stdout: child.stdout ?? null, exited: child.exited };
   },
-  now: () => Date.now(),
-  sleep: (durationMs) => Bun.sleep(durationMs),
+  now: systemClock.now,
+  sleep: systemClock.sleep,
 };
