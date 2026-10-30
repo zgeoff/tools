@@ -1,5 +1,6 @@
-import { appendFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { removePath } from '../../sync/browser-lane/remove-path.ts';
 import type { FileSystem } from './file-system.ts';
 
 export const nodeFileSystem: FileSystem = {
@@ -18,7 +19,7 @@ export const nodeFileSystem: FileSystem = {
   createDirectory: async (path) => {
     await mkdir(path, { recursive: true });
   },
-  removePath: (path) => rm(path, { recursive: true, force: true }),
+  removePath,
   probePath: async (path) => {
     try {
       await stat(path);

@@ -32,14 +32,12 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 
 - [Writing skill-gate rules](./guides/skill-gate-rules.md): path gates, tool gates, and the mistakes
   in a rules file that the gate tolerates.
-- [Setting up a browser lane](./guides/browser-lane.md): the command, the preload, and the memory
-  cap of a repo's browser lane.
 - [Gating Codex edits](./guides/skill-gate-codex.md): register the skill gate as a Codex hook, and
   how the gate counts loads there.
 
 ## Runbooks
 
 - [Setting up a downstream repo](./runbooks/downstream-repo-setup.md): wire a repo up, and opt in to
-  the skill gate and the pre-push baseline.
+  the skill gate, the pre-push baseline and the browser lane.
 - [Releasing the sync files](./runbooks/releasing-sync-files.md): push a new sync tag and move each
   repo to it.

@@ -1,8 +1,9 @@
 # Setting up a downstream repo
 
 A downstream repo takes the files tools shares through [repo sync](../architecture/repo-sync.md).
-Wire the repo up once, then opt in to each opt-in entry it runs. The skill gate and the pre-push
-baseline need changes in the repo beyond the `include` line, which repo-sync never makes.
+Wire the repo up once, then opt in to each opt-in entry it runs. The skill gate, the pre-push
+baseline and the browser lane need changes in the repo beyond the `include` line, which repo-sync
+never makes.
 
 ## Wiring up a downstream repo
 
@@ -59,3 +60,23 @@ fits a 2 GiB host. A repo opts in with three changes:
    before the baseline's, so keep only cheap repo-specific gates there.
 3. Move every whole-tree check the baseline drops, such as type-aware lint, dead code and the full
    suite, into CI as a required check, if CI does not run it already.
+
+## Opting in to the browser lane
+
+The [browser lane](../../sync/browser-lane/README.md) runs the repo's `.browser.test.ts` suites
+against Chrome. Its `test:browser` script runs it under the `memory-capped` script that the pre-push
+baseline adds, so opt in to the baseline first. A repo opts in with these changes:
+
+1. Add `browser-lane` to `include` in `.github/workflows/repo-sync.yml`. The sync adds the
+   `test:browser` script when the repo lacks one, and keeps a `test:browser` script that the repo
+   has, so replace that one with the entry's script.
+2. When the suites load a build, such as the web client, add a `build:browser` script that writes
+   the build to the folder in `BROWSER_LANE_BUILD_DIR`, and have each suite read the build from
+   there.
+3. Leave the browser suites out of the unit run, with
+   `--path-ignore-patterns='**/*.browser.test.ts'` in the `test` script.
+4. Import `runInPage` from `scripts/browser-lane/run-in-page.ts` in the suites, and delete the
+   repo's own lane command, preload and helper.
+5. Run `bun run test:browser`. Expect the suites to pass. The lane removes its run folders and keeps
+   the folder of the host's name under `node_modules/.cache/browser-lane/`, so expect that folder to
+   be empty.

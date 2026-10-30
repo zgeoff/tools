@@ -19,6 +19,8 @@ holds and how a run delivers, updates and retires the files.
 - [`hooks/`](./hooks/) — Claude Code hooks, such as the skill gate's entry point, with their tests.
 - [`pre-push/`](./pre-push/) — the [pre-push baseline](../docs/architecture/pre-push-baseline.md)
   and the [memory-cap script](../docs/architecture/memory-caps.md), with their tests.
+- [`browser-lane/`](./browser-lane/) — the [browser lane](./browser-lane/README.md): the lane
+  script, the browser preload and the `runInPage` helper, with their tests.
 
 ## Documentation
 

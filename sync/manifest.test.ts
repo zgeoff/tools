@@ -11,12 +11,14 @@ async function setupTest() {
 
   const manifestPath = join(import.meta.dir, 'manifest.json');
 
-  const build =
-    await $`jq -er '.[] | select(.name == "pre-push-baseline") | .build' ${manifestPath}`.text();
-
   return {
     directory,
-    runBuild: () => $`bash -euo pipefail -c ${build}`.cwd(directory).quiet(),
+    runBuild: async (entryName: string) => {
+      const build =
+        await $`jq -er --arg name ${entryName} '.[] | select(.name == $name) | .build' ${manifestPath}`.text();
+
+      await $`bash -euo pipefail -c ${build}`.cwd(directory).quiet();
+    },
     readPackageJSON: async () => {
       const packageJSON: unknown = await Bun.file(join(directory, 'package.json')).json();
 
@@ -39,7 +41,7 @@ test('it runs a pre-push-baseline build that moves a files:branch script that ru
     }),
   );
 
-  await ctx.runBuild();
+  await ctx.runBuild('pre-push-baseline');
 
   const packageJSON = await ctx.readPackageJSON();
 
@@ -80,7 +82,7 @@ test('it runs a pre-push-baseline build that keeps a files:branch script the rep
     }),
   );
 
-  await ctx.runBuild();
+  await ctx.runBuild('pre-push-baseline');
 
   const packageJSON = await ctx.readPackageJSON();
 
@@ -108,7 +110,7 @@ test('it runs a pre-push-baseline build that adds the package scripts a repo lac
     JSON.stringify({ scripts: { test: 'bun test' } }),
   );
 
-  await ctx.runBuild();
+  await ctx.runBuild('pre-push-baseline');
 
   const packageJSON = await ctx.readPackageJSON();
 
@@ -127,4 +129,39 @@ test('it runs a pre-push-baseline build that adds the package scripts a repo lac
       'memory-capped': 'bash scripts/run-memory-capped.sh "$(bun scripts/read-memory-budget.ts)"',
     },
   });
+});
+
+test('it runs a browser-lane build that adds a test:browser script that runs the lane under the memory cap', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { test: 'bun test' } }),
+  );
+
+  await ctx.runBuild('browser-lane');
+
+  const packageJSON = await ctx.readPackageJSON();
+
+  expect(packageJSON).toStrictEqual({
+    scripts: {
+      test: 'bun test',
+      'test:browser':
+        'bun run memory-capped bun scripts/browser-lane/run-browser-lane.ts --timeout=10000 .browser.test.ts',
+    },
+  });
+});
+
+test('it runs a browser-lane build that keeps a test:browser script the repo wrote itself', async () => {
+  const ctx = await setupTest();
+
+  const scripts = { 'test:browser': 'bun scripts/run-web-browser-suites.ts' };
+
+  await writeFile(join(ctx.directory, 'package.json'), JSON.stringify({ scripts }));
+
+  await ctx.runBuild('browser-lane');
+
+  const packageJSON = await ctx.readPackageJSON();
+
+  expect(packageJSON).toStrictEqual({ scripts });
 });

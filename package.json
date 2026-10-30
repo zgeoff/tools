@@ -46,7 +46,8 @@
   "scripts": {
     "prepare": "lefthook install --force || true; bun run build",
     "typecheck": "bun run --filter '*' typecheck && tsrs -p scripts && tsrs -p sync && tsrs -p test-utils",
-    "test": "workers=$(bun sync/pre-push/read-worker-count.ts) && bun test --parallel=$workers --randomize",
+    "test": "workers=$(bun sync/pre-push/read-worker-count.ts) && bun test --parallel=$workers --randomize --path-ignore-patterns='**/*.browser.test.ts'",
+    "test:browser": "bun run memory-capped bun sync/browser-lane/run-browser-lane.ts --timeout=10000 .browser.test.ts",
     "test:related": "bun sync/pre-push/run-related-tests.ts",
     "build": "bun run --filter '*' build",
     "lint": "oxlint",
@@ -91,6 +92,7 @@
     "tiny-invariant": "catalog:",
     "ts-pattern": "catalog:",
     "tsrs": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "zod": "catalog:"
   }
 }

@@ -126,19 +126,21 @@ preload starts that Chrome, and a `runInPage` helper runs its page code. Playwri
 
 The repo's browser lane runs the suites at `bun test --parallel=1` after the unit run, so each file
 gets its own process and Chrome starts on an idle CPU. A cold Chrome start on a CPU that the unit
-run's workers saturate can outlast the test timeout, and a raised timeout only hides that cost.
-[Setting up a browser lane](https://github.com/zgeoff/tools/blob/main/docs/guides/browser-lane.md)
-describes the lane's command, its preload, and its memory cap.
+run's workers saturate can outlast the test timeout, and a raised timeout only hides that cost. The
+repo runs the lane through the lane script, the preload and `runInPage` that the `browser-lane`
+entry of repo-sync delivers to `scripts/browser-lane/`, as the
+[browser lane](https://github.com/zgeoff/tools/blob/main/sync/browser-lane/README.md) describes.
 
 ### Page code
 
-Page code longer than one line goes through the repo's `runInPage(view, fn, arg, schema)` helper,
-never through a string passed to `view.evaluate`. The test writes the page code as a real function,
-so the type checker and the linter check it. The helper sends the function's source with a JSON
-argument and parses the result with the zod schema, with no cast. The parse also fails a result that
-JSON cannot carry, such as a `Blob`, which arrives as `{}`. The function sees only its argument and
-the page's globals, so a test variable used in its body passes the type check and throws a
-`ReferenceError` in the page. A one-line `view.evaluate` call stays as it is.
+Page code longer than one line goes through the synced
+`runInPage(view, pageFunction, argument, schema)` helper, never through a string passed to
+`view.evaluate`. The test writes the page code as a real function, so the type checker and the
+linter check it. The helper sends the function's source with a JSON argument and parses the result
+with the schema, such as a zod schema, with no cast. The parse also fails a result that JSON cannot
+carry, such as a `Blob`, which arrives as `{}`. The function sees only its argument and the page's
+globals, so a test variable used in its body passes the type check and throws a `ReferenceError` in
+the page. A one-line `view.evaluate` call stays as it is.
 
 ### Time and helpers
 

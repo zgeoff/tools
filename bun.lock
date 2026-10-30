@@ -26,6 +26,7 @@
         "ts-pattern": "catalog:",
         "tsrs": "catalog:",
         "typescript": "catalog:",
+        "zod": "catalog:",
       },
     },
     "packages/bun-test-extended": {

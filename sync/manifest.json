@@ -420,5 +420,68 @@
       "memory-capped": "bash scripts/run-memory-capped.sh \"$(bun scripts/read-memory-budget.ts)\""
     },
     "build": "old='bun scripts/collect-branch-files.ts'; new='bun scripts/read-branch-files.ts'; if [ \"$(jq -r '.scripts[\"files:branch\"] // empty' package.json)\" = \"$old\" ]; then jq --arg new \"$new\" '.scripts[\"files:branch\"] = $new' package.json > package.json.tmp; mv package.json.tmp package.json; fi; add=$(jq -cn --arg new \"$new\" --arg capped 'bash scripts/run-memory-capped.sh \"$(bun scripts/read-memory-budget.ts)\"' '{\"files:branch\":$new,\"lint:files\":\"oxlint --no-error-on-unmatched-pattern\",\"test:related\":\"bun scripts/run-related-tests.ts\",\"check:commits\":\"bun scripts/run-commits-check.ts\",\"check:local-paths\":\"bun scripts/run-local-paths-check.ts\",\"check:test-timeouts\":\"bun scripts/run-test-timeouts-check.ts\",\"check:dependency-gates\":\"bun scripts/dependency-gates/run-dependency-gates-check.ts\",\"check:workflows\":\"bun scripts/run-workflows-check.ts\",\"check:uncommitted\":\"bun scripts/run-uncommitted-check.ts\",\"memory-capped\":$capped}'); missing=$(jq -c --argjson add \"$add\" '(.scripts // {}) as $s | $add | with_entries(select(.key as $k | $s | has($k) | not))' package.json); if [ \"$missing\" != '{}' ]; then jq --argjson missing \"$missing\" '.scripts = (.scripts // {}) + $missing' package.json > package.json.tmp; mv package.json.tmp package.json; fi"
+  },
+  {
+    "name": "browser-lane",
+    "description": "The browser lane: the script that builds the suites' build once, makes the run ID, sets a short TMPDIR for Chrome and runs the .browser.test.ts suites one file at a time, the shared browser preload that starts each file's Chrome on its own profile, the runInPage helper, and the test:browser package script where the repo lacks it, which runs the lane under the memory-capped script that the pre-push-baseline entry adds; the lane script imports ts-pattern, which the repo lists in its dev dependencies",
+    "optIn": true,
+    "files": [
+      {
+        "source": "sync/browser-lane/build-browser-run.ts",
+        "target": "scripts/browser-lane/build-browser-run.ts"
+      },
+      {
+        "source": "sync/browser-lane/pick-step-after-build.ts",
+        "target": "scripts/browser-lane/pick-step-after-build.ts"
+      },
+      {
+        "source": "sync/browser-lane/build-lane-environments.ts",
+        "target": "scripts/browser-lane/build-lane-environments.ts"
+      },
+      {
+        "source": "sync/browser-lane/find-browser-run.ts",
+        "target": "scripts/browser-lane/find-browser-run.ts"
+      },
+      {
+        "source": "sync/browser-lane/has-browser-build-script.ts",
+        "target": "scripts/browser-lane/has-browser-build-script.ts"
+      },
+      {
+        "source": "sync/browser-lane/pick-chrome-dirs.ts",
+        "target": "scripts/browser-lane/pick-chrome-dirs.ts"
+      },
+      {
+        "source": "sync/browser-lane/run-browser-lane.ts",
+        "target": "scripts/browser-lane/run-browser-lane.ts"
+      },
+      {
+        "source": "sync/browser-lane/find-private-dir-problem.ts",
+        "target": "scripts/browser-lane/find-private-dir-problem.ts"
+      },
+      {
+        "source": "sync/browser-lane/lane-files.ts",
+        "target": "scripts/browser-lane/lane-files.ts"
+      },
+      {
+        "source": "sync/browser-lane/remove-path.ts",
+        "target": "scripts/browser-lane/remove-path.ts"
+      },
+      {
+        "source": "sync/browser-lane/start-browser.ts",
+        "target": "scripts/browser-lane/start-browser.ts"
+      },
+      {
+        "source": "sync/browser-lane/browser-preload.ts",
+        "target": "scripts/browser-lane/browser-preload.ts"
+      },
+      {
+        "source": "sync/browser-lane/run-in-page.ts",
+        "target": "scripts/browser-lane/run-in-page.ts"
+      }
+    ],
+    "scripts": {
+      "test:browser": "bun run memory-capped bun scripts/browser-lane/run-browser-lane.ts --timeout=10000 .browser.test.ts"
+    },
+    "build": "if ! jq -e '.scripts[\"test:browser\"] // empty' package.json > /dev/null; then jq --arg lane 'bun run memory-capped bun scripts/browser-lane/run-browser-lane.ts --timeout=10000 .browser.test.ts' '.scripts = (.scripts // {}) + {\"test:browser\": $lane}' package.json > package.json.tmp; mv package.json.tmp package.json; fi"
   }
 ]
