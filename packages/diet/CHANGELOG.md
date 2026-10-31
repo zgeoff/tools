@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.2](https://github.com/zgeoff/tools/compare/@zgeoff/diet@0.1.1...@zgeoff/diet@0.1.2) (2026-10-31)
+
+### Features
+
+- **rig:** add the rig test orchestrator with a built-in browser lane
+  ([#398](https://github.com/zgeoff/tools/issues/398))
+  ([b0f498d](https://github.com/zgeoff/tools/commit/b0f498d007242cc41f7658a460105a9982633360))
+
 ## [0.1.1](https://github.com/zgeoff/tools/compare/@zgeoff/diet@0.1.0...@zgeoff/diet@0.1.1) (2026-10-30)
 
 ### Bug Fixes
