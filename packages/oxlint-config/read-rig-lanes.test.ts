@@ -49,6 +49,30 @@ test('it fails the plugin load for a lane whose suffix would take the place of t
   expect(result.stdout).toInclude('the suffix ".e2e", which the e2e lane reserves');
 });
 
+test("it fails the plugin load with rig's parser reason for a lane whose limit is no number", async () => {
+  const files = {
+    'rig.config.ts': [
+      'export default {',
+      '  lanes: [',
+      "    { name: 'kiln', suffix: '.kiln', limitMs: '15s', parallel: 1, memory: null, start: null, stop: null },",
+      '  ],',
+      '};',
+      '',
+    ].join('\n'),
+    'oven.kiln.test.ts': buildTimeoutSource(1000),
+  };
+
+  const result = await runLintTree(files, 'oven.kiln.test.ts', {
+    'zgeoff/max-test-timeout': 'error',
+  });
+
+  expect(result.exitCode).not.toBe(0);
+
+  expect(result.stdout).toInclude(
+    'lane "kiln" has the limitMs "15s", which defineRig never resolves',
+  );
+});
+
 test('it keeps a lane test beside its module under the suffix that rig.config.ts declares', async () => {
   const files = {
     'rig.config.ts': buildRigConfigSource("{ lanes: { kiln: { limit: '15s' } } }"),

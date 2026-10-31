@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createLintTree } from './create-lint-tree.ts';
 
@@ -25,6 +25,20 @@ test('it writes each file at its path, with the folders it needs', async () => {
 
   expect(kettle).toBe('export const cups = 2;\n');
   expect(lid).toBe('export const lid = 1;\n');
+});
+
+test("it resolves @zgeoff/rig from the tree's root to the workspace's rig package", async () => {
+  const directory = await createLintTree({}, {});
+  const resolved = await realpath(Bun.resolveSync('@zgeoff/rig', directory));
+  const rigIndex = await realpath(join(import.meta.dir, '..', '..', 'rig', 'src', 'index.ts'));
+
+  expect(resolved).toBe(rigIndex);
+});
+
+test('it keeps node_modules out of the tree, so a lint of the tree skips it', async () => {
+  const directory = await createLintTree({}, {});
+
+  expect(existsSync(join(directory, 'node_modules'))).toBeFalse();
 });
 
 test('it removes the tree when the test finishes', async () => {

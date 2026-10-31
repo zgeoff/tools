@@ -140,10 +140,19 @@ process uses. The recorded shell runs `bash` on `diet`'s script, which rig resol
 and `test-beside-module` rules then take each lane's limit and suffix from the resolved table, so a
 limit changes in one file. oxlint runs a plugin under Node, which strips the types of a `.ts` file
 from version 22.18, and rig's package therefore ships a built Node entry that the config's
-`@zgeoff/rig` import resolves to. Bun resolves the same import to the source. A repo with a
-`rig.config.ts` that also sets the rules' `lanes` option gets one config error from each rule, and a
-repo without the file keeps the rules' own table. The plugin fails to load, with the import error as
-its cause, when Node cannot read the file.
+`@zgeoff/rig` import resolves to. Bun resolves the same import to the source.
+
+The plugin checks the resolved table with rig's own parser, so rig and the lint rules refuse the
+same tables with the same reason. It loads the parser from the `@zgeoff/rig` that resolves from the
+repo root, the copy that the repo's `rig.config.ts` imports. A repo with a `rig.config.ts` therefore
+already depends on `@zgeoff/rig`, and `@zgeoff/oxlint-config` declares no dependency on it.
+
+The plugin fails to load in two cases. When Node cannot read `rig.config.ts`, the plugin's error
+carries the import error. When the file's default export is no table that `defineRig` returns, the
+error carries the parser's reason.
+
+A repo with a `rig.config.ts` that also sets the rules' `lanes` option gets one config error from
+each rule. A repo without the file keeps the rules' own table.
 
 ## The journeys that test rig
 

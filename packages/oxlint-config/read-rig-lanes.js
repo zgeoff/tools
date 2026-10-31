@@ -1,4 +1,6 @@
 import { existsSync } from 'node:fs';
+// oxlint-disable-next-line zgeoff/no-require -- only resolves rig's path from the repo root; an import loads it
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import resolveRepoRoot from './resolve-repo-root.js';
@@ -20,16 +22,17 @@ export default async function readRigLanes(cwd) {
   }
 
   const config = await importConfig(configPath);
-  const lanes = config.default?.lanes;
+  const rig = await importRepoRig(root);
+  const parsed = rig.parseRigConfig(config.default);
 
-  if (!Array.isArray(lanes)) {
+  if (parsed.kind === 'refused') {
     throw new TypeError(
-      `${configPath} must default-export the result of defineRig from @zgeoff/rig`,
+      `${configPath} must default-export the result of defineRig from @zgeoff/rig: ${parsed.reason}`,
     );
   }
 
   return new Map(
-    lanes
+    parsed.config.lanes
       .filter((lane) => lane.name !== 'unit')
       .map((lane) => [lane.suffix === null ? lane.name : lane.suffix.slice(1), lane.limitMs]),
   );
@@ -49,4 +52,12 @@ async function importConfig(configPath) {
       { cause: error },
     );
   }
+}
+
+// The parser comes from the @zgeoff/rig that the repo's rig.config.ts imports, so both read one
+// version of the resolved table. A bare import would resolve from this package's folder instead.
+function importRepoRig(root) {
+  const rigPath = createRequire(join(root, 'package.json')).resolve('@zgeoff/rig');
+
+  return import(pathToFileURL(rigPath).href);
 }

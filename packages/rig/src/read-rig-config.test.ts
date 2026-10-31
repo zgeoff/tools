@@ -33,7 +33,7 @@ test('it reads the lanes that a rig.config.ts declares', async () => {
   expect(config).toStrictEqual(defineRig({ lanes: { kiln: { limit: '15s' } } }));
 });
 
-test('it refuses a rig.config.ts whose default export is no rig config', async () => {
+test("it refuses a rig.config.ts whose default export is no rig config, with the parser's reason", async () => {
   const ctx = await setupTest();
 
   await writeTreeFiles(ctx.repoRoot, { 'rig.config.ts': 'export default { lanes: 3 };\n' });
@@ -44,6 +44,6 @@ test('it refuses a rig.config.ts whose default export is no rig config', async (
 
   expect(failure).toHaveProperty(
     'message',
-    expect.stringContaining('must default-export the result of defineRig'),
+    `${join(ctx.repoRoot, 'rig.config.ts')} must default-export the result of defineRig: its lanes are no list`,
   );
 });

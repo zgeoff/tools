@@ -15,11 +15,11 @@ export async function readRigConfig(repoRoot: string): Promise<RigConfig> {
   const loaded = await import(path).then((module: unknown) => module);
 
   const defaultExport = isRecord(loaded) ? loaded['default'] : null;
-  const config = parseRigConfig(defaultExport);
+  const parsed = parseRigConfig(defaultExport);
 
-  if (config === null) {
-    throw new Error(`${path} must default-export the result of defineRig`);
+  if (parsed.kind === 'refused') {
+    throw new Error(`${path} must default-export the result of defineRig: ${parsed.reason}`);
   }
 
-  return config;
+  return parsed.config;
 }
