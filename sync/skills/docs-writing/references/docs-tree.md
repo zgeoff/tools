@@ -41,8 +41,9 @@ links `docs/reference/` once.
   only when a new decision is made.
 - **Development and releasing live in runbooks.** `docs/runbooks/development.md` holds the
   contributor setup; `docs/runbooks/releasing.md` holds only the steps the release tooling doesn't
-  do, and is deleted when none remain. A folder README that documents its own folder stays beside
-  it.
+  do, and is deleted when none remain. A README stays beside the code only as one of the
+  [five kinds](./readmes.md#the-five-kinds-of-readme), such as a package's README beside its
+  `package.json`.
 
 ## The vision doc
 
