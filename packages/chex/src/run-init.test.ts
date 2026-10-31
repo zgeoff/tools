@@ -108,6 +108,37 @@ test('it leaves every file as it was on a second run', async () => {
   expect(filesAfter).toStrictEqual(files);
 });
 
+test('it adds the chex baseline to the end of the one-entry inline list that the synced baseline writes', async () => {
+  const ctx = await setupTest();
+
+  const packageText = JSON.stringify({
+    name: 'kettle',
+    devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
+  });
+
+  await writeFile(join(ctx.repoRoot, 'package.json'), packageText);
+
+  await writeFile(
+    join(ctx.repoRoot, 'lefthook.yml'),
+    'extends: [.lefthook/pre-push-baseline.yml]\n',
+  );
+
+  const exitCode = await ctx.run();
+  const files = await ctx.readFiles();
+
+  expect({ exitCode, lines: ctx.lines }).toStrictEqual({
+    exitCode: 0,
+    lines: [
+      'out chex init: lefthook.yml extends node_modules/@zgeoff/chex/lefthook.yml\n' +
+        'chex init: package.json runs "chex prose length links" as check:docs\n',
+    ],
+  });
+
+  expect(files[1]).toBe(
+    'extends: [.lefthook/pre-push-baseline.yml, node_modules/@zgeoff/chex/lefthook.yml]\n',
+  );
+});
+
 test('it fails and leaves both files as they were when lefthook.yml writes extends as a single path', async () => {
   const ctx = await setupTest();
 
