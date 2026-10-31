@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { writeStubPrograms } from './write-stub-programs.ts';
+import { writeStubPrograms } from '../test-utils/write-stub-programs.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'write-stub-programs-'));

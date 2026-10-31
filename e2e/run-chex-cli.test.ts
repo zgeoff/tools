@@ -3,9 +3,9 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { readGitEnv } from './read-git-env.ts';
-import { runChexCLI } from './run-chex-cli.ts';
-import { writeTreeFiles } from './write-tree-files.ts';
+import { readGitEnv } from '../test-utils/read-git-env.ts';
+import { runChexCLI } from '../test-utils/run-chex-cli.ts';
+import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 
 async function setupTest() {
   const repo = await mkdtemp(join(tmpdir(), 'run-chex-cli-'));

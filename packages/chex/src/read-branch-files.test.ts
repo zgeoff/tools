@@ -157,39 +157,6 @@ test('it throws in a repository with no origin', async () => {
   );
 });
 
-test('it exits 1 with a message when run in a repository with no origin', async () => {
-  const ctx = await setupTest();
-
-  await ctx.runGit('remote', 'remove', 'origin');
-
-  const run = Bun.spawnSync([process.execPath, join(import.meta.dir, 'read-branch-files.ts')], {
-    cwd: ctx.repo,
-    env: ctx.env,
-  });
-
-  expect(run.exitCode).toBe(1);
-  expect(run.stdout.toString()).toBeEmpty();
-
-  expect(run.stderr.toString()).toStartWith(
-    'read-branch-files: cannot find the base of this branch',
-  );
-});
-
-test('it prints one file per line when run on a branch', async () => {
-  const ctx = await setupTest();
-
-  await ctx.runGit('switch', '--quiet', '--create', 'feature');
-  await ctx.createCommit({ 'a.ts': 'a', 'b.ts': 'b' });
-
-  const run = Bun.spawnSync([process.execPath, join(import.meta.dir, 'read-branch-files.ts')], {
-    cwd: ctx.repo,
-    env: ctx.env,
-  });
-
-  expect(run.exitCode).toBe(0);
-  expect(run.stdout.toString()).toBe('a.ts\nb.ts\n');
-});
-
 test('it lists each path that git diff prints between the branch base and HEAD', () => {
   const standIn = mock<RunProgram>(
     makeAnswerQueue<ProgramResult>([

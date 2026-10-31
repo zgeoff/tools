@@ -3,9 +3,9 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { readGitEnv } from './read-git-env.ts';
-import { runHookedPush } from './run-hooked-push.ts';
-import { writeStubPrograms } from './write-stub-programs.ts';
+import { readGitEnv } from '../test-utils/read-git-env.ts';
+import { runHookedPush } from '../test-utils/run-hooked-push.ts';
+import { writeStubPrograms } from '../test-utils/write-stub-programs.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'run-hooked-push-'));
