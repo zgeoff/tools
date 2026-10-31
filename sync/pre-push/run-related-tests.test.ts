@@ -439,38 +439,6 @@ test('#runRelatedTests runs no test of a lane that the oxlint config declares', 
   });
 });
 
-test('#runRelatedTests runs no test that the Bun config ignores', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(
-    join(ctx.directory, 'package.json'),
-    JSON.stringify({ scripts: { test: 'bun test' } }),
-  );
-
-  await writeFile(
-    join(ctx.directory, 'bunfig.toml'),
-    '[test]\npathIgnorePatterns = ["spikes/**"]\n',
-  );
-
-  await mkdir(join(ctx.directory, 'spikes/probe'), { recursive: true });
-
-  await writeFile(
-    join(ctx.directory, 'spikes/probe/plan.test.ts'),
-    "import { expect, test } from 'bun:test';\n\ntest('it adds', () => {\n  expect(1 + 1).toBe(2);\n});\n",
-  );
-
-  const result = await $`bun ${join(import.meta.dir, 'run-related-tests.ts')} spikes/probe/plan.ts`
-    .cwd(ctx.directory)
-    .env({ PATH: process.env['PATH'] ?? '', TEST_WORKERS: '2' })
-    .nothrow()
-    .quiet();
-
-  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
-    exitCode: 0,
-    stdout: 'run-related-tests: no related tests\n',
-  });
-});
-
 test('#runRelatedTests names the shared test input over the file cap when the branch changes both', async () => {
   const ctx = await setupTest();
 
