@@ -26,7 +26,7 @@ export async function runChex(argv: readonly string[], deps: ChexDeps): Promise<
   let exitCode = 0;
 
   for (const name of request.names) {
-    const checkExitCode = await deps.runCheck(name, request.args);
+    const checkExitCode = await runOneCheck(name, request.args, deps);
 
     deps.writeOutput(`${checkExitCode === 0 ? 'cleared' : 'bounced'}: ${name}\n`);
 
@@ -34,4 +34,22 @@ export async function runChex(argv: readonly string[], deps: ChexDeps): Promise<
   }
 
   return exitCode;
+}
+
+// A check that throws, such as a shell script on a host without bash, cannot run, so it counts as
+// exit 2 and the checks after it still run.
+async function runOneCheck(
+  name: CheckName,
+  args: readonly string[],
+  deps: ChexDeps,
+): Promise<number> {
+  try {
+    return await deps.runCheck(name, args);
+  } catch (error) {
+    deps.writeError(
+      `chex: ${name} cannot run: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+
+    return 2;
+  }
 }

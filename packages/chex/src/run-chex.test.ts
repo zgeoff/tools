@@ -3,7 +3,7 @@ import type { CheckName } from './check-names.ts';
 import type { ChexDeps } from './run-chex.ts';
 import { runChex } from './run-chex.ts';
 
-function setupTest(exitCodes: Partial<Record<CheckName, number>> = {}) {
+function setupTest(exitCodes: Partial<Record<CheckName, number | Error>> = {}) {
   const lines: string[] = [];
   const calls: string[] = [];
 
@@ -11,7 +11,9 @@ function setupTest(exitCodes: Partial<Record<CheckName, number>> = {}) {
     runCheck: (name, args) => {
       calls.push([name, ...args].join(' '));
 
-      return Promise.resolve(exitCodes[name] ?? 0);
+      const outcome = exitCodes[name] ?? 0;
+
+      return outcome instanceof Error ? Promise.reject(outcome) : Promise.resolve(outcome);
     },
     runInit: () => {
       calls.push('init');
@@ -61,6 +63,22 @@ test('it exits 2 when a check cannot run, and prints bounced', async () => {
   expect({ exitCode, lines: ctx.lines }).toStrictEqual({
     exitCode: 2,
     lines: ['out bounced: commits\n', 'out bounced: local-paths\n'],
+  });
+});
+
+test('it prints bounced and exits 2 for a check that throws, and runs the checks after it', async () => {
+  const ctx = setupTest({ length: new Error('Executable not found in $PATH: "bash"') });
+
+  const exitCode = await runChex(['length', 'commits'], ctx.deps);
+
+  expect({ exitCode, lines: ctx.lines, calls: ctx.calls }).toStrictEqual({
+    exitCode: 2,
+    lines: [
+      'err chex: length cannot run: Executable not found in $PATH: "bash"\n',
+      'out bounced: length\n',
+      'out cleared: commits\n',
+    ],
+    calls: ['length', 'commits'],
   });
 });
 
