@@ -81,7 +81,8 @@ repos too, so an edit to one of them changes every repo that takes it.
   `.github/workflows/release-please.yml`. CI and the pre-push hook run it.
 - `bun run build:step-bundles` rebuilds `step-bundles/` from the step scripts. Run it, and commit
   the bundles, after you change a step script, a file one imports, or a package it uses.
-  `bun run check:step-bundles` fails on a stale bundle, and CI and the pre-push hook run it.
+  `bun run check:step-bundles` fails on a stale bundle and on a set of bundles that a runner could
+  not download or compile, and CI and the pre-push hook run it.
 - `bun run check:repo-sync-workflows` checks the stub `sync/repo-sync.yml` against
   `.github/workflows/repo-sync.yml`: two dispatches of different tools commits get two concurrency
   groups, the sync job queues every waiting run, the stub grants every permission a job asks for,
