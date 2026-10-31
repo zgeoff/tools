@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/chex",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Run a repo's pre-push checks from one versioned baseline",
   "license": "MIT",
   "repository": {
