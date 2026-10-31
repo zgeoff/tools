@@ -6,7 +6,7 @@ repo, at `.claude/hooks/start.ts`. The stub loads
 package runs its handlers, such as the [skill gate](./skill-gate.md), in order. The stub is the only
 part that runs before `bun install`. It installs the package itself when the package is missing, so
 an agent can work in a fresh worktree at once. It fails closed: while the package cannot load, it
-refuses every tool call but a read-only command.
+refuses every tool call. The exceptions are the install itself and a few read-only commands.
 
 ## One entry per event
 
@@ -51,14 +51,20 @@ it.
 
 ## Failing closed
 
-When the package still cannot load, the stub reads no rules, because the rules code lives in the
-package. It exits 2 before every tool call with `To work here, run bun install.`, unless the call is
-a Bash command on a short read-only list: `bun install`, `ls`, `cat` and `pwd`. The list leaves out
-git, because git config can make any git command run a program, even a `git diff` with its external
-diff and textconv programs turned off: an fsmonitor program or a clean filter. A listed command must
-be one command of plain words between single spaces. A shell can build a gated path that no parser
-sees, as in `ext=ts; printf x > src/sample.$ext`, so the stub refuses a command with any other
-character, such as a variable, a quote, a glob, a redirect, a line break or a control character.
+While the package cannot load, no handler runs, so nothing checks what a tool call writes. The stub
+therefore exits 2 before every tool call, with two exceptions, each a Bash command:
 
-On any other event the stub exits 0. After a tool call there is nothing left to block, and a blocked
-prompt would stop a person from asking the agent to run the install.
+- the install that repairs the stub, `bun install` or `bun install --frozen-lockfile`;
+- a read-only `ls`, `cat` or `pwd`.
+
+An exception passes only as plain words between single spaces, because a shell can build a path that
+the stub cannot see in the command text, as in `ext=ts; printf x > src/sample.$ext`. The stub
+refuses a command with a variable, a quote, a glob, a redirect, a line break or a control character.
+Git stays off the list, because git config can make any git command run a program, such as an
+fsmonitor program.
+
+The refusal message holds the two install commands word for word, so an agent that wrote the install
+with a `cd` or a pipe knows the form to retry.
+
+On any event but `PreToolUse`, the stub exits 0. After a tool call there is nothing left to block,
+and a blocked prompt would stop a person from asking the agent to run the install.
