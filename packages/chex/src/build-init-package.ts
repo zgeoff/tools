@@ -2,7 +2,7 @@ import { isRecord } from '@zgeoff/std';
 
 // The baseline's jobs run chex, the related tests through rig, and each job under diet's memory cap.
 export const baselinePackages = ['@zgeoff/chex', '@zgeoff/rig', '@zgeoff/diet'] as const;
-export const docsScript = 'chex prose length links';
+export const docsScript = 'chex prose length links skill';
 
 export type PackageOutcome =
   | { readonly kind: 'missing'; readonly packages: readonly string[] }

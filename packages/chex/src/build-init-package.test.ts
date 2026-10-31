@@ -29,7 +29,7 @@ test('it adds a scripts object to a package.json that has none', () => {
           '@zgeoff/diet': '0.1.2',
           '@zgeoff/rig': '0.0.2',
         },
-        scripts: { 'check:docs': 'chex prose length links' },
+        scripts: { 'check:docs': 'chex prose length links skill' },
       },
       null,
       2,

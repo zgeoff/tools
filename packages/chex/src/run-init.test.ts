@@ -73,12 +73,12 @@ test('it writes lefthook.yml and package.json to the repo folder, and reports ea
     exitCode: 0,
     lines: [
       'out chex init: lefthook.yml extends node_modules/@zgeoff/chex/lefthook.yml\n' +
-        'chex init: package.json runs "chex prose length links" as check:docs\n',
+        'chex init: package.json runs "chex prose length links skill" as check:docs\n',
     ],
   });
 
   expect(files[1]).toBe('extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n');
-  expect(files[0]).toInclude('"check:docs": "chex prose length links"');
+  expect(files[0]).toInclude('"check:docs": "chex prose length links skill"');
 });
 
 test('it leaves every file as it was on a second run', async () => {
@@ -130,7 +130,7 @@ test('it adds the chex baseline to the end of the one-entry inline list that the
     exitCode: 0,
     lines: [
       'out chex init: lefthook.yml extends node_modules/@zgeoff/chex/lefthook.yml\n' +
-        'chex init: package.json runs "chex prose length links" as check:docs\n',
+        'chex init: package.json runs "chex prose length links skill" as check:docs\n',
     ],
   });
 

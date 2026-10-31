@@ -78,11 +78,12 @@ one `extends` line in place of the repo-sync entry:
    at the repo root. Expect `bun.lock` to list the five packages.
 2. Run `bun x --no-install chex init` at the repo root. Expect
    `chex init: lefthook.yml extends node_modules/@zgeoff/chex/lefthook.yml`, and, for a repo with no
-   `check:docs` script, `chex init: package.json runs "chex prose length links" as check:docs`.
-   `chex init` adds the chex baseline to an `extends` list in block form or in one-line brackets,
-   such as the `extends: [.lefthook/pre-push-baseline.yml]` that the repo-sync entry asks for. It
-   refuses `extends` written as a single path with no brackets, such as `extends: local.yml`, and a
-   bracket list across lines; for these, add the chex baseline to the list by hand.
+   `check:docs` script,
+   `chex init: package.json runs "chex prose length links skill" as check:docs`. `chex init` adds
+   the chex baseline to an `extends` list in block form or in one-line brackets, such as the
+   `extends: [.lefthook/pre-push-baseline.yml]` that the repo-sync entry asks for. It refuses
+   `extends` written as a single path with no brackets, such as `extends: local.yml`, and a bracket
+   list across lines; for these, add the chex baseline to the list by hand.
 3. Edit `check:docs` to name the docs checks the repo takes, such as
    `chex prose length links vision`. CI runs each check that it names as its own step.
 4. In `lefthook.yml`, delete `parallel` and the baseline's jobs from `pre-push` and `pre-commit`, as
