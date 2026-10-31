@@ -47,7 +47,7 @@ report against the code. It tests a corpus, not one module, so it has no module 
 - A deliberate mismatch between the report and the code fails the suite. A suite that passes on a
   stale report checks nothing.
 - A test that calls a live model is not a replay. It takes the `.model-api` suffix and runs in that
-  lane, as [Lanes](../SKILL.md#lanes) describes.
+  lane, as [Lanes](./slow-tests.md#lanes) describes.
 - Every other rule in the testing skill applies to an evaluation suite.
 
 ## Property tests
@@ -79,7 +79,7 @@ the real mechanism. Configure startup-only settings in an isolated child process
 control that proves an unprotected operation crosses the deadline; a nominal timeout value alone
 does not prove expiry. Keep default configuration coverage separate. Wait out the real default only
 when the runtime cannot expose a shorter faithful deadline. That case stays in the unit run with the
-disable comment that [A test over its limit](../SKILL.md#a-test-over-its-limit) describes.
+disable comment that [A test over its limit](./slow-tests.md#a-test-over-its-limit) describes.
 
 When a third-party library owns a timer, runs it internally, and takes only a duration in its
 config, pass the shortest duration the library accepts and wait on the observable event, never with
@@ -143,8 +143,8 @@ the page's globals, so a test variable used in its body passes the type check an
 ### Time and helpers
 
 - Every browser suite keeps the lane's default timeout, the 10 s limit that
-  [Lanes](../SKILL.md#lanes) states. No browser test takes the disable comment that
-  [A test over its limit](../SKILL.md#a-test-over-its-limit) describes.
+  [Lanes](./slow-tests.md#lanes) states. No browser test takes the disable comment that
+  [A test over its limit](./slow-tests.md#a-test-over-its-limit) describes.
 - When a browser test runs longer, find the cause in the [Slow tests](../SKILL.md#slow-tests) table
   and fix that. The usual causes are a dev server or a build per test, which moves to the lane's
   command; a fixed wait, which becomes a wait for the element or the event; and a test that drives a
@@ -216,9 +216,9 @@ safe after partial failure, interruption, and explicit shutdown.
 
 ## Rust lanes
 
-A Rust crate runs the [lanes](../SKILL.md#lanes) through cargo-nextest, with the same limits. A test
-path prefix names the lane, such as `e2e::` or `host::`, the way a directory or a file suffix does
-for Bun. The repo's `.config/nextest.toml` holds the lanes, in this made-up example:
+A Rust crate runs the [lanes](./slow-tests.md#lanes) through cargo-nextest, with the same limits. A
+test path prefix names the lane, such as `e2e::` or `host::`, the way a directory or a file suffix
+does for Bun. The repo's `.config/nextest.toml` holds the lanes, in this made-up example:
 
 ```toml
 [profile.default]

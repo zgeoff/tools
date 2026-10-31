@@ -23,7 +23,7 @@ Each test acquires a handle from the repo's test-database util, holds it in `set
 injects the handle's connection into the code under test. Code that opens its own connection escapes
 the isolation, so thread the handle's connection through instead. The util builds the schema once
 per run into a template database, from the migrations or from a schema dump, as a
-[per-run template](../SKILL.md#per-run-templates), and the util names which source it uses.
+[per-run template](./slow-tests.md#per-run-templates), and the util names which source it uses.
 
 Each worker clones the template once with `CREATE DATABASE … TEMPLATE`. The clone is named after its
 process, such as `<template>_<pid>`: the util opens the clone when it exists and clones the template
@@ -46,8 +46,8 @@ it, such as `// claimJob commits the claim before it runs the job`.
 
 Each test opens a copy of a migrated template file, because a fresh database pays for every
 migration in every test. The util migrates the template once per run, as a
-[per-run template](../SKILL.md#per-run-templates), and closes it or checkpoints its write-ahead log
-before any test copies it: a copy taken while migrations still sit in the log runs them again.
+[per-run template](./slow-tests.md#per-run-templates), and closes it or checkpoints its write-ahead
+log before any test copies it: a copy taken while migrations still sit in the log runs them again.
 `setupTest()` opens the copy and registers its cleanup with `onTestFinished`.
 
 - Copy the file into the test's `mkdtemp` tree when the code opens its own connection by path, or
