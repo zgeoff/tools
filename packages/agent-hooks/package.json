@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/agent-hooks",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "The Claude Code and Codex CLI hooks for a zgeoff repo, run from one entry point: the skill gate, which denies an edit or a gated tool call until the session loads the skills it needs",
   "keywords": [
     "claude-code",
