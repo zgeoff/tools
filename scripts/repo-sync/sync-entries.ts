@@ -19,9 +19,10 @@ import { probeStaleToolsPins } from './probe-stale-tools-pins.ts';
 import { readSyncCommitFacts } from './read-sync-commit-facts.ts';
 import { renderSyncPullRequestTitle } from './render-sync-pull-request-title.ts';
 import { selectSyncFiles } from './select-sync-files.ts';
+import { toolsPinsEntry } from './tools-pins-entry.ts';
 import { writeCopyPlan } from './write-copy-plan.ts';
 import { writeSyncAutoMerge } from './write-sync-auto-merge.ts';
-import { toolsPinsEntry, writeToolsPins } from './write-tools-pins.ts';
+import { writeToolsPins } from './write-tools-pins.ts';
 
 export interface SyncEntriesOptions {
   readonly cwd: string;

@@ -181,6 +181,27 @@ test('it sends when a commit changes only a step script that a reusable workflow
   expect(outputs).toBe(`send=true\ncommit=${commit}\n`);
 });
 
+test('it sends when a reusable workflow loses its workflow_call trigger', async () => {
+  const ctx = await setupTest();
+
+  const previous = await ctx.writeToolsCommit({
+    'sync/manifest.json': '[]',
+    '.github/workflows/bake.yml': 'on:\n  workflow_call:\njobs: {}\n',
+  });
+
+  const commit = await ctx.writeToolsCommit({
+    '.github/workflows/bake.yml': 'on:\n  schedule: []\njobs: {}\n',
+  });
+
+  ctx.answerGreenCommits([commit, previous]);
+
+  await ctx.plan('workflow_run', commit);
+
+  const outputs = await ctx.readOutputs();
+
+  expect(outputs).toBe(`send=true\ncommit=${commit}\n`);
+});
+
 test('it sends nothing when a commit changes only a workflow that no repo calls', async () => {
   const ctx = await setupTest();
 

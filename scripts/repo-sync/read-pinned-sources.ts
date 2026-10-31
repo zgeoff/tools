@@ -68,7 +68,8 @@ function isReusableWorkflow(text: string): boolean {
   return typeof triggers === 'object' && triggers !== null && 'workflow_call' in triggers;
 }
 
-// GitHub runs no workflow it cannot parse, so a broken file at an old commit is no reusable workflow.
+// GitHub runs no workflow it cannot parse, so a broken file at an old commit is no reusable
+// workflow.
 function parseWorkflow(text: string): unknown {
   try {
     const workflow: unknown = Bun.YAML.parse(text);

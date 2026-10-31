@@ -1,6 +1,6 @@
 import type { SyncedEntry } from './plan-retired-file-removal.ts';
 import { retiredFilesName } from './plan-retired-file-removal.ts';
-import { toolsPinsEntry } from './write-tools-pins.ts';
+import { toolsPinsEntry } from './tools-pins-entry.ts';
 
 // commitlint's header-max-length rule allows 72 characters, and a squash merge
 // makes the title the commit subject.

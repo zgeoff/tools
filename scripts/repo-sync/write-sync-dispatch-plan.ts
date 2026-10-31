@@ -7,7 +7,7 @@ import { writeStepOutputs } from '../ci/write-step-outputs.ts';
 import { parseSyncEntries } from './parse-sync-entries.ts';
 import type { SyncDispatchRange } from './pick-sync-dispatch-range.ts';
 import { pickSyncDispatchRange } from './pick-sync-dispatch-range.ts';
-import { readPinnedSources } from './read-pinned-sources.ts';
+import { readCommitPinnedSources } from './read-commit-pinned-sources.ts';
 
 export interface WriteSyncDispatchPlanOptions {
   // A checkout of zgeoff/tools with the history of main.
@@ -114,12 +114,19 @@ async function probeSyncedChange(
     range.commit,
   ]);
 
+  const tools = {
+    runCommand: options.runCommand,
+    cwd: options.cwd,
+    env: options.env,
+    repository: '.',
+  };
+
   const sources = new Set([
     manifestPath,
     ...(await readManifestSources(options, range.previous)),
     ...(await readManifestSources(options, range.commit)),
-    ...(await readCommitPinnedSources(options, range.previous)),
-    ...(await readCommitPinnedSources(options, range.commit)),
+    ...(await readCommitPinnedSources({ ...tools, commit: range.previous })),
+    ...(await readCommitPinnedSources({ ...tools, commit: range.commit })),
   ]);
 
   return diff.stdout.split('\0').some((path) => sources.has(path));
@@ -135,32 +142,6 @@ async function readManifestSources(
   const entries = parseSyncEntries(manifestValue) ?? [];
 
   return entries.flatMap((entry) => entry.files.map((file) => file.source));
-}
-
-async function readCommitPinnedSources(
-  options: Readonly<WriteSyncDispatchPlanOptions>,
-  commit: string,
-): Promise<string[]> {
-  const listed = await runPlanCommand(options, [
-    'git',
-    'ls-tree',
-    '-z',
-    '--name-only',
-    commit,
-    '.github/workflows/',
-  ]);
-
-  return readPinnedSources({
-    workflowPaths: listed.stdout.split('\0').filter((path) => path !== ''),
-    readFile: async (path) => {
-      const shown = await options.runCommand(['git', 'show', `${commit}:${path}`], {
-        cwd: options.cwd,
-        env: options.env,
-      });
-
-      return shown.exitCode === 0 ? shown.stdout : null;
-    },
-  });
 }
 
 if (import.meta.main) {
