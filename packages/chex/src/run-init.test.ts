@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
 import { lockFileWrites } from '../../../test-utils/lock-file-writes.ts';
+import { makeFailOnCall } from '../../../test-utils/make-fail-on-call.ts';
+import type { InitDeps } from './run-init.ts';
 import { runInit } from './run-init.ts';
 import { writeTextFile } from './write-text-file.ts';
 
@@ -27,12 +29,15 @@ async function setupTest() {
 
   const lines: string[] = [];
 
-  const run = () =>
+  // Runs init with the real filesystem, or with a rename that the test wraps.
+  const run = (
+    wrapRename: (real: InitDeps['renameFile']) => InitDeps['renameFile'] = (real) => real,
+  ) =>
     runInit({
       repoRoot,
       readText: readOptionalText,
       writeText: writeTextFile,
-      renameFile: (from, to) => rename(from, to),
+      renameFile: wrapRename((from, to) => rename(from, to)),
       removeFile: (path) => rm(path, { force: true }),
       writeOutput: (text) => {
         lines.push(`out ${text}`);
@@ -140,63 +145,57 @@ test('it fails and writes nothing in a folder with no package.json', async () =>
   expect(files).toStrictEqual([undefined, undefined]);
 });
 
-// Only ext4's immutable flag, which needs root, stops a rename onto a file; a read-only mode does not.
-const canBlockReplace = process.getuid?.() === 0;
+test('it puts lefthook.yml back as it was when package.json cannot be replaced', async () => {
+  const ctx = await setupTest();
 
-test.skipIf(!canBlockReplace)(
-  'it puts lefthook.yml back as it was when package.json cannot be replaced',
-  async () => {
-    const ctx = await setupTest();
+  const packageText = JSON.stringify({
+    name: 'kettle',
+    devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
+  });
 
-    const packageText = JSON.stringify({
-      name: 'kettle',
-      devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
-    });
+  await writeFile(join(ctx.repoRoot, 'package.json'), packageText);
+  await writeFile(join(ctx.repoRoot, 'lefthook.yml'), 'extends: [.lefthook/local.yml]\n');
 
-    await writeFile(join(ctx.repoRoot, 'package.json'), packageText);
-    await writeFile(join(ctx.repoRoot, 'lefthook.yml'), 'extends: [.lefthook/local.yml]\n');
+  // init renames lefthook.yml into place first, so the second rename is package.json's.
+  const exitCode = await ctx.run((real) =>
+    makeFailOnCall(real, 2, 'EPERM: operation not permitted'),
+  );
 
-    await ctx.lockFile('package.json');
+  const files = await ctx.readFiles();
+  const names = await readdir(ctx.repoRoot);
 
-    const exitCode = await ctx.run();
-    const files = await ctx.readFiles();
-    const names = await readdir(ctx.repoRoot);
+  expect({ exitCode, lines: ctx.lines }).toStrictEqual({
+    exitCode: 1,
+    lines: [
+      'err chex init: could not replace package.json: EPERM: operation not permitted, so both files stay as they were\n',
+    ],
+  });
 
-    expect({ exitCode, lines: ctx.lines }).toStrictEqual({
-      exitCode: 1,
-      lines: [
-        expect.stringMatching(
-          /^err chex init: could not replace package\.json: .+, so both files stay as they were\n$/u,
-        ),
-      ],
-    });
+  expect(files).toStrictEqual([packageText, 'extends: [.lefthook/local.yml]\n']);
+  expect(names.toSorted()).toStrictEqual(['lefthook.yml', 'package.json']);
+});
 
-    expect(files).toStrictEqual([packageText, 'extends: [.lefthook/local.yml]\n']);
-    expect(names.toSorted()).toStrictEqual(['lefthook.yml', 'package.json']);
-  },
-);
+test('it removes the lefthook.yml it wrote when package.json cannot be replaced', async () => {
+  const ctx = await setupTest();
 
-test.skipIf(!canBlockReplace)(
-  'it removes the lefthook.yml it wrote when package.json cannot be replaced',
-  async () => {
-    const ctx = await setupTest();
+  const packageText = JSON.stringify({
+    name: 'kettle',
+    devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
+  });
 
-    const packageText = JSON.stringify({
-      name: 'kettle',
-      devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
-    });
+  await writeFile(join(ctx.repoRoot, 'package.json'), packageText);
 
-    await writeFile(join(ctx.repoRoot, 'package.json'), packageText);
+  const exitCode = await ctx.run((real) =>
+    makeFailOnCall(real, 2, 'EPERM: operation not permitted'),
+  );
 
-    await ctx.lockFile('package.json');
+  const files = await ctx.readFiles();
+  const names = await readdir(ctx.repoRoot);
 
-    const exitCode = await ctx.run();
-    const files = await ctx.readFiles();
-
-    expect(exitCode).toBe(1);
-    expect(files).toStrictEqual([packageText, undefined]);
-  },
-);
+  expect(exitCode).toBe(1);
+  expect(files).toStrictEqual([packageText, undefined]);
+  expect(names).toStrictEqual(['package.json']);
+});
 
 test('it leaves both files untouched when the staged package.json fails midway', async () => {
   const ctx = await setupTest();
