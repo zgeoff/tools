@@ -135,40 +135,35 @@ test('it replaces the bundles folder with the bundles it writes', async () => {
   expect(text).toBe('boil');
 });
 
-test('it finds no fault in the bundles this commit holds', async () => {
-  const root = join(import.meta.dir, '../..');
-
-  const committed = await readCommittedStepBundles(root, nodeFileSystem);
-  const faults = await runBundleChecks(root, committed, () => Promise.resolve({ logs: [] }));
-
-  expect(faults).toStrictEqual([]);
-});
-
 test('it reports the set whose bundle imports a package, which a runner cannot install', async () => {
-  const root = join(import.meta.dir, '../..');
+  const committed = new Map([
+    [
+      'step-bundles/scripts/paths-changed/run-changed-files-step.js',
+      "import { match } from 'ts-pattern';\n\nmatch(1);\n",
+    ],
+  ]);
 
-  const committed = await readCommittedStepBundles(root, nodeFileSystem);
-
-  committed.set(
-    'step-bundles/scripts/paths-changed/run-changed-files-step.js',
-    "import { match } from 'ts-pattern';\n\nmatch(1);\n",
-  );
-
-  const faults = await runBundleChecks(root, committed, () => Promise.resolve({ logs: [] }));
+  const faults = await runBundleChecks('/repo', committed, () => Promise.resolve({ logs: [] }));
 
   expect(faults).toStrictEqual([
     expect.stringMatching(/^the paths-changed download: Error: .*ts-pattern/u),
   ]);
 });
 
-test('it reports each error that compiling the bundles logs', async () => {
-  const root = join(import.meta.dir, '../..');
+test('it compiles each committed bundle, and reports each error the compile logs', async () => {
+  const committed = new Map([['step-bundles/scripts/kettle/boil.js', 'export {};\n']]);
 
-  const committed = await readCommittedStepBundles(root, nodeFileSystem);
+  const configs: unknown[] = [];
 
-  const faults = await runBundleChecks(root, committed, () =>
-    Promise.resolve({ logs: ['Could not resolve "./lid.js"'] }),
-  );
+  const faults = await runBundleChecks('/repo', committed, (config) => {
+    configs.push(config);
+
+    return Promise.resolve({ logs: ['Could not resolve "./lid.js"'] });
+  });
 
   expect(faults).toStrictEqual(['bun build: Could not resolve "./lid.js"']);
+
+  expect(configs).toStrictEqual([
+    { entrypoints: ['/repo/step-bundles/scripts/kettle/boil.js'], target: 'bun', throw: false },
+  ]);
 });
