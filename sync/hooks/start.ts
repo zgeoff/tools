@@ -13,37 +13,62 @@ const GUARD_SUFFIX = '.guard';
 const READ_ONLY_PROGRAMS = new Set(['cat', 'ls', 'pwd']);
 
 const PLAIN_WORDS = /^[\w./@:=+,-]+(?: [\w./@:=+,-]+)*$/u;
-const root = path.resolve(import.meta.dirname, '../..');
-const args = process.argv.slice(2);
-const harness = parseHarness(args.filter((arg) => arg !== AFTER_INSTALL));
+const ROOT = path.resolve(import.meta.dirname, '../..');
 
-const agentHooks = await import('@zgeoff/agent-hooks').catch(() => null);
+type LockState = 'absent' | 'held' | 'stale';
 
-if (agentHooks !== null) {
-  await agentHooks.runAgentHook({ harness });
+type ClaimStep = 'retry-guard' | 'wait-for-guard' | 'give-up' | 'wait-for-install' | 'take-lock';
+
+// The guard can vanish between a failed link and the read, so an absent guard means another try.
+const CLAIM_STEPS = {
+  guard: { absent: 'retry-guard', held: 'wait-for-guard', stale: 'give-up' },
+  install: { absent: 'take-lock', held: 'wait-for-install', stale: 'take-lock' },
+} as const satisfies Readonly<Record<string, Readonly<Record<LockState, ClaimStep>>>>;
+
+interface Claim {
+  readonly lock: keyof typeof CLAIM_STEPS;
+  readonly state: LockState;
 }
 
-if (!args.includes(AFTER_INSTALL)) {
-  try {
-    await runInstallOnce(path.join(root, 'node_modules', '.agent-hooks-install.lock'));
-  } catch (error) {
-    console.error(`The agent hook could not run bun install: ${String(error)}`);
+export function pickClaimStep(claim: Claim): ClaimStep {
+  return CLAIM_STEPS[claim.lock][claim.state];
+}
+
+if (import.meta.main) {
+  await runHook(process.argv.slice(2));
+}
+
+async function runHook(args: readonly string[]): Promise<void> {
+  const harness = parseHarness(args.filter((arg) => arg !== AFTER_INSTALL));
+
+  const agentHooks = await import('@zgeoff/agent-hooks').catch(() => null);
+
+  if (agentHooks !== null) {
+    await agentHooks.runAgentHook({ harness });
   }
 
-  // Bun can keep a failed package lookup for the life of the process, so the retry is a new process,
-  // which reads the hook payload from the same stdin.
-  const retry = spawnSync(
-    process.execPath,
-    ['--no-install', import.meta.filename, ...args, AFTER_INSTALL],
-    {
-      stdio: 'inherit',
-    },
-  );
+  if (!args.includes(AFTER_INSTALL)) {
+    try {
+      await runInstallOnce(path.join(ROOT, 'node_modules', '.agent-hooks-install.lock'));
+    } catch (error) {
+      console.error(`The agent hook could not run bun install: ${String(error)}`);
+    }
 
-  process.exit(retry.status ?? 2);
+    // Bun can keep a failed package lookup for the life of the process, so the retry is a new
+    // process, which reads the hook payload from the same stdin.
+    const retry = spawnSync(
+      process.execPath,
+      ['--no-install', import.meta.filename, ...args, AFTER_INSTALL],
+      {
+        stdio: 'inherit',
+      },
+    );
+
+    process.exit(retry.status ?? 2);
+  }
+
+  refuseUnlessReadOnly(readPayloadText());
 }
-
-refuseUnlessReadOnly(readPayloadText());
 
 function parseHarness(harnessArgs: readonly string[]): 'claude-code' | 'codex' {
   try {
@@ -86,7 +111,7 @@ async function runInstallOnce(lockPath: string): Promise<void> {
   }
 
   try {
-    spawnSync('bun', ['install', '--frozen-lockfile'], { cwd: root, stdio: ['ignore', 2, 2] });
+    spawnSync('bun', ['install', '--frozen-lockfile'], { cwd: ROOT, stdio: ['ignore', 2, 2] });
   } finally {
     rmSync(lockPath, { force: true });
   }
@@ -98,13 +123,13 @@ async function claimInstallLock(lockPath: string): Promise<'owner' | 'waiter' | 
   const guardPath = `${lockPath}${GUARD_SUFFIX}`;
 
   for (let attempt = 0; !tryLock(guardPath); attempt += 1) {
-    const guardState = readLockState(guardPath);
+    const step = pickClaimStep({ lock: 'guard', state: readLockState(guardPath) });
 
-    if (guardState === 'stale') {
+    if (step === 'give-up') {
       return 'stuck';
     }
 
-    if (guardState === 'held') {
+    if (step === 'wait-for-guard') {
       if (attempt === 0) {
         console.error(
           'Another agent hook claims the install lock here, so this one waits its turn.',
@@ -116,7 +141,7 @@ async function claimInstallLock(lockPath: string): Promise<'owner' | 'waiter' | 
   }
 
   try {
-    if (readLockState(lockPath) === 'held') {
+    if (pickClaimStep({ lock: 'install', state: readLockState(lockPath) }) === 'wait-for-install') {
       return 'waiter';
     }
 
@@ -147,7 +172,7 @@ function tryLock(lockPath: string): boolean {
 
 // A hook that the harness killed leaves its lock behind, so a lock counts as held only while the
 // process it names runs.
-function readLockState(lockPath: string): 'absent' | 'held' | 'stale' {
+function readLockState(lockPath: string): LockState {
   const text = readLockText(lockPath);
 
   if (text === null) {

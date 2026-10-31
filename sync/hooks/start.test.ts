@@ -7,6 +7,7 @@ import { createStubInstall } from '../../test-utils/create-stub-install.ts';
 import { readStreamUntil } from '../../test-utils/read-stream-until.ts';
 import { readTextOrEmpty } from '../../test-utils/read-text-or-empty.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import { pickClaimStep } from './start.ts';
 
 // The stub installs with the bun on PATH and runs the retry with its own runtime, so a stand-in bun
 // first on PATH stands in for the install alone. Its installed package re-exports this repo's
@@ -615,4 +616,15 @@ test('it refuses a harness it does not know', async () => {
   expect(result.stderr).toBe(
     'The agent hook does not know the harness cursor. Use codex or claude-code.\n',
   );
+});
+
+test.each([
+  ['the guard is absent', { lock: 'guard', state: 'absent' }, 'retry-guard'],
+  ['another hook holds the guard', { lock: 'guard', state: 'held' }, 'wait-for-guard'],
+  ['a stopped hook left the guard', { lock: 'guard', state: 'stale' }, 'give-up'],
+  ['the install lock is absent', { lock: 'install', state: 'absent' }, 'take-lock'],
+  ['another hook holds the install lock', { lock: 'install', state: 'held' }, 'wait-for-install'],
+  ['a stopped hook left the install lock', { lock: 'install', state: 'stale' }, 'take-lock'],
+] as const)('it picks the claim step when %s', (_, claim, expected) => {
+  expect(pickClaimStep(claim)).toBe(expected);
 });
