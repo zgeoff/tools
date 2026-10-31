@@ -1,4 +1,5 @@
 import { docsCheckNames } from '../../packages/chex/src/check-names.ts';
+import { parseChexArgs } from '../../packages/chex/src/parse-chex-args.ts';
 
 export type DocsChecks =
   | { readonly kind: 'none' }
@@ -12,15 +13,20 @@ export function parseDocsChecks(script: string | undefined): DocsChecks {
     return { kind: 'none' };
   }
 
-  const [program, ...checks] = script.trim().split(/\s+/u);
-  const unknown = checks.filter((check) => !docsCheckNames.some((name) => name === check));
+  const [program, ...words] = script.trim().split(/\s+/u);
+  const request = parseChexArgs(words);
 
-  if (program !== 'chex' || checks.length === 0 || unknown.length > 0) {
-    return {
-      kind: 'refused',
-      message: `package.json runs "${script}" as check:docs; write it as chex and the docs checks it takes, from ${docsCheckNames.join(', ')}, such as "chex prose length links", so CI runs each check as its own step.`,
-    };
+  if (
+    program === 'chex' &&
+    request.kind === 'checks' &&
+    request.args.length === 0 &&
+    request.names.every((name) => docsCheckNames.some((docsName) => docsName === name))
+  ) {
+    return { kind: 'named', checks: request.names };
   }
 
-  return { kind: 'named', checks: [...new Set(checks)] };
+  return {
+    kind: 'refused',
+    message: `package.json runs "${script}" as check:docs; write it as chex and the docs checks it takes, from ${docsCheckNames.join(', ')}, such as "chex prose length links", so CI runs each check as its own step.`,
+  };
 }

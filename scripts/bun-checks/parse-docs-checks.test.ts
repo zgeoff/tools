@@ -17,6 +17,7 @@ test.each([
   ['a script that names a repo check', 'chex length commits'],
   ['a script that names no check', 'chex'],
   ['a script that chains a command', 'chex length && echo done'],
+  ['a script that hands a path to a check', 'chex prose docs/guide.md'],
 ])('it refuses %s', (_, script) => {
   expect(parseDocsChecks(script)).toStrictEqual({
     kind: 'refused',
