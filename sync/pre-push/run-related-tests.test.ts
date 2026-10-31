@@ -165,9 +165,14 @@ test.each([
 });
 
 test('#resolveRelatedTests leaves out a file of a lane that the oxlint config declares', () => {
-  const readConfigText = mock(
-    () => '{ "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": { "radar": 30000 } }] } }',
-  );
+  const configs = new Map([
+    [
+      '/repo/.oxlintrc.json',
+      '{ "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": { "radar": 30000 } }] } }',
+    ],
+  ]);
+
+  const readConfigText = mock((path: string) => configs.get(path) ?? null);
 
   expect(
     resolveRelatedTests(['src/sweep.radar.test.ts'], {
@@ -177,8 +182,49 @@ test('#resolveRelatedTests leaves out a file of a lane that the oxlint config de
     }),
   ).toBeEmpty();
 
-  expect(readConfigText).toHaveBeenCalledTimes(1);
   expect(readConfigText).toHaveBeenCalledWith('/repo/.oxlintrc.json');
+});
+
+test('#resolveRelatedTests leaves out a test that the Bun config ignores', () => {
+  const configs = new Map([
+    ['/repo/bunfig.toml', '[test]\npathIgnorePatterns = ["spikes/**", "drafts/**"]\n'],
+  ]);
+
+  const readConfigText = mock((path: string) => configs.get(path) ?? null);
+
+  expect(
+    resolveRelatedTests(['spikes/probe/plan.ts', 'drafts/notes.test.ts', 'src/a.ts'], {
+      cwd: '/repo',
+      readConfigText,
+      probeFile: () => true,
+    }),
+  ).toStrictEqual(['src/a.test.ts']);
+
+  expect(readConfigText).toHaveBeenCalledWith('/repo/bunfig.toml');
+});
+
+test('#resolveRelatedTests reads one ignore pattern written as a string', () => {
+  const configs = new Map([['/repo/bunfig.toml', '[test]\npathIgnorePatterns = "spikes/**"\n']]);
+
+  expect(
+    resolveRelatedTests(['spikes/probe/plan.ts', 'src/a.ts'], {
+      cwd: '/repo',
+      readConfigText: (path) => configs.get(path) ?? null,
+      probeFile: () => true,
+    }),
+  ).toStrictEqual(['src/a.test.ts']);
+});
+
+test('#resolveRelatedTests names the Bun config when it cannot parse it', () => {
+  const configs = new Map([['/repo/bunfig.toml', '[test\n']]);
+
+  expect(() =>
+    resolveRelatedTests(['src/a.ts'], {
+      cwd: '/repo',
+      readConfigText: (path) => configs.get(path) ?? null,
+      probeFile: () => true,
+    }),
+  ).toThrow(/^cannot parse bunfig\.toml: /u);
 });
 
 test('#resolveRelatedTests selects a test whose suffix no lane declares', () => {
@@ -382,6 +428,38 @@ test('#runRelatedTests runs no test of a lane that the oxlint config declares', 
   await writeFile(join(ctx.directory, 'src/boot.kvm.test.ts'), '');
 
   const result = await $`bun ${join(import.meta.dir, 'run-related-tests.ts')} src/boot.kvm.ts`
+    .cwd(ctx.directory)
+    .env({ PATH: process.env['PATH'] ?? '', TEST_WORKERS: '2' })
+    .nothrow()
+    .quiet();
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'run-related-tests: no related tests\n',
+  });
+});
+
+test('#runRelatedTests runs no test that the Bun config ignores', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { test: 'bun test' } }),
+  );
+
+  await writeFile(
+    join(ctx.directory, 'bunfig.toml'),
+    '[test]\npathIgnorePatterns = ["spikes/**"]\n',
+  );
+
+  await mkdir(join(ctx.directory, 'spikes/probe'), { recursive: true });
+
+  await writeFile(
+    join(ctx.directory, 'spikes/probe/plan.test.ts'),
+    "import { expect, test } from 'bun:test';\n\ntest('it adds', () => {\n  expect(1 + 1).toBe(2);\n});\n",
+  );
+
+  const result = await $`bun ${join(import.meta.dir, 'run-related-tests.ts')} spikes/probe/plan.ts`
     .cwd(ctx.directory)
     .env({ PATH: process.env['PATH'] ?? '', TEST_WORKERS: '2' })
     .nothrow()
