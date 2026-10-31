@@ -1,6 +1,10 @@
 import type { SyncedEntry } from './plan-retired-file-removal.ts';
 import { retiredFilesName } from './plan-retired-file-removal.ts';
 
+// commitlint's header-max-length rule allows 72 characters, and a squash merge
+// makes the title the commit subject.
+const maxTitleLength = 72;
+
 export function renderSyncPullRequestTitle(synced: readonly SyncedEntry[]): string {
   const names = synced.map((entry) => renderEntryName(entry.name));
   const [first, second] = names;
@@ -9,8 +13,10 @@ export function renderSyncPullRequestTitle(synced: readonly SyncedEntry[]): stri
     return `chore(sync): update ${first}`;
   }
 
-  return names.length === 2
-    ? `chore(sync): update ${first} and ${second}`
+  const pairTitle = `chore(sync): update ${first} and ${second}`;
+
+  return names.length === 2 && pairTitle.length <= maxTitleLength
+    ? pairTitle
     : `chore(sync): update ${names.length} shared entries`;
 }
 
