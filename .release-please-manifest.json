@@ -1,7 +1,7 @@
 {
   "packages/bun-test-extended": "0.2.2",
   "packages/format-codemod": "0.3.4",
-  "packages/oxlint-config": "0.7.4",
+  "packages/oxlint-config": "0.7.5",
   "packages/tsconfig": "2.0.0",
   "packages/commitlint-config": "0.1.0",
   "packages/oxfmt-config": "0.1.1",
@@ -10,8 +10,8 @@
   "packages/std": "0.3.0",
   "packages/kysely-bun-sqlite": "0.3.0",
   "packages/skill-gate": "0.2.11",
-  "packages/diet": "0.1.2",
+  "packages/diet": "0.1.3",
   "packages/agent-hooks": "0.1.1",
-  "packages/rig": "0.0.2",
+  "packages/rig": "0.0.3",
   "packages/chex": "0.0.1"
 }

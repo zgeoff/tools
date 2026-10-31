@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/rig",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Run every test lane of a repo from one declaration of its limits, with a browser lane built in",
   "keywords": [
     "bun",
