@@ -10,8 +10,8 @@ export type LefthookOutcome =
 const extendsLine = /^extends:[ \t]*(?:#.*)?$/mu;
 
 // Edits the text rather than writing parsed YAML back, so the repo's comments and layout stay.
-export function buildLefthookExtends(text: string | null): LefthookOutcome {
-  if (text === null) {
+export function buildLefthookExtends(text: string | undefined): LefthookOutcome {
+  if (text === undefined) {
     return { kind: 'changed', text: `extends:\n  - ${baselinePath}\n` };
   }
 

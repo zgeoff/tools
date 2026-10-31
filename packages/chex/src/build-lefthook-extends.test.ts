@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { buildLefthookExtends } from './build-lefthook-extends.ts';
 
 test('it writes a config that extends the baseline when the repo has no lefthook.yml', () => {
-  expect(buildLefthookExtends(null)).toStrictEqual({
+  expect(buildLefthookExtends(undefined)).toStrictEqual({
     kind: 'changed',
     text: 'extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n',
   });
