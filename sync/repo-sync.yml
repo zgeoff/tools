@@ -42,6 +42,7 @@ jobs:
       pull-requests: read
       checks: read
       statuses: read
+      actions: read
     uses: zgeoff/tools/.github/workflows/repo-sync.yml@main
     with:
       ref: ${{ github.event.client_payload.sha }}

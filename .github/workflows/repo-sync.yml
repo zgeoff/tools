@@ -34,7 +34,8 @@
 #
 # The alarm job opens an issue in the caller when the open sync pull request has
 # a failing check and is more than a day old, so it needs the caller's
-# issues: write, pull-requests: read, checks: read and statuses: read.
+# issues: write, pull-requests: read, checks: read, statuses: read and
+# actions: read.
 #
 # A manifest entry marked `"optIn": true` reaches a caller only when the caller
 # lists its name in the `include` input. `include` fails the run on a name that
@@ -250,6 +251,8 @@ jobs:
       pull-requests: read
       checks: read
       statuses: read
+      # gh reads each check's workflow run, which a private repo hides without it.
+      actions: read
     steps:
       - name: Download the step script downloader
         env: *tools-url
