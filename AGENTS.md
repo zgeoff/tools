@@ -80,8 +80,9 @@ repos too, so an edit to one of them changes every repo that takes it.
   you change the manifest or a file an entry lists. CI runs it, and the pre-push hook does not.
 - `bun run check:release-workflow` checks the tag step of the shared release job in
   `.github/workflows/release-please.yml`. CI and the pre-push hook run it.
-- `bun run check:repo-sync-concurrency` checks that two dispatches of different tools commits both
-  run: the stub `sync/repo-sync.yml` gives them two concurrency groups, and the sync job of
-  `.github/workflows/repo-sync.yml` queues every waiting run. CI and the pre-push hook run it.
+- `bun run check:repo-sync-workflows` checks the stub `sync/repo-sync.yml` against
+  `.github/workflows/repo-sync.yml`: two dispatches of different tools commits get two concurrency
+  groups, the sync job queues every waiting run, the stub grants every permission a job asks for,
+  and the alarm job asks for `actions: read`. CI and the pre-push hook run it.
 - `bun run check:workflows` runs the shared workflow lint over the workflows HEAD holds, so commit a
   workflow change before you run it. CI runs it.

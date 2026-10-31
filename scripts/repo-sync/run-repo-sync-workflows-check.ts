@@ -1,7 +1,8 @@
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { collectRepoSyncConcurrencyFaults } from './collect-repo-sync-concurrency-faults.ts';
+import { collectRepoSyncPermissionFaults } from './collect-repo-sync-permission-faults.ts';
 
-export interface RepoSyncConcurrencyCheckOptions {
+export interface RepoSyncWorkflowsCheckOptions {
   readonly readStub: () => Promise<string>;
 
   readonly readWorkflow: () => Promise<string>;
@@ -13,14 +14,17 @@ export interface RepoSyncConcurrencyCheckOptions {
 
 // Returns the exit code: 0 with no fault, 1 with faults, 2 when a workflow cannot be read or
 // parsed.
-export async function runRepoSyncConcurrencyCheck(
-  options: RepoSyncConcurrencyCheckOptions,
+export async function runRepoSyncWorkflowsCheck(
+  options: RepoSyncWorkflowsCheckOptions,
 ): Promise<number> {
   try {
     const stubText = await options.readStub();
     const workflowText = await options.readWorkflow();
 
-    const faults = collectRepoSyncConcurrencyFaults(stubText, workflowText);
+    const faults = [
+      ...collectRepoSyncConcurrencyFaults(stubText, workflowText),
+      ...collectRepoSyncPermissionFaults(stubText, workflowText),
+    ];
 
     for (const fault of faults) {
       options.writeOutput(`${fault}\n`);
@@ -29,7 +33,7 @@ export async function runRepoSyncConcurrencyCheck(
     return faults.length === 0 ? 0 : 1;
   } catch (error) {
     options.writeError(
-      `repo-sync-concurrency: ${error instanceof Error ? error.message : String(error)}\n`,
+      `repo-sync-workflows: ${error instanceof Error ? error.message : String(error)}\n`,
     );
 
     return 2;
@@ -37,7 +41,7 @@ export async function runRepoSyncConcurrencyCheck(
 }
 
 async function runCLI(): Promise<void> {
-  process.exitCode = await runRepoSyncConcurrencyCheck({
+  process.exitCode = await runRepoSyncWorkflowsCheck({
     readStub: () => nodeFileSystem.readText('sync/repo-sync.yml'),
     readWorkflow: () => nodeFileSystem.readText('.github/workflows/repo-sync.yml'),
     writeOutput: (text) => {
