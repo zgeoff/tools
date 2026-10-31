@@ -74,8 +74,8 @@ fits a 2 GiB host. A repo opts in with three changes:
 A repo that installs [`@zgeoff/chex`](../../packages/chex/README.md) takes the same baseline with
 one `extends` line in place of the repo-sync entry:
 
-1. Run `bun add -d @zgeoff/chex @zgeoff/rig @zgeoff/diet` at the repo root. Expect `bun.lock` to
-   list the three packages.
+1. Run `bun add -d @zgeoff/chex @zgeoff/rig @zgeoff/diet @commitlint/cli @zgeoff/commitlint-config`
+   at the repo root. Expect `bun.lock` to list the five packages.
 2. Run `bun x --no-install chex init` at the repo root. Expect
    `chex init: lefthook.yml extends node_modules/@zgeoff/chex/lefthook.yml`, and, for a repo with no
    `check:docs` script, `chex init: package.json runs "chex prose length links" as check:docs`.

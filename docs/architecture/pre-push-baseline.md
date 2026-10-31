@@ -66,7 +66,9 @@ Each job runs its command under [`diet`](./memory-caps.md), so in a
 job prints its peak memory. The jobs call `bun x --no-install` for chex, rig and diet, so a repo
 that lacks one of them fails the job, and bun never downloads a package of that name from npm. A
 repo that takes the baseline installs `@zgeoff/chex`, `@zgeoff/rig` and `@zgeoff/diet`, and
-`chex init` refuses to write the `extends` line until it does.
+`chex init` refuses to write the `extends` line until it does. The commits job lints with
+`@commitlint/cli` and `@zgeoff/commitlint-config`, and in a repo that lacks either one it prints a
+notice and passes.
 
 ## The related tests
 
