@@ -1366,6 +1366,7 @@ function listKeys(value) {
 // packages/chex/src/build-lefthook-extends.ts
 var baselinePath = "node_modules/@zgeoff/chex/lefthook.yml";
 var extendsLine = /^extends:[ \t]*(?:#.*)?$/mu;
+var inlineExtends = /^(?<open>extends:[ \t]*\[)(?<items>[^\]\n]*)(?<close>\][ \t]*(?:#.*)?)$/mu;
 function buildLefthookExtends(text) {
   if (text === undefined) {
     return { kind: "changed", text: `extends:
@@ -1382,6 +1383,10 @@ function buildLefthookExtends(text) {
   }
   if (Array.isArray(extended) && extended.includes(baselinePath)) {
     return { kind: "unchanged" };
+  }
+  const inline = inlineExtends.exec(text);
+  if (Array.isArray(extended) && inline !== null) {
+    return checkEdit(config, buildInlineExtends(text, inline));
   }
   const match = extendsLine.exec(text);
   if (!Array.isArray(extended) || match === null) {
@@ -1434,6 +1439,13 @@ ${text}`;
 extends:
   - ${baselinePath}
 ${text.slice(end)}`;
+}
+function buildInlineExtends(text, inline) {
+  const groups = inline.groups ?? {};
+  const items = groups["items"] ?? "";
+  const listed = items.trim() === "" ? baselinePath : `${items.trimEnd()}, ${baselinePath}`;
+  const end = inline.index + inline[0].length;
+  return `${text.slice(0, inline.index)}${groups["open"] ?? ""}${listed}${groups["close"] ?? ""}${text.slice(end)}`;
 }
 
 // packages/chex/src/build-init-plan.ts
