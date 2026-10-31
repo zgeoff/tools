@@ -13,5 +13,5 @@
   "packages/diet": "0.1.4",
   "packages/agent-hooks": "0.1.3",
   "packages/rig": "0.0.4",
-  "packages/chex": "0.0.2"
+  "packages/chex": "0.0.3"
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.3](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.2...@zgeoff/chex@0.0.3) (2026-10-31)
+
+
+### Bug Fixes
+
+* **chex:** read the repo's visibility for the workflow lint in a hook ([#423](https://github.com/zgeoff/tools/issues/423)) ([2dcc64b](https://github.com/zgeoff/tools/commit/2dcc64b65afeea2023dc8dcf028e7c5e8592871f))
+
 ## [0.0.2](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.1...@zgeoff/chex@0.0.2) (2026-10-31)
 
 ### Features
