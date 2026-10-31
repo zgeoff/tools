@@ -36,15 +36,17 @@ export async function runChex(argv: readonly string[], deps: ChexDeps): Promise<
   return exitCode;
 }
 
-// A check that throws, such as a shell script on a host without bash, cannot run, so it counts as
-// exit 2 and the checks after it still run.
+// A check that throws, such as a shell script on a host without bash, cannot run, and so does a
+// script that exits with a shell's own code, such as 127 for a missing perl: each counts as exit 2.
 async function runOneCheck(
   name: CheckName,
   args: readonly string[],
   deps: ChexDeps,
 ): Promise<number> {
   try {
-    return await deps.runCheck(name, args);
+    const exitCode = await deps.runCheck(name, args);
+
+    return exitCode === 0 || exitCode === 1 ? exitCode : 2;
   } catch (error) {
     deps.writeError(
       `chex: ${name} cannot run: ${error instanceof Error ? error.message : String(error)}\n`,

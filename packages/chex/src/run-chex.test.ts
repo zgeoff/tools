@@ -82,6 +82,17 @@ test('it prints bounced and exits 2 for a check that throws, and runs the checks
   });
 });
 
+test('it exits 2 and prints bounced for a check that exits with a shell code such as 127', async () => {
+  const ctx = setupTest({ links: 127 });
+
+  const exitCode = await runChex(['links'], ctx.deps);
+
+  expect({ exitCode, lines: ctx.lines }).toStrictEqual({
+    exitCode: 2,
+    lines: ['out bounced: links\n'],
+  });
+});
+
 test('it hands the arguments to the one check it names', async () => {
   const ctx = setupTest();
 

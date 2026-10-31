@@ -34,7 +34,8 @@ installs both, and `chex init` fails until it does.
 
 `chex <check>...` runs each check in turn, even after one bounces, and exits with the highest exit
 code among them: 0 when each clears, 1 when a check finds a fault, and 2 when a check cannot run.
-`chex <check> <args...>` hands the arguments to that one check.
+chex also exits 2 for a check that throws or exits with any other code, such as 127 for a missing
+program. `chex <check> <args...>` hands the arguments to that one check.
 
 The docs checks read the repo's READMEs, its `docs/` tree and its skills:
 
