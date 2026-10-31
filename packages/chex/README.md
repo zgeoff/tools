@@ -67,6 +67,18 @@ under `docs/`, each spike's `results.md`, and the Markdown under `.agents/skills
 stdin, as a pre-push hook gets them; without it, `commits` and `local-paths` read the branch's
 commits since its base.
 
+Some docs checks skip files whether or not you name paths, and a path you name never brings a
+skipped file back:
+
+- `prose` skips the `docs-writing`, `project-docs-writing`, `skill-writing` and `deslop` skills
+  under `.agents/skills/`, `.claude/skills/`, `skills/` and `sync/skills/`, which hold the banned
+  patterns as examples.
+- `links` skips `project-docs-writing` under `.agents/skills/` and `.claude/skills/`, and
+  `docs-writing` and `skill-writing` under `.claude/skills/` and `sync/skills/`, which link to
+  placeholder targets as examples.
+- `prose`, `links`, `readmes` and `skill` skip each file that `.gitattributes` marks
+  `linguist-vendored`.
+
 `chex init` writes the `extends` line into `lefthook.yml` and adds a `check:docs` script of
 `chex prose length links` when the repo has none. A second run changes nothing.
 
