@@ -16,10 +16,13 @@ if [ "$#" -eq 0 ]; then
     ':(exclude,glob).claude/**/README.md' ':(exclude,glob).agents/**/README.md'
 fi
 
-# The repo's project-docs-writing skill links to placeholder targets as examples. A file git marks
-# linguist-vendored belongs to someone else.
+# The repo's project-docs-writing skill links to placeholder targets as examples, and so do the
+# docs-writing and skill-writing bases that zgeoff/tools keeps under sync/skills/ and delivers to
+# .claude/skills/. A file git marks linguist-vendored belongs to someone else.
 set -- "$@" ':(exclude).agents/skills/project-docs-writing' \
-  ':(exclude).claude/skills/project-docs-writing' ':(exclude,attr:linguist-vendored)' \
+  ':(exclude).claude/skills/project-docs-writing' ':(exclude).claude/skills/docs-writing' \
+  ':(exclude).claude/skills/skill-writing' ':(exclude)sync/skills/docs-writing' \
+  ':(exclude)sync/skills/skill-writing' ':(exclude,attr:linguist-vendored)' \
   ':(exclude,attr:linguist-vendored=true)'
 
 # Reads untracked files too, so a new doc is checked before it is staged.

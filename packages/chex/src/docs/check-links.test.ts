@@ -350,11 +350,21 @@ test('it reads skills under .agents/skills/ and skills/, and skips READMEs under
   });
 });
 
-test('it skips the project-docs-writing skill, whose links are examples', async () => {
+test('it skips the project-docs-writing skill and the docs-writing and skill-writing bases from tools, whose links are examples', async () => {
   const ctx = await setupTest();
 
   await ctx.writePage('.agents/skills/project-docs-writing/SKILL.md', ['See [x](missing.md).']);
   await ctx.writePage('.claude/skills/project-docs-writing/SKILL.md', ['See [x](missing.md).']);
+
+  await ctx.writePage('.claude/skills/skill-writing/SKILL.md', [
+    'See [x](../../../src/missing.ts).',
+  ]);
+
+  await ctx.writePage('sync/skills/docs-writing/SKILL.md', ['See [x](url).']);
+
+  await ctx.writePage('sync/skills/skill-writing/SKILL.md', [
+    'See [x](../../../scripts/deploy.sh).',
+  ]);
 
   const result = await ctx.run();
 

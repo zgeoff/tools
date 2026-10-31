@@ -27,7 +27,7 @@ bun x --no-install chex init
 ```
 
 `chex` runs under Bun. The baseline runs the related tests through [`@zgeoff/rig`](../rig/README.md)
-and each job under [`@zgeoff/diet`](../diet/README.md)'s memory cap, so a repo that takes it
+and each job under the memory cap of [`@zgeoff/diet`](../diet/README.md), so a repo that takes it
 installs both, and `chex init` fails until it does.
 
 ## Commands
