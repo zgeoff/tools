@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { match } from 'ts-pattern';
 import type { FileSystem } from '../ci/file-system.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { writeStepOutputs } from '../ci/write-step-outputs.ts';
@@ -36,11 +37,6 @@ export async function writeCheckPlan(step: Readonly<CheckPlanStep>): Promise<str
   const scripts = findScripts(packageJSON);
   const docsScript = scripts['check:docs'];
   const docsText = typeof docsScript === 'string' ? docsScript : undefined;
-  const docs = parseDocsChecks(docsText);
-
-  if (docs.kind === 'refused') {
-    return [docs.message];
-  }
 
   const plan = planCheckScripts({
     scripts: step.scripts,
@@ -49,10 +45,13 @@ export async function writeCheckPlan(step: Readonly<CheckPlanStep>): Promise<str
     lane: step.lane,
   });
 
-  // An empty docs output runs the docs step that reads the docs scripts repo-sync delivers.
-  const docsOutput = docs.kind === 'named' ? ` ${docs.checks.join(' ')} ` : '';
-
-  return writePlanOutcome(plan, docsOutput, step);
+  // A repo with no check:docs gets an empty docs output, which runs the docs step that reads the
+  // docs scripts repo-sync delivers.
+  return match(parseDocsChecks(docsText))
+    .with({ kind: 'refused' }, (docs) => Promise.resolve([docs.message]))
+    .with({ kind: 'none' }, () => writePlanOutcome(plan, '', step))
+    .with({ kind: 'named' }, (docs) => writePlanOutcome(plan, ` ${docs.checks.join(' ')} `, step))
+    .exhaustive();
 }
 
 function findScripts(value: unknown): Readonly<Record<string, unknown>> {
