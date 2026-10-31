@@ -130,16 +130,27 @@ test('it reads a name and description past quotes and trailing comments', async 
   });
 });
 
-test('it fails a plain description that holds a colon and a space', async () => {
+test.each([
+  ['on the key line', ['description: How to run the demo service: start it, then seed it.']],
+  [
+    'inside a folded line',
+    [
+      'description:',
+      '  How to run the demo service: start it, then seed it. Load it before a demo test.',
+    ],
+  ],
+  [
+    'at the end of a folded line',
+    ['description:', '  Steps to run the demo service:', '  start it, then seed it.'],
+  ],
+  [
+    'on a folded line after a plain first line',
+    ['description: How to run the demo service.', '  Steps: start it, then seed it.'],
+  ],
+])('it fails a plain description with a colon %s', async (_, description) => {
   const ctx = await setupTest();
 
-  await ctx.writePage('.claude/skills/demo/SKILL.md', [
-    '---',
-    'name: demo',
-    'description:',
-    '  How to run the demo service: start it, then seed it. Load it before a demo test.',
-    '---',
-  ]);
+  await ctx.writePage('.claude/skills/demo/SKILL.md', ['---', 'name: demo', ...description, '---']);
 
   const result = await ctx.run();
 
@@ -152,6 +163,30 @@ test('it fails a plain description that holds a colon and a space', async () => 
     stdout:
       '.claude/skills/demo/SKILL.md: description holds a colon and a space, which YAML reads as a key in a plain scalar; reword it, or quote it or write it as a block scalar (>-)\n' +
       'check-skill: 1 skills, 1 errors, 0 warnings\n',
+    stderr: '',
+  });
+});
+
+test('it passes a colon and a space inside a literal block description', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description: |',
+    '  How to run the demo service: start it, then seed it.',
+    '---',
+  ]);
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-skill: 1 skills, 0 errors, 0 warnings\n',
     stderr: '',
   });
 });
