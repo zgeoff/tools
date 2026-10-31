@@ -56,7 +56,7 @@ The repo checks read the branch, the pushed commits and the repo's config:
 | ------------------ | --------------------------------------------------------------------------- | --------------- |
 | `commits`          | a pushed commit whose message fails `@zgeoff/commitlint-config`             | `--pushed-refs` |
 | `local-paths`      | a line a pushed commit adds that holds the home folder or the host name     | `--pushed-refs` |
-| `test-timeouts`    | a `bun test` timeout above the default, in a script or a `bunfig.toml`      | none            |
+| `test-timeouts`    | a `bun test` timeout above its lane's limit, in a script or a `bunfig.toml` | none            |
 | `workflows`        | nothing: it warns on each fault of the shared workflow lint, and passes     | the paths       |
 | `dependency-gates` | a stale age-gate exclude, an override or an audit ignore that nothing needs | none            |
 | `uncommitted`      | a file the branch changes that holds a change the push does not send        | none            |
