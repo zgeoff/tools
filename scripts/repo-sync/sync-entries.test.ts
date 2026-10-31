@@ -795,6 +795,7 @@ test('it overwrites a workflow of the repo that calls the same shared workflow',
   await ctx.writeMainCommit('README.md', '# app\n');
   await ctx.writeManifestCommit([]);
 
+  // An older commit of zgeoff/tools, so the run can order the pin against the one it syncs.
   const pinned = await ctx.writeToolsCommit();
 
   await ctx.writeBranch(
@@ -929,7 +930,6 @@ test('it moves the pins alone when every entry matches but a pinned reusable wor
   await ctx.writeMainCommit('README.md', '# app\n');
   await ctx.writeManifestCommit([]);
 
-  // An older commit of zgeoff/tools, so the run can order the pin against the one it syncs.
   const pinned = await ctx.writeToolsCommit();
 
   await ctx.writeBranch(
