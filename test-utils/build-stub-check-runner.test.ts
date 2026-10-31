@@ -14,11 +14,11 @@ test('it answers each check with its exit code and records the call with its arg
   });
 });
 
-test('it rejects with the error a check is given, as a check that cannot start throws', async () => {
+test('it rejects with the error a check is given, as a check that cannot start throws', () => {
   const stub = buildStubCheckRunner({ length: new Error('Executable not found in $PATH: "bash"') });
   const result = stub.runCheck('length', []);
 
-  await expect(result).rejects.toThrow('Executable not found in $PATH: "bash"');
+  expect(result).rejects.toThrow('Executable not found in $PATH: "bash"');
 });
 
 test('it fails on a check the test gave no answer for', () => {
