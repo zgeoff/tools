@@ -9,11 +9,12 @@ lane's timeout is written once. The [`@zgeoff/rig`](../../packages/rig/README.md
 
 ## The lane table
 
-The testing skill's [Lanes](../../sync/skills/testing/SKILL.md#lanes) table lists the built-in
-lanes, and `standard-lanes.ts` in the package holds the same table as data, which a test pins to the
-skill. A lane has a name, a file suffix (the unit and e2e lanes have none), a per-test limit, and a
-process count. Every lane but unit runs one process per file, because each needs a real system that
-two files cannot share, and the unit lane runs as many workers as the host's worker count allows.
+The testing skill's [Lanes](../../sync/skills/testing/references/slow-tests.md#lanes) table lists
+the built-in lanes, and `standard-lanes.ts` in the package holds the same table as data, which a
+test pins to the skill. A lane has a name, a file suffix (the unit and e2e lanes have none), a
+per-test limit, and a process count. Every lane but unit runs one process per file, because each
+needs a real system that two files cannot share, and the unit lane runs as many workers as the
+host's worker count allows.
 
 A repo changes the table in `rig.config.ts`. `defineRig` merges the declared lanes over the built-in
 ones and returns the resolved table. A declaration adds a lane with its own suffix and limit, or

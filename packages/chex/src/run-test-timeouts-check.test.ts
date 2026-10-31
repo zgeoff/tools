@@ -298,7 +298,7 @@ test('it holds the same lane limits as the Lanes table in the shared testing ski
   const ctx = await setupTest();
 
   const markdown = await readFile(
-    join(import.meta.dir, '../../../sync/skills/testing/SKILL.md'),
+    join(import.meta.dir, '../../../sync/skills/testing/references/slow-tests.md'),
     'utf8',
   );
 

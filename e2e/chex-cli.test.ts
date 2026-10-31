@@ -361,7 +361,7 @@ test('it writes lefthook.yml and the check:docs script to disk for init', async 
   expect(packageJSON).toStrictEqual({
     name: 'kettle',
     devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
-    scripts: { 'check:docs': 'chex prose length links' },
+    scripts: { 'check:docs': 'chex prose length links skill' },
   });
 });
 

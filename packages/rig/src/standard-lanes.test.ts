@@ -5,7 +5,17 @@ import { standardLanes } from './standard-lanes.ts';
 
 test('it holds the lanes and limits of the Lanes table in the shared testing skill', async () => {
   const markdown = await readFile(
-    join(import.meta.dir, '..', '..', '..', 'sync', 'skills', 'testing', 'SKILL.md'),
+    join(
+      import.meta.dir,
+      '..',
+      '..',
+      '..',
+      'sync',
+      'skills',
+      'testing',
+      'references',
+      'slow-tests.md',
+    ),
     'utf8',
   );
 

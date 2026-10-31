@@ -11,7 +11,7 @@ test('it plans the extends line and the check:docs script for a repo that has ne
   const editedText = `${JSON.stringify(
     {
       name: 'kettle',
-      scripts: { test: 'bun test', 'check:docs': 'chex prose length links' },
+      scripts: { test: 'bun test', 'check:docs': 'chex prose length links skill' },
       devDependencies: {
         '@zgeoff/chex': '0.1.0',
         '@zgeoff/diet': '0.1.2',
@@ -30,7 +30,7 @@ test('it plans the extends line and the check:docs script for a repo that has ne
     ],
     notes: [
       'lefthook.yml extends node_modules/@zgeoff/chex/lefthook.yml',
-      'package.json runs "chex prose length links" as check:docs',
+      'package.json runs "chex prose length links skill" as check:docs',
     ],
   });
 });
