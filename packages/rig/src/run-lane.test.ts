@@ -7,10 +7,6 @@ import type { CommandOptions } from './run-command.ts';
 import { runLane } from './run-lane.ts';
 
 function setupTest() {
-  const config = defineRig({
-    lanes: { kiln: { limit: '15s', memory: '8G', start: 'test-utils/start-kiln.ts' } },
-  });
-
   const signal = new AbortController().signal;
 
   const runCommand = mock<(command: readonly string[], options: CommandOptions) => Promise<number>>(
@@ -28,46 +24,45 @@ function setupTest() {
   );
 
   const output = { out: makeRecordingStub(), err: makeRecordingStub() };
-  const trackedFiles: string[] = [];
   const startKiln = mock<() => Promise<unknown>>();
 
   return {
-    config,
+    signal,
     runCommand,
     output,
     browserHooks,
     wireBrowserLaneHooks,
     startKiln,
-    trackedFiles,
-    signal,
-    run: { repoRoot: '/repo', environment: { PATH: '/usr/bin' }, signal, runID: '4417' },
-    findLane: (name: string) => config.lanes.find((lane) => lane.name === name),
-    deps: {
-      dietScript: '/diet.sh',
-      output,
-      readTrackedFiles: () => Promise.resolve(trackedFiles),
-      importModule: () => Promise.resolve({ default: startKiln }),
-      runCommand,
-      wireBrowserLaneHooks,
-    },
+    importModule: () => Promise.resolve({ default: startKiln }),
   };
 }
 
 test('it runs a repo lane under diet with its limit, its suffix filter and the start hook environment', async () => {
   const ctx = setupTest();
-  const lane = ctx.findLane('kiln');
+
+  const config = defineRig({
+    lanes: { kiln: { limit: '15s', memory: '8G', start: 'test-utils/start-kiln.ts' } },
+  });
+
+  const lane = config.lanes.find((candidate) => candidate.name === 'kiln');
 
   if (lane === undefined) {
     throw new Error('the config holds no kiln lane');
   }
 
   ctx.startKiln.mockResolvedValue({ environment: { KILN_URL: 'http://localhost:7001' } });
-  ctx.trackedFiles.push('pkg/src/fire.kiln.test.ts');
 
   const exitCode = await runLane(
-    { config: ctx.config, lane, extraArgs: ['--bail'] },
-    ctx.run,
-    ctx.deps,
+    { config, lane, extraArgs: ['--bail'] },
+    { repoRoot: '/repo', environment: { PATH: '/usr/bin' }, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      output: ctx.output,
+      readTrackedFiles: () => Promise.resolve(['pkg/src/fire.kiln.test.ts']),
+      importModule: ctx.importModule,
+      runCommand: ctx.runCommand,
+      wireBrowserLaneHooks: ctx.wireBrowserLaneHooks,
+    },
   );
 
   expect(exitCode).toBe(0);
@@ -97,19 +92,30 @@ test('it runs a repo lane under diet with its limit, its suffix filter and the s
 
 test('it runs the e2e lane on the e2e folders that git tracks', async () => {
   const ctx = setupTest();
-  const lane = ctx.findLane('e2e');
+  const config = defineRig({});
+  const lane = config.lanes.find((candidate) => candidate.name === 'e2e');
 
   if (lane === undefined) {
     throw new Error('the config holds no e2e lane');
   }
 
-  ctx.trackedFiles.push(
-    'e2e/login.test.ts',
-    'apps/shop/package.json',
-    'apps/shop/e2e/cart.test.ts',
+  await runLane(
+    { config, lane, extraArgs: [] },
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      output: ctx.output,
+      readTrackedFiles: () =>
+        Promise.resolve([
+          'e2e/login.test.ts',
+          'apps/shop/package.json',
+          'apps/shop/e2e/cart.test.ts',
+        ]),
+      importModule: ctx.importModule,
+      runCommand: ctx.runCommand,
+      wireBrowserLaneHooks: ctx.wireBrowserLaneHooks,
+    },
   );
-
-  await runLane({ config: ctx.config, lane, extraArgs: [] }, ctx.run, ctx.deps);
 
   expect(ctx.runCommand.mock.calls[0]?.[0]).toIncludeAllMembers([
     '--timeout=15000',
@@ -120,15 +126,25 @@ test('it runs the e2e lane on the e2e folders that git tracks', async () => {
 
 test('it says so and exits 0 for the e2e lane of a repo with no e2e folder', async () => {
   const ctx = setupTest();
-  const lane = ctx.findLane('e2e');
+  const config = defineRig({});
+  const lane = config.lanes.find((candidate) => candidate.name === 'e2e');
 
   if (lane === undefined) {
     throw new Error('the config holds no e2e lane');
   }
 
-  ctx.trackedFiles.push('src/a.test.ts');
-
-  const exitCode = await runLane({ config: ctx.config, lane, extraArgs: [] }, ctx.run, ctx.deps);
+  const exitCode = await runLane(
+    { config, lane, extraArgs: [] },
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      output: ctx.output,
+      readTrackedFiles: () => Promise.resolve(['src/a.test.ts']),
+      importModule: ctx.importModule,
+      runCommand: ctx.runCommand,
+      wireBrowserLaneHooks: ctx.wireBrowserLaneHooks,
+    },
+  );
 
   expect(exitCode).toBe(0);
   expect(ctx.output.out).toHaveBeenCalledExactlyOnceWith('rig: the e2e lane has no tests\n');
@@ -137,18 +153,25 @@ test('it says so and exits 0 for the e2e lane of a repo with no e2e folder', asy
 
 test('it runs only the lane files that a path selects, in place of the suffix filter', async () => {
   const ctx = setupTest();
-  const lane = ctx.findLane('kiln');
+  const config = defineRig({ lanes: { kiln: { limit: '15s', memory: '8G' } } });
+  const lane = config.lanes.find((candidate) => candidate.name === 'kiln');
 
   if (lane === undefined) {
     throw new Error('the config holds no kiln lane');
   }
 
-  ctx.trackedFiles.push('pkg/src/fire.kiln.test.ts', 'pkg/src/fire.test.ts', 'pkg/src/fire.ts');
-
   await runLane(
-    { config: ctx.config, lane, extraArgs: ['./pkg/src', '--seed=1'] },
-    ctx.run,
-    ctx.deps,
+    { config, lane, extraArgs: ['./pkg/src', '--seed=1'] },
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      output: ctx.output,
+      readTrackedFiles: () =>
+        Promise.resolve(['pkg/src/fire.kiln.test.ts', 'pkg/src/fire.test.ts', 'pkg/src/fire.ts']),
+      importModule: ctx.importModule,
+      runCommand: ctx.runCommand,
+      wireBrowserLaneHooks: ctx.wireBrowserLaneHooks,
+    },
   );
 
   expect(ctx.runCommand.mock.calls[0]?.[0]).toStrictEqual([
@@ -168,18 +191,28 @@ test('it runs only the lane files that a path selects, in place of the suffix fi
 
 test('it says so and exits 0 before the start hook for a suffix lane that git tracks no test file of', async () => {
   const ctx = setupTest();
-  const lane = ctx.findLane('kiln');
+
+  const config = defineRig({
+    lanes: { kiln: { limit: '15s', start: 'test-utils/start-kiln.ts' } },
+  });
+
+  const lane = config.lanes.find((candidate) => candidate.name === 'kiln');
 
   if (lane === undefined) {
     throw new Error('the config holds no kiln lane');
   }
 
-  ctx.trackedFiles.push('pkg/src/fire.test.ts', 'pkg/src/fire.kiln.ts');
-
   const exitCode = await runLane(
-    { config: ctx.config, lane, extraArgs: ['--seed=1'] },
-    ctx.run,
-    ctx.deps,
+    { config, lane, extraArgs: ['--seed=1'] },
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      output: ctx.output,
+      readTrackedFiles: () => Promise.resolve(['pkg/src/fire.test.ts', 'pkg/src/fire.kiln.ts']),
+      importModule: ctx.importModule,
+      runCommand: ctx.runCommand,
+      wireBrowserLaneHooks: ctx.wireBrowserLaneHooks,
+    },
   );
 
   expect(exitCode).toBe(0);
@@ -190,18 +223,29 @@ test('it says so and exits 0 before the start hook for a suffix lane that git tr
 
 test('it names the paths and exits 1 when they select none of the lane files', async () => {
   const ctx = setupTest();
-  const lane = ctx.findLane('kiln');
+
+  const config = defineRig({
+    lanes: { kiln: { limit: '15s', start: 'test-utils/start-kiln.ts' } },
+  });
+
+  const lane = config.lanes.find((candidate) => candidate.name === 'kiln');
 
   if (lane === undefined) {
     throw new Error('the config holds no kiln lane');
   }
 
-  ctx.trackedFiles.push('pkg/src/fire.kiln.test.ts', 'pkg/src/fire.test.ts');
-
   const exitCode = await runLane(
-    { config: ctx.config, lane, extraArgs: ['./pkg/src/fire.test.ts'] },
-    ctx.run,
-    ctx.deps,
+    { config, lane, extraArgs: ['./pkg/src/fire.test.ts'] },
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      output: ctx.output,
+      readTrackedFiles: () =>
+        Promise.resolve(['pkg/src/fire.kiln.test.ts', 'pkg/src/fire.test.ts']),
+      importModule: ctx.importModule,
+      runCommand: ctx.runCommand,
+      wireBrowserLaneHooks: ctx.wireBrowserLaneHooks,
+    },
   );
 
   expect(exitCode).toBe(1);
@@ -216,16 +260,27 @@ test('it names the paths and exits 1 when they select none of the lane files', a
 
 test('it runs the browser lane through its built-in hooks, with the lane memory and the run ID', async () => {
   const ctx = setupTest();
-  const lane = ctx.findLane('browser');
+  const config = defineRig({});
+  const lane = config.lanes.find((candidate) => candidate.name === 'browser');
 
   if (lane === undefined) {
     throw new Error('the config holds no browser lane');
   }
 
   ctx.browserHooks.run.mockResolvedValue(5);
-  ctx.trackedFiles.push('pkg/src/page.browser.test.ts');
 
-  const exitCode = await runLane({ config: ctx.config, lane, extraArgs: [] }, ctx.run, ctx.deps);
+  const exitCode = await runLane(
+    { config, lane, extraArgs: [] },
+    { repoRoot: '/repo', environment: { PATH: '/usr/bin' }, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      output: ctx.output,
+      readTrackedFiles: () => Promise.resolve(['pkg/src/page.browser.test.ts']),
+      importModule: ctx.importModule,
+      runCommand: ctx.runCommand,
+      wireBrowserLaneHooks: ctx.wireBrowserLaneHooks,
+    },
+  );
 
   expect(exitCode).toBe(5);
 
@@ -249,15 +304,25 @@ test('it runs the browser lane through its built-in hooks, with the lane memory 
 
 test('it leaves the files of the other lanes out of the e2e run', async () => {
   const ctx = setupTest();
-  const lane = ctx.findLane('e2e');
+  const config = defineRig({ lanes: { kiln: { limit: '15s' } } });
+  const lane = config.lanes.find((candidate) => candidate.name === 'e2e');
 
   if (lane === undefined) {
     throw new Error('the config holds no e2e lane');
   }
 
-  ctx.trackedFiles.push('e2e/login.test.ts', 'e2e/live.model-api.test.ts');
-
-  await runLane({ config: ctx.config, lane, extraArgs: [] }, ctx.run, ctx.deps);
+  await runLane(
+    { config, lane, extraArgs: [] },
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      output: ctx.output,
+      readTrackedFiles: () => Promise.resolve(['e2e/login.test.ts', 'e2e/live.model-api.test.ts']),
+      importModule: ctx.importModule,
+      runCommand: ctx.runCommand,
+      wireBrowserLaneHooks: ctx.wireBrowserLaneHooks,
+    },
+  );
 
   expect(ctx.runCommand.mock.calls[0]?.[0]).toIncludeAllMembers([
     './e2e/',
@@ -271,14 +336,12 @@ test('it exits 1 when a signal arrives while the stop hook cleans up after passi
 
   const controller = new AbortController();
 
-  const lane = ctx.findLane('browser');
+  const config = defineRig({});
+  const lane = config.lanes.find((candidate) => candidate.name === 'browser');
 
   if (lane === undefined) {
     throw new Error('the config holds no browser lane');
   }
-
-  ctx.browserHooks.run.mockImplementation(() => Promise.resolve(0));
-  ctx.trackedFiles.push('pkg/src/page.browser.test.ts');
 
   ctx.browserHooks.stop.mockImplementation(() => {
     controller.abort();
@@ -287,9 +350,16 @@ test('it exits 1 when a signal arrives while the stop hook cleans up after passi
   });
 
   const exitCode = await runLane(
-    { config: ctx.config, lane, extraArgs: [] },
-    { ...ctx.run, signal: controller.signal },
-    ctx.deps,
+    { config, lane, extraArgs: [] },
+    { repoRoot: '/repo', environment: {}, signal: controller.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      output: ctx.output,
+      readTrackedFiles: () => Promise.resolve(['pkg/src/page.browser.test.ts']),
+      importModule: ctx.importModule,
+      runCommand: ctx.runCommand,
+      wireBrowserLaneHooks: ctx.wireBrowserLaneHooks,
+    },
   );
 
   expect(exitCode).toBe(1);

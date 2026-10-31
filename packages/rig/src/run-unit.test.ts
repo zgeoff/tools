@@ -6,42 +6,35 @@ import type { CommandOptions } from './run-command.ts';
 import { runUnit } from './run-unit.ts';
 
 function setupTest() {
+  const signal = new AbortController().signal;
+
   const runCommand = mock<(command: readonly string[], options: CommandOptions) => Promise<number>>(
     () => Promise.resolve(0),
   );
 
   const output = { out: makeRecordingStub(), err: makeRecordingStub() };
-  const trackedFiles: string[] = [];
   const readWorkerCount = mock<() => Promise<WorkerCount>>();
 
-  return {
-    runCommand,
-    trackedFiles,
-    readWorkerCount,
-    output,
-    run: {
-      repoRoot: '/repo',
-      environment: {},
-      signal: new AbortController().signal,
-      runID: '4417',
-    },
-    deps: {
-      dietScript: '/diet.sh',
-      readTrackedFiles: () => Promise.resolve(trackedFiles),
-      runCommand,
-      output,
-      readWorkerCount,
-    },
-  };
+  return { signal, runCommand, readWorkerCount, output };
 }
 
 test('it runs the unit tests with the worker count the host gets', async () => {
   const ctx = setupTest();
 
   ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 3 });
-  ctx.trackedFiles.push('pkg/src/oven.test.ts');
 
-  const exitCode = await runUnit(defineRig({}), [], ctx.run, ctx.deps);
+  const exitCode = await runUnit(
+    defineRig({}),
+    [],
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      readTrackedFiles: () => Promise.resolve(['pkg/src/oven.test.ts']),
+      runCommand: ctx.runCommand,
+      output: ctx.output,
+      readWorkerCount: ctx.readWorkerCount,
+    },
+  );
 
   expect(exitCode).toBe(0);
   expect(ctx.runCommand.mock.calls[0]?.[0]).toContain('--parallel=3');
@@ -51,9 +44,19 @@ test('it says so and exits 0 when git tracks no unit test file', async () => {
   const ctx = setupTest();
 
   ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 3 });
-  ctx.trackedFiles.push('pkg/src/oven.ts', 'pkg/src/oven.host.test.ts');
 
-  const exitCode = await runUnit(defineRig({}), ['--bail'], ctx.run, ctx.deps);
+  const exitCode = await runUnit(
+    defineRig({}),
+    ['--bail'],
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      readTrackedFiles: () => Promise.resolve(['pkg/src/oven.ts', 'pkg/src/oven.host.test.ts']),
+      runCommand: ctx.runCommand,
+      output: ctx.output,
+      readWorkerCount: ctx.readWorkerCount,
+    },
+  );
 
   expect(exitCode).toBe(0);
   expect(ctx.output.out).toHaveBeenCalledExactlyOnceWith('rig: the unit lane has no tests\n');
@@ -64,9 +67,20 @@ test('it runs only the unit files that a path selects', async () => {
   const ctx = setupTest();
 
   ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 3 });
-  ctx.trackedFiles.push('pkg/src/oven.test.ts', 'pkg/src/oven.host.test.ts');
 
-  await runUnit(defineRig({}), ['--bail', './pkg/src/'], ctx.run, ctx.deps);
+  await runUnit(
+    defineRig({}),
+    ['--bail', './pkg/src/'],
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      readTrackedFiles: () =>
+        Promise.resolve(['pkg/src/oven.test.ts', 'pkg/src/oven.host.test.ts']),
+      runCommand: ctx.runCommand,
+      output: ctx.output,
+      readWorkerCount: ctx.readWorkerCount,
+    },
+  );
 
   expect(ctx.runCommand.mock.calls[0]?.[0]).toIncludeAllMembers([
     './pkg/src/oven.test.ts',
@@ -80,9 +94,20 @@ test('it names the path, exits 1 and runs nothing for a unit run given only the 
   const ctx = setupTest();
 
   ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 3 });
-  ctx.trackedFiles.push('pkg/src/oven.test.ts', 'pkg/src/oven.host.test.ts');
 
-  const exitCode = await runUnit(defineRig({}), ['./pkg/src/oven.host.test.ts'], ctx.run, ctx.deps);
+  const exitCode = await runUnit(
+    defineRig({}),
+    ['./pkg/src/oven.host.test.ts'],
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      readTrackedFiles: () =>
+        Promise.resolve(['pkg/src/oven.test.ts', 'pkg/src/oven.host.test.ts']),
+      runCommand: ctx.runCommand,
+      output: ctx.output,
+      readWorkerCount: ctx.readWorkerCount,
+    },
+  );
 
   expect(exitCode).toBe(1);
 
@@ -101,7 +126,18 @@ test('it exits 2 with the reason and runs no test for a worker count it refuses'
     message: 'TEST_WORKERS is four; set it to a whole number above 0',
   });
 
-  const exitCode = await runUnit(defineRig({}), [], ctx.run, ctx.deps);
+  const exitCode = await runUnit(
+    defineRig({}),
+    [],
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      readTrackedFiles: () => Promise.resolve(['pkg/src/oven.test.ts']),
+      runCommand: ctx.runCommand,
+      output: ctx.output,
+      readWorkerCount: ctx.readWorkerCount,
+    },
+  );
 
   expect(exitCode).toBe(2);
 

@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createGitCommit } from '../../../test-utils/create-git-commit.ts';
@@ -16,7 +16,7 @@ async function setupTest() {
   const env = readGitEnv(directory);
   const repo = join(directory, 'repo');
 
-  await writeTreeFiles(repo, { 'README.md': 'notes\n' });
+  await mkdir(repo);
   await runGit(repo, env, ['init', '--quiet']);
 
   return { repo, env };
@@ -25,7 +25,12 @@ async function setupTest() {
 test('it lists the files that git tracks and leaves out the untracked ones', async () => {
   const ctx = await setupTest();
 
-  await createGitCommit(ctx.repo, ctx.env, { 'src/a.test.ts': '', 'e2e/login.test.ts': '' });
+  await createGitCommit(ctx.repo, ctx.env, {
+    'README.md': 'notes\n',
+    'src/a.test.ts': '',
+    'e2e/login.test.ts': '',
+  });
+
   await writeTreeFiles(ctx.repo, { 'scratch/notes.txt': 'draft\n' });
 
   const files = await readTrackedFiles(ctx.repo);

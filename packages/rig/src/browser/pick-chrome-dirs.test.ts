@@ -3,13 +3,12 @@ import { join } from 'node:path';
 import { buildBrowserRun } from './build-browser-run.ts';
 import { pickChromeDirs } from './pick-chrome-dirs.ts';
 
-function setupTest() {
-  return { notesRun: buildBrowserRun('/work/notes-app', 'build-box', '4417') };
-}
-
 test("it keeps Chrome's temp folder in TMPDIR, under a folder of the user's own, when its socket path fits", () => {
-  const ctx = setupTest();
-  const chromeDirs = pickChromeDirs('/var/tmp', 1000, ctx.notesRun);
+  const chromeDirs = pickChromeDirs(
+    '/var/tmp',
+    1000,
+    buildBrowserRun('/work/notes-app', 'build-box', '4417'),
+  );
 
   expect(chromeDirs.privateDir).toBe('/var/tmp/rig-browser-1000');
   expect(chromeDirs.runDir).toBe(join(chromeDirs.runsDir, '4417'));
@@ -17,8 +16,11 @@ test("it keeps Chrome's temp folder in TMPDIR, under a folder of the user's own,
 });
 
 test("it gives each repo and host name its own folder for Chrome's temp folders", () => {
-  const ctx = setupTest();
-  const notesDirs = pickChromeDirs('/var/tmp', 1000, ctx.notesRun);
+  const notesDirs = pickChromeDirs(
+    '/var/tmp',
+    1000,
+    buildBrowserRun('/work/notes-app', 'build-box', '4417'),
+  );
 
   const otherRepoDirs = pickChromeDirs(
     '/var/tmp',
@@ -44,19 +46,22 @@ test("it gives each repo and host name its own folder for Chrome's temp folders"
 });
 
 test("it keeps Chrome's temp folder in a TMPDIR whose socket path takes the last of the 107 bytes", () => {
-  const ctx = setupTest();
   const tmpdir = `/${'d'.repeat(30)}`;
-  const chromeDirs = pickChromeDirs(tmpdir, 1000, ctx.notesRun);
+
+  const chromeDirs = pickChromeDirs(
+    tmpdir,
+    1000,
+    buildBrowserRun('/work/notes-app', 'build-box', '4417'),
+  );
 
   expect(`${chromeDirs.runDir}/org.chromium.Chromium.XXXXXX/SingletonSocket`).toHaveLength(107);
   expect(chromeDirs.privateDir).toBe(`${tmpdir}/rig-browser-1000`);
 });
 
 test("it moves Chrome's temp folder to /tmp when the socket path in TMPDIR passes 107 bytes", () => {
-  const ctx = setupTest();
-  const tmpdir = `/${'d'.repeat(31)}`;
-  const chromeDirs = pickChromeDirs(tmpdir, 1000, ctx.notesRun);
-  const preferredDirs = pickChromeDirs('/var/tmp', 1000, ctx.notesRun);
+  const notesRun = buildBrowserRun('/work/notes-app', 'build-box', '4417');
+  const chromeDirs = pickChromeDirs(`/${'d'.repeat(31)}`, 1000, notesRun);
+  const preferredDirs = pickChromeDirs('/var/tmp', 1000, notesRun);
 
   expect(chromeDirs.privateDir).toBe('/tmp/rig-browser-1000');
   expect(chromeDirs.runDir).toBe(preferredDirs.runDir.replace('/var/tmp/', '/tmp/'));

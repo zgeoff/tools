@@ -19,7 +19,7 @@ async function setupTest() {
     repoRoot: join(directory, 'notes-app'),
     markerPath: join(directory, 'marker.txt'),
     processes: {
-      readGroupID: mock<TestProcesses['readGroupID']>(() => 5120),
+      readGroupID: mock<TestProcesses['readGroupID']>(() => null),
       signalGroup: mock<TestProcesses['signalGroup']>(() => {}),
       probeGroup: mock<TestProcesses['probeGroup']>(() => false),
       now: clock.now,
@@ -58,6 +58,8 @@ test('it makes a git repo that tracks its manifest and one browser test file', a
 
 test("it sends SIGKILL to the group of the process ID that the build's file holds", async () => {
   const ctx = await setupTest();
+
+  ctx.processes.readGroupID.mockReturnValue(5120);
 
   const repo = await createStubBuildRepo(
     ctx.repoRoot,

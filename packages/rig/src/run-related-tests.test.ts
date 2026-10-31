@@ -6,12 +6,7 @@ import type { CommandOptions } from './run-command.ts';
 import { runRelatedTests } from './run-related-tests.ts';
 
 function setupTest() {
-  const run = {
-    repoRoot: '/repo',
-    environment: { PATH: '/usr/bin' },
-    signal: new AbortController().signal,
-    runID: '4417',
-  };
+  const signal = new AbortController().signal;
 
   const runCommand = mock<(command: readonly string[], options: CommandOptions) => Promise<number>>(
     () => Promise.resolve(0),
@@ -20,20 +15,7 @@ function setupTest() {
   const output = { out: makeRecordingStub(), err: makeRecordingStub() };
   const readWorkerCount = mock<() => Promise<WorkerCount>>();
 
-  return {
-    run,
-    runCommand,
-    readWorkerCount,
-    output,
-    deps: {
-      dietScript: '/diet.sh',
-      readTrackedFiles: () => Promise.resolve([]),
-      sources: { cwd: '/repo', probeFile: () => true },
-      readWorkerCount,
-      runCommand,
-      output,
-    },
-  };
+  return { signal, runCommand, readWorkerCount, output };
 }
 
 test('it runs the unit lane on the related test and returns its exit code', async () => {
@@ -42,7 +24,19 @@ test('it runs the unit lane on the related test and returns its exit code', asyn
   ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 2 });
   ctx.runCommand.mockResolvedValue(1);
 
-  const exitCode = await runRelatedTests(['src/a.ts'], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runRelatedTests(
+    ['src/a.ts'],
+    defineRig({}),
+    { repoRoot: '/repo', environment: { PATH: '/usr/bin' }, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      readTrackedFiles: () => Promise.resolve([]),
+      sources: { cwd: '/repo', probeFile: () => true },
+      readWorkerCount: ctx.readWorkerCount,
+      runCommand: ctx.runCommand,
+      output: ctx.output,
+    },
+  );
 
   expect(exitCode).toBe(1);
   expect(ctx.runCommand).toHaveBeenCalledTimes(1);
@@ -57,7 +51,7 @@ test('it runs the unit lane on the related test and returns its exit code', asyn
   expect(ctx.runCommand.mock.calls[0]?.[1]).toStrictEqual({
     cwd: '/repo',
     environment: { PATH: '/usr/bin' },
-    signal: ctx.run.signal,
+    signal: ctx.signal,
   });
 });
 
@@ -69,8 +63,15 @@ test('it leaves every lane out of the run, as the unit run does', async () => {
   await runRelatedTests(
     ['src/a.ts'],
     defineRig({ lanes: { kiln: { limit: '9s' } } }),
-    ctx.run,
-    ctx.deps,
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      readTrackedFiles: () => Promise.resolve([]),
+      sources: { cwd: '/repo', probeFile: () => true },
+      readWorkerCount: ctx.readWorkerCount,
+      runCommand: ctx.runCommand,
+      output: ctx.output,
+    },
   );
 
   expect(ctx.runCommand.mock.calls[0]?.[0]).toIncludeAllMembers([
@@ -84,7 +85,19 @@ test('it adds the slow-host timeout when the host gets 1 worker', async () => {
 
   ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 1 });
 
-  await runRelatedTests(['src/a.ts'], defineRig({}), ctx.run, ctx.deps);
+  await runRelatedTests(
+    ['src/a.ts'],
+    defineRig({}),
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      readTrackedFiles: () => Promise.resolve([]),
+      sources: { cwd: '/repo', probeFile: () => true },
+      readWorkerCount: ctx.readWorkerCount,
+      runCommand: ctx.runCommand,
+      output: ctx.output,
+    },
+  );
 
   expect(ctx.runCommand.mock.calls[0]?.[0]).toIncludeAllMembers([
     '--parallel=1',
@@ -98,9 +111,19 @@ test('it says so and exits 0 when no path has a related test', async () => {
 
   ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 2 });
 
-  ctx.deps.sources.probeFile = () => false;
-
-  const exitCode = await runRelatedTests(['src/a.ts'], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runRelatedTests(
+    ['src/a.ts'],
+    defineRig({}),
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      readTrackedFiles: () => Promise.resolve([]),
+      sources: { cwd: '/repo', probeFile: () => false },
+      readWorkerCount: ctx.readWorkerCount,
+      runCommand: ctx.runCommand,
+      output: ctx.output,
+    },
+  );
 
   expect(exitCode).toBe(0);
   expect(ctx.output.out).toHaveBeenCalledExactlyOnceWith('rig related: no related tests\n');
@@ -114,7 +137,19 @@ test('it runs 50 related test files, the default cap', async () => {
 
   const paths = Array.from({ length: 50 }, (_, index) => `src/t${index}.test.ts`);
 
-  const exitCode = await runRelatedTests(paths, defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runRelatedTests(
+    paths,
+    defineRig({}),
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      readTrackedFiles: () => Promise.resolve([]),
+      sources: { cwd: '/repo', probeFile: () => true },
+      readWorkerCount: ctx.readWorkerCount,
+      runCommand: ctx.runCommand,
+      output: ctx.output,
+    },
+  );
 
   expect(exitCode).toBe(0);
 
@@ -130,7 +165,19 @@ test('it skips with the CI notice past 50 related test files', async () => {
 
   const paths = Array.from({ length: 51 }, (_, index) => `src/t${index}.test.ts`);
 
-  const exitCode = await runRelatedTests(paths, defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runRelatedTests(
+    paths,
+    defineRig({}),
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      readTrackedFiles: () => Promise.resolve([]),
+      sources: { cwd: '/repo', probeFile: () => true },
+      readWorkerCount: ctx.readWorkerCount,
+      runCommand: ctx.runCommand,
+      output: ctx.output,
+    },
+  );
 
   expect(exitCode).toBe(0);
 
@@ -152,7 +199,19 @@ test.each([
 
     ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 2 });
 
-    const exitCode = await runRelatedTests(['src/a.ts', shared], defineRig({}), ctx.run, ctx.deps);
+    const exitCode = await runRelatedTests(
+      ['src/a.ts', shared],
+      defineRig({}),
+      { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+      {
+        dietScript: '/diet.sh',
+        readTrackedFiles: () => Promise.resolve([]),
+        sources: { cwd: '/repo', probeFile: () => true },
+        readWorkerCount: ctx.readWorkerCount,
+        runCommand: ctx.runCommand,
+        output: ctx.output,
+      },
+    );
 
     expect(exitCode).toBe(0);
 
@@ -171,7 +230,19 @@ test('it names the shared test input over the file cap when the branch changes b
 
   const paths = Array.from({ length: 51 }, (_, index) => `src/t${index}.test.ts`);
 
-  await runRelatedTests([...paths, 'bunfig.toml'], defineRig({}), ctx.run, ctx.deps);
+  await runRelatedTests(
+    [...paths, 'bunfig.toml'],
+    defineRig({}),
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      readTrackedFiles: () => Promise.resolve([]),
+      sources: { cwd: '/repo', probeFile: () => true },
+      readWorkerCount: ctx.readWorkerCount,
+      runCommand: ctx.runCommand,
+      output: ctx.output,
+    },
+  );
 
   expect(ctx.output.out).toHaveBeenCalledExactlyOnceWith(
     'rig related: skipped, because the branch changes bunfig.toml, a shared test helper or config; CI runs the full suite\n',
@@ -185,7 +256,19 @@ test.each([['--max-files=2'], ['--max-file=2']])(
 
     ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 2 });
 
-    const exitCode = await runRelatedTests([option, 'src/a.ts'], defineRig({}), ctx.run, ctx.deps);
+    const exitCode = await runRelatedTests(
+      [option, 'src/a.ts'],
+      defineRig({}),
+      { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+      {
+        dietScript: '/diet.sh',
+        readTrackedFiles: () => Promise.resolve([]),
+        sources: { cwd: '/repo', probeFile: () => true },
+        readWorkerCount: ctx.readWorkerCount,
+        runCommand: ctx.runCommand,
+        output: ctx.output,
+      },
+    );
 
     expect(exitCode).toBe(2);
 
@@ -205,7 +288,19 @@ test('it exits 2 with the reason and runs no test for a worker count it refuses'
     message: 'TEST_WORKERS is four; set it to a whole number above 0',
   });
 
-  const exitCode = await runRelatedTests(['src/a.ts'], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runRelatedTests(
+    ['src/a.ts'],
+    defineRig({}),
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      readTrackedFiles: () => Promise.resolve([]),
+      sources: { cwd: '/repo', probeFile: () => true },
+      readWorkerCount: ctx.readWorkerCount,
+      runCommand: ctx.runCommand,
+      output: ctx.output,
+    },
+  );
 
   expect(exitCode).toBe(2);
 

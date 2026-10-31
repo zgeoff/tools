@@ -4,30 +4,15 @@ import { makeResolvingStub } from '../../../test-utils/make-resolving-stub.ts';
 import { defineRig } from './define-rig.ts';
 import { makeRepoLaneHooks } from './make-repo-lane-hooks.ts';
 import type { CommandOptions } from './run-command.ts';
-import type { ResolvedLane } from './types.ts';
 
 function setupTest() {
   const signal = new AbortController().signal;
-  const hookModules = new Map<string, unknown>();
 
   const runCommand = mock<(command: readonly string[], options: CommandOptions) => Promise<number>>(
     () => Promise.resolve(0),
   );
 
-  return {
-    hookModules,
-    runCommand,
-    signal,
-    makeHooks: (lane: ResolvedLane) =>
-      makeRepoLaneHooks({
-        context: { repoRoot: '/repo', lane, runID: '4417', environment: { PATH: '/usr/bin' } },
-        dietScript: '/diet.sh',
-        parallel: 1,
-        signal,
-        importModule: (path) => Promise.resolve(hookModules.get(path)),
-        runCommand,
-      }),
-  };
+  return { runCommand, signal };
 }
 
 test('it starts with the test environment unchanged when the lane has no start hook', async () => {
@@ -39,7 +24,16 @@ test('it starts with the test environment unchanged when the lane has no start h
 
   invariant(lane);
 
-  const outcome = await ctx.makeHooks(lane).start();
+  const hooks = makeRepoLaneHooks({
+    context: { repoRoot: '/repo', lane, runID: '4417', environment: { PATH: '/usr/bin' } },
+    dietScript: '/diet.sh',
+    parallel: 1,
+    signal: ctx.signal,
+    importModule: () => Promise.resolve(undefined),
+    runCommand: ctx.runCommand,
+  });
+
+  const outcome = await hooks.start();
 
   expect(outcome).toStrictEqual({ kind: 'proceed', environment: { PATH: '/usr/bin' } });
 });
@@ -55,9 +49,18 @@ test('it calls the start hook with the lane context and adds the environment it 
 
   const start = makeResolvingStub({ environment: { KILN_URL: 'http://localhost:7001' } });
 
-  ctx.hookModules.set('/repo/test-utils/start-kiln.ts', { default: start });
+  const hookModules = new Map([['/repo/test-utils/start-kiln.ts', { default: start }]]);
 
-  const outcome = await ctx.makeHooks(lane).start();
+  const hooks = makeRepoLaneHooks({
+    context: { repoRoot: '/repo', lane, runID: '4417', environment: { PATH: '/usr/bin' } },
+    dietScript: '/diet.sh',
+    parallel: 1,
+    signal: ctx.signal,
+    importModule: (path) => Promise.resolve(hookModules.get(path)),
+    runCommand: ctx.runCommand,
+  });
+
+  const outcome = await hooks.start();
 
   expect(start).toHaveBeenCalledExactlyOnceWith({
     repoRoot: '/repo',
@@ -81,12 +84,18 @@ test('it refuses a start module that default-exports no function', async () => {
 
   invariant(lane);
 
-  ctx.hookModules.set('/repo/test-utils/start-kiln.ts', { default: 'start' });
+  const hookModules = new Map([['/repo/test-utils/start-kiln.ts', { default: 'start' }]]);
 
-  const failure = await ctx
-    .makeHooks(lane)
-    .start()
-    .catch((error: unknown) => error);
+  const hooks = makeRepoLaneHooks({
+    context: { repoRoot: '/repo', lane, runID: '4417', environment: {} },
+    dietScript: '/diet.sh',
+    parallel: 1,
+    signal: ctx.signal,
+    importModule: (path) => Promise.resolve(hookModules.get(path)),
+    runCommand: ctx.runCommand,
+  });
+
+  const failure = await hooks.start().catch((error: unknown) => error);
 
   expect(failure).toBeInstanceOf(Error);
 
@@ -105,9 +114,16 @@ test('it runs bun test under diet with the lane budget, one process per file, an
 
   invariant(lane);
 
-  const exitCode = await ctx
-    .makeHooks(lane)
-    .run(['--timeout=15000', '.kiln.test.ts'], { KILN_URL: 'x' });
+  const hooks = makeRepoLaneHooks({
+    context: { repoRoot: '/repo', lane, runID: '4417', environment: { PATH: '/usr/bin' } },
+    dietScript: '/diet.sh',
+    parallel: 1,
+    signal: ctx.signal,
+    importModule: () => Promise.resolve(undefined),
+    runCommand: ctx.runCommand,
+  });
+
+  const exitCode = await hooks.run(['--timeout=15000', '.kiln.test.ts'], { KILN_URL: 'x' });
 
   expect(exitCode).toBe(0);
 
@@ -143,10 +159,35 @@ test('it calls the stop hook, and skips it for a lane that has none', async () =
 
   const stop = makeResolvingStub(undefined);
 
-  ctx.hookModules.set('/repo/test-utils/stop-kiln.ts', { default: stop });
+  const hookModules = new Map([['/repo/test-utils/stop-kiln.ts', { default: stop }]]);
 
-  await ctx.makeHooks(withStop).stop();
-  await ctx.makeHooks(withoutStop).stop();
+  const hookOptions = {
+    dietScript: '/diet.sh',
+    parallel: 1,
+    signal: ctx.signal,
+    importModule: (path: string) => Promise.resolve(hookModules.get(path)),
+    runCommand: ctx.runCommand,
+  };
+
+  await makeRepoLaneHooks({
+    ...hookOptions,
+    context: {
+      repoRoot: '/repo',
+      lane: withStop,
+      runID: '4417',
+      environment: { PATH: '/usr/bin' },
+    },
+  }).stop();
+
+  await makeRepoLaneHooks({
+    ...hookOptions,
+    context: {
+      repoRoot: '/repo',
+      lane: withoutStop,
+      runID: '4417',
+      environment: { PATH: '/usr/bin' },
+    },
+  }).stop();
 
   expect(stop).toHaveBeenCalledExactlyOnceWith({
     repoRoot: '/repo',

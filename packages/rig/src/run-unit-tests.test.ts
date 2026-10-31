@@ -10,19 +10,7 @@ function setupTest() {
     () => Promise.resolve(0),
   );
 
-  const trackedFiles: string[] = [];
-
-  return {
-    signal,
-    runCommand,
-    trackedFiles,
-    run: { repoRoot: '/repo', environment: { PATH: '/usr/bin' }, signal, runID: '4417' },
-    deps: {
-      dietScript: '/diet.sh',
-      runCommand,
-      readTrackedFiles: () => Promise.resolve(trackedFiles),
-    },
-  };
+  return { signal, runCommand };
 }
 
 test('it runs the unit command under diet in the repo and returns its exit code', async () => {
@@ -33,8 +21,12 @@ test('it runs the unit command under diet in the repo and returns its exit code'
   const exitCode = await runUnitTests(
     defineRig({}),
     { workerCount: 2, extraArgs: ['./src/a.test.ts'] },
-    ctx.run,
-    ctx.deps,
+    { repoRoot: '/repo', environment: { PATH: '/usr/bin' }, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      runCommand: ctx.runCommand,
+      readTrackedFiles: () => Promise.resolve([]),
+    },
   );
 
   expect(exitCode).toBe(4);
@@ -64,8 +56,12 @@ test('it gives diet the memory that the config declares for the unit lane', asyn
   await runUnitTests(
     defineRig({ lanes: { unit: { memory: '4G' } } }),
     { workerCount: 1, extraArgs: [] },
-    ctx.run,
-    ctx.deps,
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      runCommand: ctx.runCommand,
+      readTrackedFiles: () => Promise.resolve([]),
+    },
   );
 
   expect(ctx.runCommand.mock.calls[0]?.[0].slice(0, 5)).toStrictEqual([
@@ -80,9 +76,16 @@ test('it gives diet the memory that the config declares for the unit lane', asyn
 test('it leaves out the e2e folders that git tracks and runs a src/e2e folder that is no e2e folder', async () => {
   const ctx = setupTest();
 
-  ctx.trackedFiles.push('e2e/login.test.ts', 'src/e2e/codec.test.ts');
-
-  await runUnitTests(defineRig({}), { workerCount: 1, extraArgs: [] }, ctx.run, ctx.deps);
+  await runUnitTests(
+    defineRig({}),
+    { workerCount: 1, extraArgs: [] },
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      runCommand: ctx.runCommand,
+      readTrackedFiles: () => Promise.resolve(['e2e/login.test.ts', 'src/e2e/codec.test.ts']),
+    },
+  );
 
   const command = ctx.runCommand.mock.calls[0]?.[0] ?? [];
 

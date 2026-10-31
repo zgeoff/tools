@@ -10,11 +10,9 @@ function setupTest() {
   );
 
   const output = { out: makeRecordingStub(), err: makeRecordingStub() };
-  const trackedFiles: string[] = [];
 
   return {
     runCommand,
-    trackedFiles,
     output,
     run: {
       repoRoot: '/repo',
@@ -25,9 +23,6 @@ function setupTest() {
     deps: {
       dietScript: '/diet.sh',
       output,
-      sources: { cwd: '/repo', probeFile: () => true },
-      readConfig: () => Promise.resolve(defineRig({ lanes: { kiln: { limit: '15s' } } })),
-      readTrackedFiles: () => Promise.resolve(trackedFiles),
       initFiles: {
         readJSON: () => Promise.reject(new Error('no init here')),
         writeText: () => Promise.reject(new Error('no init here')),
@@ -44,9 +39,12 @@ function setupTest() {
 test('it runs the unit lane for rig unit, with the paths after it', async () => {
   const ctx = setupTest();
 
-  ctx.trackedFiles.push('src/a.test.ts');
-
-  const exitCode = await runCLI(['unit', './src/a.test.ts'], ctx.run, ctx.deps);
+  const exitCode = await runCLI(['unit', './src/a.test.ts'], ctx.run, {
+    ...ctx.deps,
+    sources: { cwd: '/repo', probeFile: () => true },
+    readConfig: () => Promise.resolve(defineRig({ lanes: { kiln: { limit: '15s' } } })),
+    readTrackedFiles: () => Promise.resolve(['src/a.test.ts']),
+  });
 
   expect(exitCode).toBe(0);
 
@@ -60,9 +58,12 @@ test('it runs the unit lane for rig unit, with the paths after it', async () => 
 test('it passes a flag after rig unit on to bun test', async () => {
   const ctx = setupTest();
 
-  ctx.trackedFiles.push('src/a.test.ts');
-
-  const exitCode = await runCLI(['unit', '--seed=1'], ctx.run, ctx.deps);
+  const exitCode = await runCLI(['unit', '--seed=1'], ctx.run, {
+    ...ctx.deps,
+    sources: { cwd: '/repo', probeFile: () => true },
+    readConfig: () => Promise.resolve(defineRig({})),
+    readTrackedFiles: () => Promise.resolve(['src/a.test.ts']),
+  });
 
   expect(exitCode).toBe(0);
   expect(ctx.runCommand.mock.calls[0]?.[0]).toContain('--seed=1');
@@ -77,9 +78,13 @@ test.each([
   async (command, timeoutArg, extraArgs) => {
     const ctx = setupTest();
 
-    ctx.trackedFiles.push('src/a.test.ts', 'src/a.kiln.test.ts', 'src/a.browser.test.ts');
-
-    const exitCode = await runCLI([command, ...extraArgs], ctx.run, ctx.deps);
+    const exitCode = await runCLI([command, ...extraArgs], ctx.run, {
+      ...ctx.deps,
+      sources: { cwd: '/repo', probeFile: () => true },
+      readConfig: () => Promise.resolve(defineRig({ lanes: { kiln: { limit: '15s' } } })),
+      readTrackedFiles: () =>
+        Promise.resolve(['src/a.test.ts', 'src/a.kiln.test.ts', 'src/a.browser.test.ts']),
+    });
 
     expect(exitCode).toBe(2);
 
@@ -94,9 +99,12 @@ test.each([
 test('it runs a lane that the config declares for rig <lane>', async () => {
   const ctx = setupTest();
 
-  ctx.trackedFiles.push('src/a.kiln.test.ts');
-
-  const exitCode = await runCLI(['kiln'], ctx.run, ctx.deps);
+  const exitCode = await runCLI(['kiln'], ctx.run, {
+    ...ctx.deps,
+    sources: { cwd: '/repo', probeFile: () => true },
+    readConfig: () => Promise.resolve(defineRig({ lanes: { kiln: { limit: '15s' } } })),
+    readTrackedFiles: () => Promise.resolve(['src/a.kiln.test.ts']),
+  });
 
   expect(exitCode).toBe(0);
 
@@ -109,7 +117,12 @@ test('it runs a lane that the config declares for rig <lane>', async () => {
 test('it runs the related tests for rig related', async () => {
   const ctx = setupTest();
 
-  const exitCode = await runCLI(['related', 'src/a.ts'], ctx.run, ctx.deps);
+  const exitCode = await runCLI(['related', 'src/a.ts'], ctx.run, {
+    ...ctx.deps,
+    sources: { cwd: '/repo', probeFile: () => true },
+    readConfig: () => Promise.resolve(defineRig({})),
+    readTrackedFiles: () => Promise.resolve([]),
+  });
 
   expect(exitCode).toBe(0);
   expect(ctx.runCommand.mock.calls[0]?.[0]).toContain('./src/a.test.ts');
@@ -118,7 +131,12 @@ test('it runs the related tests for rig related', async () => {
 test('it exits 2 and names the commands for a command it does not know', async () => {
   const ctx = setupTest();
 
-  const exitCode = await runCLI(['kilm'], ctx.run, ctx.deps);
+  const exitCode = await runCLI(['kilm'], ctx.run, {
+    ...ctx.deps,
+    sources: { cwd: '/repo', probeFile: () => true },
+    readConfig: () => Promise.resolve(defineRig({ lanes: { kiln: { limit: '15s' } } })),
+    readTrackedFiles: () => Promise.resolve([]),
+  });
 
   expect(exitCode).toBe(2);
 
@@ -132,7 +150,12 @@ test('it exits 2 and names the commands for a command it does not know', async (
 test('it exits 2 with the parser message for a command line it refuses', async () => {
   const ctx = setupTest();
 
-  const exitCode = await runCLI([], ctx.run, ctx.deps);
+  const exitCode = await runCLI([], ctx.run, {
+    ...ctx.deps,
+    sources: { cwd: '/repo', probeFile: () => true },
+    readConfig: () => Promise.resolve(defineRig({})),
+    readTrackedFiles: () => Promise.resolve([]),
+  });
 
   expect(exitCode).toBe(2);
 

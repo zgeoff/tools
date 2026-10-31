@@ -12,12 +12,13 @@ async function setupTest() {
 
   onTestFinished(() => rm(repoRoot, { recursive: true, force: true }));
 
-  return { repoRoot, run: buildBrowserRun(repoRoot, 'build-box', '4417') };
+  return { repoRoot };
 }
 
 test("it opens the file's Chrome on its own profile folder inside the run's folder", async () => {
   const ctx = await setupTest();
 
+  const run = buildBrowserRun(ctx.repoRoot, 'build-box', '4417');
   const openView = makeResolvingStub(undefined);
 
   await startBrowser({
@@ -29,9 +30,7 @@ test("it opens the file's Chrome on its own profile folder inside the run's fold
     openView,
   });
 
-  expect(openView).toHaveBeenCalledExactlyOnceWith(
-    join(ctx.run.profilesDir, 'profile-for-notes-file'),
-  );
+  expect(openView).toHaveBeenCalledExactlyOnceWith(join(run.profilesDir, 'profile-for-notes-file'));
 });
 
 test('it fails the file, and starts no Chrome, when the lane set no run ID', async () => {
@@ -64,14 +63,15 @@ test('it fails the file, and starts no Chrome, when the lane set no run ID', asy
 test('it opens Chrome when the build folder holds the build', async () => {
   const ctx = await setupTest();
 
+  const run = buildBrowserRun(ctx.repoRoot, 'build-box', '4417');
   const openView = makeResolvingStub(undefined);
 
-  await Bun.write(join(ctx.run.buildDir, 'index.html'), '<main>notes</main>');
+  await Bun.write(join(run.buildDir, 'index.html'), '<main>notes</main>');
 
   await startBrowser({
     repoRoot: ctx.repoRoot,
     hostName: 'build-box',
-    environment: { RIG_BROWSER_RUN_ID: '4417', RIG_BROWSER_BUILD_DIR: ctx.run.buildDir },
+    environment: { RIG_BROWSER_RUN_ID: '4417', RIG_BROWSER_BUILD_DIR: run.buildDir },
     profileName: 'profile-for-notes-file',
     readDirNames: laneFiles.readDirNames,
     openView,
@@ -83,12 +83,13 @@ test('it opens Chrome when the build folder holds the build', async () => {
 test('it fails the file, and starts no Chrome, when the build folder is missing', async () => {
   const ctx = await setupTest();
 
+  const run = buildBrowserRun(ctx.repoRoot, 'build-box', '4417');
   const openView = makeResolvingStub(undefined);
 
   const start = startBrowser({
     repoRoot: ctx.repoRoot,
     hostName: 'build-box',
-    environment: { RIG_BROWSER_RUN_ID: '4417', RIG_BROWSER_BUILD_DIR: ctx.run.buildDir },
+    environment: { RIG_BROWSER_RUN_ID: '4417', RIG_BROWSER_BUILD_DIR: run.buildDir },
     profileName: 'profile-for-notes-file',
     readDirNames: laneFiles.readDirNames,
     openView,
@@ -100,7 +101,7 @@ test('it fails the file, and starts no Chrome, when the build folder is missing'
   );
 
   expect(failure).toMatchObject({
-    message: `the browser run 4417 has no build in ${ctx.run.buildDir}; the build:browser script writes it to RIG_BROWSER_BUILD_DIR`,
+    message: `the browser run 4417 has no build in ${run.buildDir}; the build:browser script writes it to RIG_BROWSER_BUILD_DIR`,
   });
 
   expect(openView).not.toHaveBeenCalled();
@@ -109,14 +110,15 @@ test('it fails the file, and starts no Chrome, when the build folder is missing'
 test('it fails the file, and starts no Chrome, when the build folder is empty', async () => {
   const ctx = await setupTest();
 
+  const run = buildBrowserRun(ctx.repoRoot, 'build-box', '4417');
   const openView = makeResolvingStub(undefined);
 
-  await mkdir(ctx.run.buildDir, { recursive: true });
+  await mkdir(run.buildDir, { recursive: true });
 
   const start = startBrowser({
     repoRoot: ctx.repoRoot,
     hostName: 'build-box',
-    environment: { RIG_BROWSER_RUN_ID: '4417', RIG_BROWSER_BUILD_DIR: ctx.run.buildDir },
+    environment: { RIG_BROWSER_RUN_ID: '4417', RIG_BROWSER_BUILD_DIR: run.buildDir },
     profileName: 'profile-for-notes-file',
     readDirNames: laneFiles.readDirNames,
     openView,
@@ -128,7 +130,7 @@ test('it fails the file, and starts no Chrome, when the build folder is empty', 
   );
 
   expect(failure).toMatchObject({
-    message: `the browser run 4417 has no build in ${ctx.run.buildDir}; the build:browser script writes it to RIG_BROWSER_BUILD_DIR`,
+    message: `the browser run 4417 has no build in ${run.buildDir}; the build:browser script writes it to RIG_BROWSER_BUILD_DIR`,
   });
 
   expect(openView).not.toHaveBeenCalled();
@@ -137,14 +139,15 @@ test('it fails the file, and starts no Chrome, when the build folder is empty', 
 test('it fails the file, and starts no Chrome, when it cannot read the build folder', async () => {
   const ctx = await setupTest();
 
+  const run = buildBrowserRun(ctx.repoRoot, 'build-box', '4417');
   const openView = makeResolvingStub(undefined);
 
-  await Bun.write(ctx.run.buildDir, 'a file where the build folder goes');
+  await Bun.write(run.buildDir, 'a file where the build folder goes');
 
   const start = startBrowser({
     repoRoot: ctx.repoRoot,
     hostName: 'build-box',
-    environment: { RIG_BROWSER_RUN_ID: '4417', RIG_BROWSER_BUILD_DIR: ctx.run.buildDir },
+    environment: { RIG_BROWSER_RUN_ID: '4417', RIG_BROWSER_BUILD_DIR: run.buildDir },
     profileName: 'profile-for-notes-file',
     readDirNames: laneFiles.readDirNames,
     openView,
