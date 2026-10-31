@@ -263,3 +263,31 @@ test('it reads the same docs as check-prose.sh reads with no path', async () => 
 
   expect(ctx.logged[0]).toBe(`${bare.stdout}${bare.stderr}`);
 });
+
+test('it rejects, and starts no check, when git cannot list the READMEs', async () => {
+  const ctx = await setupTest();
+
+  await ctx.copyDocsScripts(['check-prose.sh', 'check-length.sh', 'check-links.sh']);
+  await ctx.trackFiles({ 'README.md': '# Greeter\n' });
+
+  await writeTreeFiles(ctx.repo, { '.git/index': 'not an index' });
+
+  const outcome = await runDocsCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    fileSystem: nodeFileSystem,
+    runCommand,
+    runLoggedCommand: ctx.runLogged,
+    writeOutput: ctx.writeOutput,
+  }).then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(outcome).toMatchObject({
+    message: expect.stringMatching(/^git ls-files failed: fatal: .*index/u),
+  });
+
+  expect(ctx.logged).toStrictEqual([]);
+  expect(ctx.output).toStrictEqual([]);
+});
