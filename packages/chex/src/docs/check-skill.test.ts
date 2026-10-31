@@ -1088,6 +1088,28 @@ test('it reads the rule-set kind from a metadata flow mapping', async () => {
   expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
 });
 
+test('it keeps the plain limit for a metadata flow mapping whose quoted value holds a kind', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Rules for every demo change. Load it before writing or reviewing one.',
+    "metadata: { note: 'example, kind: rule-set, end' }",
+    '---',
+    '',
+    ...Array.from({ length: 40 }, () => 'The tool reads one file. '.repeat(10).trim()),
+  ]);
+
+  const result = await ctx.run();
+
+  expect(result.stdout.toString()).toBe(
+    'skills/demo/SKILL.md: body is 2000 words, over the limit of 1700; cut it, or move what only some tasks need into a reference\n' +
+      'check-skill: 1 skills, 1 errors, 0 warnings\n',
+  );
+});
+
 test('it keeps the plain limit for a metadata flow mapping of another kind', async () => {
   const ctx = await setupTest();
 

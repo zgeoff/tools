@@ -148,7 +148,7 @@ sub check_words {
       if ($line eq "---") { $start = $i + 1; last }
       if ($line =~ /^metadata:(?:\s+#.*)?\s*$/) { ($in_metadata, $indent) = (1, undef); next }
       if ($line =~ /^metadata:\s*\{(.*)\}\s*(?:#.*)?$/) {
-        for my $entry (split /,/, $1) {
+        for my $entry (split_flow_entries($1)) {
           ($warn, $limit) = (4000, 5000) if $entry =~ /^\s*kind:\s*(.*?)\s*$/ && unquote($1) eq "rule-set";
         }
         $in_metadata = 0;
@@ -171,6 +171,33 @@ sub check_words {
   } elsif ($words > $warn) {
     warn_about($skill, "body is $words words, over $warn; cut it, or move what only some tasks need into a reference");
   }
+}
+
+# Splits the inside of a YAML flow mapping at each comma that sits outside a quoted value and a
+# nested flow collection, so a comma inside a value never starts an entry.
+sub split_flow_entries {
+  my ($text) = @_;
+  my (@entries, $quote);
+  my ($entry, $depth) = ("", 0);
+  for (my $i = 0; $i < length $text; $i++) {
+    my $char = substr($text, $i, 1);
+    if (defined $quote) {
+      if ($quote eq "\"" && $char eq "\\") { $entry .= substr($text, $i, 2); $i++; next }
+      undef $quote if $char eq $quote;
+    } elsif ($char eq "\"" || $char eq "\x27") {
+      $quote = $char;
+    } elsif ($char eq "{" || $char eq "[") {
+      $depth++;
+    } elsif ($char eq "}" || $char eq "]") {
+      $depth--;
+    } elsif ($char eq "," && $depth == 0) {
+      push @entries, $entry;
+      $entry = "";
+      next;
+    }
+    $entry .= $char;
+  }
+  return (@entries, $entry);
 }
 
 # Returns the files that the links under the ## References heading of SKILL.md point at.
