@@ -193,17 +193,18 @@ test("it refuses a rig.config.ts that rig's parser refuses, with the parser's re
     [pathToFileURL('/bakery/node_modules/@zgeoff/rig/src/index.ts').href]: { parseRigConfig },
   };
 
-  const failure = readRigLanes('/bakery/oven', {
+  const failure = await readRigLanes('/bakery/oven', {
     resolveRepoRoot: () => '/bakery',
     probeFile: () => true,
     importModule: (url) => Promise.resolve(modules[url]),
     resolveRepoRig: () => '/bakery/node_modules/@zgeoff/rig/src/index.ts',
-  });
+  }).catch((error: unknown) => error);
 
-  await expect(failure).rejects.toThrow(
-    new TypeError(
-      '/bakery/rig.config.ts must default-export the result of defineRig from @zgeoff/rig: its lanes are no list',
-    ),
+  expect(failure).toBeInstanceOf(TypeError);
+
+  expect(failure).toHaveProperty(
+    'message',
+    '/bakery/rig.config.ts must default-export the result of defineRig from @zgeoff/rig: its lanes are no list',
   );
 });
 

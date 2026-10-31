@@ -20,11 +20,12 @@ async function setupTest() {
 test('it rejects a warm-up whose browser run exits 0 without running a browser test', async () => {
   const ctx = await setupTest();
 
-  const failure = runBrowserWarmUp(ctx.repoRoot, ctx.chromeRunsDir, {
+  const failure = await runBrowserWarmUp(ctx.repoRoot, ctx.chromeRunsDir, {
     runRigBrowser: () => Promise.resolve(),
-  });
+  }).catch((error: unknown) => error);
 
-  await expect(failure).rejects.toThrow(new Error('the Chrome warm-up ran no browser test'));
+  expect(failure).toBeInstanceOf(Error);
+  expect(failure).toHaveProperty('message', 'the Chrome warm-up ran no browser test');
 });
 
 test('it removes the Chrome runs folder after a warm-up that ran no browser test', async () => {
