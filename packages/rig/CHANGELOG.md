@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.0.4](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.0.3...@zgeoff/rig@0.0.4) (2026-10-31)
+
+### Features
+
+- **chex:** run each shared check as one chex subcommand
+  ([#409](https://github.com/zgeoff/tools/issues/409))
+  ([c7c4839](https://github.com/zgeoff/tools/commit/c7c4839335774b7c5ea1aeefaad844de218166a5))
+
+### Dependencies
+
+- The following workspace dependencies were updated
+  - dependencies
+    - @zgeoff/diet bumped to 0.1.4
+    - @zgeoff/std bumped to 0.3.1
+
 ## [0.0.3](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.0.2...@zgeoff/rig@0.0.3) (2026-10-31)
 
 ### Bug Fixes

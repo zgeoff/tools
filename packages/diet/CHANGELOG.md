@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.4](https://github.com/zgeoff/tools/compare/@zgeoff/diet@0.1.3...@zgeoff/diet@0.1.4) (2026-10-31)
+
+### Features
+
+- **chex:** run each shared check as one chex subcommand
+  ([#409](https://github.com/zgeoff/tools/issues/409))
+  ([c7c4839](https://github.com/zgeoff/tools/commit/c7c4839335774b7c5ea1aeefaad844de218166a5))
+
 ## [0.1.3](https://github.com/zgeoff/tools/compare/@zgeoff/diet@0.1.2...@zgeoff/diet@0.1.3) (2026-10-31)
 
 ### Bug Fixes

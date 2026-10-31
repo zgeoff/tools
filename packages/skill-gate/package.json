@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/skill-gate",
-  "version": "0.2.12",
+  "version": "0.2.13",
   "description": "Moved to @zgeoff/agent-hooks: this release runs the skill gate from that package",
   "keywords": [
     "claude-code",
