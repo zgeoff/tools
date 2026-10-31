@@ -82,12 +82,11 @@ test("it packs chex into the run's folder, extracts the tarball and returns the 
   ]);
 });
 
-test('it rejects with the pack failure, and never extracts or reads a bin', async () => {
+test('it rejects with the pack failure, and never extracts or reads a bin', () => {
   const ctx = setupTest('pack');
   const start = createChexPack(ctx.context, ctx.dependencies);
 
-  await expect(start).rejects.toThrow('pack exited 1');
-
+  expect(start).rejects.toThrow('pack exited 1');
   expect(ctx.commands.map((call) => call.command[0])).toStrictEqual([process.execPath]);
   expect(ctx.readPaths).toStrictEqual([]);
 });
