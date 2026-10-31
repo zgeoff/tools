@@ -15,16 +15,34 @@ export interface StepBundle {
   readonly text: string;
 }
 
-// Bun inlines every file and package a script imports, and leaves Bun and Node built-ins as
-// imports, which every runner has.
-export function readStepBundles(root: string, entries: readonly string[]): Promise<StepBundle[]> {
+export interface BundleConfig {
+  readonly entrypoints: string[];
+  readonly root: string;
+  readonly target: 'bun';
+}
+
+export interface BundleOutput {
+  readonly text: () => Promise<string>;
+}
+
+// Bun.build fits this type: it inlines every file and package a script imports, and leaves Bun and
+// Node built-ins as imports, which every runner has.
+export type BuildBundle = (
+  config: BundleConfig,
+) => Promise<{ readonly outputs: readonly BundleOutput[] }>;
+
+export function readStepBundles(
+  root: string,
+  entries: readonly string[],
+  build: BuildBundle,
+): Promise<StepBundle[]> {
   const scripts = [...new Set(entries)].filter((entry) => entry.endsWith('.ts')).toSorted();
 
   return Promise.all(
     scripts.map(async (entry) => {
-      const build = await Bun.build({ entrypoints: [join(root, entry)], root, target: 'bun' });
+      const result = await build({ entrypoints: [join(root, entry)], root, target: 'bun' });
 
-      const [output] = build.outputs;
+      const [output] = result.outputs;
 
       if (output === undefined) {
         throw new Error(`bun build wrote no bundle for ${entry}`);
@@ -86,7 +104,9 @@ if (import.meta.main) {
   const root = join(import.meta.dir, '../..');
   const parsed = parseArgs({ options: { check: { type: 'boolean' } }, strict: true });
 
-  const bundles = await readStepBundles(root, Object.values(stepScriptSets).flat());
+  const bundles = await readStepBundles(root, Object.values(stepScriptSets).flat(), (config) =>
+    Bun.build(config),
+  );
 
   if (parsed.values.check === true) {
     const committed = await readCommittedStepBundles(root);

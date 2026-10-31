@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import type { BundleConfig } from './write-step-bundles.ts';
 import {
   collectStaleStepBundles,
   readCommittedStepBundles,
@@ -38,10 +39,11 @@ test('it bundles a step script with the files and packages it imports, and keeps
     'scripts/kettle/whistle.sh': 'echo whistle\n',
   });
 
-  const bundles = await readStepBundles(ctx.directory, [
-    'scripts/kettle/boil.ts',
-    'scripts/kettle/whistle.sh',
-  ]);
+  const bundles = await readStepBundles(
+    ctx.directory,
+    ['scripts/kettle/boil.ts', 'scripts/kettle/whistle.sh'],
+    (config) => Bun.build(config),
+  );
 
   const imports = bundles.map((bundle) =>
     new Bun.Transpiler({ loader: 'js' }).scanImports(bundle.text).map((imported) => imported.path),
@@ -53,6 +55,44 @@ test('it bundles a step script with the files and packages it imports, and keeps
 
   expect(imports).toStrictEqual([['path']]);
   expect(bundles[0]?.text).toInclude('poured');
+});
+
+test('it fails with the error of a build that fails', () => {
+  const bundles = readStepBundles('/srv/kettle', ['scripts/kettle/boil.ts'], () =>
+    Promise.reject(new Error('Could not resolve: "kettle-spout"')),
+  );
+
+  expect(bundles).rejects.toThrow('Could not resolve: "kettle-spout"');
+});
+
+test('it fails for a build that writes no bundle', () => {
+  const bundles = readStepBundles('/srv/kettle', ['scripts/kettle/boil.ts'], () =>
+    Promise.resolve({ outputs: [] }),
+  );
+
+  expect(bundles).rejects.toThrow('bun build wrote no bundle for scripts/kettle/boil.ts');
+});
+
+test('it builds each TypeScript entry once from the repo root, and skips a shell script', async () => {
+  const calls: BundleConfig[] = [];
+
+  const build = (config: BundleConfig) => {
+    calls.push(config);
+
+    return Promise.resolve({ outputs: [{ text: () => Promise.resolve('// boil') }] });
+  };
+
+  const bundles = await readStepBundles(
+    '/srv/kettle',
+    ['scripts/kettle/boil.ts', 'scripts/kettle/boil.ts', 'scripts/kettle/whistle.sh'],
+    build,
+  );
+
+  expect(calls).toStrictEqual([
+    { entrypoints: ['/srv/kettle/scripts/kettle/boil.ts'], root: '/srv/kettle', target: 'bun' },
+  ]);
+
+  expect(bundles).toStrictEqual([{ path: 'step-bundles/scripts/kettle/boil.js', text: '// boil' }]);
 });
 
 test.each<[string, Readonly<Record<string, string>>, string[]]>([
