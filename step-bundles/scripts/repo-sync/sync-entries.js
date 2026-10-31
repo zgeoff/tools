@@ -1,6 +1,6 @@
 // @bun
 // scripts/repo-sync/sync-entries.ts
-import { join as join3 } from "path";
+import { join as join4 } from "path";
 
 // scripts/ci/make-logged-command-runner.ts
 function makeLoggedCommandRunner(output) {
@@ -301,6 +301,225 @@ function planRetiredFileRemoval(facts) {
   };
 }
 
+// scripts/ci/download-step-scripts.ts
+import { isBuiltin } from "module";
+import { dirname as dirname2, join, normalize } from "path";
+var stepScriptSets = {
+  "bun-checks": [
+    "scripts/bun-checks/write-check-plan.ts",
+    "scripts/bun-checks/run-shell-check.ts",
+    "scripts/bun-checks/run-docs-check.ts",
+    "scripts/bun-checks/run-actionlint-check.ts",
+    "scripts/ci/run-pinned-tool-step.ts",
+    "scripts/ci/run-package-scripts.ts",
+    "scripts/ci/collect-failed-jobs.ts",
+    "packages/chex/src/run-workflows-check.ts",
+    "packages/chex/src/run-commits-check.ts",
+    "packages/chex/src/run-local-paths-check.ts",
+    "packages/chex/src/run-test-timeouts-check.ts",
+    "packages/chex/src/dependency-gates/run-dependency-gates-check.ts"
+  ],
+  "paths-changed": ["scripts/paths-changed/run-changed-files-step.ts"],
+  "repo-sync": [
+    "scripts/repo-sync/write-sync-ref.ts",
+    "scripts/repo-sync/write-sync-entries.ts",
+    "scripts/repo-sync/sync-entries.ts",
+    "scripts/repo-sync/write-sync-alarm.ts"
+  ],
+  "repo-sync-guard": ["scripts/repo-sync/hold-hand-pushed-sync.ts"],
+  "audit-fix": [
+    "scripts/audit-fix/fix-advisories.ts",
+    "scripts/audit-fix/commit-audit-fix.ts",
+    "scripts/audit-fix/open-audit-fix-pull-request.ts"
+  ],
+  release: [
+    "scripts/check-release-head.sh",
+    "scripts/merge-release-prs.sh",
+    "scripts/release/run-sync-release-pr.ts",
+    "scripts/release/run-release-outputs-step.ts"
+  ]
+};
+var stepBundlesFolder = "step-bundles";
+function toStepRunPath(entry) {
+  return entry.endsWith(".ts") ? `${entry.slice(0, -".ts".length)}.js` : entry;
+}
+function toStepToolsPath(runPath) {
+  return runPath.endsWith(".js") ? `${stepBundlesFolder}/${runPath}` : runPath;
+}
+async function downloadStepScripts(download) {
+  const written = new Set;
+  let pending = [...download.entries];
+  while (pending.length > 0) {
+    const batch = pending.filter((path) => !written.has(path));
+    for (const path of batch) {
+      written.add(path);
+    }
+    const imported = await Promise.all(batch.map(async (path) => {
+      const text = await download.readToolsFile(path);
+      await download.writeFile(join(download.destination, path), text);
+      return collectImportedPaths(path, text);
+    }));
+    pending = [...new Set(imported.flat())];
+  }
+  return [...written];
+}
+var transpiler = new Bun.Transpiler({ loader: "ts" });
+function collectImportedPaths(path, text) {
+  if (!path.endsWith(".ts") && !path.endsWith(".js")) {
+    return [];
+  }
+  return transpiler.scanImports(text).flatMap((imported) => {
+    if (isBuiltin(imported.path)) {
+      return [];
+    }
+    if (!imported.path.startsWith(".")) {
+      throw new Error(`${path} imports the package ${imported.path}, which a downloaded step script cannot install`);
+    }
+    return [normalize(join(dirname2(path), imported.path))];
+  });
+}
+if (false) {}
+
+// scripts/repo-sync/read-pinned-sources.ts
+async function readPinnedSources(reading) {
+  const reusable = [];
+  for (const path of reading.workflowPaths.filter((candidate) => isWorkflowFile(candidate))) {
+    const text = await reading.readFile(path);
+    if (text !== null && isReusableWorkflow(text)) {
+      reusable.push(path);
+    }
+  }
+  const stepScripts = await downloadStepScripts({
+    entries: Object.values(stepScriptSets).flat().map((entry) => toStepRunPath(entry)),
+    destination: "",
+    readToolsFile: async (path) => {
+      const text = await reading.readFile(toStepToolsPath(path));
+      return text ?? "";
+    },
+    writeFile: () => Promise.resolve()
+  });
+  return [
+    ...new Set([
+      ...reusable,
+      ".bun-version",
+      "scripts/ci/download-step-scripts.ts",
+      ...stepScripts.map((path) => toStepToolsPath(path))
+    ])
+  ];
+}
+function isWorkflowFile(path) {
+  return path.endsWith(".yml") || path.endsWith(".yaml");
+}
+function isReusableWorkflow(text) {
+  const workflow = parseWorkflow(text);
+  if (typeof workflow !== "object" || workflow === null || !("on" in workflow)) {
+    return false;
+  }
+  const triggers = workflow.on;
+  if (typeof triggers === "string") {
+    return triggers === "workflow_call";
+  }
+  if (Array.isArray(triggers)) {
+    return triggers.includes("workflow_call");
+  }
+  return typeof triggers === "object" && triggers !== null && "workflow_call" in triggers;
+}
+function parseWorkflow(text) {
+  try {
+    const workflow = Bun.YAML.parse(text);
+    return workflow;
+  } catch {
+    return null;
+  }
+}
+
+// scripts/repo-sync/read-commit-pinned-sources.ts
+async function readCommitPinnedSources(reading) {
+  const listed = await runGit(reading, [
+    "ls-tree",
+    "-z",
+    "--name-only",
+    reading.commit,
+    ".github/workflows/"
+  ]);
+  return readPinnedSources({
+    workflowPaths: splitPaths(listed.stdout),
+    readFile: (path) => readCommitFile(reading, path)
+  });
+}
+async function runGit(reading, args) {
+  const argv = ["git", "-C", reading.repository, ...args];
+  const result = await reading.runCommand(argv, { cwd: reading.cwd, env: reading.env });
+  if (result.exitCode !== 0) {
+    throw new Error(`${argv.join(" ")} exited with ${result.exitCode}: ${result.stderr.trim()}`);
+  }
+  return result;
+}
+function splitPaths(stdout) {
+  return stdout.split("\x00").filter((path) => path !== "");
+}
+async function readCommitFile(reading, path) {
+  const listed = await runGit(reading, [
+    "ls-tree",
+    "-z",
+    "--name-only",
+    reading.commit,
+    "--",
+    path
+  ]);
+  if (splitPaths(listed.stdout).length === 0) {
+    return null;
+  }
+  const shown = await runGit(reading, ["show", `${reading.commit}:${path}`]);
+  return shown.stdout;
+}
+
+// scripts/repo-sync/probe-stale-tools-pins.ts
+async function probeStaleToolsPins(context, commit) {
+  const pattern = String.raw`zgeoff/tools/\.github/workflows/[^@[:space:]]+@[0-9a-f]{40}`;
+  const argv = ["git", "grep", "-h", "-o", "-E", pattern, "HEAD", "--", ".github/workflows"];
+  const found = await context.runCommand(argv, { cwd: context.cwd, env: context.env });
+  if (found.exitCode > 1) {
+    throw new Error(`git grep for the zgeoff/tools pins exited with ${found.exitCode}: ${found.stderr}`);
+  }
+  const pins = new Set([...found.stdout.matchAll(/@(?<commit>[0-9a-f]{40})/gu)].flatMap((match) => {
+    const pin = match.groups?.["commit"];
+    return pin === undefined || pin === commit ? [] : [pin];
+  }));
+  for (const pin of pins) {
+    const isStale = await probePinnedSourcesChanged(context, pin, commit);
+    if (isStale) {
+      return true;
+    }
+  }
+  return false;
+}
+async function probePinnedSourcesChanged(context, pin, commit) {
+  await context.runCommand(["git", "-C", ".repo-sync", "fetch", "-q", "origin", pin], {
+    cwd: context.cwd,
+    env: context.env
+  });
+  const tools = {
+    runCommand: context.runCommand,
+    cwd: context.cwd,
+    env: context.env,
+    repository: ".repo-sync"
+  };
+  const sources = new Set([
+    ...await readCommitPinnedSources({ ...tools, commit: pin }),
+    ...await readCommitPinnedSources({ ...tools, commit })
+  ]);
+  const argv = ["git", "-C", ".repo-sync", "diff", "--quiet", "--no-renames", pin, commit, "--"];
+  const diff = await context.runCommand([...argv, ...sources], {
+    cwd: context.cwd,
+    env: context.env
+  });
+  if (diff.exitCode > 1) {
+    throw new Error(`${argv.join(" ")} exited with ${diff.exitCode}: ${diff.stderr}`);
+  }
+  return diff.exitCode === 1;
+}
+
 // scripts/repo-sync/read-sync-commit-facts.ts
 async function readSyncCommitFacts(context, request) {
   const onMain = await runProbe(context, [
@@ -397,6 +616,12 @@ async function readPinOrder(context, commit, pin) {
   return { pin, order };
 }
 
+// scripts/repo-sync/tools-pins-entry.ts
+var toolsPinsEntry = {
+  name: "tools-pins",
+  description: "The calls to zgeoff/tools workflows, whose pinned commit changed a workflow or a step script"
+};
+
 // scripts/repo-sync/render-sync-pull-request-title.ts
 var maxTitleLength = 72;
 function renderSyncPullRequestTitle(synced) {
@@ -412,6 +637,9 @@ var entryKinds = ["skill", "workflow", "hook"];
 function renderEntryName(name) {
   if (name === retiredFilesName) {
     return "the retired files";
+  }
+  if (name === toolsPinsEntry.name) {
+    return "the zgeoff/tools pins";
   }
   const kind = entryKinds.find((candidate) => name.startsWith(`${candidate}-`));
   return kind === undefined ? `the ${name}` : `the ${name.slice(kind.length + 1)} ${kind}`;
@@ -429,7 +657,7 @@ function selectSyncFiles(files, repo) {
 }
 
 // scripts/repo-sync/write-copy-plan.ts
-import { dirname as dirname2, join } from "path";
+import { dirname as dirname3, join as join2 } from "path";
 
 // scripts/repo-sync/build-tools-pin.ts
 var callPattern = /(?<![A-Za-z0-9._/-])(?<path>zgeoff\/tools\/\.github\/workflows\/[^\]@\s"'{},]+)@[^\]{},\s"'#]+/gu;
@@ -453,9 +681,9 @@ function buildToolsPin(text, commit) {
 // scripts/repo-sync/write-copy-plan.ts
 async function writeCopyPlan(context, plan) {
   for (const copy of plan.copies) {
-    const path = join(context.cwd, copy.target);
+    const path = join2(context.cwd, copy.target);
     const existing = copy.isPinned ? await readExistingText(context, path) : null;
-    await context.fileSystem.createDirectory(join(context.cwd, dirname2(copy.target)));
+    await context.fileSystem.createDirectory(join2(context.cwd, dirname3(copy.target)));
     await runChecked(context, [
       "install",
       "-m",
@@ -596,7 +824,7 @@ function runProbe2(context, argv) {
 }
 
 // scripts/repo-sync/write-tools-pins.ts
-import { join as join2 } from "path";
+import { join as join3 } from "path";
 async function writeToolsPins(context, commit) {
   const listed = await runChecked3(context, [
     "git",
@@ -608,7 +836,7 @@ async function writeToolsPins(context, commit) {
   ]);
   const pinned = [];
   for (const target of listed.stdout.split("\x00").filter((path) => path !== "")) {
-    const path = join2(context.cwd, target);
+    const path = join3(context.cwd, target);
     const text = await context.fileSystem.readText(path);
     const pinnedText = buildToolsPin(text, commit);
     if (pinnedText !== text) {
@@ -714,7 +942,7 @@ async function commitEntries(context) {
   const taken = [];
   const copied = [];
   const scripts = {};
-  await context.fileSystem.appendText(join3(context.cwd, ".git/info/exclude"), `/.repo-sync/
+  await context.fileSystem.appendText(join4(context.cwd, ".git/info/exclude"), `/.repo-sync/
 `);
   await runSyncCommand(context, [
     "git",
@@ -763,11 +991,22 @@ async function commitEntries(context) {
     delivered: [...copied, ...retired.paths],
     scripts
   };
-  if (committed.synced.length === 0) {
+  if (committed.synced.length > 0) {
+    const pinned = await writeToolsPins(context, context.commit);
+    return { ...committed, delivered: [...committed.delivered, ...pinned] };
+  }
+  const isStale = await probeStaleToolsPins(context, context.commit);
+  if (!isStale) {
     return committed;
   }
+  context.writeOutput(`Every entry matches the source, but a pinned zgeoff/tools workflow changed; moving the pins to ${context.commit}.
+`);
   const pinned = await writeToolsPins(context, context.commit);
-  return { ...committed, delivered: [...committed.delivered, ...pinned] };
+  return {
+    ...committed,
+    synced: [toolsPinsEntry],
+    delivered: [...committed.delivered, ...pinned]
+  };
 }
 function runSyncCommand(context, argv) {
   return runCheckedCommand(context.runCommand, argv, { cwd: context.cwd, env: context.env });
@@ -814,11 +1053,11 @@ async function readExistingWorkflows(context, rows) {
   const workflows = new Map;
   const taken = buildSyncRowSplit(rows).taken;
   for (const row of taken.filter((candidate) => isWorkflowPath(candidate.target))) {
-    const target = join3(context.cwd, row.target);
+    const target = join4(context.cwd, row.target);
     const exists = await context.fileSystem.probePath(target);
     if (exists) {
       const targetText = await context.fileSystem.readText(target);
-      const sourceText = await context.fileSystem.readText(join3(context.cwd, ".repo-sync", row.source));
+      const sourceText = await context.fileSystem.readText(join4(context.cwd, ".repo-sync", row.source));
       workflows.set(row.target, { targetText, sourceText });
     }
   }
@@ -829,7 +1068,7 @@ function runProbeCommand(context, argv) {
 }
 async function removeRetiredFiles(context, taken, copied) {
   const script = ".repo-sync/scripts/remove-retired-sync-files.sh";
-  const hasScript = await context.fileSystem.probePath(join3(context.cwd, script));
+  const hasScript = await context.fileSystem.probePath(join4(context.cwd, script));
   if (!hasScript) {
     context.writeOutput(`The tools ref has no retired-file cleanup; nothing to remove.
 `);

@@ -1,4 +1,9 @@
-import { downloadStepScripts, stepScriptSets } from '../ci/download-step-scripts.ts';
+import {
+  downloadStepScripts,
+  stepScriptSets,
+  toStepRunPath,
+  toStepToolsPath,
+} from '../ci/download-step-scripts.ts';
 
 export interface PinnedSourcesReading {
   readonly workflowPaths: readonly string[];
@@ -20,10 +25,12 @@ export async function readPinnedSources(
   }
 
   const stepScripts = await downloadStepScripts({
-    entries: Object.values(stepScriptSets).flat(),
+    entries: Object.values(stepScriptSets)
+      .flat()
+      .map((entry) => toStepRunPath(entry)),
     destination: '',
     readToolsFile: async (path) => {
-      const text = await reading.readFile(path);
+      const text = await reading.readFile(toStepToolsPath(path));
 
       return text ?? '';
     },
@@ -35,7 +42,7 @@ export async function readPinnedSources(
       ...reusable,
       '.bun-version',
       'scripts/ci/download-step-scripts.ts',
-      ...stepScripts,
+      ...stepScripts.map((path) => toStepToolsPath(path)),
     ]),
   ];
 }
