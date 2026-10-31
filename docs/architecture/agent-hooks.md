@@ -51,24 +51,20 @@ it.
 
 ## Failing closed
 
-When the package still cannot load, the stub cannot run the handlers, because their code lives in
-the package. The stub then exits 2 before every tool call. Its refusal message holds the two install
-commands that pass, so an agent that wrote the install with a `cd` or a pipe can retry it in the
-form that passes.
+While the package cannot load, no handler runs, so nothing checks what a tool call writes. The stub
+therefore exits 2 before every tool call, with two exceptions, each a Bash command:
 
-The stub lets these Bash commands through:
+- the install that repairs the stub, `bun install` or `bun install --frozen-lockfile`;
+- a read-only `ls`, `cat` or `pwd`.
 
-- `bun install` and `bun install --frozen-lockfile`, which repair the stub;
-- `ls`, `cat` and `pwd`, which only read.
+An exception passes only as plain words between single spaces, because a shell can build a path that
+the stub cannot see in the command text, as in `ext=ts; printf x > src/sample.$ext`. The stub
+refuses a command with a variable, a quote, a glob, a redirect, a line break or a control character.
+Git stays off the list, because git config can make any git command run a program, such as an
+fsmonitor program.
 
-A listed command must be one command of plain words between single spaces. A shell can build the
-path of a file that a handler protects in a way no parser sees, as in
-`ext=ts; printf x > src/sample.$ext`. The stub therefore refuses a command with any other character,
-such as a variable, a quote, a glob, a redirect, a line break or a control character.
+The refusal message holds the two install commands word for word, so an agent that wrote the install
+with a `cd` or a pipe knows the form to retry.
 
-The list leaves out git, because git config can make any git command run a program, such as an
-fsmonitor program or a clean filter. Turning off the external diff and textconv programs in a
-`git diff` does not stop either one.
-
-On any other event the stub exits 0. After a tool call there is nothing left to block, and a blocked
-prompt would stop a person from asking the agent to run the install.
+On any event but `PreToolUse`, the stub exits 0. After a tool call there is nothing left to block,
+and a blocked prompt would stop a person from asking the agent to run the install.
