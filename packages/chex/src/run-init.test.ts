@@ -3,13 +3,27 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
+import { lockFileWrites } from '../../../test-utils/lock-file-writes.ts';
 import { runInit } from './run-init.ts';
 import { writeTextFile } from './write-text-file.ts';
 
 async function setupTest() {
   const repoRoot = await mkdtemp(join(tmpdir(), 'chex-init-'));
 
-  onTestFinished(() => rm(repoRoot, { recursive: true, force: true }));
+  const unlocks: (() => Promise<void>)[] = [];
+
+  // A locked file blocks the folder's removal, so each unlock runs first.
+  onTestFinished(async () => {
+    await Promise.all(unlocks.map((unlock) => unlock()));
+
+    await rm(repoRoot, { recursive: true, force: true });
+  });
+
+  const lockFile = async (name: string) => {
+    const unlock = await lockFileWrites(join(repoRoot, name));
+
+    unlocks.push(unlock);
+  };
 
   const lines: string[] = [];
 
@@ -18,6 +32,7 @@ async function setupTest() {
       repoRoot,
       readText: readOptionalText,
       writeText: writeTextFile,
+      removeFile: (path) => rm(path, { force: true }),
       writeOutput: (text) => {
         lines.push(`out ${text}`);
       },
@@ -32,7 +47,7 @@ async function setupTest() {
       readOptionalText(join(repoRoot, 'lefthook.yml')),
     ]);
 
-  return { repoRoot, lines, run, readFiles };
+  return { repoRoot, lines, run, readFiles, lockFile };
 }
 
 test('it writes lefthook.yml and package.json to the repo folder, and reports each', async () => {
@@ -122,4 +137,51 @@ test('it fails and writes nothing in a folder with no package.json', async () =>
   });
 
   expect(files).toStrictEqual([undefined, undefined]);
+});
+
+test('it leaves both files as they were when package.json cannot take its write', async () => {
+  const ctx = await setupTest();
+
+  const packageText = JSON.stringify({
+    name: 'kettle',
+    devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
+  });
+
+  await writeFile(join(ctx.repoRoot, 'package.json'), packageText);
+  await writeFile(join(ctx.repoRoot, 'lefthook.yml'), 'extends: [.lefthook/local.yml]\n');
+
+  await ctx.lockFile('package.json');
+
+  const exitCode = await ctx.run();
+  const files = await ctx.readFiles();
+
+  expect({ exitCode, lines: ctx.lines }).toStrictEqual({
+    exitCode: 1,
+    lines: [
+      expect.stringMatching(
+        /^err chex init: could not write package\.json, so both files stay as they were: .+\n$/u,
+      ),
+    ],
+  });
+
+  expect(files).toStrictEqual([packageText, 'extends: [.lefthook/local.yml]\n']);
+});
+
+test('it removes the lefthook.yml it wrote when package.json cannot take its write', async () => {
+  const ctx = await setupTest();
+
+  const packageText = JSON.stringify({
+    name: 'kettle',
+    devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
+  });
+
+  await writeFile(join(ctx.repoRoot, 'package.json'), packageText);
+
+  await ctx.lockFile('package.json');
+
+  const exitCode = await ctx.run();
+  const files = await ctx.readFiles();
+
+  expect(exitCode).toBe(1);
+  expect(files).toStrictEqual([packageText, undefined]);
 });

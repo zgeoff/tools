@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
 import { runDependencyGatesCommand } from './dependency-gates/run-dependency-gates-check.ts';
@@ -30,6 +31,7 @@ process.exitCode = await runChex(process.argv.slice(2), {
       repoRoot: process.cwd(),
       readText: readOptionalText,
       writeText: writeTextFile,
+      removeFile: (path) => rm(path, { force: true }),
       writeOutput: (text) => {
         process.stdout.write(text);
       },
