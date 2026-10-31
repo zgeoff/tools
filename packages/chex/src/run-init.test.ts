@@ -32,18 +32,18 @@ async function setupTest() {
       readOptionalText(join(repoRoot, 'lefthook.yml')),
     ]);
 
-  const packageText = JSON.stringify({
-    name: 'kettle',
-    devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
-  });
-
-  return { repoRoot, lines, run, readFiles, packageText };
+  return { repoRoot, lines, run, readFiles };
 }
 
 test('it writes lefthook.yml and package.json to the repo folder, and reports each', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.repoRoot, 'package.json'), ctx.packageText);
+  const packageText = JSON.stringify({
+    name: 'kettle',
+    devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
+  });
+
+  await writeFile(join(ctx.repoRoot, 'package.json'), packageText);
 
   const exitCode = await ctx.run();
   const files = await ctx.readFiles();
@@ -63,7 +63,12 @@ test('it writes lefthook.yml and package.json to the repo folder, and reports ea
 test('it leaves every file as it was on a second run', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.repoRoot, 'package.json'), ctx.packageText);
+  const packageText = JSON.stringify({
+    name: 'kettle',
+    devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
+  });
+
+  await writeFile(join(ctx.repoRoot, 'package.json'), packageText);
 
   await ctx.run();
 
@@ -84,7 +89,12 @@ test('it leaves every file as it was on a second run', async () => {
 test('it fails and leaves both files as they were when lefthook.yml lists extends inline', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.repoRoot, 'package.json'), ctx.packageText);
+  const packageText = JSON.stringify({
+    name: 'kettle',
+    devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
+  });
+
+  await writeFile(join(ctx.repoRoot, 'package.json'), packageText);
   await writeFile(join(ctx.repoRoot, 'lefthook.yml'), 'extends: [local.yml]\n');
 
   const exitCode = await ctx.run();
@@ -95,7 +105,7 @@ test('it fails and leaves both files as they were when lefthook.yml lists extend
     lines: [
       'err chex init: lefthook.yml writes extends in a form chex init does not edit; add node_modules/@zgeoff/chex/lefthook.yml to its list\n',
     ],
-    files: [ctx.packageText, 'extends: [local.yml]\n'],
+    files: [packageText, 'extends: [local.yml]\n'],
   });
 });
 
