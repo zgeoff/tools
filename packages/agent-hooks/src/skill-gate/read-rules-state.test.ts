@@ -134,7 +134,9 @@ test('it reads a Unix socket at the rules path as unreadable', async () => {
     socket: { data: () => {} },
   });
 
-  ctx.stack.defer(() => listener.stop(true));
+  ctx.stack.defer(() => {
+    listener.stop(true);
+  });
 
   const state = await readRulesState(ctx.fileSystem, join(ctx.directory, 'skill-gate.json'));
 
