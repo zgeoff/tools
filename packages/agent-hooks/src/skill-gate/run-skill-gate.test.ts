@@ -78,7 +78,19 @@ async function setupTest() {
     return { directory, project, runHook, patch, bash };
   };
 
-  return { directory, hookArgs, codexHookArgs, prepareCodexProject };
+  const runHook = (project: string, event: Readonly<Record<string, unknown>>) =>
+    spawnSync('bun', hookArgs, {
+      encoding: 'utf8',
+      env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: project },
+      input: JSON.stringify({
+        hook_event_name: 'PreToolUse',
+        cwd: project,
+        transcript_path: join(directory, 'transcript.jsonl'),
+        ...event,
+      }),
+    });
+
+  return { directory, hookArgs, codexHookArgs, prepareCodexProject, runHook };
 }
 
 test('it denies a test file edit until the session loads both testing skills', async () => {
@@ -2650,4 +2662,259 @@ test('it counts a skill read that follows a directory change', async () => {
 
   expect(result.status).toBe(0);
   expect(result.stdout).toBe('');
+});
+
+test('it denies an edit when a folder replaces the committed rules file, and names the git repair that brings the gate back', async () => {
+  const ctx = await setupTest();
+
+  const project = join(ctx.directory, 'project');
+
+  await mkdir(join(project, '.claude/skills/testing'), { recursive: true });
+  await writeFile(join(project, '.claude/skills/testing/SKILL.md'), '# Testing\n');
+
+  await writeFile(
+    join(project, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: 'src/**', skills: ['testing'] }] }),
+  );
+
+  await $`git init --quiet && git add -A && git commit --quiet -m rules`.cwd(project).env({
+    PATH: process.env['PATH'],
+    GIT_AUTHOR_NAME: 'Fixture Author',
+    GIT_AUTHOR_EMAIL: 'fixture@example.com',
+    GIT_COMMITTER_NAME: 'Fixture Author',
+    GIT_COMMITTER_EMAIL: 'fixture@example.com',
+  });
+
+  await rm(join(project, '.claude/skill-gate.json'));
+  await mkdir(join(project, '.claude/skill-gate.json'));
+
+  const edit = {
+    tool_name: 'Edit',
+    tool_input: { file_path: join(project, 'src/sample.ts') },
+  };
+
+  const denied = ctx.runHook(project, edit);
+  const repair = denied.stderr.trim().split('\n').at(-1) ?? '';
+
+  await $`sh -c ${repair}`.cwd(project).env({ PATH: process.env['PATH'] });
+
+  const repaired = ctx.runHook(project, edit);
+
+  expect(denied.status).toBe(2);
+  expect(denied.stdout).toBe('');
+
+  expect(denied.stderr).toBe(
+    `skill-gate: .claude/skill-gate.json exists but the gate cannot read it as a file (it is a folder), so it blocks this edit to ${join(project, 'src/sample.ts')}. Until the file reads again, the gate treats every path and tool as gated. You cannot repair it from here: ask the user to run this from the repo root, then retry:\nmv .claude/skill-gate.json .claude/skill-gate.json.broken && git checkout -- .claude/skill-gate.json\n`,
+  );
+
+  expect(repaired.status).toBe(2);
+
+  expect(repaired.stderr).toBe(
+    `Load the \`testing\` skill with the Skill tool before editing ${join(project, 'src/sample.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
+});
+
+test('it denies an edit when a folder sits at a rules path git does not track, and gives the repair in plain words', async () => {
+  const ctx = await setupTest();
+
+  const project = join(ctx.directory, 'project');
+
+  await mkdir(join(project, '.claude/skill-gate.json'), { recursive: true });
+
+  await $`git init --quiet`.cwd(project).env({ PATH: process.env['PATH'] });
+
+  const result = ctx.runHook(project, {
+    tool_name: 'Edit',
+    tool_input: { file_path: join(project, 'src/sample.ts') },
+  });
+
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
+
+  expect(result.stderr).toBe(
+    `skill-gate: .claude/skill-gate.json exists but the gate cannot read it as a file (it is a folder), so it blocks this edit to ${join(project, 'src/sample.ts')}. Until the file reads again, the gate treats every path and tool as gated. You cannot repair it from here: ask the user to run this from the repo root, then retry:\nMove whatever is at .claude/skill-gate.json aside and put the repo's rules file back in its place. Removing the path without putting the file back turns the gate off.\n`,
+  );
+});
+
+test.each([['ls'], ['ext=ts; printf x > src/sample.$ext']])(
+  'it denies the Bash command %s when a folder sits at the rules path',
+  async (command) => {
+    const ctx = await setupTest();
+
+    await mkdir(join(ctx.directory, '.claude/skill-gate.json'), { recursive: true });
+
+    const result = ctx.runHook(ctx.directory, {
+      tool_name: 'Bash',
+      tool_input: { command },
+      tool_use_id: 'toolu_bash_1',
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stdout).toBe('');
+
+    expect(result.stderr).toBe(
+      `skill-gate: .claude/skill-gate.json exists but the gate cannot read it as a file (it is a folder), so it blocks this Bash command. Until the file reads again, the gate treats every path and tool as gated. You cannot repair it from here: ask the user to run this from the repo root, then retry:\nMove whatever is at .claude/skill-gate.json aside and put the repo's rules file back in its place. Removing the path without putting the file back turns the gate off.\n`,
+    );
+  },
+);
+
+test('it denies a call to a tool the hook matcher names when a folder sits at the rules path', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, '.claude/skill-gate.json'), { recursive: true });
+
+  const result = ctx.runHook(ctx.directory, {
+    tool_name: 'mcp__linear-server__save_issue',
+    tool_input: { title: 'Rotate the staging keys' },
+  });
+
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
+
+  expect(result.stderr).toBe(
+    "skill-gate: .claude/skill-gate.json exists but the gate cannot read it as a file (it is a folder), so it blocks this call to mcp__linear-server__save_issue. Until the file reads again, the gate treats every path and tool as gated. You cannot repair it from here: ask the user to run this from the repo root, then retry:\nMove whatever is at .claude/skill-gate.json aside and put the repo's rules file back in its place. Removing the path without putting the file back turns the gate off.\n",
+  );
+});
+
+test('it stays silent after a Bash command when a folder sits at the rules path', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, '.claude/skill-gate.json'), { recursive: true });
+
+  const result = ctx.runHook(ctx.directory, {
+    hook_event_name: 'PostToolUse',
+    tool_name: 'Bash',
+    tool_input: { command: 'ls' },
+    tool_use_id: 'toolu_bash_1',
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+  expect(result.stderr).toBe('');
+});
+
+test('it denies an edit as for a folder when the rules path is a symlink to a folder', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, '.claude/rules'), { recursive: true });
+  await symlink('rules', join(ctx.directory, '.claude/skill-gate.json'));
+
+  const result = ctx.runHook(ctx.directory, {
+    tool_name: 'Edit',
+    tool_input: { file_path: join(ctx.directory, 'src/sample.ts') },
+  });
+
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
+
+  expect(result.stderr).toBe(
+    `skill-gate: .claude/skill-gate.json exists but the gate cannot read it as a file (it is a folder), so it blocks this edit to ${join(ctx.directory, 'src/sample.ts')}. Until the file reads again, the gate treats every path and tool as gated. You cannot repair it from here: ask the user to run this from the repo root, then retry:\nMove whatever is at .claude/skill-gate.json aside and put the repo's rules file back in its place. Removing the path without putting the file back turns the gate off.\n`,
+  );
+});
+
+// Root reads a mode 000 file, so the read fails only for another user.
+test.skipIf(process.getuid?.() === 0)(
+  'it denies an edit and names chmod when the rules file cannot be read',
+  async () => {
+    const ctx = await setupTest();
+
+    await mkdir(join(ctx.directory, '.claude'), { recursive: true });
+
+    await writeFile(
+      join(ctx.directory, '.claude/skill-gate.json'),
+      JSON.stringify({ gates: [{ match: 'src/**', skills: ['testing'] }] }),
+    );
+
+    await chmod(join(ctx.directory, '.claude/skill-gate.json'), 0o000);
+
+    const result = ctx.runHook(ctx.directory, {
+      tool_name: 'Edit',
+      tool_input: { file_path: join(ctx.directory, 'src/sample.ts') },
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stdout).toBe('');
+
+    expect(result.stderr).toBe(
+      `skill-gate: .claude/skill-gate.json exists but the gate cannot read it as a file (EACCES: permission denied), so it blocks this edit to ${join(ctx.directory, 'src/sample.ts')}. Until the file reads again, the gate treats every path and tool as gated. You cannot repair it from here: ask the user to run this from the repo root, then retry:\nchmod u+r .claude/skill-gate.json\n`,
+    );
+  },
+);
+
+test('it allows an edit when the rules path is a symlink that points nowhere', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, '.claude'), { recursive: true });
+  await symlink('rules.json', join(ctx.directory, '.claude/skill-gate.json'));
+
+  const result = ctx.runHook(ctx.directory, {
+    tool_name: 'Edit',
+    tool_input: { file_path: join(ctx.directory, 'src/sample.ts') },
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+  expect(result.stderr).toBe('');
+});
+
+test('it allows an edit outside the project when a folder sits at the rules path', async () => {
+  const ctx = await setupTest();
+
+  const project = join(ctx.directory, 'project');
+
+  await mkdir(join(project, '.claude/skill-gate.json'), { recursive: true });
+
+  const result = ctx.runHook(project, {
+    tool_name: 'Edit',
+    tool_input: { file_path: join(ctx.directory, 'scratch/sample.ts') },
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+  expect(result.stderr).toBe('');
+});
+
+test('it denies an apply_patch edit when a folder sits at the rules path', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  await rm(join(ctx.project, '.claude/skill-gate.json'));
+  await mkdir(join(ctx.project, '.claude/skill-gate.json'));
+
+  const result = ctx.runHook(ctx.patch('*** Add File: src/sample.ts', '+export const rate = 1;'));
+
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
+
+  expect(result.stderr).toBe(
+    `skill-gate: .claude/skill-gate.json exists but the gate cannot read it as a file (it is a folder), so it blocks this edit to ${join(ctx.project, 'src/sample.ts')}. Until the file reads again, the gate treats every path and tool as gated. You cannot repair it from here: ask the user to run this from the repo root, then retry:\nMove whatever is at .claude/skill-gate.json aside and put the repo's rules file back in its place. Removing the path without putting the file back turns the gate off.\n`,
+  );
+});
+
+test('it voids the loaded skills on a compaction while a folder sits at the rules path', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  const rulesPath = join(ctx.project, '.claude/skill-gate.json');
+
+  ctx.runHook({ hook_event_name: 'UserPromptSubmit', prompt: 'Use $testing.' });
+
+  await rm(rulesPath);
+  await mkdir(rulesPath);
+
+  const compact = ctx.runHook({ hook_event_name: 'PostCompact', trigger: 'auto' });
+
+  await rm(rulesPath, { recursive: true });
+
+  await writeFile(
+    rulesPath,
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+  );
+
+  const result = ctx.runHook(ctx.patch('*** Update File: src/a.test.ts', '@@', '-old', '+new'));
+
+  expect(compact.status).toBe(0);
+  expect(compact.stdout).toBe('');
+  expect(result.status).toBe(2);
+  expect(result.stderr).toInclude('This session was compacted');
 });

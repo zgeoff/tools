@@ -27,6 +27,11 @@ export type SkillGateRulesResult =
     }
   | { readonly ok: false; readonly error: string };
 
+export type RulesState =
+  | { readonly kind: 'missing' }
+  | { readonly kind: 'readable'; readonly text: string }
+  | { readonly kind: 'unreadable'; readonly reason: string; readonly code: string | null };
+
 export interface UnknownSkill {
   readonly match: string;
   readonly skill: string;
