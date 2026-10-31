@@ -43,12 +43,15 @@ test('it exits 1 with a message when run in a repository with no origin', async 
     },
   );
 
-  expect(run.exitCode).toBe(1);
-  expect(run.stdout.toString()).toBeEmpty();
-
-  expect(run.stderr.toString()).toStartWith(
-    'read-branch-files: cannot find the base of this branch',
-  );
+  expect({
+    exitCode: run.exitCode,
+    stdout: run.stdout.toString(),
+    stderr: run.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr: expect.stringMatching(/^read-branch-files: cannot find the base of this branch/u),
+  });
 });
 
 test('it prints one file per line when run on a branch', async () => {
@@ -65,6 +68,9 @@ test('it prints one file per line when run on a branch', async () => {
     },
   );
 
-  expect(run.exitCode).toBe(0);
-  expect(run.stdout.toString()).toBe('a.ts\nb.ts\n');
+  expect({
+    exitCode: run.exitCode,
+    stdout: run.stdout.toString(),
+    stderr: run.stderr.toString(),
+  }).toStrictEqual({ exitCode: 0, stdout: 'a.ts\nb.ts\n', stderr: '' });
 });
