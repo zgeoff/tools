@@ -164,6 +164,15 @@ async function setupTest() {
     return log.split('\n').filter((subject) => subject !== '');
   };
 
+  const readCommitBodies = async (branch: string) => {
+    const log = await $`git -C ${origin} log --reverse ${'--format=%b%x00'} main..${branch}`.text();
+
+    return log
+      .split('\0')
+      .map((body) => body.trim())
+      .slice(0, -1);
+  };
+
   const readPullRequests = async () => {
     const pulls = await readFile(state, 'utf8');
 
@@ -209,6 +218,7 @@ async function setupTest() {
     writeRemoteOnlyCommit,
     readBranchNames,
     readCommitSubjects,
+    readCommitBodies,
     readPullRequests,
     writeBranch,
   };
@@ -844,6 +854,7 @@ test("it pins the repo's own calls to zgeoff/tools in the sync pull request, whi
 
   const caller = await ctx.readBranch('repo-sync/zgeoff-tools', '.github/workflows/repo-sync.yml');
   const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
+  const bodies = await ctx.readCommitBodies('repo-sync/zgeoff-tools');
   const pulls = await ctx.readPullRequests();
   const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
   const commit = await ctx.readToolsHead();
@@ -858,6 +869,12 @@ test("it pins the repo's own calls to zgeoff/tools in the sync pull request, whi
     'chore: sync editorconfig from zgeoff/tools',
     `chore: pin the zgeoff/tools workflows to ${commit.slice(0, 12)}`,
   ]);
+
+  expect(commit).toMatch(/^[0-9a-f]{40}$/u);
+
+  expect(bodies.at(-1)).toBe(
+    `Each call to a zgeoff/tools workflow pins ${commit}, the commit this sync copies.`,
+  );
 
   expect(pulls).toStrictEqual([
     {
