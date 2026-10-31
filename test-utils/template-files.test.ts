@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readDirNames } from '../packages/rig/src/browser/read-dir-names.ts';
 import { templateFiles } from './template-files.ts';
 
 async function setupTest() {
@@ -12,11 +13,8 @@ async function setupTest() {
   return { directory };
 }
 
-test('it lists no names for a folder that does not exist', async () => {
-  const ctx = await setupTest();
-  const names = await templateFiles.readDirectoryNames(join(ctx.directory, 'missing'));
-
-  expect(names).toStrictEqual([]);
+test("it lists the names in a folder with rig's folder reader", () => {
+  expect(templateFiles.readDirectoryNames).toBe(readDirNames);
 });
 
 test('it moves a folder into place, and refuses a move onto a folder that holds files', async () => {
@@ -53,16 +51,6 @@ test('it removes a folder with its files, and a path that does not exist', async
   const entries = await readdir(ctx.directory);
 
   expect(entries).toStrictEqual([]);
-});
-
-test('it fails to list the names of a path that is a file', async () => {
-  const ctx = await setupTest();
-
-  const path = join(ctx.directory, 'bundle.js');
-
-  await writeFile(path, 'built\n');
-
-  expect(templateFiles.readDirectoryNames(path)).rejects.toMatchObject({ code: 'ENOTDIR' });
 });
 
 test('it fails to move a folder that does not exist', async () => {

@@ -1,48 +1,51 @@
-# Setting up a browser lane
+# Setting up the browser lane
 
-A repo's browser lane runs its `.browser.test.ts` suites, each in its own process, against Chrome
-through `Bun.WebView`. The lane has two parts that the repo writes: the lane command, which prepares
-the run and starts `bun test`, and the shared browser preload, which starts Chrome in each file's
-process. The [testing skill](../../sync/skills/testing/references/system-tests.md#browser-suites)
-holds the rules for the suites themselves.
+A repo that uses [`@zgeoff/rig`](../../packages/rig/README.md) gets a browser lane with no lane
+script of its own: `rig browser` runs the repo's `.browser.test.ts` suites, each file in its own
+process, against Chrome through `Bun.WebView`.
+[How rig works](../architecture/rig.md#the-browser-lane) describes what the lane does for a run. The
+[testing skill](../../sync/skills/testing/references/system-tests.md#browser-suites) holds the rules
+for the suites themselves.
 
-## The lane command
+## Adopt the lane
 
-Write the lane command as a script that the repo's `test:browser` script runs. It does these steps
-in order:
+1. Add the package: `bun add -d @zgeoff/rig`.
+2. Write a suite named `<module>.browser.test.ts` beside its module. The suite opens its views with
+   `new Bun.WebView({ backend: 'chrome' })`, and gets the Chrome that the lane's preload started.
+3. Track the suite with git: `git add <module>.browser.test.ts`. `rig init` adds the browser lane's
+   script only when git tracks a `.browser.test.ts` file.
+4. Run `bunx rig init`. Expect `test:browser` as `rig browser` in the repo's `package.json`, and a
+   starter `rig.config.ts` when the repo has none.
+5. Run `bun run test:browser` and check that the run prints no error from the preload.
 
-1. Build what the suites load, such as the web client, once for the run. A build in the preload runs
-   again in each file's process, because `--parallel=1` isolates each file and a per-process memo
-   starts empty in each one.
-2. Make the run ID and pass it to the test processes in an environment variable. The preload runs
-   again in each file's process, so an ID that the preload makes differs in each file.
-3. Set a short `TMPDIR` for the test processes, such as a folder for the run under `/tmp`. Chrome
-   stops at startup when its socket path under `TMPDIR` is too long for a Unix socket, and the
-   suites then fail with `Chrome process closed the pipe`.
-4. Run `bun test --parallel=1` over the browser suites, inside the repo's memory-cap script, as
-   [The memory cap](#the-memory-cap) describes.
+## Build what the suites load
 
-## The preload
+Define a `build:browser` script in `package.json` when the suites load a build, such as a web
+client. The lane runs it once for the run, with the folder to write in `RIG_BROWSER_BUILD_DIR`. A
+suite reads the same variable to find the build.
 
-The shared browser preload runs in each file's process. It does these steps:
+## Run page code
 
-1. Check that the build from the lane command exists, and fail the file when it does not.
-2. Read the run ID, and fail the file when the lane command set none.
-3. Give the file's Chrome its own profile folder inside a folder for the run. The run's folder sits
-   in the repo's git-ignored cache folder and takes its name from the run ID. `Bun.WebView` never
-   removes the temporary profile that it makes under `bun test`
-   ([oven-sh/bun#45389](https://github.com/oven-sh/bun/issues/45389)), so a run that lets Chrome
-   make its own profile leaves a folder per file behind.
-4. Start Chrome.
+Page code longer than one line goes through `runInPage`, which `@zgeoff/rig` exports. It takes the
+view, a real function, one JSON argument, and a schema for the result:
 
-The start-of-run sweep removes the run folders of older runs, as the testing skill's
-[Per-run templates](../../sync/skills/testing/SKILL.md#per-run-templates) describes for every
-per-run folder.
+```ts
+const heading = await runInPage(
+  view,
+  (selector: string) => document.querySelector(selector)?.textContent ?? '',
+  'h1',
+  z.string(),
+);
+```
 
-## The memory cap
+## Cap the lane's memory
 
-Run the lane under the repo's [memory-cap script](../architecture/memory-caps.md), locally and on
-CI, and never under `ulimit -v`. Chrome's V8 sandbox reserves at least 8 GB of address space and
-stops when it cannot, and no flag turns the sandbox off. `ulimit -v` caps address space, so Chrome
-fails under a cap that the lane's memory use never reaches. The cgroup cap counts only the memory
-that a process uses, so Chrome starts under it.
+The lane runs under `diet` with the host's memory budget. To set another budget, declare it in
+`rig.config.ts`:
+
+```ts
+export default defineRig({ lanes: { browser: { memory: '8G' } } });
+```
+
+Never run the lane under `ulimit -v`: Chrome reserves more address space than it uses and stops
+under that cap.

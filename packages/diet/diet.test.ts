@@ -99,6 +99,21 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
 );
 
 test.skipIf(!modesOutput.includes('systemd-sudo'))(
+  'it hands the command the TMPDIR it started with under sudo systemd-run',
+  async () => {
+    const ctx = setupTest();
+
+    const result =
+      await $`bash ${ctx.scriptPath} --budget 128M -- ${ctx.bun} -e ${'console.log(process.env.TMPDIR)'}`
+        .env({ ...ctx.env, DIET_MODE: 'systemd-sudo', TMPDIR: '/var/tmp/diet-kiln' })
+        .nothrow()
+        .quiet();
+
+    expect(result.stdout.toString()).toBe('/var/tmp/diet-kiln\n');
+  },
+);
+
+test.skipIf(!modesOutput.includes('systemd-sudo'))(
   'it fails a run over its budget with sudo systemd-run',
   async () => {
     const ctx = setupTest();

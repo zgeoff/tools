@@ -35,6 +35,9 @@ sync/               the sources that repo-sync delivers, listed in sync/manifest
   hooks/            the agent hooks' start-up stub and the skill gate's older entry point
   docs-vision/      the vision doc check, which docs-writing's check-length runs in a repo that
                     takes it
+e2e/                suites that drive the built product from outside, such as `rig browser` under
+                    signals
+integration/        flows across packages, such as one lane limit read by rig and by the lint rules
 scripts/            the step scripts that this repo's workflows run, one folder per area, the
                     shell scripts that repo-sync and the release job run, and the manual one
                     that does a package's first npm publish; tests sit beside them
@@ -57,10 +60,12 @@ repos too, so an edit to one of them changes every repo that takes it.
 
 ## Commands
 
-- Run `bun run test` from the repo root, which hands `bun test` this host's worker count. The
-  jest-extended preload lives in the root `bunfig.toml`, so a run from a package folder lacks the
-  extra matchers. The workflow-lint tests run `actionlint`, so put it on the `PATH` first: the
-  pinned build lands in `<dir>/actionlint-bin` after
+- Run `bun run test` from the repo root. It runs `rig unit`, which hands `bun test` this host's
+  worker count and leaves out every lane in `rig.config.ts` and its built-in table. The other lanes
+  have their own scripts: `bun run test:host`, `bun run test:e2e` and `bun run test:browser`, which
+  need no ignore list. The jest-extended preload lives in the root `bunfig.toml`, so a run from a
+  package folder lacks the extra matchers. The workflow-lint tests run `actionlint`, so put it on
+  the `PATH` first: the pinned build lands in `<dir>/actionlint-bin` after
   `PART=all RUNNER_TEMP=<dir> GITHUB_PATH=<dir>/path bun run ci:install-tool actionlint`.
 - `bun run format` fixes formatting. lefthook runs the light checks before a commit and a push, and
   CI runs the rest.
@@ -68,8 +73,9 @@ repos too, so an edit to one of them changes every repo that takes it.
   oxlint runs both through tsrslint (`@maschwenk/tsrslint`), a Rust port of tsgolint, in tsgolint's
   place, because stock tsgolint runs out of memory under 2 GiB on impz. `lint:full` is CI-only:
   never run it locally.
-- `bun run typecheck` runs `tsrs` per package and over `scripts/`, `sync/` and `test-utils/`. CI
-  runs it beside `lint:full`, and when the two type checks disagree, `tsrs` is right.
+- `bun run typecheck` runs `tsrs` per package and over the root `rig.config.ts`, `scripts/`,
+  `sync/`, `test-utils/`, `e2e/` and `integration/`. CI runs it beside `lint:full`, and when the two
+  type checks disagree, `tsrs` is right.
 - `bun run check:sync` checks `sync/manifest.json` against the rules repo-sync assumes. Run it after
   you change the manifest or a file an entry lists. CI runs it, and the pre-push hook does not.
 - `bun run check:release-workflow` checks the tag step of the shared release job in

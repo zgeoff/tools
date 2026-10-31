@@ -25,9 +25,11 @@ states the reason. The rule reports at the first statement, so put the comment a
 
 A lane suite, such as `<name>.browser.test.ts`, tests the same module as `<name>.test.ts` and needs
 only `<name>.<ext>`; the suffix lets the repo's test script run the suite in its own lane. The rule
-treats the standard lanes of `zgeoff/max-test-timeout` as lanes with no configuration. A repo adds
-its own lanes with the `lanes` option, in either of that rule's forms, and the standard lanes stay
-beside them:
+treats the standard lanes of `zgeoff/max-test-timeout` as lanes with no configuration. A repo that
+has a [`rig.config.ts`](./rig.md#one-source-for-the-limits) takes its lanes from that file, and the
+rule reports a `lanes` option there, once per file, because the option would give the lanes a second
+source. A repo without one adds its own lanes with the `lanes` option, in either of that rule's
+forms, and the standard lanes stay beside them:
 
 ```json
 { "rules": { "zgeoff/test-beside-module": ["error", { "lanes": { "kvm": 60000 } }] } }
@@ -98,12 +100,15 @@ one read from the environment.
 
 The file's lane comes from its suffix first, then its directory, because the default run leaves a
 suffixed file out wherever it sits. A `<name>.<lane>.test.ts` or `.test.tsx` file is in its lane
-when the lane is a standard one or one that the `lanes` option declares. Any other file under an
-`e2e/` directory or a `-e2e` package that `zgeoff/test-beside-module` exempts is in the `e2e` lane,
-and every other file is in the unit run, `integration/` and `evals/` included. The standard lanes
-and their limits are the ones in the skill's [Lanes](../../sync/skills/testing/SKILL.md#lanes)
-table, which a test of the rule pins. The `lanes` option maps a lane to its limit in milliseconds,
-and an entry adds a project lane or changes the limit of a standard one:
+when the lane is a standard one or one that the `lanes` option declares, except `e2e`, whose
+directory alone selects it. Any other file under an `e2e/` directory or a `-e2e` package that
+`zgeoff/test-beside-module` exempts is in the `e2e` lane, and every other file is in the unit run,
+`integration/` and `evals/` included. The standard lanes and their limits are the ones in the
+skill's [Lanes](../../sync/skills/testing/SKILL.md#lanes) table, which a test of the rule pins. A
+repo with a `rig.config.ts` gets every lane and limit from the table that file resolves, and the
+rule reports a `lanes` option there as `zgeoff/test-beside-module` does. In a repo without one, the
+`lanes` option maps a lane to its limit in milliseconds, and an entry adds a project lane or changes
+the limit of a standard one:
 
 ```json
 { "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": { "kvm": 60000 } }] } }

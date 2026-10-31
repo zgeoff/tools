@@ -1,4 +1,6 @@
-import { readdir, rename } from 'node:fs/promises';
+import { rename } from 'node:fs/promises';
+import { hasErrorCode } from '../packages/rig/src/browser/has-error-code.ts';
+import { readDirNames } from '../packages/rig/src/browser/read-dir-names.ts';
 import { nodeFileSystem } from '../scripts/ci/node-file-system.ts';
 
 export interface TemplateFiles {
@@ -19,17 +21,7 @@ export interface TemplateFiles {
 
 export const templateFiles: TemplateFiles = {
   readFile: nodeFileSystem.readBytes,
-  readDirectoryNames: async (path) => {
-    try {
-      return await readdir(path);
-    } catch (error) {
-      if (hasErrorCode(error, 'ENOENT')) {
-        return [];
-      }
-
-      throw error;
-    }
-  },
+  readDirectoryNames: readDirNames,
   createDirectories: nodeFileSystem.createDirectory,
   writeFile: nodeFileSystem.writeText,
   removePath: nodeFileSystem.removePath,
@@ -47,7 +39,3 @@ export const templateFiles: TemplateFiles = {
     }
   },
 };
-
-function hasErrorCode(error: unknown, code: string): boolean {
-  return error instanceof Error && 'code' in error && error.code === code;
-}

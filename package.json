@@ -47,9 +47,12 @@
   "type": "module",
   "scripts": {
     "prepare": "lefthook install --force || true; bun run build",
-    "typecheck": "bun run --filter '*' typecheck && tsrs -p scripts && tsrs -p sync && tsrs -p test-utils",
-    "test": "workers=$(bun sync/pre-push/read-worker-count.ts) && bun test --parallel=$workers --randomize",
-    "test:related": "bun sync/pre-push/run-related-tests.ts",
+    "typecheck": "bun run --filter '*' typecheck && tsrs -p . && tsrs -p scripts && tsrs -p sync && tsrs -p test-utils && tsrs -p e2e && tsrs -p integration",
+    "test": "rig unit",
+    "test:related": "rig related",
+    "test:browser": "rig browser",
+    "test:e2e": "rig e2e",
+    "test:host": "rig host",
     "build": "bun run --filter '*' build",
     "lint": "oxlint",
     "lint:files": "oxlint --no-error-on-unmatched-pattern",
@@ -88,6 +91,7 @@
     "@zgeoff/format-codemod": "workspace:*",
     "@zgeoff/oxfmt-config": "workspace:*",
     "@zgeoff/oxlint-config": "workspace:*",
+    "@zgeoff/rig": "workspace:*",
     "@zgeoff/skill-gate": "workspace:*",
     "@zgeoff/tsconfig": "workspace:*",
     "lefthook": "catalog:",
@@ -97,6 +101,7 @@
     "tiny-invariant": "catalog:",
     "ts-pattern": "catalog:",
     "tsrs": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "zod": "catalog:"
   }
 }

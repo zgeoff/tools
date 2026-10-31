@@ -7,13 +7,15 @@ const runnerNames = new Set(['test', 'it', 'describe']);
 
 const unitLimitMs = 5000;
 
-export default function buildMaxTestTimeout(resolveRoot) {
+export default function buildMaxTestTimeout(resolveRoot, rigLanes) {
   return {
     meta: {
       type: 'problem',
       messages: {
         timeout:
           'This timeout of {{timeoutMs}} ms is above the {{limitMs}} ms limit of the {{lane}} lane. Find its cause in the "Slow tests" section of the testing skill and fix it; a raised timeout only hides the cost.',
+        rigLanes:
+          'Declare lanes in rig.config.ts only: this repo has one, and the `lanes` option here would give the limits a second source.',
       },
       schema: [
         {
@@ -31,7 +33,7 @@ export default function buildMaxTestTimeout(resolveRoot) {
       ],
     },
     create(context) {
-      const limits = buildLaneLimits(context.options[0]?.lanes);
+      const limits = rigLanes ?? buildLaneLimits(context.options[0]?.lanes);
 
       const filename = context.physicalFilename;
       const lane = resolveLane(resolveRoot(filename) ?? context.cwd, filename, limits);
@@ -41,6 +43,14 @@ export default function buildMaxTestTimeout(resolveRoot) {
       };
 
       return {
+        Program() {
+          if (rigLanes !== null && context.options[0]?.lanes !== undefined) {
+            context.report({
+              loc: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
+              messageId: 'rigLanes',
+            });
+          }
+        },
         CallExpression(node) {
           // the inner call of `test.each(rows)(…)` takes the rows, not a timeout
           if (node.parent.type === 'CallExpression' && node.parent.callee === node) {
@@ -68,7 +78,8 @@ const laneTestPattern = /\.(?<lane>[^.]+)\.test\.tsx?$/u;
 function resolveLane(root, filename, limits) {
   const lane = laneTestPattern.exec(basename(filename))?.groups?.lane;
 
-  if (lane !== undefined && limits.has(lane)) {
+  // the e2e lane is a directory, so a `.e2e` suffix outside it leaves the file in the unit run
+  if (lane !== undefined && lane !== 'e2e' && limits.has(lane)) {
     return lane;
   }
 

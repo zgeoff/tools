@@ -46,7 +46,9 @@ actionlint or actionlint fails, and it prints each fault as a warning and passes
 
 Each job that calls a package script runs it through the `memory-capped` script, which the entry's
 build points at the [memory-cap script](./memory-caps.md) with the host's memory budget as the cap.
-A job that outgrows the host then fails alone, and every job prints its peak memory.
+In a [mode](./memory-caps.md#the-modes) that caps, a job that outgrows the host fails alone, and
+every job prints its peak memory. With `MEMORY_CAP_MODE=none`, or on a host with no supported mode,
+the job runs uncapped.
 
 ## The related tests
 
@@ -64,7 +66,9 @@ passes with a notice that CI runs the full suite, in two cases:
 The job passes `bun test` the [worker count](./memory-caps.md#the-worker-count) as `--parallel`.
 With one worker it also raises the per-test timeout, because a host with one worker runs each file
 slower than CI does. The runner holds that timeout as one constant, the only place a run may raise
-the timeout.
+the timeout. tools itself runs this job through `rig related`, which takes the lane suffixes from
+[rig's lane table](./rig.md#the-lane-table) and runs the unit lane in its own process, while the
+delivered runner keeps reading the `lanes` option.
 
 ## The delivered files
 

@@ -6,64 +6,70 @@ import resolveSuiteDirectory from './resolve-suite-directory.js';
 
 const testFilePattern = /^(?<base>.+)\.test\.tsx?$/u;
 
-const testBesideModule = {
-  meta: {
-    type: 'problem',
-    messages: {
-      missing:
-        'Move this test beside the module it tests: no `{{name}}.<ext>` sits in this directory. A flow across several packages belongs in `integration/`, and a test that drives the built product in `e2e/`, at the repo root or an app root.',
-    },
-    schema: [
-      {
-        type: 'object',
-        properties: {
-          lanes: {
-            anyOf: [
-              { type: 'array', items: { type: 'string' } },
-              { type: 'object', additionalProperties: { type: 'integer', minimum: 0 } },
-            ],
+export default function buildTestBesideModule(rigLanes) {
+  return {
+    meta: {
+      type: 'problem',
+      messages: {
+        missing:
+          'Move this test beside the module it tests: no `{{name}}.<ext>` sits in this directory. A flow across several packages belongs in `integration/`, and a test that drives the built product in `e2e/`, at the repo root or an app root.',
+        rigLanes:
+          'Declare lanes in rig.config.ts only: this repo has one, and the `lanes` option here would give the lanes a second source.',
+      },
+      schema: [
+        {
+          type: 'object',
+          properties: {
+            lanes: {
+              anyOf: [
+                { type: 'array', items: { type: 'string' } },
+                { type: 'object', additionalProperties: { type: 'integer', minimum: 0 } },
+              ],
+            },
           },
+          additionalProperties: false,
         },
-        additionalProperties: false,
-      },
-    ],
-  },
-  create(context) {
-    const lanes = buildLaneLimits(context.options[0]?.lanes);
+      ],
+    },
+    create(context) {
+      const lanes = rigLanes ?? buildLaneLimits(context.options[0]?.lanes);
 
-    return {
-      Program() {
-        const filename = context.physicalFilename;
-        const match = testFilePattern.exec(basename(filename));
+      return {
+        Program() {
+          const start = context.sourceCode.ast.body[0]?.loc.start ?? { line: 1, column: 0 };
 
-        if (
-          match === null ||
-          resolveSuiteDirectory(resolveRepoRoot(filename) ?? context.cwd, filename) !== null
-        ) {
-          return;
-        }
+          if (rigLanes !== null && context.options[0]?.lanes !== undefined) {
+            context.report({ loc: { start, end: start }, messageId: 'rigLanes' });
+          }
 
-        const name = toModuleName(match.groups.base, lanes);
+          const filename = context.physicalFilename;
+          const match = testFilePattern.exec(basename(filename));
 
-        if (probeModuleSibling(dirname(filename), name)) {
-          return;
-        }
+          if (
+            match === null ||
+            resolveSuiteDirectory(resolveRepoRoot(filename) ?? context.cwd, filename) !== null
+          ) {
+            return;
+          }
 
-        // anchor on the first statement, not offset 0, so a disable comment
-        // at the top of the file sits before the report and covers it
-        const start = context.sourceCode.ast.body[0]?.loc.start ?? { line: 1, column: 0 };
+          const name = toModuleName(match.groups.base, lanes);
 
-        context.report({
-          loc: { start, end: start },
-          messageId: 'missing',
-          data: { name },
-        });
-      },
-    };
-  },
-};
+          if (probeModuleSibling(dirname(filename), name)) {
+            return;
+          }
 
-export default testBesideModule;
+          // anchor on the first statement, not offset 0, so a disable comment
+          // at the top of the file sits before the report and covers it
+          context.report({
+            loc: { start, end: start },
+            messageId: 'missing',
+            data: { name },
+          });
+        },
+      };
+    },
+  };
+}
 
 function toModuleName(base, lanes) {
   const dot = base.lastIndexOf('.');

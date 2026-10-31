@@ -1,3 +1,7 @@
+import { existsSync } from 'node:fs';
+// oxlint-disable-next-line zgeoff/no-require -- only resolves rig's path from the repo root; an import loads it
+import { createRequire } from 'node:module';
+import { join } from 'node:path';
 import functionVerb from './function-verb.js';
 import importZones from './import-zones.js';
 import maxConsecutiveLineComments from './max-consecutive-line-comments.js';
@@ -12,12 +16,24 @@ import noJSDoc from './no-jsdoc.js';
 import noRequire from './no-require.js';
 import noRestrictedWords from './no-restricted-words.js';
 import noTestSleep from './no-test-sleep.js';
+import readRigLanes from './read-rig-lanes.js';
 import resolveRepoRoot from './resolve-repo-root.js';
 import setupTestOnly from './setup-test-only.js';
-import testBesideModule from './test-beside-module.js';
+import buildTestBesideModule from './test-beside-module.js';
 import testShape from './test-shape.js';
 import testTimeoutExceptionTicket from './test-timeout-exception-ticket.js';
 import verbContract from './verb-contract.js';
+
+// A repo with a rig.config.ts takes its lane limits from it, read once when oxlint loads the plugin.
+const rigLanes = await readRigLanes(process.cwd(), {
+  resolveRepoRoot,
+  probeFile: existsSync,
+  importModule: (url) => import(url),
+
+  // The parser comes from the @zgeoff/rig that the repo's rig.config.ts imports, so both read one
+  // version of the resolved table. A bare import would resolve from this package's folder instead.
+  resolveRepoRig: (root) => createRequire(join(root, 'package.json')).resolve('@zgeoff/rig'),
+});
 
 const plugin = {
   meta: { name: 'zgeoff' },
@@ -106,10 +122,10 @@ const plugin = {
     'module-order': moduleOrder,
     'no-restricted-words': noRestrictedWords,
     'no-abbreviated-names': noAbbreviatedNames,
-    'test-beside-module': testBesideModule,
+    'test-beside-module': buildTestBesideModule(rigLanes),
     'no-file-snapshot': noFileSnapshot,
     'setup-test-only': setupTestOnly,
-    'max-test-timeout': buildMaxTestTimeout(resolveRepoRoot),
+    'max-test-timeout': buildMaxTestTimeout(resolveRepoRoot, rigLanes),
     'test-timeout-exception-ticket': testTimeoutExceptionTicket,
     'no-test-sleep': noTestSleep,
     'no-require': noRequire,
