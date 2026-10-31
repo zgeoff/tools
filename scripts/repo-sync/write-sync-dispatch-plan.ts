@@ -7,6 +7,7 @@ import { writeStepOutputs } from '../ci/write-step-outputs.ts';
 import { parseSyncEntries } from './parse-sync-entries.ts';
 import type { SyncDispatchRange } from './pick-sync-dispatch-range.ts';
 import { pickSyncDispatchRange } from './pick-sync-dispatch-range.ts';
+import { readPinnedSources } from './read-pinned-sources.ts';
 
 export interface WriteSyncDispatchPlanOptions {
   // A checkout of zgeoff/tools with the history of main.
@@ -90,7 +91,8 @@ function runPlanCommand(
 }
 
 // A source of either manifest counts, so a change that drops an entry or moves its source sends the
-// sync that removes the retired copies.
+// sync that removes the retired copies. A file that a caller's pin decides counts too, because each
+// caller runs the reusable workflows at the commit it pins.
 async function probeSyncedChange(
   options: Readonly<WriteSyncDispatchPlanOptions>,
   range: Extract<SyncDispatchRange, { readonly kind: 'range' }>,
@@ -116,6 +118,8 @@ async function probeSyncedChange(
     manifestPath,
     ...(await readManifestSources(options, range.previous)),
     ...(await readManifestSources(options, range.commit)),
+    ...(await readCommitPinnedSources(options, range.previous)),
+    ...(await readCommitPinnedSources(options, range.commit)),
   ]);
 
   return diff.stdout.split('\0').some((path) => sources.has(path));
@@ -131,6 +135,32 @@ async function readManifestSources(
   const entries = parseSyncEntries(manifestValue) ?? [];
 
   return entries.flatMap((entry) => entry.files.map((file) => file.source));
+}
+
+async function readCommitPinnedSources(
+  options: Readonly<WriteSyncDispatchPlanOptions>,
+  commit: string,
+): Promise<string[]> {
+  const listed = await runPlanCommand(options, [
+    'git',
+    'ls-tree',
+    '-z',
+    '--name-only',
+    commit,
+    '.github/workflows/',
+  ]);
+
+  return readPinnedSources({
+    workflowPaths: listed.stdout.split('\0').filter((path) => path !== ''),
+    readFile: async (path) => {
+      const shown = await options.runCommand(['git', 'show', `${commit}:${path}`], {
+        cwd: options.cwd,
+        env: options.env,
+      });
+
+      return shown.exitCode === 0 ? shown.stdout : null;
+    },
+  });
 }
 
 if (import.meta.main) {

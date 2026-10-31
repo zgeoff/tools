@@ -24,13 +24,13 @@ flowchart LR
 
 A green `main` is the release gate. When a `Main` push run on `main` passes, the
 [sync-dispatch workflow](../../.github/workflows/sync-dispatch.yml) diffs `main` from the green
-commit before that run's commit up to the newest green commit. When the diff touches the manifest or
-a source that either manifest lists, the workflow sends a `repository_dispatch` event,
-`zgeoff-tools-sync`, to every repo that the sync App can reach, with the newest green commit in
-`client_payload.sha`. Two green runs that finish in either order cover every commit between them,
-because each run checks from the commit before its own. A `zgeoff-skills-sync` event from
-zgeoff/skills sends the newest green commit with no check. The dispatch needs only the App's
-contents write.
+commit before that run's commit up to the newest green commit. When the diff touches the manifest, a
+source that either manifest lists, or a file whose content a repo's pin decides, the workflow sends
+a `repository_dispatch` event, `zgeoff-tools-sync`, to every repo that the sync App can reach, with
+the newest green commit in `client_payload.sha`. Two green runs that finish in either order cover
+every commit between them, because each run checks from the commit before its own. A
+`zgeoff-skills-sync` event from zgeoff/skills sends the newest green commit with no check. The
+dispatch needs only the App's contents write.
 
 Each repo pins every call to a tools workflow to one commit on `main`, with a `# main` comment, and
 never at `main` itself, so a run of a test or doc audit never sees the shared files change under it.
@@ -39,10 +39,13 @@ that commit. The run refuses a `ref` that is not a commit on `main` of tools, be
 push to the repo can send a dispatch, and GitHub serves a fork's commit through this repository.
 
 The sync pull request also moves every call to a tools workflow in the repo's `.github/workflows/`
-to that commit, so its merge leaves the repo on one commit. A run with nothing to sync opens no pull
-request and moves no pin, and a delivered workflow that differs from its source only by its pin
-counts as nothing to sync. Renovate never moves these refs: the shared preset turns its updates off,
-because it would read the commit as a digest of `main` to bump.
+to that commit, so its merge leaves the repo on one commit. A pin decides the content of each
+reusable workflow, the two files its first step downloads, and each step script with the files it
+imports. A run with nothing to sync still opens a pull request that only moves the pins when one of
+those files differs between the repo's pin and the commit; otherwise it opens no pull request and
+moves no pin. A delivered workflow that differs from its source only by its pin counts as nothing to
+sync. Renovate never moves these refs: the shared preset turns its updates off, because it would
+read the commit as a digest of `main` to bump.
 
 A run from any other trigger, the stub's daily run, a push that changes the stub, or a manual run,
 syncs the newest green commit on `main`. The stub's concurrency group names the dispatched commit,

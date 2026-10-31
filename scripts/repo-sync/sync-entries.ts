@@ -15,12 +15,13 @@ import { pickSyncCommitVerdict } from './pick-sync-commit-verdict.ts';
 import { pickVerdictStop } from './pick-verdict-stop.ts';
 import type { RetiredFileRemoval, SyncedEntry } from './plan-retired-file-removal.ts';
 import { planRetiredFileRemoval, retiredFilesName } from './plan-retired-file-removal.ts';
+import { probeStaleToolsPins } from './probe-stale-tools-pins.ts';
 import { readSyncCommitFacts } from './read-sync-commit-facts.ts';
 import { renderSyncPullRequestTitle } from './render-sync-pull-request-title.ts';
 import { selectSyncFiles } from './select-sync-files.ts';
 import { writeCopyPlan } from './write-copy-plan.ts';
 import { writeSyncAutoMerge } from './write-sync-auto-merge.ts';
-import { writeToolsPins } from './write-tools-pins.ts';
+import { toolsPinsEntry, writeToolsPins } from './write-tools-pins.ts';
 
 export interface SyncEntriesOptions {
   readonly cwd: string;
@@ -251,13 +252,29 @@ async function commitEntries(context: SyncContext): Promise<CommittedEntries> {
           scripts,
         };
 
-  if (committed.synced.length === 0) {
+  if (committed.synced.length > 0) {
+    const pinned = await writeToolsPins(context, context.commit);
+
+    return { ...committed, delivered: [...committed.delivered, ...pinned] };
+  }
+
+  const isStale = await probeStaleToolsPins(context, context.commit);
+
+  if (!isStale) {
     return committed;
   }
 
+  context.writeOutput(
+    `Every entry matches the source, but a pinned zgeoff/tools workflow changed; moving the pins to ${context.commit}.\n`,
+  );
+
   const pinned = await writeToolsPins(context, context.commit);
 
-  return { ...committed, delivered: [...committed.delivered, ...pinned] };
+  return {
+    ...committed,
+    synced: [toolsPinsEntry],
+    delivered: [...committed.delivered, ...pinned],
+  };
 }
 
 function runSyncCommand(context: SyncContext, argv: readonly string[]): Promise<CommandResult> {

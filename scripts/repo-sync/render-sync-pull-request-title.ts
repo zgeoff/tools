@@ -1,5 +1,6 @@
 import type { SyncedEntry } from './plan-retired-file-removal.ts';
 import { retiredFilesName } from './plan-retired-file-removal.ts';
+import { toolsPinsEntry } from './write-tools-pins.ts';
 
 // commitlint's header-max-length rule allows 72 characters, and a squash merge
 // makes the title the commit subject.
@@ -25,6 +26,10 @@ const entryKinds = ['skill', 'workflow', 'hook'] as const;
 function renderEntryName(name: string): string {
   if (name === retiredFilesName) {
     return 'the retired files';
+  }
+
+  if (name === toolsPinsEntry.name) {
+    return 'the zgeoff/tools pins';
   }
 
   const kind = entryKinds.find((candidate) => name.startsWith(`${candidate}-`));

@@ -3,6 +3,7 @@ import type { FileSystem } from '../ci/file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { CommandResult } from '../ci/run-command.ts';
 import { buildToolsPin } from './build-tools-pin.ts';
+import type { SyncedEntry } from './plan-retired-file-removal.ts';
 import type { SyncCommandContext } from './write-sync-auto-merge.ts';
 
 export interface ToolsPinContext extends SyncCommandContext {
@@ -53,6 +54,13 @@ export async function writeToolsPins(context: ToolsPinContext, commit: string): 
 
   return pinned;
 }
+
+// The entry a sync pull request names when it only moves the pins.
+export const toolsPinsEntry: SyncedEntry = {
+  name: 'tools-pins',
+  description:
+    'The calls to zgeoff/tools workflows, whose pinned commit changed a workflow or a step script',
+};
 
 function runChecked(context: SyncCommandContext, argv: readonly string[]): Promise<CommandResult> {
   return runCheckedCommand(context.runCommand, argv, { cwd: context.cwd, env: context.env });
