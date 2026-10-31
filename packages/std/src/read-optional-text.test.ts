@@ -28,3 +28,17 @@ test('it reads no text from a file that does not exist', async () => {
 
   expect(text).toBeUndefined();
 });
+
+test('it reads no text from a path whose folder is a file', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'notes.md'), '# Notes\n');
+
+  const text = await readOptionalText(join(ctx.directory, 'notes.md', 'draft.md'));
+
+  expect(text).toBeUndefined();
+});
+
+test('it throws for a path that names a folder', () => {
+  expect(readOptionalText(tmpdir())).rejects.toThrow('EISDIR');
+});

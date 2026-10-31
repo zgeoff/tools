@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 import { join } from 'node:path';
+import { readOptionalText } from '@zgeoff/std';
 import { runDependencyGatesCommand } from './dependency-gates/run-dependency-gates-check.ts';
 import { makeCheckRunner } from './make-check-runner.ts';
-import { readOptionalText } from './read-optional-text.ts';
 import { runChex } from './run-chex.ts';
 import { runCommitsCommand } from './run-commits-check.ts';
 import { runInit } from './run-init.ts';

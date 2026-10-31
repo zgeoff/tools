@@ -1,1 +1,1 @@
-../../packages/chex/src/read-optional-text.ts
+../../packages/std/src/read-optional-text.ts

@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export interface MemoryBudgetSources {
@@ -54,12 +53,4 @@ async function readCgroupCap(
   const value = text?.trim();
 
   return value === undefined || value === 'max' ? undefined : Number(value);
-}
-
-// Bun.file's text reads as many bytes as stat reports, and procfs and cgroupfs report 0 for every
-// file; readFile reads to the end.
-export async function readOptionalText(path: string): Promise<string | undefined> {
-  const exists = await Bun.file(path).exists();
-
-  return exists ? readFile(path, 'utf8') : undefined;
 }

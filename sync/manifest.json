@@ -334,7 +334,7 @@
         "target": "scripts/read-memory-budget.ts"
       },
       {
-        "source": "packages/chex/src/read-optional-text.ts",
+        "source": "packages/std/src/read-optional-text.ts",
         "target": "scripts/read-optional-text.ts"
       },
       {

@@ -1,4 +1,4 @@
-import { isRecord } from './dependency-gates/is-record.ts';
+import { isRecord } from '@zgeoff/std';
 
 // The baseline's jobs run chex, the related tests through rig, and each job under diet's memory cap.
 export const baselinePackages = ['@zgeoff/chex', '@zgeoff/rig', '@zgeoff/diet'] as const;

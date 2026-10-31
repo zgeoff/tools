@@ -1,4 +1,4 @@
-import { isRecord } from './dependency-gates/is-record.ts';
+import { isRecord } from '@zgeoff/std';
 
 export const baselinePath = 'node_modules/@zgeoff/chex/lefthook.yml';
 

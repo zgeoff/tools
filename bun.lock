@@ -101,6 +101,9 @@
       "bin": {
         "chex": "./src/cli.ts",
       },
+      "dependencies": {
+        "@zgeoff/std": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "catalog:",
         "tiny-invariant": "catalog:",
