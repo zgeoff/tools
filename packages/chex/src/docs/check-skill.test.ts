@@ -1132,6 +1132,30 @@ test('it keeps the plain limit for a metadata flow mapping of another kind', asy
   );
 });
 
+test.each([
+  ['deeper', '    # The checks read this policy.'],
+  ['at the left edge', '# The checks read this policy.'],
+])('it reads the rule-set kind past a metadata comment indented %s', async (_label, comment) => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Rules for every demo change. Load it before writing or reviewing one.',
+    'metadata:',
+    comment,
+    '  kind: rule-set',
+    '---',
+    '',
+    ...Array.from({ length: 40 }, () => 'The tool reads one file. '.repeat(10).trim()),
+  ]);
+
+  const result = await ctx.run();
+
+  expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
+});
+
 test('it keeps the plain limit when the kind line sits inside another metadata value', async () => {
   const ctx = await setupTest();
 

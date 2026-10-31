@@ -162,6 +162,8 @@ sub check_words {
         $in_metadata = 0;
         next;
       }
+      # A comment-only line, at any indent, is neither a key nor the end of the mapping.
+      next if $line =~ /^\s*#/;
       $in_metadata = 0 if $line =~ /^\S/;
       next unless $in_metadata && $line =~ /^(\s+)(\S.*?)\s*$/;
       # Only a key of metadata itself counts, never a deeper line, such as the text of a block value.
