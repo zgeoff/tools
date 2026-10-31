@@ -139,6 +139,90 @@ test('it sends nothing when only files outside the manifest changed', async () =
   ]);
 });
 
+test('it sends when a commit changes only a reusable workflow that the repos pin', async () => {
+  const ctx = await setupTest();
+
+  const previous = await ctx.writeToolsCommit({
+    'sync/manifest.json': '[]',
+    '.github/workflows/bake.yml': 'on:\n  workflow_call:\njobs: {}\n',
+  });
+
+  const commit = await ctx.writeToolsCommit({
+    '.github/workflows/bake.yml': 'on:\n  workflow_call:\njobs:\n  oven: {}\n',
+  });
+
+  ctx.answerGreenCommits([commit, previous]);
+
+  await ctx.plan('workflow_run', commit);
+
+  const outputs = await ctx.readOutputs();
+
+  expect(outputs).toBe(`send=true\ncommit=${commit}\n`);
+});
+
+test('it sends when a commit changes only a step script that a reusable workflow downloads', async () => {
+  const ctx = await setupTest();
+
+  const previous = await ctx.writeToolsCommit({
+    'sync/manifest.json': '[]',
+    'scripts/repo-sync/sync-entries.ts': 'export const loaves = 1;\n',
+  });
+
+  const commit = await ctx.writeToolsCommit({
+    'scripts/repo-sync/sync-entries.ts': 'export const loaves = 2;\n',
+  });
+
+  ctx.answerGreenCommits([commit, previous]);
+
+  await ctx.plan('workflow_run', commit);
+
+  const outputs = await ctx.readOutputs();
+
+  expect(outputs).toBe(`send=true\ncommit=${commit}\n`);
+});
+
+test('it sends when a reusable workflow loses its workflow_call trigger', async () => {
+  const ctx = await setupTest();
+
+  const previous = await ctx.writeToolsCommit({
+    'sync/manifest.json': '[]',
+    '.github/workflows/bake.yml': 'on:\n  workflow_call:\njobs: {}\n',
+  });
+
+  const commit = await ctx.writeToolsCommit({
+    '.github/workflows/bake.yml': 'on:\n  schedule: []\njobs: {}\n',
+  });
+
+  ctx.answerGreenCommits([commit, previous]);
+
+  await ctx.plan('workflow_run', commit);
+
+  const outputs = await ctx.readOutputs();
+
+  expect(outputs).toBe(`send=true\ncommit=${commit}\n`);
+});
+
+test('it sends nothing when a commit changes only a workflow that no repo calls', async () => {
+  const ctx = await setupTest();
+
+  const previous = await ctx.writeToolsCommit({
+    'sync/manifest.json': '[]',
+    '.github/workflows/nightly.yml': 'on:\n  schedule: []\njobs: {}\n',
+  });
+
+  const commit = await ctx.writeToolsCommit({
+    '.github/workflows/nightly.yml': 'on:\n  schedule: []\njobs:\n  oven: {}\n',
+  });
+
+  ctx.answerGreenCommits([commit, previous]);
+
+  await ctx.plan('workflow_run', commit);
+
+  const outputs = await ctx.readOutputs();
+
+  expect(outputs).toBe(`send=false\ncommit=${commit}\n`);
+});
+
 test('it sends when a commit drops an entry, so the repos remove the retired copies', async () => {
   const ctx = await setupTest();
 

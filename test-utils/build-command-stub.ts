@@ -1,7 +1,6 @@
 import type { CommandResult, RunCommand } from '../scripts/ci/run-command.ts';
 
 export interface CommandStub {
-  // Answers each command whose argv equals one a test answered, and rejects any other.
   readonly runCommand: RunCommand;
 
   // Sets the result for the exact argv; a later answer for the same argv replaces it.

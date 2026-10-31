@@ -7,6 +7,7 @@ import { writeStepOutputs } from '../ci/write-step-outputs.ts';
 import { parseSyncEntries } from './parse-sync-entries.ts';
 import type { SyncDispatchRange } from './pick-sync-dispatch-range.ts';
 import { pickSyncDispatchRange } from './pick-sync-dispatch-range.ts';
+import { readCommitPinnedSources } from './read-commit-pinned-sources.ts';
 
 export interface WriteSyncDispatchPlanOptions {
   // A checkout of zgeoff/tools with the history of main.
@@ -90,7 +91,8 @@ function runPlanCommand(
 }
 
 // A source of either manifest counts, so a change that drops an entry or moves its source sends the
-// sync that removes the retired copies.
+// sync that removes the retired copies. A file that a caller's pin decides counts too, because each
+// caller runs the reusable workflows at the commit it pins.
 async function probeSyncedChange(
   options: Readonly<WriteSyncDispatchPlanOptions>,
   range: Extract<SyncDispatchRange, { readonly kind: 'range' }>,
@@ -112,10 +114,19 @@ async function probeSyncedChange(
     range.commit,
   ]);
 
+  const tools = {
+    runCommand: options.runCommand,
+    cwd: options.cwd,
+    env: options.env,
+    repository: '.',
+  };
+
   const sources = new Set([
     manifestPath,
     ...(await readManifestSources(options, range.previous)),
     ...(await readManifestSources(options, range.commit)),
+    ...(await readCommitPinnedSources({ ...tools, commit: range.previous })),
+    ...(await readCommitPinnedSources({ ...tools, commit: range.commit })),
   ]);
 
   return diff.stdout.split('\0').some((path) => sources.has(path));

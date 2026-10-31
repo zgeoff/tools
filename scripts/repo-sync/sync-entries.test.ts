@@ -924,6 +924,62 @@ test('it leaves the pin alone and opens no pull request when every entry matches
   expect(pulls).toStrictEqual([]);
 });
 
+test('it moves the pins alone when every entry matches but a pinned reusable workflow changed', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  const pinned = await ctx.writeToolsCommit();
+
+  await ctx.writeBranch(
+    'main',
+    '.github/workflows/repo-sync.yml',
+    `jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@${pinned} # main\n`,
+  );
+
+  await ctx.writeSource('sync/readme.md', '# app\n');
+  await ctx.writeSource('.github/workflows/repo-sync.yml', 'on:\n  workflow_call:\njobs: {}\n');
+
+  const exitCode = await ctx.runSync([
+    {
+      name: 'readme',
+      description: 'The readme',
+      files: [{ source: 'sync/readme.md', target: 'README.md' }],
+    },
+  ]);
+
+  const caller = await ctx.readBranch('repo-sync/zgeoff-tools', '.github/workflows/repo-sync.yml');
+  const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
+  const pulls = await ctx.readPullRequests();
+  const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
+  const commit = await ctx.readToolsHead();
+
+  expect(exitCode).toBe(0);
+
+  expect(caller).toBe(
+    `jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@${commit} # main\n`,
+  );
+
+  expect(subjects).toStrictEqual([
+    `chore: pin the zgeoff/tools workflows to ${commit.slice(0, 12)}`,
+  ]);
+
+  expect(pulls).toStrictEqual([
+    {
+      number: 1,
+      base: 'main',
+      head: 'repo-sync/zgeoff-tools',
+      title: 'chore(sync): update the zgeoff/tools pins',
+      body:
+        `Copied from zgeoff/tools at ${commit} by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry or pins the calls to zgeoff/tools workflows to that commit:\n\n` +
+        '- `tools-pins`: The calls to zgeoff/tools workflows, whose pinned commit changed a workflow or a step script',
+      state: 'open',
+      autoMerge: { method: 'squash', head },
+    },
+  ]);
+});
+
 test('it leaves the open pull request alone when it already syncs a newer commit', async () => {
   const ctx = await setupTest();
 
