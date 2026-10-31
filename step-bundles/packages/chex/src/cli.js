@@ -2,6 +2,7 @@
 // @bun
 
 // packages/chex/src/cli.ts
+import { rm } from "fs/promises";
 import { join as join6 } from "path";
 // packages/std/src/is-record.ts
 function isRecord(value) {
@@ -1504,11 +1505,29 @@ async function runInit(deps) {
 `).join(""));
     return Promise.resolve(1);
   }).with({ kind: "apply" }, async (apply) => {
-    await Promise.all(apply.writes.map((write) => deps.writeText(join4(deps.repoRoot, write.file), write.text)));
+    const originals = { "package.json": packageText, "lefthook.yml": lefthookText };
+    const written = [];
+    for (const write of apply.writes) {
+      const failure = await deps.writeText(join4(deps.repoRoot, write.file), write.text).then(() => null, (error) => error);
+      if (failure !== null) {
+        await restoreFiles(written, originals, deps);
+        deps.writeError(`chex init: could not write ${write.file}, so both files stay as they were: ${String(failure)}
+`);
+        return 1;
+      }
+      written.push(write);
+    }
     deps.writeOutput(apply.notes.map((note) => `chex init: ${note}
 `).join(""));
     return 0;
   }).exhaustive();
+}
+async function restoreFiles(written, originals, deps) {
+  for (const write of written) {
+    const path = join4(deps.repoRoot, write.file);
+    const original = originals[write.file];
+    await (original === undefined ? deps.removeFile(path) : deps.writeText(path, original));
+  }
 }
 
 // packages/chex/src/run-local-paths-check.ts
@@ -2846,6 +2865,7 @@ process.exitCode = await runChex(process.argv.slice(2), {
     repoRoot: process.cwd(),
     readText: readOptionalText,
     writeText: writeTextFile,
+    removeFile: (path) => rm(path, { force: true }),
     writeOutput: (text) => {
       process.stdout.write(text);
     },
