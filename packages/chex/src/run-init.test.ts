@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
@@ -32,6 +32,7 @@ async function setupTest() {
       repoRoot,
       readText: readOptionalText,
       writeText: writeTextFile,
+      renameFile: (from, to) => rename(from, to),
       removeFile: (path) => rm(path, { force: true }),
       writeOutput: (text) => {
         lines.push(`out ${text}`);
@@ -139,7 +140,65 @@ test('it fails and writes nothing in a folder with no package.json', async () =>
   expect(files).toStrictEqual([undefined, undefined]);
 });
 
-test('it leaves both files as they were when package.json cannot take its write', async () => {
+// Only ext4's immutable flag, which needs root, stops a rename onto a file; a read-only mode does not.
+const canBlockReplace = process.getuid?.() === 0;
+
+test.skipIf(!canBlockReplace)(
+  'it puts lefthook.yml back as it was when package.json cannot be replaced',
+  async () => {
+    const ctx = await setupTest();
+
+    const packageText = JSON.stringify({
+      name: 'kettle',
+      devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
+    });
+
+    await writeFile(join(ctx.repoRoot, 'package.json'), packageText);
+    await writeFile(join(ctx.repoRoot, 'lefthook.yml'), 'extends: [.lefthook/local.yml]\n');
+
+    await ctx.lockFile('package.json');
+
+    const exitCode = await ctx.run();
+    const files = await ctx.readFiles();
+    const names = await readdir(ctx.repoRoot);
+
+    expect({ exitCode, lines: ctx.lines }).toStrictEqual({
+      exitCode: 1,
+      lines: [
+        expect.stringMatching(
+          /^err chex init: could not replace package\.json: .+, so both files stay as they were\n$/u,
+        ),
+      ],
+    });
+
+    expect(files).toStrictEqual([packageText, 'extends: [.lefthook/local.yml]\n']);
+    expect(names.toSorted()).toStrictEqual(['lefthook.yml', 'package.json']);
+  },
+);
+
+test.skipIf(!canBlockReplace)(
+  'it removes the lefthook.yml it wrote when package.json cannot be replaced',
+  async () => {
+    const ctx = await setupTest();
+
+    const packageText = JSON.stringify({
+      name: 'kettle',
+      devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
+    });
+
+    await writeFile(join(ctx.repoRoot, 'package.json'), packageText);
+
+    await ctx.lockFile('package.json');
+
+    const exitCode = await ctx.run();
+    const files = await ctx.readFiles();
+
+    expect(exitCode).toBe(1);
+    expect(files).toStrictEqual([packageText, undefined]);
+  },
+);
+
+test('it leaves both files untouched when the staged package.json fails midway', async () => {
   const ctx = await setupTest();
 
   const packageText = JSON.stringify({
@@ -150,38 +209,29 @@ test('it leaves both files as they were when package.json cannot take its write'
   await writeFile(join(ctx.repoRoot, 'package.json'), packageText);
   await writeFile(join(ctx.repoRoot, 'lefthook.yml'), 'extends: [.lefthook/local.yml]\n');
 
-  await ctx.lockFile('package.json');
+  // A locked file where init stages package.json makes the second of the two writes fail.
+  await writeFile(join(ctx.repoRoot, 'package.json.chex-init'), '');
+
+  await ctx.lockFile('package.json.chex-init');
 
   const exitCode = await ctx.run();
   const files = await ctx.readFiles();
+  const names = await readdir(ctx.repoRoot);
 
   expect({ exitCode, lines: ctx.lines }).toStrictEqual({
     exitCode: 1,
     lines: [
       expect.stringMatching(
-        /^err chex init: could not write package\.json, so both files stay as they were: .+\n$/u,
+        /^err chex init: could not write package\.json: .+, so both files stay as they were\n$/u,
       ),
     ],
   });
 
   expect(files).toStrictEqual([packageText, 'extends: [.lefthook/local.yml]\n']);
-});
 
-test('it removes the lefthook.yml it wrote when package.json cannot take its write', async () => {
-  const ctx = await setupTest();
-
-  const packageText = JSON.stringify({
-    name: 'kettle',
-    devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
-  });
-
-  await writeFile(join(ctx.repoRoot, 'package.json'), packageText);
-
-  await ctx.lockFile('package.json');
-
-  const exitCode = await ctx.run();
-  const files = await ctx.readFiles();
-
-  expect(exitCode).toBe(1);
-  expect(files).toStrictEqual([packageText, undefined]);
+  expect(names.toSorted()).toStrictEqual([
+    'lefthook.yml',
+    'package.json',
+    'package.json.chex-init',
+  ]);
 });

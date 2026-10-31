@@ -11,6 +11,9 @@ export interface InitDeps {
 
   readonly writeText: (path: string, text: string) => Promise<void>;
 
+  readonly renameFile: (from: string, to: string) => Promise<void>;
+
+  // A missing file is no error.
   readonly removeFile: (path: string) => Promise<void>;
 
   readonly writeOutput: (text: string) => void;
@@ -32,25 +35,13 @@ export async function runInit(deps: InitDeps): Promise<number> {
     })
     .with({ kind: 'apply' }, async (apply) => {
       const originals = { 'package.json': packageText, 'lefthook.yml': lefthookText };
-      const written: InitWrite[] = [];
 
-      for (const write of apply.writes) {
-        const failure = await deps.writeText(join(deps.repoRoot, write.file), write.text).then(
-          () => null,
-          (error: unknown) => (error instanceof Error ? error.message : String(error)),
-        );
+      const failure = await writeInitFiles(apply.writes, originals, deps);
 
-        if (failure !== null) {
-          await restoreFiles(written, originals, deps);
+      if (failure !== null) {
+        deps.writeError(`chex init: ${failure}, so both files stay as they were\n`);
 
-          deps.writeError(
-            `chex init: could not write ${write.file}, so both files stay as they were: ${failure}\n`,
-          );
-
-          return 1;
-        }
-
-        written.push(write);
+        return 1;
       }
 
       deps.writeOutput(apply.notes.map((note) => `chex init: ${note}\n`).join(''));
@@ -60,12 +51,76 @@ export async function runInit(deps: InitDeps): Promise<number> {
     .exhaustive();
 }
 
+type InitOriginals = Readonly<Record<InitWrite['file'], string | undefined>>;
+
+// Writes each file in full beside its target before any target changes, then renames each into
+// place, so a failed write never touches a target. Returns the failure, after it puts back each
+// target already replaced; null when every file is in place.
+async function writeInitFiles(
+  writes: readonly InitWrite[],
+  originals: InitOriginals,
+  deps: InitDeps,
+): Promise<string | null> {
+  const staged: InitWrite[] = [];
+
+  for (const write of writes) {
+    const failure = await settleEffect(deps.writeText(toStagedPath(deps, write.file), write.text));
+
+    if (failure !== null) {
+      await removeStagedFiles([...staged, write], deps);
+
+      return `could not write ${write.file}: ${failure}`;
+    }
+
+    staged.push(write);
+  }
+
+  const replaced: InitWrite[] = [];
+
+  for (const write of staged) {
+    const failure = await settleEffect(
+      deps.renameFile(toStagedPath(deps, write.file), join(deps.repoRoot, write.file)),
+    );
+
+    if (failure !== null) {
+      await removeStagedFiles(staged.slice(replaced.length), deps);
+      await restoreFiles(replaced, originals, deps);
+
+      return `could not replace ${write.file}: ${failure}`;
+    }
+
+    replaced.push(write);
+  }
+
+  return null;
+}
+
+// Returns the effect's failure as its message, or null when it succeeds.
+async function settleEffect(effect: Promise<void>): Promise<string | null> {
+  try {
+    await effect;
+
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+function toStagedPath(deps: InitDeps, file: InitWrite['file']): string {
+  return join(deps.repoRoot, `${file}.chex-init`);
+}
+
+// A staged file that cannot go stays behind; the targets are what init keeps whole.
+async function removeStagedFiles(writes: readonly InitWrite[], deps: InitDeps): Promise<void> {
+  await Promise.allSettled(writes.map((write) => deps.removeFile(toStagedPath(deps, write.file))));
+}
+
 async function restoreFiles(
-  written: readonly InitWrite[],
-  originals: Readonly<Record<InitWrite['file'], string | undefined>>,
+  replaced: readonly InitWrite[],
+  originals: InitOriginals,
   deps: InitDeps,
 ): Promise<void> {
-  for (const write of written) {
+  for (const write of replaced) {
     const path = join(deps.repoRoot, write.file);
     const original = originals[write.file];
 
