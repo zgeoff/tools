@@ -53,6 +53,7 @@ jobs:
         run: bun run --silent ci:install-tool actionlint
       - run: bun run check:sync
       - run: bun run check:release-workflow
+      - run: bun run check:repo-sync-concurrency
       - run: bun run format:check
       - run: bun run lint:full
       - run: bun run typecheck
