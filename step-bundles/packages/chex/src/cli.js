@@ -2513,6 +2513,37 @@ function findInstallCachePath(paths) {
 `).map((path) => path.trim()).find((path) => !path.startsWith("!") && !path.includes("${{") && installCachePattern.test(path)) : undefined;
 }
 
+// packages/chex/src/read-checks-profile.ts
+function readChecksProfile(options) {
+  const given = parseChecksProfile(options.env["CHECKS_PROFILE"]);
+  if (given !== undefined) {
+    return given;
+  }
+  const visibility = readRepoVisibility(options);
+  if (visibility instanceof Error) {
+    options.writeError(`workflows: the repo's visibility is unknown, so every rule applies: ${visibility.message}
+`);
+    return;
+  }
+  return visibility;
+}
+function parseChecksProfile(value) {
+  return value === "public" || value === "private" ? value : undefined;
+}
+var visibilityCommand = ["gh", "repo", "view", "--json", "isPrivate", "--jq", ".isPrivate"];
+function readRepoVisibility(options) {
+  try {
+    const result = options.runProgram(visibilityCommand, { cwd: options.cwd, env: options.env });
+    const answer = result.stdout.trim();
+    if (result.exitCode === 0 && (answer === "true" || answer === "false")) {
+      return answer === "true" ? "private" : "public";
+    }
+    return new Error(`${visibilityCommand.join(" ")} exited ${result.exitCode}: ${result.stderr.trim() || answer}`);
+  } catch (error) {
+    return error instanceof Error ? error : new Error(String(error));
+  }
+}
+
 // packages/chex/src/run-workflows-check.ts
 var workflowPathPattern = /^(?:\.github\/workflows|sync\/workflow-callers)\/[^/]+\.ya?ml$/u;
 function runWorkflowsCheck(options) {
@@ -2828,7 +2859,14 @@ usage: chex workflows [path...]
       cwd: process.cwd(),
       env: process.env,
       paths,
-      profile: parseChecksProfile(process.env["CHECKS_PROFILE"]),
+      profile: readChecksProfile({
+        cwd: process.cwd(),
+        env: process.env,
+        runProgram,
+        writeError: (text) => {
+          process.stderr.write(text);
+        }
+      }),
       runProgram
     });
     const isActions = process.env["GITHUB_ACTIONS"] === "true";
@@ -2853,9 +2891,6 @@ function parseCLIPaths(args) {
   } catch (error) {
     return error instanceof Error ? error : new Error(String(error));
   }
-}
-function parseChecksProfile(value) {
-  return value === "public" || value === "private" ? value : undefined;
 }
 function formatAnnotation(finding) {
   const file = escapeAnnotationData(finding.path).replaceAll(":", "%3A").replaceAll(",", "%2C");

@@ -1,9 +1,11 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import invariant from 'tiny-invariant';
 import { createGitCommit } from '../../../test-utils/create-git-commit.ts';
+import { createStubCommand } from '../../../test-utils/create-stub-command.ts';
 import { readGitEnv } from '../../../test-utils/read-git-env.ts';
 import { runProgram } from './run-program.ts';
 import { runWorkflowsCheck } from './run-workflows-check.ts';
@@ -962,7 +964,7 @@ test('it prints each finding as a warning annotation in Actions, and exits 0', a
 
   const result = await $`bun ${join(import.meta.dir, 'run-workflows-check.ts')}`
     .cwd(ctx.directory)
-    .env({ ...ctx.env, GITHUB_ACTIONS: 'true' })
+    .env({ ...ctx.env, CHECKS_PROFILE: 'private', GITHUB_ACTIONS: 'true' })
     .nothrow()
     .quiet();
 
@@ -993,7 +995,7 @@ test('it escapes the characters a workflow command reads as syntax in its file a
 
   const result = await $`bun ${join(import.meta.dir, 'run-workflows-check.ts')}`
     .cwd(ctx.directory)
-    .env({ ...ctx.env, GITHUB_ACTIONS: 'true' })
+    .env({ ...ctx.env, CHECKS_PROFILE: 'private', GITHUB_ACTIONS: 'true' })
     .nothrow()
     .quiet();
 
@@ -1031,7 +1033,7 @@ test('it reports the git error and exits 2 when HEAD has no commit', async () =>
 
   const result = await $`bun ${join(import.meta.dir, 'run-workflows-check.ts')}`
     .cwd(ctx.directory)
-    .env(ctx.env)
+    .env({ ...ctx.env, CHECKS_PROFILE: 'private' })
     .nothrow()
     .quiet();
 
@@ -1100,3 +1102,108 @@ test.each([
     });
   },
 );
+
+test.each([
+  [
+    'true',
+    [
+      '.github/workflows/checks.yml:6: job macos is a heavy check, because it runs on macos-latest, in a workflow that runs on pull_request; a private repo runs a heavy check nightly or on dispatch, never on each pull request',
+      'workflows: 1 warning; the workflow lint warns and does not fail yet',
+      '',
+    ].join('\n'),
+  ],
+  ['false', ''],
+])(
+  'it asks GitHub whether the repo is private when CHECKS_PROFILE is unset, and gh answers %s',
+  async (isPrivate, stdout) => {
+    const ctx = await setupTest();
+    const bin = await mkdtemp(join(tmpdir(), 'run-workflows-check-bin-'));
+
+    onTestFinished(() => rm(bin, { recursive: true, force: true }));
+
+    await writeFile(join(bin, 'calls.log'), '');
+    await createStubCommand(bin, 'gh', join(bin, 'calls.log'), `${isPrivate}\n`);
+
+    await ctx.commitFiles({
+      '.github/workflows/checks.yml': [
+        'on: [pull_request]',
+        'concurrency:',
+        `  group: checks-\${{ github.ref }}`,
+        '  cancel-in-progress: true',
+        'jobs:',
+        '  macos:',
+        '    runs-on: macos-latest',
+        '    timeout-minutes: 5',
+        '    steps:',
+        '      - run: bun run test:host',
+        '',
+      ].join('\n'),
+    });
+
+    const result = await $`bun ${join(import.meta.dir, 'run-workflows-check.ts')}`
+      .cwd(ctx.directory)
+      .env({ ...ctx.env, PATH: `${bin}:${ctx.env['PATH']}`, GITHUB_ACTIONS: '' })
+      .nothrow()
+      .quiet();
+
+    const calls = await readFile(join(bin, 'calls.log'), 'utf8');
+
+    expect({
+      exitCode: result.exitCode,
+      stdout: result.stdout.toString(),
+      stderr: result.stderr.toString(),
+    }).toStrictEqual({ exitCode: 0, stdout, stderr: '' });
+
+    expect(calls).toBe('gh repo view --json isPrivate --jq .isPrivate\n');
+  },
+);
+
+test('it applies every rule and says why when CHECKS_PROFILE is unset and gh is not on the PATH', async () => {
+  const ctx = await setupTest();
+  const bin = await mkdtemp(join(tmpdir(), 'run-workflows-check-bin-'));
+
+  onTestFinished(() => rm(bin, { recursive: true, force: true }));
+
+  const git = Bun.which('git');
+
+  invariant(git !== null, 'git is on the PATH');
+
+  await symlink(git, join(bin, 'git'));
+
+  await ctx.commitFiles({
+    '.github/workflows/checks.yml': [
+      'on: [pull_request]',
+      'concurrency:',
+      `  group: checks-\${{ github.ref }}`,
+      '  cancel-in-progress: true',
+      'jobs:',
+      '  macos:',
+      '    runs-on: macos-latest',
+      '    timeout-minutes: 5',
+      '    steps:',
+      '      - run: bun run test:host',
+      '',
+    ].join('\n'),
+  });
+
+  const result = await $`${process.execPath} ${join(import.meta.dir, 'run-workflows-check.ts')}`
+    .cwd(ctx.directory)
+    .env({ ...ctx.env, PATH: bin, GITHUB_ACTIONS: '' })
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: [
+      '.github/workflows/checks.yml:6: job macos is a heavy check, because it runs on macos-latest, in a workflow that runs on pull_request; a private repo runs a heavy check nightly or on dispatch, never on each pull request',
+      'workflows: 1 warning; the workflow lint warns and does not fail yet',
+      '',
+    ].join('\n'),
+    stderr:
+      'workflows: the repo\'s visibility is unknown, so every rule applies: Executable not found in $PATH: "gh"\n',
+  });
+});
