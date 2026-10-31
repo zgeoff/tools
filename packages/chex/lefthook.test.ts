@@ -1,38 +1,25 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
+import { collectFailedHookJobs } from '../../test-utils/collect-failed-hook-jobs.ts';
+import type { ChexBaselineFixture } from '../../test-utils/create-chex-baseline-repo.ts';
+import { createChexBaselineRepo } from '../../test-utils/create-chex-baseline-repo.ts';
+import { readCallLog } from '../../test-utils/read-call-log.ts';
+import { writeStubPrograms } from '../../test-utils/write-stub-programs.ts';
 
 // Bun's skipIf takes a boolean at collection time. A host without actionlint skips the test that
 // needs it, as the hook skips the check there; CI installs actionlint, so a CI run without it fails.
 const canRunActionlint = Bun.which('actionlint') !== null || process.env['CI'] === 'true';
-
-interface RepoFixture {
-  // The chex checks that run for real; every other check prints that it cleared and passes.
-  readonly realChecks?: readonly string[];
-
-  readonly scripts?: Readonly<Record<string, string>>;
-
-  readonly files?: Readonly<Record<string, string>>;
-
-  // The body of the stub rig, which records its arguments first.
-  readonly rig?: string;
-
-  readonly oxlint?: string;
-
-  // Links commitlint and its config into the repo, for the commits check.
-  readonly withCommitlint?: boolean;
-}
 
 // Every git call gets a clean environment, so a GIT_DIR this test inherits from a real hook cannot
 // reach the repo it runs in.
 async function setupTest() {
   const packageRoot = import.meta.dir;
   const repoRoot = join(packageRoot, '../..');
-  const cliPath = join(packageRoot, 'src/cli.ts');
 
   const directory = await mkdtemp(join(tmpdir(), 'chex-lefthook-'));
 
@@ -85,71 +72,13 @@ async function setupTest() {
 
   const lefthook = join(repoRoot, 'node_modules/.bin/lefthook');
 
-  for (const hook of ['pre-push', 'pre-commit']) {
-    await writeFile(
-      join(main, '.git/hooks', hook),
-      `#!/bin/sh\nexec ${process.execPath} ${lefthook} run ${hook} "$@"\n`,
-    );
+  await writeStubPrograms(join(main, '.git/hooks'), {
+    'pre-push': `exec ${process.execPath} ${lefthook} run pre-push "$@"`,
+    'pre-commit': `exec ${process.execPath} ${lefthook} run pre-commit "$@"`,
+  });
 
-    await chmod(join(main, '.git/hooks', hook), 0o755);
-  }
-
-  // Writes the repo as `chex init` leaves it, with the baseline's programs installed: chex from
-  // this package, and stubs of diet, rig and oxlint.
-  const writeRepo = async (root: string, fixture: Readonly<RepoFixture> = {}) => {
-    const realChecks = fixture.realChecks ?? [];
-    const binFolder = join(root, 'node_modules/.bin');
-
-    await mkdir(join(root, 'node_modules/@zgeoff'), { recursive: true });
-    await mkdir(binFolder, { recursive: true });
-    await symlink(packageRoot, join(root, 'node_modules/@zgeoff/chex'));
-
-    const stubs = {
-      chex: `case " ${realChecks.join(' ')} " in *" $1 "*) exec ${process.execPath} ${cliPath} "$@" ;; esac\necho "cleared: $1"`,
-      diet: '[ "$1" = -- ] && shift\nexec "$@"',
-      oxlint: fixture.oxlint ?? 'exit 0',
-      rig: `echo "$*" >> ${rigCalls}\n${fixture.rig ?? 'exit 0'}`,
-    };
-
-    for (const [name, body] of Object.entries(stubs)) {
-      await writeFile(join(binFolder, name), `#!/bin/sh\n${body}\n`);
-      await chmod(join(binFolder, name), 0o755);
-    }
-
-    if (fixture.withCommitlint === true) {
-      await mkdir(join(root, 'node_modules/@commitlint'), { recursive: true });
-      await symlink(join(repoRoot, 'node_modules/.bin/commitlint'), join(binFolder, 'commitlint'));
-
-      await symlink(
-        join(repoRoot, 'node_modules/@zgeoff/commitlint-config'),
-        join(root, 'node_modules/@zgeoff/commitlint-config'),
-      );
-
-      await symlink(
-        join(repoRoot, 'node_modules/@commitlint/cli'),
-        join(root, 'node_modules/@commitlint/cli'),
-      );
-    }
-
-    const files: Record<string, string> = {
-      'lefthook.yml': 'extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n',
-      '.gitignore': 'node_modules/\n',
-      'package.json': JSON.stringify({
-        scripts: {
-          'format:check': 'true',
-          typecheck: 'true',
-          'check:docs': 'true',
-          ...fixture.scripts,
-        },
-      }),
-      ...fixture.files,
-    };
-
-    for (const [path, text] of Object.entries(files)) {
-      await mkdir(dirname(join(root, path)), { recursive: true });
-      await writeFile(join(root, path), text);
-    }
-  };
+  const writeRepo = (root: string, fixture?: Readonly<ChexBaselineFixture>) =>
+    createChexBaselineRepo(root, { toolsRoot: repoRoot, rigLog: rigCalls }, fixture);
 
   const commitAll = async (root: string, message: string) => {
     await $`git add -A`.cwd(root).env(env);
@@ -160,23 +89,12 @@ async function setupTest() {
     const result = await $`git push origin ${ref}`.cwd(worktree).env(pushEnv).nothrow().quiet();
 
     const output = `${result.stdout.toString()}${result.stderr.toString()}`;
-
-    const failedJobs = [...output.matchAll(/^🥊\s+(?<job>\S+)/gmu)].map(
-      (failure) => failure.groups?.['job'],
-    );
+    const failedJobs = collectFailedHookJobs(output);
 
     return { exitCode: result.exitCode, output, failedJobs };
   };
 
-  const readRigCalls = async () => {
-    if (!existsSync(rigCalls)) {
-      return [];
-    }
-
-    const calls = await readFile(rigCalls, 'utf8');
-
-    return calls.split('\n').filter(Boolean);
-  };
+  const readRigCalls = () => readCallLog(rigCalls);
 
   return {
     directory,
@@ -215,7 +133,7 @@ test('it runs the related tests through rig under diet, and leaves the main chec
     exitCode: 0,
     bare: 'false\n',
     sandbox: true,
-    rigCalls: ['related fixture.ts'],
+    rigCalls: ['under diet: related fixture.ts'],
   });
 });
 
