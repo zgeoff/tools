@@ -9,6 +9,7 @@ test.each([
   ],
   [['editorconfig', 'retired-files'], 'chore(sync): update the editorconfig and the retired files'],
   [['socket', 'pr-template', 'skill-ci-design'], 'chore(sync): update 3 shared entries'],
+  [['pre-push-baseline', 'workflow-repo-sync-guard'], 'chore(sync): update 2 shared entries'],
 ])('it names the synced entries %j in the title', (names, expected) => {
   const title = renderSyncPullRequestTitle(
     names.map((name) => ({ name, description: 'A shared file' })),

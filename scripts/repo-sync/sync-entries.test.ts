@@ -856,7 +856,7 @@ test("it pins the repo's own calls to zgeoff/tools in the sync pull request, whi
 
   expect(subjects).toStrictEqual([
     'chore: sync editorconfig from zgeoff/tools',
-    `chore: pin the zgeoff/tools workflows to ${commit}`,
+    `chore: pin the zgeoff/tools workflows to ${commit.slice(0, 12)}`,
   ]);
 
   expect(pulls).toStrictEqual([

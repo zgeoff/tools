@@ -45,7 +45,9 @@ export async function writeToolsPins(context: ToolsPinContext, commit: string): 
       'commit',
       '-q',
       '-m',
-      `chore: pin the zgeoff/tools workflows to ${commit}`,
+      `chore: pin the zgeoff/tools workflows to ${commit.slice(0, 12)}`,
+      '-m',
+      `Each call to a zgeoff/tools workflow pins ${commit}, the commit this sync copies.`,
     ]);
   }
 
