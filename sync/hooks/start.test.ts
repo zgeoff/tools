@@ -603,6 +603,37 @@ test('it runs one install for two hook calls that meet a stale lock at once', as
   expect(installLog).toBe(`bun install --frozen-lockfile in ${ctx.project}\n`);
 });
 
+test('it skips the install and refuses when it cannot create the install lock', async () => {
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+  });
+
+  await mkdir(join(ctx.project, 'node_modules'), { mode: 0o555 });
+
+  const hook = ctx.startStub(
+    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+  );
+
+  const status = await hook.exited;
+
+  const stderr = await new Response(hook.stderr).text();
+
+  expect(status).toBe(2);
+
+  expect(stderr).toStartWith(
+    `The agent hook could not run bun install: Error: EACCES: permission denied, open '${join(ctx.project, 'node_modules/.agent-hooks-install.lock.guard')}.`,
+  );
+
+  expect(stderr).toEndWith('\nTo work here, run bun install.\n');
+
+  const installLog = await ctx.readInstallLog();
+
+  expect(installLog).toBe('');
+});
+
 test('it refuses a harness it does not know', async () => {
   const ctx = await setupTest();
 

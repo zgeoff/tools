@@ -44,8 +44,10 @@ imports the package without an install. A harness kills a hook that runs past it
 counts only while it names a process that runs. Two stubs can both find a lock stale, so a stub
 takes, checks or replaces the lock only while it holds a second lock, the guard. The guard's holder
 removes the guard itself. When a stopped stub leaves the guard behind, a stub skips the install and
-names the guard file to remove. The lock does not cover an install that outlives its killed hook,
-and a second install can then start beside it.
+names the guard file to remove. When a stub cannot create a lock file for a reason other than an
+existing lock, such as a read-only `node_modules`, it skips the install and reports the error. The
+lock does not cover an install that outlives its killed hook, and a second install can then start
+beside it.
 
 ## Failing closed
 

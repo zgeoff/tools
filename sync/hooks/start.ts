@@ -154,7 +154,8 @@ async function claimInstallLock(lockPath: string): Promise<'owner' | 'waiter' | 
 }
 
 // A hard link fails when the lock exists and makes the lock appear with its process id already in
-// it, so a hook never reads a lock that is still empty.
+// it, so a hook never reads a lock that is still empty. Any other failure repeats on every try, so
+// it ends the install instead of a retry.
 function tryLock(lockPath: string): boolean {
   const draftPath = `${lockPath}.${process.pid}`;
 
@@ -163,8 +164,12 @@ function tryLock(lockPath: string): boolean {
     linkSync(draftPath, lockPath);
 
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'EEXIST') {
+      return false;
+    }
+
+    throw error;
   } finally {
     rmSync(draftPath, { force: true });
   }
