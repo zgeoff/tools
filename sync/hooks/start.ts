@@ -6,7 +6,9 @@ import { parseArgs } from 'node:util';
 
 // A harness runs the call when a PreToolUse hook exits with any status but 2, so a static import
 // that fails would let the call through. This file therefore imports only Node builtins.
-const REFUSAL = 'To work here, run bun install.';
+const REFUSAL =
+  'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.';
+
 const AFTER_INSTALL = '--after-install';
 const GUARD_SUFFIX = '.guard';
 
