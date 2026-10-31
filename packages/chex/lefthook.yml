@@ -55,8 +55,8 @@ pre-push:
           fi
         done
         status=0
-        shellcheck --external-sources --source-path=SCRIPTDIR "--source-path=$PWD" -- {files} || status=1
-        shfmt -d -- {files} || status=1
+        bun x --no-install diet -- shellcheck --external-sources --source-path=SCRIPTDIR "--source-path=$PWD" -- {files} || status=1
+        bun x --no-install diet -- shfmt -d -- {files} || status=1
         exit "$status"
     # The docs checks pick the docs they read themselves, so the glob only
     # decides whether the job runs. The repo's check:docs script names the
@@ -81,9 +81,9 @@ pre-push:
         if ! command -v actionlint > /dev/null; then
           echo "workflows: actionlint skipped, because it is not on the PATH; CI runs it"
         elif [ "$(date -u +%Y%m%d)" -lt 20270122 ]; then
-          actionlint -ignore 'unexpected key "queue" for "concurrency" section' -- {files} || status=1
+          bun x --no-install diet -- actionlint -ignore 'unexpected key "queue" for "concurrency" section' -- {files} || status=1
         else
-          actionlint -- {files} || status=1
+          bun x --no-install diet -- actionlint -- {files} || status=1
         fi
         bun x --no-install diet -- bun x --no-install chex workflows {files} || status=1
         exit "$status"
