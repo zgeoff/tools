@@ -5,11 +5,15 @@ import { join } from 'node:path';
 import { readRulesState } from './read-rules-state.ts';
 
 async function setupTest() {
+  const stack = new AsyncDisposableStack();
+
+  onTestFinished(() => stack.disposeAsync());
+
   const directory = await mkdtemp(join(tmpdir(), 'skill-gate-rules-'));
 
-  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+  stack.defer(() => rm(directory, { recursive: true, force: true }));
 
-  return { directory };
+  return { directory, stack };
 }
 
 test('it reads the text of a rules file', async () => {
@@ -102,7 +106,7 @@ test.skipIf(process.getuid?.() === 0)(
     await writeFile(join(ctx.directory, '.claude/skill-gate.json'), '{"gates":[]}');
     await chmod(join(ctx.directory, '.claude'), 0o000);
 
-    onTestFinished(() => chmod(join(ctx.directory, '.claude'), 0o700));
+    ctx.stack.defer(() => chmod(join(ctx.directory, '.claude'), 0o700));
 
     const state = await readRulesState(join(ctx.directory, '.claude/skill-gate.json'));
 
