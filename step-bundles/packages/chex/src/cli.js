@@ -2,7 +2,7 @@
 // @bun
 
 // packages/chex/src/cli.ts
-import { rm } from "fs/promises";
+import { rename, rm } from "fs/promises";
 import { join as join6 } from "path";
 // packages/std/src/is-record.ts
 function isRecord(value) {
@@ -1506,24 +1506,55 @@ async function runInit(deps) {
     return Promise.resolve(1);
   }).with({ kind: "apply" }, async (apply) => {
     const originals = { "package.json": packageText, "lefthook.yml": lefthookText };
-    const written = [];
-    for (const write of apply.writes) {
-      const failure = await deps.writeText(join4(deps.repoRoot, write.file), write.text).then(() => null, (error) => error instanceof Error ? error.message : String(error));
-      if (failure !== null) {
-        await restoreFiles(written, originals, deps);
-        deps.writeError(`chex init: could not write ${write.file}, so both files stay as they were: ${failure}
+    const failure = await writeInitFiles(apply.writes, originals, deps);
+    if (failure !== null) {
+      deps.writeError(`chex init: ${failure}, so both files stay as they were
 `);
-        return 1;
-      }
-      written.push(write);
+      return 1;
     }
     deps.writeOutput(apply.notes.map((note) => `chex init: ${note}
 `).join(""));
     return 0;
   }).exhaustive();
 }
-async function restoreFiles(written, originals, deps) {
-  for (const write of written) {
+async function writeInitFiles(writes, originals, deps) {
+  const staged = [];
+  for (const write of writes) {
+    const failure = await settleEffect(deps.writeText(toStagedPath(deps, write.file), write.text));
+    if (failure !== null) {
+      await removeStagedFiles([...staged, write], deps);
+      return `could not write ${write.file}: ${failure}`;
+    }
+    staged.push(write);
+  }
+  const replaced = [];
+  for (const write of staged) {
+    const failure = await settleEffect(deps.renameFile(toStagedPath(deps, write.file), join4(deps.repoRoot, write.file)));
+    if (failure !== null) {
+      await removeStagedFiles(staged.slice(replaced.length), deps);
+      await restoreFiles(replaced, originals, deps);
+      return `could not replace ${write.file}: ${failure}`;
+    }
+    replaced.push(write);
+  }
+  return null;
+}
+async function settleEffect(effect) {
+  try {
+    await effect;
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+function toStagedPath(deps, file) {
+  return join4(deps.repoRoot, `${file}.chex-init`);
+}
+async function removeStagedFiles(writes, deps) {
+  await Promise.allSettled(writes.map((write) => deps.removeFile(toStagedPath(deps, write.file))));
+}
+async function restoreFiles(replaced, originals, deps) {
+  for (const write of replaced) {
     const path = join4(deps.repoRoot, write.file);
     const original = originals[write.file];
     await (original === undefined ? deps.removeFile(path) : deps.writeText(path, original));
@@ -2865,6 +2896,7 @@ process.exitCode = await runChex(process.argv.slice(2), {
     repoRoot: process.cwd(),
     readText: readOptionalText,
     writeText: writeTextFile,
+    renameFile: (from, to) => rename(from, to),
     removeFile: (path) => rm(path, { force: true }),
     writeOutput: (text) => {
       process.stdout.write(text);
