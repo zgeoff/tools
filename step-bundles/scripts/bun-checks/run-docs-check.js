@@ -73,17 +73,52 @@ var nodeFileSystem = {
   }
 };
 
-// scripts/bun-checks/pick-docs-scripts.ts
+// scripts/ci/run-command.ts
+async function runCommand(argv, options) {
+  const child = Bun.spawn([...argv], {
+    cwd: options.cwd,
+    env: { ...options.env },
+    stdin: options.stdin === undefined ? "ignore" : Buffer.from(options.stdin),
+    stdout: "pipe",
+    stderr: "pipe",
+    ...options.signal === undefined ? {} : { signal: options.signal }
+  });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited
+  ]);
+  return { exitCode, stdout, stderr };
+}
+
+// scripts/bun-checks/build-docs-commands.ts
 import { join } from "path";
 var docsScriptsFolder = ".claude/skills/docs-writing/scripts";
 var visionScript = join(docsScriptsFolder, "check-vision.sh");
 var skillScript = ".claude/skills/skill-writing/scripts/check-skill.sh";
-var checkScripts = ["check-prose.sh", "check-length.sh", "check-links.sh"];
-function pickDocsScripts(present) {
+var readmePathspecs = [
+  ":(glob)**/README.md",
+  ":(exclude,glob).claude/**",
+  ":(exclude,glob).agents/**"
+];
+var prosePathspecs = [
+  ":(glob)docs/**/*.md",
+  ":(glob)**/results.md",
+  ":(glob).agents/skills/**/*.md",
+  ":(glob).claude/skills/**/*.md",
+  ":(glob)skills/**/*.md",
+  ":(glob)sync/skills/**/*.md"
+];
+function buildDocsCommands(input) {
   return [
-    ...checkScripts.map((script) => join(docsScriptsFolder, script)),
-    ...present.vision ? [visionScript] : [],
-    ...present.skill ? [skillScript] : []
+    {
+      script: join(docsScriptsFolder, "check-prose.sh"),
+      args: [...input.readmes, ...prosePathspecs]
+    },
+    { script: join(docsScriptsFolder, "check-length.sh"), args: [] },
+    { script: join(docsScriptsFolder, "check-links.sh"), args: [] },
+    ...input.vision ? [{ script: visionScript, args: [] }] : [],
+    ...input.skill ? [{ script: skillScript, args: [] }] : []
   ];
 }
 
@@ -97,26 +132,46 @@ async function runDocsCheck(run) {
   }
   const vision = await run.fileSystem.probePath(join2(run.cwd, visionScript));
   const skill = await run.fileSystem.probePath(join2(run.cwd, skillScript));
-  const scripts = pickDocsScripts({ vision, skill });
+  const readmes = await readReadmes(run);
+  const commands = buildDocsCommands({ vision, skill, readmes });
   let exitCode = 0;
-  for (const script of scripts) {
-    const result = await run.runLoggedCommand(["bash", script], {
+  for (const command of commands) {
+    const result = await run.runLoggedCommand(["bash", command.script, ...command.args], {
       cwd: run.cwd,
       env: run.env
     });
     if (result.exitCode !== 0) {
-      run.writeOutput(`::error::docs: ${basename(script)} failed; its output above holds each failing file and its fault
+      run.writeOutput(`::error::docs: ${basename(command.script)} failed; its output above holds each failing file and its fault
 `);
       exitCode = 1;
     }
   }
   return exitCode;
 }
+async function readReadmes(run) {
+  const result = await run.runCommand([
+    "git",
+    "-c",
+    "core.quotePath=false",
+    "ls-files",
+    "-z",
+    "--cached",
+    "--others",
+    "--exclude-standard",
+    "--",
+    ...readmePathspecs
+  ], { cwd: run.cwd, env: run.env });
+  if (result.exitCode !== 0) {
+    throw new Error(`git ls-files failed: ${result.stderr.trim()}`);
+  }
+  return [...new Set(result.stdout.split("\x00").filter((path) => path !== ""))].toSorted();
+}
 if (import.meta.main) {
   process.exitCode = await runDocsCheck({
     cwd: process.cwd(),
     env: process.env,
     fileSystem: nodeFileSystem,
+    runCommand,
     runLoggedCommand: makeLoggedCommandRunner({ stdout: process.stdout, stderr: process.stderr }),
     writeOutput: (text) => {
       process.stdout.write(text);

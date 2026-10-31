@@ -59,6 +59,7 @@ test('it skips with a notice when the repo has no docs-writing scripts', async (
     cwd: ctx.repo,
     env: ctx.env,
     fileSystem: nodeFileSystem,
+    runCommand,
     runLoggedCommand: ctx.runLogged,
     writeOutput: ctx.writeOutput,
   });
@@ -81,6 +82,7 @@ test('it fails on a broken link even when every doc is within its length limit',
     cwd: ctx.repo,
     env: ctx.env,
     fileSystem: nodeFileSystem,
+    runCommand,
     runLoggedCommand: ctx.runLogged,
     writeOutput: ctx.writeOutput,
   });
@@ -115,6 +117,7 @@ test('it fails on a README over its line limit even when every link resolves', a
     cwd: ctx.repo,
     env: ctx.env,
     fileSystem: nodeFileSystem,
+    runCommand,
     runLoggedCommand: ctx.runLogged,
     writeOutput: ctx.writeOutput,
   });
@@ -142,6 +145,7 @@ test('it fails on a banned word in a doc', async () => {
     cwd: ctx.repo,
     env: ctx.env,
     fileSystem: nodeFileSystem,
+    runCommand,
     runLoggedCommand: ctx.runLogged,
     writeOutput: ctx.writeOutput,
   });
@@ -178,6 +182,7 @@ test('it runs the vision check that sits beside the docs scripts and the install
     cwd: ctx.repo,
     env: ctx.env,
     fileSystem: nodeFileSystem,
+    runCommand,
     runLoggedCommand: ctx.runLogged,
     writeOutput: ctx.writeOutput,
   });
@@ -188,4 +193,73 @@ test('it runs the vision check that sits beside the docs scripts and the install
     '::error::docs: check-vision.sh failed; its output above holds each failing file and its fault\n',
     '::error::docs: check-skill.sh failed; its output above holds each failing file and its fault\n',
   ]);
+});
+
+test('it names the docs to a check-prose.sh that repo-sync delivered before chex, which needs a path', async () => {
+  const ctx = await setupTest();
+
+  await ctx.copyDocsScripts(['check-length.sh', 'check-links.sh']);
+
+  await ctx.trackFiles({
+    '.claude/skills/docs-writing/scripts/check-prose.sh':
+      '[ "$#" -eq 0 ] && { echo "usage: check-prose.sh <path>..." >&2; exit 2; }\nprintf "%s\\n" "$@"\n',
+    'README.md': '# Greeter\n',
+    'guides/README.md': '# Guides\n',
+    '.claude/notes/README.md': '# Notes\n',
+  });
+
+  const exitCode = await runDocsCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    fileSystem: nodeFileSystem,
+    runCommand,
+    runLoggedCommand: ctx.runLogged,
+    writeOutput: ctx.writeOutput,
+  });
+
+  expect(exitCode).toBe(0);
+
+  expect(ctx.logged[0]).toBe(
+    [
+      'README.md',
+      'guides/README.md',
+      ':(glob)docs/**/*.md',
+      ':(glob)**/results.md',
+      ':(glob).agents/skills/**/*.md',
+      ':(glob).claude/skills/**/*.md',
+      ':(glob)skills/**/*.md',
+      ':(glob)sync/skills/**/*.md',
+      '',
+    ].join('\n'),
+  );
+});
+
+test('it reads the same docs as check-prose.sh reads with no path', async () => {
+  const ctx = await setupTest();
+
+  await ctx.copyDocsScripts(['check-prose.sh', 'check-length.sh', 'check-links.sh']);
+
+  await ctx.trackFiles({
+    'README.md': '# Greeter\n\nThe greeting is load-bearing.\n',
+    'guides/README.md': '# Guides\n\nThe guide is load-bearing.\n',
+    '.claude/notes/README.md': '# Notes\n\nThe note is load-bearing.\n',
+    '.claude/skills/greeter/README.md': '# Greeter skill\n\nThe skill is load-bearing.\n',
+    'docs/tone.md': '# Tone\n\nThe tone is load-bearing.\n',
+  });
+
+  await runDocsCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    fileSystem: nodeFileSystem,
+    runCommand,
+    runLoggedCommand: ctx.runLogged,
+    writeOutput: ctx.writeOutput,
+  });
+
+  const bare = await runCommand(['bash', '.claude/skills/docs-writing/scripts/check-prose.sh'], {
+    cwd: ctx.repo,
+    env: ctx.env,
+  });
+
+  expect(ctx.logged[0]).toBe(`${bare.stdout}${bare.stderr}`);
 });
