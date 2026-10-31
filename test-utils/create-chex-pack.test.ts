@@ -1,15 +1,21 @@
-import { expect, test } from 'bun:test';
+import { expect, onTestFinished, test } from 'bun:test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { LaneContext } from '@zgeoff/rig';
+import { laneFiles } from '../packages/rig/src/browser/lane-files.ts';
+import { initFiles } from '../packages/rig/src/init-files.ts';
+import { buildStubCommandRunner } from './build-stub-command-runner.ts';
 import { createChexPack } from './create-chex-pack.ts';
-import type { E2EPackDependencies } from './e2e-pack-dependencies.ts';
+import { writeTreeFiles } from './write-tree-files.ts';
 
-function setupTest(failingCommand: string | null) {
-  const commands: { readonly command: readonly string[]; readonly cwd: string }[] = [];
-  const createdDirs: string[] = [];
-  const readPaths: string[] = [];
+async function setupTest() {
+  const repoRoot = await mkdtemp(join(tmpdir(), 'create-chex-pack-'));
+
+  onTestFinished(() => rm(repoRoot, { recursive: true, force: true }));
 
   const context: LaneContext = {
-    repoRoot: '/repo',
+    repoRoot,
     runID: '4417',
     lane: {
       name: 'e2e',
@@ -23,70 +29,70 @@ function setupTest(failingCommand: string | null) {
     environment: {},
   };
 
-  const dependencies: E2EPackDependencies = {
-    hostName: 'galley',
-    tempDir: '/scratch',
-    userID: 1000,
-    files: {
-      createDirs: (path) => {
-        createdDirs.push(path);
+  const runDir = join(repoRoot, 'packages/chex/node_modules/.cache/chex-e2e/galley/4417');
 
-        return Promise.resolve();
-      },
-      readDirNames: () => Promise.resolve([]),
-      removePath: () => Promise.resolve(),
-    },
-    packedFiles: {
-      readJSON: (path) => {
-        readPaths.push(path);
+  const pack = (answers: Readonly<Record<string, string | null>>) => {
+    const commands = buildStubCommandRunner(answers);
 
-        return Promise.resolve({ bin: { chex: './src/cli.ts' } });
-      },
-      probeFile: () => Promise.resolve(true),
-    },
-    probeProcess: () => false,
-    runCommand: (command, cwd) => {
-      commands.push({ command, cwd });
+    const start = createChexPack(context, {
+      hostName: 'galley',
+      tempDir: tmpdir(),
+      userID: 1000,
+      files: laneFiles,
+      packedFiles: initFiles,
+      probeProcess: () => true,
+      runCommand: commands.runCommand,
+    });
 
-      return failingCommand !== null && command.includes(failingCommand)
-        ? Promise.reject(new Error(`${failingCommand} exited 1`))
-        : Promise.resolve();
-    },
+    return { start, calls: commands.calls };
   };
 
-  return { commands, createdDirs, readPaths, context, dependencies };
+  return { repoRoot, runDir, pack };
 }
 
 test("it packs chex into the run's folder, extracts the tarball and returns the packed bin", async () => {
-  const ctx = setupTest(null);
+  const ctx = await setupTest();
 
-  const start = await createChexPack(ctx.context, ctx.dependencies);
+  const tarballPath = join(ctx.runDir, 'chex.tgz');
 
-  const runDir = '/repo/packages/chex/node_modules/.cache/chex-e2e/galley/4417';
+  // The files that the stub tar stands for extracting.
+  await writeTreeFiles(join(ctx.runDir, 'package'), {
+    'package.json': JSON.stringify({ bin: { chex: './src/cli.ts' } }),
+    'src/cli.ts': 'export {};\n',
+  });
+
+  const run = ctx.pack({
+    [`${process.execPath} pm pack --filename ${tarballPath} --quiet`]: null,
+    [`tar -xzf ${tarballPath} -C ${ctx.runDir}`]: null,
+  });
+
+  const start = await run.start;
 
   expect(start).toStrictEqual({
     environment: {
-      CHEX_E2E_PACKAGE: `${runDir}/package`,
-      CHEX_E2E_BIN: `${runDir}/package/src/cli.ts`,
+      CHEX_E2E_PACKAGE: join(ctx.runDir, 'package'),
+      CHEX_E2E_BIN: join(ctx.runDir, 'package/src/cli.ts'),
     },
   });
 
-  expect(ctx.createdDirs).toStrictEqual([runDir]);
-
-  expect(ctx.commands).toStrictEqual([
+  expect(run.calls).toStrictEqual([
     {
-      command: [process.execPath, 'pm', 'pack', '--filename', `${runDir}/chex.tgz`, '--quiet'],
-      cwd: '/repo/packages/chex',
+      command: [process.execPath, 'pm', 'pack', '--filename', tarballPath, '--quiet'],
+      cwd: join(ctx.repoRoot, 'packages/chex'),
     },
-    { command: ['tar', '-xzf', `${runDir}/chex.tgz`, '-C', runDir], cwd: runDir },
+    { command: ['tar', '-xzf', tarballPath, '-C', ctx.runDir], cwd: ctx.runDir },
   ]);
 });
 
-test('it rejects with the pack failure, and never extracts or reads a bin', () => {
-  const ctx = setupTest('pack');
-  const start = createChexPack(ctx.context, ctx.dependencies);
+test('it rejects with the pack failure, and never extracts the tarball', async () => {
+  const ctx = await setupTest();
 
-  expect(start).rejects.toThrow('pack exited 1');
-  expect(ctx.commands.map((call) => call.command[0])).toStrictEqual([process.execPath]);
-  expect(ctx.readPaths).toStrictEqual([]);
+  const tarballPath = join(ctx.runDir, 'chex.tgz');
+
+  const run = ctx.pack({
+    [`${process.execPath} pm pack --filename ${tarballPath} --quiet`]: 'bun pm pack exited 1',
+  });
+
+  expect(run.start).rejects.toThrow('bun pm pack exited 1');
+  expect(run.calls.map((call) => call.command[0])).toStrictEqual([process.execPath]);
 });
