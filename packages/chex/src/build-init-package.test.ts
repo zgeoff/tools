@@ -57,3 +57,16 @@ test('it refuses a package.json that is a JSON array', () => {
     reason: 'package.json is not a JSON object',
   });
 });
+
+test('it refuses a package.json whose scripts are not a JSON object', () => {
+  const text = JSON.stringify({
+    name: 'kettle',
+    scripts: [],
+    devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
+  });
+
+  expect(buildInitPackage(text)).toStrictEqual({
+    kind: 'refused',
+    reason: 'the scripts of package.json are not a JSON object',
+  });
+});
