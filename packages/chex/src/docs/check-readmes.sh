@@ -45,8 +45,16 @@ done
 # Holds when the first H1 outside a code block starts "Spike: ".
 is_spike() {
   awk '
-    /^[ \t]*(```|~~~)/ { open = !open; next }
-    !open && /^# / { found = ($0 ~ /^# Spike: /); exit }
+    match($0, /^[ \t]*(```+|~~~+)/) {
+      marker = substr($0, RSTART, RLENGTH)
+      sub(/^[ \t]*/, "", marker)
+      rest = substr($0, RSTART + RLENGTH)
+      # A fence closes only with the opening character, at least as long, and nothing after it.
+      if (open == "") open = marker
+      else if (substr(marker, 1, 1) == substr(open, 1, 1) && length(marker) >= length(open) && rest ~ /^[ \t]*$/) open = ""
+      next
+    }
+    open == "" && /^# / { found = ($0 ~ /^# Spike: /); exit }
     END { exit !found }
   ' "$1"
 }

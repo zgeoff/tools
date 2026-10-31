@@ -87,6 +87,29 @@ test('it passes spike READMEs and the index of a folder of spikes', async () => 
   });
 });
 
+test('it reads the spike title past a longer fence that holds a shorter one', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('research/README.md', '# Research\n');
+
+  await ctx.writeText(
+    'research/pool-size/README.md',
+    '````markdown\n```\n# Not the title\n```\n````\n\n# Spike: Pool size\n',
+  );
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-readmes: 2 READMEs, 0 not one of the five kinds\n',
+    stderr: '',
+  });
+});
+
 test('it fails a README that is none of the five kinds, and says what to do', async () => {
   const ctx = await setupTest();
 
