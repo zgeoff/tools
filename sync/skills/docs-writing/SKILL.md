@@ -521,7 +521,7 @@ passes with this guide as its only reference.
    takes, and CI runs the same ones:
 
    ```bash
-   bun x @zgeoff/chex prose length links
+   bun x @zgeoff/chex prose length links skill
    ```
 
    `chex prose` reads the READMEs, each spike's `results.md`, the Markdown under `docs/`, and each
@@ -531,8 +531,10 @@ passes with this guide as its only reference.
    whose `check:docs` names it. `chex links` checks every relative link and anchor in the READMEs,
    the `results.md` files, `docs/`, and the skills, and fails on a broken one. It skips the
    docs-writing, project-docs-writing, and skill-writing skills, whose examples link to placeholder
-   targets. Pass paths to check other Markdown. Both skip a file git marks `linguist-vendored`. To
-   check other prose, such as AGENTS.md, run `bun x @zgeoff/chex prose <path>...` on it.
+   targets. Pass paths to check other Markdown. `chex skill` checks each skill's frontmatter and
+   word limit, as the skill-writing skill describes, and passes in a repo with no skills. `prose`,
+   `links` and `skill` skip a file git marks `linguist-vendored`. To check other prose, such as
+   AGENTS.md, run `bun x @zgeoff/chex prose <path>...` on it.
 
    `chex prose` fails on traces of the work session, the banned words a grep can catch, values with
    units under `docs/architecture/`, formatting faults, untagged code blocks, and a paragraph over
