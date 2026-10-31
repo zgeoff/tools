@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { buildInitPlan } from './build-init-plan.ts';
+import { matchKind } from './match-kind.ts';
 
 export interface InitDeps {
   readonly repoRoot: string;
@@ -20,17 +21,20 @@ export async function runInit(deps: InitDeps): Promise<number> {
 
   const plan = buildInitPlan(packageText, lefthookText);
 
-  if (plan.kind === 'refused') {
-    deps.writeError(plan.reasons.map((reason) => `chex init: ${reason}\n`).join(''));
+  return matchKind(plan, {
+    refused: (refusal) => {
+      deps.writeError(refusal.reasons.map((reason) => `chex init: ${reason}\n`).join(''));
 
-    return 1;
-  }
+      return Promise.resolve(1);
+    },
+    apply: async (apply) => {
+      await Promise.all(
+        apply.writes.map((write) => deps.writeText(join(deps.repoRoot, write.file), write.text)),
+      );
 
-  await Promise.all(
-    plan.writes.map((write) => deps.writeText(join(deps.repoRoot, write.file), write.text)),
-  );
+      deps.writeOutput(apply.notes.map((note) => `chex init: ${note}\n`).join(''));
 
-  deps.writeOutput(plan.notes.map((note) => `chex init: ${note}\n`).join(''));
-
-  return 0;
+      return 0;
+    },
+  });
 }

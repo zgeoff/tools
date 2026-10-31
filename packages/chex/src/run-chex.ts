@@ -1,4 +1,5 @@
 import type { CheckName } from './check-names.ts';
+import { matchKind } from './match-kind.ts';
 import { chexUsage, parseChexArgs } from './parse-chex-args.ts';
 
 export interface ChexDeps {
@@ -10,23 +11,27 @@ export interface ChexDeps {
 
 // Runs every named check, even after one bounces, so the output names each check that fails.
 // Returns the highest exit code of the checks, and 2 for a refused request.
-export async function runChex(argv: readonly string[], deps: ChexDeps): Promise<number> {
-  const request = parseChexArgs(argv);
+export function runChex(argv: readonly string[], deps: ChexDeps): Promise<number> {
+  return matchKind(parseChexArgs(argv), {
+    refused: (refusal) => {
+      deps.writeError(`chex: ${refusal.message}\n${chexUsage}\n`);
 
-  if (request.kind === 'refused') {
-    deps.writeError(`chex: ${request.message}\n${chexUsage}\n`);
+      return Promise.resolve(2);
+    },
+    init: () => deps.runInit(),
+    checks: (request) => runChecks(request.names, request.args, deps),
+  });
+}
 
-    return 2;
-  }
-
-  if (request.kind === 'init') {
-    return deps.runInit();
-  }
-
+async function runChecks(
+  names: readonly CheckName[],
+  args: readonly string[],
+  deps: ChexDeps,
+): Promise<number> {
   let exitCode = 0;
 
-  for (const name of request.names) {
-    const checkExitCode = await runOneCheck(name, request.args, deps);
+  for (const name of names) {
+    const checkExitCode = await runOneCheck(name, args, deps);
 
     deps.writeOutput(`${checkExitCode === 0 ? 'cleared' : 'bounced'}: ${name}\n`);
 
