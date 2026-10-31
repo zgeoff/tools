@@ -68,3 +68,18 @@ fits a 2 GiB host. A repo opts in with three changes:
    before the baseline's, so keep only cheap repo-specific gates there.
 3. Move every whole-tree check the baseline drops, such as type-aware lint, dead code and the full
    suite, into CI as a required check, if CI does not run it already.
+
+## Taking the baseline from chex
+
+A repo that installs [`@zgeoff/chex`](../../packages/chex/README.md) takes the same baseline with
+one `extends` line in place of the repo-sync entry:
+
+1. Run `bun add -d @zgeoff/chex @zgeoff/rig @zgeoff/diet` at the repo root. Expect `bun.lock` to
+   list the three packages.
+2. Run `bun x --no-install chex init` at the repo root. Expect
+   `chex init: lefthook.yml extends node_modules/@zgeoff/chex/lefthook.yml`, and, for a repo with no
+   `check:docs` script, `chex init: package.json runs "chex prose length links" as check:docs`.
+3. Edit `check:docs` to name the docs checks the repo takes, such as
+   `chex prose length links vision`. CI runs each check that it names as its own step.
+4. In `lefthook.yml`, delete `parallel` and the baseline's jobs from `pre-push` and `pre-commit`, as
+   step 2 of [Opting in to the pre-push baseline](#opting-in-to-the-pre-push-baseline) describes.

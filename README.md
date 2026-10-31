@@ -8,7 +8,7 @@
 
   <p>
     <a href="./AGENTS.md">Agent guidelines</a> •
-    <a href="./sync/README.md">Repo sync</a> •
+    <a href="./docs/architecture/repo-sync.md">Repo sync</a> •
     <a href="./RELEASING.md">Releasing</a>
   </p>
 </div>

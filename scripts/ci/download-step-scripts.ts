@@ -16,11 +16,13 @@ export const stepScriptSets = {
     'scripts/ci/run-pinned-tool-step.ts',
     'scripts/ci/run-package-scripts.ts',
     'scripts/ci/collect-failed-jobs.ts',
-    'packages/chex/src/run-workflows-check.ts',
-    'packages/chex/src/run-commits-check.ts',
-    'packages/chex/src/run-local-paths-check.ts',
-    'packages/chex/src/run-test-timeouts-check.ts',
-    'packages/chex/src/dependency-gates/run-dependency-gates-check.ts',
+    'packages/chex/src/cli.ts',
+    'packages/chex/src/docs/check-prose.sh',
+    'packages/chex/src/docs/check-length.sh',
+    'packages/chex/src/docs/check-links.sh',
+    'packages/chex/src/docs/check-readmes.sh',
+    'packages/chex/src/docs/check-vision.sh',
+    'packages/chex/src/docs/check-skill.sh',
   ],
   'paths-changed': ['scripts/paths-changed/run-changed-files-step.ts'],
   'repo-sync': [
@@ -115,7 +117,10 @@ function collectImportedPaths(path: string, text: string): string[] {
     return [];
   }
 
-  return transpiler.scanImports(text).flatMap((imported) => {
+  // The transpiler rejects the shebang line that starts a bin's entry file.
+  const source = text.replace(/^#!.*/u, '');
+
+  return transpiler.scanImports(source).flatMap((imported) => {
     // Bun writes a bundle's built-in imports without the node: prefix.
     if (isBuiltin(imported.path)) {
       return [];

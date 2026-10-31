@@ -10,6 +10,26 @@ checks with no review, as [Auto-merge](#auto-merge) describes.
 merge to `main` here that changes a synced file reaches each repo as that pull request once `main`
 is green, as [Delivery](#delivery) describes.
 
+## The sources
+
+The entries name their sources under [`sync/`](../../sync/), and a source can sit elsewhere in the
+repo:
+
+- [`sync/manifest.json`](../../sync/manifest.json): the entries, which
+  `scripts/check-sync-manifest.sh` checks in CI.
+- [`sync/repo-sync.yml`](../../sync/repo-sync.yml): the stub that calls the repo-sync workflow at a
+  pinned commit.
+- [`sync/workflow-callers/`](../../sync/workflow-callers/): workflows that each call a reusable
+  workflow in this repo, all opt-in but the repo-sync guard.
+- [`sync/skills/`](../../sync/skills/): the shared base of each Claude skill.
+- [`sync/hooks/`](../../sync/hooks/): the agent hooks' start-up stub and the skill gate's older
+  entry point.
+- [`sync/pre-push/`](../../sync/pre-push/): the [pre-push baseline](./pre-push-baseline.md) that the
+  `pre-push-baseline` entry delivers, and the [memory-cap script](./memory-caps.md).
+- [`packages/chex/src/`](../../packages/chex/src/): the docs check scripts that the skill entries
+  and the `docs-vision-check` entry deliver, and the check scripts of the `pre-push-baseline` entry.
+  [`@zgeoff/chex`](../../packages/chex/README.md) runs the same scripts as `chex <check>`.
+
 ## Delivery
 
 ```mermaid

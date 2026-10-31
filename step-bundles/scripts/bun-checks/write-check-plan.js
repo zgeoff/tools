@@ -65,6 +65,34 @@ async function writeStepOutputs(fileSystem, outputPath, outputs) {
   await fileSystem.appendText(outputPath, lines.join(""));
 }
 
+// packages/chex/src/check-names.ts
+var docsCheckNames = ["prose", "length", "links", "readmes", "vision", "skill"];
+var checkNames = [
+  ...docsCheckNames,
+  "commits",
+  "local-paths",
+  "test-timeouts",
+  "workflows",
+  "dependency-gates",
+  "uncommitted"
+];
+
+// scripts/bun-checks/parse-docs-checks.ts
+function parseDocsChecks(script) {
+  if (script === undefined) {
+    return { kind: "none" };
+  }
+  const [program, ...checks] = script.trim().split(/\s+/u);
+  const unknown = checks.filter((check) => !docsCheckNames.some((name) => name === check));
+  if (program !== "chex" || checks.length === 0 || unknown.length > 0) {
+    return {
+      kind: "refused",
+      message: `package.json runs "${script}" as check:docs; write it as chex and the docs checks it takes, from ${docsCheckNames.join(", ")}, such as "chex prose length links", so CI runs each check as its own step.`
+    };
+  }
+  return { kind: "named", checks: [...new Set(checks)] };
+}
+
 // scripts/bun-checks/plan-check-scripts.ts
 function planCheckScripts(request) {
   const defined = new Set(request.defined);
@@ -120,38 +148,47 @@ async function writeCheckPlan(step) {
   }
   const packageText = await step.fileSystem.readText(join(step.cwd, "package.json"));
   const packageJSON = JSON.parse(packageText);
+  const scripts = findScripts(packageJSON);
+  const docsScript = scripts["check:docs"];
+  const docsText = typeof docsScript === "string" ? docsScript : undefined;
+  const docs = parseDocsChecks(docsText);
+  if (docs.kind === "refused") {
+    return [docs.message];
+  }
   const plan = planCheckScripts({
     scripts: step.scripts,
-    defined: readScriptNames(packageJSON),
+    defined: Object.keys(scripts),
     part,
     lane: step.lane
   });
-  return writePlanOutcome(plan, step);
+  const docsOutput = docs.kind === "named" ? ` ${docs.checks.join(" ")} ` : "";
+  return writePlanOutcome(plan, docsOutput, step);
 }
-function readScriptNames(value) {
+function findScripts(value) {
   if (typeof value !== "object" || value === null || !("scripts" in value)) {
-    return [];
+    return {};
   }
   const scripts = value.scripts;
-  return typeof scripts === "object" && scripts !== null ? Object.keys(scripts) : [];
+  return typeof scripts === "object" && scripts !== null ? { ...scripts } : {};
 }
 var planOutcomeWriters = {
   missing: (plan) => Promise.resolve([
     `package.json defines no script named: ${plan.missing.join(" ")}. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list.`
   ]),
-  planned: async (plan, step) => {
+  planned: async (plan, docs, step) => {
     await writeStepOutputs(step.fileSystem, step.outputPath, {
       scripts: ` ${plan.scripts.join(" ")} `,
       static: ` ${plan.static.join(" ")} `,
       test: ` ${plan.test.join(" ")} `,
-      lanes: JSON.stringify(plan.lanes)
+      lanes: JSON.stringify(plan.lanes),
+      docs
     });
     return [];
   }
 };
-function writePlanOutcome(plan, step) {
+function writePlanOutcome(plan, docs, step) {
   const writeOutcome = planOutcomeWriters[plan.kind];
-  return writeOutcome(plan, step);
+  return writeOutcome(plan, docs, step);
 }
 if (import.meta.main) {
   const errors = await writeCheckPlan({

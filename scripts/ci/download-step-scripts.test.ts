@@ -95,6 +95,24 @@ test('it downloads a file that two files import once', async () => {
   ]);
 });
 
+test('it reads the imports of a bin entry that starts with a shebang line', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.source, {
+    'packages/kettle/src/cli.ts': "#!/usr/bin/env bun\nimport './boil.ts';\n",
+    'packages/kettle/src/boil.ts': 'export {};\n',
+  });
+
+  const written = await downloadStepScripts({
+    entries: ['packages/kettle/src/cli.ts'],
+    destination: ctx.destination,
+    readToolsFile: ctx.readSourceFile,
+    writeFile: nodeFileSystem.writeText,
+  });
+
+  expect(written).toStrictEqual(['packages/kettle/src/cli.ts', 'packages/kettle/src/boil.ts']);
+});
+
 test('it refuses a step script that imports a package, which no caller installs', async () => {
   const ctx = await setupTest();
 

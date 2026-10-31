@@ -13,9 +13,11 @@
 #
 # The static job, and the checks job in a private repo, run the shared checks
 # as named steps beside the scripts: shell, docs, workflows, the workflow lint,
-# commits, local paths, test timeouts and dependency gates. A check that needs
-# a tool the repo lacks prints a notice and passes. Each step runs one script,
-# which the job downloads from the commit of zgeoff/tools that defines it, so a
+# commits, local paths, test timeouts and dependency gates. Each docs check
+# that the repo's check:docs script names, such as chex prose length links,
+# runs as its own step. A check that needs a tool the repo lacks prints a
+# notice and passes. Each step runs one script or one chex subcommand, which
+# the job downloads from the commit of zgeoff/tools that defines it, so a
 # caller pinned to a commit runs that commit's scripts.
 #
 # `scripts` is a space-separated list of package.json script names. Empty means
@@ -228,10 +230,57 @@ jobs:
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
         run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/run-shell-check.js"
 
+      # A repo whose check:docs script names its docs checks runs each one as
+      # its own step. A repo with no check:docs script runs this step, which
+      # reads the docs scripts that repo-sync delivers.
       - &check-docs
         name: Check docs
-        if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
+        if:
+          ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' && steps.plan.outputs.docs
+          == '' }}
         run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/run-docs-check.js"
+
+      - &check-prose
+        name: Check prose
+        if:
+          ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' &&
+          contains(steps.plan.outputs.docs, ' prose ') }}
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/cli.js" prose
+
+      - &check-length
+        name: Check length
+        if:
+          ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' &&
+          contains(steps.plan.outputs.docs, ' length ') }}
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/cli.js" length
+
+      - &check-links
+        name: Check links
+        if:
+          ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' &&
+          contains(steps.plan.outputs.docs, ' links ') }}
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/cli.js" links
+
+      - &check-readmes
+        name: Check readmes
+        if:
+          ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' &&
+          contains(steps.plan.outputs.docs, ' readmes ') }}
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/cli.js" readmes
+
+      - &check-vision
+        name: Check vision
+        if:
+          ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' &&
+          contains(steps.plan.outputs.docs, ' vision ') }}
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/cli.js" vision
+
+      - &check-skill
+        name: Check skill
+        if:
+          ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' &&
+          contains(steps.plan.outputs.docs, ' skill ') }}
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/cli.js" skill
 
       - &check-workflows
         name: Check workflows
@@ -247,28 +296,27 @@ jobs:
           CHECKS_PROFILE:
             ${{ ((github.event.repository && github.event.repository.private) ||
             (!github.event.repository && inputs.private)) && 'private' || 'public' }}
-        run: bun "$RUNNER_TEMP/tools/packages/chex/src/run-workflows-check.js"
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/cli.js" workflows
 
       - &check-commits
         name: Check commits
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/packages/chex/src/run-commits-check.js"
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/cli.js" commits
 
       - &check-local-paths
         name: Check local paths
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/packages/chex/src/run-local-paths-check.js"
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/cli.js" local-paths
 
       - &check-test-timeouts
         name: Check test timeouts
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/packages/chex/src/run-test-timeouts-check.js"
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/cli.js" test-timeouts
 
       - &check-dependency-gates
         name: Check dependency gates
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run:
-          bun "$RUNNER_TEMP/tools/packages/chex/src/dependency-gates/run-dependency-gates-check.js"
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/cli.js" dependency-gates
 
       - &run-scripts
         name: Run the check scripts
@@ -424,6 +472,12 @@ jobs:
 
       - *check-shell
       - *check-docs
+      - *check-prose
+      - *check-length
+      - *check-links
+      - *check-readmes
+      - *check-vision
+      - *check-skill
       - *check-workflows
       - *lint-workflows
       - *check-commits

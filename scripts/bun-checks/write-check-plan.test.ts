@@ -37,9 +37,14 @@ test('it writes the plan for the script names package.json defines to the step o
   expect(errors).toStrictEqual([]);
 
   expect(output).toBe(
-    ['scripts= lint test test:e2e ', 'static= lint ', 'test= test ', 'lanes=["e2e"]', ''].join(
-      '\n',
-    ),
+    [
+      'scripts= lint test test:e2e ',
+      'static= lint ',
+      'test= test ',
+      'lanes=["e2e"]',
+      'docs=',
+      '',
+    ].join('\n'),
   );
 });
 
@@ -95,7 +100,7 @@ test('it plans no lanes for a repo without lane scripts, so no public lane job s
   const output = await ctx.readOutput();
 
   expect(output).toBe(
-    ['scripts= lint test ', 'static= lint ', 'test= test ', 'lanes=[]', ''].join('\n'),
+    ['scripts= lint test ', 'static= lint ', 'test= test ', 'lanes=[]', 'docs=', ''].join('\n'),
   );
 });
 
@@ -121,7 +126,14 @@ test('it plans one lane per lane script, and a lane job runs only its own lane s
   const output = await ctx.readOutput();
 
   expect(output).toBe(
-    ['scripts= test:host ', 'static= lint ', 'test= test ', 'lanes=["e2e","host"]', ''].join('\n'),
+    [
+      'scripts= test:host ',
+      'static= lint ',
+      'test= test ',
+      'lanes=["e2e","host"]',
+      'docs=',
+      '',
+    ].join('\n'),
   );
 });
 
@@ -159,6 +171,7 @@ test('it plans the static checks, the tests and each lane once for the private c
       'static= lint ',
       'test= test ',
       'lanes=["e2e","browser","docker","host"]',
+      'docs=',
       '',
     ].join('\n'),
   );
@@ -210,4 +223,53 @@ test('it fails with an error on a part it does not know', async () => {
   expect(errors).toStrictEqual([
     'the plan step needs PART (one of all, static, test, lane) and GITHUB_OUTPUT.',
   ]);
+});
+
+test('it plans each docs check that the check:docs script names', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { lint: 'true', 'check:docs': 'chex prose length links' } }),
+  );
+
+  const errors = await writeCheckPlan({
+    cwd: ctx.directory,
+    outputPath: ctx.outputPath,
+    part: 'static',
+    scripts: 'lint',
+    lane: '',
+    fileSystem: nodeFileSystem,
+  });
+
+  const output = await ctx.readOutput();
+
+  expect(errors).toStrictEqual([]);
+  expect(output).toInclude('\ndocs= prose length links \n');
+});
+
+test('it fails with an error and writes no outputs when check:docs runs more than chex', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { lint: 'true', 'check:docs': 'bash scripts/check-docs.sh' } }),
+  );
+
+  const errors = await writeCheckPlan({
+    cwd: ctx.directory,
+    outputPath: ctx.outputPath,
+    part: 'static',
+    scripts: 'lint',
+    lane: '',
+    fileSystem: nodeFileSystem,
+  });
+
+  expect(errors).toStrictEqual([
+    'package.json runs "bash scripts/check-docs.sh" as check:docs; write it as chex and the docs checks it takes, from prose, length, links, readmes, vision, skill, such as "chex prose length links", so CI runs each check as its own step.',
+  ]);
+
+  const wroteOutputs = await Bun.file(ctx.outputPath).exists();
+
+  expect(wroteOutputs).toBeFalse();
 });
