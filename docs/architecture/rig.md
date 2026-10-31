@@ -156,6 +156,9 @@ isolated linker links rig's dependencies there and not at the repo root. The sto
 run's pack, and the next run's start removes any pack whose run has exited. A journey that runs
 outside the lane fails at once, because nothing set `RIG_E2E_BIN`.
 
-After it unpacks the bin, the start hook runs the packed bin's browser lane once, on a repo with one
-empty suite. A fresh CI runner's first Chrome start is the slow one, so the journeys that start
-Chrome never pay for it.
+A fresh CI runner's first Chrome start is the slow one, so after it unpacks the bin, the start hook
+starts Chrome once and the journeys that start Chrome never pay for that first start. The hook
+creates a git repo inside the run's pack folder that tracks one browser suite, because rig skips a
+lane whose test files git does not track. The suite's one test writes a mark file. The hook runs the
+packed bin's browser lane on that repo, and it fails the e2e lane when that run fails or leaves no
+mark file, so a warm-up that started no Chrome never passes silently.
