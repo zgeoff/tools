@@ -66,7 +66,7 @@ test('it fails with git error when a file the tree lists cannot be read', async 
 
   const reading = ctx.read(commit, ctx.runWithFailedShow);
 
-  await expect(reading).rejects.toThrow(
+  expect(reading).rejects.toThrow(
     `git -C tools show ${commit}:.github/workflows/bake.yml exited with 128: ${ctx.blobError}`,
   );
 });
@@ -79,5 +79,5 @@ test('it fails with git error when the commit is missing from the checkout', asy
   const missing = '0000000000000000000000000000000000000b01';
   const reading = ctx.read(missing);
 
-  await expect(reading).rejects.toThrow(`git -C tools ls-tree -z --name-only ${missing}`);
+  expect(reading).rejects.toThrow(`git -C tools ls-tree -z --name-only ${missing}`);
 });
