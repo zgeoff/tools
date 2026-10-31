@@ -15,9 +15,7 @@ test('it returns each result of the runner it wraps and records what each comman
     env: { PATH: process.env['PATH'] },
   });
 
-  expect({
-    first: first.exitCode,
-    second: second.exitCode,
-    outputs: recording.outputs,
-  }).toStrictEqual({ first: 0, second: 3, outputs: ['boil\nhiss\n', ''] });
+  expect(first.exitCode).toBe(0);
+  expect(second.exitCode).toBe(3);
+  expect(recording.outputs).toStrictEqual(['boil\nhiss\n', '']);
 });

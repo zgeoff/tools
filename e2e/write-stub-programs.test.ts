@@ -21,8 +21,6 @@ test('it writes each program as an executable script that runs its body', async 
   const kettle = await $`${join(ctx.folder, 'kettle')} water`.nothrow().quiet();
   const lid = await $`${join(ctx.folder, 'lid')}`.nothrow().quiet();
 
-  expect({ kettle: kettle.stdout.toString(), lid: lid.exitCode }).toStrictEqual({
-    kettle: 'boils water\n',
-    lid: 3,
-  });
+  expect(kettle.stdout.toString()).toBe('boils water\n');
+  expect(lid.exitCode).toBe(3);
 });

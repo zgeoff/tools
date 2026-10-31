@@ -22,5 +22,6 @@ test('it copies only the named files into a folder it creates', async () => {
   const names = await readdir(ctx.to);
   const text = await readFile(join(ctx.to, 'kettle.sh'), 'utf8');
 
-  expect({ names, text }).toStrictEqual({ names: ['kettle.sh'], text: 'echo boil\n' });
+  expect(names).toStrictEqual(['kettle.sh']);
+  expect(text).toBe('echo boil\n');
 });

@@ -48,15 +48,15 @@ test('it writes lefthook.yml and package.json to the repo folder, and reports ea
   const exitCode = await ctx.run();
   const files = await ctx.readFiles();
 
-  expect({ exitCode, lines: ctx.lines, lefthook: files[1] }).toStrictEqual({
+  expect({ exitCode, lines: ctx.lines }).toStrictEqual({
     exitCode: 0,
     lines: [
       'out chex init: lefthook.yml extends node_modules/@zgeoff/chex/lefthook.yml\n' +
         'chex init: package.json runs "chex prose length links" as check:docs\n',
     ],
-    lefthook: 'extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n',
   });
 
+  expect(files[1]).toBe('extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n');
   expect(files[0]).toInclude('"check:docs": "chex prose length links"');
 });
 
@@ -79,11 +79,12 @@ test('it leaves every file as it was on a second run', async () => {
   const exitCode = await ctx.run();
   const filesAfter = await ctx.readFiles();
 
-  expect({ exitCode, lines: ctx.lines, files: filesAfter }).toStrictEqual({
+  expect({ exitCode, lines: ctx.lines }).toStrictEqual({
     exitCode: 0,
     lines: ['out chex init: the repo already takes the baseline; nothing to change\n'],
-    files,
   });
+
+  expect(filesAfter).toStrictEqual(files);
 });
 
 test('it fails and leaves both files as they were when lefthook.yml lists extends inline', async () => {
@@ -100,13 +101,14 @@ test('it fails and leaves both files as they were when lefthook.yml lists extend
   const exitCode = await ctx.run();
   const files = await ctx.readFiles();
 
-  expect({ exitCode, lines: ctx.lines, files }).toStrictEqual({
+  expect({ exitCode, lines: ctx.lines }).toStrictEqual({
     exitCode: 1,
     lines: [
       'err chex init: lefthook.yml writes extends in a form chex init does not edit; add node_modules/@zgeoff/chex/lefthook.yml to its list\n',
     ],
-    files: [packageText, 'extends: [local.yml]\n'],
   });
+
+  expect(files).toStrictEqual([packageText, 'extends: [local.yml]\n']);
 });
 
 test('it fails and writes nothing in a folder with no package.json', async () => {
@@ -114,9 +116,10 @@ test('it fails and writes nothing in a folder with no package.json', async () =>
   const exitCode = await ctx.run();
   const files = await ctx.readFiles();
 
-  expect({ exitCode, lines: ctx.lines, files }).toStrictEqual({
+  expect({ exitCode, lines: ctx.lines }).toStrictEqual({
     exitCode: 1,
     lines: ['err chex init: the folder has no package.json; run chex init from the repo root\n'],
-    files: [undefined, undefined],
   });
+
+  expect(files).toStrictEqual([undefined, undefined]);
 });

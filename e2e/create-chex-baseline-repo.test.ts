@@ -43,12 +43,10 @@ test('it writes the files chex init leaves, with the fixture files and scripts a
   const notes = await readFile(join(ctx.root, 'notes.txt'), 'utf8');
   const chexLink = await readlink(join(ctx.root, 'node_modules/@zgeoff/chex'));
 
-  expect({ lefthook, packageJSON, notes, chexLink }).toStrictEqual({
-    lefthook: 'extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n',
-    packageJSON: { scripts: { 'format:check': 'true', typecheck: 'tsc' } },
-    notes: 'The kettle boils.\n',
-    chexLink: join(ctx.toolsRoot, 'packages/chex'),
-  });
+  expect(lefthook).toBe('extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n');
+  expect(packageJSON).toStrictEqual({ scripts: { 'format:check': 'true', typecheck: 'tsc' } });
+  expect(notes).toBe('The kettle boils.\n');
+  expect(chexLink).toBe(join(ctx.toolsRoot, 'packages/chex'));
 });
 
 test('it stubs chex to clear each check it does not run for real', async () => {
@@ -99,14 +97,12 @@ test('it stubs rig to log each call, and marks a call that the stub diet wraps',
   const bare = await $`${join(ctx.bin, 'rig')} related lid.ts`.cwd(ctx.root).nothrow().quiet();
   const calls = await readCallLog(ctx.rigLog);
 
-  expect({ wrapped: wrapped.exitCode, bare: bare.exitCode, calls }).toStrictEqual({
-    wrapped: 4,
-    bare: 4,
-    calls: ['under diet: related kettle.ts', 'related lid.ts'],
-  });
+  expect(wrapped.exitCode).toBe(4);
+  expect(bare.exitCode).toBe(4);
+  expect(calls).toStrictEqual(['under diet: related kettle.ts', 'related lid.ts']);
 });
 
-test('it links commitlint only for a fixture that asks for it', async () => {
+test('it links no commitlint for a fixture that does not ask for it', async () => {
   const ctx = await setupTest();
 
   await createChexBaselineRepo(
@@ -122,9 +118,11 @@ test('it links commitlint only for a fixture that asks for it', async () => {
     },
   );
 
-  const without = existsSync(join(ctx.root, 'node_modules/.bin/commitlint'));
+  expect(existsSync(join(ctx.root, 'node_modules/.bin/commitlint'))).toBeFalse();
+});
 
-  await rm(ctx.root, { recursive: true, force: true });
+test('it links commitlint for a fixture that asks for it', async () => {
+  const ctx = await setupTest();
 
   await createChexBaselineRepo(
     ctx.root,
@@ -139,7 +137,5 @@ test('it links commitlint only for a fixture that asks for it', async () => {
     },
   );
 
-  const withLink = existsSync(join(ctx.root, 'node_modules/.bin/commitlint'));
-
-  expect({ without, withLink }).toStrictEqual({ without: false, withLink: true });
+  expect(existsSync(join(ctx.root, 'node_modules/.bin/commitlint'))).toBeTrue();
 });

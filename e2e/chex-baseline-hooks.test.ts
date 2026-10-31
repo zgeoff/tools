@@ -110,17 +110,10 @@ test('it runs the related tests through rig under diet, and leaves the main chec
   const bare = await $`git config --get core.bare`.cwd(ctx.main).env(ctx.env).text();
   const rigCalls = await ctx.readRigCalls();
 
-  expect({
-    exitCode: result.exitCode,
-    bare,
-    sandbox: existsSync(join(ctx.worktree, 'sandbox/.git')),
-    rigCalls,
-  }).toStrictEqual({
-    exitCode: 0,
-    bare: 'false\n',
-    sandbox: true,
-    rigCalls: ['under diet: related fixture.ts'],
-  });
+  expect(result.exitCode).toBe(0);
+  expect(bare).toBe('false\n');
+  expect(existsSync(join(ctx.worktree, 'sandbox/.git'))).toBeTrue();
+  expect(rigCalls).toStrictEqual(['under diet: related fixture.ts']);
 });
 
 test('it runs each repo check through chex and prints that it cleared', async () => {
@@ -246,10 +239,8 @@ test('it lints the files the branch changes with plain oxlint', async () => {
   const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
   const args = await readFile(join(ctx.directory, 'oxlint-args'), 'utf8');
 
-  expect({ exitCode: result.exitCode, args }).toStrictEqual({
-    exitCode: 0,
-    args: '--no-error-on-unmatched-pattern src/kettle.ts\n',
-  });
+  expect(result.exitCode).toBe(0);
+  expect(args).toBe('--no-error-on-unmatched-pattern src/kettle.ts\n');
 });
 
 test('it fails the push on the shell job alone when a shell file the branch changes fails shellcheck', async () => {
@@ -540,10 +531,8 @@ test("it fails the commit when typecheck fails, after the repo's own pre-commit 
 
   const ran = await readFile(join(ctx.worktree, 'ran.txt'), 'utf8');
 
-  expect({ exitCode: result.exitCode, ran }).toStrictEqual({
-    exitCode: 1,
-    ran: 'fixer\ntypecheck\n',
-  });
+  expect(result.exitCode).toBe(1);
+  expect(ran).toBe('fixer\ntypecheck\n');
 });
 
 test('it skips typecheck on a commit that stages no code or config file', async () => {

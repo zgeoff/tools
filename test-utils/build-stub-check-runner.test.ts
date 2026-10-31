@@ -7,11 +7,9 @@ test('it answers each check with its exit code and records the call with its arg
   const prose = await stub.runCheck('prose', ['docs/guide.md']);
   const links = await stub.runCheck('links', []);
 
-  expect({ prose, links, calls: stub.calls }).toStrictEqual({
-    prose: 1,
-    links: 0,
-    calls: ['prose docs/guide.md', 'links'],
-  });
+  expect(prose).toBe(1);
+  expect(links).toBe(0);
+  expect(stub.calls).toStrictEqual(['prose docs/guide.md', 'links']);
 });
 
 test('it rejects with the error a check is given, as a check that cannot start throws', () => {

@@ -354,14 +354,13 @@ test('it writes lefthook.yml and the check:docs script to disk for init', async 
   const lefthook = await Bun.file(join(ctx.repo, 'lefthook.yml')).text();
   const packageJSON: unknown = await Bun.file(join(ctx.repo, 'package.json')).json();
 
-  expect({ exitCode: run.exitCode, lefthook, packageJSON }).toStrictEqual({
-    exitCode: 0,
-    lefthook: 'extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n',
-    packageJSON: {
-      name: 'kettle',
-      devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
-      scripts: { 'check:docs': 'chex prose length links' },
-    },
+  expect(run.exitCode).toBe(0);
+  expect(lefthook).toBe('extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n');
+
+  expect(packageJSON).toStrictEqual({
+    name: 'kettle',
+    devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
+    scripts: { 'check:docs': 'chex prose length links' },
   });
 });
 
