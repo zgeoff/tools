@@ -94,7 +94,7 @@
     },
     "packages/chex": {
       "name": "@zgeoff/chex",
-      "version": "0.0.0",
+      "version": "0.0.1",
     },
     "packages/commitlint-config": {
       "name": "@zgeoff/commitlint-config",
@@ -192,7 +192,7 @@
     },
     "packages/rig": {
       "name": "@zgeoff/rig",
-      "version": "0.0.0",
+      "version": "0.0.1",
     },
     "packages/skill-gate": {
       "name": "@zgeoff/skill-gate",
