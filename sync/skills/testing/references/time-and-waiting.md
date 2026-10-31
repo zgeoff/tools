@@ -21,8 +21,5 @@ slower by its full length on every run, and it still fails on a slow machine. Wh
 nothing observable to wait on, the code lacks a signal: add one, such as an event, a log marker, or
 a state flag, and wait on that.
 
-## Native timers and scenario delays
-
-A native runtime or kernel timer, a timer a third-party library owns, a deadline the repo's code
-runs in a spawned process, and a deliberate workload or fault delay each follow
-[System tests](./system-tests.md#native-timers-and-scenario-delays).
+A timer that no clock or argument from the test reaches, and a delay the test adds on purpose,
+follow [System tests](./system-tests.md#native-timers-and-scenario-delays).
