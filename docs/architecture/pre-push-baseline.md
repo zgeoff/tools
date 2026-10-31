@@ -105,7 +105,9 @@ the table above, with these differences:
   `.claude/skills/docs-writing/scripts/` it prints a notice and passes.
 - The test job runs `scripts/run-related-tests.ts`, which takes the lane suffixes from the `lanes`
   option of `zgeoff/max-test-timeout` in the root `.oxlintrc.json`, as
-  [the test timeout check](./oxlint-config-tests.md#the-test-timeout-check) reads it.
+  [the test timeout check](./oxlint-config-tests.md#the-test-timeout-check) reads it. It also drops
+  each test that the `[test]` `pathIgnorePatterns` of the root `bunfig.toml` cover, because
+  `bun test` exits 1 when every path it is given is ignored.
 
 The entry delivers the check scripts from [`packages/chex/src/`](../../packages/chex/src/), under
 the same names in `scripts/`, so a delivered check runs the code that `chex <check>` runs. The

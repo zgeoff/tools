@@ -165,9 +165,14 @@ test.each([
 });
 
 test('#resolveRelatedTests leaves out a file of a lane that the oxlint config declares', () => {
-  const readConfigText = mock(
-    () => '{ "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": { "radar": 30000 } }] } }',
-  );
+  const configs = new Map([
+    [
+      '/repo/.oxlintrc.json',
+      '{ "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": { "radar": 30000 } }] } }',
+    ],
+  ]);
+
+  const readConfigText = mock((path: string) => configs.get(path) ?? null);
 
   expect(
     resolveRelatedTests(['src/sweep.radar.test.ts'], {
@@ -177,8 +182,49 @@ test('#resolveRelatedTests leaves out a file of a lane that the oxlint config de
     }),
   ).toBeEmpty();
 
-  expect(readConfigText).toHaveBeenCalledTimes(1);
   expect(readConfigText).toHaveBeenCalledWith('/repo/.oxlintrc.json');
+});
+
+test('#resolveRelatedTests leaves out a test that the Bun config ignores', () => {
+  const configs = new Map([
+    ['/repo/bunfig.toml', '[test]\npathIgnorePatterns = ["spikes/**", "drafts/**"]\n'],
+  ]);
+
+  const readConfigText = mock((path: string) => configs.get(path) ?? null);
+
+  expect(
+    resolveRelatedTests(['spikes/probe/plan.ts', 'drafts/notes.test.ts', 'src/a.ts'], {
+      cwd: '/repo',
+      readConfigText,
+      probeFile: () => true,
+    }),
+  ).toStrictEqual(['src/a.test.ts']);
+
+  expect(readConfigText).toHaveBeenCalledWith('/repo/bunfig.toml');
+});
+
+test('#resolveRelatedTests reads one ignore pattern written as a string', () => {
+  const configs = new Map([['/repo/bunfig.toml', '[test]\npathIgnorePatterns = "spikes/**"\n']]);
+
+  expect(
+    resolveRelatedTests(['spikes/probe/plan.ts', 'src/a.ts'], {
+      cwd: '/repo',
+      readConfigText: (path) => configs.get(path) ?? null,
+      probeFile: () => true,
+    }),
+  ).toStrictEqual(['src/a.test.ts']);
+});
+
+test('#resolveRelatedTests names the Bun config when it cannot parse it', () => {
+  const configs = new Map([['/repo/bunfig.toml', '[test\n']]);
+
+  expect(() =>
+    resolveRelatedTests(['src/a.ts'], {
+      cwd: '/repo',
+      readConfigText: (path) => configs.get(path) ?? null,
+      probeFile: () => true,
+    }),
+  ).toThrow(/^cannot parse bunfig\.toml: /u);
 });
 
 test('#resolveRelatedTests selects a test whose suffix no lane declares', () => {
