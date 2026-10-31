@@ -1,6 +1,34 @@
 import { expect, test } from 'bun:test';
 import { runRepoSyncConcurrencyCheck } from './run-repo-sync-concurrency-check.ts';
 
+test('it prints nothing and returns 0 for workflows that run every dispatch', async () => {
+  const output: string[] = [];
+  const errors: string[] = [];
+
+  const exitCode = await runRepoSyncConcurrencyCheck({
+    readStub: () =>
+      Promise.resolve(
+        [
+          'concurrency:',
+          `  group: bakery-sync-\${{ github.event.client_payload.sha || github.sha }}`,
+          '',
+        ].join('\n'),
+      ),
+    readWorkflow: () =>
+      Promise.resolve(['jobs:', '  sync:', '    concurrency:', '      queue: max', ''].join('\n')),
+    writeOutput: (line) => {
+      output.push(line);
+    },
+    writeError: (line) => {
+      errors.push(line);
+    },
+  });
+
+  expect(exitCode).toBe(0);
+  expect(output).toBeEmpty();
+  expect(errors).toBeEmpty();
+});
+
 test('it prints each fault of the repo-sync workflows and returns 1', async () => {
   const output: string[] = [];
   const errors: string[] = [];
