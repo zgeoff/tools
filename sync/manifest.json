@@ -358,6 +358,10 @@
         "target": "scripts/run-workflows-check.ts"
       },
       {
+        "source": "packages/chex/src/read-checks-profile.ts",
+        "target": "scripts/read-checks-profile.ts"
+      },
+      {
         "source": "packages/chex/src/run-uncommitted-check.ts",
         "target": "scripts/run-uncommitted-check.ts"
       },
