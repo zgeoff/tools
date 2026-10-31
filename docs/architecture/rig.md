@@ -51,8 +51,12 @@ that matches no file. Otherwise it runs three steps, and the last one always run
    own tracked test files and hands `bun test` that exact list, because `bun test` runs any file a
    path names, whatever its lane. Paths that select none of the lane's files fail the run with exit
    code 1, so a mistyped path never passes as a run with no tests.
-3. `stop` cleans up, whether the tests passed, failed or never started. When `start` or `run` fails
-   and `stop` fails too, rig reports both errors, the first failure first.
+3. `stop` cleans up, whether the tests passed, failed or never started. When `stop` throws, rig
+   exits 1, and what it reports depends on how the lane ended:
+   - after `start` or `run` threw, that error first and the stop error second;
+   - after an exit code other than 0, an error with that exit code first and the stop error second,
+     so the operator still sees that the tests failed;
+   - after an exit code of 0, the stop error alone.
 
 `rig` turns SIGINT, SIGTERM and SIGHUP into an abort. Every command rig starts runs in a process
 group of its own, because a test can start a process that a signal to `bun test` alone leaves

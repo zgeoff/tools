@@ -1,11 +1,10 @@
+import { match } from 'ts-pattern';
 import type { LaneHooks } from './lane-hooks.ts';
 
 type LaneOutcome =
   | { readonly kind: 'exited'; readonly exitCode: number }
   | { readonly kind: 'failed'; readonly error: unknown };
 
-// When the run and the stop hook both fail, the error holds both, the run's first, so the stop
-// hook's failure never hides the cause of the run's.
 export async function runLaneHooks(testArgs: readonly string[], hooks: LaneHooks): Promise<number> {
   const outcome = await runStartedLane(testArgs, hooks).then(
     (exitCode): LaneOutcome => ({ kind: 'exited', exitCode }),
@@ -15,9 +14,7 @@ export async function runLaneHooks(testArgs: readonly string[], hooks: LaneHooks
   try {
     await hooks.stop();
   } catch (stopError) {
-    throw outcome.kind === 'failed'
-      ? new AggregateError([outcome.error, stopError], 'the lane failed, and so did its stop hook')
-      : stopError;
+    throw buildStopFailure(outcome, stopError);
   }
 
   if (outcome.kind === 'failed') {
@@ -35,4 +32,18 @@ async function runStartedLane(testArgs: readonly string[], hooks: LaneHooks): Pr
   }
 
   return hooks.run(testArgs, started.environment);
+}
+
+function buildStopFailure(outcome: LaneOutcome, stopError: unknown): unknown {
+  return match(outcome)
+    .with({ kind: 'failed' }, (failed) => buildLaneAndStopFailure(failed.error, stopError))
+    .with({ kind: 'exited', exitCode: 0 }, () => stopError)
+    .with({ kind: 'exited' }, (exited) =>
+      buildLaneAndStopFailure(new Error(`the lane exited with code ${exited.exitCode}`), stopError),
+    )
+    .exhaustive();
+}
+
+function buildLaneAndStopFailure(laneError: unknown, stopError: unknown): AggregateError {
+  return new AggregateError([laneError, stopError], 'the lane failed, and so did its stop hook');
 }

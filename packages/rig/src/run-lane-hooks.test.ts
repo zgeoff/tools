@@ -102,7 +102,37 @@ test('it keeps the run failure first, beside the stop failure, when both fail', 
   expect(failure).toHaveProperty('errors', [runFailure, stopFailure]);
 });
 
-test('it fails with the stop failure alone when the tests ran', async () => {
+test('it reports the failed exit first, beside the stop failure, when the tests fail and stop fails', async () => {
+  const stopFailure = new Error('the kiln did not cool down');
+
+  const hooks = {
+    start: makeResolvingStub<LaneStartOutcome>({ kind: 'proceed', environment: {} }),
+    run: makeResolvingStub(1),
+    stop: makeRejectingStub(stopFailure),
+  };
+
+  const failure = await runLaneHooks([], hooks).catch((error: unknown) => error);
+
+  expect(failure).toBeInstanceOf(AggregateError);
+  expect(failure).toHaveProperty('errors', [new Error('the lane exited with code 1'), stopFailure]);
+});
+
+test('it reports the exit code that start finishes with, beside the stop failure, when stop fails', async () => {
+  const stopFailure = new Error('the kiln did not cool down');
+
+  const hooks = {
+    start: makeResolvingStub<LaneStartOutcome>({ kind: 'finish', exitCode: 7 }),
+    run: makeResolvingStub(0),
+    stop: makeRejectingStub(stopFailure),
+  };
+
+  const failure = await runLaneHooks([], hooks).catch((error: unknown) => error);
+
+  expect(failure).toBeInstanceOf(AggregateError);
+  expect(failure).toHaveProperty('errors', [new Error('the lane exited with code 7'), stopFailure]);
+});
+
+test('it fails with the stop failure alone when the tests passed', async () => {
   const stopFailure = new Error('the kiln did not cool down');
 
   const hooks = {
