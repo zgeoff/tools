@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { hostname, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
@@ -7,16 +6,14 @@ import { $ } from 'bun';
 import { buildBrowserRun } from '../packages/rig/src/browser/build-browser-run.ts';
 import { laneFiles } from '../packages/rig/src/browser/lane-files.ts';
 import { pickChromeDirs } from '../packages/rig/src/browser/pick-chrome-dirs.ts';
-import { removePath } from '../packages/rig/src/browser/remove-path.ts';
 import { buildRigPackRun } from './build-rig-pack-run.ts';
-import { buildWarmUpSuite } from './build-warm-up-suite.ts';
 import { createRigTarball } from './create-rig-tarball.ts';
-import { createTrackedRepo } from './create-tracked-repo.ts';
 import { fileLocks } from './file-locks.ts';
 import { rigE2EBinVariable } from './get-rig-e2e-bin.ts';
 import { parsePackageBin } from './parse-package-bin.ts';
 import { probeProcess } from './probe-process.ts';
 import { removeExitedRigPacks } from './remove-exited-rig-packs.ts';
+import { runBrowserWarmUp } from './run-browser-warm-up.ts';
 import { systemClock } from './system-clock.ts';
 
 // rig's bin runs from its source, so the tarball, shaped by the files list and the rewritten
@@ -45,7 +42,19 @@ export default async function createRigPack(context: LaneContext): Promise<LaneS
 
   const binPath = await readPackedBin(run.packageDir);
 
-  await runBrowserWarmUp(binPath, join(run.runDir, 'warm-up'));
+  const warmUpRoot = join(run.runDir, 'warm-up');
+
+  // rig removes its run's Chrome folder and keeps the repo's folder above it, which can sit in the
+  // /tmp that every user shares.
+  const chromeRunsDir = pickChromeDirs(
+    tmpdir(),
+    userInfo().uid,
+    buildBrowserRun(warmUpRoot, hostname(), '0'),
+  ).runsDir;
+
+  await runBrowserWarmUp(warmUpRoot, chromeRunsDir, {
+    runRigBrowser: (repoRoot) => $`${binPath} browser`.cwd(repoRoot).quiet(),
+  });
 
   return { environment: { [rigE2EBinVariable]: binPath } };
 }
@@ -68,35 +77,4 @@ async function readPackedBin(packageDir: string): Promise<string> {
   }
 
   return absolutePath;
-}
-
-// A fresh CI runner's first Chrome start took 0.9 to 13 s and its second 0.3 s, so a journey
-// that started the runner's first Chrome ran past the e2e limit.
-async function runBrowserWarmUp(binPath: string, repoRoot: string): Promise<void> {
-  // rig removes its run's Chrome folder and keeps the repo's folder above it, which can sit in the
-  // /tmp that every user shares.
-  const chromeRunsDir = pickChromeDirs(
-    tmpdir(),
-    userInfo().uid,
-    buildBrowserRun(repoRoot, hostname(), '0'),
-  ).runsDir;
-
-  const markPath = join(repoRoot, 'warm-up.mark');
-
-  // rig runs only the test files that git tracks, and exits 0 before Chrome starts when a lane
-  // has none.
-  await createTrackedRepo(repoRoot, {
-    'package.json': '{}\n',
-    'warm-up.browser.test.ts': buildWarmUpSuite(markPath),
-  });
-
-  try {
-    await $`${binPath} browser`.cwd(repoRoot).quiet();
-
-    if (!existsSync(markPath)) {
-      throw new Error('the Chrome warm-up ran no browser test');
-    }
-  } finally {
-    await removePath(chromeRunsDir);
-  }
 }
