@@ -60,7 +60,8 @@ reaches a repo once its next sync pull request merges.
 When the open sync pull request has a failing check and is more than a day old, the workflow's alarm
 job opens one issue for it in the repo, so a red sync never waits unseen. The alarm runs with the
 repo's own token, which is why the stub grants `issues: write`, `pull-requests: read`,
-`checks: read` and `statuses: read`.
+`checks: read`, `statuses: read` and `actions: read`. A called workflow can never gain a permission
+its caller withholds, so the stub and the alarm job change their permissions together.
 
 ## Manifest entries
 
