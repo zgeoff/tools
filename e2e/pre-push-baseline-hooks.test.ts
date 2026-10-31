@@ -5,7 +5,7 @@ import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
-import { copyNamedFiles } from '../../test-utils/copy-named-files.ts';
+import { copyNamedFiles } from '../test-utils/copy-named-files.ts';
 
 // Bun's skipIf takes a boolean at collection time. A host without actionlint skips the test that
 // needs it, as the hook skips the check there; CI installs actionlint, so a CI run without it fails.
@@ -58,7 +58,7 @@ async function setupTest() {
   // The scripts that the skill-docs-writing entry delivers.
   const copyDocsScripts = (scripts: readonly string[]) =>
     copyNamedFiles(
-      join(import.meta.dir, '../../packages/chex/src/docs'),
+      join(import.meta.dir, '../packages/chex/src/docs'),
       join(worktree, '.claude/skills/docs-writing/scripts'),
       scripts,
     );
@@ -69,8 +69,8 @@ async function setupTest() {
     main,
     worktree,
     copyDocsScripts,
-    baseline: join(import.meta.dir, 'lefthook-pre-push.yml'),
-    lefthook: join(import.meta.dir, '../../node_modules/.bin/lefthook'),
+    baseline: join(import.meta.dir, '../sync/pre-push/lefthook-pre-push.yml'),
+    lefthook: join(import.meta.dir, '../node_modules/.bin/lefthook'),
   };
 }
 
@@ -140,7 +140,7 @@ test('it fails the push on the uncommitted job and names the file when a file th
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
-        'check:uncommitted': `bun ${join(import.meta.dir, '../../packages/chex/src/run-uncommitted-check.ts')}`,
+        'check:uncommitted': `bun ${join(import.meta.dir, '../packages/chex/src/run-uncommitted-check.ts')}`,
         'memory-capped': 'exec',
       },
     }),
@@ -192,7 +192,7 @@ test('it fails the push on the uncommitted job and names the file when a file th
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
-        'check:uncommitted': `bun ${join(import.meta.dir, '../../packages/chex/src/run-uncommitted-check.ts')}`,
+        'check:uncommitted': `bun ${join(import.meta.dir, '../packages/chex/src/run-uncommitted-check.ts')}`,
         'memory-capped': 'exec',
       },
     }),
@@ -252,7 +252,7 @@ test('it fails the push on the uncommitted job and names the file when a file th
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
-        'check:uncommitted': `bun ${join(import.meta.dir, '../../packages/chex/src/run-uncommitted-check.ts')}`,
+        'check:uncommitted': `bun ${join(import.meta.dir, '../packages/chex/src/run-uncommitted-check.ts')}`,
         'memory-capped': 'exec',
       },
     }),
@@ -312,7 +312,7 @@ test('it passes the push when only a file the branch leaves unchanged holds an u
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
-        'check:uncommitted': `bun ${join(import.meta.dir, '../../packages/chex/src/run-uncommitted-check.ts')}`,
+        'check:uncommitted': `bun ${join(import.meta.dir, '../packages/chex/src/run-uncommitted-check.ts')}`,
         'memory-capped': 'exec',
       },
     }),
@@ -717,7 +717,7 @@ test('it warns and passes the push when the workflow lint faults a workflow call
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
-        'check:workflows': `bun ${join(import.meta.dir, '../../packages/chex/src/run-workflows-check.ts')}`,
+        'check:workflows': `bun ${join(import.meta.dir, '../packages/chex/src/run-workflows-check.ts')}`,
         'check:uncommitted': 'true',
         'memory-capped': 'exec',
       },
@@ -873,7 +873,7 @@ test.skipIf(!canRunActionlint)(
 
     // This repo's own actionlint config sits beside the workflow, so the expiry holds in tools too.
     await cp(
-      join(import.meta.dir, '../../.github/actionlint.yaml'),
+      join(import.meta.dir, '../.github/actionlint.yaml'),
       join(ctx.worktree, '.github/actionlint.yaml'),
     );
 
@@ -1090,7 +1090,7 @@ test('it fails the push when a commit of the branch fails commitlint', async () 
 
   await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
   await writeFile(join(ctx.worktree, '.gitignore'), 'node_modules\n');
-  await symlink(join(import.meta.dir, '../../node_modules'), join(ctx.worktree, 'node_modules'));
+  await symlink(join(import.meta.dir, '../node_modules'), join(ctx.worktree, 'node_modules'));
 
   await writeFile(
     join(ctx.worktree, 'package.json'),
@@ -1101,7 +1101,7 @@ test('it fails the push when a commit of the branch fails commitlint', async () 
         typecheck: 'true',
         'files:branch': 'true',
         'test:related': 'true',
-        'check:commits': `bun ${join(import.meta.dir, '../../packages/chex/src/run-commits-check.ts')}`,
+        'check:commits': `bun ${join(import.meta.dir, '../packages/chex/src/run-commits-check.ts')}`,
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
@@ -1146,7 +1146,7 @@ test('it fails the push when a commit of the branch adds the home directory', as
         'files:branch': 'echo cache.txt',
         'test:related': 'true',
         'check:commits': 'true',
-        'check:local-paths': `bun ${join(import.meta.dir, '../../packages/chex/src/run-local-paths-check.ts')}`,
+        'check:local-paths': `bun ${join(import.meta.dir, '../packages/chex/src/run-local-paths-check.ts')}`,
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
@@ -1189,7 +1189,7 @@ test('it fails a push of another branch when that branch adds the home directory
         'files:branch': 'true',
         'test:related': 'true',
         'check:commits': 'true',
-        'check:local-paths': `bun ${join(import.meta.dir, '../../packages/chex/src/run-local-paths-check.ts')}`,
+        'check:local-paths': `bun ${join(import.meta.dir, '../packages/chex/src/run-local-paths-check.ts')}`,
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
@@ -1233,7 +1233,7 @@ test('it passes the commits check and fails the local-paths check on a push of a
 
   await writeFile(join(ctx.main, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
   await writeFile(join(ctx.main, '.gitignore'), 'node_modules\n');
-  await symlink(join(import.meta.dir, '../../node_modules'), join(ctx.main, 'node_modules'));
+  await symlink(join(import.meta.dir, '../node_modules'), join(ctx.main, 'node_modules'));
 
   await writeFile(
     join(ctx.main, 'package.json'),
@@ -1244,8 +1244,8 @@ test('it passes the commits check and fails the local-paths check on a push of a
         typecheck: 'true',
         'files:branch': 'true',
         'test:related': 'true',
-        'check:commits': `bun ${join(import.meta.dir, '../../packages/chex/src/run-commits-check.ts')}`,
-        'check:local-paths': `bun ${join(import.meta.dir, '../../packages/chex/src/run-local-paths-check.ts')}`,
+        'check:commits': `bun ${join(import.meta.dir, '../packages/chex/src/run-commits-check.ts')}`,
+        'check:local-paths': `bun ${join(import.meta.dir, '../packages/chex/src/run-local-paths-check.ts')}`,
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
@@ -1287,7 +1287,7 @@ test('it fails the commits check on a push of another branch from a checkout wit
 
   await writeFile(join(ctx.main, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
   await writeFile(join(ctx.main, '.gitignore'), 'node_modules\n');
-  await symlink(join(import.meta.dir, '../../node_modules'), join(ctx.main, 'node_modules'));
+  await symlink(join(import.meta.dir, '../node_modules'), join(ctx.main, 'node_modules'));
 
   await writeFile(
     join(ctx.main, 'package.json'),
@@ -1298,8 +1298,8 @@ test('it fails the commits check on a push of another branch from a checkout wit
         typecheck: 'true',
         'files:branch': 'true',
         'test:related': 'true',
-        'check:commits': `bun ${join(import.meta.dir, '../../packages/chex/src/run-commits-check.ts')}`,
-        'check:local-paths': `bun ${join(import.meta.dir, '../../packages/chex/src/run-local-paths-check.ts')}`,
+        'check:commits': `bun ${join(import.meta.dir, '../packages/chex/src/run-commits-check.ts')}`,
+        'check:local-paths': `bun ${join(import.meta.dir, '../packages/chex/src/run-local-paths-check.ts')}`,
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
@@ -1350,7 +1350,7 @@ test('it checks each branch of a push that sends two', async () => {
         'files:branch': 'true',
         'test:related': 'true',
         'check:commits': 'true',
-        'check:local-paths': `bun ${join(import.meta.dir, '../../packages/chex/src/run-local-paths-check.ts')}`,
+        'check:local-paths': `bun ${join(import.meta.dir, '../packages/chex/src/run-local-paths-check.ts')}`,
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
@@ -1401,7 +1401,7 @@ test('it fails a push of another branch when a commit of that branch fails commi
 
   await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
   await writeFile(join(ctx.worktree, '.gitignore'), 'node_modules\n');
-  await symlink(join(import.meta.dir, '../../node_modules'), join(ctx.worktree, 'node_modules'));
+  await symlink(join(import.meta.dir, '../node_modules'), join(ctx.worktree, 'node_modules'));
 
   await writeFile(
     join(ctx.worktree, 'package.json'),
@@ -1412,7 +1412,7 @@ test('it fails a push of another branch when a commit of that branch fails commi
         typecheck: 'true',
         'files:branch': 'true',
         'test:related': 'true',
-        'check:commits': `bun ${join(import.meta.dir, '../../packages/chex/src/run-commits-check.ts')}`,
+        'check:commits': `bun ${join(import.meta.dir, '../packages/chex/src/run-commits-check.ts')}`,
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
@@ -1465,7 +1465,7 @@ test('it fails the push when a bunfig.toml raises the test timeout above 5 s', a
         'test:related': 'true',
         'check:commits': 'true',
         'check:local-paths': 'true',
-        'check:test-timeouts': `bun ${join(import.meta.dir, '../../packages/chex/src/run-test-timeouts-check.ts')}`,
+        'check:test-timeouts': `bun ${join(import.meta.dir, '../packages/chex/src/run-test-timeouts-check.ts')}`,
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'check:uncommitted': 'true',
@@ -1521,7 +1521,7 @@ test('it fails the push when bunfig.toml holds an age-gate exclude past its remo
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
-        'check:dependency-gates': `bun ${join(import.meta.dir, '../../packages/chex/src/dependency-gates/run-dependency-gates-check.ts')}`,
+        'check:dependency-gates': `bun ${join(import.meta.dir, '../packages/chex/src/dependency-gates/run-dependency-gates-check.ts')}`,
         'check:workflows': 'true',
         'check:uncommitted': 'true',
         'memory-capped': 'exec',
@@ -1646,14 +1646,14 @@ test('it skips the test job with the CI notice when the branch has more than 50 
         typecheck: 'true',
         'files:branch': 'git diff --name-only main...HEAD',
         test: 'bun test',
-        'test:related': `bun ${join(import.meta.dir, 'run-related-tests.ts')}`,
+        'test:related': `bun ${join(import.meta.dir, '../sync/pre-push/run-related-tests.ts')}`,
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'check:uncommitted': 'true',
-        'memory-capped': `bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024`,
+        'memory-capped': `bash ${join(import.meta.dir, '../sync/pre-push/run-memory-capped.sh')} 1024`,
       },
     }),
   );
@@ -1704,7 +1704,7 @@ test('it runs the related tests under the memory cap when the branch has 50 or f
         typecheck: 'true',
         'files:branch': 'git diff --name-only main...HEAD',
         test: 'bun test',
-        'test:related': `bun ${join(import.meta.dir, 'run-related-tests.ts')}`,
+        'test:related': `bun ${join(import.meta.dir, '../sync/pre-push/run-related-tests.ts')}`,
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
@@ -1712,7 +1712,7 @@ test('it runs the related tests under the memory cap when the branch has 50 or f
         'check:workflows': 'true',
         'check:uncommitted': 'true',
 
-        'memory-capped': `bash -c 'echo "$*" >> capped.txt; exec bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024 "$@"' memory-capped`,
+        'memory-capped': `bash -c 'echo "$*" >> capped.txt; exec bash ${join(import.meta.dir, '../sync/pre-push/run-memory-capped.sh')} 1024 "$@"' memory-capped`,
       },
     }),
   );
@@ -1769,14 +1769,14 @@ test('it runs no tests in the hook when the branch changes only lane files', asy
         typecheck: 'true',
         'files:branch': 'git diff --name-only main...HEAD',
         test: 'bun test',
-        'test:related': `bun ${join(import.meta.dir, 'run-related-tests.ts')}`,
+        'test:related': `bun ${join(import.meta.dir, '../sync/pre-push/run-related-tests.ts')}`,
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'check:uncommitted': 'true',
-        'memory-capped': `bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024`,
+        'memory-capped': `bash ${join(import.meta.dir, '../sync/pre-push/run-memory-capped.sh')} 1024`,
       },
     }),
   );
@@ -1819,14 +1819,14 @@ test('it passes the slow-host timeout to the tests when the host gets 1 worker',
         typecheck: 'true',
         'files:branch': 'git diff --name-only main...HEAD',
         test: 'echo test-args',
-        'test:related': `bun ${join(import.meta.dir, 'run-related-tests.ts')}`,
+        'test:related': `bun ${join(import.meta.dir, '../sync/pre-push/run-related-tests.ts')}`,
         'check:commits': 'true',
         'check:local-paths': 'true',
         'check:test-timeouts': 'true',
         'check:dependency-gates': 'true',
         'check:workflows': 'true',
         'check:uncommitted': 'true',
-        'memory-capped': `bash ${join(import.meta.dir, 'run-memory-capped.sh')} 1024`,
+        'memory-capped': `bash ${join(import.meta.dir, '../sync/pre-push/run-memory-capped.sh')} 1024`,
       },
     }),
   );

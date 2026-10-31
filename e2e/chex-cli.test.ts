@@ -3,11 +3,11 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { commitAllFiles } from '../../../test-utils/commit-all-files.ts';
-import { linkCommitlint } from '../../../test-utils/link-commitlint.ts';
-import { readGitEnv } from '../../../test-utils/read-git-env.ts';
-import { runChexCLI } from '../../../test-utils/run-chex-cli.ts';
-import { writeTreeFiles } from '../../../test-utils/write-tree-files.ts';
+import { commitAllFiles } from '../test-utils/commit-all-files.ts';
+import { linkCommitlint } from '../test-utils/link-commitlint.ts';
+import { readGitEnv } from '../test-utils/read-git-env.ts';
+import { runChexCLI } from '../test-utils/run-chex-cli.ts';
+import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 
 interface CheckCase {
   readonly files: Readonly<Record<string, string>>;
@@ -39,7 +39,7 @@ async function setupTest() {
   await $`git switch --quiet -c feature`.cwd(repo).env({ ...env });
 
   await writeFile(join(repo, '.git/info/exclude'), 'node_modules/\n');
-  await linkCommitlint(repo, join(import.meta.dir, '../../..'));
+  await linkCommitlint(repo, join(import.meta.dir, '..'));
 
   return { directory, repo, env };
 }

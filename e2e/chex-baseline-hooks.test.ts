@@ -5,11 +5,11 @@ import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
-import { commitAllFiles } from '../../test-utils/commit-all-files.ts';
-import { createChexBaselineRepo } from '../../test-utils/create-chex-baseline-repo.ts';
-import { readCallLog } from '../../test-utils/read-call-log.ts';
-import { runHookedPush } from '../../test-utils/run-hooked-push.ts';
-import { writeStubPrograms } from '../../test-utils/write-stub-programs.ts';
+import { commitAllFiles } from '../test-utils/commit-all-files.ts';
+import { createChexBaselineRepo } from '../test-utils/create-chex-baseline-repo.ts';
+import { readCallLog } from '../test-utils/read-call-log.ts';
+import { runHookedPush } from '../test-utils/run-hooked-push.ts';
+import { writeStubPrograms } from '../test-utils/write-stub-programs.ts';
 
 // Bun's skipIf takes a boolean at collection time. A host without actionlint skips the test that
 // needs it, as the hook skips the check there; CI installs actionlint, so a CI run without it fails.
@@ -18,7 +18,7 @@ const canRunActionlint = Bun.which('actionlint') !== null || process.env['CI'] =
 // Every git call gets a clean environment, so a GIT_DIR this test inherits from a real hook cannot
 // reach the repo it runs in.
 async function setupTest() {
-  const packageRoot = import.meta.dir;
+  const packageRoot = join(import.meta.dir, '../packages/chex');
   const repoRoot = join(packageRoot, '../..');
 
   const directory = await mkdtemp(join(tmpdir(), 'chex-lefthook-'));
