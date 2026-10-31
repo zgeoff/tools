@@ -1,3 +1,4 @@
+import { parseArgs } from 'node:util';
 import type { CheckName } from './check-names.ts';
 import { checkNames, isCheckName } from './check-names.ts';
 
@@ -35,13 +36,21 @@ export function parseChexArgs(argv: readonly string[]): ChexRequest {
       : { kind: 'refused', message: 'init takes no arguments' };
   }
 
-  const firstArg = argv.findIndex((word) => !isCheckName(word));
+  // Each check parses its own options, so the tokens only mark where the check names end.
+  const tokens = parseArgs({
+    args: [...argv],
+    strict: false,
+    allowPositionals: true,
+    tokens: true,
+  }).tokens;
 
-  const names = (firstArg === -1 ? argv : argv.slice(0, firstArg)).filter((word) =>
+  const firstArg = tokens.find((token) => token.kind !== 'positional' || !isCheckName(token.value));
+
+  const names = (firstArg === undefined ? argv : argv.slice(0, firstArg.index)).filter((word) =>
     isCheckName(word),
   );
 
-  const args = firstArg === -1 ? [] : argv.slice(firstArg);
+  const args = firstArg === undefined ? [] : argv.slice(firstArg.index);
   const [only, ...others] = names;
 
   if (only === undefined) {

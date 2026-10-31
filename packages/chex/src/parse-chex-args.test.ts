@@ -60,3 +60,19 @@ test('it refuses an argument to a check that takes none', () => {
     message: 'length takes no arguments, and got "README.md"',
   });
 });
+
+test('it hands an option with an inline value and a group of short options to the check whole', () => {
+  expect(parseChexArgs(['workflows', '--profile=ci', '-qv'])).toStrictEqual({
+    kind: 'checks',
+    names: ['workflows'],
+    args: ['--profile=ci', '-qv'],
+  });
+});
+
+test('it reads a check name after -- as an argument, not a check', () => {
+  expect(parseChexArgs(['prose', '--', 'links'])).toStrictEqual({
+    kind: 'checks',
+    names: ['prose'],
+    args: ['--', 'links'],
+  });
+});
