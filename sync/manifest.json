@@ -326,7 +326,7 @@
         "target": "scripts/run-program.ts"
       },
       {
-        "source": "sync/pre-push/parse-lane-limits.ts",
+        "source": "packages/chex/src/parse-lane-limits.ts",
         "target": "scripts/parse-lane-limits.ts"
       },
       {
