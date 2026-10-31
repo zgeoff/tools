@@ -1,8 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { $ } from 'bun';
+import { linkCommitlint } from '../../../test-utils/link-commitlint.ts';
+import { writeTreeFiles } from '../../../test-utils/write-tree-files.ts';
 
 interface CheckCase {
   readonly files?: Readonly<Record<string, string>>;
@@ -11,8 +13,6 @@ interface CheckCase {
   readonly uncommitted?: Readonly<Record<string, string>>;
 
   readonly message?: string;
-
-  readonly withCommitlint?: boolean;
 
   readonly args?: readonly string[];
 }
@@ -29,7 +29,9 @@ async function setupTest() {
 
   const env = {
     PATH: process.env['PATH'],
-    HOME: directory,
+
+    // A home that does not exist, which the local-paths case names, so nothing writes to a real one.
+    HOME: '/home/kettle-cook',
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_AUTHOR_NAME: 'Test',
@@ -50,37 +52,17 @@ async function setupTest() {
   await $`git push --quiet -u origin main`.cwd(repo).env(env);
   await $`git switch --quiet -c feature`.cwd(repo).env(env);
 
-  const writeFiles = async (files: Readonly<Record<string, string>>) => {
-    for (const [path, text] of Object.entries(files)) {
-      await mkdir(dirname(join(repo, path)), { recursive: true });
-
-      // The local-paths case writes the home folder, which only the setup knows.
-      await writeFile(join(repo, path), text.replaceAll('{home}', directory));
-    }
-  };
+  // Every case links commitlint, which the commits check runs for real; the other checks leave
+  // node_modules alone, and .gitignore keeps it out of the commit.
+  await linkCommitlint(repo, repoRoot);
 
   const runCase = async (name: string, check: Readonly<CheckCase>) => {
-    await writeFiles({ '.gitignore': 'node_modules/\n', ...check.files });
-
-    if (check.withCommitlint === true) {
-      await mkdir(join(repo, 'node_modules/.bin'), { recursive: true });
-      await mkdir(join(repo, 'node_modules/@zgeoff'), { recursive: true });
-      await mkdir(join(repo, 'node_modules/@commitlint'), { recursive: true });
-
-      await symlink(
-        join(repoRoot, 'node_modules/.bin/commitlint'),
-        join(repo, 'node_modules/.bin/commitlint'),
-      );
-
-      for (const linked of ['@zgeoff/commitlint-config', '@commitlint/cli']) {
-        await symlink(join(repoRoot, 'node_modules', linked), join(repo, 'node_modules', linked));
-      }
-    }
+    await writeTreeFiles(repo, { '.gitignore': 'node_modules/\n', ...check.files });
 
     await $`git add -A`.cwd(repo).env(env);
     await $`git commit --quiet -m ${check.message ?? 'docs: add the files'}`.cwd(repo).env(env);
 
-    await writeFiles(check.uncommitted ?? {});
+    await writeTreeFiles(repo, check.uncommitted ?? {});
 
     const result = await $`bun ${cliPath} ${name} ${check.args ?? []}`
       .cwd(repo)
@@ -88,9 +70,10 @@ async function setupTest() {
       .nothrow()
       .quiet();
 
-    const lines = result.stdout.toString().trimEnd().split('\n');
-
-    return { exitCode: result.exitCode, lastLine: lines.at(-1) };
+    return {
+      exitCode: result.exitCode,
+      lastLine: result.stdout.toString().trimEnd().split('\n').at(-1),
+    };
   };
 
   const runCLI = (...args: readonly string[]) => $`bun ${cliPath} ${args}`.nothrow().quiet();
@@ -108,7 +91,7 @@ async function setupTest() {
   };
 
   const runInitCLI = async () => {
-    await writeFiles({
+    await writeTreeFiles(repo, {
       'package.json': JSON.stringify({
         name: 'kettle',
         devDependencies: {
@@ -172,8 +155,8 @@ test.each<[string, CheckCase, number]>([
   ['readmes', { files: { 'README.md': '# Kettle\n', 'notes/README.md': '# Notes\n' } }, 1],
   ['vision', { files: { 'README.md': '# Kettle\n' } }, 1],
   ['skill', { files: { '.claude/skills/kettle/SKILL.md': '---\nname: kettle\n---\n' } }, 1],
-  ['commits', { message: 'tidy up', withCommitlint: true }, 1],
-  ['local-paths', { files: { 'notes.txt': 'cache: {home}/.cache\n' } }, 1],
+  ['commits', { message: 'tidy up' }, 1],
+  ['local-paths', { files: { 'notes.txt': 'cache: /home/kettle-cook/.cache\n' } }, 1],
   ['test-timeouts', { files: { 'bunfig.toml': '[test]\ntimeout = 20000\n' } }, 1],
   ['workflows', { args: ['--profile'] }, 2],
   [

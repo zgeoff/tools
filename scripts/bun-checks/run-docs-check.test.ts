@@ -1,7 +1,8 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { cp, mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import { copyNamedFiles } from '../../test-utils/copy-named-files.ts';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
@@ -23,16 +24,12 @@ async function setupTest() {
   // entry puts beside them.
   const docsScripts = ['check-prose.sh', 'check-length.sh', 'check-links.sh'];
 
-  const copyDocsScripts = async (scripts: readonly string[] = docsScripts) => {
-    await mkdir(join(repo, '.claude/skills/docs-writing/scripts'), { recursive: true });
-
-    for (const script of scripts) {
-      await cp(
-        join(import.meta.dir, '../../packages/chex/src/docs', script),
-        join(repo, '.claude/skills/docs-writing/scripts', script),
-      );
-    }
-  };
+  const copyDocsScripts = (scripts: readonly string[] = docsScripts) =>
+    copyNamedFiles(
+      join(import.meta.dir, '../../packages/chex/src/docs'),
+      join(repo, '.claude/skills/docs-writing/scripts'),
+      scripts,
+    );
 
   const trackFiles = async (files: Readonly<Record<string, string>>) => {
     await writeTreeFiles(repo, files);
@@ -176,11 +173,10 @@ test('it runs the vision check that sits beside the docs scripts and the install
 
   await ctx.copyDocsScripts([...ctx.docsScripts, 'check-vision.sh']);
 
-  await mkdir(join(ctx.repo, '.claude/skills/skill-writing/scripts'), { recursive: true });
-
-  await cp(
-    join(import.meta.dir, '../../packages/chex/src/docs/check-skill.sh'),
-    join(ctx.repo, '.claude/skills/skill-writing/scripts/check-skill.sh'),
+  await copyNamedFiles(
+    join(import.meta.dir, '../../packages/chex/src/docs'),
+    join(ctx.repo, '.claude/skills/skill-writing/scripts'),
+    ['check-skill.sh'],
   );
 
   await ctx.trackFiles({

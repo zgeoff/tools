@@ -5,6 +5,7 @@ import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
+import { copyNamedFiles } from '../../test-utils/copy-named-files.ts';
 
 // Bun's skipIf takes a boolean at collection time. A host without actionlint skips the test that
 // needs it, as the hook skips the check there; CI installs actionlint, so a CI run without it fails.
@@ -55,16 +56,12 @@ async function setupTest() {
   await $`git worktree add --quiet -b feature ${worktree}`.cwd(main).env(env);
 
   // The scripts that the skill-docs-writing entry delivers.
-  const copyDocsScripts = async () => {
-    await mkdir(join(worktree, '.claude/skills/docs-writing/scripts'), { recursive: true });
-
-    for (const script of ['check-prose.sh', 'check-length.sh', 'check-links.sh']) {
-      await cp(
-        join(import.meta.dir, '../../packages/chex/src/docs', script),
-        join(worktree, '.claude/skills/docs-writing/scripts', script),
-      );
-    }
-  };
+  const copyDocsScripts = () =>
+    copyNamedFiles(
+      join(import.meta.dir, '../../packages/chex/src/docs'),
+      join(worktree, '.claude/skills/docs-writing/scripts'),
+      ['check-prose.sh', 'check-length.sh', 'check-links.sh'],
+    );
 
   return {
     env,
