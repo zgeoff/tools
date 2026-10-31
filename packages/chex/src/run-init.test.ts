@@ -56,12 +56,13 @@ test('it writes the extends line and the check:docs script into a repo that has 
   const exitCode = await ctx.run();
 
   const packageText = ctx.tree.get('/repo/package.json') ?? '{}';
+  const packageJSON: unknown = JSON.parse(packageText);
 
   expect({
     exitCode,
     lines: ctx.lines,
     lefthook: ctx.tree.get('/repo/lefthook.yml'),
-    packageJSON: JSON.parse(packageText),
+    packageJSON,
   }).toStrictEqual({
     exitCode: 0,
     lines: [
