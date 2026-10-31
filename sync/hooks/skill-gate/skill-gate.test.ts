@@ -149,8 +149,48 @@ test.each([
     `The skill gate cannot load, so it blocks this call to ${toolName}: Cannot find package '@zgeoff/skill-gate'`,
   );
 
-  expect(result.stderr).toContain('To work here, run bun install.');
+  expect(result.stderr).toEndWith(
+    'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n',
+  );
 });
+
+test.each([
+  ['a cd before it', 'cd packages && bun install'],
+  ['a pipe after it', 'bun install 2>&1 | tail'],
+  ['a flag the gate does not list', 'bun install --verbose'],
+])(
+  'it names the bun install it allows when it blocks bun install with %s and the gate cannot load',
+  async (_label, command) => {
+    const ctx = await setupTest();
+
+    const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
+
+    await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
+    await mkdir(join(ctx.directory, 'node_modules'));
+    await copyFile(ctx.hookPath, copiedHookPath);
+
+    const result = spawnSync('bun', ['--no-install', copiedHookPath], {
+      encoding: 'utf8',
+      env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
+      input: JSON.stringify({
+        hook_event_name: 'PreToolUse',
+        cwd: ctx.directory,
+        transcript_path: join(ctx.directory, 'transcript.jsonl'),
+        tool_name: 'Bash',
+        tool_input: { command },
+      }),
+    });
+
+    expect({ status: result.status, stdout: result.stdout }).toStrictEqual({
+      status: 2,
+      stdout: '',
+    });
+
+    expect(result.stderr).toEndWith(
+      'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n',
+    );
+  },
+);
 
 test.each([
   'bun install',
@@ -158,7 +198,7 @@ test.each([
   'ls packages',
   'cat package.json',
   'pwd',
-])('it lets the read-only command %p run when the gate cannot load', async (command) => {
+])('it lets the command %p run when the gate cannot load', async (command) => {
   const ctx = await setupTest();
 
   const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');

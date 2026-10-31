@@ -6,7 +6,7 @@ repo, at `.claude/hooks/start.ts`. The stub loads
 package runs its handlers, such as the [skill gate](./skill-gate.md), in order. The stub is the only
 part that runs before `bun install`. It installs the package itself when the package is missing, so
 an agent can work in a fresh worktree at once. It fails closed: while the package cannot load, it
-refuses every tool call but a read-only command.
+refuses every tool call. The exceptions are the install itself and a few read-only commands.
 
 ## One entry per event
 
@@ -51,14 +51,24 @@ it.
 
 ## Failing closed
 
-When the package still cannot load, the stub reads no rules, because the rules code lives in the
-package. It exits 2 before every tool call with `To work here, run bun install.`, unless the call is
-a Bash command on a short read-only list: `bun install`, `ls`, `cat` and `pwd`. The list leaves out
-git, because git config can make any git command run a program, even a `git diff` with its external
-diff and textconv programs turned off: an fsmonitor program or a clean filter. A listed command must
-be one command of plain words between single spaces. A shell can build a gated path that no parser
-sees, as in `ext=ts; printf x > src/sample.$ext`, so the stub refuses a command with any other
-character, such as a variable, a quote, a glob, a redirect, a line break or a control character.
+When the package still cannot load, the stub cannot run the handlers, because their code lives in
+the package. The stub then exits 2 before every tool call. Its refusal message holds the two install
+commands that pass, so an agent that wrote the install with a `cd` or a pipe can retry it in the
+form that passes.
+
+The stub lets these Bash commands through:
+
+- `bun install` and `bun install --frozen-lockfile`, which repair the stub;
+- `ls`, `cat` and `pwd`, which only read.
+
+A listed command must be one command of plain words between single spaces. A shell can build the
+path of a file that a handler protects in a way no parser sees, as in
+`ext=ts; printf x > src/sample.$ext`. The stub therefore refuses a command with any other character,
+such as a variable, a quote, a glob, a redirect, a line break or a control character.
+
+The list leaves out git, because git config can make any git command run a program, such as an
+fsmonitor program or a clean filter. Turning off the external diff and textconv programs in a
+`git diff` does not stop either one.
 
 On any other event the stub exits 0. After a tool call there is nothing left to block, and a blocked
 prompt would stop a person from asking the agent to run the install.

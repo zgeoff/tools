@@ -292,7 +292,7 @@
   },
   {
     "name": "hook-start",
-    "description": "The agent hooks' start-up stub, which every hook entry runs: it runs the hooks from the @zgeoff/agent-hooks package, runs bun install --frozen-lockfile once under a lock when the package is missing, and refuses each tool call but a read-only Bash command with exit 2 when the package still cannot load; the repo installs the package and writes its hook entries with agent-hooks init",
+    "description": "The agent hooks' start-up stub, which every hook entry runs: it runs the hooks from the @zgeoff/agent-hooks package, runs bun install --frozen-lockfile once under a lock when the package is missing, and refuses each tool call but a read-only Bash command or a plain bun install with exit 2 when the package still cannot load, and names the install commands it allows; the repo installs the package and writes its hook entries with agent-hooks init",
     "optIn": true,
     "files": [
       {
