@@ -1152,13 +1152,9 @@ test.each([
       exitCode: result.exitCode,
       stdout: result.stdout.toString(),
       stderr: result.stderr.toString(),
-      calls,
-    }).toStrictEqual({
-      exitCode: 0,
-      stdout,
-      stderr: '',
-      calls: 'gh repo view --json isPrivate --jq .isPrivate\n',
-    });
+    }).toStrictEqual({ exitCode: 0, stdout, stderr: '' });
+
+    expect(calls).toBe('gh repo view --json isPrivate --jq .isPrivate\n');
   },
 );
 

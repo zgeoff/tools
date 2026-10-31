@@ -14,10 +14,8 @@ test.each([['public' as const], ['private' as const]])(
       writeError,
     });
 
-    expect({ result, errors: writeError.mock.calls }).toStrictEqual({
-      result: profile,
-      errors: [],
-    });
+    expect(result).toBe(profile);
+    expect(writeError.mock.calls).toStrictEqual([]);
   },
 );
 
@@ -39,10 +37,8 @@ test.each([
       writeError,
     });
 
-    expect({ result, errors: writeError.mock.calls }).toStrictEqual({
-      result: profile,
-      errors: [],
-    });
+    expect(result).toBe(profile);
+    expect(writeError.mock.calls).toStrictEqual([]);
   },
 );
 
@@ -67,8 +63,6 @@ test.each([
     writeError,
   });
 
-  expect({ result, errors: writeError.mock.calls }).toStrictEqual({
-    result: undefined,
-    errors: [[error]],
-  });
+  expect(result).toBeUndefined();
+  expect(writeError.mock.calls).toStrictEqual([[error]]);
 });
