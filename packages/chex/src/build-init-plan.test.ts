@@ -62,13 +62,13 @@ test('it refuses a repo that does not install rig and diet', () => {
   });
 });
 
-test('it refuses both edits when lefthook.yml lists extends inline', () => {
+test('it refuses both edits when lefthook.yml writes extends as a single path', () => {
   const packageText = JSON.stringify({
     name: 'kettle',
     devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
   });
 
-  expect(buildInitPlan(packageText, 'extends: [local.yml]\n')).toStrictEqual({
+  expect(buildInitPlan(packageText, 'extends: local.yml\n')).toStrictEqual({
     kind: 'refused',
     reasons: [
       'lefthook.yml writes extends in a form chex init does not edit; add node_modules/@zgeoff/chex/lefthook.yml to its list',

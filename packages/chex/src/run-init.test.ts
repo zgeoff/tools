@@ -87,7 +87,7 @@ test('it leaves every file as it was on a second run', async () => {
   expect(filesAfter).toStrictEqual(files);
 });
 
-test('it fails and leaves both files as they were when lefthook.yml lists extends inline', async () => {
+test('it fails and leaves both files as they were when lefthook.yml writes extends as a single path', async () => {
   const ctx = await setupTest();
 
   const packageText = JSON.stringify({
@@ -96,7 +96,7 @@ test('it fails and leaves both files as they were when lefthook.yml lists extend
   });
 
   await writeFile(join(ctx.repoRoot, 'package.json'), packageText);
-  await writeFile(join(ctx.repoRoot, 'lefthook.yml'), 'extends: [local.yml]\n');
+  await writeFile(join(ctx.repoRoot, 'lefthook.yml'), 'extends: local.yml\n');
 
   const exitCode = await ctx.run();
   const files = await ctx.readFiles();
@@ -108,7 +108,7 @@ test('it fails and leaves both files as they were when lefthook.yml lists extend
     ],
   });
 
-  expect(files).toStrictEqual([packageText, 'extends: [local.yml]\n']);
+  expect(files).toStrictEqual([packageText, 'extends: local.yml\n']);
 });
 
 test('it fails and writes nothing in a folder with no package.json', async () => {

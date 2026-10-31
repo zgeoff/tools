@@ -9,6 +9,9 @@ export type LefthookOutcome =
 
 const extendsLine = /^extends:[ \t]*(?:#.*)?$/mu;
 
+// A one-line flow list, such as `extends: [.lefthook/local.yml]`, with an optional comment after it.
+const inlineExtends = /^(?<open>extends:[ \t]*\[)(?<items>[^\]\n]*)(?<close>\][ \t]*(?:#.*)?)$/mu;
+
 // Edits the text rather than writing parsed YAML back, so the repo's comments and layout stay.
 export function buildLefthookExtends(text: string | undefined): LefthookOutcome {
   if (text === undefined) {
@@ -29,6 +32,12 @@ export function buildLefthookExtends(text: string | undefined): LefthookOutcome 
 
   if (Array.isArray(extended) && extended.includes(baselinePath)) {
     return { kind: 'unchanged' };
+  }
+
+  const inline = inlineExtends.exec(text);
+
+  if (Array.isArray(extended) && inline !== null) {
+    return checkEdit(config, buildInlineExtends(text, inline));
   }
 
   const match = extendsLine.exec(text);
@@ -96,4 +105,13 @@ function buildFirstExtends(text: string): string {
   const end = start[0].length;
 
   return `${text.slice(0, end)}\nextends:\n  - ${baselinePath}\n${text.slice(end)}`;
+}
+
+function buildInlineExtends(text: string, inline: RegExpExecArray): string {
+  const groups = inline.groups ?? {};
+  const items = groups['items'] ?? '';
+  const listed = items.trim() === '' ? baselinePath : `${items.trimEnd()}, ${baselinePath}`;
+  const end = inline.index + inline[0].length;
+
+  return `${text.slice(0, inline.index)}${groups['open'] ?? ''}${listed}${groups['close'] ?? ''}${text.slice(end)}`;
 }

@@ -32,8 +32,22 @@ test('it leaves a config that already extends the baseline unchanged', () => {
   ).toStrictEqual({ kind: 'unchanged' });
 });
 
-test('it refuses an extends list written inline', () => {
-  expect(buildLefthookExtends('extends: [.lefthook/local.yml]\n')).toStrictEqual({
+test.each([
+  [
+    'a list',
+    'extends: [.lefthook/local.yml] # the repo jobs\npre-push:\n  jobs: []\n',
+    'extends: [.lefthook/local.yml, node_modules/@zgeoff/chex/lefthook.yml] # the repo jobs\npre-push:\n  jobs: []\n',
+  ],
+  ['an empty list', 'extends: []\n', 'extends: [node_modules/@zgeoff/chex/lefthook.yml]\n'],
+])('it adds the baseline to the end of an extends written inline as %s', (_label, text, edited) => {
+  expect(buildLefthookExtends(text)).toStrictEqual({ kind: 'changed', text: edited });
+});
+
+test.each([
+  ['a single path', 'extends: .lefthook/local.yml\n'],
+  ['a flow list across lines', 'extends: [ .lefthook/a.yml,\n  .lefthook/b.yml ]\n'],
+])('it refuses an extends written as %s', (_label, text) => {
+  expect(buildLefthookExtends(text)).toStrictEqual({
     kind: 'refused',
     reason:
       'lefthook.yml writes extends in a form chex init does not edit; add node_modules/@zgeoff/chex/lefthook.yml to its list',
