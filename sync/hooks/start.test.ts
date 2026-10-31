@@ -1,10 +1,11 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createStubInstall } from '../../test-utils/create-stub-install.ts';
 import { readStreamUntil } from '../../test-utils/read-stream-until.ts';
+import { readTextOrEmpty } from '../../test-utils/read-text-or-empty.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 
 // The stub installs with the bun on PATH and runs the retry with its own runtime, so a stand-in bun
@@ -66,13 +67,7 @@ async function setupTest() {
     return child;
   };
 
-  const readInstallLog = async () => {
-    try {
-      return await readFile(installLog, 'utf8');
-    } catch {
-      return '';
-    }
-  };
+  const readInstallLog = () => readTextOrEmpty(installLog);
 
   return {
     directory,
