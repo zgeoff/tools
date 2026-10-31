@@ -89,6 +89,10 @@
         "target": ".claude/skills/testing/SKILL.md"
       },
       {
+        "source": "sync/skills/testing/references/assertions.md",
+        "target": ".claude/skills/testing/references/assertions.md"
+      },
+      {
         "source": "sync/skills/testing/references/claude-code-mods.md",
         "target": ".claude/skills/testing/references/claude-code-mods.md"
       },
@@ -119,6 +123,14 @@
         "target": ".claude/skills/testing/references/http.md"
       },
       {
+        "source": "sync/skills/testing/references/loops.md",
+        "target": ".claude/skills/testing/references/loops.md"
+      },
+      {
+        "source": "sync/skills/testing/references/matchers.md",
+        "target": ".claude/skills/testing/references/matchers.md"
+      },
+      {
         "source": "sync/skills/testing/references/nixos.md",
         "target": ".claude/skills/testing/references/nixos.md",
         "except": ["zgeoff/atc"]
@@ -128,12 +140,32 @@
         "target": ".claude/skills/testing/references/observability.md"
       },
       {
+        "source": "sync/skills/testing/references/schemas-and-parsers.md",
+        "target": ".claude/skills/testing/references/schemas-and-parsers.md"
+      },
+      {
         "source": "sync/skills/testing/references/shell.md",
         "target": ".claude/skills/testing/references/shell.md"
       },
       {
+        "source": "sync/skills/testing/references/slow-tests.md",
+        "target": ".claude/skills/testing/references/slow-tests.md"
+      },
+      {
+        "source": "sync/skills/testing/references/stored-state.md",
+        "target": ".claude/skills/testing/references/stored-state.md"
+      },
+      {
         "source": "sync/skills/testing/references/system-tests.md",
         "target": ".claude/skills/testing/references/system-tests.md"
+      },
+      {
+        "source": "sync/skills/testing/references/test-data.md",
+        "target": ".claude/skills/testing/references/test-data.md"
+      },
+      {
+        "source": "sync/skills/testing/references/time-and-waiting.md",
+        "target": ".claude/skills/testing/references/time-and-waiting.md"
       },
       {
         "source": "sync/skills/testing/references/workflows.md",
@@ -166,12 +198,20 @@
         "target": ".claude/skills/docs-writing/references/architecture-docs.md"
       },
       {
+        "source": "sync/skills/docs-writing/references/copying-what-the-code-owns.md",
+        "target": ".claude/skills/docs-writing/references/copying-what-the-code-owns.md"
+      },
+      {
         "source": "sync/skills/docs-writing/references/docs-tree.md",
         "target": ".claude/skills/docs-writing/references/docs-tree.md"
       },
       {
         "source": "sync/skills/docs-writing/references/readmes.md",
         "target": ".claude/skills/docs-writing/references/readmes.md"
+      },
+      {
+        "source": "sync/skills/docs-writing/references/reviewing-a-doc.md",
+        "target": ".claude/skills/docs-writing/references/reviewing-a-doc.md"
       },
       {
         "source": "packages/chex/src/docs/check-prose.sh",

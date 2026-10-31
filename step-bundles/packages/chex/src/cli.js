@@ -1327,7 +1327,7 @@ import { join as join4 } from "path";
 
 // packages/chex/src/build-init-package.ts
 var baselinePackages = ["@zgeoff/chex", "@zgeoff/rig", "@zgeoff/diet"];
-var docsScript = "chex prose length links";
+var docsScript = "chex prose length links skill";
 function buildInitPackage(text) {
   let parsed;
   try {

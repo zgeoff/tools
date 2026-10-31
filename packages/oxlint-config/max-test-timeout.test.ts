@@ -308,11 +308,11 @@ test('it reports the timeout on the line of an options object after the callback
 
 test('it accepts the disable comment that the testing skill shows', async () => {
   const markdown = await readFile(
-    join(import.meta.dir, '..', '..', 'sync', 'skills', 'testing', 'SKILL.md'),
+    join(import.meta.dir, '..', '..', 'sync', 'skills', 'testing', 'references', 'slow-tests.md'),
     'utf8',
   );
 
-  const example = /### A test over its limit\n[\s\S]*?```ts\n(?<code>[\s\S]*?)```/u.exec(markdown)
+  const example = /## A test over its limit\n[\s\S]*?```ts\n(?<code>[\s\S]*?)```/u.exec(markdown)
     ?.groups?.['code'];
 
   const result = await runLintTree(
@@ -332,7 +332,7 @@ test('it accepts the disable comment that the testing skill shows', async () => 
 
 test('it holds the same lane limits as the Lanes table in the shared testing skill', async () => {
   const markdown = await readFile(
-    join(import.meta.dir, '..', '..', 'sync', 'skills', 'testing', 'SKILL.md'),
+    join(import.meta.dir, '..', '..', 'sync', 'skills', 'testing', 'references', 'slow-tests.md'),
     'utf8',
   );
 
