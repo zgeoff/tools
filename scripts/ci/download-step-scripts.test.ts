@@ -13,6 +13,8 @@ import {
   readURL,
   runDownloadStep,
   stepScriptSets,
+  toStepRunPath,
+  toStepToolsPath,
 } from './download-step-scripts.ts';
 import type { URLOutcome } from './download-step-scripts.ts';
 import { nodeFileSystem } from './node-file-system.ts';
@@ -256,23 +258,23 @@ test.each([
 });
 
 test.each(Object.entries(stepScriptSets))(
-  'it downloads the %s scripts from this commit with every file they import',
+  'it downloads the %s scripts from the bundles this commit holds, which import no package',
   async (_name, entries) => {
     const ctx = await setupTest();
 
     const root = join(import.meta.dir, '../..');
 
     await downloadStepScripts({
-      entries,
+      entries: entries.map((entry) => toStepRunPath(entry)),
       destination: ctx.destination,
-      readToolsFile: (path) => readFile(join(root, path), 'utf8'),
+      readToolsFile: (path) => readFile(join(root, toStepToolsPath(path)), 'utf8'),
       writeFile: nodeFileSystem.writeText,
     });
 
     const build = await Bun.build({
       entrypoints: entries
         .filter((entry) => entry.endsWith('.ts'))
-        .map((entry) => join(ctx.destination, entry)),
+        .map((entry) => join(ctx.destination, toStepRunPath(entry))),
       target: 'bun',
       throw: false,
     });
@@ -281,6 +283,14 @@ test.each(Object.entries(stepScriptSets))(
     expect(build.success).toBeTrue();
   },
 );
+
+test.each([
+  ['scripts/kettle/boil.ts', 'scripts/kettle/boil.js', 'step-bundles/scripts/kettle/boil.js'],
+  ['scripts/kettle/whistle.sh', 'scripts/kettle/whistle.sh', 'scripts/kettle/whistle.sh'],
+])('it runs %s from %s, downloaded from %s', (entry, runPath, toolsPath) => {
+  expect(toStepRunPath(entry)).toBe(runPath);
+  expect(toStepToolsPath(runPath)).toBe(toolsPath);
+});
 
 test('it fails the step and downloads nothing when TOOLS_URL names no commit', async () => {
   const urls: string[] = [];
@@ -404,11 +414,11 @@ test('it downloads the set from the tools commit into the runner folder', async 
   );
 
   const repoContents = await Promise.all(
-    downloaded.map((path) => readFile(join(root, path), 'utf8')),
+    downloaded.map((path) => readFile(join(root, toStepToolsPath(path)), 'utf8')),
   );
 
   expect(exitCode).toBe(0);
-  expect(downloaded).toContain('scripts/paths-changed/match-changed-files.ts');
+  expect(downloaded).toStrictEqual(['scripts/paths-changed/run-changed-files-step.js']);
   expect(contents).toStrictEqual(repoContents);
   expect(output).toStrictEqual([`downloaded ${downloaded.length} files from ${toolsURL}\n`]);
 });

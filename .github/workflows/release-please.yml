@@ -163,7 +163,7 @@ jobs:
         if: steps.release.outputs.prs_created == 'true' && inputs.sync-command != ''
         env:
           SYNC_COMMAND: ${{ inputs.sync-command }}
-        run: bun "$RUNNER_TEMP/tools/scripts/release/run-sync-release-pr.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/release/run-sync-release-pr.js"
 
       # Reads no release-please outputs on purpose: prs_created is false
       # when the open release PR needed no update (a previous run failed
@@ -206,4 +206,4 @@ jobs:
           RELEASE_OUTPUTS:
             ${{ steps.tag.outputs.releases_created == 'true' && toJSON(steps.tag.outputs) ||
             toJSON(steps.release.outputs) }}
-        run: bun "$RUNNER_TEMP/tools/scripts/release/run-release-outputs-step.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/release/run-release-outputs-step.js"

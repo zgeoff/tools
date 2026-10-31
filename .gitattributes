@@ -1,0 +1,2 @@
+# The bundles that bun run build:step-bundles writes, which review reads at their sources.
+step-bundles/** linguist-generated=true

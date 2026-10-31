@@ -1,10 +1,12 @@
 // A reusable workflow's first step downloads this file alone with curl, so it imports no other file
 // of this repo.
 import { mkdir, writeFile } from 'node:fs/promises';
+import { isBuiltin } from 'node:module';
 import { dirname, join, normalize } from 'node:path';
 import { parseArgs } from 'node:util';
 
-// The scripts each reusable workflow's steps run. The download adds every file they import.
+// The scripts each reusable workflow's steps run. The download fetches the bundle of each
+// TypeScript script, which a step runs.
 export const stepScriptSets = {
   'bun-checks': [
     'scripts/bun-checks/write-check-plan.ts',
@@ -42,6 +44,20 @@ export const stepScriptSets = {
 } as const satisfies Record<string, readonly string[]>;
 
 export type StepScriptSet = keyof typeof stepScriptSets;
+
+// The folder that holds one bundle of each TypeScript step script. Bun bundles each script with
+// every file and package it imports, so a caller's runner runs it with no install.
+export const stepBundlesFolder = 'step-bundles';
+
+// A step runs a TypeScript script from its bundle, at the script's repo path with a .js extension,
+// so a path the script builds from its own folder still finds the files downloaded beside it.
+export function toStepRunPath(entry: string): string {
+  return entry.endsWith('.ts') ? `${entry.slice(0, -'.ts'.length)}.js` : entry;
+}
+
+export function toStepToolsPath(runPath: string): string {
+  return runPath.endsWith('.js') ? `${stepBundlesFolder}/${runPath}` : runPath;
+}
 
 export type ReadToolsFile = (path: string) => Promise<string>;
 
@@ -95,12 +111,13 @@ const transpiler = new Bun.Transpiler({ loader: 'ts' });
 // A caller's runner installs no package for the downloaded files, so a package import would fail
 // only when the step runs.
 function collectImportedPaths(path: string, text: string): string[] {
-  if (!path.endsWith('.ts')) {
+  if (!path.endsWith('.ts') && !path.endsWith('.js')) {
     return [];
   }
 
   return transpiler.scanImports(text).flatMap((imported) => {
-    if (isBuiltinModule(imported.path)) {
+    // Bun writes a bundle's built-in imports without the node: prefix.
+    if (isBuiltin(imported.path)) {
       return [];
     }
 
@@ -112,10 +129,6 @@ function collectImportedPaths(path: string, text: string): string[] {
 
     return [normalize(join(dirname(path), imported.path))];
   });
-}
-
-function isBuiltinModule(specifier: string): boolean {
-  return specifier === 'bun' || specifier.startsWith('bun:') || specifier.startsWith('node:');
 }
 
 export type URLOutcome =
@@ -250,16 +263,18 @@ export async function runDownloadStep(step: Readonly<DownloadStep>): Promise<num
     return 1;
   }
 
+  const readToolsFile = makeToolsFileReader({
+    toolsURL,
+    attempts: 4,
+    retryDelayMs: 2000,
+    readURL: step.readURL,
+    wait: step.wait,
+  });
+
   const written = await downloadStepScripts({
-    entries: stepScriptSets[parsed.set],
+    entries: stepScriptSets[parsed.set].map((entry) => toStepRunPath(entry)),
     destination: join(runnerTemp, 'tools'),
-    readToolsFile: makeToolsFileReader({
-      toolsURL,
-      attempts: 4,
-      retryDelayMs: 2000,
-      readURL: step.readURL,
-      wait: step.wait,
-    }),
+    readToolsFile: (path) => readToolsFile(toStepToolsPath(path)),
     writeFile: step.writeFile,
   });
 

@@ -9,6 +9,7 @@
     "**/dist/**",
     ".worktrees/**",
     "**/*.json",
-    ".claude/skills/docs-writing/**"
+    ".claude/skills/docs-writing/**",
+    "step-bundles/**"
   ]
 }

@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": ["bun.lock"],
+  "ignorePatterns": ["bun.lock", "step-bundles"],
   "proseWrap": "always",
   "semi": true,
   "trailingComma": "all",

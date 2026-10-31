@@ -53,4 +53,4 @@ jobs:
           BRANCH: ${{ github.ref_name }}
           PUSHER: ${{ github.event.sender.login }}
           GH_TOKEN: ${{ github.token }}
-        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/hold-hand-pushed-sync.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/hold-hand-pushed-sync.js"
