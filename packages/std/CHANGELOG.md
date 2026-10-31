@@ -2,10 +2,11 @@
 
 ## [0.3.1](https://github.com/zgeoff/tools/compare/@zgeoff/std@0.3.0...@zgeoff/std@0.3.1) (2026-10-31)
 
-
 ### Features
 
-* **chex:** run each shared check as one chex subcommand ([#409](https://github.com/zgeoff/tools/issues/409)) ([c7c4839](https://github.com/zgeoff/tools/commit/c7c4839335774b7c5ea1aeefaad844de218166a5))
+- **chex:** run each shared check as one chex subcommand
+  ([#409](https://github.com/zgeoff/tools/issues/409))
+  ([c7c4839](https://github.com/zgeoff/tools/commit/c7c4839335774b7c5ea1aeefaad844de218166a5))
 
 ## [0.3.0](https://github.com/zgeoff/tools/compare/@zgeoff/std@0.2.0...@zgeoff/std@0.3.0) (2026-10-20)
 

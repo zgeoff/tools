@@ -2,12 +2,11 @@
 
 ## [0.2.13](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.12...@zgeoff/skill-gate@0.2.13) (2026-10-31)
 
-
 ### Dependencies
 
-* The following workspace dependencies were updated
-  * dependencies
-    * @zgeoff/agent-hooks bumped to 0.1.3
+- The following workspace dependencies were updated
+  - dependencies
+    - @zgeoff/agent-hooks bumped to 0.1.3
 
 ## [0.2.12](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.11...@zgeoff/skill-gate@0.2.12) (2026-10-31)
 

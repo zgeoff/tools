@@ -35,7 +35,7 @@
     },
     "packages/agent-hooks": {
       "name": "@zgeoff/agent-hooks",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "bin": {
         "agent-hooks": "./dist/cli.js",
       },
@@ -97,7 +97,7 @@
     },
     "packages/chex": {
       "name": "@zgeoff/chex",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "bin": {
         "chex": "./src/cli.ts",
       },
@@ -129,7 +129,7 @@
     },
     "packages/diet": {
       "name": "@zgeoff/diet",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "bin": {
         "diet": "./diet.sh",
       },
@@ -208,7 +208,7 @@
     },
     "packages/rig": {
       "name": "@zgeoff/rig",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "bin": {
         "rig": "./src/cli.ts",
       },
@@ -228,7 +228,7 @@
     },
     "packages/skill-gate": {
       "name": "@zgeoff/skill-gate",
-      "version": "0.2.12",
+      "version": "0.2.13",
       "dependencies": {
         "@zgeoff/agent-hooks": "workspace:*",
       },
@@ -240,7 +240,7 @@
     },
     "packages/std": {
       "name": "@zgeoff/std",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "devDependencies": {
         "@types/bun": "catalog:",
         "tsrs": "catalog:",
