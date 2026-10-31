@@ -2948,3 +2948,29 @@ test('it gives the repair in plain words when git tracks the rules path as a sym
     `skill-gate: .claude/skill-gate.json exists but the gate cannot read it as a file (it is a folder), so it blocks this edit to ${join(project, 'src/sample.ts')}. Until the file reads again, the gate treats every path and tool as gated. You cannot repair it from here: ask the user to run this from the repo root, then retry:\nMove whatever is at .claude/skill-gate.json aside and put the repo's rules file back in its place. Removing the path without putting the file back turns the gate off.\n`,
   );
 });
+
+test('it counts a skill the prompt names while a folder sits at the rules path', async () => {
+  const base = await setupTest();
+  const ctx = await base.prepareCodexProject();
+
+  const rulesPath = join(ctx.project, '.claude/skill-gate.json');
+
+  await rm(rulesPath);
+  await mkdir(rulesPath);
+
+  const prompt = ctx.runHook({ hook_event_name: 'UserPromptSubmit', prompt: 'Use $testing.' });
+
+  await rm(rulesPath, { recursive: true });
+
+  await writeFile(
+    rulesPath,
+    JSON.stringify({ gates: [{ match: '**/*.test.ts', skills: ['testing'] }] }),
+  );
+
+  const result = ctx.runHook(ctx.patch('*** Update File: src/a.test.ts', '@@', '-old', '+new'));
+
+  expect(prompt.status).toBe(0);
+  expect(prompt.stdout).toBe('');
+  expect(result.status).toBe(0);
+  expect(result.stdout).toBe('');
+});
