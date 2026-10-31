@@ -51,7 +51,9 @@ and trust the entries.
 
 ## Configuration
 
-`.claude/skill-gate.json` holds the skill gate's rules, and a repo without the file has no gate.
+`.claude/skill-gate.json` holds the skill gate's rules, and a repo without the file has no gate. A
+path there that the gate cannot read as a file, such as a folder, makes it deny every gated call. A
+rules file that does not parse makes it warn and deny nothing.
 [Writing skill-gate rules](../../docs/guides/skill-gate-rules.md) covers each key.
 
 ## Documentation

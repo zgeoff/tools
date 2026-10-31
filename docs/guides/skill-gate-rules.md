@@ -64,3 +64,8 @@ blocks every call:
 
 In each case, the hook warns the user and the agent on every edit, and on every call to a tool that
 the hook matcher names, until you fix the rules file.
+
+The gate does not tolerate a rules path it cannot read as a file, such as a folder or a file the
+hook cannot read: it denies every gated call until the file reads again, as
+[Failing closed](../architecture/skill-gate.md#failing-closed) describes. A repo with nothing at the
+path has no gate.

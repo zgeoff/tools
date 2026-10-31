@@ -1,5 +1,5 @@
 import { statSync } from 'node:fs';
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { GitError, simpleGit } from 'simple-git';
 import type { SimpleGit } from 'simple-git';
@@ -15,11 +15,13 @@ import { collectBashCandidates } from './collect-bash-candidates.ts';
 import { collectChangedPaths } from './collect-changed-paths.ts';
 import { collectGateSkills } from './collect-gate-skills.ts';
 import { collectWrittenPaths } from './collect-written-paths.ts';
+import { formatUnreadableRulesDenial } from './format-unreadable-rules-denial.ts';
 import { parseHookInput } from './parse-hook-input.ts';
 import { parseSkillGateRules } from './parse-skill-gate-rules.ts';
 import { pickCommitRange } from './pick-commit-range.ts';
 import { pickComparisonStep } from './pick-comparison-step.ts';
 import { pickRecordStep } from './pick-record-step.ts';
+import { pickRulesRepair } from './pick-rules-repair.ts';
 import { planBashSkillGate } from './plan-bash-skill-gate.ts';
 import { planSkillGate } from './plan-skill-gate.ts';
 import { planToolGate } from './plan-tool-gate.ts';
@@ -29,6 +31,7 @@ import { readCommitHashes } from './read-commit-hashes.ts';
 import { readCommittedPaths } from './read-committed-paths.ts';
 import { readFileContent } from './read-file-content.ts';
 import { readFileHashes } from './read-file-hashes.ts';
+import { readRulesState } from './read-rules-state.ts';
 import { readSessionLoads } from './read-session-loads.ts';
 import { readWorkTree } from './read-work-tree.ts';
 import { recordCommandReads, recordLifecycle } from './record-codex-loads.ts';
@@ -42,12 +45,20 @@ import type {
   HookInput,
   PostToolEvent,
   RecordedSnapshot,
+  RulesFileSystem,
+  RulesState,
   SkillGateHookOutput,
   SkillGateRules,
   WrittenPath,
 } from './types.ts';
 
 const ALLOW: HookResult = { kind: 'allow' };
+const RULES_PATH = '.claude/skill-gate.json';
+
+const RULES_FILE_SYSTEM: RulesFileSystem = {
+  stat,
+  readText: (filePath) => readFile(filePath, 'utf8'),
+};
 
 export async function runSkillGate(payload: unknown, context: RepoContext): Promise<HookResult> {
   const parsedInput = parseHookInput(context.harness, payload);
@@ -61,26 +72,125 @@ export async function runSkillGate(payload: unknown, context: RepoContext): Prom
   process.env['GIT_OPTIONAL_LOCKS'] = '0';
 
   const projectDir = context.projectDir;
-  const rulesFile = Bun.file(path.join(projectDir, '.claude', 'skill-gate.json'));
 
-  const hasRules = await rulesFile.exists();
+  const rulesState = await readRulesState(RULES_FILE_SYSTEM, path.join(projectDir, RULES_PATH));
 
   if (parsedInput.kind === 'lifecycle') {
-    if (hasRules) {
+    if (rulesState.kind !== 'missing') {
       await recordLifecycle(parsedInput, projectDir);
     }
 
     return ALLOW;
   }
 
-  const input = parsedInput;
+  return match(rulesState)
+    .returnType<Promise<HookResult>>()
+    .with({ kind: 'missing' }, () => Promise.resolve(ALLOW))
+    .with({ kind: 'unreadable' }, (state) =>
+      checkUnreadableRules(parsedInput, { projectDir, git: simpleGit(projectDir) }, state),
+    )
+    .with({ kind: 'readable' }, (state) => checkRules(parsedInput, projectDir, state.text))
+    .exhaustive();
+}
 
-  if (hasRules && input.toolName !== null && input.event === 'PreToolUse') {
+interface UnreadableRulesProject {
+  readonly projectDir: string;
+  readonly git: SimpleGit;
+}
+
+async function checkUnreadableRules(
+  input: HookInput,
+  project: UnreadableRulesProject,
+  state: Extract<RulesState, { kind: 'unreadable' }>,
+): Promise<HookResult> {
+  if (input.event !== 'PreToolUse') {
+    return ALLOW;
+  }
+
+  const call = pickBlockedCall(input, project.projectDir);
+
+  if (call === null) {
+    return ALLOW;
+  }
+
+  const isTrackedFile = state.cause === 'folder' ? await probeTrackedRulesFile(project.git) : false;
+
+  return {
+    kind: 'block',
+    message: formatUnreadableRulesDenial({
+      reason: state.reason,
+      call,
+      repair: pickRulesRepair(state.cause, isTrackedFile),
+    }),
+  };
+}
+
+const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'apply_patch']);
+
+function pickBlockedCall(input: HookInput, projectDir: string): string | null {
+  if (input.toolName !== null && input.toolName !== 'Bash' && !EDIT_TOOLS.has(input.toolName)) {
+    return `this call to ${input.toolName}`;
+  }
+
+  // The Bash parser misses writes such as `ext=ts; printf x > src/a.$ext`, and with no rules the
+  // PostToolUse check has no snapshot to compare, so every command is denied.
+  if (input.command !== null) {
+    return 'this Bash command';
+  }
+
+  const [edit] = collectProjectEdits(input, projectDir);
+
+  return edit === undefined ? null : `this edit to ${edit.filePath}`;
+}
+
+interface ProjectEdit {
+  readonly filePath: string;
+  readonly relativePath: string;
+}
+
+function collectProjectEdits(input: HookInput, projectDir: string): readonly ProjectEdit[] {
+  return input.editPaths
+    .map((editPath) => path.resolve(input.cwd, editPath))
+    .map((filePath) => ({ filePath, relativePath: toProjectPath(projectDir, filePath) }))
+    .filter((edit) => !isOutsideProject(edit.relativePath));
+}
+
+function toProjectPath(projectDir: string, absolute: string): string {
+  return path.relative(projectDir, absolute).split(path.sep).join('/');
+}
+
+function isOutsideProject(fromProject: string): boolean {
+  return fromProject === '..' || fromProject.startsWith('../') || path.isAbsolute(fromProject);
+}
+
+// A git checkout of a tracked symlink to a folder brings the same folder back.
+async function probeTrackedRulesFile(git: SimpleGit): Promise<boolean> {
+  try {
+    const entries = await git.raw(['ls-files', '--stage', '--', RULES_PATH]);
+
+    return entries
+      .split('\n')
+      .some((entry) => entry.startsWith('100') && entry.endsWith(`\t${RULES_PATH}`));
+  } catch (error) {
+    if (error instanceof GitError) {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
+async function checkRules(
+  input: HookInput,
+  projectDir: string,
+  rulesText: string,
+): Promise<HookResult> {
+  if (input.toolName !== null && input.event === 'PreToolUse') {
     const toolResult = await checkToolCall({
       hookInput: input,
       toolName: input.toolName,
       projectDir,
-      rulesText: await rulesFile.text(),
+      rulesText,
     });
 
     if (toolResult !== null) {
@@ -88,9 +198,7 @@ export async function runSkillGate(payload: unknown, context: RepoContext): Prom
     }
   }
 
-  if (hasRules && input.command !== null) {
-    const rulesText = await rulesFile.text();
-
+  if (input.command !== null) {
     if (input.harness === 'codex' && input.event === 'PostToolUse') {
       await recordCommandReads(input, input.command, projectDir, rulesText);
     }
@@ -98,20 +206,15 @@ export async function runSkillGate(payload: unknown, context: RepoContext): Prom
     return checkBash({ hookInput: input, command: input.command, projectDir, rulesText });
   }
 
-  if (input.editPaths.length === 0 || input.event !== 'PreToolUse') {
+  if (input.event !== 'PreToolUse') {
     return ALLOW;
   }
 
-  const edits = input.editPaths
-    .map((editPath) => path.resolve(input.cwd, editPath))
-    .map((filePath) => ({ filePath, relativePath: toProjectPath(projectDir, filePath) }))
-    .filter((edit) => !isOutsideProject(edit.relativePath));
+  const edits = collectProjectEdits(input, projectDir);
 
-  if (!hasRules || edits.length === 0) {
+  if (edits.length === 0) {
     return ALLOW;
   }
-
-  const rulesText = await rulesFile.text();
 
   const parsed = parseSkillGateRules(rulesText);
 
@@ -328,14 +431,6 @@ function collectGatedProjectPaths(
     (relativePath) =>
       !isOutsideProject(relativePath) && collectGateSkills(rules, relativePath).length > 0,
   );
-}
-
-function toProjectPath(projectDir: string, absolute: string): string {
-  return path.relative(projectDir, absolute).split(path.sep).join('/');
-}
-
-function isOutsideProject(fromProject: string): boolean {
-  return fromProject === '..' || fromProject.startsWith('../') || path.isAbsolute(fromProject);
 }
 
 async function checkBashCommand(

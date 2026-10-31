@@ -12,9 +12,20 @@ needs a skill the session lacks.
 
 The gate runs only once the package loads. Until then the start-up stub refuses every edit, gated
 tool call and Bash command but a read-only one, as [Failing closed](./agent-hooks.md#failing-closed)
-in the agent hooks doc describes. Once the gate runs, a rules file that does not parse makes it warn
-rather than deny, as
-[Mistakes the gate tolerates](../guides/skill-gate-rules.md#mistakes-the-gate-tolerates) describes.
+in the agent hooks doc describes. Once the gate runs, what it finds at `.claude/skill-gate.json`
+sets what it does:
+
+- With nothing at the path, or a symlink that points nowhere, the repo has no gate.
+- A path the gate cannot read as a file, such as a folder, a symlink to a folder or a file the hook
+  cannot read, makes the gate fail closed. With no rules it cannot tell which paths or tools are
+  gated, so before a tool call it denies every edit inside the project, every Bash command and every
+  call to a tool the hook matcher names. It denies every Bash command because a shell can build a
+  path that no parser sees. After a tool call it stays silent, and the Codex prompt and compaction
+  events write the load ledger as they do for a readable file. The agent can neither edit the path
+  nor run a command, so the denial names the cause and one repair for the user to run.
+- A rules file that does not parse makes the gate warn rather than deny, as
+  [Mistakes the gate tolerates](../guides/skill-gate-rules.md#mistakes-the-gate-tolerates)
+  describes.
 
 ## Which loads count
 

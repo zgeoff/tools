@@ -27,6 +27,20 @@ export type SkillGateRulesResult =
     }
   | { readonly ok: false; readonly error: string };
 
+export type RulesState =
+  | { readonly kind: 'missing' }
+  | { readonly kind: 'readable'; readonly text: string }
+  | { readonly kind: 'unreadable'; readonly reason: string; readonly cause: UnreadableRulesCause };
+
+export type UnreadableRulesCause = 'folder' | 'file-permission' | 'other';
+
+export interface RulesFileSystem {
+  readonly stat: (
+    filePath: string,
+  ) => Promise<{ readonly isDirectory: () => boolean; readonly isFile: () => boolean }>;
+  readonly readText: (filePath: string) => Promise<string>;
+}
+
 export interface UnknownSkill {
   readonly match: string;
   readonly skill: string;
