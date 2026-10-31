@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { cp, mkdtemp, rm } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
@@ -19,12 +19,20 @@ async function setupTest() {
 
   await $`git init --quiet --initial-branch=main ${repo}`.env({ ...env });
 
-  const copyDocsScripts = () =>
-    cp(
-      join(import.meta.dir, '../../sync/skills/docs-writing/scripts'),
-      join(repo, '.claude/skills/docs-writing/scripts'),
-      { recursive: true },
-    );
+  // The scripts the skill-docs-writing entry ships, and the vision check that the docs-vision-check
+  // entry puts beside them.
+  const docsScripts = ['check-prose.sh', 'check-length.sh', 'check-links.sh'];
+
+  const copyDocsScripts = async (scripts: readonly string[] = docsScripts) => {
+    await mkdir(join(repo, '.claude/skills/docs-writing/scripts'), { recursive: true });
+
+    for (const script of scripts) {
+      await cp(
+        join(import.meta.dir, '../../packages/chex/src/docs', script),
+        join(repo, '.claude/skills/docs-writing/scripts', script),
+      );
+    }
+  };
 
   const trackFiles = async (files: Readonly<Record<string, string>>) => {
     await writeTreeFiles(repo, files);
@@ -49,7 +57,17 @@ async function setupTest() {
     output.push(text);
   };
 
-  return { repo, env, copyDocsScripts, trackFiles, logged, runLogged, output, writeOutput };
+  return {
+    repo,
+    env,
+    docsScripts,
+    copyDocsScripts,
+    trackFiles,
+    logged,
+    runLogged,
+    output,
+    writeOutput,
+  };
 }
 
 test('it skips with a notice when the repo has no docs-writing scripts', async () => {
@@ -86,7 +104,12 @@ test('it fails on a broken link even when every doc is within its length limit',
   });
 
   expect(exitCode).toBe(1);
-  expect(ctx.logged).toStrictEqual([expect.any(String), expect.stringContaining('guide.md')]);
+
+  expect(ctx.logged).toStrictEqual([
+    expect.any(String),
+    expect.any(String),
+    expect.stringContaining('guide.md'),
+  ]);
 
   expect(ctx.output).toStrictEqual([
     '::error::docs: check-links.sh failed; its output above holds each failing file and its fault\n',
@@ -96,8 +119,12 @@ test('it fails on a broken link even when every doc is within its length limit',
 test('it fails on a README over its line limit even when every link resolves', async () => {
   const ctx = await setupTest();
 
-  // The root README holds 100 lines at most, and this one has 101 and no link.
-  const lines = Array.from({ length: 100 }, (_, index) => `Step ${index + 1} greets the visitor.`);
+  // The root README holds 100 lines at most, and this one has 101 and no link. Each line is a list
+  // item, which the prose check's paragraph limit skips.
+  const lines = Array.from(
+    { length: 100 },
+    (_, index) => `- Step ${index + 1} greets the visitor.`,
+  );
 
   await ctx.copyDocsScripts();
   await ctx.trackFiles({ 'README.md': `# Greeter\n${lines.join('\n')}\n` });
@@ -113,11 +140,66 @@ test('it fails on a README over its line limit even when every link resolves', a
   expect(exitCode).toBe(1);
 
   expect(ctx.logged).toStrictEqual([
+    expect.any(String),
     expect.stringContaining('README.md: 101 lines, over the front page README limit of 100'),
     expect.any(String),
   ]);
 
   expect(ctx.output).toStrictEqual([
     '::error::docs: check-length.sh failed; its output above holds each failing file and its fault\n',
+  ]);
+});
+
+test('it fails on a banned word in a doc', async () => {
+  const ctx = await setupTest();
+
+  await ctx.copyDocsScripts();
+  await ctx.trackFiles({ 'README.md': '# Greeter\n\nThe greeting is load-bearing.\n' });
+
+  const exitCode = await runDocsCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    fileSystem: nodeFileSystem,
+    runLoggedCommand: ctx.runLogged,
+    writeOutput: ctx.writeOutput,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.output).toStrictEqual([
+    '::error::docs: check-prose.sh failed; its output above holds each failing file and its fault\n',
+  ]);
+});
+
+test('it runs the vision check that sits beside the docs scripts and the installed skill check', async () => {
+  const ctx = await setupTest();
+
+  await ctx.copyDocsScripts([...ctx.docsScripts, 'check-vision.sh']);
+
+  await mkdir(join(ctx.repo, '.claude/skills/skill-writing/scripts'), { recursive: true });
+
+  await cp(
+    join(import.meta.dir, '../../packages/chex/src/docs/check-skill.sh'),
+    join(ctx.repo, '.claude/skills/skill-writing/scripts/check-skill.sh'),
+  );
+
+  await ctx.trackFiles({
+    'README.md': '# Greeter\n',
+    '.claude/skills/greeter/SKILL.md': '---\nname: greeter\n---\n',
+  });
+
+  const exitCode = await runDocsCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    fileSystem: nodeFileSystem,
+    runLoggedCommand: ctx.runLogged,
+    writeOutput: ctx.writeOutput,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.output).toStrictEqual([
+    '::error::docs: check-vision.sh failed; its output above holds each failing file and its fault\n',
+    '::error::docs: check-skill.sh failed; its output above holds each failing file and its fault\n',
   ]);
 });

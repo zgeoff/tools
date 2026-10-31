@@ -247,27 +247,28 @@ jobs:
           CHECKS_PROFILE:
             ${{ ((github.event.repository && github.event.repository.private) ||
             (!github.event.repository && inputs.private)) && 'private' || 'public' }}
-        run: bun "$RUNNER_TEMP/tools/sync/pre-push/run-workflows-check.ts"
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/run-workflows-check.ts"
 
       - &check-commits
         name: Check commits
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/sync/pre-push/run-commits-check.ts"
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/run-commits-check.ts"
 
       - &check-local-paths
         name: Check local paths
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/sync/pre-push/run-local-paths-check.ts"
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/run-local-paths-check.ts"
 
       - &check-test-timeouts
         name: Check test timeouts
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/sync/pre-push/run-test-timeouts-check.ts"
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/run-test-timeouts-check.ts"
 
       - &check-dependency-gates
         name: Check dependency gates
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/sync/pre-push/dependency-gates/run-dependency-gates-check.ts"
+        run:
+          bun "$RUNNER_TEMP/tools/packages/chex/src/dependency-gates/run-dependency-gates-check.ts"
 
       - &run-scripts
         name: Run the check scripts

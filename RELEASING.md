@@ -93,16 +93,17 @@ release PRs are still created but must be merged by hand.
 ### First publish of a new package (per package)
 
 npm trusted publishing can't create a package that doesn't exist yet, so the first publish is
-manual, then OIDC takes over:
+manual, then OIDC takes over. The
+[npm-publish skill](https://github.com/zgeoff/skills/blob/main/skills/npm-publish/SKILL.md) in
+zgeoff/skills holds the `npm-first-publish` helper and its steps:
 
-```sh
-npm login
-scripts/first-publish.sh <package-dir>   # e.g. scripts/first-publish.sh format-codemod
-```
+1. Run `npm-first-publish check packages/<pkg>` from the repo root. It builds, packs and dry-runs
+   the package, with no login, and saves a plan.
+2. Hand the publisher `npm-first-publish`, which publishes the planned version from their machine.
+3. Have the publisher run `npm-first-publish trust packages/<pkg>`, which adds the trusted
+   publisher: repo `zgeoff/tools`, workflow `main.yml`.
 
-The script builds, publishes the current version from your machine, and prints the trusted publisher
-settings to add on npmjs.com (Access → Trusted Publisher: repo `zgeoff/tools`, workflow `main.yml`).
-Once that's saved, CI publishes all future versions with no tokens.
+From then on, CI publishes every version with no tokens.
 
 ## Troubleshooting
 

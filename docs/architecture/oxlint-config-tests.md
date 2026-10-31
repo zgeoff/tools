@@ -126,9 +126,9 @@ honours the comment with its reason, and `zgeoff/test-timeout-exception-ticket` 
 
 oxlint lints only JavaScript and TypeScript files, so it cannot read a `package.json` script or a
 `bunfig.toml`. The pre-push baseline's
-[`run-test-timeouts-check.ts`](../../sync/pre-push/run-test-timeouts-check.ts) reads them as `HEAD`
-holds them, as the `test-timeouts` job before a push and the `Check test timeouts` step of the
-shared pull-request checks. It reports:
+[`run-test-timeouts-check.ts`](../../packages/chex/src/run-test-timeouts-check.ts) reads them as
+`HEAD` holds them, as the `test-timeouts` job before a push and the `Check test timeouts` step of
+the shared pull-request checks. It reports:
 
 - each `--timeout` above the script's limit, and each `--timeout` of 0, which Bun reads as no
   timeout, in either the `--timeout 20000` or the `--timeout=20000` form. The check reads the words

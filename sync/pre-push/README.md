@@ -1,10 +1,11 @@
 # Pre-push baseline
 
-This folder holds the sources of the lefthook pre-push baseline, which the `pre-push-baseline` entry
-of repo-sync delivers to a repo's `.lefthook/` and `scripts/` folders, and the memory-cap script,
-which the `memory-cap` entry delivers. The baseline runs the checks that fit a small host before a
-push: the files a branch changes, the unit tests beside them, and a whole-tree type check, each
-under a memory cap. CI runs every whole-tree check and every lane.
+This folder holds the lefthook pre-push baseline that the `pre-push-baseline` entry of repo-sync
+delivers to a repo's `.lefthook/` folder, the related-tests runner and the host helpers it delivers
+to `scripts/`, and the memory-cap script, which the `memory-cap` entry delivers. The entry's check
+scripts come from [`@zgeoff/chex`](../../packages/chex/). The baseline runs the checks that fit a
+small host before a push: the files a branch changes, the unit tests beside them, and a whole-tree
+type check, each under a memory cap. CI runs every whole-tree check and every lane.
 
 ## Memory budgets
 

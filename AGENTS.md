@@ -28,19 +28,16 @@ packages/           the @zgeoff/* packages; release-please versions each one and
 sync/               the sources that repo-sync delivers, listed in sync/manifest.json; an edit here
                     reaches every repo that takes the entry, as sync/README.md describes
   skills/           the shared skill bases, each delivered to .claude/skills/<name>/
-  pre-push/         the lefthook pre-push baseline and its pre-commit typecheck, which this repo's
-                    lefthook.yml extends too
+  pre-push/         the pre-push baseline that the pre-push-baseline entry delivers, which this
+                    repo's lefthook.yml extends too; its check scripts live in packages/chex
   workflow-callers/ workflow stubs that call this repo's reusable workflows, all opt-in but the
                     repo-sync guard
   hooks/            the agent hooks' start-up stub and the skill gate's older entry point
-  docs-vision/      the vision doc check, which docs-writing's check-length runs in a repo that
-                    takes it
 e2e/                suites that drive the built product from outside, such as `rig browser` under
                     signals
 integration/        flows across packages, such as one lane limit read by rig and by the lint rules
-scripts/            the step scripts that this repo's workflows run, one folder per area, the
-                    shell scripts that repo-sync and the release job run, and the manual one
-                    that does a package's first npm publish; tests sit beside them
+scripts/            the step scripts that this repo's workflows run, one folder per area, and the
+                    shell scripts that repo-sync and the release job run; tests sit beside them
 .github/workflows/  this repo's CI, release and sync dispatch, and the reusable workflows that other repos call:
                     bun-checks, repo-sync and its guard, audit-fix, release-please and the
                     paths-changed gate

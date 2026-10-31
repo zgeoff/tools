@@ -1,17 +1,41 @@
 {
   "name": "@zgeoff/chex",
   "version": "0.0.1",
-  "description": "Run a repo's pre-push checks from one versioned baseline",
+  "description": "Run each shared docs and repo check as one subcommand, with the lefthook pre-push baseline that calls them",
+  "keywords": [
+    "checks",
+    "docs",
+    "lefthook",
+    "pre-push"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zgeoff/tools.git",
     "directory": "packages/chex"
   },
+  "bin": {
+    "chex": "./src/cli.ts"
+  },
   "files": [
-    "README.md"
+    "src",
+    "!src/**/*.test.ts",
+    "lefthook.yml"
   ],
+  "type": "module",
   "publishConfig": {
     "access": "public"
+  },
+  "scripts": {
+    "typecheck": "tsrs"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "tiny-invariant": "catalog:",
+    "tsrs": "catalog:",
+    "typescript": "catalog:"
+  },
+  "engines": {
+    "bun": ">=1.3"
   }
 }

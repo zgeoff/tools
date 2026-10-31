@@ -1,0 +1,222 @@
+import { expect, mock, onTestFinished, test } from 'bun:test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createGitCommit } from '../../../test-utils/create-git-commit.ts';
+import { makeAnswerQueue } from '../../../test-utils/make-answer-queue.ts';
+import { readGitEnv } from '../../../test-utils/read-git-env.ts';
+import { runGit } from '../../../test-utils/run-git.ts';
+import { readBranchFiles } from './read-branch-files.ts';
+import type { ProgramResult, RunProgram } from './run-program.ts';
+import { runProgram } from './run-program.ts';
+
+async function setupTest() {
+  const directory = await mkdtemp(join(tmpdir(), 'read-branch-files-'));
+
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+
+  const env = readGitEnv(directory);
+  const upstream = join(directory, 'upstream.git');
+  const repo = join(directory, 'work');
+
+  await runGit(directory, env, ['init', '--quiet', '--bare', '--initial-branch=main', upstream]);
+  await runGit(directory, env, ['clone', '--quiet', upstream, repo]);
+  await runGit(repo, env, ['switch', '--quiet', '--create', 'main']);
+  await createGitCommit(repo, env, { 'README.md': '# repo\n' });
+  await runGit(repo, env, ['push', '--quiet', '-u', 'origin', 'main']);
+  await runGit(repo, env, ['remote', 'set-head', 'origin', 'main']);
+
+  return {
+    repo,
+    env,
+    runGit: (...args: readonly string[]) => runGit(repo, env, args),
+    createCommit: (files: Readonly<Record<string, string>>) => createGitCommit(repo, env, files),
+  };
+}
+
+test('it lists the files a new branch with no upstream changes', async () => {
+  const ctx = await setupTest();
+
+  await ctx.runGit('switch', '--quiet', '--create', 'feature');
+  await ctx.createCommit({ 'a.ts': 'a', 'b.ts': 'b' });
+
+  const files = readBranchFiles({ cwd: ctx.repo, env: ctx.env, runProgram });
+
+  expect(files).toIncludeSameMembers(['a.ts', 'b.ts']);
+});
+
+test('it lists only the branch files once the branch is pushed with an upstream', async () => {
+  const ctx = await setupTest();
+
+  await ctx.runGit('switch', '--quiet', '--create', 'feature');
+  await ctx.createCommit({ 'a.ts': 'a' });
+  await ctx.runGit('push', '--quiet', '-u', 'origin', 'feature');
+
+  const files = readBranchFiles({ cwd: ctx.repo, env: ctx.env, runProgram });
+
+  expect(files).toStrictEqual(['a.ts']);
+});
+
+test('it leaves out the files main gained after the branch started', async () => {
+  const ctx = await setupTest();
+
+  await ctx.runGit('switch', '--quiet', '--create', 'feature');
+  await ctx.createCommit({ 'a.ts': 'a' });
+  await ctx.runGit('switch', '--quiet', 'main');
+  await ctx.createCommit({ 'main.ts': 'main' });
+  await ctx.runGit('push', '--quiet', 'origin', 'main');
+  await ctx.runGit('switch', '--quiet', 'feature');
+
+  const files = readBranchFiles({ cwd: ctx.repo, env: ctx.env, runProgram });
+
+  expect(files).toStrictEqual(['a.ts']);
+});
+
+test('it lists nothing when the branch has no commits of its own', async () => {
+  const ctx = await setupTest();
+
+  await ctx.runGit('switch', '--quiet', '--create', 'feature');
+
+  const files = readBranchFiles({ cwd: ctx.repo, env: ctx.env, runProgram });
+
+  expect(files).toBeEmpty();
+});
+
+test('it leaves out a file the branch deleted', async () => {
+  const ctx = await setupTest();
+
+  await ctx.runGit('switch', '--quiet', '--create', 'feature');
+  await ctx.runGit('rm', '--quiet', 'README.md');
+  await ctx.createCommit({ 'a.ts': 'a' });
+
+  const files = readBranchFiles({ cwd: ctx.repo, env: ctx.env, runProgram });
+
+  expect(files).toStrictEqual(['a.ts']);
+});
+
+test('it lists a file the branch deleted when asked for deleted paths', async () => {
+  const ctx = await setupTest();
+
+  await ctx.runGit('switch', '--quiet', '--create', 'feature');
+  await ctx.runGit('rm', '--quiet', 'README.md');
+  await ctx.createCommit({ 'a.ts': 'a' });
+
+  const files = readBranchFiles({ cwd: ctx.repo, env: ctx.env, runProgram, withDeleted: true });
+
+  expect(files).toIncludeSameMembers(['README.md', 'a.ts']);
+});
+
+test('it lists a file whose name holds a byte past ASCII as git stores it', async () => {
+  const ctx = await setupTest();
+
+  await ctx.runGit('switch', '--quiet', '--create', 'feature');
+  await ctx.createCommit({ 'café.md': '# Menu\n' });
+
+  const files = readBranchFiles({ cwd: ctx.repo, env: ctx.env, runProgram });
+
+  expect(files).toStrictEqual(['café.md']);
+});
+
+test('it lists the new path of a file the branch renamed', async () => {
+  const ctx = await setupTest();
+
+  await ctx.runGit('switch', '--quiet', '--create', 'feature');
+  await ctx.runGit('mv', 'README.md', 'GUIDE.md');
+  await ctx.runGit('commit', '--quiet', '-m', 'rename');
+
+  const files = readBranchFiles({ cwd: ctx.repo, env: ctx.env, runProgram });
+
+  expect(files).toStrictEqual(['GUIDE.md']);
+});
+
+test('it falls back to origin/main when origin/HEAD is unset', async () => {
+  const ctx = await setupTest();
+
+  await ctx.runGit('remote', 'set-head', 'origin', '--delete');
+  await ctx.runGit('switch', '--quiet', '--create', 'feature');
+  await ctx.createCommit({ 'a.ts': 'a' });
+
+  const files = readBranchFiles({ cwd: ctx.repo, env: ctx.env, runProgram });
+
+  expect(files).toStrictEqual(['a.ts']);
+});
+
+test('it throws in a repository with no origin', async () => {
+  const ctx = await setupTest();
+
+  await ctx.runGit('remote', 'remove', 'origin');
+
+  expect(() => readBranchFiles({ cwd: ctx.repo, env: ctx.env, runProgram })).toThrow(
+    /^cannot find the base of this branch/u,
+  );
+});
+
+test('it exits 1 with a message when run in a repository with no origin', async () => {
+  const ctx = await setupTest();
+
+  await ctx.runGit('remote', 'remove', 'origin');
+
+  const run = Bun.spawnSync([process.execPath, join(import.meta.dir, 'read-branch-files.ts')], {
+    cwd: ctx.repo,
+    env: ctx.env,
+  });
+
+  expect(run.exitCode).toBe(1);
+  expect(run.stdout.toString()).toBeEmpty();
+
+  expect(run.stderr.toString()).toStartWith(
+    'read-branch-files: cannot find the base of this branch',
+  );
+});
+
+test('it prints one file per line when run on a branch', async () => {
+  const ctx = await setupTest();
+
+  await ctx.runGit('switch', '--quiet', '--create', 'feature');
+  await ctx.createCommit({ 'a.ts': 'a', 'b.ts': 'b' });
+
+  const run = Bun.spawnSync([process.execPath, join(import.meta.dir, 'read-branch-files.ts')], {
+    cwd: ctx.repo,
+    env: ctx.env,
+  });
+
+  expect(run.exitCode).toBe(0);
+  expect(run.stdout.toString()).toBe('a.ts\nb.ts\n');
+});
+
+test('it lists each path that git diff prints between the branch base and HEAD', () => {
+  const standIn = mock<RunProgram>(
+    makeAnswerQueue<ProgramResult>([
+      { exitCode: 0, stdout: 'origin/main\n', stderr: '' },
+      { exitCode: 0, stdout: '5f3c1e0a9b7d\n', stderr: '' },
+      { exitCode: 0, stdout: 'src/kettle.ts\0docs/brew guide.md\0', stderr: '' },
+    ]),
+  );
+
+  const files = readBranchFiles({
+    cwd: '/srv/kettle',
+    env: { HOME: '/home/kettle' },
+    runProgram: standIn,
+  });
+
+  expect(files).toStrictEqual(['src/kettle.ts', 'docs/brew guide.md']);
+
+  expect(standIn.mock.calls[2]).toStrictEqual([
+    ['git', 'diff', '--name-only', '-z', '--no-renames', '--diff-filter=d', '5f3c1e0a9b7d', 'HEAD'],
+    { cwd: '/srv/kettle', env: { HOME: '/home/kettle' } },
+  ]);
+});
+
+test('it throws the error of git when git diff fails', () => {
+  const standIn = mock<RunProgram>(
+    makeAnswerQueue<ProgramResult>([
+      { exitCode: 0, stdout: 'origin/main\n', stderr: '' },
+      { exitCode: 0, stdout: '5f3c1e0a9b7d\n', stderr: '' },
+      { exitCode: 128, stdout: '', stderr: 'fatal: bad object 5f3c1e0a9b7d\n' },
+    ]),
+  );
+
+  expect(() =>
+    readBranchFiles({ cwd: '/srv/kettle', env: { HOME: '/home/kettle' }, runProgram: standIn }),
+  ).toThrow(new Error('git diff failed: fatal: bad object 5f3c1e0a9b7d'));
+});

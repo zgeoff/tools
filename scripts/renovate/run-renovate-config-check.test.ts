@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { firstPartyScopes } from '../../sync/pre-push/dependency-gates/first-party-scopes.ts';
+import { firstPartyScopes } from '../../packages/chex/src/dependency-gates/first-party-scopes.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import type { CommandOptions, CommandResult } from '../ci/run-command.ts';

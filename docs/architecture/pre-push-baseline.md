@@ -1,11 +1,12 @@
 # The pre-push baseline
 
-The pre-push baseline is the set of lefthook jobs that a downstream repo runs before a push. Files
-under [`sync/pre-push/`](../../sync/pre-push/) are the baseline, delivered by the opt-in
-`pre-push-baseline` entry, except the [memory-cap script](./memory-caps.md), which every repo takes,
-and this repo's own `lefthook.yml` extends it too. The baseline runs its jobs one at a time, so a
-push fits a host with little memory or a machine shared by parallel agents. CI keeps every
-whole-tree check required.
+The pre-push baseline is the set of lefthook jobs that a downstream repo runs before a push. The
+opt-in `pre-push-baseline` entry delivers it: the jobs and the related-tests runner from
+[`sync/pre-push/`](../../sync/pre-push/), and the check scripts from
+[`packages/chex/src/`](../../packages/chex/src/). The [memory-cap script](./memory-caps.md) in the
+same folder goes to every repo. This repo's own `lefthook.yml` extends the baseline too. The
+baseline runs its jobs one at a time, so a push fits a host with little memory or a machine shared
+by parallel agents. CI keeps every whole-tree check required.
 
 ## What the baseline runs
 
@@ -13,9 +14,10 @@ The baseline runs `format:check`, `typecheck` and the
 [dependency gates check](./dependency-updates.md#the-dependency-gates-check) over the whole tree,
 and plain `oxlint`, the shell, docs and workflows checks and the sibling tests over the files the
 branch changes. The shell check runs `shellcheck` and `shfmt -d`, the docs check runs the
-docs-writing skill's `check-length.sh` and `check-links.sh`, and the workflows check runs
-`actionlint` and then the workflow lint. Each runs only when the branch changes a file that matches
-its glob.
+docs-writing skill's `check-prose.sh`, `check-length.sh` and `check-links.sh`, then
+`check-vision.sh` when the `docs-vision-check` entry put it beside them and the skill-writing
+skill's `check-skill.sh` when the repo takes that skill, and the workflows check runs `actionlint`
+and then the workflow lint. Each runs only when the branch changes a file that matches its glob.
 
 The uncommitted check runs first. It fails the push when a file the branch changes or deletes
 differs from the pushed commit on disk or in the index, such as a staged change or a deleted file
