@@ -2,17 +2,17 @@
 
 ## [0.2.11](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.10...@zgeoff/skill-gate@0.2.11) (2026-10-31)
 
-
 ### Features
 
-* **agent-hooks:** run every agent hook behind one start-up stub ([#395](https://github.com/zgeoff/tools/issues/395)) ([ef24054](https://github.com/zgeoff/tools/commit/ef240545b93a9e524a810596ded9183d1293f665))
-
+- **agent-hooks:** run every agent hook behind one start-up stub
+  ([#395](https://github.com/zgeoff/tools/issues/395))
+  ([ef24054](https://github.com/zgeoff/tools/commit/ef240545b93a9e524a810596ded9183d1293f665))
 
 ### Dependencies
 
-* The following workspace dependencies were updated
-  * dependencies
-    * @zgeoff/agent-hooks bumped to 0.1.1
+- The following workspace dependencies were updated
+  - dependencies
+    - @zgeoff/agent-hooks bumped to 0.1.1
 
 ## [0.2.10](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.9...@zgeoff/skill-gate@0.2.10) (2026-10-30)
 

@@ -32,7 +32,7 @@
     },
     "packages/agent-hooks": {
       "name": "@zgeoff/agent-hooks",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "bin": {
         "agent-hooks": "./dist/cli.js",
       },
@@ -188,7 +188,7 @@
     },
     "packages/skill-gate": {
       "name": "@zgeoff/skill-gate",
-      "version": "0.2.10",
+      "version": "0.2.11",
       "dependencies": {
         "@zgeoff/agent-hooks": "workspace:*",
       },
