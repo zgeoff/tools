@@ -29,8 +29,8 @@ bun x --no-install chex init
 `chex` runs under Bun. The baseline runs the related tests through [`@zgeoff/rig`](../rig/README.md)
 and each job under the memory cap of [`@zgeoff/diet`](../diet/README.md), so a repo that takes it
 installs both, and `chex init` fails until it does. `chex commits` lints commit messages with
-`@commitlint/cli` and `@zgeoff/commitlint-config`; in a repo without both, it prints a notice and
-passes.
+`@commitlint/cli` and `@zgeoff/commitlint-config`; in a repo that lacks either one, it prints a
+notice and passes.
 
 ## Commands
 
