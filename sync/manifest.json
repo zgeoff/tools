@@ -334,6 +334,10 @@
         "target": "scripts/read-memory-budget.ts"
       },
       {
+        "source": "packages/chex/src/read-optional-text.ts",
+        "target": "scripts/read-optional-text.ts"
+      },
+      {
         "source": "sync/pre-push/read-worker-count.ts",
         "target": "scripts/read-worker-count.ts"
       },
