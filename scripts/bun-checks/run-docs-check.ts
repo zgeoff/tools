@@ -3,6 +3,12 @@ import type { FileSystem } from '../ci/file-system.ts';
 import { makeLoggedCommandRunner } from '../ci/make-logged-command-runner.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import type { RunCommand } from '../ci/run-command.ts';
+import {
+  docsScriptsFolder,
+  pickDocsScripts,
+  skillScript,
+  visionScript,
+} from './pick-docs-scripts.ts';
 
 export interface DocsCheckRun {
   readonly cwd: string;
@@ -17,39 +23,25 @@ export interface DocsCheckRun {
   readonly writeOutput: (text: string) => void;
 }
 
-const scriptsFolder = '.claude/skills/docs-writing/scripts';
-const checkScripts = ['check-prose.sh', 'check-length.sh', 'check-links.sh'];
-const visionScript = join(scriptsFolder, 'check-vision.sh');
-const skillScript = '.claude/skills/skill-writing/scripts/check-skill.sh';
-
 // The docs-writing skill's scripts pick the docs they read themselves. Each one runs even after
 // another fails, so the log names every check that fails. Returns the step's exit code.
 export async function runDocsCheck(run: Readonly<DocsCheckRun>): Promise<number> {
   const hasScripts = await run.fileSystem.probePath(
-    join(run.cwd, scriptsFolder, 'check-length.sh'),
+    join(run.cwd, docsScriptsFolder, 'check-length.sh'),
   );
 
   if (!hasScripts) {
     run.writeOutput(
-      `::notice::docs: skipped, because the repo has no ${scriptsFolder}/check-length.sh; take the skill-docs-writing entry of repo-sync to run it\n`,
+      `::notice::docs: skipped, because the repo has no ${docsScriptsFolder}/check-length.sh; take the skill-docs-writing entry of repo-sync to run it\n`,
     );
 
     return 0;
   }
 
-  const optionalScripts = await Promise.all(
-    [visionScript, skillScript].map(async (script) => {
-      const exists = await run.fileSystem.probePath(join(run.cwd, script));
+  const vision = await run.fileSystem.probePath(join(run.cwd, visionScript));
+  const skill = await run.fileSystem.probePath(join(run.cwd, skillScript));
 
-      return exists ? [script] : [];
-    }),
-  );
-
-  const scripts = [
-    ...checkScripts.map((script) => join(scriptsFolder, script)),
-    ...optionalScripts.flat(),
-  ];
-
+  const scripts = pickDocsScripts({ vision, skill });
   let exitCode = 0;
 
   for (const script of scripts) {
