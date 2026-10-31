@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
 import { makeAnswerQueue } from '../../test-utils/make-answer-queue.ts';
+import { makeStubToolsURLReader } from '../../test-utils/make-stub-tools-url-reader.ts';
 import { server } from '../../test-utils/mocks/node.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import {
@@ -380,11 +381,7 @@ test('it downloads the set from the tools commit into the runner folder', async 
   const exitCode = await runDownloadStep({
     args: ['paths-changed'],
     env: { TOOLS_URL: toolsURL, RUNNER_TEMP: ctx.destination },
-    readURL: async (url) => {
-      const text = await readFile(join(root, url.slice(toolsURL.length + 1)), 'utf8');
-
-      return { kind: 'read', text };
-    },
+    readURL: makeStubToolsURLReader(toolsURL, root),
     wait: () => Promise.resolve(),
     writeFile: nodeFileSystem.writeText,
     writeOutput: (text) => {
