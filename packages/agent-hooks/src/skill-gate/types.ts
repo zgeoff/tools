@@ -30,7 +30,9 @@ export type SkillGateRulesResult =
 export type RulesState =
   | { readonly kind: 'missing' }
   | { readonly kind: 'readable'; readonly text: string }
-  | { readonly kind: 'unreadable'; readonly reason: string; readonly code: string | null };
+  | { readonly kind: 'unreadable'; readonly reason: string; readonly cause: UnreadableRulesCause };
+
+export type UnreadableRulesCause = 'folder' | 'file-permission' | 'other';
 
 export interface UnknownSkill {
   readonly match: string;

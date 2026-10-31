@@ -100,14 +100,14 @@ async function checkUnreadableRules(
     return ALLOW;
   }
 
-  const isTracked = state.code === 'EISDIR' ? await probeTrackedRules(projectDir) : false;
+  const isTrackedFile = state.cause === 'folder' ? await probeTrackedRulesFile(projectDir) : false;
 
   return {
     kind: 'block',
     message: formatUnreadableRulesDenial({
       reason: state.reason,
       call,
-      repair: pickRulesRepair(state.code, isTracked),
+      repair: pickRulesRepair(state.cause, isTrackedFile),
     }),
   };
 }
@@ -150,11 +150,14 @@ function isOutsideProject(fromProject: string): boolean {
   return fromProject === '..' || fromProject.startsWith('../') || path.isAbsolute(fromProject);
 }
 
-async function probeTrackedRules(projectDir: string): Promise<boolean> {
+// A git checkout of a tracked symlink to a folder brings the same folder back.
+async function probeTrackedRulesFile(projectDir: string): Promise<boolean> {
   try {
-    await simpleGit(projectDir).raw(['ls-files', '--error-unmatch', RULES_PATH]);
+    const entries = await simpleGit(projectDir).raw(['ls-files', '--stage', '--', RULES_PATH]);
 
-    return true;
+    return entries
+      .split('\n')
+      .some((entry) => entry.startsWith('100') && entry.endsWith(`\t${RULES_PATH}`));
   } catch (error) {
     if (error instanceof GitError) {
       return false;

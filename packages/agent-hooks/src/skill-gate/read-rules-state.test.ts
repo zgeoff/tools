@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readRulesState } from './read-rules-state.ts';
@@ -56,7 +56,7 @@ test('it reads a folder as unreadable', async () => {
 
   const state = await readRulesState(join(ctx.directory, 'skill-gate.json'));
 
-  expect(state).toStrictEqual({ kind: 'unreadable', reason: 'it is a folder', code: 'EISDIR' });
+  expect(state).toStrictEqual({ kind: 'unreadable', reason: 'it is a folder', cause: 'folder' });
 });
 
 test('it reads a symlink loop as unreadable and names the error code', async () => {
@@ -69,6 +69,47 @@ test('it reads a symlink loop as unreadable and names the error code', async () 
   expect(state).toStrictEqual({
     kind: 'unreadable',
     reason: 'ELOOP: too many symbolic links encountered',
-    code: 'ELOOP',
+    cause: 'other',
   });
 });
+
+// Root reads a mode 000 file and searches a mode 000 folder, so the read fails only for another
+// user.
+test.skipIf(process.getuid?.() === 0)(
+  'it reads a rules file whose read is refused as a permission problem of the file',
+  async () => {
+    const ctx = await setupTest();
+
+    await writeFile(join(ctx.directory, 'skill-gate.json'), '{"gates":[]}');
+    await chmod(join(ctx.directory, 'skill-gate.json'), 0o000);
+
+    const state = await readRulesState(join(ctx.directory, 'skill-gate.json'));
+
+    expect(state).toStrictEqual({
+      kind: 'unreadable',
+      reason: 'EACCES: permission denied',
+      cause: 'file-permission',
+    });
+  },
+);
+
+test.skipIf(process.getuid?.() === 0)(
+  'it reads a rules file in a folder it cannot search as unreadable for another cause',
+  async () => {
+    const ctx = await setupTest();
+
+    await mkdir(join(ctx.directory, '.claude'));
+    await writeFile(join(ctx.directory, '.claude/skill-gate.json'), '{"gates":[]}');
+    await chmod(join(ctx.directory, '.claude'), 0o000);
+
+    onTestFinished(() => chmod(join(ctx.directory, '.claude'), 0o700));
+
+    const state = await readRulesState(join(ctx.directory, '.claude/skill-gate.json'));
+
+    expect(state).toStrictEqual({
+      kind: 'unreadable',
+      reason: 'EACCES: permission denied',
+      cause: 'other',
+    });
+  },
+);

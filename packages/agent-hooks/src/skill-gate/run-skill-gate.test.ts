@@ -2918,3 +2918,33 @@ test('it voids the loaded skills on a compaction while a folder sits at the rule
   expect(result.status).toBe(2);
   expect(result.stderr).toInclude('This session was compacted');
 });
+
+test('it gives the repair in plain words when git tracks the rules path as a symlink to a folder', async () => {
+  const ctx = await setupTest();
+
+  const project = join(ctx.directory, 'project');
+
+  await mkdir(join(project, '.claude/rules'), { recursive: true });
+  await writeFile(join(project, '.claude/rules/README.md'), '# Rules\n');
+  await symlink('rules', join(project, '.claude/skill-gate.json'));
+
+  await $`git init --quiet && git add -A && git commit --quiet -m rules`.cwd(project).env({
+    PATH: process.env['PATH'],
+    GIT_AUTHOR_NAME: 'Fixture Author',
+    GIT_AUTHOR_EMAIL: 'fixture@example.com',
+    GIT_COMMITTER_NAME: 'Fixture Author',
+    GIT_COMMITTER_EMAIL: 'fixture@example.com',
+  });
+
+  const result = ctx.runHook(project, {
+    tool_name: 'Edit',
+    tool_input: { file_path: join(project, 'src/sample.ts') },
+  });
+
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
+
+  expect(result.stderr).toBe(
+    `skill-gate: .claude/skill-gate.json exists but the gate cannot read it as a file (it is a folder), so it blocks this edit to ${join(project, 'src/sample.ts')}. Until the file reads again, the gate treats every path and tool as gated. You cannot repair it from here: ask the user to run this from the repo root, then retry:\nMove whatever is at .claude/skill-gate.json aside and put the repo's rules file back in its place. Removing the path without putting the file back turns the gate off.\n`,
+  );
+});
