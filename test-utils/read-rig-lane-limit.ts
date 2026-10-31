@@ -6,8 +6,9 @@ export async function readRigLaneLimit(repoRoot: string, laneName: string): Prom
   const readerPath = join(import.meta.dir, '..', 'packages', 'rig', 'src', 'read-rig-config.ts');
 
   const script = [
+    "import { existsSync } from 'node:fs';",
     `import { readRigConfig } from ${JSON.stringify(readerPath)};`,
-    `const config = await readRigConfig(${JSON.stringify(repoRoot)});`,
+    `const config = await readRigConfig(${JSON.stringify(repoRoot)}, { probeFile: existsSync, importModule: (path) => import(path) });`,
     `const lane = config.lanes.find((candidate) => candidate.name === ${JSON.stringify(laneName)});`,
     'console.log(JSON.stringify(lane?.limitMs ?? null));',
   ].join('\n');

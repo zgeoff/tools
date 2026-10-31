@@ -48,7 +48,8 @@ try {
       dietScript: resolveDietScript(),
       output,
       sources: { cwd: repoRoot, probeFile: existsSync },
-      readConfig: readRigConfig,
+      readConfig: (root) =>
+        readRigConfig(root, { probeFile: existsSync, importModule: (path) => import(path) }),
       readTrackedFiles,
       initFiles,
       readWorkerCount: () =>
