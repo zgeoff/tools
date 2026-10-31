@@ -1,42 +1,29 @@
-import { expect, test } from 'bun:test';
-import type { CheckName } from './check-names.ts';
-import type { ChexDeps } from './run-chex.ts';
+import { expect, mock, test } from 'bun:test';
+import { buildStubCheckRunner } from '../../../test-utils/build-stub-check-runner.ts';
 import { runChex } from './run-chex.ts';
 
-function setupTest(exitCodes: Partial<Record<CheckName, number | Error>> = {}) {
+function setupTest() {
   const lines: string[] = [];
-  const calls: string[] = [];
+  const runInit = mock(() => Promise.resolve(0));
 
-  const deps: ChexDeps = {
-    runCheck: (name, args) => {
-      calls.push([name, ...args].join(' '));
-
-      const outcome = exitCodes[name] ?? 0;
-
-      return outcome instanceof Error ? Promise.reject(outcome) : Promise.resolve(outcome);
-    },
-    runInit: () => {
-      calls.push('init');
-
-      return Promise.resolve(0);
-    },
-    writeOutput: (text) => {
-      lines.push(`out ${text}`);
-    },
-    writeError: (text) => {
-      lines.push(`err ${text}`);
-    },
+  const writeOutput = (text: string) => {
+    lines.push(`out ${text}`);
   };
 
-  return { deps, lines, calls };
+  const writeError = (text: string) => {
+    lines.push(`err ${text}`);
+  };
+
+  return { lines, runInit, writeOutput, writeError };
 }
 
 test('it prints cleared with the name of each check that passes', async () => {
   const ctx = setupTest();
+  const stub = buildStubCheckRunner({ length: 0, links: 0 });
 
-  const exitCode = await runChex(['length', 'links'], ctx.deps);
+  const exitCode = await runChex(['length', 'links'], { ...ctx, runCheck: stub.runCheck });
 
-  expect({ exitCode, lines: ctx.lines, calls: ctx.calls }).toStrictEqual({
+  expect({ exitCode, lines: ctx.lines, calls: stub.calls }).toStrictEqual({
     exitCode: 0,
     lines: ['out cleared: length\n', 'out cleared: links\n'],
     calls: ['length', 'links'],
@@ -44,11 +31,12 @@ test('it prints cleared with the name of each check that passes', async () => {
 });
 
 test('it prints bounced for a failed check, runs the checks after it, and exits 1', async () => {
-  const ctx = setupTest({ prose: 1 });
+  const ctx = setupTest();
+  const stub = buildStubCheckRunner({ prose: 1, vision: 0 });
 
-  const exitCode = await runChex(['prose', 'vision'], ctx.deps);
+  const exitCode = await runChex(['prose', 'vision'], { ...ctx, runCheck: stub.runCheck });
 
-  expect({ exitCode, lines: ctx.lines, calls: ctx.calls }).toStrictEqual({
+  expect({ exitCode, lines: ctx.lines, calls: stub.calls }).toStrictEqual({
     exitCode: 1,
     lines: ['out bounced: prose\n', 'out cleared: vision\n'],
     calls: ['prose', 'vision'],
@@ -56,9 +44,10 @@ test('it prints bounced for a failed check, runs the checks after it, and exits 
 });
 
 test('it exits 2 when a check cannot run, and prints bounced', async () => {
-  const ctx = setupTest({ commits: 2, 'local-paths': 1 });
+  const ctx = setupTest();
+  const stub = buildStubCheckRunner({ commits: 2, 'local-paths': 1 });
 
-  const exitCode = await runChex(['commits', 'local-paths'], ctx.deps);
+  const exitCode = await runChex(['commits', 'local-paths'], { ...ctx, runCheck: stub.runCheck });
 
   expect({ exitCode, lines: ctx.lines }).toStrictEqual({
     exitCode: 2,
@@ -67,11 +56,16 @@ test('it exits 2 when a check cannot run, and prints bounced', async () => {
 });
 
 test('it prints bounced and exits 2 for a check that throws, and runs the checks after it', async () => {
-  const ctx = setupTest({ length: new Error('Executable not found in $PATH: "bash"') });
+  const ctx = setupTest();
 
-  const exitCode = await runChex(['length', 'commits'], ctx.deps);
+  const stub = buildStubCheckRunner({
+    length: new Error('Executable not found in $PATH: "bash"'),
+    commits: 0,
+  });
 
-  expect({ exitCode, lines: ctx.lines, calls: ctx.calls }).toStrictEqual({
+  const exitCode = await runChex(['length', 'commits'], { ...ctx, runCheck: stub.runCheck });
+
+  expect({ exitCode, lines: ctx.lines, calls: stub.calls }).toStrictEqual({
     exitCode: 2,
     lines: [
       'err chex: length cannot run: Executable not found in $PATH: "bash"\n',
@@ -83,9 +77,10 @@ test('it prints bounced and exits 2 for a check that throws, and runs the checks
 });
 
 test('it exits 2 and prints bounced for a check that exits with a shell code such as 127', async () => {
-  const ctx = setupTest({ links: 127 });
+  const ctx = setupTest();
+  const stub = buildStubCheckRunner({ links: 127 });
 
-  const exitCode = await runChex(['links'], ctx.deps);
+  const exitCode = await runChex(['links'], { ...ctx, runCheck: stub.runCheck });
 
   expect({ exitCode, lines: ctx.lines }).toStrictEqual({
     exitCode: 2,
@@ -95,10 +90,14 @@ test('it exits 2 and prints bounced for a check that exits with a shell code suc
 
 test('it hands the arguments to the one check it names', async () => {
   const ctx = setupTest();
+  const stub = buildStubCheckRunner({ workflows: 0 });
 
-  const exitCode = await runChex(['workflows', '.github/workflows/pr.yml'], ctx.deps);
+  const exitCode = await runChex(['workflows', '.github/workflows/pr.yml'], {
+    ...ctx,
+    runCheck: stub.runCheck,
+  });
 
-  expect({ exitCode, calls: ctx.calls }).toStrictEqual({
+  expect({ exitCode, calls: stub.calls }).toStrictEqual({
     exitCode: 0,
     calls: ['workflows .github/workflows/pr.yml'],
   });
@@ -106,22 +105,26 @@ test('it hands the arguments to the one check it names', async () => {
 
 test('it runs init for the init command and prints no check line', async () => {
   const ctx = setupTest();
+  const stub = buildStubCheckRunner({});
 
-  const exitCode = await runChex(['init'], ctx.deps);
+  const exitCode = await runChex(['init'], { ...ctx, runCheck: stub.runCheck });
 
-  expect({ exitCode, lines: ctx.lines, calls: ctx.calls }).toStrictEqual({
+  expect({ exitCode, lines: ctx.lines, calls: stub.calls }).toStrictEqual({
     exitCode: 0,
     lines: [],
-    calls: ['init'],
+    calls: [],
   });
+
+  expect(ctx.runInit).toHaveBeenCalledTimes(1);
 });
 
 test('it exits 2 with the usage and runs nothing for an unknown check', async () => {
   const ctx = setupTest();
+  const stub = buildStubCheckRunner({});
 
-  const exitCode = await runChex(['spelling'], ctx.deps);
+  const exitCode = await runChex(['spelling'], { ...ctx, runCheck: stub.runCheck });
 
-  expect({ exitCode, lines: ctx.lines, calls: ctx.calls }).toStrictEqual({
+  expect({ exitCode, lines: ctx.lines, calls: stub.calls }).toStrictEqual({
     exitCode: 2,
     lines: [
       'err chex: unknown check "spelling"\n' +
