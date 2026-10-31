@@ -147,6 +147,13 @@ sub check_words {
       my $line = $lines[$i];
       if ($line eq "---") { $start = $i + 1; last }
       if ($line =~ /^metadata:(?:\s+#.*)?\s*$/) { ($in_metadata, $indent) = (1, undef); next }
+      if ($line =~ /^metadata:\s*\{(.*)\}\s*(?:#.*)?$/) {
+        for my $entry (split /,/, $1) {
+          ($warn, $limit) = (4000, 5000) if $entry =~ /^\s*kind:\s*(.*?)\s*$/ && unquote($1) eq "rule-set";
+        }
+        $in_metadata = 0;
+        next;
+      }
       $in_metadata = 0 if $line =~ /^\S/;
       next unless $in_metadata && $line =~ /^(\s+)(\S.*?)\s*$/;
       # Only a key of metadata itself counts, never a deeper line, such as the text of a block value.

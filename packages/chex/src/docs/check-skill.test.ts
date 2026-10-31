@@ -1069,6 +1069,47 @@ test('it reads the rule-set kind under a metadata key with a comment after it', 
   expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
 });
 
+test('it reads the rule-set kind from a metadata flow mapping', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Rules for every demo change. Load it before writing or reviewing one.',
+    "metadata: { owner: docs, kind: 'rule-set' } # how the checks treat the skill",
+    '---',
+    '',
+    ...Array.from({ length: 40 }, () => 'The tool reads one file. '.repeat(10).trim()),
+  ]);
+
+  const result = await ctx.run();
+
+  expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
+});
+
+test('it keeps the plain limit for a metadata flow mapping of another kind', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Rules for every demo change. Load it before writing or reviewing one.',
+    'metadata: { kind: guide }',
+    '---',
+    '',
+    ...Array.from({ length: 341 }, () => 'The tool reads one file.'),
+  ]);
+
+  const result = await ctx.run();
+
+  expect(result.stdout.toString()).toBe(
+    'skills/demo/SKILL.md: body is 1705 words, over the limit of 1700; cut it, or move what only some tasks need into a reference\n' +
+      'check-skill: 1 skills, 1 errors, 0 warnings\n',
+  );
+});
+
 test('it keeps the plain limit when the kind line sits inside another metadata value', async () => {
   const ctx = await setupTest();
 
