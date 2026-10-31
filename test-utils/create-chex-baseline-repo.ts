@@ -14,19 +14,20 @@ export interface ChexBaselineInstall {
 
 export interface ChexBaselineFixture {
   // The chex checks that run for real; every other check prints that it cleared and passes.
-  readonly realChecks?: readonly string[];
+  readonly realChecks: readonly string[];
 
-  readonly scripts?: Readonly<Record<string, string>>;
+  // The scripts of package.json, which the format:check, typecheck and docs jobs run.
+  readonly scripts: Readonly<Record<string, string>>;
 
-  readonly files?: Readonly<Record<string, string>>;
+  readonly files: Readonly<Record<string, string>>;
 
   // The body of the stub rig, which records its arguments first.
-  readonly rig?: string;
+  readonly rig: string;
 
-  readonly oxlint?: string;
+  readonly oxlint: string;
 
   // Links commitlint and its config into the repo, for the commits check.
-  readonly withCommitlint?: boolean;
+  readonly withCommitlint: boolean;
 }
 
 // Writes a repo as `chex init` leaves it, with the baseline's programs installed: chex from the
@@ -35,11 +36,11 @@ export interface ChexBaselineFixture {
 export async function createChexBaselineRepo(
   root: string,
   install: Readonly<ChexBaselineInstall>,
-  fixture: Readonly<ChexBaselineFixture> = {},
+  fixture: Readonly<ChexBaselineFixture>,
 ): Promise<void> {
   const packageRoot = join(install.toolsRoot, 'packages/chex');
   const cliPath = join(packageRoot, 'src/cli.ts');
-  const realChecks = (fixture.realChecks ?? []).join(' ');
+  const realChecks = fixture.realChecks.join(' ');
 
   await mkdir(join(root, 'node_modules/@zgeoff'), { recursive: true });
   await symlink(packageRoot, join(root, 'node_modules/@zgeoff/chex'));
@@ -47,25 +48,18 @@ export async function createChexBaselineRepo(
   await writeStubPrograms(join(root, 'node_modules/.bin'), {
     chex: `case " ${realChecks} " in *" $1 "*) exec ${process.execPath} ${cliPath} "$@" ;; esac\necho "cleared: $1"`,
     diet: '[ "$1" = -- ] && shift\nCHEX_STUB_UNDER_DIET=1 exec "$@"',
-    oxlint: fixture.oxlint ?? 'exit 0',
-    rig: `echo "\${CHEX_STUB_UNDER_DIET:+under diet: }$*" >> ${install.rigLog}\n${fixture.rig ?? 'exit 0'}`,
+    oxlint: fixture.oxlint,
+    rig: `echo "\${CHEX_STUB_UNDER_DIET:+under diet: }$*" >> ${install.rigLog}\n${fixture.rig}`,
   });
 
-  if (fixture.withCommitlint === true) {
+  if (fixture.withCommitlint) {
     await linkCommitlint(root, install.toolsRoot);
   }
 
   await writeTreeFiles(root, {
     'lefthook.yml': 'extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n',
     '.gitignore': 'node_modules/\n',
-    'package.json': JSON.stringify({
-      scripts: {
-        'format:check': 'true',
-        typecheck: 'true',
-        'check:docs': 'true',
-        ...fixture.scripts,
-      },
-    }),
+    'package.json': JSON.stringify({ scripts: fixture.scripts }),
     ...fixture.files,
   });
 }

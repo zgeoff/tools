@@ -5,10 +5,10 @@ import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
-import { collectFailedHookJobs } from '../../test-utils/collect-failed-hook-jobs.ts';
-import type { ChexBaselineFixture } from '../../test-utils/create-chex-baseline-repo.ts';
+import { commitAllFiles } from '../../test-utils/commit-all-files.ts';
 import { createChexBaselineRepo } from '../../test-utils/create-chex-baseline-repo.ts';
 import { readCallLog } from '../../test-utils/read-call-log.ts';
+import { runHookedPush } from '../../test-utils/run-hooked-push.ts';
 import { writeStubPrograms } from '../../test-utils/write-stub-programs.ts';
 
 // Bun's skipIf takes a boolean at collection time. A host without actionlint skips the test that
@@ -77,23 +77,7 @@ async function setupTest() {
     'pre-commit': `exec ${process.execPath} ${lefthook} run pre-commit "$@"`,
   });
 
-  const writeRepo = (root: string, fixture?: Readonly<ChexBaselineFixture>) =>
-    createChexBaselineRepo(root, { toolsRoot: repoRoot, rigLog: rigCalls }, fixture);
-
-  const commitAll = async (root: string, message: string) => {
-    await $`git add -A`.cwd(root).env(env);
-    await $`git commit --quiet -m ${message}`.cwd(root).env(env);
-  };
-
-  const push = async (ref = 'feature', pushEnv: Readonly<Record<string, string>> = env) => {
-    const result = await $`git push origin ${ref}`.cwd(worktree).env(pushEnv).nothrow().quiet();
-
-    const output = `${result.stdout.toString()}${result.stderr.toString()}`;
-    const failedJobs = collectFailedHookJobs(output);
-
-    return { exitCode: result.exitCode, output, failedJobs };
-  };
-
+  const install = { toolsRoot: repoRoot, rigLog: rigCalls };
   const readRigCalls = () => readCallLog(rigCalls);
 
   return {
@@ -103,9 +87,7 @@ async function setupTest() {
     bin,
     main,
     worktree,
-    writeRepo,
-    commitAll,
-    push,
+    install,
     readRigCalls,
   };
 }
@@ -113,14 +95,18 @@ async function setupTest() {
 test('it runs the related tests through rig under diet, and leaves the main checkout non-bare in a pre-push from a worktree', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeRepo(ctx.worktree, {
-    rig: 'git init --quiet sandbox',
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
+    realChecks: [],
+    scripts: { 'format:check': 'true', typecheck: 'true', 'check:docs': 'true' },
     files: { 'fixture.ts': 'export {};\n' },
+    rig: 'git init --quiet sandbox',
+    oxlint: 'exit 0',
+    withCommitlint: false,
   });
 
-  await ctx.commitAll(ctx.worktree, 'test: add the fixture');
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixture');
 
-  const result = await ctx.push();
+  const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
   const bare = await $`git config --get core.bare`.cwd(ctx.main).env(ctx.env).text();
   const rigCalls = await ctx.readRigCalls();
 
@@ -140,14 +126,18 @@ test('it runs the related tests through rig under diet, and leaves the main chec
 test('it runs each repo check through chex and prints that it cleared', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeRepo(ctx.worktree, {
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
     realChecks: ['uncommitted', 'commits', 'local-paths', 'test-timeouts', 'dependency-gates'],
+    scripts: { 'format:check': 'true', typecheck: 'true', 'check:docs': 'true' },
     files: { 'notes.txt': 'The kettle boils.\n' },
+    rig: 'exit 0',
+    oxlint: 'exit 0',
+    withCommitlint: false,
   });
 
-  await ctx.commitAll(ctx.worktree, 'docs: add the notes');
+  await commitAllFiles(ctx.worktree, ctx.env, 'docs: add the notes');
 
-  const result = await ctx.push();
+  const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
 
   expect(result.exitCode).toBe(0);
 
@@ -165,17 +155,21 @@ test('it runs each repo check through chex and prints that it cleared', async ()
 test('it fails the push on the uncommitted job and names the file when a file the branch changes holds an uncommitted change', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeRepo(ctx.worktree, {
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
     realChecks: ['uncommitted'],
+    scripts: { 'format:check': 'true', typecheck: 'true', 'check:docs': 'true' },
     files: { 'guide.md': '# Guide\n\nA draft that runs too long.\n' },
+    rig: 'exit 0',
+    oxlint: 'exit 0',
+    withCommitlint: false,
   });
 
-  await ctx.commitAll(ctx.worktree, 'test: add the fixture');
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixture');
 
   // The fixed copy stays on disk, uncommitted, as the push sends the draft.
   await writeFile(join(ctx.worktree, 'guide.md'), '# Guide\n\nA short copy.\n');
 
-  const result = await ctx.push();
+  const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
 
   expect(result.exitCode).not.toBe(0);
   expect(result.failedJobs).toStrictEqual(['uncommitted']);
@@ -187,21 +181,24 @@ test('it passes the push when only a file the branch leaves unchanged holds an u
   const ctx = await setupTest();
 
   await writeFile(join(ctx.main, 'notes.md'), '# Notes\n');
+  await commitAllFiles(ctx.main, ctx.env, 'docs: add the notes');
 
-  await ctx.commitAll(ctx.main, 'docs: add the notes');
   await $`git push --quiet origin main`.cwd(ctx.main).env(ctx.env);
   await $`git merge --quiet main`.cwd(ctx.worktree).env(ctx.env);
 
-  await ctx.writeRepo(ctx.worktree, {
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
     realChecks: ['uncommitted'],
+    scripts: { 'format:check': 'true', typecheck: 'true', 'check:docs': 'true' },
     files: { 'guide.md': '# Guide\n' },
+    rig: 'exit 0',
+    oxlint: 'exit 0',
+    withCommitlint: false,
   });
 
-  await ctx.commitAll(ctx.worktree, 'test: add the fixture');
-
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixture');
   await writeFile(join(ctx.worktree, 'notes.md'), '# Notes, edited\n');
 
-  const result = await ctx.push();
+  const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
 
   expect(result.exitCode).toBe(0);
   expect(result.output).toMatch(/^cleared: uncommitted$/mu);
@@ -210,13 +207,19 @@ test('it passes the push when only a file the branch leaves unchanged holds an u
 test('it fails the push and downloads nothing when the repo does not install chex', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeRepo(ctx.worktree);
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
+    realChecks: [],
+    scripts: { 'format:check': 'true', typecheck: 'true', 'check:docs': 'true' },
+    files: {},
+    rig: 'exit 0',
+    oxlint: 'exit 0',
+    withCommitlint: false,
+  });
 
   await rm(join(ctx.worktree, 'node_modules/.bin/chex'));
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixture');
 
-  await ctx.commitAll(ctx.worktree, 'test: add the fixture');
-
-  const result = await ctx.push();
+  const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
 
   expect(result.exitCode).not.toBe(0);
   expect(result.failedJobs[0]).toBe('uncommitted');
@@ -229,14 +232,18 @@ test('it fails the push and downloads nothing when the repo does not install che
 test('it lints the files the branch changes with plain oxlint', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeRepo(ctx.worktree, {
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
+    realChecks: [],
+    scripts: { 'format:check': 'true', typecheck: 'true', 'check:docs': 'true' },
     files: { 'src/kettle.ts': 'export {};\n' },
+    rig: 'exit 0',
     oxlint: `echo "$*" > ${join(ctx.directory, 'oxlint-args')}`,
+    withCommitlint: false,
   });
 
-  await ctx.commitAll(ctx.worktree, 'test: add the fixture');
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixture');
 
-  const result = await ctx.push();
+  const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
   const args = await readFile(join(ctx.directory, 'oxlint-args'), 'utf8');
 
   expect({ exitCode: result.exitCode, args }).toStrictEqual({
@@ -248,10 +255,18 @@ test('it lints the files the branch changes with plain oxlint', async () => {
 test('it fails the push on the shell job alone when a shell file the branch changes fails shellcheck', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeRepo(ctx.worktree, { files: { 'bad.sh': '#!/usr/bin/env bash\necho $1\n' } });
-  await ctx.commitAll(ctx.worktree, 'test: add the fixture');
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
+    realChecks: [],
+    scripts: { 'format:check': 'true', typecheck: 'true', 'check:docs': 'true' },
+    files: { 'bad.sh': '#!/usr/bin/env bash\necho $1\n' },
+    rig: 'exit 0',
+    oxlint: 'exit 0',
+    withCommitlint: false,
+  });
 
-  const result = await ctx.push();
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixture');
+
+  const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
 
   expect(result.exitCode).not.toBe(0);
   expect(result.failedJobs).toStrictEqual(['shell']);
@@ -271,10 +286,18 @@ test('it passes the push with a notice when the machine lacks shfmt', async () =
 
   await symlink(process.execPath, join(ctx.bin, 'bun'));
 
-  await ctx.writeRepo(ctx.worktree, { files: { 'bad.sh': '#!/usr/bin/env bash\necho $1\n' } });
-  await ctx.commitAll(ctx.worktree, 'test: add the fixture');
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
+    realChecks: [],
+    scripts: { 'format:check': 'true', typecheck: 'true', 'check:docs': 'true' },
+    files: { 'bad.sh': '#!/usr/bin/env bash\necho $1\n' },
+    rig: 'exit 0',
+    oxlint: 'exit 0',
+    withCommitlint: false,
+  });
 
-  const result = await ctx.push('feature', { ...ctx.env, PATH: ctx.bin });
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixture');
+
+  const result = await runHookedPush(ctx.worktree, 'feature', { ...ctx.env, PATH: ctx.bin });
 
   expect(result.exitCode).toBe(0);
 
@@ -292,15 +315,18 @@ test("it runs the docs checks that the repo's check:docs script names, and fails
     (_, index) => `- Step ${index + 1} greets the visitor.`,
   );
 
-  await ctx.writeRepo(ctx.worktree, {
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
     realChecks: ['length', 'links'],
-    scripts: { 'check:docs': 'chex length links' },
+    scripts: { 'format:check': 'true', typecheck: 'true', 'check:docs': 'chex length links' },
     files: { 'README.md': `# Greeter\n${lines.join('\n')}\n` },
+    rig: 'exit 0',
+    oxlint: 'exit 0',
+    withCommitlint: false,
   });
 
-  await ctx.commitAll(ctx.worktree, 'test: add the fixture');
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixture');
 
-  const result = await ctx.push();
+  const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
 
   expect(result.failedJobs).toStrictEqual(['docs']);
   expect(result.output).toInclude('README.md: 101 lines, over the front page README limit of 100');
@@ -311,16 +337,23 @@ test("it runs the docs checks that the repo's check:docs script names, and fails
 test('it fails the docs job of a repo with no check:docs script, since the repo names its docs checks', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeRepo(ctx.worktree, { files: { 'README.md': '# Greeter\n' } });
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
+    realChecks: [],
+    scripts: { 'format:check': 'true', typecheck: 'true', 'check:docs': 'true' },
+    files: { 'README.md': '# Greeter\n' },
+    rig: 'exit 0',
+    oxlint: 'exit 0',
+    withCommitlint: false,
+  });
 
   await writeFile(
     join(ctx.worktree, 'package.json'),
     JSON.stringify({ scripts: { 'format:check': 'true', typecheck: 'true' } }),
   );
 
-  await ctx.commitAll(ctx.worktree, 'test: add the fixture');
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixture');
 
-  const result = await ctx.push();
+  const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
 
   expect(result.failedJobs).toStrictEqual(['docs']);
 });
@@ -338,14 +371,18 @@ test('it passes the push with a notice when the machine lacks actionlint, and ru
 
   await symlink(process.execPath, join(ctx.bin, 'bun'));
 
-  await ctx.writeRepo(ctx.worktree, {
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
     realChecks: ['workflows'],
+    scripts: { 'format:check': 'true', typecheck: 'true', 'check:docs': 'true' },
     files: { '.github/workflows/greet.yml': 'on: push\njobs: {}\n' },
+    rig: 'exit 0',
+    oxlint: 'exit 0',
+    withCommitlint: false,
   });
 
-  await ctx.commitAll(ctx.worktree, 'test: add the fixture');
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixture');
 
-  const result = await ctx.push('feature', { ...ctx.env, PATH: ctx.bin });
+  const result = await runHookedPush(ctx.worktree, 'feature', { ...ctx.env, PATH: ctx.bin });
 
   expect(result.exitCode).toBe(0);
 
@@ -361,14 +398,18 @@ test.skipIf(!canRunActionlint)(
   async () => {
     const ctx = await setupTest();
 
-    await ctx.writeRepo(ctx.worktree, {
+    await createChexBaselineRepo(ctx.worktree, ctx.install, {
       realChecks: ['workflows'],
+      scripts: { 'format:check': 'true', typecheck: 'true', 'check:docs': 'true' },
       files: { '.github/workflows/greet.yml': 'on: push\njobs:\n  greet:\n    steps: []\n' },
+      rig: 'exit 0',
+      oxlint: 'exit 0',
+      withCommitlint: false,
     });
 
-    await ctx.commitAll(ctx.worktree, 'test: add the fixture');
+    await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixture');
 
-    const result = await ctx.push();
+    const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
 
     expect(result.failedJobs).toStrictEqual(['workflows']);
     expect(result.output).toInclude('"runs-on" section is missing in job "greet"');
@@ -378,10 +419,18 @@ test.skipIf(!canRunActionlint)(
 test('it fails the push when a commit of the branch fails commitlint', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeRepo(ctx.worktree, { realChecks: ['commits'], withCommitlint: true });
-  await ctx.commitAll(ctx.worktree, 'tidy up');
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
+    realChecks: ['commits'],
+    scripts: { 'format:check': 'true', typecheck: 'true', 'check:docs': 'true' },
+    files: {},
+    rig: 'exit 0',
+    oxlint: 'exit 0',
+    withCommitlint: true,
+  });
 
-  const result = await ctx.push();
+  await commitAllFiles(ctx.worktree, ctx.env, 'tidy up');
+
+  const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
 
   expect(result.failedJobs).toStrictEqual(['commits']);
   expect(result.output).toInclude('subject may not be empty [subject-empty]');
@@ -391,16 +440,25 @@ test('it fails the push when a commit of the branch fails commitlint', async () 
 test('it fails a push of another branch when that branch adds the home directory', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeRepo(ctx.worktree, { realChecks: ['local-paths'] });
-  await ctx.commitAll(ctx.worktree, 'test: add the hook config');
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
+    realChecks: ['local-paths'],
+    scripts: { 'format:check': 'true', typecheck: 'true', 'check:docs': 'true' },
+    files: {},
+    rig: 'exit 0',
+    oxlint: 'exit 0',
+    withCommitlint: false,
+  });
+
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the hook config');
+
   await $`git switch --quiet -c cache-notes`.cwd(ctx.worktree).env(ctx.env);
 
   await writeFile(join(ctx.worktree, 'cache.txt'), `cache: ${ctx.env.HOME}/.cache\n`);
+  await commitAllFiles(ctx.worktree, ctx.env, 'docs: note the cache folder');
 
-  await ctx.commitAll(ctx.worktree, 'docs: note the cache folder');
   await $`git switch --quiet feature`.cwd(ctx.worktree).env(ctx.env);
 
-  const result = await ctx.push('cache-notes');
+  const result = await runHookedPush(ctx.worktree, 'cache-notes', ctx.env);
 
   expect(result.failedJobs).toStrictEqual(['local-paths']);
   expect(result.output).toInclude('cache.txt:1: commit ');
@@ -409,14 +467,18 @@ test('it fails a push of another branch when that branch adds the home directory
 test('it fails the push when a bunfig.toml raises the test timeout above 5 s', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeRepo(ctx.worktree, {
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
     realChecks: ['test-timeouts'],
+    scripts: { 'format:check': 'true', typecheck: 'true', 'check:docs': 'true' },
     files: { 'bunfig.toml': '[test]\ntimeout = 20000\n' },
+    rig: 'exit 0',
+    oxlint: 'exit 0',
+    withCommitlint: false,
   });
 
-  await ctx.commitAll(ctx.worktree, 'test: add the fixture');
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixture');
 
-  const result = await ctx.push();
+  const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
 
   expect(result.failedJobs).toStrictEqual(['test-timeouts']);
   expect(result.output).toMatch(/^bounced: test-timeouts$/mu);
@@ -425,8 +487,9 @@ test('it fails the push when a bunfig.toml raises the test timeout above 5 s', a
 test('it fails the push when bunfig.toml holds an age-gate exclude past its removal date', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeRepo(ctx.worktree, {
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
     realChecks: ['dependency-gates'],
+    scripts: { 'format:check': 'true', typecheck: 'true', 'check:docs': 'true' },
     files: {
       'bunfig.toml': [
         '[install]',
@@ -434,11 +497,14 @@ test('it fails the push when bunfig.toml holds an age-gate exclude past its remo
         'minimumReleaseAgeExcludes = ["left-pad"]',
       ].join('\n'),
     },
+    rig: 'exit 0',
+    oxlint: 'exit 0',
+    withCommitlint: false,
   });
 
-  await ctx.commitAll(ctx.worktree, 'test: add the fixture');
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixture');
 
-  const result = await ctx.push();
+  const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
 
   expect(result.failedJobs).toStrictEqual(['dependency-gates']);
   expect(result.output).toInclude('left-pad');
@@ -447,13 +513,21 @@ test('it fails the push when bunfig.toml holds an age-gate exclude past its remo
 test("it fails the commit when typecheck fails, after the repo's own pre-commit job runs", async () => {
   const ctx = await setupTest();
 
-  await ctx.writeRepo(ctx.worktree, {
-    scripts: { typecheck: 'echo typecheck >> ran.txt && exit 1' },
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
+    realChecks: [],
+    scripts: {
+      'format:check': 'true',
+      typecheck: 'echo typecheck >> ran.txt && exit 1',
+      'check:docs': 'true',
+    },
     files: {
       'lefthook.yml':
         'extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\npre-commit:\n  jobs:\n    - name: fixer\n      run: echo fixer >> ran.txt\n',
       'fixture.ts': 'export {};\n',
     },
+    rig: 'exit 0',
+    oxlint: 'exit 0',
+    withCommitlint: false,
   });
 
   await $`git add lefthook.yml fixture.ts package.json .gitignore`.cwd(ctx.worktree).env(ctx.env);
@@ -475,7 +549,15 @@ test("it fails the commit when typecheck fails, after the repo's own pre-commit 
 test('it skips typecheck on a commit that stages no code or config file', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeRepo(ctx.worktree, { scripts: { typecheck: 'exit 1' } });
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
+    realChecks: [],
+    scripts: { 'format:check': 'true', typecheck: 'exit 1', 'check:docs': 'true' },
+    files: {},
+    rig: 'exit 0',
+    oxlint: 'exit 0',
+    withCommitlint: false,
+  });
+
   await $`git add lefthook.yml .gitignore`.cwd(ctx.worktree).env(ctx.env);
 
   await writeFile(join(ctx.worktree, 'notes.md'), '# Notes\n');

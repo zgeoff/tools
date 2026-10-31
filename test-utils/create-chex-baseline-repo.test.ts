@@ -25,7 +25,14 @@ test('it writes the files chex init leaves, with the fixture files and scripts a
   await createChexBaselineRepo(
     ctx.root,
     { toolsRoot: ctx.toolsRoot, rigLog: ctx.rigLog },
-    { scripts: { typecheck: 'tsc' }, files: { 'notes.txt': 'The kettle boils.\n' } },
+    {
+      realChecks: [],
+      scripts: { 'format:check': 'true', typecheck: 'tsc' },
+      files: { 'notes.txt': 'The kettle boils.\n' },
+      rig: 'exit 0',
+      oxlint: 'exit 0',
+      withCommitlint: false,
+    },
   );
 
   const lefthook = await readFile(join(ctx.root, 'lefthook.yml'), 'utf8');
@@ -38,7 +45,7 @@ test('it writes the files chex init leaves, with the fixture files and scripts a
 
   expect({ lefthook, packageJSON, notes, chexLink }).toStrictEqual({
     lefthook: 'extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n',
-    packageJSON: { scripts: { 'format:check': 'true', typecheck: 'tsc', 'check:docs': 'true' } },
+    packageJSON: { scripts: { 'format:check': 'true', typecheck: 'tsc' } },
     notes: 'The kettle boils.\n',
     chexLink: join(ctx.toolsRoot, 'packages/chex'),
   });
@@ -47,7 +54,18 @@ test('it writes the files chex init leaves, with the fixture files and scripts a
 test('it stubs chex to clear each check it does not run for real', async () => {
   const ctx = await setupTest();
 
-  await createChexBaselineRepo(ctx.root, { toolsRoot: ctx.toolsRoot, rigLog: ctx.rigLog });
+  await createChexBaselineRepo(
+    ctx.root,
+    { toolsRoot: ctx.toolsRoot, rigLog: ctx.rigLog },
+    {
+      realChecks: ['prose'],
+      scripts: {},
+      files: {},
+      rig: 'exit 0',
+      oxlint: 'exit 0',
+      withCommitlint: false,
+    },
+  );
 
   const result = await $`${join(ctx.bin, 'chex')} commits`.cwd(ctx.root).nothrow().quiet();
 
@@ -63,7 +81,14 @@ test('it stubs rig to log each call, and marks a call that the stub diet wraps',
   await createChexBaselineRepo(
     ctx.root,
     { toolsRoot: ctx.toolsRoot, rigLog: ctx.rigLog },
-    { rig: 'exit 4' },
+    {
+      realChecks: [],
+      scripts: {},
+      files: {},
+      rig: 'exit 4',
+      oxlint: 'exit 0',
+      withCommitlint: false,
+    },
   );
 
   const wrapped = await $`${join(ctx.bin, 'diet')} -- ${join(ctx.bin, 'rig')} related kettle.ts`
@@ -84,7 +109,18 @@ test('it stubs rig to log each call, and marks a call that the stub diet wraps',
 test('it links commitlint only for a fixture that asks for it', async () => {
   const ctx = await setupTest();
 
-  await createChexBaselineRepo(ctx.root, { toolsRoot: ctx.toolsRoot, rigLog: ctx.rigLog });
+  await createChexBaselineRepo(
+    ctx.root,
+    { toolsRoot: ctx.toolsRoot, rigLog: ctx.rigLog },
+    {
+      realChecks: [],
+      scripts: {},
+      files: {},
+      rig: 'exit 0',
+      oxlint: 'exit 0',
+      withCommitlint: false,
+    },
+  );
 
   const without = existsSync(join(ctx.root, 'node_modules/.bin/commitlint'));
 
@@ -93,7 +129,14 @@ test('it links commitlint only for a fixture that asks for it', async () => {
   await createChexBaselineRepo(
     ctx.root,
     { toolsRoot: ctx.toolsRoot, rigLog: ctx.rigLog },
-    { withCommitlint: true },
+    {
+      realChecks: [],
+      scripts: {},
+      files: {},
+      rig: 'exit 0',
+      oxlint: 'exit 0',
+      withCommitlint: true,
+    },
   );
 
   const withLink = existsSync(join(ctx.root, 'node_modules/.bin/commitlint'));
