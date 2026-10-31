@@ -4,6 +4,7 @@ import path from 'node:path';
 import { GitError, simpleGit } from 'simple-git';
 import type { SimpleGit } from 'simple-git';
 import { match } from 'ts-pattern';
+import type { HookResult, RepoContext } from '../types.ts';
 import { bashSnapshotSchema } from './bash-snapshot-schema.ts';
 import { buildBashChangeOutput } from './build-bash-change-output.ts';
 import { buildBashCheckFailureOutput } from './build-bash-check-failure-output.ts';
@@ -14,7 +15,6 @@ import { collectBashCandidates } from './collect-bash-candidates.ts';
 import { collectChangedPaths } from './collect-changed-paths.ts';
 import { collectGateSkills } from './collect-gate-skills.ts';
 import { collectWrittenPaths } from './collect-written-paths.ts';
-import type { Harness } from './harness.ts';
 import { parseHookInput } from './parse-hook-input.ts';
 import { parseSkillGateRules } from './parse-skill-gate-rules.ts';
 import { pickCommitRange } from './pick-commit-range.ts';
@@ -29,37 +29,38 @@ import { readCommitHashes } from './read-commit-hashes.ts';
 import { readCommittedPaths } from './read-committed-paths.ts';
 import { readFileContent } from './read-file-content.ts';
 import { readFileHashes } from './read-file-hashes.ts';
-import { readProjectDir } from './read-project-dir.ts';
 import { readSessionLoads } from './read-session-loads.ts';
 import { readWorkTree } from './read-work-tree.ts';
 import { recordCommandReads, recordLifecycle } from './record-codex-loads.ts';
 import { resolveStateDir } from './resolve-state-dir.ts';
 import type {
+  BashChangeHookOutput,
   BashComparison,
   BashResultStep,
   BashSnapshot,
+  GateOutput,
   HookInput,
   PostToolEvent,
   RecordedSnapshot,
+  SkillGateHookOutput,
   SkillGateRules,
   WrittenPath,
 } from './types.ts';
 
-export async function runSkillGate(harness: Harness = 'claude-code'): Promise<never> {
-  const payload: unknown = await Bun.stdin.json().catch(() => null);
+const ALLOW: HookResult = { kind: 'allow' };
 
-  const parsedInput = parseHookInput(harness, payload);
+export async function runSkillGate(payload: unknown, context: RepoContext): Promise<HookResult> {
+  const parsedInput = parseHookInput(context.harness, payload);
 
   if (parsedInput === null) {
-    process.exit(0);
+    return ALLOW;
   }
 
   // A plain git status refreshes the index under index.lock, which fails a git command that runs
   // beside the hook. simple-git refuses an env it is handed that holds GIT_EDITOR, so set it here.
   process.env['GIT_OPTIONAL_LOCKS'] = '0';
 
-  const projectDir = await readProjectDir(parsedInput.cwd);
-
+  const projectDir = context.projectDir;
   const rulesFile = Bun.file(path.join(projectDir, '.claude', 'skill-gate.json'));
 
   const hasRules = await rulesFile.exists();
@@ -69,18 +70,22 @@ export async function runSkillGate(harness: Harness = 'claude-code'): Promise<ne
       await recordLifecycle(parsedInput, projectDir);
     }
 
-    process.exit(0);
+    return ALLOW;
   }
 
   const input = parsedInput;
 
   if (hasRules && input.toolName !== null && input.event === 'PreToolUse') {
-    await checkToolCall({
+    const toolResult = await checkToolCall({
       hookInput: input,
       toolName: input.toolName,
       projectDir,
       rulesText: await rulesFile.text(),
     });
+
+    if (toolResult !== null) {
+      return toolResult;
+    }
   }
 
   if (hasRules && input.command !== null) {
@@ -90,11 +95,11 @@ export async function runSkillGate(harness: Harness = 'claude-code'): Promise<ne
       await recordCommandReads(input, input.command, projectDir, rulesText);
     }
 
-    await checkBash({ hookInput: input, command: input.command, projectDir, rulesText });
+    return checkBash({ hookInput: input, command: input.command, projectDir, rulesText });
   }
 
   if (input.editPaths.length === 0 || input.event !== 'PreToolUse') {
-    process.exit(0);
+    return ALLOW;
   }
 
   const edits = input.editPaths
@@ -103,7 +108,7 @@ export async function runSkillGate(harness: Harness = 'claude-code'): Promise<ne
     .filter((edit) => !isOutsideProject(edit.relativePath));
 
   if (!hasRules || edits.length === 0) {
-    process.exit(0);
+    return ALLOW;
   }
 
   const rulesText = await rulesFile.text();
@@ -114,9 +119,7 @@ export async function runSkillGate(harness: Harness = 'claude-code'): Promise<ne
     const emptyPlan = { missing: [], unknown: [] };
     const unchecked = edits.map((edit) => ({ filePath: edit.filePath, plan: emptyPlan }));
 
-    printOutput(buildEditOutput(input.harness, unchecked, { rulesError: parsed.error }));
-
-    process.exit(0);
+    return toHookResult(buildEditOutput(input.harness, unchecked, { rulesError: parsed.error }));
   }
 
   const availableSkills = await readAvailableSkills(path.join(projectDir, '.claude', 'skills'));
@@ -132,14 +135,12 @@ export async function runSkillGate(harness: Harness = 'claude-code'): Promise<ne
     }),
   }));
 
-  printOutput(
+  return toHookResult(
     buildEditOutput(input.harness, entries, {
       compacted: loaded.compacted,
       unknownKeys: parsed.unknownKeys,
     }),
   );
-
-  process.exit(0);
 }
 
 const PATH_GATED_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'Bash', 'apply_patch']);
@@ -151,29 +152,27 @@ interface ToolCallCheck {
   readonly rulesText: string;
 }
 
-async function checkToolCall(check: ToolCallCheck): Promise<void> {
+async function checkToolCall(check: ToolCallCheck): Promise<HookResult | null> {
   const parsedRules = parseSkillGateRules(check.rulesText);
 
   if (!parsedRules.ok) {
     // The hook matcher names only gated tools beside the path-gated ones, so a broken rules file
     // warns on each such call and lets it through.
     if (!PATH_GATED_TOOLS.has(check.toolName)) {
-      printOutput(
+      return toHookResult(
         buildToolGateOutput(
           check.toolName,
           { missingSkills: [], missingReferences: [], unknown: [] },
           { rulesError: parsedRules.error },
         ),
       );
-
-      process.exit(0);
     }
 
-    return;
+    return null;
   }
 
   if (!parsedRules.tools.some((gate) => gate.tool === check.toolName)) {
-    return;
+    return null;
   }
 
   const skillsDir = path.join(check.projectDir, '.claude', 'skills');
@@ -193,21 +192,32 @@ async function checkToolCall(check: ToolCallCheck): Promise<void> {
     ),
   });
 
-  printOutput(
+  return toHookResult(
     buildToolGateOutput(check.toolName, plan, {
       harness: check.hookInput.harness,
       compacted: loads.compacted,
       unknownKeys: parsedRules.unknownKeys,
     }),
   );
-
-  process.exit(0);
 }
 
-function printOutput(output: object | null): void {
-  if (output !== null) {
-    console.log(JSON.stringify(output));
+// Each harness blocks a call when the hook exits 2, and takes its stderr as the reason.
+function toHookResult(output: GateOutput | null): HookResult {
+  if (output === null) {
+    return ALLOW;
   }
+
+  if ('decision' in output) {
+    return { kind: 'block', message: output.reason };
+  }
+
+  const specific = output.hookSpecificOutput;
+
+  if ('permissionDecision' in specific && specific.permissionDecision === 'deny') {
+    return { kind: 'block', message: specific.permissionDecisionReason ?? '' };
+  }
+
+  return { kind: 'allow', output };
 }
 
 interface BashCheck {
@@ -217,11 +227,11 @@ interface BashCheck {
   readonly rulesText: string;
 }
 
-async function checkBash(check: BashCheck): Promise<never> {
+async function checkBash(check: BashCheck): Promise<HookResult> {
   const parsedRules = parseSkillGateRules(check.rulesText);
 
   if (!parsedRules.ok) {
-    process.exit(0);
+    return ALLOW;
   }
 
   const snapshotPath = resolveSnapshotPath(check.hookInput);
@@ -232,18 +242,22 @@ async function checkBash(check: BashCheck): Promise<never> {
       await writeGatedSnapshot(git, snapshotPath, check.projectDir, parsedRules.rules);
     }
 
-    await checkBashCommand(check, parsedRules.rules);
+    const commandOutput = await checkBashCommand(check, parsedRules.rules);
+
+    return toHookResult(commandOutput);
   }
 
-  if (snapshotPath !== null && check.hookInput.event !== 'PreToolUse') {
-    await checkBashResult(check, parsedRules.rules, {
-      git,
-      event: check.hookInput.event,
-      snapshotPath,
-    });
+  if (snapshotPath === null) {
+    return ALLOW;
   }
 
-  process.exit(0);
+  const resultOutput = await checkBashResult(check, parsedRules.rules, {
+    git,
+    event: check.hookInput.event,
+    snapshotPath,
+  });
+
+  return toHookResult(resultOutput);
 }
 
 function resolveSnapshotPath(hookInput: HookInput): string | null {
@@ -324,7 +338,10 @@ function isOutsideProject(fromProject: string): boolean {
   return fromProject === '..' || fromProject.startsWith('../') || path.isAbsolute(fromProject);
 }
 
-async function checkBashCommand(check: BashCheck, rules: SkillGateRules): Promise<void> {
+async function checkBashCommand(
+  check: BashCheck,
+  rules: SkillGateRules,
+): Promise<SkillGateHookOutput | null> {
   const written = collectWrittenPaths(check.command).map((entry) =>
     readWrittenPath(check.hookInput.cwd, entry),
   );
@@ -334,7 +351,7 @@ async function checkBashCommand(check: BashCheck, rules: SkillGateRules): Promis
   );
 
   if (candidates.length === 0) {
-    return;
+    return null;
   }
 
   const skills = await readAvailableSkills(path.join(check.projectDir, '.claude', 'skills'));
@@ -350,12 +367,10 @@ async function checkBashCommand(check: BashCheck, rules: SkillGateRules): Promis
     availableSkills: skills,
   });
 
-  printOutput(
-    buildBashSkillGateOutput(bashPlan.gatedPaths, bashPlan.missing, {
-      harness: check.hookInput.harness,
-      compacted: sessionLoads.compacted,
-    }),
-  );
+  return buildBashSkillGateOutput(bashPlan.gatedPaths, bashPlan.missing, {
+    harness: check.hookInput.harness,
+    compacted: sessionLoads.compacted,
+  });
 }
 
 // A `cp` or `mv` onto an existing directory writes the source's file name inside it.
@@ -381,7 +396,7 @@ async function checkBashResult(
   check: BashCheck,
   rules: SkillGateRules,
   result: BashResult,
-): Promise<void> {
+): Promise<GateOutput | null> {
   const record = await readSnapshot(result.snapshotPath);
 
   await rm(result.snapshotPath, { force: true });
@@ -389,14 +404,12 @@ async function checkBashResult(
   const recordStep = pickRecordStep(record);
 
   if (recordStep.kind !== 'compare') {
-    await runBashResultStep(check, rules, result, recordStep);
-
-    return;
+    return runBashResultStep(check, rules, result, recordStep);
   }
 
   const comparison = await readComparison(check, rules, result, recordStep.recorded);
 
-  await runBashResultStep(check, rules, result, pickComparisonStep(comparison));
+  return runBashResultStep(check, rules, result, pickComparisonStep(comparison));
 }
 
 async function readSnapshot(snapshotPath: string): Promise<BashSnapshot | null> {
@@ -418,19 +431,18 @@ function parseJSON(text: string): unknown {
   }
 }
 
-async function runBashResultStep(
+function runBashResultStep(
   check: BashCheck,
   rules: SkillGateRules,
   result: BashResult,
   step: BashResultStep,
-): Promise<void> {
-  await match(step)
-    .with({ kind: 'skip' }, () => Promise.resolve())
-    .with({ kind: 'report' }, (report) => {
-      printOutput(buildBashCheckFailureOutput(result.event, report.error));
-
-      return Promise.resolve();
-    })
+): Promise<GateOutput | null> {
+  return match(step)
+    .returnType<Promise<GateOutput | null>>()
+    .with({ kind: 'skip' }, () => Promise.resolve(null))
+    .with({ kind: 'report' }, (report) =>
+      Promise.resolve(buildBashCheckFailureOutput(result.event, report.error)),
+    )
     .with({ kind: 'gate' }, (gate) => checkChangedPaths(check, rules, result, gate.changedPaths))
     .exhaustive();
 }
@@ -440,7 +452,7 @@ async function checkChangedPaths(
   rules: SkillGateRules,
   result: BashResult,
   changedPaths: readonly string[],
-): Promise<void> {
+): Promise<BashChangeHookOutput | null> {
   const skills = await readAvailableSkills(path.join(check.projectDir, '.claude', 'skills'));
   const sessionLoads = await readSessionLoads(check.hookInput);
 
@@ -454,12 +466,10 @@ async function checkChangedPaths(
     availableSkills: skills,
   });
 
-  printOutput(
-    buildBashChangeOutput(result.event, changePlan.gatedPaths, changePlan.missing, {
-      harness: check.hookInput.harness,
-      compacted: sessionLoads.compacted,
-    }),
-  );
+  return buildBashChangeOutput(result.event, changePlan.gatedPaths, changePlan.missing, {
+    harness: check.hookInput.harness,
+    compacted: sessionLoads.compacted,
+  });
 }
 
 async function readComparison(

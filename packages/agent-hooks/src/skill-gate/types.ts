@@ -1,6 +1,6 @@
 import type { z } from 'zod';
+import type { Harness } from '../harness.ts';
 import type { bashSnapshotSchema } from './bash-snapshot-schema.ts';
-import type { Harness } from './harness.ts';
 
 export interface SkillGate {
   readonly match: string;
@@ -165,6 +165,8 @@ export interface BashCheckFailureHookOutput {
     readonly additionalContext: string;
   };
 }
+
+export type GateOutput = SkillGateHookOutput | BashChangeHookOutput | BashCheckFailureHookOutput;
 
 export interface CommitRange {
   readonly from: string | null;

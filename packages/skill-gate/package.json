@@ -1,7 +1,7 @@
 {
   "name": "@zgeoff/skill-gate",
   "version": "0.2.10",
-  "description": "A Claude Code and Codex CLI hook that denies an edit or a gated tool call until the session loads the skills and reads the reference files it needs, and blocks after a Bash command that changed a gated file without them",
+  "description": "Moved to @zgeoff/agent-hooks: this release runs the skill gate from that package",
   "keywords": [
     "claude-code",
     "codex",
@@ -28,21 +28,16 @@
     "access": "public"
   },
   "scripts": {
-    "build": "rm -rf dist && bun run build:outdir dist",
-    "build:outdir": "sh -c 'bun build src/index.ts --target bun --outdir \"$0\" && tsc -p tsconfig.build.json --outDir \"$0\"'",
+    "build": "rm -rf dist && bun build src/index.ts --target bun --outdir dist --packages external && tsc -p tsconfig.build.json",
     "typecheck": "tsrs"
+  },
+  "dependencies": {
+    "@zgeoff/agent-hooks": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "catalog:",
-    "@types/picomatch": "catalog:",
-    "@zgeoff/std": "workspace:*",
-    "picomatch": "catalog:",
-    "simple-git": "catalog:",
-    "tiny-invariant": "catalog:",
-    "ts-pattern": "catalog:",
     "tsrs": "catalog:",
-    "typescript": "catalog:",
-    "zod": "catalog:"
+    "typescript": "catalog:"
   },
   "engines": {
     "bun": ">=1.3"

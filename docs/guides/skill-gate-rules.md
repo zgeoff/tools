@@ -1,9 +1,8 @@
 # Writing skill-gate rules
 
-The rules file, `.claude/skill-gate.json`, tells the
-[skill gate](../../packages/skill-gate/README.md) which skills an edit needs and which skills and
-references a tool call needs. Path gates cover edits and Bash commands, and tool gates cover any
-other tool. A repo without the file has no gate.
+The rules file, `.claude/skill-gate.json`, tells the [skill gate](../architecture/skill-gate.md)
+which skills an edit needs and which skills and references a tool call needs. Path gates cover edits
+and Bash commands, and tool gates cover any other tool. A repo without the file has no gate.
 
 ## Path gates
 
@@ -45,10 +44,9 @@ skill or reference. A reference is a file path under `.claude/skills/`. A tool g
 }
 ```
 
-Add each gated tool to the `PreToolUse` matcher in `.claude/settings.json` too, as the package
-README's [Entry point](../../packages/skill-gate/README.md#entry-point) section shows. The hook
-never sees a call that the matcher skips. The denial names each missing skill and each reference to
-read.
+Run `bunx agent-hooks init` after you add or remove a tool gate, so that the `PreToolUse` matcher in
+`.claude/settings.json` and `.codex/hooks.json` names each gated tool. The hook never sees a call
+that the matcher skips. The denial names each missing skill and each reference to read.
 
 ## Mistakes the gate tolerates
 
@@ -61,8 +59,8 @@ blocks every call:
   the rest of the rules. The key itself denies nothing, so a rules file written for a later version
   of the package never blocks every call.
 - A rules file that does not parse denies no edit and no tool call. When the package cannot load,
-  the entry point fails closed instead, as
-  [Failing closed](../architecture/skill-gate.md#failing-closed) describes.
+  the start-up stub fails closed instead, as
+  [Failing closed](../architecture/agent-hooks.md#failing-closed) describes.
 
 In each case, the hook warns the user and the agent on every edit, and on every call to a tool that
 the hook matcher names, until you fix the rules file.

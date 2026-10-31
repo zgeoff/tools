@@ -11,16 +11,16 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const indexPath = fileURLToPath(new URL('index.ts', import.meta.url));
+  const indexPath = fileURLToPath(new URL('../index.ts', import.meta.url));
 
   const hookArgs = [
     '--eval',
-    `const { runSkillGate } = await import(${JSON.stringify(indexPath)}); await runSkillGate();`,
+    `const { runAgentHook } = await import(${JSON.stringify(indexPath)}); await runAgentHook({ harness: 'claude-code' });`,
   ];
 
   const codexHookArgs = [
     '--eval',
-    `const { runSkillGate } = await import(${JSON.stringify(indexPath)}); await runSkillGate('codex');`,
+    `const { runAgentHook } = await import(${JSON.stringify(indexPath)}); await runAgentHook({ harness: 'codex' });`,
   ];
 
   // A repo that Codex works in keeps its skills in .agents/skills and links .claude/skills to them.
@@ -116,15 +116,12 @@ test('it denies a test file edit until the session loads both testing skills', a
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    hookSpecificOutput: {
-      hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason: `Load the \`project-testing\` skill with the Skill tool before editing ${join(ctx.directory, 'src/a.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-    },
-  });
+  expect(result.stderr).toBe(
+    `Load the \`project-testing\` skill with the Skill tool before editing ${join(ctx.directory, 'src/a.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test('it allows a test file edit once the session loads both testing skills', async () => {
@@ -254,15 +251,12 @@ test('it denies a subagent edit when only the main session loaded the skills', a
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    hookSpecificOutput: {
-      hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason: `Load the \`testing\` skill with the Skill tool before editing ${join(ctx.directory, 'src/a.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-    },
-  });
+  expect(result.stderr).toBe(
+    `Load the \`testing\` skill with the Skill tool before editing ${join(ctx.directory, 'src/a.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test('it allows a workflow subagent edit once the subagent loads both testing skills', async () => {
@@ -365,17 +359,12 @@ test('it denies a workflow subagent edit when the subagent loads one of the test
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  const output: unknown = JSON.parse(result.stdout);
-
-  expect(output).toStrictEqual({
-    hookSpecificOutput: {
-      hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason: `Load the \`project-testing\` skill with the Skill tool before editing ${join(ctx.directory, 'src/a.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-    },
-  });
+  expect(result.stderr).toBe(
+    `Load the \`project-testing\` skill with the Skill tool before editing ${join(ctx.directory, 'src/a.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test('it denies a subagent edit when the subagent has no transcript', async () => {
@@ -411,15 +400,12 @@ test('it denies a subagent edit when the subagent has no transcript', async () =
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    hookSpecificOutput: {
-      hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason: `Load the \`testing\` skill with the Skill tool before editing ${join(ctx.directory, 'src/a.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-    },
-  });
+  expect(result.stderr).toBe(
+    `Load the \`testing\` skill with the Skill tool before editing ${join(ctx.directory, 'src/a.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test('it denies a subagent edit whose agent id climbs out of the subagents folder', async () => {
@@ -455,15 +441,12 @@ test('it denies a subagent edit whose agent id climbs out of the subagents folde
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    hookSpecificOutput: {
-      hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason: `Load the \`testing\` skill with the Skill tool before editing ${join(ctx.directory, 'src/a.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-    },
-  });
+  expect(result.stderr).toBe(
+    `Load the \`testing\` skill with the Skill tool before editing ${join(ctx.directory, 'src/a.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test('it denies an edit after a compaction and says to load the skills again', async () => {
@@ -497,15 +480,12 @@ test('it denies an edit after a compaction and says to load the skills again', a
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    hookSpecificOutput: {
-      hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason: `Load the \`testing\` skill again with the Skill tool before editing ${join(ctx.directory, 'src/a.test.ts')}, then retry the edit. This session was compacted, and a skill loaded before the compaction no longer counts. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-    },
-  });
+  expect(result.stderr).toBe(
+    `Load the \`testing\` skill again with the Skill tool before editing ${join(ctx.directory, 'src/a.test.ts')}, then retry the edit. This session was compacted, and a skill loaded before the compaction no longer counts. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test('it stays silent in a repo without a rules file', async () => {
@@ -629,15 +609,12 @@ test('it reads the project root from the payload cwd when CLAUDE_PROJECT_DIR is 
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    hookSpecificOutput: {
-      hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason: `Load the \`testing\` skill with the Skill tool before editing ${join(ctx.directory, 'a.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-    },
-  });
+  expect(result.stderr).toBe(
+    `Load the \`testing\` skill with the Skill tool before editing ${join(ctx.directory, 'a.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test('it stays silent on a Bash command that writes no file', async () => {
@@ -686,15 +663,12 @@ test('it gates a project file whose name starts with two dots', async () => {
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    hookSpecificOutput: {
-      hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason: `Load the \`testing\` skill with the Skill tool before editing ${join(ctx.directory, '..dots.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-    },
-  });
+  expect(result.stderr).toBe(
+    `Load the \`testing\` skill with the Skill tool before editing ${join(ctx.directory, '..dots.test.ts')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test.each([
@@ -1038,12 +1012,12 @@ test('it blocks after a Bash command changes a gated file before the session loa
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    decision: 'block',
-    reason: `skill-gate: this Bash command changed the gated path ${join(project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill with the Skill tool, then review what the command changed against it and fix what breaks a rule. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-  });
+  expect(result.stderr).toBe(
+    `skill-gate: this Bash command changed the gated path ${join(project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill with the Skill tool, then review what the command changed against it and fix what breaks a rule. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test('it blocks after a Bash command adds a gated symlink that points nowhere', async () => {
@@ -1092,12 +1066,12 @@ test('it blocks after a Bash command adds a gated symlink that points nowhere', 
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    decision: 'block',
-    reason: `skill-gate: this Bash command changed the gated path ${join(project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill with the Skill tool, then review what the command changed against it and fix what breaks a rule. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-  });
+  expect(result.stderr).toBe(
+    `skill-gate: this Bash command changed the gated path ${join(project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill with the Skill tool, then review what the command changed against it and fix what breaks a rule. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test('it warns after a Bash command when git cannot read the index afterwards', async () => {
@@ -1280,12 +1254,12 @@ test('it blocks after a Bash change by a subagent when only the main session loa
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    decision: 'block',
-    reason: `skill-gate: this Bash command changed the gated path ${join(project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill with the Skill tool, then review what the command changed against it and fix what breaks a rule. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-  });
+  expect(result.stderr).toBe(
+    `skill-gate: this Bash command changed the gated path ${join(project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill with the Skill tool, then review what the command changed against it and fix what breaks a rule. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test('it lets a Bash change to a gated file through once the session loads its skills', async () => {
@@ -1481,12 +1455,12 @@ test('it blocks after a Bash command rewrites a gated file that was dirty before
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    decision: 'block',
-    reason: `skill-gate: this Bash command changed the gated path ${join(project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill with the Skill tool, then review what the command changed against it and fix what breaks a rule. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-  });
+  expect(result.stderr).toBe(
+    `skill-gate: this Bash command changed the gated path ${join(project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill with the Skill tool, then review what the command changed against it and fix what breaks a rule. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test('it lets a Bash change to a file no gate matches through', async () => {
@@ -1592,12 +1566,12 @@ test('it blocks after a Bash change that follows a compaction and says to load t
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    decision: 'block',
-    reason: `skill-gate: this Bash command changed the gated path ${join(project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill again with the Skill tool, then review what the command changed against it and fix what breaks a rule. This session was compacted, and a skill loaded before the compaction no longer counts. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-  });
+  expect(result.stderr).toBe(
+    `skill-gate: this Bash command changed the gated path ${join(project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill again with the Skill tool, then review what the command changed against it and fix what breaks a rule. This session was compacted, and a skill loaded before the compaction no longer counts. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test('it lets a Bash change after a compaction through once the session loads the skills again', async () => {
@@ -1781,12 +1755,12 @@ test('it blocks after a Bash command changes a clean gated file and commits it',
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    decision: 'block',
-    reason: `skill-gate: this Bash command changed the gated path ${join(project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill with the Skill tool, then review what the command changed against it and fix what breaks a rule. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-  });
+  expect(result.stderr).toBe(
+    `skill-gate: this Bash command changed the gated path ${join(project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill with the Skill tool, then review what the command changed against it and fix what breaks a rule. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test('it lets a Bash command through when it changes only the mode of a clean gated file', async () => {
@@ -1903,12 +1877,12 @@ test('it blocks after a Bash command adds a gated file in the first commit', asy
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    decision: 'block',
-    reason: `skill-gate: this Bash command changed the gated path ${join(project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill with the Skill tool, then review what the command changed against it and fix what breaks a rule. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-  });
+  expect(result.stderr).toBe(
+    `skill-gate: this Bash command changed the gated path ${join(project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill with the Skill tool, then review what the command changed against it and fix what breaks a rule. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test('it gives the reason as context after a failed Bash command changes a gated file', async () => {
@@ -2013,12 +1987,12 @@ test('it blocks after a Bash change when the session environment sets GIT_EDITOR
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    decision: 'block',
-    reason: `skill-gate: this Bash command changed the gated path ${join(project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill with the Skill tool, then review what the command changed against it and fix what breaks a rule. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-  });
+  expect(result.stderr).toBe(
+    `skill-gate: this Bash command changed the gated path ${join(project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill with the Skill tool, then review what the command changed against it and fix what breaks a rule. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test('it removes the record of the dirty files once the Bash command is checked', async () => {
@@ -2115,16 +2089,12 @@ test('it denies a gated tool call and names the reference the session has not re
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    hookSpecificOutput: {
-      hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason:
-        'Before calling mcp__linear-server__save_issue, read .claude/skills/ticket-review/references/follow-ups.md with the Read tool, then retry the call. .claude/skill-gate.json lists the skills and references each tool needs.',
-    },
-  });
+  expect(result.stderr).toBe(
+    'Before calling mcp__linear-server__save_issue, read .claude/skills/ticket-review/references/follow-ups.md with the Read tool, then retry the call. .claude/skill-gate.json lists the skills and references each tool needs.\n',
+  );
 });
 
 test('it allows a gated tool call once the session reads the reference', async () => {
@@ -2218,16 +2188,12 @@ test('it denies a gated tool call again after a compaction voids the read', asyn
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    hookSpecificOutput: {
-      hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason:
-        'Before calling mcp__linear-server__save_issue, read .claude/skills/ticket-review/references/follow-ups.md again with the Read tool, then retry the call. This session was compacted, and a skill or reference loaded before the compaction no longer counts. .claude/skill-gate.json lists the skills and references each tool needs.',
-    },
-  });
+  expect(result.stderr).toBe(
+    'Before calling mcp__linear-server__save_issue, read .claude/skills/ticket-review/references/follow-ups.md again with the Read tool, then retry the call. This session was compacted, and a skill or reference loaded before the compaction no longer counts. .claude/skill-gate.json lists the skills and references each tool needs.\n',
+  );
 });
 
 test('it stays silent on a tool call that no tool gate names', async () => {
@@ -2387,15 +2353,12 @@ test('it denies an apply_patch edit of a gated file until a cat loads the skill'
   const gatedPatch = ctx.patch('*** Update File: src/a.test.ts', '@@', '-old', '+new');
   const denied = ctx.runHook(gatedPatch);
 
-  expect(denied.status).toBe(0);
+  expect(denied.status).toBe(2);
+  expect(denied.stdout).toBe('');
 
-  expect(JSON.parse(denied.stdout)).toStrictEqual({
-    hookSpecificOutput: {
-      hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason: `This patch changes a gated path before the session loaded the skills it needs: ${join(ctx.project, 'src/a.test.ts')} needs the \`testing\` skill. Load each missing skill by reading its SKILL.md with cat, for example \`cat .agents/skills/<name>/SKILL.md\`, then retry the patch. Change a gated path only with apply_patch, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-    },
-  });
+  expect(denied.stderr).toBe(
+    `This patch changes a gated path before the session loaded the skills it needs: ${join(ctx.project, 'src/a.test.ts')} needs the \`testing\` skill. Load each missing skill by reading its SKILL.md with cat, for example \`cat .agents/skills/<name>/SKILL.md\`, then retry the patch. Change a gated path only with apply_patch, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 
   const read = ctx.runHook(ctx.bash('PostToolUse', 'cat .agents/skills/testing/SKILL.md'));
 
@@ -2432,9 +2395,7 @@ test('it does not count a read by a command that is not a reader', async () => {
 
   const result = ctx.runHook(ctx.patch('*** Add File: src/b.test.ts', '+test'));
 
-  expect(JSON.parse(result.stdout)).toMatchObject({
-    hookSpecificOutput: { permissionDecision: 'deny' },
-  });
+  expect(result.status).toBe(2);
 });
 
 test('it allows an edit once the prompt names the skill as $testing', async () => {
@@ -2467,17 +2428,9 @@ test('it denies an edit again after a compaction voids the loaded skill', async 
 
   const result = ctx.runHook(ctx.patch('*** Update File: src/a.test.ts', '@@', '-old', '+new'));
 
-  expect(JSON.parse(result.stdout)).toMatchObject({
-    hookSpecificOutput: {
-      permissionDecisionReason: expect.stringContaining('Load each missing skill again by reading'),
-    },
-  });
-
-  expect(JSON.parse(result.stdout)).toMatchObject({
-    hookSpecificOutput: {
-      permissionDecisionReason: expect.stringContaining('This session was compacted'),
-    },
-  });
+  expect(result.status).toBe(2);
+  expect(result.stderr).toInclude('Load each missing skill again by reading');
+  expect(result.stderr).toInclude('This session was compacted');
 });
 
 test('it gates the destination of a Move to header', async () => {
@@ -2488,13 +2441,11 @@ test('it gates the destination of a Move to header', async () => {
     ctx.patch('*** Update File: src/old.ts', '*** Move to: src/new.test.ts', '@@', '-a', '+b'),
   );
 
-  expect(JSON.parse(result.stdout)).toMatchObject({
-    hookSpecificOutput: {
-      permissionDecisionReason: expect.stringContaining(
-        `${join(ctx.project, 'src/new.test.ts')} needs the \`testing\` skill`,
-      ),
-    },
-  });
+  expect(result.status).toBe(2);
+
+  expect(result.stderr).toInclude(
+    `${join(ctx.project, 'src/new.test.ts')} needs the \`testing\` skill`,
+  );
 });
 
 test('it names every gated path in a patch that changes several', async () => {
@@ -2521,7 +2472,9 @@ test('it names every gated path in a patch that changes several', async () => {
     ),
   );
 
-  const output = JSON.stringify(JSON.parse(result.stdout));
+  expect(result.status).toBe(2);
+
+  const output = result.stderr;
 
   expect(output).toContain(`${join(ctx.project, 'src/a.test.ts')} needs the \`testing\` skill`);
   expect(output).toContain(`${join(ctx.project, 'notes.md')} needs the \`testing\` skill`);
@@ -2548,12 +2501,12 @@ test('it blocks after a Bash command writes a gated file before the session load
 
   const result = ctx.runHook(ctx.bash('PostToolUse', 'node scripts/stamp.mjs'));
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    decision: 'block',
-    reason: `skill-gate: this Bash command changed the gated path ${join(ctx.project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill by reading its SKILL.md with cat, for example \`cat .agents/skills/<name>/SKILL.md\`, then review what the command changed against it and fix what breaks a rule. Change a gated path only with apply_patch, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-  });
+  expect(result.stderr).toBe(
+    `skill-gate: this Bash command changed the gated path ${join(ctx.project, 'src/a.test.ts')} before the session loaded the skills it needs. Load the \`testing\` skill by reading its SKILL.md with cat, for example \`cat .agents/skills/<name>/SKILL.md\`, then review what the command changed against it and fix what breaks a rule. Change a gated path only with apply_patch, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test('it lets a Bash change through once a cat loaded the skill', async () => {
@@ -2603,13 +2556,11 @@ test('it finds the project from the git top level when CLAUDE_PROJECT_DIR is uns
 
   const denied = ctx.runHook(patchEvent, {});
 
-  expect(JSON.parse(denied.stdout)).toMatchObject({
-    hookSpecificOutput: {
-      permissionDecisionReason: expect.stringContaining(
-        `${join(ctx.project, 'src/a.test.ts')} needs the \`testing\` skill`,
-      ),
-    },
-  });
+  expect(denied.status).toBe(2);
+
+  expect(denied.stderr).toInclude(
+    `${join(ctx.project, 'src/a.test.ts')} needs the \`testing\` skill`,
+  );
 
   ctx.runHook(
     {
@@ -2661,13 +2612,8 @@ test('it denies a gated MCP tool call until the skill loads and a reference is r
 
   const denied = ctx.runHook(call);
 
-  expect(JSON.parse(denied.stdout)).toMatchObject({
-    hookSpecificOutput: {
-      permissionDecisionReason: expect.stringContaining(
-        'load the `testing` skill by reading its SKILL.md with cat',
-      ),
-    },
-  });
+  expect(denied.status).toBe(2);
+  expect(denied.stderr).toInclude('load the `testing` skill by reading its SKILL.md with cat');
 
   ctx.runHook(
     ctx.bash(
@@ -2691,9 +2637,7 @@ test('it does not count a skill read that a failing guard keeps from running', a
 
   const result = ctx.runHook(ctx.patch('*** Add File: src/b.test.ts', '+test'));
 
-  expect(JSON.parse(result.stdout)).toMatchObject({
-    hookSpecificOutput: { permissionDecision: 'deny' },
-  });
+  expect(result.status).toBe(2);
 });
 
 test('it counts a skill read that follows a directory change', async () => {

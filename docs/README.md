@@ -14,8 +14,10 @@ The docs of tools: how its shared files and packages work, and the steps a contr
   Renovate run, and the audit-fix workflow.
 - [The Socket config](./architecture/socket-config.md): how the `socket` entry limits Socket's
   scans.
-- [Skill gate](./architecture/skill-gate.md): how `@zgeoff/skill-gate` decides which edits, Bash
-  commands and tool calls it denies.
+- [Agent hooks](./architecture/agent-hooks.md): the start-up stub that every hook entry runs, how it
+  installs `@zgeoff/agent-hooks`, and how it fails closed.
+- [Skill gate](./architecture/skill-gate.md): how the skill gate decides which edits, Bash commands
+  and tool calls it denies.
 - [@zgeoff/oxlint-config](./architecture/oxlint-config.md), with its
   [code-style rules](./architecture/oxlint-config-code-style.md),
   [import zones](./architecture/oxlint-config-import-zones.md) and
@@ -39,4 +41,4 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 ## Runbooks
 
 - [Setting up a downstream repo](./runbooks/downstream-repo-setup.md): wire a repo up, and opt in to
-  the skill gate and the pre-push baseline.
+  the agent hooks and the pre-push baseline.

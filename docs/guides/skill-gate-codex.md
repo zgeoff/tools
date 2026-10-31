@@ -1,62 +1,14 @@
 # Gating Codex edits
 
-The same entry point runs as a Codex hook. Codex follows Claude Code's hook contract, so the gate
+The start-up stub runs as a Codex hook too. Codex follows Claude Code's hook contract, so the gate
 denies an edit, denies a gated tool call, and blocks after a Bash command exactly as it does under
-Claude Code. The hook command passes `--harness codex`, which makes `runSkillGate` read the Codex
+Claude Code. The hook command passes `--harness codex`, which makes the package read the Codex
 payload; with no argument the harness is Claude Code. The rules stay in `.claude/skill-gate.json`.
 
-Register the entry point in `.codex/hooks.json`. The command resolves the repo root with `git`,
-because Codex sets no `CLAUDE_PROJECT_DIR`. The `PreToolUse` matcher names `apply_patch`, which is
-how Codex edits files, and each gated tool. This example gates `mcp__tracker__update_ticket`:
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash|apply_patch|mcp__tracker__update_ticket",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun --no-install \"$(git rev-parse --show-toplevel)/.claude/hooks/skill-gate/skill-gate.ts\" --harness codex"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun --no-install \"$(git rev-parse --show-toplevel)/.claude/hooks/skill-gate/skill-gate.ts\" --harness codex"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun --no-install \"$(git rev-parse --show-toplevel)/.claude/hooks/skill-gate/skill-gate.ts\" --harness codex"
-          }
-        ]
-      }
-    ],
-    "PostCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun --no-install \"$(git rev-parse --show-toplevel)/.claude/hooks/skill-gate/skill-gate.ts\" --harness codex"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
+`bunx agent-hooks init` registers the stub in `.codex/hooks.json`. The command finds the repo root
+with `git`, because Codex sets no `CLAUDE_PROJECT_DIR`. The `PreToolUse` matcher names Bash,
+`apply_patch`, which is how Codex edits files, and each gated tool. The stub also runs on
+`UserPromptSubmit` and `PostCompact`, which write the gate's ledger.
 
 Codex runs a repo's hooks only in a trusted project, and only after you trust each hook definition.
 Open `/hooks` in the Codex CLI and trust the four entries. A changed definition needs a new review.

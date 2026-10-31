@@ -1,6 +1,6 @@
 import { isRecord } from '@zgeoff/std';
 import { match } from 'ts-pattern';
-import type { Harness } from './harness.ts';
+import type { Harness } from '../harness.ts';
 import { parsePatchPaths } from './parse-patch-paths.ts';
 import type { HookEvent, HookInput, LifecycleInput } from './types.ts';
 

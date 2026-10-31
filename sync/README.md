@@ -17,7 +17,8 @@ holds and how a run delivers, updates and retires the files.
 - [`skills/`](./skills/) — the shared base of each Claude skill, with its scripts' tests.
 - [`docs-vision/`](./docs-vision/) — the vision doc check, which docs-writing's `check-length.sh`
   runs in a repo that takes it, with its test.
-- [`hooks/`](./hooks/) — Claude Code hooks, such as the skill gate's entry point, with their tests.
+- [`hooks/`](./hooks/) — agent hooks: the start-up stub and the skill gate's older entry point, with
+  their tests.
 - [`pre-push/`](./pre-push/) — the [pre-push baseline](../docs/architecture/pre-push-baseline.md)
   and the [memory-cap script](../docs/architecture/memory-caps.md), with their tests.
 
@@ -34,4 +35,4 @@ holds and how a run delivers, updates and retires the files.
 - [The Socket config](../docs/architecture/socket-config.md): how the `socket` entry limits Socket's
   scans.
 - [Setting up a downstream repo](../docs/runbooks/downstream-repo-setup.md): wire a repo up, and opt
-  in to the skill gate and the pre-push baseline.
+  in to the agent hooks and the pre-push baseline.

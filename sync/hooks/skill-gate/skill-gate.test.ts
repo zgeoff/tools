@@ -41,15 +41,12 @@ test('it denies a gated edit through the delivered entry point', async () => {
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
+  expect(result.stdout).toBe('');
 
-  expect(JSON.parse(result.stdout)).toStrictEqual({
-    hookSpecificOutput: {
-      hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
-      permissionDecisionReason: `Load the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.directory, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.`,
-    },
-  });
+  expect(result.stderr).toBe(
+    `Load the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.directory, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  );
 });
 
 test.each([
@@ -348,15 +345,11 @@ test('it denies a gated apply_patch edit through the entry point when given --ha
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
 
-  expect(JSON.parse(result.stdout)).toMatchObject({
-    hookSpecificOutput: {
-      permissionDecisionReason: expect.stringContaining(
-        `${join(ctx.directory, 'guide.md')} needs the \`docs-writing\` skill`,
-      ),
-    },
-  });
+  expect(result.stderr).toInclude(
+    `${join(ctx.directory, 'guide.md')} needs the \`docs-writing\` skill`,
+  );
 });
 
 test.each([
@@ -433,15 +426,11 @@ test('it reads --harness=codex in the joined form', async () => {
     }),
   });
 
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(2);
 
-  expect(JSON.parse(result.stdout)).toMatchObject({
-    hookSpecificOutput: {
-      permissionDecisionReason: expect.stringContaining(
-        `${join(ctx.directory, 'guide.md')} needs the \`docs-writing\` skill`,
-      ),
-    },
-  });
+  expect(result.stderr).toInclude(
+    `${join(ctx.directory, 'guide.md')} needs the \`docs-writing\` skill`,
+  );
 });
 
 test.each([

@@ -52,6 +52,10 @@
     "packages/diet": {
       "component": "@zgeoff/diet",
       "initial-version": "0.1.0"
+    },
+    "packages/agent-hooks": {
+      "component": "@zgeoff/agent-hooks",
+      "initial-version": "0.1.0"
     }
   }
 }

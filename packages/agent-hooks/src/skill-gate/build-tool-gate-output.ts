@@ -1,6 +1,6 @@
+import type { Harness } from '../harness.ts';
 import { formatSkillList } from './format-skill-list.ts';
 import { formatUnknownKeyWarning } from './format-unknown-key-warning.ts';
-import type { Harness } from './harness.ts';
 import { pickHarnessWording } from './pick-harness-wording.ts';
 import type {
   SkillGateHookOutput,

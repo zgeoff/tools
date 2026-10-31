@@ -127,16 +127,15 @@ a copy from before its `except` removes that copy itself.
 
 ## Hooks
 
-Files under [`hooks/`](../../sync/hooks/) are Claude Code hooks, delivered as opt-in entries to
-`.claude/hooks/<name>/`. Their tests stay in tools. `hook-skill-gate` delivers the skill gate's
-entry point, a file that runs the gate from
-[`@zgeoff/skill-gate`](../../packages/skill-gate/README.md). The gate denies an edit until the
-session has loaded every skill the path needs, and a call to a gated tool until the session has
-loaded its skills and read its reference files. The package README describes what it allows, blocks
-and warns on. The repo takes a gate fix by bumping the package, and the entry point changes only
-when the package's API does. A repo opts in with four changes, which repo-sync never touches, as
-[Opting in to the skill gate](../runbooks/downstream-repo-setup.md#opting-in-to-the-skill-gate)
-lists.
+Files under [`hooks/`](../../sync/hooks/) are agent hooks, delivered as opt-in entries to
+`.claude/hooks/`. Their tests stay in tools. `hook-start` delivers the start-up stub that every hook
+entry runs, which runs the hooks from [`@zgeoff/agent-hooks`](../../packages/agent-hooks/README.md)
+and installs the package when it is missing, as [Agent hooks](./agent-hooks.md) describes. A repo
+takes a hook fix by bumping the package, and the stub changes only when the package's API does. A
+repo opts in with the changes that
+[Opting in to the agent hooks](../runbooks/downstream-repo-setup.md#opting-in-to-the-agent-hooks)
+lists, which repo-sync never touches. `hook-skill-gate` delivers the skill gate's older entry point,
+which runs the gate from `@zgeoff/skill-gate`.
 
 The pre-push baseline is an entry of its own kind, which
 [The pre-push baseline](./pre-push-baseline.md) describes.
