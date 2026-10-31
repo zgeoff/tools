@@ -42,7 +42,7 @@ async function setupTest() {
   const run = (...args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`.cwd(directory).env(env).nothrow().quiet();
 
-  const runInPullRequest = (baseRef: string, args: readonly string[], cwd = directory) =>
+  const runInPullRequest = (cwd: string, baseRef: string, args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`
       .cwd(cwd)
       .env({ ...env, GITHUB_BASE_REF: baseRef })
@@ -970,7 +970,7 @@ test('it fetches the base branch in a pull-request run with no origin history', 
   await ctx.writeText('new.md', `${'word '.repeat(260)}\n`);
   await ctx.runCommit('add the new doc');
 
-  const result = await ctx.runInPullRequest('main', ['old.md', 'new.md']);
+  const result = await ctx.runInPullRequest(ctx.directory, 'main', ['old.md', 'new.md']);
 
   expect({
     exitCode: result.exitCode,
@@ -1006,7 +1006,7 @@ test('it counts only the PR documents in a shallow pull-request merge checkout',
   await ctx.runGit('push', '-q', 'origin', 'main', 'pull-merge');
 
   const cloneDir = await ctx.createShallowClone(originDir, 'pull-merge');
-  const result = await ctx.runInPullRequest('main', ['base.md', 'pr.md'], cloneDir);
+  const result = await ctx.runInPullRequest(cloneDir, 'main', ['base.md', 'pr.md']);
 
   expect({
     exitCode: result.exitCode,

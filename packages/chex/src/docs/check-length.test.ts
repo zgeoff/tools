@@ -23,13 +23,6 @@ async function setupTest() {
 
   const scriptPath = fileURLToPath(new URL('check-length.sh', import.meta.url));
 
-  const writeLines = async (path: string, count: number) => {
-    await mkdir(dirname(join(directory, path)), { recursive: true });
-
-    // Each line is a list item, which the prose check's paragraph limit skips.
-    await writeFile(join(directory, path), '- The tool reads one file.\n'.repeat(count));
-  };
-
   const writeText = async (path: string, text: string) => {
     await mkdir(dirname(join(directory, path)), { recursive: true });
     await writeFile(join(directory, path), text);
@@ -38,13 +31,13 @@ async function setupTest() {
   const run = (...args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`.cwd(directory).env(env).nothrow().quiet();
 
-  return { directory, writeLines, writeText, run };
+  return { directory, writeText, run };
 }
 
 test('it fails when the root README is over the front page limit', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeLines('README.md', 101);
+  await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(101));
 
   const result = await ctx.run();
 
@@ -65,7 +58,7 @@ test('it fails when the root README is over the front page limit', async () => {
 test('it warns and passes when a README is over its target but within its limit', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeLines('README.md', 81);
+  await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(81));
 
   const result = await ctx.run();
 
@@ -86,8 +79,8 @@ test('it warns and passes when a README is over its target but within its limit'
 test('it holds a README under packages/ to the package limit', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeLines('packages/parser/README.md', 100);
-  await ctx.writeLines('packages/runner/README.md', 101);
+  await ctx.writeText('packages/parser/README.md', '- The tool reads one file.\n'.repeat(100));
+  await ctx.writeText('packages/runner/README.md', '- The tool reads one file.\n'.repeat(101));
 
   const result = await ctx.run();
 
@@ -109,8 +102,8 @@ test('it holds a README under packages/ to the package limit', async () => {
 test('it fails a folder README over 70 lines', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeLines('README.md', 10);
-  await ctx.writeLines('kernel/README.md', 71);
+  await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(10));
+  await ctx.writeText('kernel/README.md', '- The tool reads one file.\n'.repeat(71));
 
   const result = await ctx.run();
 
@@ -132,7 +125,10 @@ test('it fails a folder README over 70 lines', async () => {
 test('it holds a README below a package folder to the folder limit', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeLines('packages/parser/fixtures/README.md', 71);
+  await ctx.writeText(
+    'packages/parser/fixtures/README.md',
+    '- The tool reads one file.\n'.repeat(71),
+  );
 
   const result = await ctx.run();
 
@@ -154,7 +150,7 @@ test('it holds a README beside a public package.json outside packages/ to the fo
   const ctx = await setupTest();
 
   await ctx.writeText('tools/lint/package.json', '{ "name": "lint" }\n');
-  await ctx.writeLines('tools/lint/README.md', 71);
+  await ctx.writeText('tools/lint/README.md', '- The tool reads one file.\n'.repeat(71));
 
   const result = await ctx.run();
 
@@ -175,8 +171,15 @@ test('it holds a README beside a public package.json outside packages/ to the fo
 test('it holds a spike README under docs/design to the folder limit and its results.md to no cap', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeLines('docs/design/sync/spikes/cold-start/README.md', 71);
-  await ctx.writeLines('docs/design/sync/spikes/cold-start/results.md', 251);
+  await ctx.writeText(
+    'docs/design/sync/spikes/cold-start/README.md',
+    '- The tool reads one file.\n'.repeat(71),
+  );
+
+  await ctx.writeText(
+    'docs/design/sync/spikes/cold-start/results.md',
+    '- The tool reads one file.\n'.repeat(251),
+  );
 
   const result = await ctx.run();
 
@@ -197,7 +200,7 @@ test('it holds a spike README under docs/design to the folder limit and its resu
 test('it accepts --package and ignores it', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeLines('README.md', 101);
+  await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(101));
 
   const result = await ctx.run('--package', 'README.md', '--package', 'missing/README.md');
 
@@ -220,8 +223,8 @@ test('it accepts --package and ignores it', async () => {
 test('it warns and passes when a docs file is over its cap', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeLines('README.md', 10);
-  await ctx.writeLines('docs/architecture/overview.md', 251);
+  await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(10));
+  await ctx.writeText('docs/architecture/overview.md', '- The tool reads one file.\n'.repeat(251));
 
   const result = await ctx.run();
 
@@ -243,8 +246,8 @@ test('it warns and passes when a docs file is over its cap', async () => {
 test('it holds a runbook to a cap of 300 lines', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeLines('docs/runbooks/operations.md', 300);
-  await ctx.writeLines('docs/runbooks/releasing.md', 301);
+  await ctx.writeText('docs/runbooks/operations.md', '- The tool reads one file.\n'.repeat(300));
+  await ctx.writeText('docs/runbooks/releasing.md', '- The tool reads one file.\n'.repeat(301));
 
   const result = await ctx.run();
 
@@ -265,7 +268,7 @@ test('it holds a runbook to a cap of 300 lines', async () => {
 test('it reads docs/README.md as a doc, not as a README', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeLines('docs/README.md', 100);
+  await ctx.writeText('docs/README.md', '- The tool reads one file.\n'.repeat(100));
 
   const result = await ctx.run();
 
@@ -283,8 +286,8 @@ test('it reads docs/README.md as a doc, not as a README', async () => {
 test('it passes when every README and doc is under its limit and cap', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeLines('README.md', 50);
-  await ctx.writeLines('docs/guides/setup.md', 250);
+  await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(50));
+  await ctx.writeText('docs/guides/setup.md', '- The tool reads one file.\n'.repeat(250));
 
   const result = await ctx.run();
 
@@ -305,8 +308,8 @@ test('it passes when every README and doc is under its limit and cap', async () 
 test('it checks a README whose path is not ASCII', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeLines('README.md', 10);
-  await ctx.writeLines('café/README.md', 71);
+  await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(10));
+  await ctx.writeText('café/README.md', '- The tool reads one file.\n'.repeat(71));
 
   const result = await ctx.run();
 
@@ -328,9 +331,9 @@ test('it checks a README whose path is not ASCII', async () => {
 test('it holds no README under a skills folder to a README limit', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeLines('README.md', 10);
-  await ctx.writeLines('.agents/skills/demo/README.md', 71);
-  await ctx.writeLines('.claude/skills/other/README.md', 71);
+  await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(10));
+  await ctx.writeText('.agents/skills/demo/README.md', '- The tool reads one file.\n'.repeat(71));
+  await ctx.writeText('.claude/skills/other/README.md', '- The tool reads one file.\n'.repeat(71));
 
   const result = await ctx.run();
 
@@ -351,7 +354,7 @@ test('it holds no README under a skills folder to a README limit', async () => {
 test('it passes a doc with a banned word, since the prose check owns the words', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeLines('README.md', 10);
+  await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(10));
   await ctx.writeText('docs/overview.md', 'The cache is load-bearing.\n');
 
   const result = await ctx.run();

@@ -31,10 +31,7 @@ async function setupTest() {
   const run = (...args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`.cwd(directory).env(env).nothrow().quiet();
 
-  const advice =
-    'not one of the five kinds of README; move its content into docs/, or into a code comment beside the code it explains';
-
-  return { writeText, run, advice };
+  return { writeText, run };
 }
 
 test('it passes the root, package, docs index and design READMEs', async () => {
@@ -110,12 +107,12 @@ test('it fails a README that is none of the five kinds, and says what to do', as
   }).toStrictEqual({
     exitCode: 1,
     stdout:
-      `docs/design/README.md: ${ctx.advice}\n` +
-      `docs/design/sync/spikes/README.md: ${ctx.advice}\n` +
-      `docs/design/sync/spikes/cold-start/README.md: ${ctx.advice}\n` +
-      `docs/guides/README.md: ${ctx.advice}\n` +
-      `notes/README.md: ${ctx.advice}\n` +
-      `src/cache/README.md: ${ctx.advice}\n` +
+      `docs/design/README.md: not one of the five kinds of README; move its content into docs/, or into a code comment beside the code it explains\n` +
+      `docs/design/sync/spikes/README.md: not one of the five kinds of README; move its content into docs/, or into a code comment beside the code it explains\n` +
+      `docs/design/sync/spikes/cold-start/README.md: not one of the five kinds of README; move its content into docs/, or into a code comment beside the code it explains\n` +
+      `docs/guides/README.md: not one of the five kinds of README; move its content into docs/, or into a code comment beside the code it explains\n` +
+      `notes/README.md: not one of the five kinds of README; move its content into docs/, or into a code comment beside the code it explains\n` +
+      `src/cache/README.md: not one of the five kinds of README; move its content into docs/, or into a code comment beside the code it explains\n` +
       'check-readmes: 7 READMEs, 6 not one of the five kinds\n',
     stderr: '',
   });
@@ -135,7 +132,7 @@ test('it fails a README in a design subfolder whose parent has no design README'
   }).toStrictEqual({
     exitCode: 1,
     stdout:
-      `docs/design/sync/conflicts/README.md: ${ctx.advice}\n` +
+      `docs/design/sync/conflicts/README.md: not one of the five kinds of README; move its content into docs/, or into a code comment beside the code it explains\n` +
       'check-readmes: 1 READMEs, 1 not one of the five kinds\n',
     stderr: '',
   });
@@ -177,7 +174,7 @@ test('it fails a spike index inside docs/design/, because the design README list
   }).toStrictEqual({
     exitCode: 1,
     stdout:
-      `docs/design/sync/spikes/README.md: ${ctx.advice}\n` +
+      `docs/design/sync/spikes/README.md: not one of the five kinds of README; move its content into docs/, or into a code comment beside the code it explains\n` +
       'check-readmes: 4 READMEs, 1 not one of the five kinds\n',
     stderr: '',
   });

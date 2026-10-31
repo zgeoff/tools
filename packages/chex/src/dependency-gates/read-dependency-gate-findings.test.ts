@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'bun:test';
-import invariant from 'tiny-invariant';
+import { buildStubProgramRunner } from '../../../../test-utils/build-stub-program-runner.ts';
 import type { ProgramResult } from '../run-program.ts';
 import { readDependencyGateFindings } from './read-dependency-gate-findings.ts';
 
@@ -62,13 +62,7 @@ test('it reports a stale exclude, an unneeded override and an unneeded audit ign
     cwd: '/repo',
     env: {},
     today: '2026-03-09',
-    runProgram: (argv) => {
-      const answer = answers[argv.join(' ')];
-
-      invariant(answer, `the test has no answer for ${argv.join(' ')}`);
-
-      return answer;
-    },
+    runProgram: buildStubProgramRunner(answers),
     readRepoFile: (path) => files[path] ?? null,
   });
 

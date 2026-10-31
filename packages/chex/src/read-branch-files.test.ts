@@ -22,7 +22,7 @@ async function setupTest() {
   await runGit(directory, env, ['init', '--quiet', '--bare', '--initial-branch=main', upstream]);
   await runGit(directory, env, ['clone', '--quiet', upstream, repo]);
   await runGit(repo, env, ['switch', '--quiet', '--create', 'main']);
-  await createGitCommit(repo, env, { 'README.md': '# repo\n' });
+  await createGitCommit(repo, env, {});
   await runGit(repo, env, ['push', '--quiet', '-u', 'origin', 'main']);
   await runGit(repo, env, ['remote', 'set-head', 'origin', 'main']);
 
@@ -85,6 +85,8 @@ test('it lists nothing when the branch has no commits of its own', async () => {
 test('it leaves out a file the branch deleted', async () => {
   const ctx = await setupTest();
 
+  await ctx.createCommit({ 'README.md': '# repo\n' });
+  await ctx.runGit('push', '--quiet', 'origin', 'main');
   await ctx.runGit('switch', '--quiet', '--create', 'feature');
   await ctx.runGit('rm', '--quiet', 'README.md');
   await ctx.createCommit({ 'a.ts': 'a' });
@@ -97,6 +99,8 @@ test('it leaves out a file the branch deleted', async () => {
 test('it lists a file the branch deleted when asked for deleted paths', async () => {
   const ctx = await setupTest();
 
+  await ctx.createCommit({ 'README.md': '# repo\n' });
+  await ctx.runGit('push', '--quiet', 'origin', 'main');
   await ctx.runGit('switch', '--quiet', '--create', 'feature');
   await ctx.runGit('rm', '--quiet', 'README.md');
   await ctx.createCommit({ 'a.ts': 'a' });
@@ -120,6 +124,8 @@ test('it lists a file whose name holds a byte past ASCII as git stores it', asyn
 test('it lists the new path of a file the branch renamed', async () => {
   const ctx = await setupTest();
 
+  await ctx.createCommit({ 'README.md': '# repo\n' });
+  await ctx.runGit('push', '--quiet', 'origin', 'main');
   await ctx.runGit('switch', '--quiet', '--create', 'feature');
   await ctx.runGit('mv', 'README.md', 'GUIDE.md');
   await ctx.runGit('commit', '--quiet', '-m', 'rename');

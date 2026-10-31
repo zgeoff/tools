@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { $ } from 'bun';
+import { buildSkillPageLines } from '../../../../test-utils/build-skill-page-lines.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'check-skill-'));
@@ -31,34 +32,7 @@ async function setupTest() {
   const run = (...args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`.cwd(directory).env(env).nothrow().quiet();
 
-  const writeSkill = (path: string, name: string, words: number) =>
-    writePage(path, [
-      '---',
-      `name: ${name}`,
-      'description:',
-      `  Commands and traps for the ${name} service. Load it before running or writing a ${name} test.`,
-      '---',
-      '',
-      ...Array.from({ length: words / 5 }, () => 'The tool reads one file.'),
-    ]);
-
-  const writeRuleSet = (path: string, name: string, words: number) =>
-    writePage(path, [
-      '---',
-      `name: ${name}`,
-      'description:',
-      `  Rules for every ${name} change. Load it before writing or reviewing one.`,
-      'metadata:',
-      '  kind: rule-set',
-      '---',
-      '',
-      ...Array.from({ length: Math.floor(words / 50) }, () =>
-        'The tool reads one file. '.repeat(10).trim(),
-      ),
-      ...Array.from({ length: (words % 50) / 5 }, () => 'The tool reads one file.'),
-    ]);
-
-  return { writePage, run, writeSkill, writeRuleSet };
+  return { writePage, run };
 }
 
 test('it passes a skill with a name, a description, and short files', async () => {
@@ -900,7 +874,15 @@ test('it reads a link after a comment marker inside inline code', async () => {
 test('it passes a SKILL.md body of 1,500 words', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeSkill('skills/demo/SKILL.md', 'demo', 1500);
+  await ctx.writePage(
+    'skills/demo/SKILL.md',
+    buildSkillPageLines({
+      name: 'demo',
+      description:
+        'Commands and traps for the demo service. Load it before running or writing a demo test.',
+      bodyWords: 1500,
+    }),
+  );
 
   const result = await ctx.run();
 
@@ -918,7 +900,15 @@ test('it passes a SKILL.md body of 1,500 words', async () => {
 test('it warns and passes when a SKILL.md body is over 1,500 words', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeSkill('.agents/skills/demo/SKILL.md', 'demo', 1505);
+  await ctx.writePage(
+    '.agents/skills/demo/SKILL.md',
+    buildSkillPageLines({
+      name: 'demo',
+      description:
+        'Commands and traps for the demo service. Load it before running or writing a demo test.',
+      bodyWords: 1505,
+    }),
+  );
 
   const result = await ctx.run();
 
@@ -938,8 +928,25 @@ test('it warns and passes when a SKILL.md body is over 1,500 words', async () =>
 test('it fails a SKILL.md body over 1,700 words, and counts no word of the frontmatter', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeSkill('skills/demo/SKILL.md', 'demo', 1700);
-  await ctx.writeSkill('skills/other/SKILL.md', 'other', 1705);
+  await ctx.writePage(
+    'skills/demo/SKILL.md',
+    buildSkillPageLines({
+      name: 'demo',
+      description:
+        'Commands and traps for the demo service. Load it before running or writing a demo test.',
+      bodyWords: 1700,
+    }),
+  );
+
+  await ctx.writePage(
+    'skills/other/SKILL.md',
+    buildSkillPageLines({
+      name: 'other',
+      description:
+        'Commands and traps for the other service. Load it before running or writing a other test.',
+      bodyWords: 1705,
+    }),
+  );
 
   const result = await ctx.run();
 
@@ -960,7 +967,15 @@ test('it fails a SKILL.md body over 1,700 words, and counts no word of the front
 test('it passes a rule set of 4,000 words', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeRuleSet('skills/demo/SKILL.md', 'demo', 4000);
+  await ctx.writePage(
+    'skills/demo/SKILL.md',
+    buildSkillPageLines({
+      name: 'demo',
+      description: 'Rules for every demo change. Load it before writing or reviewing one.',
+      kind: 'rule-set',
+      bodyWords: 4000,
+    }),
+  );
 
   const result = await ctx.run();
 
@@ -978,8 +993,25 @@ test('it passes a rule set of 4,000 words', async () => {
 test('it warns on a rule set over 4,000 words and fails one over 5,000', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeRuleSet('skills/demo/SKILL.md', 'demo', 4005);
-  await ctx.writeRuleSet('skills/other/SKILL.md', 'other', 5005);
+  await ctx.writePage(
+    'skills/demo/SKILL.md',
+    buildSkillPageLines({
+      name: 'demo',
+      description: 'Rules for every demo change. Load it before writing or reviewing one.',
+      kind: 'rule-set',
+      bodyWords: 4005,
+    }),
+  );
+
+  await ctx.writePage(
+    'skills/other/SKILL.md',
+    buildSkillPageLines({
+      name: 'other',
+      description: 'Rules for every other change. Load it before writing or reviewing one.',
+      kind: 'rule-set',
+      bodyWords: 5005,
+    }),
+  );
 
   const result = await ctx.run();
 

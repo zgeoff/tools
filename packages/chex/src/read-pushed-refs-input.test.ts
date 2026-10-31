@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, mock, test } from 'bun:test';
 import { readPushedRefsInput } from './read-pushed-refs-input.ts';
 
 test('it returns the text of stdin when the arguments hold --pushed-refs', async () => {
@@ -14,15 +14,12 @@ test('it returns the text of stdin when the arguments hold --pushed-refs', async
 });
 
 test('it returns null without reading stdin when the arguments lack --pushed-refs', async () => {
-  let reads = 0;
+  const readStdin = mock(() => Promise.resolve('refs/heads/greeting'));
 
-  const input = await readPushedRefsInput([], () => {
-    reads += 1;
+  const input = await readPushedRefsInput([], readStdin);
 
-    return Promise.resolve('refs/heads/greeting');
-  });
-
-  expect({ input, reads }).toStrictEqual({ input: null, reads: 0 });
+  expect(input).toBeNull();
+  expect(readStdin).not.toHaveBeenCalled();
 });
 
 test('it throws on an argument it does not know', () => {

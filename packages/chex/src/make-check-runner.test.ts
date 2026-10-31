@@ -1,27 +1,5 @@
-import { expect, test } from 'bun:test';
-import type { RepoCheckName } from './make-check-runner.ts';
+import { expect, mock, test } from 'bun:test';
 import { makeCheckRunner } from './make-check-runner.ts';
-
-function setupTest(exitCode: number) {
-  const calls: string[][] = [];
-
-  const makeRepoCheck = (name: RepoCheckName) => (args: readonly string[]) => {
-    calls.push([name, ...args]);
-
-    return exitCode;
-  };
-
-  const repoChecks = {
-    commits: makeRepoCheck('commits'),
-    'local-paths': makeRepoCheck('local-paths'),
-    'test-timeouts': makeRepoCheck('test-timeouts'),
-    workflows: makeRepoCheck('workflows'),
-    'dependency-gates': makeRepoCheck('dependency-gates'),
-    uncommitted: makeRepoCheck('uncommitted'),
-  };
-
-  return { calls, repoChecks };
-}
 
 test.each([
   ['prose', 'check-prose.sh'],
@@ -31,25 +9,28 @@ test.each([
   ['vision', 'check-vision.sh'],
   ['skill', 'check-skill.sh'],
 ] as const)('it runs the %s check as its shell script with its arguments', async (name, script) => {
-  const ctx = setupTest(0);
-  const commands: string[][] = [];
+  const runScript = mock<(argv: readonly string[]) => Promise<number>>(() => Promise.resolve(3));
 
   const runCheck = makeCheckRunner({
     docsFolder: '/pkg/src/docs',
-    runScript: (argv) => {
-      commands.push([...argv]);
-
-      return Promise.resolve(3);
+    runScript,
+    repoChecks: {
+      commits: mock(() => 0),
+      'local-paths': mock(() => 0),
+      'test-timeouts': mock(() => 0),
+      workflows: mock(() => 0),
+      'dependency-gates': mock(() => 0),
+      uncommitted: mock(() => 0),
     },
-    repoChecks: ctx.repoChecks,
   });
 
   const exitCode = await runCheck(name, ['docs/guide.md']);
 
-  expect({ exitCode, commands }).toStrictEqual({
-    exitCode: 3,
-    commands: [['bash', `/pkg/src/docs/${script}`, 'docs/guide.md']],
-  });
+  expect(exitCode).toBe(3);
+
+  expect(runScript.mock.calls).toStrictEqual([
+    [['bash', `/pkg/src/docs/${script}`, 'docs/guide.md']],
+  ]);
 });
 
 test.each([
@@ -60,18 +41,22 @@ test.each([
   ['dependency-gates'],
   ['uncommitted'],
 ] as const)('it runs the %s check through the repo check it is given', async (name) => {
-  const ctx = setupTest(1);
+  const repoChecks = {
+    commits: mock(() => 1),
+    'local-paths': mock(() => 1),
+    'test-timeouts': mock(() => 1),
+    workflows: mock(() => 1),
+    'dependency-gates': mock(() => 1),
+    uncommitted: mock(() => 1),
+  };
 
-  const runCheck = makeCheckRunner({
-    docsFolder: '/pkg/src/docs',
-    runScript: () => Promise.resolve(0),
-    repoChecks: ctx.repoChecks,
-  });
+  const runScript = mock(() => Promise.resolve(0));
+  const runCheck = makeCheckRunner({ docsFolder: '/pkg/src/docs', runScript, repoChecks });
 
   const exitCode = await runCheck(name, ['--pushed-refs']);
 
-  expect({ exitCode, calls: ctx.calls }).toStrictEqual({
-    exitCode: 1,
-    calls: [[name, '--pushed-refs']],
-  });
+  expect(exitCode).toBe(1);
+  expect(repoChecks[name]).toHaveBeenCalledTimes(1);
+  expect(repoChecks[name]).toHaveBeenCalledWith(['--pushed-refs']);
+  expect(runScript).not.toHaveBeenCalled();
 });
