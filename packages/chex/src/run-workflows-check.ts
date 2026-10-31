@@ -3,10 +3,10 @@ import { collectCommandNames } from './collect-command-names.ts';
 import { collectExpressionReferences } from './collect-expression-references.ts';
 import { findInstallCachePath } from './find-install-cache-path.ts';
 import { parseShellWords } from './parse-shell-words.ts';
+import type { ChecksProfile } from './read-checks-profile.ts';
+import { readChecksProfile } from './read-checks-profile.ts';
 import type { RunProgram } from './run-program.ts';
 import { runProgram } from './run-program.ts';
-
-export type ChecksProfile = 'public' | 'private';
 
 export interface WorkflowsCheckOptions {
   readonly cwd: string;
@@ -15,7 +15,7 @@ export interface WorkflowsCheckOptions {
   // The workflow files to read, relative to the repo root; empty reads every one HEAD holds.
   readonly paths: readonly string[];
 
-  // The bun-checks profile of the run; undefined when the check cannot see it, such as in a hook.
+  // The bun-checks profile of the run; undefined when it is unknown, which applies every rule.
   readonly profile: ChecksProfile | undefined;
 
   readonly runProgram: RunProgram;
@@ -552,7 +552,14 @@ export function runWorkflowsCommand(args: readonly string[]): number {
       cwd: process.cwd(),
       env: process.env,
       paths,
-      profile: parseChecksProfile(process.env['CHECKS_PROFILE']),
+      profile: readChecksProfile({
+        cwd: process.cwd(),
+        env: process.env,
+        runProgram,
+        writeError: (text) => {
+          process.stderr.write(text);
+        },
+      }),
       runProgram,
     });
 
@@ -583,10 +590,6 @@ function parseCLIPaths(args: readonly string[]): string[] | Error {
   } catch (error) {
     return error instanceof Error ? error : new Error(String(error));
   }
-}
-
-function parseChecksProfile(value: string | undefined): ChecksProfile | undefined {
-  return value === 'public' || value === 'private' ? value : undefined;
 }
 
 // GitHub reads a workflow command's properties up to `,` and `::`, and its message up to a
