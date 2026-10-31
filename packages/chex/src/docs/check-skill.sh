@@ -146,7 +146,7 @@ sub check_words {
     for my $i (1 .. $#lines) {
       my $line = $lines[$i];
       if ($line eq "---") { $start = $i + 1; last }
-      if ($line =~ /^metadata:\s*$/) { ($in_metadata, $indent) = (1, undef); next }
+      if ($line =~ /^metadata:(?:\s+#.*)?\s*$/) { ($in_metadata, $indent) = (1, undef); next }
       $in_metadata = 0 if $line =~ /^\S/;
       next unless $in_metadata && $line =~ /^(\s+)(\S.*?)\s*$/;
       # Only a key of metadata itself counts, never a deeper line, such as the text of a block value.

@@ -1017,6 +1017,26 @@ test('it reads a quoted rule-set kind', async () => {
   expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
 });
 
+test('it reads the rule-set kind under a metadata key with a comment after it', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Rules for every demo change. Load it before writing or reviewing one.',
+    'metadata: # how the checks treat the skill',
+    '  kind: rule-set',
+    '---',
+    '',
+    ...Array.from({ length: 40 }, () => 'The tool reads one file. '.repeat(10).trim()),
+  ]);
+
+  const result = await ctx.run();
+
+  expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
+});
+
 test('it keeps the plain limit when the kind line sits inside another metadata value', async () => {
   const ctx = await setupTest();
 
