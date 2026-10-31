@@ -1,8 +1,12 @@
-import { hostname } from 'node:os';
 import type { LaneContext } from '@zgeoff/rig';
-import { removePath } from '../packages/rig/src/browser/remove-path.ts';
 import { buildChexPackRun } from './build-chex-pack-run.ts';
+import type { E2EPackDependencies } from './e2e-pack-dependencies.ts';
 
-export async function removeChexPack(context: LaneContext): Promise<void> {
-  await removePath(buildChexPackRun(context.repoRoot, hostname(), context.runID).runDir);
+export async function removeChexPack(
+  context: LaneContext,
+  dependencies: Pick<E2EPackDependencies, 'hostName' | 'files'>,
+): Promise<void> {
+  await dependencies.files.removePath(
+    buildChexPackRun(context.repoRoot, dependencies.hostName, context.runID).runDir,
+  );
 }
