@@ -1,6 +1,5 @@
 import type { SyncedEntry } from './plan-retired-file-removal.ts';
 
-// The entry a sync pull request names when it only moves the pins.
 export const toolsPinsEntry: SyncedEntry = {
   name: 'tools-pins',
   description:

@@ -1,15 +1,11 @@
 import { downloadStepScripts, stepScriptSets } from '../ci/download-step-scripts.ts';
 
 export interface PinnedSourcesReading {
-  // The workflow paths under .github/workflows at the commit.
   readonly workflowPaths: readonly string[];
 
-  // The text of a path at the commit, or null when the commit has no such file.
   readonly readFile: (path: string) => Promise<string | null>;
 }
 
-// The files whose content a caller's pin decides: the reusable workflows, the two files their
-// first step downloads, and the step scripts with every file they import, as a run downloads them.
 export async function readPinnedSources(
   reading: Readonly<PinnedSourcesReading>,
 ): Promise<string[]> {

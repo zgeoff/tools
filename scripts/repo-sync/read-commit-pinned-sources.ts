@@ -6,13 +6,11 @@ export interface CommitPinnedSourcesReading {
   readonly cwd: string;
   readonly env: Readonly<Record<string, string | undefined>>;
 
-  // The checkout of zgeoff/tools, relative to cwd, that holds the commit.
   readonly repository: string;
 
   readonly commit: string;
 }
 
-// The pinned sources of one commit of zgeoff/tools, read from its tree.
 export async function readCommitPinnedSources(
   reading: Readonly<CommitPinnedSourcesReading>,
 ): Promise<string[]> {

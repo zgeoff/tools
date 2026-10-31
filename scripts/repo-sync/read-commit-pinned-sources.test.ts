@@ -1,7 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { buildCommandStub } from '../../test-utils/build-command-stub.ts';
 import { createGitCommit } from '../../test-utils/create-git-commit.ts';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { runGit } from '../../test-utils/run-git.ts';
@@ -26,7 +25,15 @@ async function setupTest() {
   const read = (commit: string, run: RunCommand = runCommand) =>
     readCommitPinnedSources({ runCommand: run, cwd: directory, env, repository: 'tools', commit });
 
-  return { writeToolsCommit, read };
+  const removeBlob = async (commit: string, path: string) => {
+    const blob = await runCommand(['git', 'rev-parse', `${commit}:${path}`], { cwd: tools, env });
+
+    const id = blob.stdout.trim();
+
+    await rm(join(tools, '.git', 'objects', id.slice(0, 2), id.slice(2)), { force: true });
+  };
+
+  return { writeToolsCommit, read, removeBlob };
 }
 
 test('it reads the reusable workflows and the step scripts the commit holds', async () => {
@@ -50,26 +57,19 @@ test('it reads the reusable workflows and the step scripts the commit holds', as
   expect(sources).not.toContain('.github/workflows/nightly.yml');
 });
 
-test('it fails with git error when a file the tree lists cannot be read', async () => {
+test('it fails with git error when the tree lists a file whose blob git cannot read', async () => {
   const ctx = await setupTest();
 
   const commit = await ctx.writeToolsCommit({
     '.github/workflows/bake.yml': 'on:\n  workflow_call:\njobs: {}\n',
   });
 
-  // A blobless checkout fails the read of a blob it cannot fetch.
-  const commands = buildCommandStub({ program: 'git', runCommand });
+  await ctx.removeBlob(commit, '.github/workflows/bake.yml');
 
-  commands.answer(['git', '-C', 'tools', 'show', `${commit}:.github/workflows/bake.yml`], {
-    exitCode: 128,
-    stdout: '',
-    stderr: 'fatal: could not fetch the blob\n',
-  });
-
-  const reading = ctx.read(commit, commands.runCommand);
+  const reading = ctx.read(commit);
 
   expect(reading).rejects.toThrow(
-    `git -C tools show ${commit}:.github/workflows/bake.yml exited with 128: fatal: could not fetch the blob`,
+    `git -C tools show ${commit}:.github/workflows/bake.yml exited with 128: fatal:`,
   );
 });
 

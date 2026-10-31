@@ -1,8 +1,6 @@
 import { readCommitPinnedSources } from './read-commit-pinned-sources.ts';
 import type { SyncCommandContext } from './write-sync-auto-merge.ts';
 
-// The caller runs each reusable workflow at the commit it pins, so a pin whose pinned sources
-// differ from the commit's runs older workflow code even when every entry matches.
 export async function probeStaleToolsPins(
   context: SyncCommandContext,
   commit: string,
