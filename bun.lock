@@ -92,6 +92,10 @@
         "zustand",
       ],
     },
+    "packages/chex": {
+      "name": "@zgeoff/chex",
+      "version": "0.0.0",
+    },
     "packages/commitlint-config": {
       "name": "@zgeoff/commitlint-config",
       "version": "0.1.0",
@@ -185,6 +189,10 @@
         "tsrs": "catalog:",
         "typescript": "catalog:",
       },
+    },
+    "packages/rig": {
+      "name": "@zgeoff/rig",
+      "version": "0.0.0",
     },
     "packages/skill-gate": {
       "name": "@zgeoff/skill-gate",
@@ -603,6 +611,8 @@
 
     "@zgeoff/bun-test-react": ["@zgeoff/bun-test-react@workspace:packages/bun-test-react"],
 
+    "@zgeoff/chex": ["@zgeoff/chex@workspace:packages/chex"],
+
     "@zgeoff/commitlint-config": ["@zgeoff/commitlint-config@workspace:packages/commitlint-config"],
 
     "@zgeoff/diet": ["@zgeoff/diet@workspace:packages/diet"],
@@ -616,6 +626,8 @@
     "@zgeoff/oxlint-config": ["@zgeoff/oxlint-config@workspace:packages/oxlint-config"],
 
     "@zgeoff/release-manifest": ["@zgeoff/release-manifest@workspace:packages/release-manifest"],
+
+    "@zgeoff/rig": ["@zgeoff/rig@workspace:packages/rig"],
 
     "@zgeoff/skill-gate": ["@zgeoff/skill-gate@workspace:packages/skill-gate"],
 

@@ -1,0 +1,17 @@
+{
+  "name": "@zgeoff/chex",
+  "version": "0.0.0",
+  "description": "Run a repo's pre-push checks from one versioned baseline",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zgeoff/tools.git",
+    "directory": "packages/chex"
+  },
+  "files": [
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

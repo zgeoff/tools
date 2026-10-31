@@ -11,5 +11,7 @@
   "packages/kysely-bun-sqlite": "0.3.0",
   "packages/skill-gate": "0.2.11",
   "packages/diet": "0.1.1",
-  "packages/agent-hooks": "0.1.1"
+  "packages/agent-hooks": "0.1.1",
+  "packages/rig": "0.0.0",
+  "packages/chex": "0.0.0"
 }
