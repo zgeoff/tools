@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { createGitCommit } from '../../test-utils/create-git-commit.ts';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { runGit } from '../../test-utils/run-git.ts';
-import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { readCommitPinnedSources } from './read-commit-pinned-sources.ts';
 
@@ -22,18 +21,10 @@ async function setupTest() {
   const writeToolsCommit = (files: Readonly<Record<string, string>>) =>
     createGitCommit(tools, env, files);
 
-  const read = (commit: string, run: RunCommand = runCommand) =>
-    readCommitPinnedSources({ runCommand: run, cwd: directory, env, repository: 'tools', commit });
+  const read = (commit: string) =>
+    readCommitPinnedSources({ runCommand, cwd: directory, env, repository: 'tools', commit });
 
-  const removeBlob = async (commit: string, path: string) => {
-    const blob = await runCommand(['git', 'rev-parse', `${commit}:${path}`], { cwd: tools, env });
-
-    const id = blob.stdout.trim();
-
-    await rm(join(tools, '.git', 'objects', id.slice(0, 2), id.slice(2)), { force: true });
-  };
-
-  return { writeToolsCommit, read, removeBlob };
+  return { tools, env, writeToolsCommit, read };
 }
 
 test('it reads the reusable workflows and the step scripts the commit holds', async () => {
@@ -64,7 +55,14 @@ test('it fails with git error when the tree lists a file whose blob git cannot r
     '.github/workflows/bake.yml': 'on:\n  workflow_call:\njobs: {}\n',
   });
 
-  await ctx.removeBlob(commit, '.github/workflows/bake.yml');
+  const blob = await runCommand(['git', 'rev-parse', `${commit}:.github/workflows/bake.yml`], {
+    cwd: ctx.tools,
+    env: ctx.env,
+  });
+
+  const id = blob.stdout.trim();
+
+  await rm(join(ctx.tools, '.git', 'objects', id.slice(0, 2), id.slice(2)));
 
   const reading = ctx.read(commit);
 
