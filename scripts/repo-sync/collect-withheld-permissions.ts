@@ -1,3 +1,5 @@
+import { isTextEntry } from '../ci/is-text-entry.ts';
+
 // A called workflow's job gets only the token permissions its caller grants, and GitHub fails the
 // whole run at startup when a job asks for more.
 export function collectWithheldPermissions(stubText: string, workflowText: string): string[] {
@@ -27,11 +29,7 @@ function toRecord(value: unknown): Record<string, unknown> {
 }
 
 function toPermissionMap(value: unknown): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(toRecord(value)).filter(
-      (entry): entry is [string, string] => typeof entry[1] === 'string',
-    ),
-  );
+  return Object.fromEntries(Object.entries(toRecord(value)).filter((entry) => isTextEntry(entry)));
 }
 
 function isGranted(grant: string | undefined, level: string): boolean {

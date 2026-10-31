@@ -56,3 +56,11 @@ test('it finds nothing withheld between the stub and the reusable sync workflow'
 
   expect(withheld).toBeEmpty();
 });
+
+test('it asks for actions: read in the alarm job, which reads the workflow run of each check', async () => {
+  const workflowText = await nodeFileSystem.readText('.github/workflows/repo-sync.yml');
+
+  const workflow: unknown = Bun.YAML.parse(workflowText);
+
+  expect(workflow).toMatchObject({ jobs: { alarm: { permissions: { actions: 'read' } } } });
+});

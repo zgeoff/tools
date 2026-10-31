@@ -1,3 +1,5 @@
+import { isTextEntry } from '../ci/is-text-entry.ts';
+
 export function parseTextRecord(text: string): Record<string, string> | null {
   const parsed = parseJSON(text);
 
@@ -6,10 +8,7 @@ export function parseTextRecord(text: string): Record<string, string> | null {
   }
 
   const entries: [string, unknown][] = Object.entries(parsed);
-
-  const textEntries = entries.filter(
-    (entry): entry is [string, string] => typeof entry[1] === 'string',
-  );
+  const textEntries = entries.filter((entry) => isTextEntry(entry));
 
   return textEntries.length === entries.length ? Object.fromEntries(textEntries) : null;
 }
