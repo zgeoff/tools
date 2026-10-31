@@ -1,6 +1,8 @@
+import { match } from 'ts-pattern';
+import type { PackageOutcome } from './build-init-package.ts';
 import { buildInitPackage, docsScript } from './build-init-package.ts';
+import type { LefthookOutcome } from './build-lefthook-extends.ts';
 import { baselinePath, buildLefthookExtends } from './build-lefthook-extends.ts';
-import { matchKind } from './match-kind.ts';
 
 export interface InitWrite {
   readonly file: 'lefthook.yml' | 'package.json';
@@ -27,15 +29,15 @@ export function buildInitPlan(
     };
   }
 
-  return matchKind<ReturnType<typeof buildInitPackage>, InitPlan>(buildInitPackage(packageText), {
-    missing: (outcome) => ({
+  return match<PackageOutcome, InitPlan>(buildInitPackage(packageText))
+    .with({ kind: 'missing' }, (outcome) => ({
       kind: 'refused',
       reasons: [
         `the baseline needs ${outcome.packages.join(', ')} installed; run bun add -d ${outcome.packages.join(' ')}`,
       ],
-    }),
-    unchanged: () => buildPlanFromSteps([buildLefthookStep(lefthookText)]),
-    changed: (outcome) =>
+    }))
+    .with({ kind: 'unchanged' }, () => buildPlanFromSteps([buildLefthookStep(lefthookText)]))
+    .with({ kind: 'changed' }, (outcome) =>
       buildPlanFromSteps([
         buildLefthookStep(lefthookText),
         {
@@ -44,12 +46,14 @@ export function buildInitPlan(
           notes: [`package.json runs "${docsScript}" as check:docs`],
         },
       ]),
-    refused: (outcome) =>
+    )
+    .with({ kind: 'refused' }, (outcome) =>
       buildPlanFromSteps([
         buildLefthookStep(lefthookText),
         { reasons: [outcome.reason], writes: [], notes: [] },
       ]),
-  });
+    )
+    .exhaustive();
 }
 
 interface InitStep {
@@ -80,13 +84,13 @@ function buildPlanFromSteps(steps: readonly InitStep[]): InitPlan {
 const keptStep: InitStep = { reasons: [], writes: [], notes: [] };
 
 function buildLefthookStep(lefthookText: string | undefined): InitStep {
-  return matchKind(buildLefthookExtends(lefthookText), {
-    unchanged: () => keptStep,
-    changed: (outcome) => ({
+  return match<LefthookOutcome, InitStep>(buildLefthookExtends(lefthookText))
+    .with({ kind: 'unchanged' }, () => keptStep)
+    .with({ kind: 'changed' }, (outcome) => ({
       reasons: [],
       writes: [{ file: 'lefthook.yml', text: outcome.text }],
       notes: [`lefthook.yml extends ${baselinePath}`],
-    }),
-    refused: (outcome) => ({ reasons: [outcome.reason], writes: [], notes: [] }),
-  });
+    }))
+    .with({ kind: 'refused' }, (outcome) => ({ reasons: [outcome.reason], writes: [], notes: [] }))
+    .exhaustive();
 }

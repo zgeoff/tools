@@ -30,7 +30,8 @@
     "typecheck": "tsrs"
   },
   "dependencies": {
-    "@zgeoff/std": "workspace:*"
+    "@zgeoff/std": "workspace:*",
+    "ts-pattern": "catalog:"
   },
   "devDependencies": {
     "@types/bun": "catalog:",

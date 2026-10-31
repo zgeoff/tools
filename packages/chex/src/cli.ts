@@ -12,8 +12,6 @@ import { runUncommittedCommand } from './run-uncommitted-check.ts';
 import { runWorkflowsCommand } from './run-workflows-check.ts';
 import { writeTextFile } from './write-text-file.ts';
 
-// A reusable workflow downloads this file and every file it imports, with no install, so it and
-// its imports import no package.
 process.exitCode = await runChex(process.argv.slice(2), {
   runCheck: makeCheckRunner({
     docsFolder: join(import.meta.dir, 'docs'),

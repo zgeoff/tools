@@ -103,6 +103,7 @@
       },
       "dependencies": {
         "@zgeoff/std": "workspace:*",
+        "ts-pattern": "catalog:",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
