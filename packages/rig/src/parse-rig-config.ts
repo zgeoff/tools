@@ -87,7 +87,7 @@ function isNullableString(value: unknown): value is string | null {
 function refuseField(lane: string, field: keyof ResolvedLane, value: unknown): ParsedLane {
   return {
     kind: 'refused',
-    reason: `lane "${lane}" has the ${field} ${String(JSON.stringify(value))}, which defineRig never resolves`,
+    reason: `lane "${lane}" has the ${field} ${JSON.stringify(value)}, which defineRig never resolves`,
   };
 }
 
