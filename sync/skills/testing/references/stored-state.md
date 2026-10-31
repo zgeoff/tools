@@ -36,6 +36,10 @@ expect(existsSync(buildArchivePath(ctx.dataDir, note.id, 'list.txt'))).toBe(true
 The store's own test, `src/notes/store/read-note.test.ts`, still inserts and queries `notes`
 directly, because the table is what it checks.
 
+With Kysely, the owner's test reads a row that must exist with `executeTakeFirstOrThrow()`, with the
+selection narrowed to the one column under test when only that column matters, and asserts absence
+with `executeTakeFirst()` and `toBeUndefined()`.
+
 ## Seeding stored state
 
 A test seeds stored state with direct inserts and [factories](./factories.md) by default. A seeding

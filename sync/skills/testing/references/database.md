@@ -81,23 +81,7 @@ database computes some of its fields, and asserts that overrides apply.
 
 ## Reading results back
 
-[Stored state](../SKILL.md#stored-state) holds the rule for which test reads a row back. With
-Kysely, `executeTakeFirstOrThrow()` reads a row that must exist, with the selection narrowed to the
-one column under test when only that column matters, and `executeTakeFirst()` with `toBeUndefined()`
-asserts absence.
-
-```ts
-// remove-note.test.ts, in the store that writes the notes table
-await removeNote(ctx.db, note.id);
-
-const row = await ctx.db
-  .selectFrom('notes')
-  .select('id')
-  .where('id', '=', note.id)
-  .executeTakeFirst();
-
-expect(row).toBeUndefined();
-```
+[Stored state](../SKILL.md#stored-state) holds how a test reads a row back.
 
 When a later query in the same test must see a rejected call's transaction settle, settle the call
 first, then assert on it:
