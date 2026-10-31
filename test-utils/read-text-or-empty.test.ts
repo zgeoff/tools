@@ -37,5 +37,5 @@ test('it rejects with the read error when the path is a folder', async () => {
 
   const read = readTextOrEmpty(join(ctx.directory, 'orders'));
 
-  await expect(read).rejects.toMatchObject({ code: 'EISDIR' });
+  expect(read).rejects.toMatchObject({ code: 'EISDIR' });
 });
