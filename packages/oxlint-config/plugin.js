@@ -1,3 +1,7 @@
+import { existsSync } from 'node:fs';
+// oxlint-disable-next-line zgeoff/no-require -- only resolves rig's path from the repo root; an import loads it
+import { createRequire } from 'node:module';
+import { join } from 'node:path';
 import functionVerb from './function-verb.js';
 import importZones from './import-zones.js';
 import maxConsecutiveLineComments from './max-consecutive-line-comments.js';
@@ -21,7 +25,15 @@ import testTimeoutExceptionTicket from './test-timeout-exception-ticket.js';
 import verbContract from './verb-contract.js';
 
 // A repo with a rig.config.ts takes its lane limits from it, read once when oxlint loads the plugin.
-const rigLanes = await readRigLanes(process.cwd());
+const rigLanes = await readRigLanes(process.cwd(), {
+  resolveRepoRoot,
+  probeFile: existsSync,
+  importModule: (url) => import(url),
+
+  // The parser comes from the @zgeoff/rig that the repo's rig.config.ts imports, so both read one
+  // version of the resolved table. A bare import would resolve from this package's folder instead.
+  resolveRepoRig: (root) => createRequire(join(root, 'package.json')).resolve('@zgeoff/rig'),
+});
 
 const plugin = {
   meta: { name: 'zgeoff' },

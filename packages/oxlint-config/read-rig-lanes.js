@@ -1,15 +1,11 @@
-import { existsSync } from 'node:fs';
-// oxlint-disable-next-line zgeoff/no-require -- only resolves rig's path from the repo root; an import loads it
-import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import resolveRepoRoot from './resolve-repo-root.js';
 
 // Returns the limit in ms of each lane that the repo's rig.config.ts resolves, keyed by the lane
 // suffix without its dot, and `e2e` for the directory lane. Returns null for a repo with no
 // rig.config.ts, which leaves the rules on their own lane table.
-export default async function readRigLanes(cwd) {
-  const root = resolveRepoRoot(join(cwd, 'oxlint'));
+export default async function readRigLanes(cwd, dependencies) {
+  const root = dependencies.resolveRepoRoot(join(cwd, 'oxlint'));
 
   if (root === null) {
     return null;
@@ -17,12 +13,14 @@ export default async function readRigLanes(cwd) {
 
   const configPath = join(root, 'rig.config.ts');
 
-  if (!existsSync(configPath)) {
+  if (!dependencies.probeFile(configPath)) {
     return null;
   }
 
-  const config = await importConfig(configPath);
-  const rig = await importRepoRig(root);
+  const config = await importConfig(configPath, dependencies.importModule);
+  const rig = await dependencies.importModule(
+    pathToFileURL(dependencies.resolveRepoRig(root)).href,
+  );
   const parsed = rig.parseRigConfig(config.default);
 
   if (parsed.kind === 'refused') {
@@ -40,9 +38,9 @@ export default async function readRigLanes(cwd) {
 
 // oxlint runs a plugin under Node, which strips the types of a .ts file from Node 22.18, and Bun
 // runs one as it is.
-async function importConfig(configPath) {
+async function importConfig(configPath, importModule) {
   try {
-    return await import(pathToFileURL(configPath).href);
+    return await importModule(pathToFileURL(configPath).href);
   } catch (error) {
     // oxlint prints a plugin's load error without its cause, so the message carries the cause's.
     const reason = error instanceof Error ? error.message : String(error);
@@ -52,12 +50,4 @@ async function importConfig(configPath) {
       { cause: error },
     );
   }
-}
-
-// The parser comes from the @zgeoff/rig that the repo's rig.config.ts imports, so both read one
-// version of the resolved table. A bare import would resolve from this package's folder instead.
-function importRepoRig(root) {
-  const rigPath = createRequire(join(root, 'package.json')).resolve('@zgeoff/rig');
-
-  return import(pathToFileURL(rigPath).href);
 }

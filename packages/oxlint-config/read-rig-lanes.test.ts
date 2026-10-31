@@ -1,4 +1,7 @@
 import { expect, test } from 'bun:test';
+import { pathToFileURL } from 'node:url';
+import { defineRig, parseRigConfig } from '../rig/src/index.ts';
+import readRigLanes from './read-rig-lanes.js';
 import { buildRigConfigSource } from './test-utils/build-rig-config-source.ts';
 import { buildTimeoutSource } from './test-utils/build-timeout-source.ts';
 import { runLintTree } from './test-utils/run-lint-tree.ts';
@@ -132,4 +135,94 @@ test('it fails the plugin load with the cause when rig.config.ts cannot be impor
 
   expect(result.exitCode).not.toBe(0);
   expect(result.stdout).toInclude('reading a TypeScript config needs Node >= 22.18 or Bun');
+});
+
+test('it reads no lanes outside a repository', async () => {
+  const lanes = await readRigLanes('/bakery', {
+    resolveRepoRoot: () => null,
+    probeFile: () => true,
+    importModule: () => Promise.resolve({}),
+    resolveRepoRig: () => '/bakery/node_modules/@zgeoff/rig/src/index.ts',
+  });
+
+  expect(lanes).toBeNull();
+});
+
+test('it reads no lanes from a repository without a rig.config.ts', async () => {
+  const lanes = await readRigLanes('/bakery/oven', {
+    resolveRepoRoot: () => '/bakery',
+    probeFile: () => false,
+    importModule: () => Promise.resolve({}),
+    resolveRepoRig: () => '/bakery/node_modules/@zgeoff/rig/src/index.ts',
+  });
+
+  expect(lanes).toBeNull();
+});
+
+test('it keys each lane but unit by its suffix, and a directory lane by its name', async () => {
+  const modules: Readonly<Record<string, unknown>> = {
+    [pathToFileURL('/bakery/rig.config.ts').href]: {
+      default: defineRig({ lanes: { kiln: { limit: '15s' } } }),
+    },
+    [pathToFileURL('/bakery/node_modules/@zgeoff/rig/src/index.ts').href]: { parseRigConfig },
+  };
+
+  const lanes = await readRigLanes('/bakery/oven', {
+    resolveRepoRoot: () => '/bakery',
+    probeFile: () => true,
+    importModule: (url) => Promise.resolve(modules[url]),
+    resolveRepoRig: () => '/bakery/node_modules/@zgeoff/rig/src/index.ts',
+  });
+
+  expect(lanes).toStrictEqual(
+    new Map([
+      ['e2e', 15_000],
+      ['browser', 10_000],
+      ['docker', 15_000],
+      ['host', 15_000],
+      ['agent-sdk', 5000],
+      ['model-api', 120_000],
+      ['kiln', 15_000],
+    ]),
+  );
+});
+
+test("it refuses a rig.config.ts that rig's parser refuses, with the parser's reason", async () => {
+  const modules: Readonly<Record<string, unknown>> = {
+    [pathToFileURL('/bakery/rig.config.ts').href]: { default: { lanes: 3 } },
+    [pathToFileURL('/bakery/node_modules/@zgeoff/rig/src/index.ts').href]: { parseRigConfig },
+  };
+
+  const failure = readRigLanes('/bakery/oven', {
+    resolveRepoRoot: () => '/bakery',
+    probeFile: () => true,
+    importModule: (url) => Promise.resolve(modules[url]),
+    resolveRepoRig: () => '/bakery/node_modules/@zgeoff/rig/src/index.ts',
+  });
+
+  await expect(failure).rejects.toThrow(
+    new TypeError(
+      '/bakery/rig.config.ts must default-export the result of defineRig from @zgeoff/rig: its lanes are no list',
+    ),
+  );
+});
+
+test('it refuses a rig.config.ts that fails to import, with the cause in the message', async () => {
+  const cause = new Error('Cannot find module ./missing-rig.ts');
+
+  const failure = await readRigLanes('/bakery/oven', {
+    resolveRepoRoot: () => '/bakery',
+    probeFile: () => true,
+    importModule: () => Promise.reject(cause),
+    resolveRepoRig: () => '/bakery/node_modules/@zgeoff/rig/src/index.ts',
+  }).catch((error: unknown) => error);
+
+  expect(failure).toBeInstanceOf(Error);
+
+  expect(failure).toHaveProperty(
+    'message',
+    'cannot load /bakery/rig.config.ts: Cannot find module ./missing-rig.ts (reading a TypeScript config needs Node >= 22.18 or Bun)',
+  );
+
+  expect(failure).toHaveProperty('cause', cause);
 });
