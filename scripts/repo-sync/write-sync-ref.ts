@@ -24,8 +24,8 @@ export interface WriteSyncRefOptions {
   readonly writeOutput: (text: string) => void;
 }
 
-// GitHub keeps one pending run per concurrency group and drops the others, so a dispatch can be
-// lost. A run with no ref syncs the newest green commit, which delivers what a lost one carried.
+// GitHub can drop a repository_dispatch event. A run with no ref syncs the newest green commit,
+// which delivers what a lost one carried.
 export async function writeSyncRef(options: Readonly<WriteSyncRefOptions>): Promise<number> {
   if (options.ref !== '') {
     await writeStepOutputs(options.fileSystem, options.outputPath, { ref: options.ref });
