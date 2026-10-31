@@ -28,13 +28,11 @@ test.each([
   ['a string trigger', 'on: workflow_call\n'],
   ['a list of triggers', 'on: [push, workflow_call]\n'],
 ])('it counts a workflow with %s as reusable', async (_label, text) => {
+  const files: Record<string, string> = { '.github/workflows/bake.yml': text };
+
   const sources = await readPinnedSources({
     workflowPaths: ['.github/workflows/bake.yml'],
-    readFile: (path) => {
-      const found = path === '.github/workflows/bake.yml' ? text : null;
-
-      return Promise.resolve(found);
-    },
+    readFile: (path) => Promise.resolve(files[path] ?? null),
   });
 
   expect(sources).toContain('.github/workflows/bake.yml');
