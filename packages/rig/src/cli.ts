@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 import { existsSync } from 'node:fs';
 import { availableParallelism, totalmem } from 'node:os';
+import { readOptionalText } from '@zgeoff/std';
 import { wireBrowserLaneHooks } from './browser/wire-browser-lane-hooks.ts';
 import { initFiles } from './init-files.ts';
-import { readOptionalText } from './read-memory-budget.ts';
 import { readRigConfig } from './read-rig-config.ts';
 import { readTrackedFiles } from './read-tracked-files.ts';
 import { readWorkerCount } from './read-worker-count.ts';

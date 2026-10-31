@@ -14,13 +14,16 @@ holds and how a run delivers, updates and retires the files.
   commit.
 - [`workflow-callers/`](./workflow-callers/) — workflows that each call a reusable workflow in this
   repo, all opt-in but the repo-sync guard.
-- [`skills/`](./skills/) — the shared base of each Claude skill, with its scripts' tests.
-- [`docs-vision/`](./docs-vision/) — the vision doc check, which docs-writing's `check-length.sh`
-  runs in a repo that takes it, with its test.
+- [`skills/`](./skills/) — the shared base of each Claude skill.
 - [`hooks/`](./hooks/) — agent hooks: the start-up stub and the skill gate's older entry point, with
   their tests.
 - [`pre-push/`](./pre-push/) — the [pre-push baseline](../docs/architecture/pre-push-baseline.md)
-  and the [memory-cap script](../docs/architecture/memory-caps.md), with their tests.
+  that the `pre-push-baseline` entry delivers, and the
+  [memory-cap script](../docs/architecture/memory-caps.md), with their tests.
+
+The docs check scripts that the skill entries and the `docs-vision-check` entry deliver, and the
+check scripts of the `pre-push-baseline` entry, live in [`@zgeoff/chex`](../packages/chex/), which
+also runs them as `chex <check>`.
 
 ## Documentation
 

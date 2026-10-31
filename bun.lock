@@ -13,6 +13,7 @@
         "@zgeoff/agent-hooks": "workspace:*",
         "@zgeoff/bun-test-extended": "workspace:*",
         "@zgeoff/bun-test-react": "workspace:*",
+        "@zgeoff/chex": "workspace:*",
         "@zgeoff/commitlint-config": "workspace:*",
         "@zgeoff/diet": "workspace:*",
         "@zgeoff/format-codemod": "workspace:*",
@@ -97,6 +98,19 @@
     "packages/chex": {
       "name": "@zgeoff/chex",
       "version": "0.0.1",
+      "bin": {
+        "chex": "./src/cli.ts",
+      },
+      "dependencies": {
+        "@zgeoff/std": "workspace:*",
+        "ts-pattern": "catalog:",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "tiny-invariant": "catalog:",
+        "tsrs": "catalog:",
+        "typescript": "catalog:",
+      },
     },
     "packages/commitlint-config": {
       "name": "@zgeoff/commitlint-config",

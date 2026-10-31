@@ -160,16 +160,16 @@ test('it sends when a commit changes only a reusable workflow that the repos pin
   expect(outputs).toBe(`send=true\ncommit=${commit}\n`);
 });
 
-test('it sends when a commit changes only a step script that a reusable workflow downloads', async () => {
+test('it sends when a commit changes only the bundle of a step script that a reusable workflow downloads', async () => {
   const ctx = await setupTest();
 
   const previous = await ctx.writeToolsCommit({
     'sync/manifest.json': '[]',
-    'scripts/repo-sync/sync-entries.ts': 'export const loaves = 1;\n',
+    'step-bundles/scripts/repo-sync/sync-entries.js': 'export const loaves = 1;\n',
   });
 
   const commit = await ctx.writeToolsCommit({
-    'scripts/repo-sync/sync-entries.ts': 'export const loaves = 2;\n',
+    'step-bundles/scripts/repo-sync/sync-entries.js': 'export const loaves = 2;\n',
   });
 
   ctx.answerGreenCommits([commit, previous]);

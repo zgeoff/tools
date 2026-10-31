@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
+import { readStreamUntil } from '../../test-utils/read-stream-until.ts';
 
 // Bun's skipIf takes a boolean at collection time, so the modes this host supports are probed once
 // here: a GitHub runner has the systemd-sudo mode, a root shell without systemd the cgroupfs one.
@@ -33,7 +34,7 @@ test.skipIf(modesOutput === '')(
     const ctx = setupTest();
 
     const result =
-      await $`bash ${ctx.scriptPath} --budget 256M -- ${ctx.bun} -e ${"Buffer.alloc(512 * 1024 * 1024, 1); console.log('done')"}`
+      await $`bash ${ctx.scriptPath} --budget 64M -- ${ctx.bun} -e ${"Buffer.alloc(128 * 1024 * 1024, 1); console.log('done')"}`
         .env(ctx.env)
         .nothrow()
         .quiet();
@@ -46,7 +47,7 @@ test.skipIf(modesOutput === '')(
       exitCode: 1,
       stdout: '',
       stderr: expect.stringMatching(
-        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 256 MB\ndiet: the command went over its 256 MB budget, and the kernel OOM-killed 1 process\n$/u,
+        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 64 MB\ndiet: the command went over its 64 MB budget, and the kernel OOM-killed 1 process\n$/u,
       ),
     });
   },
@@ -119,7 +120,7 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
     const ctx = setupTest();
 
     const result =
-      await $`bash ${ctx.scriptPath} --budget 128M -- ${ctx.bun} -e ${"Buffer.alloc(256 * 1024 * 1024, 1); console.log('done')"}`
+      await $`bash ${ctx.scriptPath} --budget 64M -- ${ctx.bun} -e ${"Buffer.alloc(128 * 1024 * 1024, 1); console.log('done')"}`
         .env({ ...ctx.env, DIET_MODE: 'systemd-sudo' })
         .nothrow()
         .quiet();
@@ -132,7 +133,7 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
       exitCode: 1,
       stdout: '',
       stderr: expect.stringMatching(
-        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 128 MB\ndiet: the command went over its 128 MB budget, and the kernel OOM-killed 1 process\n$/u,
+        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 64 MB\ndiet: the command went over its 64 MB budget, and the kernel OOM-killed 1 process\n$/u,
       ),
     });
   },
@@ -167,7 +168,7 @@ test.skipIf(!modesOutput.includes('systemd-user'))(
     const ctx = setupTest();
 
     const result =
-      await $`bash ${ctx.scriptPath} --budget 128M -- ${ctx.bun} -e ${"Buffer.alloc(256 * 1024 * 1024, 1); console.log('done')"}`
+      await $`bash ${ctx.scriptPath} --budget 64M -- ${ctx.bun} -e ${"Buffer.alloc(128 * 1024 * 1024, 1); console.log('done')"}`
         .env({ ...ctx.env, DIET_MODE: 'systemd-user' })
         .nothrow()
         .quiet();
@@ -180,7 +181,7 @@ test.skipIf(!modesOutput.includes('systemd-user'))(
       exitCode: 1,
       stdout: '',
       stderr: expect.stringMatching(
-        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 128 MB\ndiet: the command went over its 128 MB budget, and the kernel OOM-killed 1 process\n$/u,
+        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 64 MB\ndiet: the command went over its 64 MB budget, and the kernel OOM-killed 1 process\n$/u,
       ),
     });
   },
@@ -215,7 +216,7 @@ test.skipIf(!modesOutput.includes('cgroupfs'))(
     const ctx = setupTest();
 
     const result =
-      await $`bash ${ctx.scriptPath} --budget 128M -- ${ctx.bun} -e ${"Buffer.alloc(256 * 1024 * 1024, 1); console.log('done')"}`
+      await $`bash ${ctx.scriptPath} --budget 64M -- ${ctx.bun} -e ${"Buffer.alloc(128 * 1024 * 1024, 1); console.log('done')"}`
         .env({ ...ctx.env, DIET_MODE: 'cgroupfs' })
         .nothrow()
         .quiet();
@@ -228,7 +229,7 @@ test.skipIf(!modesOutput.includes('cgroupfs'))(
       exitCode: 1,
       stdout: '',
       stderr: expect.stringMatching(
-        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 128 MB\ndiet: the command went over its 128 MB budget, and the kernel OOM-killed 1 process\n$/u,
+        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 64 MB\ndiet: the command went over its 64 MB budget, and the kernel OOM-killed 1 process\n$/u,
       ),
     });
   },
@@ -264,7 +265,7 @@ test.skipIf(!modesOutput.includes('cgroupfs'))(
         '--',
         'bash',
         '-c',
-        'echo $$; cat /proc/self/cgroup; exec sleep 30',
+        'echo $$; cat /proc/self/cgroup; echo started; exec sleep 30',
       ],
       {
         env: { ...ctx.env, DIET_MODE: 'cgroupfs' },
@@ -280,21 +281,9 @@ test.skipIf(!modesOutput.includes('cgroupfs'))(
       Bun.spawnSync(['kill', '-KILL', '--', `-${run.pid}`]);
     });
 
-    const reader = run.stdout.getReader();
-
-    const decoder = new TextDecoder();
-
-    let started = '';
-
     // The command prints its pid and cgroup before it sleeps, so a signal after both lines reaches
     // a running command.
-    while (started.split('\n').length < 3) {
-      const chunk = await reader.read();
-
-      invariant(!chunk.done);
-
-      started += decoder.decode(chunk.value);
-    }
+    const started = await readStreamUntil(run.stdout, 'started\n');
 
     run.kill('SIGTERM');
 
@@ -348,31 +337,15 @@ test.each([['SIGHUP'], ['SIGINT'], ['SIGTERM']] as const)(
       Bun.spawnSync(['kill', '-KILL', '--', `-${run.pid}`]);
     });
 
-    const reader = run.stdout.getReader();
-
-    const decoder = new TextDecoder();
-
-    let output = '';
-
     // The command prints ready once its handler is set, so a signal after that line reaches it. A bash
     // command would defer its trap until a blocking read returns.
-    while (!output.includes('ready\n')) {
-      const chunk = await reader.read();
-
-      invariant(!chunk.done);
-
-      output += decoder.decode(chunk.value);
-    }
+    const ready = await readStreamUntil(run.stdout, 'ready\n');
 
     run.kill(signal);
 
-    let chunk = await reader.read();
+    const rest = await readStreamUntil(run.stdout, `got ${name}\n`);
 
-    while (!chunk.done) {
-      output += decoder.decode(chunk.value);
-
-      chunk = await reader.read();
-    }
+    const output = `${ready}${rest}`;
 
     const exitCode = await run.exited;
 
@@ -391,12 +364,12 @@ test.skipIf(modesOutput === '' || !hasMemoryPeak)(
     // The allocation reaches the cap well inside one 200 ms sample interval, so the sampled peak
     // stays below it.
     const result =
-      await $`bash ${ctx.scriptPath} --budget 128M -- ${ctx.bun} -e ${'Buffer.alloc(256 * 1024 * 1024, 1)'}`
+      await $`bash ${ctx.scriptPath} --budget 64M -- ${ctx.bun} -e ${'Buffer.alloc(128 * 1024 * 1024, 1)'}`
         .env(ctx.env)
         .nothrow()
         .quiet();
 
-    expect(result.stderr.toString()).toStartWith('diet: peaked at 128 MB of 128 MB\n');
+    expect(result.stderr.toString()).toStartWith('diet: peaked at 64 MB of 64 MB\n');
   },
 );
 
@@ -500,13 +473,13 @@ test.skipIf(modesOutput === '')(
     const ctx = setupTest();
 
     const result =
-      await $`bash ${ctx.scriptPath} --budget 128M -- ${ctx.bun} -e ${'Buffer.alloc(256 * 1024 * 1024, 1)'}`
+      await $`bash ${ctx.scriptPath} --budget 64M -- ${ctx.bun} -e ${'Buffer.alloc(128 * 1024 * 1024, 1)'}`
         .env({ ...ctx.env, GITHUB_ACTIONS: 'true' })
         .nothrow()
         .quiet();
 
     expect(result.stderr.toString()).toEndWith(
-      '::error::diet: the command went over its 128 MB budget, and the kernel OOM-killed 1 process\n',
+      '::error::diet: the command went over its 64 MB budget, and the kernel OOM-killed 1 process\n',
     );
   },
 );

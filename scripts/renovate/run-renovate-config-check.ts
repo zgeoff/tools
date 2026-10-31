@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { firstPartyScopes } from '../../sync/pre-push/dependency-gates/first-party-scopes.ts';
+import { firstPartyScopes } from '../../packages/chex/src/dependency-gates/first-party-scopes.ts';
 import type { FileSystem } from '../ci/file-system.ts';
 import { makeLoggedCommandRunner } from '../ci/make-logged-command-runner.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';

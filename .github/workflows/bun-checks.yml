@@ -141,7 +141,7 @@ jobs:
 
       # actionlint does not know job.workflow_repository or job.workflow_sha,
       # so the step reads them through toJSON. The first download is the one
-      # script that downloads the others with every file they import.
+      # script that downloads the bundles of the others.
       - &download-downloader
         name: Download the step script downloader
         env: &tools-url
@@ -166,7 +166,7 @@ jobs:
         id: plan
         env: &plan-env
           SCRIPTS: ${{ inputs.scripts }}
-        run: &plan-body bun "$RUNNER_TEMP/tools/scripts/bun-checks/write-check-plan.ts"
+        run: &plan-body bun "$RUNNER_TEMP/tools/scripts/bun-checks/write-check-plan.js"
 
   static:
     if:
@@ -212,31 +212,31 @@ jobs:
         name: Setup shfmt
         env: &shfmt-env
           SETUP_TOOL: ${{ inputs.setup-shfmt }}
-        run: &shfmt-body bun "$RUNNER_TEMP/tools/scripts/ci/run-pinned-tool-step.ts" shfmt
+        run: &shfmt-body bun "$RUNNER_TEMP/tools/scripts/ci/run-pinned-tool-step.js" shfmt
 
       - &setup-actionlint
         name: Setup actionlint
         id: setup-actionlint
         env: &actionlint-env
           SETUP_TOOL: ${{ inputs.setup-actionlint }}
-        run: &actionlint-body bun "$RUNNER_TEMP/tools/scripts/ci/run-pinned-tool-step.ts" actionlint
+        run: &actionlint-body bun "$RUNNER_TEMP/tools/scripts/ci/run-pinned-tool-step.js" actionlint
 
       # Each check and script step after the setup runs even when an earlier
       # one fails, so the run shows every check that fails, each by name.
       - &check-shell
         name: Check shell
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/run-shell-check.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/run-shell-check.js"
 
       - &check-docs
         name: Check docs
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/run-docs-check.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/run-docs-check.js"
 
       - &check-workflows
         name: Check workflows
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/run-actionlint-check.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/run-actionlint-check.js"
 
       # The workflow lint reads the profile, because one of its rules covers a
       # private repo alone.
@@ -247,34 +247,35 @@ jobs:
           CHECKS_PROFILE:
             ${{ ((github.event.repository && github.event.repository.private) ||
             (!github.event.repository && inputs.private)) && 'private' || 'public' }}
-        run: bun "$RUNNER_TEMP/tools/sync/pre-push/run-workflows-check.ts"
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/run-workflows-check.js"
 
       - &check-commits
         name: Check commits
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/sync/pre-push/run-commits-check.ts"
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/run-commits-check.js"
 
       - &check-local-paths
         name: Check local paths
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/sync/pre-push/run-local-paths-check.ts"
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/run-local-paths-check.js"
 
       - &check-test-timeouts
         name: Check test timeouts
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/sync/pre-push/run-test-timeouts-check.ts"
+        run: bun "$RUNNER_TEMP/tools/packages/chex/src/run-test-timeouts-check.js"
 
       - &check-dependency-gates
         name: Check dependency gates
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/sync/pre-push/dependency-gates/run-dependency-gates-check.ts"
+        run:
+          bun "$RUNNER_TEMP/tools/packages/chex/src/dependency-gates/run-dependency-gates-check.js"
 
       - &run-scripts
         name: Run the check scripts
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
         env:
           SCRIPTS: ${{ steps.plan.outputs.scripts }}
-        run: &run-body bun "$RUNNER_TEMP/tools/scripts/ci/run-package-scripts.ts"
+        run: &run-body bun "$RUNNER_TEMP/tools/scripts/ci/run-package-scripts.js"
 
   test:
     if:
@@ -480,4 +481,4 @@ jobs:
         if: ${{ always() && env.PROFILE == 'public' }}
         env:
           NEEDS: ${{ toJSON(needs) }}
-        run: bun "$RUNNER_TEMP/tools/scripts/ci/collect-failed-jobs.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/ci/collect-failed-jobs.js"

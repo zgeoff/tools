@@ -40,12 +40,13 @@ push to the repo can send a dispatch, and GitHub serves a fork's commit through 
 
 The sync pull request also moves every call to a tools workflow in the repo's `.github/workflows/`
 to that commit, so its merge leaves the repo on one commit. A pin decides the content of each
-reusable workflow, the two files its first step downloads, and each step script with the files it
-imports. A run with nothing to sync still opens a pull request that only moves the pins when one of
-those files differs between the repo's pin and the commit; otherwise it opens no pull request and
-moves no pin. A delivered workflow that differs from its source only by its pin counts as nothing to
-sync. Renovate never moves these refs: the shared preset turns its updates off, because it would
-read the commit as a digest of `main` to bump.
+reusable workflow, the two files its first step downloads, and the bundle of each step script under
+`step-bundles/`, which the download fetches in place of the script. A run with nothing to sync still
+opens a pull request that only moves the pins when one of those files differs between the repo's pin
+and the commit; otherwise it opens no pull request and moves no pin. A delivered workflow that
+differs from its source only by its pin counts as nothing to sync. Renovate never moves these refs:
+the shared preset turns its updates off, because it would read the commit as a digest of `main` to
+bump.
 
 A run from any other trigger, the stub's daily run, a push that changes the stub, or a manual run,
 syncs the newest green commit on `main`. The stub's concurrency group names the dispatched commit,

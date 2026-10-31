@@ -195,4 +195,5 @@ The check runs `bun audit` only when the `audit` script ignores an advisory, so 
 in a repo with no ignore. A repo with no override, exclude or ignore passes. The
 `Check dependency gates` step of [`bun-checks.yml`](../../.github/workflows/bun-checks.yml) runs it
 on every pull request, and the [pre-push baseline](./pre-push-baseline.md) runs it before a push.
-Its scripts live in [`sync/pre-push/dependency-gates/`](../../sync/pre-push/dependency-gates/).
+Its scripts live in
+[`packages/chex/src/dependency-gates/`](../../packages/chex/src/dependency-gates/).

@@ -49,3 +49,16 @@ test('it lists a folder it created and probes a path before and after its remova
 test("it removes a path with rig's removePath", () => {
   expect(nodeFileSystem.removePath).toBe(removePath);
 });
+
+test('it reads the path of every file below a folder, and none for a missing folder', async () => {
+  const ctx = await setupTest();
+
+  await nodeFileSystem.writeText(join(ctx.directory, 'kettle/spout/water.txt'), 'hot\n');
+  await nodeFileSystem.writeText(join(ctx.directory, 'kettle/lid.txt'), 'shut\n');
+
+  const paths = await nodeFileSystem.readFilePaths(join(ctx.directory, 'kettle'));
+  const missing = await nodeFileSystem.readFilePaths(join(ctx.directory, 'teapot'));
+
+  expect(paths).toStrictEqual(['lid.txt', 'spout/water.txt']);
+  expect(missing).toStrictEqual([]);
+});

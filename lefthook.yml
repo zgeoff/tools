@@ -37,3 +37,10 @@ pre-push:
         - '.github/workflows/repo-sync.yml'
         - 'sync/repo-sync.yml'
       run: bun run --silent check:repo-sync-workflows
+    - name: step-bundles
+      glob:
+        - '*.ts'
+        - 'step-bundles/**'
+        - 'bun.lock'
+        - '.bun-version'
+      run: bun run --silent check:step-bundles

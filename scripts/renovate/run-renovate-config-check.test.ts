@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { firstPartyScopes } from '../../sync/pre-push/dependency-gates/first-party-scopes.ts';
+import { firstPartyScopes } from '../../packages/chex/src/dependency-gates/first-party-scopes.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import type { CommandOptions, CommandResult } from '../ci/run-command.ts';
@@ -14,16 +14,6 @@ async function setupTest() {
 
   const calls: { argv: readonly string[]; cwd: string }[] = [];
   const errors: string[] = [];
-
-  const writeWorkflow = (text: string) =>
-    writeTreeFiles(directory, { '.github/workflows/renovate.yml': text });
-
-  const writePreset = (matchPackageNames: readonly string[]) =>
-    writeTreeFiles(directory, {
-      'default.json': JSON.stringify({
-        packageRules: [{ matchPackageNames, minimumReleaseAge: null }],
-      }),
-    });
 
   // Runs the check; the validator, if it runs, answers with the given result.
   const runCheck = (validatorResult: Readonly<CommandResult>) =>
@@ -41,17 +31,27 @@ async function setupTest() {
       },
     });
 
-  return { directory, calls, errors, writeWorkflow, writePreset, runCheck };
+  return { directory, calls, errors, runCheck };
 }
 
 test('it validates default.json strictly at the pinned version and returns the validator exit code', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePreset(firstPartyScopes.map((scope) => `${scope}**`));
+  await writeTreeFiles(ctx.directory, {
+    'default.json': JSON.stringify({
+      packageRules: [
+        {
+          matchPackageNames: firstPartyScopes.map((scope) => `${scope}**`),
+          minimumReleaseAge: null,
+        },
+      ],
+    }),
+  });
 
-  await ctx.writeWorkflow(
-    'jobs:\n  renovate:\n    steps:\n      - with:\n          renovate-version: 44.1.0\n',
-  );
+  await writeTreeFiles(ctx.directory, {
+    '.github/workflows/renovate.yml':
+      'jobs:\n  renovate:\n    steps:\n      - with:\n          renovate-version: 44.1.0\n',
+  });
 
   const exitCode = await ctx.runCheck({
     exitCode: 1,
@@ -82,11 +82,21 @@ test('it validates default.json strictly at the pinned version and returns the v
 test('it fails on stderr and runs no validator when renovate.yml pins no single version', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePreset(firstPartyScopes.map((scope) => `${scope}**`));
+  await writeTreeFiles(ctx.directory, {
+    'default.json': JSON.stringify({
+      packageRules: [
+        {
+          matchPackageNames: firstPartyScopes.map((scope) => `${scope}**`),
+          minimumReleaseAge: null,
+        },
+      ],
+    }),
+  });
 
-  await ctx.writeWorkflow(
-    'jobs:\n  renovate:\n    steps:\n      - uses: renovatebot/github-action@def\n',
-  );
+  await writeTreeFiles(ctx.directory, {
+    '.github/workflows/renovate.yml':
+      'jobs:\n  renovate:\n    steps:\n      - uses: renovatebot/github-action@def\n',
+  });
 
   const exitCode = await ctx.runCheck({ exitCode: 0, stdout: '', stderr: '' });
 
@@ -114,8 +124,8 @@ test('it fails on stderr and runs no validator when renovate.yml does not allow 
     }),
   });
 
-  await ctx.writeWorkflow(
-    [
+  await writeTreeFiles(ctx.directory, {
+    '.github/workflows/renovate.yml': [
       'jobs:',
       '  renovate:',
       '    steps:',
@@ -125,7 +135,7 @@ test('it fails on stderr and runs no validator when renovate.yml does not allow 
       `          RENOVATE_ALLOWED_COMMANDS: '["^bun run --if-present node_modules/\\\\.bin/widget init$"]'`,
       '',
     ].join('\n'),
-  );
+  });
 
   const exitCode = await ctx.runCheck({ exitCode: 0, stdout: '', stderr: '' });
 
@@ -141,11 +151,16 @@ test('it fails on stderr and runs no validator when renovate.yml does not allow 
 test('it fails on stderr and runs no validator when the first-party rule and the check disagree', async () => {
   const ctx = await setupTest();
 
-  await ctx.writePreset(['@zgeoff/**']);
+  await writeTreeFiles(ctx.directory, {
+    'default.json': JSON.stringify({
+      packageRules: [{ matchPackageNames: ['@zgeoff/**'], minimumReleaseAge: null }],
+    }),
+  });
 
-  await ctx.writeWorkflow(
-    'jobs:\n  renovate:\n    steps:\n      - with:\n          renovate-version: 44.1.0\n',
-  );
+  await writeTreeFiles(ctx.directory, {
+    '.github/workflows/renovate.yml':
+      'jobs:\n  renovate:\n    steps:\n      - with:\n          renovate-version: 44.1.0\n',
+  });
 
   const exitCode = await ctx.runCheck({ exitCode: 0, stdout: '', stderr: '' });
 

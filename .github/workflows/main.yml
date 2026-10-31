@@ -54,6 +54,7 @@ jobs:
       - run: bun run check:sync
       - run: bun run check:release-workflow
       - run: bun run check:repo-sync-workflows
+      - run: bun run check:step-bundles
       - run: bun run format:check
       - run: bun run lint:full
       - run: bun run typecheck

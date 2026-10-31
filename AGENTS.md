@@ -28,19 +28,18 @@ packages/           the @zgeoff/* packages; release-please versions each one and
 sync/               the sources that repo-sync delivers, listed in sync/manifest.json; an edit here
                     reaches every repo that takes the entry, as sync/README.md describes
   skills/           the shared skill bases, each delivered to .claude/skills/<name>/
-  pre-push/         the lefthook pre-push baseline and its pre-commit typecheck, which this repo's
-                    lefthook.yml extends too
+  pre-push/         the pre-push baseline that the pre-push-baseline entry delivers, which this
+                    repo's lefthook.yml extends too; its check scripts live in packages/chex
   workflow-callers/ workflow stubs that call this repo's reusable workflows, all opt-in but the
                     repo-sync guard
   hooks/            the agent hooks' start-up stub and the skill gate's older entry point
-  docs-vision/      the vision doc check, which docs-writing's check-length runs in a repo that
-                    takes it
 e2e/                suites that drive the built product from outside, such as `rig browser` under
                     signals
 integration/        flows across packages, such as one lane limit read by rig and by the lint rules
-scripts/            the step scripts that this repo's workflows run, one folder per area, the
-                    shell scripts that repo-sync and the release job run, and the manual one
-                    that does a package's first npm publish; tests sit beside them
+scripts/            the step scripts that this repo's workflows run, one folder per area, and the
+                    shell scripts that repo-sync and the release job run; tests sit beside them
+step-bundles/       the bundle of each step script that a reusable workflow downloads, which
+                    `bun run build:step-bundles` writes; edit the script, never its bundle
 .github/workflows/  this repo's CI, release and sync dispatch, and the reusable workflows that other repos call:
                     bun-checks, repo-sync and its guard, audit-fix, release-please and the
                     paths-changed gate
@@ -80,6 +79,10 @@ repos too, so an edit to one of them changes every repo that takes it.
   you change the manifest or a file an entry lists. CI runs it, and the pre-push hook does not.
 - `bun run check:release-workflow` checks the tag step of the shared release job in
   `.github/workflows/release-please.yml`. CI and the pre-push hook run it.
+- `bun run build:step-bundles` rebuilds `step-bundles/` from the step scripts. Run it, and commit
+  the bundles, after you change a step script, a file one imports, or a package it uses.
+  `bun run check:step-bundles` fails on a stale bundle and on a set of bundles that a runner could
+  not download or compile, and CI and the pre-push hook run it.
 - `bun run check:repo-sync-workflows` checks the stub `sync/repo-sync.yml` against
   `.github/workflows/repo-sync.yml`: two dispatches of different tools commits get two concurrency
   groups, the sync job queues every waiting run, the stub grants every permission a job asks for,

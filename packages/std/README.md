@@ -63,6 +63,18 @@ const sizes = ['small', 'large'] as const;
 const size = isOneOf(input, sizes) ? input : 'small';
 ```
 
+### `readOptionalText`
+
+Reads a file's text, or returns `undefined` when the file or a folder on its path does not exist. It
+reads to the end of the file, so a procfs or cgroupfs file that reports a size of 0 still reads in
+full. Any other failure, such as a path that names a folder, throws.
+
+```ts
+import { readOptionalText } from '@zgeoff/std';
+
+const lefthook = await readOptionalText('lefthook.yml');
+```
+
 ## Typed helpers
 
 Each typed helper holds the one type assertion that its job needs, because TypeScript cannot prove

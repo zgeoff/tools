@@ -24,13 +24,15 @@ async function setupTest() {
   return {
     stack,
     groupsDir: join(directory, 'groups'),
-    probeProcess: mock<(pid: number) => boolean>(() => false),
-    groups: { probeGroup: mock<ProcessGroups['probeGroup']>(() => false) },
+    probeProcess: mock<(pid: number) => boolean>(),
+    groups: { probeGroup: mock<ProcessGroups['probeGroup']>() },
   };
 }
 
 test('it finds a run live while its lane runs, and touches none of its records', async () => {
   const ctx = await setupTest();
+
+  ctx.groups.probeGroup.mockReturnValue(false);
 
   await mkdir(join(ctx.groupsDir, 'pending-tests'), { recursive: true });
 
@@ -52,6 +54,8 @@ test('it finds a run live while its lane runs, and touches none of its records',
 test('it finds a run live while a group it recorded still runs', async () => {
   const ctx = await setupTest();
 
+  ctx.probeProcess.mockReturnValue(false);
+
   await mkdir(join(ctx.groupsDir, '5120'), { recursive: true });
 
   ctx.groups.probeGroup.mockImplementation(buildStubProcessProbe([5120]));
@@ -67,6 +71,8 @@ test('it finds a run live while a group it recorded still runs', async () => {
 
 test('it removes the pending records of an exited lane, so no command can record a group after the probe', async () => {
   const ctx = await setupTest();
+
+  ctx.probeProcess.mockReturnValue(false);
 
   await mkdir(join(ctx.groupsDir, 'pending-build'), { recursive: true });
   await mkdir(join(ctx.groupsDir, 'pending-tests'));
@@ -88,6 +94,7 @@ test('it removes the pending records of an exited lane, so no command can record
 test('it finds a run live when a command records its group just before the sweep removes its pending record', async () => {
   const ctx = await setupTest();
 
+  ctx.probeProcess.mockReturnValue(false);
   ctx.groups.probeGroup.mockImplementation(buildStubProcessProbe([6230]));
 
   // The command moves its pending record to its group ID between the two reads of the folder, a
@@ -107,6 +114,8 @@ test('it finds a run live when a command records its group just before the sweep
 test('it finds a run exited when its lane and every group it recorded have exited', async () => {
   const ctx = await setupTest();
 
+  ctx.probeProcess.mockReturnValue(false);
+
   await mkdir(join(ctx.groupsDir, '5120'), { recursive: true });
   await mkdir(join(ctx.groupsDir, '6230'));
 
@@ -125,6 +134,9 @@ test('it finds a run exited when its lane and every group it recorded have exite
 
 test.skipIf(isRoot)('it fails when it cannot remove a pending record', async () => {
   const ctx = await setupTest();
+
+  ctx.probeProcess.mockReturnValue(false);
+  ctx.groups.probeGroup.mockReturnValue(false);
 
   await mkdir(join(ctx.groupsDir, 'pending-tests'), { recursive: true });
   await chmod(ctx.groupsDir, 0o500);

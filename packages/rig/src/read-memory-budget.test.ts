@@ -2,8 +2,9 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readOptionalText } from '@zgeoff/std';
 import { writeTreeFiles } from '../../../test-utils/write-tree-files.ts';
-import { readMemoryBudget, readOptionalText } from './read-memory-budget.ts';
+import { readMemoryBudget } from './read-memory-budget.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'read-memory-budget-'));

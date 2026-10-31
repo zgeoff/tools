@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
-import { readMemoryBudget, readOptionalText } from './read-memory-budget.ts';
+import { readMemoryBudget } from './read-memory-budget.ts';
+import { readOptionalText } from './read-optional-text.ts';
 
 // Bun's skipIf takes a boolean at collection time, so the cap modes this host supports are probed
 // once here; the CLI test needs a mode that caps its process.

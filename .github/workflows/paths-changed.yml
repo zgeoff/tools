@@ -80,4 +80,4 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           PATTERNS: ${{ inputs.paths }}
-        run: bun "$RUNNER_TEMP/tools/scripts/paths-changed/run-changed-files-step.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/paths-changed/run-changed-files-step.js"

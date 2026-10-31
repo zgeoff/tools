@@ -105,7 +105,7 @@ jobs:
         env:
           EXPIRY_DAYS: ${{ inputs.expiry-days }}
           NO_COLOR: 1
-        run: bun "$RUNNER_TEMP/tools/scripts/audit-fix/fix-advisories.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/audit-fix/fix-advisories.js"
 
       # An ignore must not ride an auto-merge armed for an earlier fix, so
       # auto-merge goes off before the push, and a rerun that makes the tree
@@ -114,7 +114,7 @@ jobs:
         id: push
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: bun "$RUNNER_TEMP/tools/scripts/audit-fix/commit-audit-fix.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/audit-fix/commit-audit-fix.js"
 
       - name: Open or update the pull request
         if: steps.push.outputs.pushed == 'true'
@@ -123,4 +123,4 @@ jobs:
           AUTOMERGE: ${{ inputs.automerge }}
           RUN_URL:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: bun "$RUNNER_TEMP/tools/scripts/audit-fix/open-audit-fix-pull-request.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/audit-fix/open-audit-fix-pull-request.js"

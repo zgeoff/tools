@@ -174,17 +174,17 @@
         "target": ".claude/skills/docs-writing/references/readmes.md"
       },
       {
-        "source": "sync/skills/docs-writing/scripts/check-prose.sh",
+        "source": "packages/chex/src/docs/check-prose.sh",
         "target": ".claude/skills/docs-writing/scripts/check-prose.sh",
         "mode": "0755"
       },
       {
-        "source": "sync/skills/docs-writing/scripts/check-length.sh",
+        "source": "packages/chex/src/docs/check-length.sh",
         "target": ".claude/skills/docs-writing/scripts/check-length.sh",
         "mode": "0755"
       },
       {
-        "source": "sync/skills/docs-writing/scripts/check-links.sh",
+        "source": "packages/chex/src/docs/check-links.sh",
         "target": ".claude/skills/docs-writing/scripts/check-links.sh",
         "mode": "0755"
       }
@@ -192,7 +192,7 @@
   },
   {
     "name": "skill-skill-writing",
-    "description": "The shared skill-writing skill and its check-skill script, which docs-writing's check-length runs when it is present",
+    "description": "The shared skill-writing skill and its check-skill script",
     "optIn": true,
     "files": [
       {
@@ -200,7 +200,7 @@
         "target": ".claude/skills/skill-writing/SKILL.md"
       },
       {
-        "source": "sync/skills/skill-writing/scripts/check-skill.sh",
+        "source": "packages/chex/src/docs/check-skill.sh",
         "target": ".claude/skills/skill-writing/scripts/check-skill.sh",
         "mode": "0755"
       }
@@ -208,11 +208,11 @@
   },
   {
     "name": "docs-vision-check",
-    "description": "The vision doc check, which docs-writing's check-length runs to fail a repo whose docs/vision.md is missing or over one page",
+    "description": "The vision doc check, which fails a repo whose docs/vision.md is missing or over one page",
     "optIn": true,
     "files": [
       {
-        "source": "sync/docs-vision/check-vision.sh",
+        "source": "packages/chex/src/docs/check-vision.sh",
         "target": ".claude/skills/docs-writing/scripts/check-vision.sh",
         "mode": "0755"
       }
@@ -282,7 +282,7 @@
         "target": ".lefthook/pre-push-baseline.yml"
       },
       {
-        "source": "sync/pre-push/read-branch-files.ts",
+        "source": "packages/chex/src/read-branch-files.ts",
         "target": "scripts/read-branch-files.ts"
       },
       {
@@ -290,43 +290,43 @@
         "target": "scripts/run-related-tests.ts"
       },
       {
-        "source": "sync/pre-push/read-branch-base.ts",
+        "source": "packages/chex/src/read-branch-base.ts",
         "target": "scripts/read-branch-base.ts"
       },
       {
-        "source": "sync/pre-push/read-pushed-ranges.ts",
+        "source": "packages/chex/src/read-pushed-ranges.ts",
         "target": "scripts/read-pushed-ranges.ts"
       },
       {
-        "source": "sync/pre-push/parse-pushed-refs.ts",
+        "source": "packages/chex/src/parse-pushed-refs.ts",
         "target": "scripts/parse-pushed-refs.ts"
       },
       {
-        "source": "sync/pre-push/read-range-commits.ts",
+        "source": "packages/chex/src/read-range-commits.ts",
         "target": "scripts/read-range-commits.ts"
       },
       {
-        "source": "sync/pre-push/format-commit-lines.ts",
+        "source": "packages/chex/src/format-commit-lines.ts",
         "target": "scripts/format-commit-lines.ts"
       },
       {
-        "source": "sync/pre-push/read-pushed-refs-input.ts",
+        "source": "packages/chex/src/read-pushed-refs-input.ts",
         "target": "scripts/read-pushed-refs-input.ts"
       },
       {
-        "source": "sync/pre-push/parse-added-lines.ts",
+        "source": "packages/chex/src/parse-added-lines.ts",
         "target": "scripts/parse-added-lines.ts"
       },
       {
-        "source": "sync/pre-push/pick-merge-blobs-command.ts",
+        "source": "packages/chex/src/pick-merge-blobs-command.ts",
         "target": "scripts/pick-merge-blobs-command.ts"
       },
       {
-        "source": "sync/pre-push/run-program.ts",
+        "source": "packages/chex/src/run-program.ts",
         "target": "scripts/run-program.ts"
       },
       {
-        "source": "sync/pre-push/parse-lane-limits.ts",
+        "source": "packages/chex/src/parse-lane-limits.ts",
         "target": "scripts/parse-lane-limits.ts"
       },
       {
@@ -334,99 +334,103 @@
         "target": "scripts/read-memory-budget.ts"
       },
       {
+        "source": "packages/std/src/read-optional-text.ts",
+        "target": "scripts/read-optional-text.ts"
+      },
+      {
         "source": "sync/pre-push/read-worker-count.ts",
         "target": "scripts/read-worker-count.ts"
       },
       {
-        "source": "sync/pre-push/run-commits-check.ts",
+        "source": "packages/chex/src/run-commits-check.ts",
         "target": "scripts/run-commits-check.ts"
       },
       {
-        "source": "sync/pre-push/run-local-paths-check.ts",
+        "source": "packages/chex/src/run-local-paths-check.ts",
         "target": "scripts/run-local-paths-check.ts"
       },
       {
-        "source": "sync/pre-push/run-test-timeouts-check.ts",
+        "source": "packages/chex/src/run-test-timeouts-check.ts",
         "target": "scripts/run-test-timeouts-check.ts"
       },
       {
-        "source": "sync/pre-push/run-workflows-check.ts",
+        "source": "packages/chex/src/run-workflows-check.ts",
         "target": "scripts/run-workflows-check.ts"
       },
       {
-        "source": "sync/pre-push/run-uncommitted-check.ts",
+        "source": "packages/chex/src/run-uncommitted-check.ts",
         "target": "scripts/run-uncommitted-check.ts"
       },
       {
-        "source": "sync/pre-push/parse-shell-words.ts",
+        "source": "packages/chex/src/parse-shell-words.ts",
         "target": "scripts/parse-shell-words.ts"
       },
       {
-        "source": "sync/pre-push/shell-escape-parsers.ts",
+        "source": "packages/chex/src/shell-escape-parsers.ts",
         "target": "scripts/shell-escape-parsers.ts"
       },
       {
-        "source": "sync/pre-push/collect-command-names.ts",
+        "source": "packages/chex/src/collect-command-names.ts",
         "target": "scripts/collect-command-names.ts"
       },
       {
-        "source": "sync/pre-push/collect-expression-references.ts",
+        "source": "packages/chex/src/collect-expression-references.ts",
         "target": "scripts/collect-expression-references.ts"
       },
       {
-        "source": "sync/pre-push/find-install-cache-path.ts",
+        "source": "packages/chex/src/find-install-cache-path.ts",
         "target": "scripts/find-install-cache-path.ts"
       },
       {
-        "source": "sync/pre-push/dependency-gates/collect-stale-age-gate-excludes.ts",
+        "source": "packages/chex/src/dependency-gates/collect-stale-age-gate-excludes.ts",
         "target": "scripts/dependency-gates/collect-stale-age-gate-excludes.ts"
       },
       {
-        "source": "sync/pre-push/dependency-gates/collect-unneeded-audit-ignores.ts",
+        "source": "packages/chex/src/dependency-gates/collect-unneeded-audit-ignores.ts",
         "target": "scripts/dependency-gates/collect-unneeded-audit-ignores.ts"
       },
       {
-        "source": "sync/pre-push/dependency-gates/collect-unneeded-overrides.ts",
+        "source": "packages/chex/src/dependency-gates/collect-unneeded-overrides.ts",
         "target": "scripts/dependency-gates/collect-unneeded-overrides.ts"
       },
       {
-        "source": "sync/pre-push/dependency-gates/first-party-scopes.ts",
+        "source": "packages/chex/src/dependency-gates/first-party-scopes.ts",
         "target": "scripts/dependency-gates/first-party-scopes.ts"
       },
       {
-        "source": "sync/pre-push/dependency-gates/is-record.ts",
+        "source": "packages/chex/src/dependency-gates/is-record.ts",
         "target": "scripts/dependency-gates/is-record.ts"
       },
       {
-        "source": "sync/pre-push/dependency-gates/parse-audit-advisories.ts",
+        "source": "packages/chex/src/dependency-gates/parse-audit-advisories.ts",
         "target": "scripts/dependency-gates/parse-audit-advisories.ts"
       },
       {
-        "source": "sync/pre-push/dependency-gates/parse-audit-ignore-ids.ts",
+        "source": "packages/chex/src/dependency-gates/parse-audit-ignore-ids.ts",
         "target": "scripts/dependency-gates/parse-audit-ignore-ids.ts"
       },
       {
-        "source": "sync/pre-push/dependency-gates/parse-fixable-packages.ts",
+        "source": "packages/chex/src/dependency-gates/parse-fixable-packages.ts",
         "target": "scripts/dependency-gates/parse-fixable-packages.ts"
       },
       {
-        "source": "sync/pre-push/dependency-gates/parse-lockfile-dependents.ts",
+        "source": "packages/chex/src/dependency-gates/parse-lockfile-dependents.ts",
         "target": "scripts/dependency-gates/parse-lockfile-dependents.ts"
       },
       {
-        "source": "sync/pre-push/dependency-gates/parse-root-manifest.ts",
+        "source": "packages/chex/src/dependency-gates/parse-root-manifest.ts",
         "target": "scripts/dependency-gates/parse-root-manifest.ts"
       },
       {
-        "source": "sync/pre-push/dependency-gates/read-dependency-gate-findings.ts",
+        "source": "packages/chex/src/dependency-gates/read-dependency-gate-findings.ts",
         "target": "scripts/dependency-gates/read-dependency-gate-findings.ts"
       },
       {
-        "source": "sync/pre-push/dependency-gates/run-dependency-gates-check.ts",
+        "source": "packages/chex/src/dependency-gates/run-dependency-gates-check.ts",
         "target": "scripts/dependency-gates/run-dependency-gates-check.ts"
       },
       {
-        "source": "sync/pre-push/dependency-gates/types.ts",
+        "source": "packages/chex/src/dependency-gates/types.ts",
         "target": "scripts/dependency-gates/types.ts"
       }
     ],

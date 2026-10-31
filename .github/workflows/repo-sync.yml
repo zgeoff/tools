@@ -111,7 +111,7 @@ jobs:
           REF: ${{ inputs.ref }}
           WORKFLOW_COMMIT: ${{ job.workflow_sha }}
           GH_TOKEN: ${{ github.token }}
-        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/write-sync-ref.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/write-sync-ref.js"
 
       - name: Check out the manifest
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -126,7 +126,7 @@ jobs:
         env:
           SKIP: ${{ inputs.skip }}
           INCLUDE: ${{ inputs.include }}
-        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/write-sync-entries.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/write-sync-entries.js"
 
   sync:
     name: Sync the entries
@@ -233,7 +233,7 @@ jobs:
           SKIP: ${{ inputs.skip }}
           BASE: ${{ github.ref_name }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/sync-entries.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/sync-entries.js"
 
   alarm:
     name: Raise a red sync pull request
@@ -276,4 +276,4 @@ jobs:
           BRANCH: repo-sync/zgeoff-tools
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
-        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/write-sync-alarm.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/write-sync-alarm.js"

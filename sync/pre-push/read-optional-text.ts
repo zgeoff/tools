@@ -1,0 +1,1 @@
+../../packages/std/src/read-optional-text.ts

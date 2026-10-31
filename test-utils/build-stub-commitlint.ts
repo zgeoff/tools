@@ -1,5 +1,5 @@
-import type { ProgramResult, RunProgram } from '../sync/pre-push/run-program.ts';
-import { runProgram } from '../sync/pre-push/run-program.ts';
+import type { ProgramResult, RunProgram } from '../packages/chex/src/run-program.ts';
+import { runProgram } from '../packages/chex/src/run-program.ts';
 
 export interface StubCommitlint {
   readonly runProgram: RunProgram;

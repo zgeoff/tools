@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runProgram } from '../sync/pre-push/run-program.ts';
+import { runProgram } from '../packages/chex/src/run-program.ts';
 import { buildStubCommitlint } from './build-stub-commitlint.ts';
 import { readGitEnv } from './read-git-env.ts';
 
