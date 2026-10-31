@@ -203,7 +203,11 @@ function readLockText(lockPath: string): string | null {
   try {
     return readFileSync(lockPath, 'utf8');
   } catch (error) {
-    return error instanceof Error && 'code' in error && error.code === 'ENOENT' ? null : '';
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return null;
+    }
+
+    throw error;
   }
 }
 
