@@ -125,3 +125,38 @@ test.skipIf(process.getuid?.() === 0)(
     });
   },
 );
+
+test('it reads a Unix socket at the rules path as unreadable', async () => {
+  const ctx = await setupTest();
+
+  const listener = Bun.listen({
+    unix: join(ctx.directory, 'skill-gate.json'),
+    socket: { data: () => {} },
+  });
+
+  ctx.stack.defer(() => listener.stop(true));
+
+  const state = await readRulesState(ctx.fileSystem, join(ctx.directory, 'skill-gate.json'));
+
+  expect(state).toStrictEqual({
+    kind: 'unreadable',
+    reason: 'it is not a regular file',
+    cause: 'other',
+  });
+});
+
+test('it reads a rules file whose read fails for another reason as unreadable', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'skill-gate.json'), '{"gates":[]}');
+
+  const failingFileSystem = {
+    stat,
+    readText: () =>
+      Promise.reject(Object.assign(new Error('EIO: i/o error, read'), { code: 'EIO' })),
+  };
+
+  const state = await readRulesState(failingFileSystem, join(ctx.directory, 'skill-gate.json'));
+
+  expect(state).toStrictEqual({ kind: 'unreadable', reason: 'EIO: i/o error', cause: 'other' });
+});
