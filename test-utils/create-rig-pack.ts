@@ -1,4 +1,5 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import { hostname, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import type { LaneContext, LaneStart } from '@zgeoff/rig';
@@ -8,7 +9,9 @@ import { laneFiles } from '../packages/rig/src/browser/lane-files.ts';
 import { pickChromeDirs } from '../packages/rig/src/browser/pick-chrome-dirs.ts';
 import { removePath } from '../packages/rig/src/browser/remove-path.ts';
 import { buildRigPackRun } from './build-rig-pack-run.ts';
+import { buildWarmUpSuite } from './build-warm-up-suite.ts';
 import { createRigTarball } from './create-rig-tarball.ts';
+import { createTrackedRepo } from './create-tracked-repo.ts';
 import { fileLocks } from './file-locks.ts';
 import { rigE2EBinVariable } from './get-rig-e2e-bin.ts';
 import { parsePackageBin } from './parse-package-bin.ts';
@@ -78,16 +81,21 @@ async function runBrowserWarmUp(binPath: string, repoRoot: string): Promise<void
     buildBrowserRun(repoRoot, hostname(), '0'),
   ).runsDir;
 
-  await mkdir(repoRoot, { recursive: true });
-  await writeFile(join(repoRoot, 'package.json'), '{}\n');
+  const markPath = join(repoRoot, 'warm-up.mark');
 
-  await writeFile(
-    join(repoRoot, 'warm-up.browser.test.ts'),
-    "import { test } from 'bun:test';\n\ntest('it starts Chrome', () => {});\n",
-  );
+  // rig runs only the test files that git tracks, and exits 0 before Chrome starts when a lane
+  // has none.
+  await createTrackedRepo(repoRoot, {
+    'package.json': '{}\n',
+    'warm-up.browser.test.ts': buildWarmUpSuite(markPath),
+  });
 
   try {
     await $`${binPath} browser`.cwd(repoRoot).quiet();
+
+    if (!existsSync(markPath)) {
+      throw new Error('the Chrome warm-up ran no browser test');
+    }
   } finally {
     await removePath(chromeRunsDir);
   }
