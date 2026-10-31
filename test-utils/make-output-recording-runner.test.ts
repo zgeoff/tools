@@ -1,21 +1,21 @@
 import { expect, test } from 'bun:test';
-import { runCommand } from '../scripts/ci/run-command.ts';
+import type { CommandResult } from '../scripts/ci/run-command.ts';
 import { makeOutputRecordingRunner } from './make-output-recording-runner.ts';
 
 test('it returns each result of the runner it wraps and records what each command printed', async () => {
-  const recording = makeOutputRecordingRunner(runCommand);
+  const results: Readonly<Record<string, CommandResult>> = {
+    boil: { exitCode: 0, stdout: 'boil\n', stderr: 'hiss\n' },
+    spill: { exitCode: 3, stdout: '', stderr: '' },
+  };
 
-  const first = await recording.runCommand(['sh', '-c', 'echo boil; echo hiss >&2'], {
-    cwd: import.meta.dir,
-    env: { PATH: process.env['PATH'] },
-  });
+  const recording = makeOutputRecordingRunner((argv) =>
+    Promise.resolve(results[argv[0] ?? ''] ?? { exitCode: 127, stdout: '', stderr: 'unknown\n' }),
+  );
 
-  const second = await recording.runCommand(['sh', '-c', 'exit 3'], {
-    cwd: import.meta.dir,
-    env: { PATH: process.env['PATH'] },
-  });
+  const first = await recording.runCommand(['boil'], { cwd: '/srv/kettle', env: {} });
+  const second = await recording.runCommand(['spill'], { cwd: '/srv/kettle', env: {} });
 
-  expect(first.exitCode).toBe(0);
-  expect(second.exitCode).toBe(3);
+  expect(first).toStrictEqual({ exitCode: 0, stdout: 'boil\n', stderr: 'hiss\n' });
+  expect(second).toStrictEqual({ exitCode: 3, stdout: '', stderr: '' });
   expect(recording.outputs).toStrictEqual(['boil\nhiss\n', '']);
 });
