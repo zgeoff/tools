@@ -1508,10 +1508,10 @@ async function runInit(deps) {
     const originals = { "package.json": packageText, "lefthook.yml": lefthookText };
     const written = [];
     for (const write of apply.writes) {
-      const failure = await deps.writeText(join4(deps.repoRoot, write.file), write.text).then(() => null, (error) => error);
+      const failure = await deps.writeText(join4(deps.repoRoot, write.file), write.text).then(() => null, (error) => error instanceof Error ? error.message : String(error));
       if (failure !== null) {
         await restoreFiles(written, originals, deps);
-        deps.writeError(`chex init: could not write ${write.file}, so both files stay as they were: ${String(failure)}
+        deps.writeError(`chex init: could not write ${write.file}, so both files stay as they were: ${failure}
 `);
         return 1;
       }
