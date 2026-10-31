@@ -16,6 +16,11 @@
 # reference, and a code-formatted span outside a table that names an existing repo file.
 set -uo pipefail
 
+if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+  echo "check-skill: run it inside a git work tree, because it lists the files with git" >&2
+  exit 2
+fi
+
 # Lists tracked and untracked files, so a new skill is checked before it is staged.
 list_files() {
   git -c core.quotePath=false ls-files --cached --others --exclude-standard -- "$@" | sort -u

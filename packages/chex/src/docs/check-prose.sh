@@ -10,6 +10,11 @@
 # shellcheck disable=SC2016
 set -uo pipefail
 
+if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+  echo "check-prose: run it inside a git work tree, because it lists the files with git" >&2
+  exit 2
+fi
+
 # A skill folder's README is a skill file, so only the READMEs outside the skill folders are listed
 # one by one.
 if [ "$#" -eq 0 ]; then

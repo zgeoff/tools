@@ -9,6 +9,11 @@
 # GitHub's heading anchors and the page's explicit id and name attributes.
 set -uo pipefail
 
+if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+  echo "check-links: run it inside a git work tree, because it lists the files with git" >&2
+  exit 2
+fi
+
 if [ "$#" -eq 0 ]; then
   set -- ':(glob)**/README.md' ':(glob)**/results.md' ':(glob)docs/**/*.md' \
     ':(glob).agents/skills/**/*.md' ':(glob).claude/skills/**/*.md' ':(glob)skills/**/*.md' \

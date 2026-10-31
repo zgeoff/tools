@@ -13,6 +13,11 @@
 # A README git marks linguist-vendored belongs to someone else and is skipped.
 set -uo pipefail
 
+if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+  echo "check-readmes: run it inside a git work tree, because it lists the files with git" >&2
+  exit 2
+fi
+
 if [ "$#" -gt 0 ]; then
   echo "usage: check-readmes.sh" >&2
   exit 2

@@ -95,7 +95,38 @@ async function setupTest() {
 
   const runCLI = (...args: readonly string[]) => $`bun ${cliPath} ${args}`.nothrow().quiet();
 
-  return { env, runCase, runCLI };
+  const runOutsideRepo = async (name: string) => {
+    await writeFile(join(directory, 'README.md'), '# Kettle\n');
+
+    const result = await $`bun ${cliPath} ${name}`.cwd(directory).env(env).nothrow().quiet();
+
+    return {
+      exitCode: result.exitCode,
+      stderr: result.stderr.toString(),
+      lastLine: result.stdout.toString().trimEnd().split('\n').at(-1),
+    };
+  };
+
+  const runInitCLI = async () => {
+    await writeFiles({
+      'package.json': JSON.stringify({
+        name: 'kettle',
+        devDependencies: {
+          '@zgeoff/chex': '0.1.0',
+          '@zgeoff/diet': '0.1.2',
+          '@zgeoff/rig': '0.0.2',
+        },
+      }),
+    });
+
+    const result = await $`bun ${cliPath} init`.cwd(repo).env(env).nothrow().quiet();
+    const lefthook = await Bun.file(join(repo, 'lefthook.yml')).text();
+    const packageJSON: unknown = await Bun.file(join(repo, 'package.json')).json();
+
+    return { exitCode: result.exitCode, lefthook, packageJSON };
+  };
+
+  return { env, runCase, runCLI, runOutsideRepo, runInitCLI };
 }
 
 test.each<[string, CheckCase]>([
@@ -172,6 +203,35 @@ test.each<[string, CheckCase, number]>([
   const result = await ctx.runCase(name, check);
 
   expect(result).toStrictEqual({ exitCode, lastLine: `bounced: ${name}` });
+});
+
+test.each([['prose'], ['length'], ['links'], ['readmes'], ['skill']])(
+  'it prints bounced and exits 2 when the %s check runs outside a git work tree',
+  async (name) => {
+    const ctx = await setupTest();
+    const result = await ctx.runOutsideRepo(name);
+
+    expect(result).toStrictEqual({
+      exitCode: 2,
+      stderr: `check-${name}: run it inside a git work tree, because it lists the files with git\n`,
+      lastLine: `bounced: ${name}`,
+    });
+  },
+);
+
+test('it writes lefthook.yml and the check:docs script to disk for init', async () => {
+  const ctx = await setupTest();
+  const result = await ctx.runInitCLI();
+
+  expect(result).toStrictEqual({
+    exitCode: 0,
+    lefthook: 'extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n',
+    packageJSON: {
+      name: 'kettle',
+      devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
+      scripts: { 'check:docs': 'chex prose length links' },
+    },
+  });
 });
 
 test('it prints each check of a list on its own line and exits 1 when one bounces', async () => {
