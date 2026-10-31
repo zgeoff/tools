@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { commitAllFiles } from '../test-utils/commit-all-files.ts';
+import { getChexE2EPack } from '../test-utils/get-chex-e2e-pack.ts';
 import { linkCommitlint } from '../test-utils/link-commitlint.ts';
 import { readGitEnv } from '../test-utils/read-git-env.ts';
 import { runChexCLI } from '../test-utils/run-chex-cli.ts';
@@ -41,7 +42,7 @@ async function setupTest() {
   await writeFile(join(repo, '.git/info/exclude'), 'node_modules/\n');
   await linkCommitlint(repo, join(import.meta.dir, '..'));
 
-  return { directory, repo, env };
+  return { directory, repo, env, chexBin: getChexE2EPack(process.env).binPath };
 }
 
 test.each<[string, CheckCase]>([
@@ -166,7 +167,7 @@ test.each<[string, CheckCase]>([
   await commitAllFiles(ctx.repo, ctx.env, check.message);
   await writeTreeFiles(ctx.repo, check.uncommitted);
 
-  const run = await runChexCLI(ctx.repo, ctx.env, [name, ...check.args]);
+  const run = await runChexCLI(ctx.chexBin, ctx.repo, ctx.env, [name, ...check.args]);
 
   expect({ exitCode: run.exitCode, lastLine: run.lastLine }).toStrictEqual({
     exitCode: 0,
@@ -299,7 +300,7 @@ test.each<[string, CheckCase, number]>([
   await commitAllFiles(ctx.repo, ctx.env, check.message);
   await writeTreeFiles(ctx.repo, check.uncommitted);
 
-  const run = await runChexCLI(ctx.repo, ctx.env, [name, ...check.args]);
+  const run = await runChexCLI(ctx.chexBin, ctx.repo, ctx.env, [name, ...check.args]);
 
   expect({ exitCode: run.exitCode, lastLine: run.lastLine }).toStrictEqual({
     exitCode,
@@ -315,7 +316,7 @@ test('it prints bounced when the local-paths check finds a path under the home f
   await writeTreeFiles(ctx.repo, { 'notes.txt': 'cache: /home/kettle-cook/.cache\n' });
   await commitAllFiles(ctx.repo, env, 'docs: add the notes');
 
-  const run = await runChexCLI(ctx.repo, env, ['local-paths']);
+  const run = await runChexCLI(ctx.chexBin, ctx.repo, env, ['local-paths']);
 
   expect({ exitCode: run.exitCode, lastLine: run.lastLine }).toStrictEqual({
     exitCode: 1,
@@ -330,7 +331,7 @@ test.each([['prose'], ['length'], ['links'], ['readmes'], ['skill']])(
 
     await writeTreeFiles(ctx.directory, { 'README.md': '# Kettle\n' });
 
-    const run = await runChexCLI(ctx.directory, ctx.env, [name]);
+    const run = await runChexCLI(ctx.chexBin, ctx.directory, ctx.env, [name]);
 
     expect({ exitCode: run.exitCode, stderr: run.stderr, lastLine: run.lastLine }).toStrictEqual({
       exitCode: 2,
@@ -350,7 +351,7 @@ test('it writes lefthook.yml and the check:docs script to disk for init', async 
     }),
   });
 
-  const run = await runChexCLI(ctx.repo, ctx.env, ['init']);
+  const run = await runChexCLI(ctx.chexBin, ctx.repo, ctx.env, ['init']);
   const lefthook = await Bun.file(join(ctx.repo, 'lefthook.yml')).text();
   const packageJSON: unknown = await Bun.file(join(ctx.repo, 'package.json')).json();
 
@@ -370,7 +371,7 @@ test('it prints each check of a list on its own line and exits 1 when one bounce
   await writeTreeFiles(ctx.repo, { 'README.md': '# Kettle\n\nRead the [guide](./guide.md).\n' });
   await commitAllFiles(ctx.repo, ctx.env, 'docs: add the readme');
 
-  const run = await runChexCLI(ctx.repo, ctx.env, ['length', 'links']);
+  const run = await runChexCLI(ctx.chexBin, ctx.repo, ctx.env, ['length', 'links']);
 
   expect({ exitCode: run.exitCode, stdout: run.stdout }).toStrictEqual({
     exitCode: 1,
@@ -380,7 +381,7 @@ test('it prints each check of a list on its own line and exits 1 when one bounce
 
 test('it exits 2 with the usage on an unknown check', async () => {
   const ctx = await setupTest();
-  const run = await runChexCLI(ctx.repo, ctx.env, ['spelling']);
+  const run = await runChexCLI(ctx.chexBin, ctx.repo, ctx.env, ['spelling']);
 
   expect({ exitCode: run.exitCode, stdout: run.stdout, stderr: run.stderr }).toStrictEqual({
     exitCode: 2,

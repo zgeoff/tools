@@ -10,8 +10,8 @@ import { buildRigPackRun } from './build-rig-pack-run.ts';
 import { createRigTarball } from './create-rig-tarball.ts';
 import { fileLocks } from './file-locks.ts';
 import { rigE2EBinVariable } from './get-rig-e2e-bin.ts';
-import { parsePackageBin } from './parse-package-bin.ts';
 import { probeProcess } from './probe-process.ts';
+import { readPackedBin } from './read-packed-bin.ts';
 import { removeExitedRigPacks } from './remove-exited-rig-packs.ts';
 import { runBrowserWarmUp } from './run-browser-warm-up.ts';
 import { systemClock } from './system-clock.ts';
@@ -40,7 +40,7 @@ export default async function createRigPack(context: LaneContext): Promise<LaneS
 
   await $`tar -xzf ${run.tarballPath} -C ${run.runDir}`;
 
-  const binPath = await readPackedBin(run.packageDir);
+  const binPath = await readPackedBin(run.packageDir, 'rig');
 
   const warmUpRoot = join(run.runDir, 'warm-up');
 
@@ -57,24 +57,4 @@ export default async function createRigPack(context: LaneContext): Promise<LaneS
   });
 
   return { environment: { [rigE2EBinVariable]: binPath } };
-}
-
-async function readPackedBin(packageDir: string): Promise<string> {
-  const manifestPath = join(packageDir, 'package.json');
-
-  const manifest: unknown = await Bun.file(manifestPath).json();
-
-  const binPath = parsePackageBin(manifest, 'rig');
-
-  if (binPath === null) {
-    throw new Error(`the packed ${manifestPath} declares no bin named rig`);
-  }
-
-  const absolutePath = join(packageDir, binPath);
-
-  if (!(await Bun.file(absolutePath).exists())) {
-    throw new Error(`the packed rig declares the bin ${binPath}, which its tarball lacks`);
-  }
-
-  return absolutePath;
 }

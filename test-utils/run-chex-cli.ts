@@ -1,4 +1,3 @@
-import { join } from 'node:path';
 import { $ } from 'bun';
 import type { GitEnv } from './read-git-env.ts';
 
@@ -11,15 +10,14 @@ export interface ChexCLIRun {
   readonly lastLine: string | undefined;
 }
 
-const cliPath = join(import.meta.dir, '../packages/chex/src/cli.ts');
-
-// Runs the chex bin from this checkout in the folder, as `bun x chex <args>` runs it in a repo.
+// Runs the bin of a packed chex in the folder, as `bun x chex <args>` runs it in a repo.
 export async function runChexCLI(
+  binPath: string,
   cwd: string,
   env: GitEnv,
   args: readonly string[],
 ): Promise<ChexCLIRun> {
-  const result = await $`bun ${cliPath} ${args}`
+  const result = await $`bun ${binPath} ${args}`
     .cwd(cwd)
     .env({ ...env })
     .nothrow()

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { createChexBaselineRepo } from '../test-utils/create-chex-baseline-repo.ts';
+import { getChexE2EPack } from '../test-utils/get-chex-e2e-pack.ts';
 import { readCallLog } from '../test-utils/read-call-log.ts';
 
 async function setupTest() {
@@ -15,8 +16,9 @@ async function setupTest() {
   const root = join(directory, 'repo');
   const toolsRoot = join(import.meta.dir, '..');
   const rigLog = join(directory, 'rig-calls');
+  const chex = getChexE2EPack(process.env);
 
-  return { root, toolsRoot, rigLog, bin: join(root, 'node_modules/.bin') };
+  return { root, toolsRoot, chex, rigLog, bin: join(root, 'node_modules/.bin') };
 }
 
 test('it writes the files chex init leaves, with the fixture files and scripts added', async () => {
@@ -24,7 +26,7 @@ test('it writes the files chex init leaves, with the fixture files and scripts a
 
   await createChexBaselineRepo(
     ctx.root,
-    { toolsRoot: ctx.toolsRoot, rigLog: ctx.rigLog },
+    { toolsRoot: ctx.toolsRoot, chex: ctx.chex, rigLog: ctx.rigLog },
     {
       realChecks: [],
       scripts: { 'format:check': 'true', typecheck: 'tsc' },
@@ -46,7 +48,7 @@ test('it writes the files chex init leaves, with the fixture files and scripts a
   expect(lefthook).toBe('extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n');
   expect(packageJSON).toStrictEqual({ scripts: { 'format:check': 'true', typecheck: 'tsc' } });
   expect(notes).toBe('The kettle boils.\n');
-  expect(chexLink).toBe(join(ctx.toolsRoot, 'packages/chex'));
+  expect(chexLink).toBe(ctx.chex.packageDir);
 });
 
 test('it stubs chex to clear each check it does not run for real', async () => {
@@ -54,7 +56,7 @@ test('it stubs chex to clear each check it does not run for real', async () => {
 
   await createChexBaselineRepo(
     ctx.root,
-    { toolsRoot: ctx.toolsRoot, rigLog: ctx.rigLog },
+    { toolsRoot: ctx.toolsRoot, chex: ctx.chex, rigLog: ctx.rigLog },
     {
       realChecks: ['prose'],
       scripts: {},
@@ -78,7 +80,7 @@ test('it stubs rig to log each call, and marks a call that the stub diet wraps',
 
   await createChexBaselineRepo(
     ctx.root,
-    { toolsRoot: ctx.toolsRoot, rigLog: ctx.rigLog },
+    { toolsRoot: ctx.toolsRoot, chex: ctx.chex, rigLog: ctx.rigLog },
     {
       realChecks: [],
       scripts: {},
@@ -107,7 +109,7 @@ test('it links no commitlint for a fixture that does not ask for it', async () =
 
   await createChexBaselineRepo(
     ctx.root,
-    { toolsRoot: ctx.toolsRoot, rigLog: ctx.rigLog },
+    { toolsRoot: ctx.toolsRoot, chex: ctx.chex, rigLog: ctx.rigLog },
     {
       realChecks: [],
       scripts: {},
@@ -126,7 +128,7 @@ test('it links commitlint for a fixture that asks for it', async () => {
 
   await createChexBaselineRepo(
     ctx.root,
-    { toolsRoot: ctx.toolsRoot, rigLog: ctx.rigLog },
+    { toolsRoot: ctx.toolsRoot, chex: ctx.chex, rigLog: ctx.rigLog },
     {
       realChecks: [],
       scripts: {},

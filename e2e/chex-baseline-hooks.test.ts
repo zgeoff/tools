@@ -7,6 +7,7 @@ import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 import { commitAllFiles } from '../test-utils/commit-all-files.ts';
 import { createChexBaselineRepo } from '../test-utils/create-chex-baseline-repo.ts';
+import { getChexE2EPack } from '../test-utils/get-chex-e2e-pack.ts';
 import { readCallLog } from '../test-utils/read-call-log.ts';
 import { runHookedPush } from '../test-utils/run-hooked-push.ts';
 import { writeStubPrograms } from '../test-utils/write-stub-programs.ts';
@@ -77,7 +78,7 @@ async function setupTest() {
     'pre-commit': `exec ${process.execPath} ${lefthook} run pre-commit "$@"`,
   });
 
-  const install = { toolsRoot: repoRoot, rigLog: rigCalls };
+  const install = { toolsRoot: repoRoot, chex: getChexE2EPack(process.env), rigLog: rigCalls };
   const readRigCalls = () => readCallLog(rigCalls);
 
   return {
