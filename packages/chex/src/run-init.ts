@@ -37,14 +37,14 @@ export async function runInit(deps: InitDeps): Promise<number> {
       for (const write of apply.writes) {
         const failure = await deps.writeText(join(deps.repoRoot, write.file), write.text).then(
           () => null,
-          (error: unknown) => error,
+          (error: unknown) => (error instanceof Error ? error.message : String(error)),
         );
 
         if (failure !== null) {
           await restoreFiles(written, originals, deps);
 
           deps.writeError(
-            `chex init: could not write ${write.file}, so both files stay as they were: ${String(failure)}\n`,
+            `chex init: could not write ${write.file}, so both files stay as they were: ${failure}\n`,
           );
 
           return 1;
