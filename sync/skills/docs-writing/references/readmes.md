@@ -63,10 +63,9 @@ it.
 
 ## README limits
 
-[`check-length.sh`](../scripts/check-length.sh) takes each README's limit from its path alone, so
-the pre-push hook, CI and a repo's own script give the same result. It checks each README outside
-`docs/` and `.claude/`, and each spike README under `docs/design/**/spikes/*/`, and fails the run
-above its limit:
+`chex length` takes each README's limit from its path alone, so the pre-push hook, CI and a repo's
+own script give the same result. It checks each README outside `docs/` and `.claude/`, and each
+spike README under `docs/design/**/spikes/*/`, and fails the run above its limit:
 
 | README     | Path                                      | Target | Limit |
 | ---------- | ----------------------------------------- | ------ | ----- |
