@@ -81,11 +81,10 @@ database computes some of its fields, and asserts that overrides apply.
 
 ## Reading results back
 
-A test outside the store reads a row back through the store's read function, as
-[Stored state](../SKILL.md#stored-state) states. The store's own test queries its table directly.
-With Kysely, it reads a row that must exist with `executeTakeFirstOrThrow()`, narrowing the
-selection to the one column under test when only that column matters. It asserts absence with
-`executeTakeFirst()` and `toBeUndefined()`.
+[Stored state](../SKILL.md#stored-state) says which test reads a row back directly. That test, in
+Kysely, reads a row that must exist with `executeTakeFirstOrThrow()`, narrowing the selection to the
+one column under test when only that column matters. It asserts absence with `executeTakeFirst()`
+and `toBeUndefined()`.
 
 ```ts
 // archive-note.test.ts, in the store that writes the notes table

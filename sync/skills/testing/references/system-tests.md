@@ -82,20 +82,20 @@ when the runtime cannot expose a shorter faithful deadline. That case stays in t
 disable comment that [A test over its limit](./slow-tests.md#a-test-over-its-limit) describes.
 
 When a third-party library owns a timer, runs it internally, and takes only a duration in its
-config, pass the shortest duration the library accepts and wait on the observable event, never with
-a sleep. Add a control: the same duration with a live peer does not fire. Fake timers stay for
-libraries whose timers do not interleave with real I/O.
+config, pass the shortest duration the library accepts and wait on the observable event, as
+[Time and waiting](../SKILL.md#time-and-waiting) says. Add a control: the same duration with a live
+peer does not fire. Fake timers stay for libraries whose timers do not interleave with real I/O.
 
 A deadline that the repo's own code runs on real time in a process that the test spawns, where no
 clock the test injects reaches it, such as a crash harness's settle window, needs only two things: a
 name, from an option of the code that owns the deadline or a constant exported outside the test
 file, and a wait that ends on a condition, checked by the test or reported by the process that owns
-the deadline, never on a fixed sleep. The rules above for native and library timers do not apply to
-it. A deadline that the repo's own code runs in the test's own process takes a time argument or an
-injected clock, in the order [Time and waiting](../SKILL.md#time-and-waiting) ranks them. A deadline
-that the repo's code schedules, even with `setTimeout`, is its own. A native runtime or kernel timer
-is one that the runtime configures and runs, such as a server's idle timeout; it and a library-owned
-timer follow the rules above in any process.
+the deadline. The rules above for native and library timers do not apply to it. A deadline that the
+repo's own code runs in the test's own process takes a time argument or an injected clock, in the
+order [Time and waiting](../SKILL.md#time-and-waiting) ranks them. A deadline that the repo's code
+schedules, even with `setTimeout`, is its own. A native runtime or kernel timer is one that the
+runtime configures and runs, such as a server's idle timeout; it and a library-owned timer follow
+the rules above in any process.
 
 A real delay may define an end-to-end workload rate or a seeded fault-injection offset. State the
 rate or fault purpose and preserve replay information. A claim that a fault lands mid-operation
