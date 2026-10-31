@@ -83,3 +83,6 @@ one `extends` line in place of the repo-sync entry:
    `chex prose length links vision`. CI runs each check that it names as its own step.
 4. In `lefthook.yml`, delete `parallel` and the baseline's jobs from `pre-push` and `pre-commit`, as
    step 2 of [Opting in to the pre-push baseline](#opting-in-to-the-pre-push-baseline) describes.
+5. If the repo takes the `pre-push-baseline` entry, delete it from `include` in
+   `.github/workflows/repo-sync.yml`, and delete `.lefthook/pre-push-baseline.yml` from `extends` in
+   `lefthook.yml`, so the push runs one baseline.
