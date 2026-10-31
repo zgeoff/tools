@@ -51,7 +51,7 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
     const ctx = setupTest();
 
     const result =
-      await $`bash ${ctx.scriptPath} 128 ${ctx.bun} -e ${"Buffer.alloc(256 * 1024 * 1024, 1); console.log('done')"}`
+      await $`bash ${ctx.scriptPath} 64 ${ctx.bun} -e ${"Buffer.alloc(128 * 1024 * 1024, 1); console.log('done')"}`
         .env({ ...ctx.env, MEMORY_CAP_MODE: 'systemd-sudo' })
         .nothrow()
         .quiet();
@@ -64,7 +64,7 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
       exitCode: 1,
       stdout: '',
       stderr: expect.stringMatching(
-        /^run-memory-capped: systemd-sudo, memory.max 128 MiB, memory.swap.max (?:0 MiB|absent)\nrun-memory-capped: peak anon memory \d+ MiB, sampled every 200 ms; memory.peak (?:\d+ MiB|absent)\nrun-memory-capped: OOM kills [1-9]\d*\nrun-memory-capped: the command went over its memory cap, and the kernel OOM-killed a process\n$/u,
+        /^run-memory-capped: systemd-sudo, memory.max 64 MiB, memory.swap.max (?:0 MiB|absent)\nrun-memory-capped: peak anon memory \d+ MiB, sampled every 200 ms; memory.peak (?:\d+ MiB|absent)\nrun-memory-capped: OOM kills [1-9]\d*\nrun-memory-capped: the command went over its memory cap, and the kernel OOM-killed a process\n$/u,
       ),
     });
   },
@@ -101,7 +101,7 @@ test.skipIf(!modesOutput.includes('systemd-user'))(
     const ctx = setupTest();
 
     const result =
-      await $`bash ${ctx.scriptPath} 128 ${ctx.bun} -e ${"Buffer.alloc(256 * 1024 * 1024, 1); console.log('done')"}`
+      await $`bash ${ctx.scriptPath} 64 ${ctx.bun} -e ${"Buffer.alloc(128 * 1024 * 1024, 1); console.log('done')"}`
         .env({ ...ctx.env, MEMORY_CAP_MODE: 'systemd-user' })
         .nothrow()
         .quiet();
@@ -114,7 +114,7 @@ test.skipIf(!modesOutput.includes('systemd-user'))(
       exitCode: 1,
       stdout: '',
       stderr: expect.stringMatching(
-        /^run-memory-capped: systemd-user, memory.max 128 MiB, memory.swap.max (?:0 MiB|absent)\nrun-memory-capped: peak anon memory \d+ MiB, sampled every 200 ms; memory.peak (?:\d+ MiB|absent)\nrun-memory-capped: OOM kills [1-9]\d*\nrun-memory-capped: the command went over its memory cap, and the kernel OOM-killed a process\n$/u,
+        /^run-memory-capped: systemd-user, memory.max 64 MiB, memory.swap.max (?:0 MiB|absent)\nrun-memory-capped: peak anon memory \d+ MiB, sampled every 200 ms; memory.peak (?:\d+ MiB|absent)\nrun-memory-capped: OOM kills [1-9]\d*\nrun-memory-capped: the command went over its memory cap, and the kernel OOM-killed a process\n$/u,
       ),
     });
   },
@@ -151,7 +151,7 @@ test.skipIf(!modesOutput.includes('cgroupfs'))(
     const ctx = setupTest();
 
     const result =
-      await $`bash ${ctx.scriptPath} 128 ${ctx.bun} -e ${"Buffer.alloc(256 * 1024 * 1024, 1); console.log('done')"}`
+      await $`bash ${ctx.scriptPath} 64 ${ctx.bun} -e ${"Buffer.alloc(128 * 1024 * 1024, 1); console.log('done')"}`
         .env({ ...ctx.env, MEMORY_CAP_MODE: 'cgroupfs' })
         .nothrow()
         .quiet();
@@ -164,7 +164,7 @@ test.skipIf(!modesOutput.includes('cgroupfs'))(
       exitCode: 1,
       stdout: '',
       stderr: expect.stringMatching(
-        /^run-memory-capped: cgroupfs, memory.max 128 MiB, memory.swap.max (?:0 MiB|absent)\nrun-memory-capped: peak anon memory \d+ MiB, sampled every 200 ms; memory.peak (?:\d+ MiB|absent)\nrun-memory-capped: OOM kills [1-9]\d*\nrun-memory-capped: the command went over its memory cap, and the kernel OOM-killed a process\n$/u,
+        /^run-memory-capped: cgroupfs, memory.max 64 MiB, memory.swap.max (?:0 MiB|absent)\nrun-memory-capped: peak anon memory \d+ MiB, sampled every 200 ms; memory.peak (?:\d+ MiB|absent)\nrun-memory-capped: OOM kills [1-9]\d*\nrun-memory-capped: the command went over its memory cap, and the kernel OOM-killed a process\n$/u,
       ),
     });
   },
@@ -340,7 +340,7 @@ test.skipIf(modesOutput === '')(
     const ctx = setupTest();
 
     const result =
-      await $`bash ${ctx.scriptPath} 128 ${ctx.bun} -e ${'Buffer.alloc(256 * 1024 * 1024, 1)'}`
+      await $`bash ${ctx.scriptPath} 64 ${ctx.bun} -e ${'Buffer.alloc(128 * 1024 * 1024, 1)'}`
         .env({ ...ctx.env, GITHUB_ACTIONS: 'true' })
         .nothrow()
         .quiet();

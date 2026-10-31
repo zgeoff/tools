@@ -34,7 +34,7 @@ test.skipIf(modesOutput === '')(
     const ctx = setupTest();
 
     const result =
-      await $`bash ${ctx.scriptPath} --budget 256M -- ${ctx.bun} -e ${"Buffer.alloc(512 * 1024 * 1024, 1); console.log('done')"}`
+      await $`bash ${ctx.scriptPath} --budget 64M -- ${ctx.bun} -e ${"Buffer.alloc(128 * 1024 * 1024, 1); console.log('done')"}`
         .env(ctx.env)
         .nothrow()
         .quiet();
@@ -47,7 +47,7 @@ test.skipIf(modesOutput === '')(
       exitCode: 1,
       stdout: '',
       stderr: expect.stringMatching(
-        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 256 MB\ndiet: the command went over its 256 MB budget, and the kernel OOM-killed 1 process\n$/u,
+        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 64 MB\ndiet: the command went over its 64 MB budget, and the kernel OOM-killed 1 process\n$/u,
       ),
     });
   },
@@ -120,7 +120,7 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
     const ctx = setupTest();
 
     const result =
-      await $`bash ${ctx.scriptPath} --budget 128M -- ${ctx.bun} -e ${"Buffer.alloc(256 * 1024 * 1024, 1); console.log('done')"}`
+      await $`bash ${ctx.scriptPath} --budget 64M -- ${ctx.bun} -e ${"Buffer.alloc(128 * 1024 * 1024, 1); console.log('done')"}`
         .env({ ...ctx.env, DIET_MODE: 'systemd-sudo' })
         .nothrow()
         .quiet();
@@ -133,7 +133,7 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
       exitCode: 1,
       stdout: '',
       stderr: expect.stringMatching(
-        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 128 MB\ndiet: the command went over its 128 MB budget, and the kernel OOM-killed 1 process\n$/u,
+        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 64 MB\ndiet: the command went over its 64 MB budget, and the kernel OOM-killed 1 process\n$/u,
       ),
     });
   },
@@ -168,7 +168,7 @@ test.skipIf(!modesOutput.includes('systemd-user'))(
     const ctx = setupTest();
 
     const result =
-      await $`bash ${ctx.scriptPath} --budget 128M -- ${ctx.bun} -e ${"Buffer.alloc(256 * 1024 * 1024, 1); console.log('done')"}`
+      await $`bash ${ctx.scriptPath} --budget 64M -- ${ctx.bun} -e ${"Buffer.alloc(128 * 1024 * 1024, 1); console.log('done')"}`
         .env({ ...ctx.env, DIET_MODE: 'systemd-user' })
         .nothrow()
         .quiet();
@@ -181,7 +181,7 @@ test.skipIf(!modesOutput.includes('systemd-user'))(
       exitCode: 1,
       stdout: '',
       stderr: expect.stringMatching(
-        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 128 MB\ndiet: the command went over its 128 MB budget, and the kernel OOM-killed 1 process\n$/u,
+        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 64 MB\ndiet: the command went over its 64 MB budget, and the kernel OOM-killed 1 process\n$/u,
       ),
     });
   },
@@ -216,7 +216,7 @@ test.skipIf(!modesOutput.includes('cgroupfs'))(
     const ctx = setupTest();
 
     const result =
-      await $`bash ${ctx.scriptPath} --budget 128M -- ${ctx.bun} -e ${"Buffer.alloc(256 * 1024 * 1024, 1); console.log('done')"}`
+      await $`bash ${ctx.scriptPath} --budget 64M -- ${ctx.bun} -e ${"Buffer.alloc(128 * 1024 * 1024, 1); console.log('done')"}`
         .env({ ...ctx.env, DIET_MODE: 'cgroupfs' })
         .nothrow()
         .quiet();
@@ -229,7 +229,7 @@ test.skipIf(!modesOutput.includes('cgroupfs'))(
       exitCode: 1,
       stdout: '',
       stderr: expect.stringMatching(
-        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 128 MB\ndiet: the command went over its 128 MB budget, and the kernel OOM-killed 1 process\n$/u,
+        /^diet: peaked at \d+(?:\.\d)? [KMG]?B of 64 MB\ndiet: the command went over its 64 MB budget, and the kernel OOM-killed 1 process\n$/u,
       ),
     });
   },
@@ -364,12 +364,12 @@ test.skipIf(modesOutput === '' || !hasMemoryPeak)(
     // The allocation reaches the cap well inside one 200 ms sample interval, so the sampled peak
     // stays below it.
     const result =
-      await $`bash ${ctx.scriptPath} --budget 128M -- ${ctx.bun} -e ${'Buffer.alloc(256 * 1024 * 1024, 1)'}`
+      await $`bash ${ctx.scriptPath} --budget 64M -- ${ctx.bun} -e ${'Buffer.alloc(128 * 1024 * 1024, 1)'}`
         .env(ctx.env)
         .nothrow()
         .quiet();
 
-    expect(result.stderr.toString()).toStartWith('diet: peaked at 128 MB of 128 MB\n');
+    expect(result.stderr.toString()).toStartWith('diet: peaked at 64 MB of 64 MB\n');
   },
 );
 
@@ -473,13 +473,13 @@ test.skipIf(modesOutput === '')(
     const ctx = setupTest();
 
     const result =
-      await $`bash ${ctx.scriptPath} --budget 128M -- ${ctx.bun} -e ${'Buffer.alloc(256 * 1024 * 1024, 1)'}`
+      await $`bash ${ctx.scriptPath} --budget 64M -- ${ctx.bun} -e ${'Buffer.alloc(128 * 1024 * 1024, 1)'}`
         .env({ ...ctx.env, GITHUB_ACTIONS: 'true' })
         .nothrow()
         .quiet();
 
     expect(result.stderr.toString()).toEndWith(
-      '::error::diet: the command went over its 128 MB budget, and the kernel OOM-killed 1 process\n',
+      '::error::diet: the command went over its 64 MB budget, and the kernel OOM-killed 1 process\n',
     );
   },
 );
