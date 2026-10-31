@@ -56,11 +56,11 @@ async function setupTest() {
   await $`git worktree add --quiet -b feature ${worktree}`.cwd(main).env(env);
 
   // The scripts that the skill-docs-writing entry delivers.
-  const copyDocsScripts = () =>
+  const copyDocsScripts = (scripts: readonly string[]) =>
     copyNamedFiles(
       join(import.meta.dir, '../../packages/chex/src/docs'),
       join(worktree, '.claude/skills/docs-writing/scripts'),
-      ['check-prose.sh', 'check-length.sh', 'check-links.sh'],
+      scripts,
     );
 
   return {
@@ -977,7 +977,7 @@ test('it fails the push on the docs job when the installed length script rejects
 
   await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
 
-  await ctx.copyDocsScripts();
+  await ctx.copyDocsScripts(['check-prose.sh', 'check-length.sh', 'check-links.sh']);
 
   // The root README holds 100 lines at most; this one has 101, in short paragraphs with no link.
   const paragraphs = Array.from(
@@ -1038,7 +1038,7 @@ test('it fails the push on the docs job when the installed link script finds a b
 
   await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
 
-  await ctx.copyDocsScripts();
+  await ctx.copyDocsScripts(['check-prose.sh', 'check-length.sh', 'check-links.sh']);
 
   await writeFile(join(ctx.worktree, 'README.md'), '# Greeter\n\nRead the [guide](./guide.md).\n');
 

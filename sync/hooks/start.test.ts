@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { chmod, copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { buildPreToolUsePayload } from '../../test-utils/build-pre-tool-use-payload.ts';
 import { createStubInstall } from '../../test-utils/create-stub-install.ts';
 import { readStreamUntil } from '../../test-utils/read-stream-until.ts';
 import { readTextOrEmpty } from '../../test-utils/read-text-or-empty.ts';
@@ -37,16 +38,7 @@ async function setupTest() {
     CLAUDE_PROJECT_DIR: project,
   };
 
-  const buildPayload = (toolName: string, toolInput: Readonly<Record<string, unknown>>) =>
-    JSON.stringify({
-      hook_event_name: 'PreToolUse',
-      cwd: project,
-      transcript_path: join(project, 'transcript.jsonl'),
-      tool_name: toolName,
-      tool_input: toolInput,
-    });
-
-  const runStub = (payload: string, args: readonly string[] = []) =>
+  const runStub = (payload: string, args: readonly string[]) =>
     spawnSync(process.execPath, ['--no-install', stubPath, ...args], {
       encoding: 'utf8',
       env,
@@ -80,7 +72,6 @@ async function setupTest() {
     packageDir,
     agentHooksSource: join(import.meta.dir, '../../packages/agent-hooks/src/index.ts'),
     installLog,
-    buildPayload,
     runStub,
     startStub,
     readInstallLog,
@@ -113,7 +104,8 @@ test('it installs the missing package in a fresh worktree, then blocks a gated e
   });
 
   const result = ctx.runStub(
-    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
+    [],
   );
 
   expect(result.status).toBe(2);
@@ -154,7 +146,8 @@ test('it allows an ungated edit after the install with no output', async () => {
   });
 
   const result = ctx.runStub(
-    ctx.buildPayload('Write', { file_path: join(ctx.project, 'main.ts') }),
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'main.ts') }),
+    [],
   );
 
   expect(result.status).toBe(0);
@@ -186,10 +179,14 @@ test('it runs no install when the package loads', async () => {
     'transcript.jsonl': '',
   });
 
-  ctx.runStub(ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }));
+  ctx.runStub(
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
+    [],
+  );
 
   const result = ctx.runStub(
-    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
+    [],
   );
 
   expect(result.status).toBe(2);
@@ -209,7 +206,8 @@ test('it refuses an edit with the install message when the install fails', async
   await createStubInstall(ctx.fakeBin, { log: ctx.installLog, outcome: { kind: 'fails' } });
 
   const result = ctx.runStub(
-    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
+    [],
   );
 
   expect(result.status).toBe(2);
@@ -237,7 +235,7 @@ test.each([
 
   await createStubInstall(ctx.fakeBin, { log: ctx.installLog, outcome: { kind: 'fails' } });
 
-  const result = ctx.runStub(ctx.buildPayload('Bash', { command }));
+  const result = ctx.runStub(buildPreToolUsePayload(ctx.project, 'Bash', { command }), []);
 
   expect(result.status).toBe(2);
   expect(result.stderr).toEndWith('To work here, run bun install.\n');
@@ -261,7 +259,10 @@ test.each([
 
   await createStubInstall(ctx.fakeBin, { log: ctx.installLog, outcome: { kind: 'fails' } });
 
-  const result = ctx.runStub(ctx.buildPayload('Bash', { command: row.command }));
+  const result = ctx.runStub(
+    buildPreToolUsePayload(ctx.project, 'Bash', { command: row.command }),
+    [],
+  );
 
   expect(result.status).toBe(2);
   expect(result.stderr).toEndWith('To work here, run bun install.\n');
@@ -278,7 +279,7 @@ test.each([
 
   await createStubInstall(ctx.fakeBin, { log: ctx.installLog, outcome: { kind: 'fails' } });
 
-  const result = ctx.runStub(ctx.buildPayload('Bash', { command }));
+  const result = ctx.runStub(buildPreToolUsePayload(ctx.project, 'Bash', { command }), []);
 
   expect(result.status).toBe(0);
   expect(result.stdout).toBe('');
@@ -289,7 +290,10 @@ test('it refuses a gated tool call when the install fails', async () => {
 
   await createStubInstall(ctx.fakeBin, { log: ctx.installLog, outcome: { kind: 'fails' } });
 
-  const result = ctx.runStub(ctx.buildPayload('mcp__tracker__update_ticket', { title: 'Draft' }));
+  const result = ctx.runStub(
+    buildPreToolUsePayload(ctx.project, 'mcp__tracker__update_ticket', { title: 'Draft' }),
+    [],
+  );
 
   expect(result.status).toBe(2);
   expect(result.stderr).toEndWith('To work here, run bun install.\n');
@@ -338,13 +342,13 @@ test('it runs one install for two parallel hook calls in one worktree', async ()
   });
 
   const first = ctx.startStub(
-    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
   );
 
   await readStreamUntil(first.stderr, 'stub install started');
 
   const second = ctx.startStub(
-    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
   );
 
   const waiting = await readStreamUntil(second.stderr, 'Another agent hook runs bun install here');
@@ -398,7 +402,8 @@ test('it installs over a lock that a stopped hook left behind', async () => {
   await writeFile(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), String(stopped.pid));
 
   const result = ctx.runStub(
-    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
+    [],
   );
 
   expect(result.status).toBe(2);
@@ -440,7 +445,8 @@ test.each([
   await writeFile(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), row.contents);
 
   const result = ctx.runStub(
-    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
+    [],
   );
 
   expect(result.status).toBe(2);
@@ -483,7 +489,7 @@ test('it waits while another hook holds the guard on the install lock, then inst
   });
 
   const hook = ctx.startStub(
-    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
   );
 
   const waiting = await readStreamUntil(hook.stderr, 'waits its turn');
@@ -521,7 +527,8 @@ test('it skips the install and refuses when a stopped hook left the guard behind
   });
 
   const result = ctx.runStub(
-    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
+    [],
   );
 
   expect(result.status).toBe(2);
@@ -573,11 +580,11 @@ test('it runs one install for two hook calls that meet a stale lock at once', as
   });
 
   const first = ctx.startStub(
-    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
   );
 
   const second = ctx.startStub(
-    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
   );
 
   await readStreamUntil(first.stderr, 'waits its turn');
@@ -619,7 +626,7 @@ test.skipIf(isRoot)(
     await mkdir(join(ctx.project, 'node_modules'), { mode: 0o555 });
 
     const hook = ctx.startStub(
-      ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+      buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
     );
 
     const status = await hook.exited;
@@ -659,7 +666,7 @@ test.skipIf(isRoot)(
     await chmod(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), 0o000);
 
     const hook = ctx.startStub(
-      ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+      buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
     );
 
     const status = await hook.exited;
@@ -682,7 +689,7 @@ test('it refuses a harness it does not know', async () => {
   const ctx = await setupTest();
 
   const result = ctx.runStub(
-    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
     ['--harness', 'cursor'],
   );
 

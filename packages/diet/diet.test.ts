@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
+import { readStreamUntil } from '../../test-utils/read-stream-until.ts';
 
 // Bun's skipIf takes a boolean at collection time, so the modes this host supports are probed once
 // here: a GitHub runner has the systemd-sudo mode, a root shell without systemd the cgroupfs one.
@@ -264,7 +265,7 @@ test.skipIf(!modesOutput.includes('cgroupfs'))(
         '--',
         'bash',
         '-c',
-        'echo $$; cat /proc/self/cgroup; exec sleep 30',
+        'echo $$; cat /proc/self/cgroup; echo started; exec sleep 30',
       ],
       {
         env: { ...ctx.env, DIET_MODE: 'cgroupfs' },
@@ -280,21 +281,9 @@ test.skipIf(!modesOutput.includes('cgroupfs'))(
       Bun.spawnSync(['kill', '-KILL', '--', `-${run.pid}`]);
     });
 
-    const reader = run.stdout.getReader();
-
-    const decoder = new TextDecoder();
-
-    let started = '';
-
     // The command prints its pid and cgroup before it sleeps, so a signal after both lines reaches
     // a running command.
-    while (started.split('\n').length < 3) {
-      const chunk = await reader.read();
-
-      invariant(!chunk.done);
-
-      started += decoder.decode(chunk.value);
-    }
+    const started = await readStreamUntil(run.stdout, 'started\n');
 
     run.kill('SIGTERM');
 
@@ -348,31 +337,15 @@ test.each([['SIGHUP'], ['SIGINT'], ['SIGTERM']] as const)(
       Bun.spawnSync(['kill', '-KILL', '--', `-${run.pid}`]);
     });
 
-    const reader = run.stdout.getReader();
-
-    const decoder = new TextDecoder();
-
-    let output = '';
-
     // The command prints ready once its handler is set, so a signal after that line reaches it. A bash
     // command would defer its trap until a blocking read returns.
-    while (!output.includes('ready\n')) {
-      const chunk = await reader.read();
-
-      invariant(!chunk.done);
-
-      output += decoder.decode(chunk.value);
-    }
+    const ready = await readStreamUntil(run.stdout, 'ready\n');
 
     run.kill(signal);
 
-    let chunk = await reader.read();
+    const rest = await readStreamUntil(run.stdout, `got ${name}\n`);
 
-    while (!chunk.done) {
-      output += decoder.decode(chunk.value);
-
-      chunk = await reader.read();
-    }
+    const output = `${ready}${rest}`;
 
     const exitCode = await run.exited;
 

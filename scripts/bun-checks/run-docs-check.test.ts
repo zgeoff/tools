@@ -3,10 +3,10 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { copyNamedFiles } from '../../test-utils/copy-named-files.ts';
+import { makeOutputRecordingRunner } from '../../test-utils/make-output-recording-runner.ts';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
-import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { runDocsCheck } from './run-docs-check.ts';
 
@@ -20,11 +20,7 @@ async function setupTest() {
 
   await $`git init --quiet --initial-branch=main ${repo}`.env({ ...env });
 
-  // The scripts the skill-docs-writing entry ships, and the vision check that the docs-vision-check
-  // entry puts beside them.
-  const docsScripts = ['check-prose.sh', 'check-length.sh', 'check-links.sh'];
-
-  const copyDocsScripts = (scripts: readonly string[] = docsScripts) =>
+  const copyDocsScripts = (scripts: readonly string[]) =>
     copyNamedFiles(
       join(import.meta.dir, '../../packages/chex/src/docs'),
       join(repo, '.claude/skills/docs-writing/scripts'),
@@ -37,17 +33,7 @@ async function setupTest() {
     await $`git add -A`.cwd(repo).env({ ...env });
   };
 
-  // Captures each logged command's output, which the CLI's runner prints as it runs.
-  const logged: string[] = [];
-
-  const runLogged: RunCommand = async (argv, options) => {
-    const result = await runCommand(argv, options);
-
-    logged.push(`${result.stdout}${result.stderr}`);
-
-    return result;
-  };
-
+  const recording = makeOutputRecordingRunner(runCommand);
   const output: string[] = [];
 
   const writeOutput = (text: string) => {
@@ -57,11 +43,10 @@ async function setupTest() {
   return {
     repo,
     env,
-    docsScripts,
     copyDocsScripts,
     trackFiles,
-    logged,
-    runLogged,
+    logged: recording.outputs,
+    runLogged: recording.runCommand,
     output,
     writeOutput,
   };
@@ -89,7 +74,7 @@ test('it skips with a notice when the repo has no docs-writing scripts', async (
 test('it fails on a broken link even when every doc is within its length limit', async () => {
   const ctx = await setupTest();
 
-  await ctx.copyDocsScripts();
+  await ctx.copyDocsScripts(['check-prose.sh', 'check-length.sh', 'check-links.sh']);
   await ctx.trackFiles({ 'README.md': '# Greeter\n\nRead the [guide](./guide.md).\n' });
 
   const exitCode = await runDocsCheck({
@@ -123,7 +108,7 @@ test('it fails on a README over its line limit even when every link resolves', a
     (_, index) => `- Step ${index + 1} greets the visitor.`,
   );
 
-  await ctx.copyDocsScripts();
+  await ctx.copyDocsScripts(['check-prose.sh', 'check-length.sh', 'check-links.sh']);
   await ctx.trackFiles({ 'README.md': `# Greeter\n${lines.join('\n')}\n` });
 
   const exitCode = await runDocsCheck({
@@ -150,7 +135,7 @@ test('it fails on a README over its line limit even when every link resolves', a
 test('it fails on a banned word in a doc', async () => {
   const ctx = await setupTest();
 
-  await ctx.copyDocsScripts();
+  await ctx.copyDocsScripts(['check-prose.sh', 'check-length.sh', 'check-links.sh']);
   await ctx.trackFiles({ 'README.md': '# Greeter\n\nThe greeting is load-bearing.\n' });
 
   const exitCode = await runDocsCheck({
@@ -171,7 +156,12 @@ test('it fails on a banned word in a doc', async () => {
 test('it runs the vision check that sits beside the docs scripts and the installed skill check', async () => {
   const ctx = await setupTest();
 
-  await ctx.copyDocsScripts([...ctx.docsScripts, 'check-vision.sh']);
+  await ctx.copyDocsScripts([
+    'check-prose.sh',
+    'check-length.sh',
+    'check-links.sh',
+    'check-vision.sh',
+  ]);
 
   await copyNamedFiles(
     join(import.meta.dir, '../../packages/chex/src/docs'),
