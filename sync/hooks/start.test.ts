@@ -531,7 +531,7 @@ test('it skips the install and refuses when a stopped hook left the guard behind
   expect(installLog).toBe('');
 });
 
-test('it runs one install for two hook calls that both find a stale lock', async () => {
+test('it runs one install for two hook calls that meet a stale lock at once', async () => {
   const ctx = await setupTest();
 
   const releasePath = join(ctx.directory, 'release');
@@ -561,21 +561,30 @@ test('it runs one install for two hook calls that both find a stale lock', async
 
   const stopped = spawnSync('true');
 
+  // A guard that this test holds stops both hooks before the stale lock, so its removal sends them
+  // at the stale lock together.
   await writeTreeFiles(ctx.project, {
     'node_modules/.agent-hooks-install.lock': String(stopped.pid),
+    'node_modules/.agent-hooks-install.lock.guard': String(process.pid),
   });
 
   const first = ctx.startStub(
     ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
   );
 
-  await readStreamUntil(first.stderr, 'stub install started');
-
   const second = ctx.startStub(
     ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
   );
 
-  await readStreamUntil(second.stderr, 'Another agent hook runs bun install here');
+  await readStreamUntil(first.stderr, 'waits its turn');
+  await readStreamUntil(second.stderr, 'waits its turn');
+  await rm(join(ctx.project, 'node_modules/.agent-hooks-install.lock.guard'));
+
+  const waiting = await Promise.race([
+    readStreamUntil(first.stderr, 'Another agent hook runs bun install here'),
+    readStreamUntil(second.stderr, 'Another agent hook runs bun install here'),
+  ]);
+
   await writeFile(releasePath, '');
 
   const firstStatus = await first.exited;
@@ -583,6 +592,10 @@ test('it runs one install for two hook calls that both find a stale lock', async
 
   expect(firstStatus).toBe(2);
   expect(secondStatus).toBe(2);
+
+  expect(waiting).toInclude(
+    'Another agent hook runs bun install here, so this one waits for it.\n',
+  );
 
   const installLog = await ctx.readInstallLog();
 
