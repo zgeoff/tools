@@ -46,3 +46,29 @@ test('it refuses a config that is no YAML mapping', () => {
     reason: 'lefthook.yml is not a YAML mapping',
   });
 });
+
+test('it puts the extends list inside the document of a config that starts with a document marker', () => {
+  const text = '# Git hooks.\n---\npre-push:\n  jobs: []\n';
+
+  expect(buildLefthookExtends(text)).toStrictEqual({
+    kind: 'changed',
+    text: '# Git hooks.\n---\nextends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n\npre-push:\n  jobs: []\n',
+  });
+});
+
+test('it refuses a config written as a flow mapping, which an extends line above would break', () => {
+  expect(buildLefthookExtends('{ pre-push: { jobs: [] } }\n')).toStrictEqual({
+    kind: 'refused',
+    reason:
+      'lefthook.yml is laid out in a form chex init does not edit; add an extends list that names node_modules/@zgeoff/chex/lefthook.yml',
+  });
+});
+
+test('it refuses a config that holds a second YAML document, which the edit would leave out', () => {
+  expect(
+    buildLefthookExtends('pre-push:\n  jobs: []\n---\npre-commit:\n  jobs: []\n'),
+  ).toStrictEqual({
+    kind: 'refused',
+    reason: 'lefthook.yml is not a YAML mapping',
+  });
+});

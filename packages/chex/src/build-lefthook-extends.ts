@@ -24,7 +24,7 @@ export function buildLefthookExtends(text: string | null): LefthookOutcome {
   const extended = config['extends'];
 
   if (extended === undefined) {
-    return { kind: 'changed', text: `extends:\n  - ${baselinePath}\n\n${text}` };
+    return checkEdit(config, buildFirstExtends(text));
   }
 
   if (Array.isArray(extended) && extended.includes(baselinePath)) {
@@ -41,16 +41,8 @@ export function buildLefthookExtends(text: string | null): LefthookOutcome {
   }
 
   const end = match.index + match[0].length;
-  const edited = `${text.slice(0, end)}\n  - ${baselinePath}${text.slice(end)}`;
-  const editedConfig = parseConfig(edited);
-  const editedExtends = editedConfig?.['extends'];
 
-  return Array.isArray(editedExtends) && editedExtends.includes(baselinePath)
-    ? { kind: 'changed', text: edited }
-    : {
-        kind: 'refused',
-        reason: `lefthook.yml lists extends in a form chex init does not edit; add ${baselinePath} to its list`,
-      };
+  return checkEdit(config, `${text.slice(0, end)}\n  - ${baselinePath}${text.slice(end)}`);
 }
 
 function parseConfig(text: string): Record<string, unknown> | undefined {
@@ -67,4 +59,41 @@ function parseConfig(text: string): Record<string, unknown> | undefined {
   }
 
   return isRecord(parsed) ? parsed : undefined;
+}
+
+// A flow mapping or a second YAML document reads differently once a block key joins the text.
+function checkEdit(config: Record<string, unknown>, edited: string): LefthookOutcome {
+  const editedConfig = parseConfig(edited);
+
+  if (editedConfig !== undefined) {
+    const { extends: editedExtends, ...editedRest } = editedConfig;
+    const { extends: _, ...rest } = config;
+
+    if (
+      Array.isArray(editedExtends) &&
+      editedExtends.includes(baselinePath) &&
+      Bun.deepEquals(editedRest, rest, true)
+    ) {
+      return { kind: 'changed', text: edited };
+    }
+  }
+
+  return {
+    kind: 'refused',
+    reason: `lefthook.yml is laid out in a form chex init does not edit; add an extends list that names ${baselinePath}`,
+  };
+}
+
+const documentStart = /^(?:[ \t]*(?:#.*)?\n)*---[ \t]*(?:#.*)?(?=\n|$)/u;
+
+function buildFirstExtends(text: string): string {
+  const start = documentStart.exec(text);
+
+  if (start === null) {
+    return `extends:\n  - ${baselinePath}\n\n${text}`;
+  }
+
+  const end = start[0].length;
+
+  return `${text.slice(0, end)}\nextends:\n  - ${baselinePath}\n${text.slice(end)}`;
 }
