@@ -378,3 +378,22 @@ test('it skips the project-docs-writing skill and the docs-writing and skill-wri
     stderr: '',
   });
 });
+
+test('it exits 2 and checks nothing when git cannot list the files', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('README.md', ['# Kettle']);
+  await ctx.writePage('.git/index', ['not an index']);
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr: expect.stringContaining('check-links: git ls-files failed, so no link was checked\n'),
+  });
+});

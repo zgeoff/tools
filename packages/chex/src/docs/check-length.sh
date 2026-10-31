@@ -32,10 +32,18 @@ done
 
 # Lists tracked and untracked files, so a new doc is checked before it is staged. A file deleted
 # from the working tree stays in the index until the deletion is staged, so it is dropped here.
+# A caller runs it in a command substitution and exits on its failure, because git's failure
+# otherwise reaches the check as an empty list.
 list_files() {
-  git -c core.quotePath=false ls-files --cached --others --exclude-standard -- "$@" | sort -u | while IFS= read -r file; do
-    [ -f "$file" ] && printf '%s\n' "$file"
-  done
+  local listing file
+  if ! listing=$(git -c core.quotePath=false ls-files --cached --others --exclude-standard -- "$@"); then
+    echo "check-length: git ls-files failed, so no file was checked" >&2
+    exit 2
+  fi
+  while IFS= read -r file; do
+    [ -n "$file" ] && [ -f "$file" ] && printf '%s\n' "$file"
+  done < <(sort -u <<< "$listing")
+  return 0
 }
 
 count_lines() {
@@ -63,7 +71,18 @@ spike_files='docs/design/**/spikes/**'
 
 # docs/README.md is the docs index, so the docs cap governs it, not a README limit. A spike README
 # under docs/design/ is a README.
+readme_list=$(
+  list_files ':(glob)**/README.md' ':(exclude,glob)docs/**' ':(exclude,glob).claude/**' \
+    ':(exclude,glob).agents/**'
+
+  # git ls-files warns on a pathspec whose folder is missing.
+  if [ -d docs/design ]; then
+    list_files ":(glob)$spike_readmes"
+  fi
+) || exit 2
+
 while IFS= read -r readme; do
+  [ -n "$readme" ] || continue
   readmes=$((readmes + 1))
   read -r target limit name <<< "$(pick_readme_kind "$readme")"
   lines=$(count_lines "$readme")
@@ -77,18 +96,10 @@ while IFS= read -r readme; do
   else
     echo "$readme: $lines lines ($name README; target $target, limit $limit)"
   fi
-done < <({
-  list_files ':(glob)**/README.md' ':(exclude,glob)docs/**' ':(exclude,glob).claude/**' \
-    ':(exclude,glob).agents/**'
-
-  # git ls-files warns on a pathspec whose folder is missing.
-  if [ -d docs/design ]; then
-    list_files ":(glob)$spike_readmes"
-  fi
-} | sort)
+done < <(sort <<< "$readme_list")
 
 # A spike's README takes a README limit, and its other files have no cap.
-docs=$(list_files ':(glob)docs/**/*.md' ":(exclude,glob)$spike_files")
+docs=$(list_files ':(glob)docs/**/*.md' ":(exclude,glob)$spike_files") || exit 2
 
 while IFS= read -r doc; do
   [ -n "$doc" ] || continue

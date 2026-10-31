@@ -18,10 +18,14 @@ fi
 # A skill folder's README is a skill file, so only the READMEs outside the skill folders are listed
 # one by one.
 if [ "$#" -eq 0 ]; then
+  if ! readme_list=$(git -c core.quotePath=false ls-files --cached --others --exclude-standard -- \
+    ':(glob)**/README.md' ':(exclude,glob).claude/**' ':(exclude,glob).agents/**'); then
+    echo "check-prose: git ls-files failed, so no doc was checked" >&2
+    exit 2
+  fi
   while IFS= read -r readme; do
-    set -- "$@" "$readme"
-  done < <(git -c core.quotePath=false ls-files --cached --others --exclude-standard -- \
-    ':(glob)**/README.md' ':(exclude,glob).claude/**' ':(exclude,glob).agents/**' | sort -u)
+    [ -n "$readme" ] && set -- "$@" "$readme"
+  done < <(sort -u <<< "$readme_list")
   set -- "$@" ':(glob)docs/**/*.md' ':(glob)**/results.md' ':(glob).agents/skills/**/*.md' \
     ':(glob).claude/skills/**/*.md' ':(glob)skills/**/*.md' ':(glob)sync/skills/**/*.md'
 fi
@@ -40,6 +44,13 @@ for root in .agents/skills .claude/skills skills sync/skills; do
     ":(exclude)$root/skill-writing" ":(exclude)$root/deslop"
 done
 set -- "$@" ':(exclude,attr:linguist-vendored)' ':(exclude,attr:linguist-vendored=true)'
+
+# The greps below read git's file list in pipelines, which drop git's exit status, so a git that
+# cannot list the files fails here once.
+if ! git ls-files --cached --others --exclude-standard -- "$@" > /dev/null; then
+  echo "check-prose: git ls-files failed, so no doc was checked" >&2
+  exit 2
+fi
 
 # Every grep reads untracked files too, so a new doc is checked before it is staged, and skips
 # binary files.

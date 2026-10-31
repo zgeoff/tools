@@ -22,8 +22,15 @@ if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
 fi
 
 # Lists tracked and untracked files, so a new skill is checked before it is staged.
+# A caller runs it in a command substitution and exits on its failure, because git's failure
+# otherwise reaches the check as an empty list.
 list_files() {
-  git -c core.quotePath=false ls-files --cached --others --exclude-standard -- "$@" | sort -u
+  local listing
+  if ! listing=$(git -c core.quotePath=false ls-files --cached --others --exclude-standard -- "$@"); then
+    echo "check-skill: git ls-files failed, so no skill was checked" >&2
+    exit 2
+  fi
+  sort -u <<< "$listing"
 }
 
 is_vendored() {
@@ -44,10 +51,11 @@ if [ "$#" -gt 0 ]; then
     dirs+=("$dir")
   done
 else
+  skill_files=$(list_files ':(glob).agents/skills/**/SKILL.md' ':(glob).claude/skills/**/SKILL.md' \
+    ':(glob)skills/**/SKILL.md' ':(glob)sync/skills/**/SKILL.md') || exit 2
   while IFS= read -r file; do
-    [ -f "$file" ] && dirs+=("$(dirname "$file")")
-  done < <(list_files ':(glob).agents/skills/**/SKILL.md' ':(glob).claude/skills/**/SKILL.md' \
-    ':(glob)skills/**/SKILL.md' ':(glob)sync/skills/**/SKILL.md')
+    [ -n "$file" ] && [ -f "$file" ] && dirs+=("$(dirname "$file")")
+  done <<< "$skill_files"
 fi
 
 checked=()

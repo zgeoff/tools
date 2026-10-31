@@ -14,7 +14,10 @@ limit=60
 
 # A tracked or untracked doc counts, so a new one passes before it is staged, and an ignored one
 # does not.
-listed=$(git -c core.quotePath=false ls-files --cached --others --exclude-standard -- "$vision")
+if ! listed=$(git -c core.quotePath=false ls-files --cached --others --exclude-standard -- "$vision"); then
+  echo "check-vision: git ls-files failed, so the vision doc was not checked" >&2
+  exit 2
+fi
 
 if [ -z "$listed" ] || [ ! -f "$vision" ]; then
   echo "$vision: missing; write the vision doc the docs-writing skill's docs-tree reference describes (error)"

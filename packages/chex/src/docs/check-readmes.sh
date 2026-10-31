@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Fails on each README.md that is not one of the five kinds in references/readmes.md, and prints
-# what to do with it. Its last line counts the READMEs and those of no kind.
+# Fails on each README.md that is not one of the five kinds in docs-writing's
+# references/readmes.md, and prints what to do with it. Its last line counts the READMEs and those of
+# no kind.
 # Usage (from the repo root): check-readmes.sh
 # The five kinds:
 # 1. the root README.md;
@@ -25,12 +26,16 @@ fi
 
 # Lists tracked and untracked READMEs, so a new README is checked before it is staged. A file deleted
 # from the working tree stays in the index until the deletion is staged, so it is dropped here.
+if ! listing=$(git -c core.quotePath=false ls-files --cached --others --exclude-standard -- \
+  ':(glob)**/README.md' ':(exclude,attr:linguist-vendored)' ':(exclude,attr:linguist-vendored=true)'); then
+  echo "check-readmes: git ls-files failed, so no README was checked" >&2
+  exit 2
+fi
+
 readmes=()
 while IFS= read -r file; do
   [ -f "$file" ] && readmes+=("$file")
-done < <(git -c core.quotePath=false ls-files --cached --others --exclude-standard -- \
-  ':(glob)**/README.md' ':(exclude,attr:linguist-vendored)' \
-  ':(exclude,attr:linguist-vendored=true)' | sort -u)
+done < <(sort -u <<< "$listing")
 
 declare -A listed=()
 for readme in "${readmes[@]}"; do

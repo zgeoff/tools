@@ -121,3 +121,24 @@ test('it exits 2 when given an argument', async () => {
     stderr: 'usage: check-vision.sh\n',
   });
 });
+
+test('it exits 2 and checks nothing when git cannot list the files', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('docs/vision.md', '# Vision\n');
+  await ctx.writeText('.git/index', 'not an index');
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr: expect.stringContaining(
+      'check-vision: git ls-files failed, so the vision doc was not checked\n',
+    ),
+  });
+});

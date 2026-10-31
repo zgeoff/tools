@@ -361,3 +361,22 @@ test('it passes a doc with a banned word, since the prose check owns the words',
 
   expect(result.exitCode).toBe(0);
 });
+
+test('it exits 2 and checks nothing when git cannot list the files', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('README.md', '# Kettle\n');
+  await ctx.writeText('.git/index', 'not an index');
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr: expect.stringContaining('check-length: git ls-files failed, so no file was checked\n'),
+  });
+});

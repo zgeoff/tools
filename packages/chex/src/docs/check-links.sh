@@ -30,6 +30,13 @@ set -- "$@" ':(exclude).agents/skills/project-docs-writing' \
   ':(exclude)sync/skills/skill-writing' ':(exclude,attr:linguist-vendored)' \
   ':(exclude,attr:linguist-vendored=true)'
 
+# The pipeline below drops git's exit status until perl has printed its summary, so a git that
+# cannot list the files fails here first.
+if ! git ls-files --cached --others --exclude-standard -- "$@" > /dev/null; then
+  echo "check-links: git ls-files failed, so no link was checked" >&2
+  exit 2
+fi
+
 # Reads untracked files too, so a new doc is checked before it is staged.
 git ls-files -z --cached --others --exclude-standard -- "$@" | perl -0 -COE -e '
 use strict;
