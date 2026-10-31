@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
+  downloadStepScripts,
   stepBundlesFolder,
   stepScriptSets,
   toStepRunPath,
@@ -107,6 +108,47 @@ export async function writeStepBundles(
   }
 }
 
+export interface CompileConfig {
+  readonly entrypoints: string[];
+  readonly target: 'bun';
+  readonly throw: false;
+}
+
+// Bun.build fits this type too, and with throw false it returns its errors as logs.
+export type CompileBundles = (
+  config: CompileConfig,
+) => Promise<{ readonly logs: readonly unknown[] }>;
+
+// Returns a fault for each step script set that a runner could not download from the committed
+// bundles, and for each error that compiling the committed bundles reports.
+export async function runBundleChecks(
+  root: string,
+  committed: ReadonlyMap<string, string>,
+  compile: CompileBundles,
+): Promise<string[]> {
+  const downloadFaults = await Promise.all(
+    Object.entries(stepScriptSets).map(([name, entries]) =>
+      downloadStepScripts({
+        entries: entries.map((entry) => toStepRunPath(entry)),
+        destination: '',
+        readToolsFile: (path) => Promise.resolve(committed.get(toStepToolsPath(path)) ?? ''),
+        writeFile: () => Promise.resolve(),
+      }).then(
+        () => [],
+        (error: unknown) => [`the ${name} download: ${String(error)}`],
+      ),
+    ),
+  );
+
+  const result = await compile({
+    entrypoints: [...committed.keys()].map((path) => join(root, path)),
+    target: 'bun',
+    throw: false,
+  });
+
+  return [...downloadFaults.flat(), ...result.logs.map((log) => `bun build: ${String(log)}`)];
+}
+
 if (import.meta.main) {
   const root = join(import.meta.dir, '../..');
   const parsed = parseArgs({ options: { check: { type: 'boolean' } }, strict: true });
@@ -120,15 +162,25 @@ if (import.meta.main) {
 
     const stale = collectStaleStepBundles(bundles, committed);
 
+    const faults = await runBundleChecks(root, committed, (config) => Bun.build(config));
+
     for (const path of stale) {
       process.stderr.write(`${path}: stale; run bun run build:step-bundles and commit it\n`);
     }
 
-    if (stale.length === 0) {
-      process.stdout.write(`step bundles: ${bundles.length} fresh\n`);
+    for (const fault of faults) {
+      process.stderr.write(`step bundles: ${fault}\n`);
     }
 
-    process.exitCode = stale.length === 0 ? 0 : 1;
+    const passed = stale.length === 0 && faults.length === 0;
+
+    if (passed) {
+      process.stdout.write(
+        `step bundles: ${bundles.length} fresh, and each downloads and compiles\n`,
+      );
+    }
+
+    process.exitCode = passed ? 0 : 1;
   } else {
     await writeStepBundles(root, bundles, nodeFileSystem);
 

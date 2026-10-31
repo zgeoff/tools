@@ -12,7 +12,6 @@ import {
   parseDownloadArgs,
   readURL,
   runDownloadStep,
-  stepScriptSets,
   toStepRunPath,
   toStepToolsPath,
 } from './download-step-scripts.ts';
@@ -256,33 +255,6 @@ test.each([
 ])('it reads a tools URL with %s as %p', (_label, url, expected) => {
   expect(isToolsURL(url)).toBe(expected);
 });
-
-test.each(Object.entries(stepScriptSets))(
-  'it downloads the %s scripts from the bundles this commit holds, which import no package',
-  async (_name, entries) => {
-    const ctx = await setupTest();
-
-    const root = join(import.meta.dir, '../..');
-
-    await downloadStepScripts({
-      entries: entries.map((entry) => toStepRunPath(entry)),
-      destination: ctx.destination,
-      readToolsFile: (path) => readFile(join(root, toStepToolsPath(path)), 'utf8'),
-      writeFile: nodeFileSystem.writeText,
-    });
-
-    const build = await Bun.build({
-      entrypoints: entries
-        .filter((entry) => entry.endsWith('.ts'))
-        .map((entry) => join(ctx.destination, toStepRunPath(entry))),
-      target: 'bun',
-      throw: false,
-    });
-
-    expect(build.logs).toStrictEqual([]);
-    expect(build.success).toBeTrue();
-  },
-);
 
 test.each([
   ['scripts/kettle/boil.ts', 'scripts/kettle/boil.js', 'step-bundles/scripts/kettle/boil.js'],

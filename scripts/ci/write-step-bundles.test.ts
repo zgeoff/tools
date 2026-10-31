@@ -8,6 +8,7 @@ import {
   collectStaleStepBundles,
   readCommittedStepBundles,
   readStepBundles,
+  runBundleChecks,
   writeStepBundles,
 } from './write-step-bundles.ts';
 
@@ -132,4 +133,42 @@ test('it replaces the bundles folder with the bundles it writes', async () => {
   const text = await readFile(join(ctx.directory, 'step-bundles/scripts/kettle/boil.js'), 'utf8');
 
   expect(text).toBe('boil');
+});
+
+test('it finds no fault in the bundles this commit holds', async () => {
+  const root = join(import.meta.dir, '../..');
+
+  const committed = await readCommittedStepBundles(root, nodeFileSystem);
+  const faults = await runBundleChecks(root, committed, () => Promise.resolve({ logs: [] }));
+
+  expect(faults).toStrictEqual([]);
+});
+
+test('it reports the set whose bundle imports a package, which a runner cannot install', async () => {
+  const root = join(import.meta.dir, '../..');
+
+  const committed = await readCommittedStepBundles(root, nodeFileSystem);
+
+  committed.set(
+    'step-bundles/scripts/paths-changed/run-changed-files-step.js',
+    "import { match } from 'ts-pattern';\n\nmatch(1);\n",
+  );
+
+  const faults = await runBundleChecks(root, committed, () => Promise.resolve({ logs: [] }));
+
+  expect(faults).toStrictEqual([
+    expect.stringMatching(/^the paths-changed download: Error: .*ts-pattern/u),
+  ]);
+});
+
+test('it reports each error that compiling the bundles logs', async () => {
+  const root = join(import.meta.dir, '../..');
+
+  const committed = await readCommittedStepBundles(root, nodeFileSystem);
+
+  const faults = await runBundleChecks(root, committed, () =>
+    Promise.resolve({ logs: ['Could not resolve "./lid.js"'] }),
+  );
+
+  expect(faults).toStrictEqual(['bun build: Could not resolve "./lid.js"']);
 });
