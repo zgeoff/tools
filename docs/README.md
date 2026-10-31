@@ -33,6 +33,8 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 
 ## Guides
 
+- [Memory budgets](./guides/memory-budgets.md): the peak memory a pre-push job and a test suite keep
+  to on each kind of host.
 - [Writing skill-gate rules](./guides/skill-gate-rules.md): path gates, tool gates, and the mistakes
   in a rules file that the gate tolerates.
 - [Setting up the browser lane](./guides/browser-lane.md): adopt rig's browser lane, its build

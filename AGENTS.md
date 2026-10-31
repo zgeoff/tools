@@ -26,10 +26,12 @@ tools is one Bun workspace.
 packages/           the @zgeoff/* packages; release-please versions each one and publishes the
                     public ones to npm, as RELEASING.md describes
 sync/               the sources that repo-sync delivers, listed in sync/manifest.json; an edit here
-                    reaches every repo that takes the entry, as sync/README.md describes
+                    reaches every repo that takes the entry, as docs/architecture/repo-sync.md
+                    describes
   skills/           the shared skill bases, each delivered to .claude/skills/<name>/
-  pre-push/         the pre-push baseline that the pre-push-baseline entry delivers, which this
-                    repo's lefthook.yml extends too; its check scripts live in packages/chex
+  pre-push/         the pre-push baseline that the pre-push-baseline entry delivers; its check
+                    scripts come from packages/chex, whose own baseline this repo's lefthook.yml
+                    extends
   workflow-callers/ workflow stubs that call this repo's reusable workflows, all opt-in but the
                     repo-sync guard
   hooks/            the agent hooks' start-up stub and the skill gate's older entry point
@@ -87,5 +89,6 @@ repos too, so an edit to one of them changes every repo that takes it.
   `.github/workflows/repo-sync.yml`: two dispatches of different tools commits get two concurrency
   groups, the sync job queues every waiting run, the stub grants every permission a job asks for,
   and the alarm job asks for `actions: read`. CI and the pre-push hook run it.
-- `bun run check:workflows` runs the shared workflow lint over the workflows HEAD holds, so commit a
-  workflow change before you run it. CI runs it.
+- `bun x chex workflows` runs the shared workflow lint over the workflows HEAD holds, so commit a
+  workflow change before you run it. CI runs it. `bun run check:docs` runs the docs checks that this
+  repo takes, which the pre-push hook and CI run too.

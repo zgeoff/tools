@@ -1,7 +1,9 @@
 import { join } from 'node:path';
+import { match } from 'ts-pattern';
 import type { FileSystem } from '../ci/file-system.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { writeStepOutputs } from '../ci/write-step-outputs.ts';
+import { parseDocsChecks } from './parse-docs-checks.ts';
 import type { CheckPart, CheckPlan } from './plan-check-scripts.ts';
 import { planCheckScripts } from './plan-check-scripts.ts';
 
@@ -32,31 +34,41 @@ export async function writeCheckPlan(step: Readonly<CheckPlanStep>): Promise<str
   const packageText = await step.fileSystem.readText(join(step.cwd, 'package.json'));
 
   const packageJSON: unknown = JSON.parse(packageText);
+  const scripts = findScripts(packageJSON);
+  const docsScript = scripts['check:docs'];
+  const docsText = typeof docsScript === 'string' ? docsScript : undefined;
 
   const plan = planCheckScripts({
     scripts: step.scripts,
-    defined: readScriptNames(packageJSON),
+    defined: Object.keys(scripts),
     part,
     lane: step.lane,
   });
 
-  return writePlanOutcome(plan, step);
+  // A repo with no check:docs gets an empty docs output, which runs the docs step that reads the
+  // docs scripts repo-sync delivers.
+  return match(parseDocsChecks(docsText))
+    .with({ kind: 'refused' }, (docs) => Promise.resolve([docs.message]))
+    .with({ kind: 'none' }, () => writePlanOutcome(plan, '', step))
+    .with({ kind: 'named' }, (docs) => writePlanOutcome(plan, ` ${docs.checks.join(' ')} `, step))
+    .exhaustive();
 }
 
-function readScriptNames(value: unknown): string[] {
+function findScripts(value: unknown): Readonly<Record<string, unknown>> {
   if (typeof value !== 'object' || value === null || !('scripts' in value)) {
-    return [];
+    return {};
   }
 
   const scripts = value.scripts;
 
-  return typeof scripts === 'object' && scripts !== null ? Object.keys(scripts) : [];
+  return typeof scripts === 'object' && scripts !== null ? { ...scripts } : {};
 }
 
 type CheckPlanOf<Kind extends CheckPlan['kind']> = Extract<CheckPlan, { readonly kind: Kind }>;
 
 type PlanOutcomeWriter<Kind extends CheckPlan['kind']> = (
   plan: CheckPlanOf<Kind>,
+  docs: string,
   step: Readonly<CheckPlanStep>,
 ) => Promise<string[]>;
 
@@ -66,13 +78,14 @@ const planOutcomeWriters: { readonly [Kind in CheckPlan['kind']]: PlanOutcomeWri
     Promise.resolve([
       `package.json defines no script named: ${plan.missing.join(' ')}. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list.`,
     ]),
-  planned: async (plan, step) => {
+  planned: async (plan, docs, step) => {
     // Spaces around each list let a later step match one whole name.
     await writeStepOutputs(step.fileSystem, step.outputPath, {
       scripts: ` ${plan.scripts.join(' ')} `,
       static: ` ${plan.static.join(' ')} `,
       test: ` ${plan.test.join(' ')} `,
       lanes: JSON.stringify(plan.lanes),
+      docs,
     });
 
     return [];
@@ -81,11 +94,12 @@ const planOutcomeWriters: { readonly [Kind in CheckPlan['kind']]: PlanOutcomeWri
 
 function writePlanOutcome<Kind extends CheckPlan['kind']>(
   plan: CheckPlanOf<Kind>,
+  docs: string,
   step: Readonly<CheckPlanStep>,
 ): Promise<string[]> {
   const writeOutcome: PlanOutcomeWriter<Kind> = planOutcomeWriters[plan.kind];
 
-  return writeOutcome(plan, step);
+  return writeOutcome(plan, docs, step);
 }
 
 if (import.meta.main) {

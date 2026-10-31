@@ -3,10 +3,9 @@
 # gates. CI runs every whole-tree check, type-aware lint and the full suite
 # among them.
 
-# The source of the baseline that repo-sync delivers to the other repos as
-# .lefthook/pre-push-baseline.yml.
+# The baseline that @zgeoff/chex ships, which chex init writes into a repo.
 extends:
-  - sync/pre-push/lefthook-pre-push.yml
+  - node_modules/@zgeoff/chex/lefthook.yml
 
 pre-commit:
   piped: true

@@ -68,3 +68,25 @@ fits a 2 GiB host. A repo opts in with three changes:
    before the baseline's, so keep only cheap repo-specific gates there.
 3. Move every whole-tree check the baseline drops, such as type-aware lint, dead code and the full
    suite, into CI as a required check, if CI does not run it already.
+
+## Taking the baseline from chex
+
+A repo that installs [`@zgeoff/chex`](../../packages/chex/README.md) takes the same baseline with
+one `extends` line in place of the repo-sync entry:
+
+1. Run `bun add -d @zgeoff/chex @zgeoff/rig @zgeoff/diet @commitlint/cli @zgeoff/commitlint-config`
+   at the repo root. Expect `bun.lock` to list the five packages.
+2. Run `bun x --no-install chex init` at the repo root. Expect
+   `chex init: lefthook.yml extends node_modules/@zgeoff/chex/lefthook.yml`, and, for a repo with no
+   `check:docs` script, `chex init: package.json runs "chex prose length links" as check:docs`.
+   `chex init` adds the chex baseline to an `extends` list in block form or in one-line brackets,
+   such as the `extends: [.lefthook/pre-push-baseline.yml]` that the repo-sync entry asks for. It
+   refuses `extends` written as a single path with no brackets, such as `extends: local.yml`, and a
+   bracket list across lines; for these, add the chex baseline to the list by hand.
+3. Edit `check:docs` to name the docs checks the repo takes, such as
+   `chex prose length links vision`. CI runs each check that it names as its own step.
+4. In `lefthook.yml`, delete `parallel` and the baseline's jobs from `pre-push` and `pre-commit`, as
+   step 2 of [Opting in to the pre-push baseline](#opting-in-to-the-pre-push-baseline) describes.
+5. If the repo takes the `pre-push-baseline` entry, delete it from `include` in
+   `.github/workflows/repo-sync.yml`, and delete `.lefthook/pre-push-baseline.yml` from `extends` in
+   `lefthook.yml`, so the push runs one baseline.

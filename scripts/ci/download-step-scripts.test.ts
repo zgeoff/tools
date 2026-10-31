@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
 import { makeAnswerQueue } from '../../test-utils/make-answer-queue.ts';
+import { makeStubToolsURLReader } from '../../test-utils/make-stub-tools-url-reader.ts';
 import { server } from '../../test-utils/mocks/node.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import {
@@ -93,6 +94,24 @@ test('it downloads a file that two files import once', async () => {
     'scripts/kettle/shared.ts',
     'scripts/kettle/pour.ts',
   ]);
+});
+
+test('it reads the imports of a bin entry that starts with a shebang line', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.source, {
+    'packages/kettle/src/cli.ts': "#!/usr/bin/env bun\nimport './boil.ts';\n",
+    'packages/kettle/src/boil.ts': 'export {};\n',
+  });
+
+  const written = await downloadStepScripts({
+    entries: ['packages/kettle/src/cli.ts'],
+    destination: ctx.destination,
+    readToolsFile: ctx.readSourceFile,
+    writeFile: nodeFileSystem.writeText,
+  });
+
+  expect(written).toStrictEqual(['packages/kettle/src/cli.ts', 'packages/kettle/src/boil.ts']);
 });
 
 test('it refuses a step script that imports a package, which no caller installs', async () => {
@@ -362,11 +381,7 @@ test('it downloads the set from the tools commit into the runner folder', async 
   const exitCode = await runDownloadStep({
     args: ['paths-changed'],
     env: { TOOLS_URL: toolsURL, RUNNER_TEMP: ctx.destination },
-    readURL: async (url) => {
-      const text = await readFile(join(root, url.slice(toolsURL.length + 1)), 'utf8');
-
-      return { kind: 'read', text };
-    },
+    readURL: makeStubToolsURLReader(toolsURL, root),
     wait: () => Promise.resolve(),
     writeFile: nodeFileSystem.writeText,
     writeOutput: (text) => {
