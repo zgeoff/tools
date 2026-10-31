@@ -41,14 +41,14 @@ program. `chex <check> <args...>` hands the arguments to that one check.
 
 The docs checks read the repo's READMEs, its `docs/` tree and its skills:
 
-| Check     | Fails on                                                                               | Arguments      |
-| --------- | -------------------------------------------------------------------------------------- | -------------- |
-| `prose`   | banned words, process residue and over-long paragraphs                                 | the paths      |
-| `length`  | a README over its line limit, and warns on a doc over its cap                          | none           |
-| `links`   | a relative link or anchor that does not resolve                                        | the paths      |
-| `readmes` | a README other than the root's, a package's, `docs/README.md`, a design's or a spike's | none           |
-| `vision`  | a missing `docs/vision.md`, or one past 60 lines                                       | none           |
-| `skill`   | a skill's frontmatter, its word limit, and a link with a line anchor                   | the skill dirs |
+| Check     | Fails on                                                                                                            | Arguments      |
+| --------- | ------------------------------------------------------------------------------------------------------------------- | -------------- |
+| `prose`   | banned words, process residue and over-long paragraphs                                                              | the paths      |
+| `length`  | a README over its line limit, and warns on a doc over its cap                                                       | none           |
+| `links`   | a relative link or anchor that does not resolve                                                                     | the paths      |
+| `readmes` | a README of none of the [five kinds](../../sync/skills/docs-writing/references/readmes.md#the-five-kinds-of-readme) | none           |
+| `vision`  | a missing `docs/vision.md`, or one past 60 lines                                                                    | none           |
+| `skill`   | a skill's frontmatter, its word limit, and a link with a line anchor                                                | the skill dirs |
 
 The repo checks read the branch, the pushed commits and the repo's config:
 
