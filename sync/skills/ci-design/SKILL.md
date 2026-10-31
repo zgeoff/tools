@@ -142,6 +142,11 @@ A shared reusable workflow lives in zgeoff/tools, and a repo calls it as
 the repo's own `.github/workflows/` and is called by its path. Before writing setup steps by hand,
 check whether a tools reusable workflow covers them, and call it.
 
+A script or tool that reads a tools pin from a `uses:` line accepts a full commit ID.
+`git clone --branch` cannot check out a commit, so such a script fetches the commit instead. zizmor
+reads the `# main` comment as a version that matches no commit, so a repo that runs zizmor disables
+its `ref-version-mismatch` audit.
+
 ## Step scripts
 
 A `run:` holds one plain command on one line, such as `run: bun run --silent ci:tag-release`. The
