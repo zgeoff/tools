@@ -61,8 +61,8 @@ holds these sections, in this order:
 The doc fits one page: 60 lines at most. Write each goal as an outcome, never as a mechanism, which
 the architecture docs own. When the project changes direction, rewrite the section the change made
 false, as every other doc does. A repo that takes the `docs-vision-check` entry of repo-sync gets
-`check-vision.sh`, and `check-length.sh` runs it, so the repo's doc checks fail when its vision doc
-is missing or over 60 lines.
+`check-vision.sh`, which fails the repo's doc checks when its vision doc is missing or over 60
+lines.
 
 ## Spikes
 

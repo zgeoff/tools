@@ -192,7 +192,7 @@
   },
   {
     "name": "skill-skill-writing",
-    "description": "The shared skill-writing skill and its check-skill script, which docs-writing's check-length runs when it is present",
+    "description": "The shared skill-writing skill and its check-skill script",
     "optIn": true,
     "files": [
       {
@@ -208,7 +208,7 @@
   },
   {
     "name": "docs-vision-check",
-    "description": "The vision doc check, which docs-writing's check-length runs to fail a repo whose docs/vision.md is missing or over one page",
+    "description": "The vision doc check, which fails a repo whose docs/vision.md is missing or over one page",
     "optIn": true,
     "files": [
       {

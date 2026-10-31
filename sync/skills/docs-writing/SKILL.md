@@ -519,23 +519,25 @@ passes with this guide as its only reference.
    the doc lets you predict what the system does.
 2. How it says it. Reread each surviving paragraph against "Writing the sentences", "Choosing
    words", "Shaping the doc", and "Formatting and links", in that order.
-3. The scripted checks. Run from the repo root; CI runs the same two commands:
+3. The scripted checks. Run from the repo root; CI runs the same checks:
 
    ```bash
+   bash .claude/skills/docs-writing/scripts/check-prose.sh
    bash .claude/skills/docs-writing/scripts/check-length.sh
    bash .claude/skills/docs-writing/scripts/check-links.sh
    ```
 
-   `check-length.sh` prints each README against the limit its path sets and each docs/ file over its
-   cap, then runs `check-prose.sh` over the READMEs, each spike's `results.md`, the Markdown under
-   `docs/`, and each skill's Markdown. It fails on a README over its limit or on a prose violation,
-   and its last line counts the READMEs and those over their limit. In a repo that takes the
-   `docs-vision-check` entry of repo-sync, it also fails on a missing or over-long `docs/vision.md`.
-   `check-links.sh` checks every relative link and anchor in the READMEs, the `results.md` files,
-   `docs/`, and the skills, and fails on a broken one. It skips the docs-writing,
-   project-docs-writing, and skill-writing skills, whose examples link to placeholder targets. Pass
-   paths to check other Markdown. Both skip a file git marks `linguist-vendored`. To check other
-   prose, such as AGENTS.md, run `check-prose.sh <path>...` on it.
+   `check-prose.sh` reads the READMEs, each spike's `results.md`, the Markdown under `docs/`, and
+   each skill's Markdown. `check-length.sh` prints each README against the limit its path sets and
+   each docs/ file over its cap, fails on a README over its limit, and its last line counts the
+   READMEs and those over their limit. In a repo that takes the `docs-vision-check` entry of
+   repo-sync, run `bash .claude/skills/docs-writing/scripts/check-vision.sh` too, which fails on a
+   missing or over-long `docs/vision.md`. `check-links.sh` checks every relative link and anchor in
+   the READMEs, the `results.md` files, `docs/`, and the skills, and fails on a broken one. It skips
+   the docs-writing, project-docs-writing, and skill-writing skills, whose examples link to
+   placeholder targets. Pass paths to check other Markdown. Both skip a file git marks
+   `linguist-vendored`. To check other prose, such as AGENTS.md, run `check-prose.sh <path>...` on
+   it.
 
    `check-prose.sh` fails on traces of the work session, the banned words a grep can catch, values
    with units under `docs/architecture/`, formatting faults, untagged code blocks, and a paragraph
