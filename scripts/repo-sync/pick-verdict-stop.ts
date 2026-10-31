@@ -28,7 +28,7 @@ const syncVerdictStopPickers: {
   }),
 };
 
-export function pickSyncVerdictStop<Kind extends SyncCommitVerdict['kind']>(
+export function pickVerdictStop<Kind extends SyncCommitVerdict['kind']>(
   verdict: SyncCommitVerdictOf<Kind>,
   commit: string,
 ): SyncVerdictStop | null {

@@ -12,7 +12,7 @@ import { isWorkflowPath } from './is-workflow-path.ts';
 import type { SyncEntry } from './parse-sync-entries.ts';
 import { parseSyncEntries } from './parse-sync-entries.ts';
 import { pickSyncCommitVerdict } from './pick-sync-commit-verdict.ts';
-import { pickSyncVerdictStop } from './pick-sync-verdict-stop.ts';
+import { pickVerdictStop } from './pick-verdict-stop.ts';
 import type { RetiredFileRemoval, SyncedEntry } from './plan-retired-file-removal.ts';
 import { planRetiredFileRemoval, retiredFilesName } from './plan-retired-file-removal.ts';
 import { readSyncCommitFacts } from './read-sync-commit-facts.ts';
@@ -91,7 +91,7 @@ export async function syncEntries(options: Readonly<SyncEntriesOptions>): Promis
   });
 
   const verdict = pickSyncCommitVerdict(facts);
-  const stop = pickSyncVerdictStop(verdict, context.commit);
+  const stop = pickVerdictStop(verdict, context.commit);
 
   if (stop !== null) {
     options.writeOutput(stop.line);
