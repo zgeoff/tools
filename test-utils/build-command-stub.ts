@@ -1,7 +1,8 @@
 import type { CommandResult, RunCommand } from '../scripts/ci/run-command.ts';
 
 export interface CommandStub {
-  // Answers each command whose argv equals one a test answered, and rejects any other.
+  // Answers each command whose argv equals one a test answered, runs any other command of the
+  // pass-through program, and rejects the rest.
   readonly runCommand: RunCommand;
 
   // Sets the result for the exact argv; a later answer for the same argv replaces it.
@@ -24,11 +25,11 @@ export function buildCommandStub(passThrough?: Readonly<CommandPassThrough>): Co
   const runCommand: RunCommand = (argv, options) => {
     calls.push([...argv]);
 
-    if (passThrough !== undefined && argv[0] === passThrough.program) {
+    const result = answers.get(JSON.stringify(argv));
+
+    if (result === undefined && passThrough !== undefined && argv[0] === passThrough.program) {
       return passThrough.runCommand(argv, options);
     }
-
-    const result = answers.get(JSON.stringify(argv));
 
     if (result === undefined) {
       return Promise.reject(new Error(`the stub has no answer for: ${argv.join(' ')}`));

@@ -1,6 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { buildCommandStub } from '../../test-utils/build-command-stub.ts';
 import { createGitCommit } from '../../test-utils/create-git-commit.ts';
 import { readGitEnv } from '../../test-utils/read-git-env.ts';
 import { runGit } from '../../test-utils/run-git.ts';
@@ -25,15 +26,7 @@ async function setupTest() {
   const read = (commit: string, run: RunCommand = runCommand) =>
     readCommitPinnedSources({ runCommand: run, cwd: directory, env, repository: 'tools', commit });
 
-  const blobError = 'fatal: could not fetch the blob';
-
-  // Runs git for real, but fails each show as a blob that a blobless checkout cannot fetch.
-  const runWithFailedShow: RunCommand = (argv, options) =>
-    argv.includes('show')
-      ? Promise.resolve({ exitCode: 128, stdout: '', stderr: `${blobError}\n` })
-      : runCommand(argv, options);
-
-  return { writeToolsCommit, read, runWithFailedShow, blobError };
+  return { writeToolsCommit, read };
 }
 
 test('it reads the reusable workflows and the step scripts the commit holds', async () => {
@@ -64,10 +57,19 @@ test('it fails with git error when a file the tree lists cannot be read', async 
     '.github/workflows/bake.yml': 'on:\n  workflow_call:\njobs: {}\n',
   });
 
-  const reading = ctx.read(commit, ctx.runWithFailedShow);
+  // A blobless checkout fails the read of a blob it cannot fetch.
+  const commands = buildCommandStub({ program: 'git', runCommand });
+
+  commands.answer(['git', '-C', 'tools', 'show', `${commit}:.github/workflows/bake.yml`], {
+    exitCode: 128,
+    stdout: '',
+    stderr: 'fatal: could not fetch the blob\n',
+  });
+
+  const reading = ctx.read(commit, commands.runCommand);
 
   expect(reading).rejects.toThrow(
-    `git -C tools show ${commit}:.github/workflows/bake.yml exited with 128: ${ctx.blobError}`,
+    `git -C tools show ${commit}:.github/workflows/bake.yml exited with 128: fatal: could not fetch the blob`,
   );
 });
 

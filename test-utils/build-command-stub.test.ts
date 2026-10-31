@@ -49,3 +49,19 @@ test('it hands the commands of the pass-through program to its runner', async ()
   expect(result).toStrictEqual({ exitCode: 0, stdout: 'ran git status\n', stderr: '' });
   expect(stub.calls).toStrictEqual([['git', 'status']]);
 });
+
+test('it answers an argv of the pass-through program that a test answered, and runs the rest', async () => {
+  const stub = buildCommandStub({
+    program: 'git',
+    runCommand: (argv) =>
+      Promise.resolve({ exitCode: 0, stdout: `ran ${argv.join(' ')}\n`, stderr: '' }),
+  });
+
+  stub.answer(['git', 'show', 'HEAD:oven.yml'], { exitCode: 128, stdout: '', stderr: 'fatal\n' });
+
+  const answered = await stub.runCommand(['git', 'show', 'HEAD:oven.yml'], { cwd: '.', env: {} });
+  const ran = await stub.runCommand(['git', 'status'], { cwd: '.', env: {} });
+
+  expect(answered).toStrictEqual({ exitCode: 128, stdout: '', stderr: 'fatal\n' });
+  expect(ran).toStrictEqual({ exitCode: 0, stdout: 'ran git status\n', stderr: '' });
+});
