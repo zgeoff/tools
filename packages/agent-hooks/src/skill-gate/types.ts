@@ -34,6 +34,13 @@ export type RulesState =
 
 export type UnreadableRulesCause = 'folder' | 'file-permission' | 'other';
 
+export interface RulesFileSystem {
+  readonly stat: (
+    filePath: string,
+  ) => Promise<{ readonly isDirectory: () => boolean; readonly isFile: () => boolean }>;
+  readonly readText: (filePath: string) => Promise<string>;
+}
+
 export interface UnknownSkill {
   readonly match: string;
   readonly skill: string;

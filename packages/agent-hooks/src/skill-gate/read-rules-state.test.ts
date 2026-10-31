@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readRulesState } from './read-rules-state.ts';
@@ -13,7 +13,9 @@ async function setupTest() {
 
   stack.defer(() => rm(directory, { recursive: true, force: true }));
 
-  return { directory, stack };
+  const fileSystem = { stat, readText: (filePath: string) => readFile(filePath, 'utf8') };
+
+  return { directory, stack, fileSystem };
 }
 
 test('it reads the text of a rules file', async () => {
@@ -21,14 +23,14 @@ test('it reads the text of a rules file', async () => {
 
   await writeFile(join(ctx.directory, 'skill-gate.json'), '{"gates":[]}');
 
-  const state = await readRulesState(join(ctx.directory, 'skill-gate.json'));
+  const state = await readRulesState(ctx.fileSystem, join(ctx.directory, 'skill-gate.json'));
 
   expect(state).toStrictEqual({ kind: 'readable', text: '{"gates":[]}' });
 });
 
 test('it reads a path that holds nothing as missing', async () => {
   const ctx = await setupTest();
-  const state = await readRulesState(join(ctx.directory, 'skill-gate.json'));
+  const state = await readRulesState(ctx.fileSystem, join(ctx.directory, 'skill-gate.json'));
 
   expect(state).toStrictEqual({ kind: 'missing' });
 });
@@ -38,7 +40,10 @@ test('it reads a path under a file as missing', async () => {
 
   await writeFile(join(ctx.directory, '.claude'), '');
 
-  const state = await readRulesState(join(ctx.directory, '.claude/skill-gate.json'));
+  const state = await readRulesState(
+    ctx.fileSystem,
+    join(ctx.directory, '.claude/skill-gate.json'),
+  );
 
   expect(state).toStrictEqual({ kind: 'missing' });
 });
@@ -48,7 +53,7 @@ test('it reads a symlink that points nowhere as missing', async () => {
 
   await symlink('rules.json', join(ctx.directory, 'skill-gate.json'));
 
-  const state = await readRulesState(join(ctx.directory, 'skill-gate.json'));
+  const state = await readRulesState(ctx.fileSystem, join(ctx.directory, 'skill-gate.json'));
 
   expect(state).toStrictEqual({ kind: 'missing' });
 });
@@ -58,7 +63,7 @@ test('it reads a folder as unreadable', async () => {
 
   await mkdir(join(ctx.directory, 'skill-gate.json'));
 
-  const state = await readRulesState(join(ctx.directory, 'skill-gate.json'));
+  const state = await readRulesState(ctx.fileSystem, join(ctx.directory, 'skill-gate.json'));
 
   expect(state).toStrictEqual({ kind: 'unreadable', reason: 'it is a folder', cause: 'folder' });
 });
@@ -68,7 +73,7 @@ test('it reads a symlink loop as unreadable and names the error code', async () 
 
   await symlink('skill-gate.json', join(ctx.directory, 'skill-gate.json'));
 
-  const state = await readRulesState(join(ctx.directory, 'skill-gate.json'));
+  const state = await readRulesState(ctx.fileSystem, join(ctx.directory, 'skill-gate.json'));
 
   expect(state).toStrictEqual({
     kind: 'unreadable',
@@ -87,7 +92,7 @@ test.skipIf(process.getuid?.() === 0)(
     await writeFile(join(ctx.directory, 'skill-gate.json'), '{"gates":[]}');
     await chmod(join(ctx.directory, 'skill-gate.json'), 0o000);
 
-    const state = await readRulesState(join(ctx.directory, 'skill-gate.json'));
+    const state = await readRulesState(ctx.fileSystem, join(ctx.directory, 'skill-gate.json'));
 
     expect(state).toStrictEqual({
       kind: 'unreadable',
@@ -108,7 +113,10 @@ test.skipIf(process.getuid?.() === 0)(
 
     ctx.stack.defer(() => chmod(join(ctx.directory, '.claude'), 0o700));
 
-    const state = await readRulesState(join(ctx.directory, '.claude/skill-gate.json'));
+    const state = await readRulesState(
+      ctx.fileSystem,
+      join(ctx.directory, '.claude/skill-gate.json'),
+    );
 
     expect(state).toStrictEqual({
       kind: 'unreadable',

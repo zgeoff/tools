@@ -1,5 +1,5 @@
 import { statSync } from 'node:fs';
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { GitError, simpleGit } from 'simple-git';
 import type { SimpleGit } from 'simple-git';
@@ -45,6 +45,7 @@ import type {
   HookInput,
   PostToolEvent,
   RecordedSnapshot,
+  RulesFileSystem,
   RulesState,
   SkillGateHookOutput,
   SkillGateRules,
@@ -53,6 +54,11 @@ import type {
 
 const ALLOW: HookResult = { kind: 'allow' };
 const RULES_PATH = '.claude/skill-gate.json';
+
+const RULES_FILE_SYSTEM: RulesFileSystem = {
+  stat,
+  readText: (filePath) => readFile(filePath, 'utf8'),
+};
 
 export async function runSkillGate(payload: unknown, context: RepoContext): Promise<HookResult> {
   const parsedInput = parseHookInput(context.harness, payload);
@@ -67,7 +73,7 @@ export async function runSkillGate(payload: unknown, context: RepoContext): Prom
 
   const projectDir = context.projectDir;
 
-  const rulesState = await readRulesState(path.join(projectDir, RULES_PATH));
+  const rulesState = await readRulesState(RULES_FILE_SYSTEM, path.join(projectDir, RULES_PATH));
 
   if (parsedInput.kind === 'lifecycle') {
     if (rulesState.kind !== 'missing') {
@@ -80,27 +86,34 @@ export async function runSkillGate(payload: unknown, context: RepoContext): Prom
   return match(rulesState)
     .returnType<Promise<HookResult>>()
     .with({ kind: 'missing' }, () => Promise.resolve(ALLOW))
-    .with({ kind: 'unreadable' }, (state) => checkUnreadableRules(parsedInput, projectDir, state))
+    .with({ kind: 'unreadable' }, (state) =>
+      checkUnreadableRules(parsedInput, { projectDir, git: simpleGit(projectDir) }, state),
+    )
     .with({ kind: 'readable' }, (state) => checkRules(parsedInput, projectDir, state.text))
     .exhaustive();
 }
 
+interface UnreadableRulesProject {
+  readonly projectDir: string;
+  readonly git: SimpleGit;
+}
+
 async function checkUnreadableRules(
   input: HookInput,
-  projectDir: string,
+  project: UnreadableRulesProject,
   state: Extract<RulesState, { kind: 'unreadable' }>,
 ): Promise<HookResult> {
   if (input.event !== 'PreToolUse') {
     return ALLOW;
   }
 
-  const call = pickBlockedCall(input, projectDir);
+  const call = pickBlockedCall(input, project.projectDir);
 
   if (call === null) {
     return ALLOW;
   }
 
-  const isTrackedFile = state.cause === 'folder' ? await probeTrackedRulesFile(projectDir) : false;
+  const isTrackedFile = state.cause === 'folder' ? await probeTrackedRulesFile(project.git) : false;
 
   return {
     kind: 'block',
@@ -151,9 +164,9 @@ function isOutsideProject(fromProject: string): boolean {
 }
 
 // A git checkout of a tracked symlink to a folder brings the same folder back.
-async function probeTrackedRulesFile(projectDir: string): Promise<boolean> {
+async function probeTrackedRulesFile(git: SimpleGit): Promise<boolean> {
   try {
-    const entries = await simpleGit(projectDir).raw(['ls-files', '--stage', '--', RULES_PATH]);
+    const entries = await git.raw(['ls-files', '--stage', '--', RULES_PATH]);
 
     return entries
       .split('\n')
