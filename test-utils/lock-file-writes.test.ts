@@ -60,3 +60,20 @@ test('it lets the file take a write after the unlock', async () => {
 
   expect(text).toBe('{"boiled":true}');
 });
+
+test('it unlocks a file that has gone since the lock', async () => {
+  const ctx = await setupTest();
+
+  const path = join(ctx.directory, 'kettle.json');
+
+  await writeFile(path, '{"boiled":false}');
+
+  const unlock = await ctx.lock(path);
+
+  await unlock();
+  await rm(path);
+
+  const unlocked = unlock();
+
+  expect(unlocked).resolves.toBeUndefined();
+});
