@@ -1,5 +1,4 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
   stepBundlesFolder,
@@ -7,6 +6,8 @@ import {
   toStepRunPath,
   toStepToolsPath,
 } from './download-step-scripts.ts';
+import type { FileSystem } from './file-system.ts';
+import { nodeFileSystem } from './node-file-system.ts';
 
 export interface StepBundle {
   // The bundle's repo path, under the step bundles folder.
@@ -70,17 +71,25 @@ export function collectStaleStepBundles(
   return [...changed, ...orphaned].toSorted();
 }
 
-export async function readCommittedStepBundles(root: string): Promise<Map<string, string>> {
-  const paths = await Array.fromAsync(
-    new Bun.Glob('**/*.js').scan({ cwd: join(root, stepBundlesFolder) }),
-  );
+export type BundleFiles = Pick<
+  FileSystem,
+  'readFilePaths' | 'readText' | 'writeText' | 'removePath'
+>;
+
+export async function readCommittedStepBundles(
+  root: string,
+  files: BundleFiles,
+): Promise<Map<string, string>> {
+  const paths = await files.readFilePaths(join(root, stepBundlesFolder));
 
   const entries = await Promise.all(
-    paths.map(async (path): Promise<[string, string]> => {
-      const repoPath = `${stepBundlesFolder}/${path}`;
+    paths
+      .filter((path) => path.endsWith('.js'))
+      .map(async (path): Promise<[string, string]> => {
+        const repoPath = `${stepBundlesFolder}/${path}`;
 
-      return [repoPath, await Bun.file(join(root, repoPath)).text()];
-    }),
+        return [repoPath, await files.readText(join(root, repoPath))];
+      }),
   );
 
   return new Map(entries);
@@ -89,14 +98,12 @@ export async function readCommittedStepBundles(root: string): Promise<Map<string
 export async function writeStepBundles(
   root: string,
   bundles: readonly StepBundle[],
+  files: BundleFiles,
 ): Promise<void> {
-  await rm(join(root, stepBundlesFolder), { recursive: true, force: true });
+  await files.removePath(join(root, stepBundlesFolder));
 
   for (const bundle of bundles) {
-    const path = join(root, bundle.path);
-
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, bundle.text);
+    await files.writeText(join(root, bundle.path), bundle.text);
   }
 }
 
@@ -109,7 +116,7 @@ if (import.meta.main) {
   );
 
   if (parsed.values.check === true) {
-    const committed = await readCommittedStepBundles(root);
+    const committed = await readCommittedStepBundles(root, nodeFileSystem);
 
     const stale = collectStaleStepBundles(bundles, committed);
 
@@ -123,7 +130,7 @@ if (import.meta.main) {
 
     process.exitCode = stale.length === 0 ? 0 : 1;
   } else {
-    await writeStepBundles(root, bundles);
+    await writeStepBundles(root, bundles, nodeFileSystem);
 
     process.stdout.write(`step bundles: wrote ${bundles.length}\n`);
   }

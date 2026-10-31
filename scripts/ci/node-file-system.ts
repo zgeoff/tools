@@ -11,6 +11,17 @@ export const nodeFileSystem: FileSystem = {
     return new Uint8Array(buffer);
   },
   readDirectory: (path) => readdir(path),
+  readFilePaths: async (folder) => {
+    try {
+      await stat(folder);
+    } catch {
+      return [];
+    }
+
+    const paths = await Array.fromAsync(new Bun.Glob('**/*').scan({ cwd: folder }));
+
+    return paths.toSorted();
+  },
   writeText: writeTextFile,
   appendText: (path, text) => appendFile(path, text),
   createDirectory: async (path) => {

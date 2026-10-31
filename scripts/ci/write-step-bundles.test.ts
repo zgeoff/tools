@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import { nodeFileSystem } from './node-file-system.ts';
 import type { BundleConfig } from './write-step-bundles.ts';
 import {
   collectStaleStepBundles,
@@ -118,11 +119,13 @@ test('it replaces the bundles folder with the bundles it writes', async () => {
 
   await writeTreeFiles(ctx.directory, { 'step-bundles/old/steep.js': 'steep' });
 
-  await writeStepBundles(ctx.directory, [
-    { path: 'step-bundles/scripts/kettle/boil.js', text: 'boil' },
-  ]);
+  await writeStepBundles(
+    ctx.directory,
+    [{ path: 'step-bundles/scripts/kettle/boil.js', text: 'boil' }],
+    nodeFileSystem,
+  );
 
-  const committed = await readCommittedStepBundles(ctx.directory);
+  const committed = await readCommittedStepBundles(ctx.directory, nodeFileSystem);
 
   expect(committed).toStrictEqual(new Map([['step-bundles/scripts/kettle/boil.js', 'boil']]));
 

@@ -4,6 +4,10 @@ export interface FileSystem {
   readonly readBytes: (path: string) => Promise<Uint8Array>;
   readonly readDirectory: (path: string) => Promise<string[]>;
 
+  // Returns the path of every file below the folder, relative to it, sorted; none for a missing
+  // folder.
+  readonly readFilePaths: (folder: string) => Promise<string[]>;
+
   // Writes the text in place of the file's contents, and creates its folders first.
   readonly writeText: (path: string, text: string) => Promise<void>;
   readonly appendText: (path: string, text: string) => Promise<void>;
