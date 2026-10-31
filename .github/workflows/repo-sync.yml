@@ -136,10 +136,12 @@ jobs:
     timeout-minutes: 15
     # Two runs at once could push one commit's files and then write the other
     # commit's title and body. The group names only the caller, so runs of every
-    # ref wait for each other.
+    # ref wait for each other. queue: max keeps every waiting run; the default
+    # replaces a waiting run, which would drop its dispatched commit.
     concurrency:
       group: repo-sync-${{ github.repository }}
       cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
     steps:

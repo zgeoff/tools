@@ -134,7 +134,11 @@ test('it fails the plugin load with the cause when rig.config.ts cannot be impor
   const result = await runLintTree(files, 'oven.test.ts', { 'zgeoff/max-test-timeout': 'error' });
 
   expect(result.exitCode).not.toBe(0);
-  expect(result.stdout).toInclude('reading a TypeScript config needs Node >= 22.18 or Bun');
+
+  // oxlint wraps the plugin error at a fixed width, so a long temp path can split the message.
+  expect(result.stdout.replaceAll(/\n\s*\| /gu, ' ')).toInclude(
+    'reading a TypeScript config needs Node >= 22.18 or Bun',
+  );
 });
 
 test('it reads no lanes outside a repository', async () => {

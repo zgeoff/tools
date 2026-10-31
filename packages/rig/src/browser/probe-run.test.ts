@@ -9,6 +9,9 @@ import { laneFiles } from './lane-files.ts';
 import { probeRun } from './probe-run.ts';
 import type { ProcessGroups } from './process-groups.ts';
 
+// Root ignores file modes, so a read-only folder cannot stop root from removing a record.
+const isRoot = process.getuid?.() === 0;
+
 async function setupTest() {
   const stack = new AsyncDisposableStack();
 
@@ -120,7 +123,7 @@ test('it finds a run exited when its lane and every group it recorded have exite
   ).toStrictEqual([[5120], [6230]]);
 });
 
-test('it fails when it cannot remove a pending record', async () => {
+test.skipIf(isRoot)('it fails when it cannot remove a pending record', async () => {
   const ctx = await setupTest();
 
   await mkdir(join(ctx.groupsDir, 'pending-tests'), { recursive: true });

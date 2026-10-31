@@ -32,3 +32,8 @@ pre-push:
     - name: release-workflow
       glob: '.github/workflows/release-please.yml'
       run: bun run --silent check:release-workflow
+    - name: repo-sync-concurrency
+      glob:
+        - '.github/workflows/repo-sync.yml'
+        - 'sync/repo-sync.yml'
+      run: bun run --silent check:repo-sync-concurrency

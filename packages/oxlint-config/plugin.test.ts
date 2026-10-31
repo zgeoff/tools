@@ -6,7 +6,7 @@ import { createLintTree } from './test-utils/create-lint-tree.ts';
 import { runLintIn } from './test-utils/run-lint-in.ts';
 import { runLintTree } from './test-utils/run-lint-tree.ts';
 import { runLint } from './test-utils/run-lint.ts';
-import type { OxlintRun } from './test-utils/run-oxlint.ts';
+import { runOxlint } from './test-utils/run-oxlint.ts';
 
 test('it flags a multi-line JSDoc block', async () => {
   const source = '/**\n * Documents the export.\n */\nexport const answer = 42;\n';
@@ -2237,13 +2237,22 @@ test('it accepts a restricted module inside its zone, out of scope, or imported 
     ],
   });
 
-  const results = await Promise.all(
-    ['src/model/send.ts', 'src/state/agent.ts', 'scripts/send.ts'].map((target: string) =>
-      runLintIn(directory, directory, target),
-    ),
+  // Each oxlint run loads the JS plugin, and three runs at once exceed the unit time limit on a
+  // two-core host, so one run lints all three files.
+  const result = await runOxlint(
+    [
+      '-c',
+      join(directory, '.oxlintrc.json'),
+      '--report-unused-disable-directives-severity',
+      'error',
+      'src/model/send.ts',
+      'src/state/agent.ts',
+      'scripts/send.ts',
+    ],
+    directory,
   );
 
-  expect(results.map((result: OxlintRun) => result.exitCode)).toStrictEqual([0, 0, 0]);
+  expect(result.exitCode).toBe(0);
 });
 
 test('it flags a restricted global call outside its zones', async () => {

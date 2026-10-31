@@ -45,13 +45,14 @@ counts as nothing to sync. Renovate never moves these refs: the shared preset tu
 because it would read the commit as a digest of `main` to bump.
 
 A run from any other trigger, the stub's daily run, a push that changes the stub, or a manual run,
-syncs the newest green commit on `main`. GitHub keeps one pending run per concurrency group and
-drops the others, so a dispatch can be lost, and the next daily run delivers what it carried. When
-the Actions API fails or lists no green run, the run warns and syncs the commit the repo pins, so
-that day's run delivers nothing and the lost change waits for a run that reads the API. A run whose
-commit is older than any commit that a workflow on the repo's `main` or on its open sync pull
-request pins changes nothing, so dispatches may arrive in any order. A run that cannot read those
-pins, or cannot tell whether one is newer, fails rather than guess, and the next run tries again.
+syncs the newest green commit on `main`. The stub's concurrency group names the dispatched commit,
+and the sync job queues every waiting run, so a dispatch of each commit runs. A dispatch that GitHub
+drops is lost, and the next daily run delivers what it carried. When the Actions API fails or lists
+no green run, the run warns and syncs the commit the repo pins, so that day's run delivers nothing
+and the lost change waits for a run that reads the API. A run whose commit is older than any commit
+that a workflow on the repo's `main` or on its open sync pull request pins changes nothing, so
+dispatches may arrive in any order. A run that cannot read those pins, or cannot tell whether one is
+newer, fails rather than guess, and the next run tries again.
 
 The step scripts of a run come from the pinned commit, never from `ref`, so a change to the scripts
 reaches a repo once its next sync pull request merges.

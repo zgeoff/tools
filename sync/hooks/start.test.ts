@@ -9,6 +9,9 @@ import { readTextOrEmpty } from '../../test-utils/read-text-or-empty.ts';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import { pickClaimStep } from './start.ts';
 
+// Root ignores file modes, so a folder or a lock with no permissions cannot stop root from using it.
+const isRoot = process.getuid?.() === 0;
+
 // The stub installs with the bun on PATH and runs the retry with its own runtime, so a stand-in bun
 // first on PATH stands in for the install alone. Its installed package re-exports this repo's
 // source, so the gate that runs after the install is the real one.
@@ -603,71 +606,77 @@ test('it runs one install for two hook calls that meet a stale lock at once', as
   expect(installLog).toBe(`bun install --frozen-lockfile in ${ctx.project}\n`);
 });
 
-test('it skips the install and refuses when it cannot create the install lock', async () => {
-  const ctx = await setupTest();
+test.skipIf(isRoot)(
+  'it skips the install and refuses when it cannot create the install lock',
+  async () => {
+    const ctx = await setupTest();
 
-  await createStubInstall(ctx.fakeBin, {
-    log: ctx.installLog,
-    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
-  });
+    await createStubInstall(ctx.fakeBin, {
+      log: ctx.installLog,
+      outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+    });
 
-  await mkdir(join(ctx.project, 'node_modules'), { mode: 0o555 });
+    await mkdir(join(ctx.project, 'node_modules'), { mode: 0o555 });
 
-  const hook = ctx.startStub(
-    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
-  );
+    const hook = ctx.startStub(
+      ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+    );
 
-  const status = await hook.exited;
+    const status = await hook.exited;
 
-  const stderr = await new Response(hook.stderr).text();
+    const stderr = await new Response(hook.stderr).text();
 
-  expect(status).toBe(2);
+    expect(status).toBe(2);
 
-  expect(stderr).toStartWith(
-    `The agent hook could not run bun install: Error: EACCES: permission denied, open '${join(ctx.project, 'node_modules/.agent-hooks-install.lock.guard')}.`,
-  );
+    expect(stderr).toStartWith(
+      `The agent hook could not run bun install: Error: EACCES: permission denied, open '${join(ctx.project, 'node_modules/.agent-hooks-install.lock.guard')}.`,
+    );
 
-  expect(stderr).toEndWith('\nTo work here, run bun install.\n');
+    expect(stderr).toEndWith('\nTo work here, run bun install.\n');
 
-  const installLog = await ctx.readInstallLog();
+    const installLog = await ctx.readInstallLog();
 
-  expect(installLog).toBe('');
-});
+    expect(installLog).toBe('');
+  },
+);
 
-test('it skips the install and refuses when it cannot read the install lock', async () => {
-  const ctx = await setupTest();
+test.skipIf(isRoot)(
+  'it skips the install and refuses when it cannot read the install lock',
+  async () => {
+    const ctx = await setupTest();
 
-  await createStubInstall(ctx.fakeBin, {
-    log: ctx.installLog,
-    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
-  });
+    await createStubInstall(ctx.fakeBin, {
+      log: ctx.installLog,
+      outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+    });
 
-  const stopped = spawnSync('true');
+    const stopped = spawnSync('true');
 
-  await writeTreeFiles(ctx.project, {
-    'node_modules/.agent-hooks-install.lock': String(stopped.pid),
-  });
+    await writeTreeFiles(ctx.project, {
+      'node_modules/.agent-hooks-install.lock': String(stopped.pid),
+    });
 
-  await chmod(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), 0o000);
+    await chmod(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), 0o000);
 
-  const hook = ctx.startStub(
-    ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
-  );
+    const hook = ctx.startStub(
+      ctx.buildPayload('Write', { file_path: join(ctx.project, 'guide.md') }),
+    );
 
-  const status = await hook.exited;
+    const status = await hook.exited;
 
-  const stderr = await new Response(hook.stderr).text();
+    const stderr = await new Response(hook.stderr).text();
 
-  expect(status).toBe(2);
+    expect(status).toBe(2);
 
-  expect(stderr).toBe(
-    `The agent hook could not run bun install: Error: EACCES: permission denied, open '${join(ctx.project, 'node_modules/.agent-hooks-install.lock')}'\nTo work here, run bun install.\n`,
-  );
+    expect(stderr).toBe(
+      `The agent hook could not run bun install: Error: EACCES: permission denied, open '${join(ctx.project, 'node_modules/.agent-hooks-install.lock')}'\nTo work here, run bun install.\n`,
+    );
 
-  const installLog = await ctx.readInstallLog();
+    const installLog = await ctx.readInstallLog();
 
-  expect(installLog).toBe('');
-});
+    expect(installLog).toBe('');
+  },
+);
 
 test('it refuses a harness it does not know', async () => {
   const ctx = await setupTest();
