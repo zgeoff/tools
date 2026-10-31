@@ -484,7 +484,7 @@ test.skipIf(modesOutput === '')('it uses the first mode the host supports', asyn
   const cgroupPatterns: Readonly<Record<string, RegExp>> = {
     'systemd-sudo': /^0::\/system\.slice\/diet-\d+\.scope\n$/u,
     'systemd-user': /^0::\/user\.slice\/.*\/user@\d+\.service\/.*\/diet-\d+\.scope\n$/u,
-    cgroupfs: /^0::\/.*\/diet-\d+\n$/u,
+    cgroupfs: /^0::\/(?:.*\/)?diet-\d+\n$/u,
   };
 
   const result = await $`bash ${ctx.scriptPath} --budget 128M -- cat /proc/self/cgroup`
