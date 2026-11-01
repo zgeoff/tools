@@ -34,7 +34,17 @@ async function setupTest() {
   return { commands, output, writePin, pin };
 }
 
-test('it opens a pull request that moves the pin, with auto-merge on', async () => {
+// A refused auto-merge leaves the pull request open for a hand merge, so the run still passes.
+test.each([
+  ['turns auto-merge on', 0, []],
+  [
+    'warns and passes when GitHub refuses auto-merge',
+    1,
+    [
+      '::warning::GitHub refused auto-merge; allow auto-merge in the repo settings, or merge the pull request by hand.\n',
+    ],
+  ],
+])('it opens a pull request that moves the pin and %s', async (_label, mergeExitCode, warnings) => {
   const ctx = await setupTest();
 
   const pinned = '0123456789abcdef0123456789abcdef01234567';
@@ -158,7 +168,7 @@ test('it opens a pull request that moves the pin, with auto-merge on', async () 
       '--match-head-commit',
       'c0ffee0123456789abcdef0123456789abcdef01',
     ],
-    { exitCode: 0, stdout: '', stderr: '' },
+    { exitCode: mergeExitCode, stdout: '', stderr: 'auto-merge is not allowed' },
   );
 
   ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin-next'], {
@@ -221,7 +231,7 @@ test('it opens a pull request that moves the pin, with auto-merge on', async () 
     'c0ffee0123456789abcdef0123456789abcdef01',
   ]);
 
-  expect(ctx.output).toStrictEqual(['https://github.com/example/tools/pull/41\n']);
+  expect(ctx.output).toStrictEqual(['https://github.com/example/tools/pull/41\n', ...warnings]);
 });
 
 test('it opens its own pull request when only a fork holds a pin branch pull request', async () => {
