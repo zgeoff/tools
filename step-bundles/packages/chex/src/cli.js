@@ -1469,9 +1469,11 @@ var guardScript = [
   `if [ ! -f ${baselinePath} ]; then`,
   `  echo "${guardName}: ${baselinePath} is missing, so lefthook runs none of the chex baseline's jobs; run bun install, then try again"`,
   "  exit 1",
-  "fi"
+  "fi",
+  "# {files}"
 ];
-var guardJob = { name: guardName, run: `${guardScript.join(`
+var guardFiles = "echo package.json";
+var guardJob = { name: guardName, files: guardFiles, run: `${guardScript.join(`
 `)}
 ` };
 function buildHookEdit(text, hook) {
@@ -1489,10 +1491,11 @@ ${hook}:
   jobs:
 ${formatGuardJob("    ")}`);
   }
-  const jobs = isRecord(hookConfig) ? hookConfig["jobs"] : undefined;
-  if (!isRecord(hookConfig) || !Array.isArray(jobs)) {
+  const listedJobs = isRecord(hookConfig) ? hookConfig["jobs"] : undefined;
+  if (!isRecord(hookConfig) || !Array.isArray(listedJobs)) {
     return refuseHook(hook);
   }
+  const jobs = listedJobs;
   const listed = jobs.find((job) => isRecord(job) && job["name"] === guardName);
   if (listed !== undefined) {
     return Bun.deepEquals(listed, guardJob, true) ? { kind: "guarded", text } : {
@@ -1520,7 +1523,12 @@ function refuseHook(hook) {
   };
 }
 function formatGuardJob(indent) {
-  const lines = [`- name: ${guardName}`, "  run: |", ...guardScript.map((line) => `    ${line}`)];
+  const lines = [
+    `- name: ${guardName}`,
+    `  files: ${guardFiles}`,
+    "  run: |",
+    ...guardScript.map((line) => `    ${line}`)
+  ];
   return lines.map((line) => `${indent}${line}
 `).join("");
 }

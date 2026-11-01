@@ -38,9 +38,14 @@ const guardScript = [
   `  echo "${guardName}: ${baselinePath} is missing, so lefthook runs none of the chex baseline's jobs; run bun install, then try again"`,
   '  exit 1',
   'fi',
+  '# {files}',
 ];
 
-const guardJob = { name: guardName, run: `${guardScript.join('\n')}\n` };
+// lefthook 2.2.2 skips a job whose run substitutes no file when no file matches: a commit that
+// stages none, or a push of another branch while the checked-out one has nothing to push. Every
+// repo that takes the baseline has package.json, and the shell comment hides it from the check.
+const guardFiles = 'echo package.json';
+const guardJob = { name: guardName, files: guardFiles, run: `${guardScript.join('\n')}\n` };
 
 function buildHookEdit(text: string, hook: GuardedHook): HookEdit {
   const config = parseLefthookConfig(text);
@@ -62,13 +67,14 @@ function buildHookEdit(text: string, hook: GuardedHook): HookEdit {
     );
   }
 
-  const jobs = isRecord(hookConfig) ? hookConfig['jobs'] : undefined;
+  const listedJobs = isRecord(hookConfig) ? hookConfig['jobs'] : undefined;
 
-  if (!isRecord(hookConfig) || !Array.isArray(jobs)) {
+  if (!isRecord(hookConfig) || !Array.isArray(listedJobs)) {
     return refuseHook(hook);
   }
 
-  const listed = jobs.find((job) => isRecord(job) && job['name'] === guardName);
+  const jobs: readonly unknown[] = listedJobs;
+  const listed = jobs.find((job: unknown) => isRecord(job) && job['name'] === guardName);
 
   if (listed !== undefined) {
     return Bun.deepEquals(listed, guardJob, true)
@@ -121,7 +127,12 @@ function refuseHook(hook: GuardedHook): HookEdit {
 }
 
 function formatGuardJob(indent: string): string {
-  const lines = [`- name: ${guardName}`, '  run: |', ...guardScript.map((line) => `    ${line}`)];
+  const lines = [
+    `- name: ${guardName}`,
+    `  files: ${guardFiles}`,
+    '  run: |',
+    ...guardScript.map((line) => `    ${line}`),
+  ];
 
   return lines.map((line) => `${indent}${line}\n`).join('');
 }

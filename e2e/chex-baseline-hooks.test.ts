@@ -196,6 +196,73 @@ test('it fails a push in a checkout with no node_modules, and names the missing 
   );
 });
 
+test('it fails a commit that stages no file in a checkout with no node_modules', async () => {
+  const ctx = await setupTest();
+
+  // A fresh worktree before its first install: chex init has written lefthook.yml, and
+  // node_modules does not exist, so lefthook finds no baseline to extend.
+  await writeTreeFiles(ctx.worktree, {
+    'package.json': JSON.stringify({
+      name: 'kettle',
+      devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
+    }),
+    'fixture.ts': 'export {};\n',
+  });
+
+  const init = await runChexCLI(ctx.install.chex.binPath, ctx.worktree, ctx.env, ['init']);
+
+  expect(init.exitCode).toBe(0);
+  expect(existsSync(join(ctx.worktree, 'node_modules'))).toBeFalse();
+
+  const result = await $`git commit --allow-empty -m ${'chore: mark the start'}`
+    .cwd(ctx.worktree)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+  expect(result.exitCode).toBe(1);
+  expect(collectFailedHookJobs(output)).toStrictEqual(['chex-baseline']);
+});
+
+test('it fails a push of another branch in a checkout with no node_modules whose own branch has nothing to push', async () => {
+  const ctx = await setupTest();
+
+  // A fresh worktree before its first install: chex init has written lefthook.yml, and
+  // node_modules does not exist, so lefthook finds no baseline to extend.
+  await writeTreeFiles(ctx.worktree, {
+    'package.json': JSON.stringify({
+      name: 'kettle',
+      devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
+    }),
+    'fixture.ts': 'export {};\n',
+  });
+
+  const init = await runChexCLI(ctx.install.chex.binPath, ctx.worktree, ctx.env, ['init']);
+
+  expect(init.exitCode).toBe(0);
+  expect(existsSync(join(ctx.worktree, 'node_modules'))).toBeFalse();
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+
+  // Plumbing commits without the commit hook, which would refuse this checkout.
+  const tree = await $`git write-tree`.cwd(ctx.worktree).env(ctx.env).text();
+
+  const commit = await $`git commit-tree ${tree.trim()} -p HEAD -m ${'test: add the fixture'}`
+    .cwd(ctx.worktree)
+    .env(ctx.env)
+    .text();
+
+  await $`git update-ref refs/heads/other ${commit.trim()}`.cwd(ctx.worktree).env(ctx.env);
+  await $`git branch --quiet --set-upstream-to=origin/main`.cwd(ctx.worktree).env(ctx.env);
+
+  const result = await runHookedPush(ctx.worktree, 'other', ctx.env);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.failedJobs).toStrictEqual(['chex-baseline']);
+});
+
 test('it runs each repo check through chex and prints that it cleared', async () => {
   const ctx = await setupTest();
 

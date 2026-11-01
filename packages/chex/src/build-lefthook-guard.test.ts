@@ -5,11 +5,13 @@ import { buildLefthookGuard } from './build-lefthook-guard.ts';
 function setupTest() {
   const guardJob =
     '    - name: chex-baseline\n' +
+    '      files: echo package.json\n' +
     '      run: |\n' +
     '        if [ ! -f node_modules/@zgeoff/chex/lefthook.yml ]; then\n' +
     '          echo "chex-baseline: node_modules/@zgeoff/chex/lefthook.yml is missing, so lefthook runs none of the chex baseline\'s jobs; run bun install, then try again"\n' +
     '          exit 1\n' +
-    '        fi\n';
+    '        fi\n' +
+    '        # {files}\n';
 
   return { guardJob };
 }

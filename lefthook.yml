@@ -11,11 +11,13 @@ pre-commit:
   piped: true
   jobs:
     - name: chex-baseline
+      files: echo package.json
       run: |
         if [ ! -f node_modules/@zgeoff/chex/lefthook.yml ]; then
           echo "chex-baseline: node_modules/@zgeoff/chex/lefthook.yml is missing, so lefthook runs none of the chex baseline's jobs; run bun install, then try again"
           exit 1
         fi
+        # {files}
     - name: oxlint --fix
       glob: '*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}'
       run: bunx oxlint --fix --no-error-on-unmatched-pattern {staged_files}
@@ -35,11 +37,13 @@ pre-commit:
 pre-push:
   jobs:
     - name: chex-baseline
+      files: echo package.json
       run: |
         if [ ! -f node_modules/@zgeoff/chex/lefthook.yml ]; then
           echo "chex-baseline: node_modules/@zgeoff/chex/lefthook.yml is missing, so lefthook runs none of the chex baseline's jobs; run bun install, then try again"
           exit 1
         fi
+        # {files}
     - name: release-workflow
       glob: '.github/workflows/release-please.yml'
       run: bun run --silent check:release-workflow
