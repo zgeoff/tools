@@ -58,10 +58,11 @@ therefore exits 2 before every tool call, with two exceptions, each a Bash comma
 - a read-only `ls`, `cat` or `pwd`.
 
 An exception passes only as plain words between single spaces, because a shell can build a path that
-the stub cannot see in the command text, as in `ext=ts; printf x > src/sample.$ext`. The stub
-refuses a command with a variable, a quote, a glob, a redirect, a line break or a control character.
-Git stays off the list, because git config can make any git command run a program, such as an
-fsmonitor program.
+the stub cannot see in the command text, as in `ext=ts; printf x > src/sample.$ext`. A plain word
+holds only ASCII letters, digits and the characters `_ . / @ : = + , -`. The stub refuses any other
+character, so a variable, a quote, a glob, a redirect, a pipe, a semicolon, `&`, a parenthesis, a
+backtick, a line break and a control character all fail. Git stays off the list, because git config
+can make any git command run a program, such as an fsmonitor program.
 
 The refusal message holds the two install commands word for word, so an agent that wrote the install
 with a `cd` or a pipe knows the form to retry.
