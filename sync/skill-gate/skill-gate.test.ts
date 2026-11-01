@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';
-import { copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,53 +12,11 @@ async function setupTest() {
 
   const project = join(directory, 'project');
   const transcriptPath = join(directory, 'transcript.jsonl');
+  const rulesPath = join(import.meta.dir, 'skill-gate.json');
 
   const indexPath = fileURLToPath(
     new URL('../../packages/agent-hooks/src/index.ts', import.meta.url),
   );
-
-  await mkdir(join(project, '.claude'), { recursive: true });
-
-  await copyFile(
-    join(import.meta.dir, 'skill-gate.json'),
-    join(project, '.claude/skill-gate.json'),
-  );
-
-  await Promise.all(
-    ['skill-writing', 'docs-writing', 'deslop'].map(async (skill) => {
-      await mkdir(join(project, '.claude/skills', skill), { recursive: true });
-      await writeFile(join(project, '.claude/skills', skill, 'SKILL.md'), `# ${skill}\n`);
-    }),
-  );
-
-  const writeLoadedSkills = (skills: readonly string[]) =>
-    writeFile(
-      transcriptPath,
-      skills
-        .flatMap((skill, index) => [
-          JSON.stringify({
-            type: 'assistant',
-            message: {
-              content: [
-                { type: 'tool_use', id: `toolu_${index}`, name: 'Skill', input: { skill } },
-              ],
-            },
-          }),
-          JSON.stringify({
-            type: 'user',
-            message: {
-              content: [
-                {
-                  type: 'tool_result',
-                  tool_use_id: `toolu_${index}`,
-                  content: `Launching skill: ${skill}`,
-                },
-              ],
-            },
-          }),
-        ])
-        .join('\n'),
-    );
 
   const runEdit = (relativePath: string) =>
     spawnSync(
@@ -80,7 +38,7 @@ async function setupTest() {
       },
     );
 
-  return { project, writeLoadedSkills, runEdit };
+  return { project, transcriptPath, rulesPath, runEdit };
 }
 
 test.each([
@@ -96,7 +54,16 @@ test.each([
   async (relativePath) => {
     const ctx = await setupTest();
 
-    await ctx.writeLoadedSkills([]);
+    await Bun.write(join(ctx.project, '.claude/skill-gate.json'), Bun.file(ctx.rulesPath));
+
+    await Bun.write(
+      join(ctx.project, '.claude/skills/skill-writing/SKILL.md'),
+      '# Skill writing\n',
+    );
+
+    await Bun.write(join(ctx.project, '.claude/skills/docs-writing/SKILL.md'), '# Docs writing\n');
+    await Bun.write(join(ctx.project, '.claude/skills/deslop/SKILL.md'), '# Deslop\n');
+    await Bun.write(ctx.transcriptPath, '');
 
     const result = ctx.runEdit(relativePath);
 
@@ -111,7 +78,20 @@ test.each([
 test('it refuses a skill edit after the session loads skill-writing and docs-writing, and names deslop', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeLoadedSkills(['skill-writing', 'docs-writing']);
+  await Bun.write(join(ctx.project, '.claude/skill-gate.json'), Bun.file(ctx.rulesPath));
+  await Bun.write(join(ctx.project, '.claude/skills/skill-writing/SKILL.md'), '# Skill writing\n');
+  await Bun.write(join(ctx.project, '.claude/skills/docs-writing/SKILL.md'), '# Docs writing\n');
+  await Bun.write(join(ctx.project, '.claude/skills/deslop/SKILL.md'), '# Deslop\n');
+
+  await Bun.write(
+    ctx.transcriptPath,
+    [
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"skill-writing"}}]}}',
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Launching skill: skill-writing"}]}}',
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_2","name":"Skill","input":{"skill":"docs-writing"}}]}}',
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_2","content":"Launching skill: docs-writing"}]}}',
+    ].join('\n'),
+  );
 
   const result = ctx.runEdit('.claude/skills/release-notes/SKILL.md');
 
@@ -125,7 +105,22 @@ test('it refuses a skill edit after the session loads skill-writing and docs-wri
 test('it allows a skill edit once the session loads all three skills', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeLoadedSkills(['skill-writing', 'docs-writing', 'deslop']);
+  await Bun.write(join(ctx.project, '.claude/skill-gate.json'), Bun.file(ctx.rulesPath));
+  await Bun.write(join(ctx.project, '.claude/skills/skill-writing/SKILL.md'), '# Skill writing\n');
+  await Bun.write(join(ctx.project, '.claude/skills/docs-writing/SKILL.md'), '# Docs writing\n');
+  await Bun.write(join(ctx.project, '.claude/skills/deslop/SKILL.md'), '# Deslop\n');
+
+  await Bun.write(
+    ctx.transcriptPath,
+    [
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"skill-writing"}}]}}',
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Launching skill: skill-writing"}]}}',
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_2","name":"Skill","input":{"skill":"docs-writing"}}]}}',
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_2","content":"Launching skill: docs-writing"}]}}',
+      '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_3","name":"Skill","input":{"skill":"deslop"}}]}}',
+      '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_3","content":"Launching skill: deslop"}]}}',
+    ].join('\n'),
+  );
 
   const result = ctx.runEdit('.claude/skills/release-notes/references/tone.md');
 
@@ -140,7 +135,11 @@ test.each([
 ])('it allows an edit of %s with no skill loaded', async (relativePath) => {
   const ctx = await setupTest();
 
-  await ctx.writeLoadedSkills([]);
+  await Bun.write(join(ctx.project, '.claude/skill-gate.json'), Bun.file(ctx.rulesPath));
+  await Bun.write(join(ctx.project, '.claude/skills/skill-writing/SKILL.md'), '# Skill writing\n');
+  await Bun.write(join(ctx.project, '.claude/skills/docs-writing/SKILL.md'), '# Docs writing\n');
+  await Bun.write(join(ctx.project, '.claude/skills/deslop/SKILL.md'), '# Deslop\n');
+  await Bun.write(ctx.transcriptPath, '');
 
   const result = ctx.runEdit(relativePath);
 
