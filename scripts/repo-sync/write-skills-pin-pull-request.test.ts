@@ -79,10 +79,11 @@ test.each([
     { exitCode: 0, stdout: 'identical\n', stderr: '' },
   );
 
-  ctx.commands.answer(
-    ['gh', 'api', 'repos/example/tools/git/ref/heads/main', '--jq', '.object.sha'],
-    { exitCode: 0, stdout: 'fedcba9876543210fedcba9876543210fedcba98\n', stderr: '' },
-  );
+  ctx.commands.answer(['git', 'rev-parse', 'HEAD'], {
+    exitCode: 0,
+    stdout: 'fedcba9876543210fedcba9876543210fedcba98\n',
+    stderr: '',
+  });
 
   ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin'], {
     exitCode: 1,
@@ -269,10 +270,11 @@ test('it opens its own pull request when only a fork holds a pin branch pull req
     { exitCode: 0, stdout: 'identical\n', stderr: '' },
   );
 
-  ctx.commands.answer(
-    ['gh', 'api', 'repos/example/tools/git/ref/heads/main', '--jq', '.object.sha'],
-    { exitCode: 0, stdout: 'fedcba9876543210fedcba9876543210fedcba98\n', stderr: '' },
-  );
+  ctx.commands.answer(['git', 'rev-parse', 'HEAD'], {
+    exitCode: 0,
+    stdout: 'fedcba9876543210fedcba9876543210fedcba98\n',
+    stderr: '',
+  });
 
   ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin'], {
     exitCode: 1,
@@ -444,10 +446,11 @@ test('it moves the branch of the open pin pull request to a newer commit', async
     { exitCode: 0, stdout: 'identical\n', stderr: '' },
   );
 
-  ctx.commands.answer(
-    ['gh', 'api', 'repos/example/tools/git/ref/heads/main', '--jq', '.object.sha'],
-    { exitCode: 0, stdout: 'fedcba9876543210fedcba9876543210fedcba98\n', stderr: '' },
-  );
+  ctx.commands.answer(['git', 'rev-parse', 'HEAD'], {
+    exitCode: 0,
+    stdout: 'fedcba9876543210fedcba9876543210fedcba98\n',
+    stderr: '',
+  });
 
   ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin'], {
     exitCode: 0,

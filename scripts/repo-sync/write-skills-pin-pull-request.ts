@@ -213,14 +213,15 @@ function runGH(
 async function writePinBranch(
   options: Readonly<WriteSkillsPinPullRequestOptions>,
 ): Promise<string> {
-  const main = await runCheckedGH(options, [
-    'api',
-    `repos/${options.repo}/git/ref/heads/main`,
-    '--jq',
-    '.object.sha',
-  ]);
+  // The branch starts from the checkout the pin was read from, not from main as it is now. A pin
+  // that merged since then changes the same line, so the pull request conflicts and never merges an
+  // older pin over it.
+  const checkedOut = await runCheckedCommand(options.runCommand, ['git', 'rev-parse', 'HEAD'], {
+    cwd: options.cwd,
+    env: options.env,
+  });
 
-  await writeBranchRef(options, stagingBranch, main.stdout.trim());
+  await writeBranchRef(options, stagingBranch, checkedOut.stdout.trim());
 
   const file = await runCheckedGH(options, [
     'api',
