@@ -43,11 +43,16 @@ export interface WritePinnedSkillsOptions {
   readonly writeOutput: (text: string) => void;
 }
 
-// Unpacks zgeoff/skills at the pinned commit once, drops the trees of other commits, and links each
-// skill this repo takes to its folder in that tree, as repo-sync gives another repo its copy.
-export async function writePinnedSkills(
-  options: Readonly<WritePinnedSkillsOptions>,
-): Promise<number> {
+// Unpacks zgeoff/skills at the pinned commit once, links each skill this repo takes to its folder
+// in that tree, as repo-sync gives another repo its copy, and drops the trees of other commits.
+export function writePinnedSkills(options: Readonly<WritePinnedSkillsOptions>): Promise<number> {
+  const lockPath = join(options.cwd, `${pinnedSkillsFolder}.lock`);
+
+  return options.withLock(lockPath, () => writeLockedSkills(options));
+}
+
+// The pin is read under the lock, so a run that waited installs the pin as it is now.
+async function writeLockedSkills(options: Readonly<WritePinnedSkillsOptions>): Promise<number> {
   const pinText = await options.fileSystem.readText(join(options.cwd, skillsPinPath));
 
   const pinValue: unknown = JSON.parse(pinText);
@@ -59,15 +64,6 @@ export async function writePinnedSkills(
     return 1;
   }
 
-  const lockPath = join(options.cwd, `${pinnedSkillsFolder}.lock`);
-
-  return options.withLock(lockPath, () => writeLockedSkills(options, commit));
-}
-
-async function writeLockedSkills(
-  options: Readonly<WritePinnedSkillsOptions>,
-  commit: string,
-): Promise<number> {
   const folder = join(options.cwd, pinnedSkillsFolder);
 
   const hasTree = await options.fileSystem.probePath(join(folder, commit));

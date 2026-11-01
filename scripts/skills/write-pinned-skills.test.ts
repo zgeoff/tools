@@ -272,3 +272,42 @@ test('it waits for the install that holds the lock before it unpacks', async () 
   expect(exitCode).toBe(0);
   expect(existsSync(join(ctx.tools, '.claude', 'skills', 'kettle', 'SKILL.md'))).toBeTrue();
 });
+
+test('it installs the pin as it stands once the lock is free', async () => {
+  const ctx = await setupTest();
+
+  const older = '0123456789abcdef0123456789abcdef01234567';
+  const newer = '89abcdef0123456789abcdef0123456789abcdef';
+
+  await ctx.writeArchive(older, { 'skills/kettle/SKILL.md': '# Kettle\n' });
+  await ctx.writeArchive(newer, { 'skills/kettle/SKILL.md': '# Kettle, rewritten\n' });
+  await ctx.writePin(older);
+
+  const waited = Promise.withResolvers<void>();
+
+  const waiting = ctx.buildLockOptions(() => {
+    waited.resolve();
+
+    return new Promise((resolve) => {
+      setImmediate(resolve);
+    });
+  });
+
+  // The pin moves while the install waits, as a checkout of another branch does.
+  const run = await withInstallLock(ctx.buildLockOptions(), async () => {
+    const pending = ctx.install(['kettle'], 'waiting', waiting);
+
+    await waited.promise;
+
+    await ctx.writePin(newer);
+
+    return { pending };
+  });
+
+  const exitCode = await run.pending;
+  const text = await readFile(join(ctx.tools, '.claude', 'skills', 'kettle', 'SKILL.md'), 'utf8');
+
+  expect(exitCode).toBe(0);
+  expect(text).toBe('# Kettle, rewritten\n');
+  expect(existsSync(join(ctx.tools, '.zgeoff-skills', older))).toBeFalse();
+});
