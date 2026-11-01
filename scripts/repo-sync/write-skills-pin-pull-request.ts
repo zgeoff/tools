@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { isRecord } from '../../packages/std/src/is-record.ts';
 import type { FileSystem } from '../ci/file-system.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
@@ -82,10 +83,11 @@ export async function writeSkillsPinPullRequest(
     return 1;
   }
 
-  await writePinBranch(options);
-
+  const head = await writePinBranch(options);
   const number = await writePinPullRequest(options, pinned, openNumber);
 
+  // Auto-merge binds to the commit this run wrote, so a later push to the branch never merges
+  // unchecked.
   const merge = await runGH(options, [
     'pr',
     'merge',
@@ -94,6 +96,8 @@ export async function writeSkillsPinPullRequest(
     options.repo,
     '--auto',
     '--squash',
+    '--match-head-commit',
+    head,
   ]);
 
   if (merge.exitCode !== 0) {
@@ -105,7 +109,9 @@ export async function writeSkillsPinPullRequest(
   return 0;
 }
 
-// Returns the number of the open pin pull request, or empty for none.
+// Returns the number of the open pin pull request from this repo's own branch, or empty for none.
+// gh matches --head by branch name alone, so a fork's pull request from a branch of the same name
+// is listed too, and the step must never turn auto-merge on for it.
 async function readOpenPinPullRequest(
   options: Readonly<WriteSkillsPinPullRequestOptions>,
 ): Promise<string> {
@@ -119,12 +125,14 @@ async function readOpenPinPullRequest(
     '--state',
     'open',
     '--json',
-    'number',
-    '--jq',
-    '.[0].number // empty',
+    'number,isCrossRepository',
   ]);
 
-  return listed.stdout.trim();
+  const pullsValue: unknown = JSON.parse(listed.stdout);
+  const pulls: unknown[] = Array.isArray(pullsValue) ? pullsValue : [];
+  const own = pulls.find((pull) => isRecord(pull) && pull['isCrossRepository'] === false);
+
+  return isRecord(own) && typeof own['number'] === 'number' ? String(own['number']) : '';
 }
 
 function runCheckedGH(
@@ -180,9 +188,11 @@ async function readCompareStatus(
   return compared.exitCode === 0 ? compared.stdout.trim() : '';
 }
 
-// The branch restarts from main on every move, so the pull request holds one commit. The contents
-// API writes that commit as the App, so GitHub signs it and the ruleset attributes it.
-async function writePinBranch(options: Readonly<WriteSkillsPinPullRequestOptions>): Promise<void> {
+// Returns the commit it wrote. The branch restarts from main on every move, so the pull request
+// holds one commit, which the contents API writes as the App, so GitHub signs it.
+async function writePinBranch(
+  options: Readonly<WriteSkillsPinPullRequestOptions>,
+): Promise<string> {
   const main = await runCheckedGH(options, [
     'api',
     `repos/${options.repo}/git/ref/heads/main`,
@@ -225,9 +235,8 @@ async function writePinBranch(options: Readonly<WriteSkillsPinPullRequestOptions
 
   const text = `${JSON.stringify({ commit: options.commit }, null, 2)}\n`;
 
-  await runCheckedGH(options, [
+  const written = await runCheckedGH(options, [
     'api',
-    '--silent',
     '-X',
     'PUT',
     `repos/${options.repo}/contents/${skillsPinPath}`,
@@ -239,7 +248,11 @@ async function writePinBranch(options: Readonly<WriteSkillsPinPullRequestOptions
     `sha=${file.stdout.trim()}`,
     '-f',
     `branch=${pinBranch}`,
+    '--jq',
+    '.commit.sha',
   ]);
+
+  return written.stdout.trim();
 }
 
 function renderPinTitle(commit: string): string {
