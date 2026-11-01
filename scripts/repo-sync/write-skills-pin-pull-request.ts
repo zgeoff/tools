@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { isRecord } from '../../packages/std/src/is-record.ts';
+import { writeStdout } from '../../packages/std/src/write-stdout.ts';
 import type { FileSystem } from '../ci/file-system.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
@@ -418,8 +419,6 @@ if (import.meta.main) {
     repo: process.env['REPO'] ?? '',
     fileSystem: nodeFileSystem,
     runCommand,
-    writeOutput: (text) => {
-      process.stdout.write(text);
-    },
+    writeOutput: writeStdout,
   });
 }

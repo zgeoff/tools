@@ -23,6 +23,10 @@ async function readOptionalText(path) {
 function isMissingFileError(error) {
   return error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR");
 }
+// packages/std/src/write-stdout.ts
+function writeStdout(text) {
+  process.stdout.write(text);
+}
 // packages/chex/src/dependency-gates/run-dependency-gates-check.ts
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
@@ -829,9 +833,7 @@ function runDependencyGatesCommand() {
       const fullPath = join(cwd, path);
       return existsSync(fullPath) ? readFileSync(fullPath, "utf8") : null;
     },
-    writeOutput: (text) => {
-      process.stdout.write(text);
-    },
+    writeOutput: writeStdout,
     writeError: (text) => {
       process.stderr.write(text);
     }

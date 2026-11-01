@@ -1,5 +1,6 @@
 import { rename } from 'node:fs/promises';
 import { join } from 'node:path';
+import { writeStdout } from '../../packages/std/src/write-stdout.ts';
 import type { FileSystem } from '../ci/file-system.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
@@ -203,8 +204,6 @@ if (import.meta.main) {
         work,
       ),
     runCommand,
-    writeOutput: (text) => {
-      process.stdout.write(text);
-    },
+    writeOutput: writeStdout,
   });
 }
