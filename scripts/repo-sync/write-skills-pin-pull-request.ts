@@ -148,31 +148,21 @@ function runCheckedGH(
   });
 }
 
-// The pin on the branch of the open pin pull request; null when the branch holds none.
+// The pin on the branch of the open pin pull request; null when the branch holds no full commit
+// ID. A failed read fails the run, as a run that skipped the check could replace a newer pin.
 async function readProposedPin(
   options: Readonly<WriteSkillsPinPullRequestOptions>,
 ): Promise<string | null> {
-  const shown = await runGH(options, [
+  const shown = await runCheckedGH(options, [
     'api',
     `repos/${options.repo}/contents/${skillsPinPath}?ref=${pinBranch}`,
     '-H',
     'Accept: application/vnd.github.raw',
   ]);
 
-  if (shown.exitCode !== 0) {
-    return null;
-  }
-
   const proposedValue: unknown = JSON.parse(shown.stdout);
 
   return parseSkillsPin(proposedValue);
-}
-
-function runGH(
-  options: Readonly<WriteSkillsPinPullRequestOptions>,
-  args: readonly string[],
-): Promise<CommandResult> {
-  return options.runCommand(['gh', ...args], { cwd: options.cwd, env: options.env });
 }
 
 // Returns empty when the API refuses, as it does for a commit that zgeoff/skills does not hold.
@@ -189,6 +179,13 @@ async function readCompareStatus(
   ]);
 
   return compared.exitCode === 0 ? compared.stdout.trim() : '';
+}
+
+function runGH(
+  options: Readonly<WriteSkillsPinPullRequestOptions>,
+  args: readonly string[],
+): Promise<CommandResult> {
+  return options.runCommand(['gh', ...args], { cwd: options.cwd, env: options.env });
 }
 
 // Returns the commit it wrote, which the contents API writes as the App on a staging branch, so

@@ -809,3 +809,42 @@ test('it fails and calls nothing when the pin on main holds no full commit ID', 
     '::error::sync/skills-pin.json holds no full commit ID of zgeoff/skills\n',
   ]);
 });
+
+test('it fails and writes nothing when it cannot read the pin of the open pull request', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePin('0123456789abcdef0123456789abcdef01234567');
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'pr',
+      'list',
+      '--repo',
+      'example/tools',
+      '--head',
+      'skills-pin',
+      '--state',
+      'open',
+      '--json',
+      'number,isCrossRepository',
+    ],
+    { exitCode: 0, stdout: '[{"number":41,"isCrossRepository":false}]', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      'repos/example/tools/contents/sync/skills-pin.json?ref=skills-pin',
+      '-H',
+      'Accept: application/vnd.github.raw',
+    ],
+    { exitCode: 1, stdout: '', stderr: 'gh: Server Error (HTTP 502)' },
+  );
+
+  const pinning = ctx.pin('89abcdef0123456789abcdef0123456789abcdef');
+
+  expect(pinning).rejects.toThrow('gh: Server Error (HTTP 502)');
+  expect(ctx.commands.calls).toHaveLength(2);
+});
