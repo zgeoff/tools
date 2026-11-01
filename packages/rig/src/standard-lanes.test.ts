@@ -1,22 +1,12 @@
 import { expect, test } from 'bun:test';
-import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { readPinnedSkillText } from '../../../test-utils/read-pinned-skill-text.ts';
 import { standardLanes } from './standard-lanes.ts';
 
 test('it holds the lanes and limits of the Lanes table in the shared testing skill', async () => {
-  const markdown = await readFile(
-    join(
-      import.meta.dir,
-      '..',
-      '..',
-      '..',
-      'sync',
-      'skills',
-      'testing',
-      'references',
-      'slow-tests.md',
-    ),
-    'utf8',
+  const markdown = await readPinnedSkillText(
+    join(import.meta.dir, '..', '..', '..'),
+    'skills/testing/references/slow-tests.md',
   );
 
   const rows = [
