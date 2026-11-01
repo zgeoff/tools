@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { writeFileSync } from 'node:fs';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { flockLockFile } from './flock-lock-file.ts';
 import type { InstallLockOptions } from './with-install-lock.ts';
 import { withInstallLock } from './with-install-lock.ts';
 
@@ -14,8 +14,7 @@ async function setupTest() {
 
   const buildOptions = (overrides: Partial<InstallLockOptions> = {}): InstallLockOptions => ({
     lockPath,
-    ownerID: '4242',
-    probeOwner: () => true,
+    lockFile: flockLockFile,
     wait: () =>
       new Promise((resolve) => {
         setImmediate(resolve);
@@ -24,21 +23,30 @@ async function setupTest() {
     ...overrides,
   });
 
-  const readNames = () => readdir(directory);
+  // Takes the lock through a descriptor of its own, as another process would, and closes it.
+  const probeFreeLock = async () => {
+    const descriptor = await flockLockFile.createDescriptor(lockPath);
 
-  return { lockPath, buildOptions, readNames };
+    const isFree = flockLockFile.createLock(descriptor);
+
+    await flockLockFile.removeDescriptor(descriptor);
+
+    return isFree;
+  };
+
+  return { lockPath, buildOptions, probeFreeLock };
 }
 
-test('it runs the work under a lock that names its owner and removes the lock after', async () => {
+test('it runs the work under the lock and ends the lock after', async () => {
   const ctx = await setupTest();
-  const result = await withInstallLock(ctx.buildOptions(), () => readFile(ctx.lockPath, 'utf8'));
-  const names = await ctx.readNames();
+  const isFreeDuringWork = await withInstallLock(ctx.buildOptions(), () => ctx.probeFreeLock());
+  const isFreeAfter = await ctx.probeFreeLock();
 
-  expect(result).toBe('4242');
-  expect(names).toStrictEqual([]);
+  expect(isFreeDuringWork).toBeFalse();
+  expect(isFreeAfter).toBeTrue();
 });
 
-test('it removes the lock when the work fails', async () => {
+test('it ends the lock when the work fails', async () => {
   const ctx = await setupTest();
 
   const run = withInstallLock(ctx.buildOptions(), () =>
@@ -47,20 +55,20 @@ test('it removes the lock when the work fails', async () => {
 
   expect(run).rejects.toThrow('kettle boiled dry');
 
-  const names = await ctx.readNames();
+  const isFree = await ctx.probeFreeLock();
 
-  expect(names).toStrictEqual([]);
+  expect(isFree).toBeTrue();
 });
 
-test('it starts the work of a second owner only after the first owner ends', async () => {
+test('it starts the work of a second run only after the first run ends', async () => {
   const ctx = await setupTest();
 
   const events: string[] = [];
   const firstStarted = Promise.withResolvers<void>();
   const secondWaited = Promise.withResolvers<void>();
 
-  // The first owner holds the lock until the second has had to wait for it.
-  const first = withInstallLock(ctx.buildOptions({ ownerID: '1001' }), async () => {
+  // The first run holds the lock until the second has had to wait for it.
+  const first = withInstallLock(ctx.buildOptions(), async () => {
     events.push('first starts');
     firstStarted.resolve();
 
@@ -79,7 +87,7 @@ test('it starts the work of a second owner only after the first owner ends', asy
     });
   };
 
-  const second = withInstallLock(ctx.buildOptions({ ownerID: '1002', wait }), () => {
+  const second = withInstallLock(ctx.buildOptions({ wait }), () => {
     events.push('second starts');
 
     return Promise.resolve();
@@ -90,82 +98,15 @@ test('it starts the work of a second owner only after the first owner ends', asy
   expect(events).toStrictEqual(['first starts', 'first ends', 'second starts']);
 });
 
-test('it takes over a lock whose owner no longer runs', async () => {
+test('it fails after every try while another run holds the lock', async () => {
   const ctx = await setupTest();
+  const holding = await flockLockFile.createDescriptor(ctx.lockPath);
 
-  await writeFile(ctx.lockPath, '3003');
+  onTestFinished(() => flockLockFile.removeDescriptor(holding));
 
-  const options = ctx.buildOptions({ probeOwner: (ownerID) => ownerID !== '3003' });
-
-  const result = await withInstallLock(options, () => readFile(ctx.lockPath, 'utf8'));
-  const names = await ctx.readNames();
-
-  expect(result).toBe('4242');
-  expect(names).toStrictEqual([]);
-});
-
-test('it fails and keeps the lock when its owner still runs after every try', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(ctx.lockPath, '3003');
+  flockLockFile.createLock(holding);
 
   const run = withInstallLock(ctx.buildOptions({ attempts: 3 }), () => Promise.resolve());
 
-  expect(run).rejects.toThrow(
-    `${ctx.lockPath} is held by another install; if no install runs, remove it and ${ctx.lockPath}.recovery, then try again`,
-  );
-
-  const owner = await readFile(ctx.lockPath, 'utf8');
-  const names = await ctx.readNames();
-
-  expect(owner).toBe('3003');
-  expect(names).toStrictEqual(['install.lock']);
-});
-
-test('it keeps a lock that a live owner made after the dead owner', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(ctx.lockPath, '3003');
-
-  // Another waiter removes the dead lock and takes the lock between this waiter's first read and
-  // its read under the recovery lock.
-  const probeOwner = (ownerID: string) => {
-    if (ownerID === '3003') {
-      writeFileSync(ctx.lockPath, '5005');
-    }
-
-    return ownerID !== '3003';
-  };
-
-  const run = withInstallLock(ctx.buildOptions({ probeOwner, attempts: 2 }), () =>
-    Promise.resolve(),
-  );
-
-  expect(run).rejects.toThrow('is held by another install');
-
-  const owner = await readFile(ctx.lockPath, 'utf8');
-  const names = await ctx.readNames();
-
-  expect(owner).toBe('5005');
-  expect(names).toStrictEqual(['install.lock']);
-});
-
-test('it leaves a dead lock to the waiter that holds the recovery lock', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(ctx.lockPath, '3003');
-  await writeFile(`${ctx.lockPath}.recovery`, '6006');
-
-  const options = ctx.buildOptions({
-    probeOwner: (ownerID) => ownerID !== '3003',
-    attempts: 2,
-  });
-
-  const run = withInstallLock(options, () => Promise.resolve());
-
-  expect(run).rejects.toThrow('is held by another install');
-
-  const owner = await readFile(ctx.lockPath, 'utf8');
-
-  expect(owner).toBe('3003');
+  expect(run).rejects.toThrow(`${ctx.lockPath} is held by another install; try again once it ends`);
 });

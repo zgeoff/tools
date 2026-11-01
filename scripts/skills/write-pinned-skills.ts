@@ -7,8 +7,8 @@ import type { CommandResult, RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { parseSkillsPin } from '../repo-sync/parse-skills-pin.ts';
 import { skillsPinPath } from '../repo-sync/skills-pin-path.ts';
+import { flockLockFile } from './flock-lock-file.ts';
 import { pinnedSkillsFolder } from './pinned-skills-folder.ts';
-import { probeRunningProcess } from './probe-running-process.ts';
 import { withInstallLock } from './with-install-lock.ts';
 
 export interface WritePinnedSkillsOptions {
@@ -188,13 +188,7 @@ if (import.meta.main) {
     runID: String(process.pid),
     withLock: (lockPath, work) =>
       withInstallLock(
-        {
-          lockPath,
-          ownerID: String(process.pid),
-          probeOwner: probeRunningProcess,
-          wait: () => Bun.sleep(250),
-          attempts: 480,
-        },
+        { lockPath, lockFile: flockLockFile, wait: () => Bun.sleep(250), attempts: 480 },
         work,
       ),
     runCommand,

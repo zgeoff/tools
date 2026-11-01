@@ -15,6 +15,7 @@ import { $ } from 'bun';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { flockLockFile } from './flock-lock-file.ts';
 import type { InstallLockOptions } from './with-install-lock.ts';
 import { withInstallLock } from './with-install-lock.ts';
 import { writePinnedSkills } from './write-pinned-skills.ts';
@@ -46,17 +47,15 @@ async function setupTest() {
 
   const lockPath = join(tools, '.zgeoff-skills.lock');
 
-  // Every owner counts as running, and each wait lets the other runs move on.
+  // Each wait lets the other runs move on.
   const buildLockOptions = (
-    ownerID: string,
     wait: () => Promise<void> = () =>
       new Promise((resolve) => {
         setImmediate(resolve);
       }),
   ): InstallLockOptions => ({
     lockPath,
-    ownerID,
-    probeOwner: () => true,
+    lockFile: flockLockFile,
     wait,
     attempts: 100_000,
   });
@@ -64,7 +63,7 @@ async function setupTest() {
   const install = (
     skills: readonly string[],
     runID = 'run',
-    lockOptions: InstallLockOptions = buildLockOptions(runID),
+    lockOptions: InstallLockOptions = buildLockOptions(),
   ) =>
     writePinnedSkills({
       cwd: tools,
@@ -250,7 +249,7 @@ test('it waits for the install that holds the lock before it unpacks', async () 
 
   const waited = Promise.withResolvers<void>();
 
-  const waiting = ctx.buildLockOptions('waiting', () => {
+  const waiting = ctx.buildLockOptions(() => {
     waited.resolve();
 
     return new Promise((resolve) => {
@@ -259,7 +258,7 @@ test('it waits for the install that holds the lock before it unpacks', async () 
   });
 
   // The install comes back wrapped, as awaiting it while the lock is held would never end.
-  const run = await withInstallLock(ctx.buildLockOptions('holding'), async () => {
+  const run = await withInstallLock(ctx.buildLockOptions(), async () => {
     const pending = ctx.install(['kettle'], 'waiting', waiting);
 
     await waited.promise;

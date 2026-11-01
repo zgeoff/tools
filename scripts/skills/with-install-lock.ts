@@ -1,14 +1,18 @@
-import { link, readFile, rm, writeFile } from 'node:fs/promises';
+// The file operations the lock runs; flockLockFile holds the real ones.
+export interface LockFile {
+  // Opens the lock file, which it creates when missing, and returns its descriptor.
+  readonly createDescriptor: (path: string) => Promise<number>;
+
+  // Takes the lock through the descriptor at once; false when another descriptor holds it.
+  readonly createLock: (descriptor: number) => boolean;
+
+  // Closes the descriptor, which ends any lock it holds.
+  readonly removeDescriptor: (descriptor: number) => Promise<void>;
+}
 
 export interface InstallLockOptions {
-  // The lock file; its folder must exist.
   readonly lockPath: string;
-
-  // Names this process in the lock, as its process ID does.
-  readonly ownerID: string;
-
-  // Answers whether the owner a lock names still runs.
-  readonly probeOwner: (ownerID: string) => boolean;
+  readonly lockFile: LockFile;
 
   // Waits between two tries for the lock.
   readonly wait: () => Promise<void>;
@@ -16,98 +20,27 @@ export interface InstallLockOptions {
   readonly attempts: number;
 }
 
-// Runs the work while this process holds the lock. The lock file is a hard link to a file that
-// names its owner, so it never exists without one. A lock whose owner no longer runs is removed.
+// Runs the work while this run holds the lock. The lock ends with the descriptor that holds it, and
+// so with the process, so a stopped install leaves no lock for a later one to clear.
 export async function withInstallLock<T>(
   options: Readonly<InstallLockOptions>,
   work: () => Promise<T>,
 ): Promise<T> {
-  const claim = `${options.lockPath}.${options.ownerID}`;
-
-  await writeFile(claim, options.ownerID);
+  const descriptor = await options.lockFile.createDescriptor(options.lockPath);
 
   try {
     for (let attempt = 0; attempt < options.attempts; attempt += 1) {
-      const isHeld = await createLock(claim, options.lockPath);
+      const isHeld = options.lockFile.createLock(descriptor);
 
       if (isHeld) {
-        try {
-          return await work();
-        } finally {
-          await rm(options.lockPath, { force: true });
-        }
+        return await work();
       }
-
-      await removeDeadLock(options, claim);
 
       await options.wait();
     }
   } finally {
-    await rm(claim, { force: true });
+    await options.lockFile.removeDescriptor(descriptor);
   }
 
-  throw new Error(
-    `${options.lockPath} is held by another install; if no install runs, remove it and ${options.lockPath}.recovery, then try again`,
-  );
-}
-
-// Returns false when another process holds the lock.
-async function createLock(claim: string, lockPath: string): Promise<boolean> {
-  try {
-    await link(claim, lockPath);
-
-    return true;
-  } catch (error) {
-    if (isErrorCode(error, 'EEXIST')) {
-      return false;
-    }
-
-    throw error;
-  }
-}
-
-function isErrorCode(error: unknown, code: string): boolean {
-  return error instanceof Error && 'code' in error && error.code === code;
-}
-
-// Only a waiter that holds the recovery lock removes a dead lock, and it reads the owner again under
-// that lock. No other process can free the lock path while a dead owner holds it, so the lock it
-// removes is always a dead one. A waiter that finds the recovery lock held lets its holder recover.
-async function removeDeadLock(options: Readonly<InstallLockOptions>, claim: string): Promise<void> {
-  const owner = await readLockOwner(options.lockPath);
-
-  if (owner === null || options.probeOwner(owner)) {
-    return;
-  }
-
-  const recoveryPath = `${options.lockPath}.recovery`;
-
-  const isRecovering = await createLock(claim, recoveryPath);
-
-  if (!isRecovering) {
-    return;
-  }
-
-  try {
-    const current = await readLockOwner(options.lockPath);
-
-    if (current !== null && !options.probeOwner(current)) {
-      await rm(options.lockPath, { force: true });
-    }
-  } finally {
-    await rm(recoveryPath, { force: true });
-  }
-}
-
-// Returns null when no lock exists.
-async function readLockOwner(path: string): Promise<string | null> {
-  try {
-    return await readFile(path, 'utf8');
-  } catch (error) {
-    if (isErrorCode(error, 'ENOENT')) {
-      return null;
-    }
-
-    throw error;
-  }
+  throw new Error(`${options.lockPath} is held by another install; try again once it ends`);
 }
