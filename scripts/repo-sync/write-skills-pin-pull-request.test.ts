@@ -640,6 +640,94 @@ test('it writes nothing for a commit that the pin on main already covers', async
   ]);
 });
 
+test('it leaves a newer open pin in place for an older dispatch and writes nothing', async () => {
+  const ctx = await setupTest();
+
+  const pinned = '0123456789abcdef0123456789abcdef01234567';
+  const commit = '456789abcdef0123456789abcdef0123456789ab';
+  const proposed = '89abcdef0123456789abcdef0123456789abcdef';
+
+  await ctx.writePin(pinned);
+
+  const listOpen = [
+    'gh',
+    'pr',
+    'list',
+    '--repo',
+    'example/tools',
+    '--head',
+    'skills-pin',
+    '--state',
+    'open',
+    '--json',
+    'number,isCrossRepository',
+  ];
+
+  const readProposed = [
+    'gh',
+    'api',
+    'repos/example/tools/contents/sync/skills-pin.json?ref=skills-pin',
+    '-H',
+    'Accept: application/vnd.github.raw',
+  ];
+
+  const compareToPin = [
+    'gh',
+    'api',
+    `repos/zgeoff/skills/compare/${pinned}...${commit}`,
+    '--jq',
+    '.status',
+  ];
+
+  const compareToProposed = [
+    'gh',
+    'api',
+    `repos/zgeoff/skills/compare/${proposed}...${commit}`,
+    '--jq',
+    '.status',
+  ];
+
+  const compareToMain = [
+    'gh',
+    'api',
+    `repos/zgeoff/skills/compare/${commit}...main`,
+    '--jq',
+    '.status',
+  ];
+
+  ctx.commands.answer(listOpen, {
+    exitCode: 0,
+    stdout: '[{"number":41,"isCrossRepository":false}]',
+    stderr: '',
+  });
+
+  ctx.commands.answer(readProposed, {
+    exitCode: 0,
+    stdout: JSON.stringify({ commit: proposed }),
+    stderr: '',
+  });
+
+  ctx.commands.answer(compareToPin, { exitCode: 0, stdout: 'ahead\n', stderr: '' });
+  ctx.commands.answer(compareToProposed, { exitCode: 0, stdout: 'behind\n', stderr: '' });
+  ctx.commands.answer(compareToMain, { exitCode: 0, stdout: 'ahead\n', stderr: '' });
+
+  const exitCode = await ctx.pin(commit);
+
+  expect(exitCode).toBe(0);
+
+  expect(ctx.commands.calls).toStrictEqual([
+    listOpen,
+    readProposed,
+    compareToPin,
+    compareToProposed,
+    compareToMain,
+  ]);
+
+  expect(ctx.output).toStrictEqual([
+    `Nothing to pin: the open pin pull request already pins ${commit} or a newer commit.\n`,
+  ]);
+});
+
 test('it fails and writes nothing for a commit that is not on main of zgeoff/skills', async () => {
   const ctx = await setupTest();
 
