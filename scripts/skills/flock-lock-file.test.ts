@@ -24,12 +24,24 @@ async function setupTest() {
 test('it refuses a second descriptor the lock until the first one closes', async () => {
   const ctx = await setupTest();
   const first = await flockLockFile.createDescriptor(ctx.lockPath);
+
+  let isFirstOpen = true;
+
+  // A failed check before the close leaves the first descriptor open, so the cleanup closes it.
+  onTestFinished(async () => {
+    if (isFirstOpen) {
+      await flockLockFile.removeDescriptor(first);
+    }
+  });
+
   const second = await ctx.createDescriptor();
 
   const isFirstHeld = flockLockFile.createLock(first);
   const isSecondHeldWhileFirstOpen = flockLockFile.createLock(second);
 
   await flockLockFile.removeDescriptor(first);
+
+  isFirstOpen = false;
 
   const isSecondHeldAfter = flockLockFile.createLock(second);
 
