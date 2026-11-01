@@ -97,7 +97,7 @@
     },
     "packages/chex": {
       "name": "@zgeoff/chex",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "bin": {
         "chex": "./src/cli.ts",
       },
