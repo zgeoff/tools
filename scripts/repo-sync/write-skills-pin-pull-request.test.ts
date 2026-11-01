@@ -784,3 +784,18 @@ test('it fails and calls nothing for a dispatch that names no full commit ID', a
   expect(ctx.commands.calls).toStrictEqual([]);
   expect(ctx.output).toStrictEqual(["::error::'main' is not a full commit ID of zgeoff/skills\n"]);
 });
+
+test('it fails and calls nothing when the pin on main holds no full commit ID', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePin('main');
+
+  const exitCode = await ctx.pin('89abcdef0123456789abcdef0123456789abcdef');
+
+  expect(exitCode).toBe(1);
+  expect(ctx.commands.calls).toStrictEqual([]);
+
+  expect(ctx.output).toStrictEqual([
+    '::error::sync/skills-pin.json holds no full commit ID of zgeoff/skills\n',
+  ]);
+});
