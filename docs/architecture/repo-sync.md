@@ -147,8 +147,8 @@ skill-writing entries also deliver the docs check scripts from this repo.
 
 This repo takes `code-style` and `docs-writing` from the same pin. `bun run skills:install`, which
 `bun install` runs, unpacks zgeoff/skills at the pinned commit into the git-ignored
-`.zgeoff-skills/<commit>/` and links each skill there from `.claude/skills/`. The tests of the
-verb-contract and function-verb lint rules read code-style's role table from that tree.
+`.zgeoff-skills/<commit>/` and links each skill there from `.claude/skills/`. The verb-contract test
+reads code-style's role table from that tree, and the function-verb test reads its banned verbs.
 
 A reference that fits only some repos, such as one for a language a repo never uses, names the other
 repos in its `except`, so they never load it. Every link to it in the entry's Markdown files sits in
