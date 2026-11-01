@@ -64,11 +64,16 @@ test('it frees the lock when the process that holds it is killed', async () => {
       '-e',
       `const { flockLockFile } = await import(${JSON.stringify(module)}); const descriptor = await flockLockFile.createDescriptor(${JSON.stringify(ctx.lockPath)}); console.log(flockLockFile.createLock(descriptor)); setInterval(() => {}, 1000);`,
     ],
-    { stdout: 'pipe' },
+    { stdout: 'pipe', detached: true },
   );
 
+  let isHolderRunning = true;
+
+  // The child leads its own process group, so the cleanup stops every process it started.
   onTestFinished(() => {
-    holder.kill(9);
+    if (isHolderRunning) {
+      process.kill(-holder.pid, 'SIGKILL');
+    }
   });
 
   const reader = holder.stdout.getReader();
@@ -78,9 +83,11 @@ test('it frees the lock when the process that holds it is killed', async () => {
 
   const isHeldWhileChildRuns = flockLockFile.createLock(descriptor);
 
-  holder.kill(9);
+  process.kill(-holder.pid, 'SIGKILL');
 
   await holder.exited;
+
+  isHolderRunning = false;
 
   const isHeldAfterKill = flockLockFile.createLock(descriptor);
 
