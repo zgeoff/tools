@@ -212,7 +212,10 @@ test('it refuses an edit with the install message when the install fails', async
 
   expect(result.status).toBe(2);
   expect(result.stdout).toBe('');
-  expect(result.stderr).toBe('stub install started\nTo work here, run bun install.\n');
+
+  expect(result.stderr).toBe(
+    'stub install started\nTo work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n',
+  );
 });
 
 // A parser cannot see a gated path that the shell builds, so any shell syntax refuses the command.
@@ -230,6 +233,9 @@ test.each([
   'git diff --no-ext-diff --no-textconv --stat',
   'git status',
   'cat "$(echo guide.md)"',
+  'cd packages && bun install',
+  'bun install 2>&1 | tail',
+  'bun install --verbose',
 ])('it refuses the Bash command %s when the install fails', async (command) => {
   const ctx = await setupTest();
 
@@ -238,7 +244,10 @@ test.each([
   const result = ctx.runStub(buildPreToolUsePayload(ctx.project, 'Bash', { command }), []);
 
   expect(result.status).toBe(2);
-  expect(result.stderr).toEndWith('To work here, run bun install.\n');
+
+  expect(result.stderr).toEndWith(
+    'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n',
+  );
 });
 
 test.each([
@@ -265,7 +274,10 @@ test.each([
   );
 
   expect(result.status).toBe(2);
-  expect(result.stderr).toEndWith('To work here, run bun install.\n');
+
+  expect(result.stderr).toEndWith(
+    'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n',
+  );
 });
 
 test.each([
@@ -274,7 +286,7 @@ test.each([
   'ls -la src',
   'cat package.json',
   'pwd',
-])('it allows the read-only Bash command %s when the install fails', async (command) => {
+])('it allows the Bash command %s when the install fails', async (command) => {
   const ctx = await setupTest();
 
   await createStubInstall(ctx.fakeBin, { log: ctx.installLog, outcome: { kind: 'fails' } });
@@ -296,7 +308,10 @@ test('it refuses a gated tool call when the install fails', async () => {
   );
 
   expect(result.status).toBe(2);
-  expect(result.stderr).toEndWith('To work here, run bun install.\n');
+
+  expect(result.stderr).toEndWith(
+    'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n',
+  );
 });
 
 test('it lets a prompt through when the install fails, so a person can still ask for the install', async () => {
@@ -534,7 +549,7 @@ test('it skips the install and refuses when a stopped hook left the guard behind
   expect(result.status).toBe(2);
 
   expect(result.stderr).toBe(
-    `A stopped agent hook left ${join(ctx.project, 'node_modules/.agent-hooks-install.lock.guard')} behind, so this one skips the install. Remove that file.\nTo work here, run bun install.\n`,
+    `A stopped agent hook left ${join(ctx.project, 'node_modules/.agent-hooks-install.lock.guard')} behind, so this one skips the install. Remove that file.\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
   );
 
   const installLog = await ctx.readInstallLog();
@@ -639,7 +654,9 @@ test.skipIf(isRoot)(
       `The agent hook could not run bun install: Error: EACCES: permission denied, open '${join(ctx.project, 'node_modules/.agent-hooks-install.lock.guard')}.`,
     );
 
-    expect(stderr).toEndWith('\nTo work here, run bun install.\n');
+    expect(stderr).toEndWith(
+      '\nTo work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n',
+    );
 
     const installLog = await ctx.readInstallLog();
 
@@ -676,7 +693,7 @@ test.skipIf(isRoot)(
     expect(status).toBe(2);
 
     expect(stderr).toBe(
-      `The agent hook could not run bun install: Error: EACCES: permission denied, open '${join(ctx.project, 'node_modules/.agent-hooks-install.lock')}'\nTo work here, run bun install.\n`,
+      `The agent hook could not run bun install: Error: EACCES: permission denied, open '${join(ctx.project, 'node_modules/.agent-hooks-install.lock')}'\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
     );
 
     const installLog = await ctx.readInstallLog();

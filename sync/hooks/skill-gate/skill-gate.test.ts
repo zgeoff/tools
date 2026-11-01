@@ -71,6 +71,9 @@ test.each([
     { command: 'git diff --no-ext-diff --no-textconv --output=changes.patch' },
   ],
   ['bun install that adds a package', 'Bash', { command: 'bun install left-pad' }],
+  ['bun install after a cd', 'Bash', { command: 'cd packages && bun install' }],
+  ['bun install piped to tail', 'Bash', { command: 'bun install 2>&1 | tail' }],
+  ['bun install with a flag the gate does not list', 'Bash', { command: 'bun install --verbose' }],
   ['a plain git diff', 'Bash', { command: 'git diff' }],
   [
     'git diff with both flags that turn config programs off',
@@ -149,7 +152,9 @@ test.each([
     `The skill gate cannot load, so it blocks this call to ${toolName}: Cannot find package '@zgeoff/skill-gate'`,
   );
 
-  expect(result.stderr).toContain('To work here, run bun install.');
+  expect(result.stderr).toEndWith(
+    'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n',
+  );
 });
 
 test.each([
@@ -158,7 +163,7 @@ test.each([
   'ls packages',
   'cat package.json',
   'pwd',
-])('it lets the read-only command %p run when the gate cannot load', async (command) => {
+])('it lets the command %p run when the gate cannot load', async (command) => {
   const ctx = await setupTest();
 
   const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
