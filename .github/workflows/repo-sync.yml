@@ -6,6 +6,8 @@
 # main of this repository reaches each repo as one pull request. A later run
 # while that pull request is open force-pushes the branch and updates the same
 # pull request. A new shared file is a manifest entry here with no change downstream.
+# An entry whose `repo` is zgeoff/skills copies its files from that repo at the
+# commit that sync/skills-pin.json in the synced commit pins.
 # A file that an earlier manifest delivered and the current one drops goes in
 # one more commit, as docs/architecture/repo-sync.md describes.
 #
@@ -77,6 +79,7 @@ jobs:
       contents: read
     outputs:
       entries: ${{ steps.manifest.outputs.entries }}
+      skills-ref: ${{ steps.manifest.outputs.skills-ref }}
       ref: ${{ steps.ref.outputs.ref }}
     steps:
       # The step scripts download from the commit of this workflow, whatever
@@ -118,7 +121,9 @@ jobs:
         with:
           repository: zgeoff/tools
           ref: ${{ steps.ref.outputs.ref }}
-          sparse-checkout: sync/manifest.json
+          sparse-checkout: |
+            sync/manifest.json
+            sync/skills-pin.json
           sparse-checkout-cone-mode: false
 
       - name: Drop the skipped and the unrequested entries
@@ -176,6 +181,19 @@ jobs:
           fetch-depth: 0
           filter: ''
 
+      # A tools commit from before the skill text moved holds no pin, and then
+      # no entry reads zgeoff/skills. The cleanup reads this history too.
+      - name: Check out zgeoff/skills
+        if: ${{ needs.prepare.outputs.skills-ref != '' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: zgeoff/skills
+          ref: ${{ needs.prepare.outputs.skills-ref }}
+          path: .repo-sync-skills
+          persist-credentials: false
+          fetch-depth: 0
+          filter: ''
+
       # The step scripts download from the commit of this workflow, whatever
       # ref names, so the run syncs through the scripts of the caller's pin.
       # actionlint does not know job.workflow_repository or job.workflow_sha,
@@ -229,6 +247,7 @@ jobs:
           BRANCH: repo-sync/zgeoff-tools
           MARKER: repo-sync delivers this file from zgeoff/tools
           TOOLS_REF: ${{ needs.prepare.outputs.ref }}
+          SKILLS_REF: ${{ needs.prepare.outputs.skills-ref }}
           REPO: ${{ github.repository }}
           SKIP: ${{ inputs.skip }}
           BASE: ${{ github.ref_name }}

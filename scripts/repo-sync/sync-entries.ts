@@ -17,8 +17,11 @@ import type { RetiredFileRemoval, SyncedEntry } from './plan-retired-file-remova
 import { planRetiredFileRemoval, retiredFilesName } from './plan-retired-file-removal.ts';
 import { probeStaleToolsPins } from './probe-stale-tools-pins.ts';
 import { readSyncCommitFacts } from './read-sync-commit-facts.ts';
+import { renderSyncCommitSubject } from './render-sync-commit-subject.ts';
+import { renderSyncPullRequestBody } from './render-sync-pull-request-body.ts';
 import { renderSyncPullRequestTitle } from './render-sync-pull-request-title.ts';
 import { selectSyncFiles } from './select-sync-files.ts';
+import { syncSourceCheckouts } from './sync-source-checkouts.ts';
 import { toolsPinsEntry } from './tools-pins-entry.ts';
 import { writeCopyPlan } from './write-copy-plan.ts';
 import { writeSyncAutoMerge } from './write-sync-auto-merge.ts';
@@ -50,6 +53,10 @@ interface SyncSettings {
   readonly branch: string;
   readonly marker: string;
   readonly commit: string;
+
+  // The commit of zgeoff/skills checked out for the entries that read it; empty for none.
+  readonly skillsCommit: string;
+
   readonly repo: string;
   readonly skip: string;
   readonly base: string;
@@ -140,6 +147,15 @@ function parseSyncSettings(env: Readonly<Record<string, string | undefined>>): S
     };
   }
 
+  const skillsCommit = env['SKILLS_REF'] ?? '';
+
+  if (skillsCommit !== '' && !isCommitID(skillsCommit)) {
+    return {
+      kind: 'refused',
+      message: `the zgeoff/skills ref '${skillsCommit.replaceAll(':', ' ')}' is not a full commit ID`,
+    };
+  }
+
   const entriesText = env['ENTRIES'] ?? '';
   const entriesJSON = entriesText === '' ? '[]' : entriesText;
   const entriesValue: unknown = JSON.parse(entriesJSON);
@@ -155,6 +171,7 @@ function parseSyncSettings(env: Readonly<Record<string, string | undefined>>): S
     branch: env['BRANCH'] ?? '',
     marker: env['MARKER'] ?? '',
     commit,
+    skillsCommit,
     repo: env['REPO'] ?? '',
     skip: env['SKIP'] ?? '',
     base: env['BASE'] ?? '',
@@ -186,8 +203,13 @@ async function commitEntries(context: SyncContext): Promise<CommittedEntries> {
   const copied: string[] = [];
   const scripts: Record<string, string> = {};
 
-  // The checkout of this repository stays out of every commit.
-  await context.fileSystem.appendText(join(context.cwd, '.git/info/exclude'), '/.repo-sync/\n');
+  // The checkouts of the source repos stay out of every commit.
+  await context.fileSystem.appendText(
+    join(context.cwd, '.git/info/exclude'),
+    Object.values(syncSourceCheckouts)
+      .map((checkout) => `/${checkout}/\n`)
+      .join(''),
+  );
 
   await runSyncCommand(context, [
     'git',
@@ -229,13 +251,7 @@ async function commitEntries(context: SyncContext): Promise<CommittedEntries> {
       continue;
     }
 
-    await runSyncCommand(context, [
-      'git',
-      'commit',
-      '-q',
-      '-m',
-      `chore: sync ${entry.name} from zgeoff/tools`,
-    ]);
+    await runSyncCommand(context, ['git', 'commit', '-q', '-m', renderSyncCommitSubject(entry)]);
 
     synced.push({ name: entry.name, description: entry.description });
   }
@@ -357,10 +373,7 @@ async function readExistingWorkflows(
 
     if (exists) {
       const targetText = await context.fileSystem.readText(target);
-
-      const sourceText = await context.fileSystem.readText(
-        join(context.cwd, '.repo-sync', row.source),
-      );
+      const sourceText = await context.fileSystem.readText(join(context.cwd, row.source));
 
       workflows.set(row.target, { targetText, sourceText });
     }
@@ -398,6 +411,11 @@ async function removeRetiredFiles(
   }
 
   const takenList = taken.map((name) => `${name},`).join('');
+  const skillsCheckout = syncSourceCheckouts['zgeoff/skills'];
+
+  // The retired copies of a zgeoff/skills source are matched against that repo's history, which a
+  // run with no zgeoff/skills checkout lacks, so the script keeps them.
+  const hasSkillsCheckout = await context.fileSystem.probePath(join(context.cwd, skillsCheckout));
 
   const result = await runProbeCommand(context, [
     'bash',
@@ -406,6 +424,7 @@ async function removeRetiredFiles(
     takenList,
     context.skip,
     copied.join('\n'),
+    ...(hasSkillsCheckout ? [skillsCheckout] : []),
   ]);
 
   context.writeOutput(result.stderr);
@@ -523,7 +542,13 @@ async function writePullRequest(
   synced: readonly SyncedEntry[],
 ): Promise<string> {
   const title = renderSyncPullRequestTitle(synced);
-  const body = renderPullRequestBody(context.commit, synced);
+
+  const body = renderSyncPullRequestBody({
+    commit: context.commit,
+    skillsCommit: context.skillsCommit,
+    entries: context.entries,
+    synced,
+  });
 
   const listed = await runSyncCommand(context, [
     'gh',
@@ -569,12 +594,6 @@ async function writePullRequest(
   const url = created.stdout.trim();
 
   return url.slice(url.lastIndexOf('/') + 1);
-}
-
-function renderPullRequestBody(commit: string, synced: readonly SyncedEntry[]): string {
-  const lines = synced.map((entry) => `- \`${entry.name}\`: ${entry.description}`);
-
-  return `Copied from zgeoff/tools at ${commit} by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry or pins the calls to zgeoff/tools workflows to that commit:\n\n${lines.join('\n')}`;
 }
 
 async function removeEntryBranches(

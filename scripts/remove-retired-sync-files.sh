@@ -20,11 +20,16 @@
 # entry that the comma-separated skip list names stays too, because skip leaves
 # an entry alone. The earlier manifests come from the checkout's history, so a
 # shallow checkout fails.
-# Usage: remove-retired-sync-files.sh <tools-checkout> <synced> [skip [copied]]
+#
+# A file whose `repo` is zgeoff/skills names a source in that repo, so the
+# versions of that source and its renames come from the history of the
+# zgeoff/skills checkout. Without that checkout, a retired file whose sources
+# all sat in zgeoff/skills stays.
+# Usage: remove-retired-sync-files.sh <tools-checkout> <synced> [skip [copied [skills-checkout]]]
 set -euo pipefail
 
-if [ $# -lt 2 ] || [ $# -gt 4 ]; then
-  echo "usage: remove-retired-sync-files.sh <tools-checkout> <synced> [skip [copied]]" >&2
+if [ $# -lt 2 ] || [ $# -gt 5 ]; then
+  echo "usage: remove-retired-sync-files.sh <tools-checkout> <synced> [skip [copied [skills-checkout]]]" >&2
   exit 2
 fi
 
@@ -32,11 +37,28 @@ tools="$1"
 synced="$2"
 skip="${3:-}"
 copied_targets="${4:-}"
+skills="${5:-}"
 
-if [ "$(git -C "$tools" rev-parse --is-shallow-repository)" = true ]; then
-  echo "remove-retired-sync-files: $tools is a shallow clone, so it lacks the earlier manifests" >&2
-  exit 1
+checkouts=("$tools")
+if [ -n "$skills" ]; then
+  checkouts+=("$skills")
 fi
+
+for checkout in "${checkouts[@]}"; do
+  if [ "$(git -C "$checkout" rev-parse --is-shallow-repository)" = true ]; then
+    echo "remove-retired-sync-files: $checkout is a shallow clone, so it lacks the history the cleanup reads" >&2
+    exit 1
+  fi
+done
+
+# Prints the checkout of the repo that an entry names, or nothing when the run
+# has no checkout of it.
+checkout_of() {
+  case "$1" in
+    zgeoff/tools) printf '%s' "$tools" ;;
+    zgeoff/skills) printf '%s' "$skills" ;;
+  esac
+}
 
 here=$(dirname "${BASH_SOURCE[0]}")
 
@@ -48,14 +70,14 @@ here=$(dirname "${BASH_SOURCE[0]}")
 # needs more than 8 paths gets only its unchanged form, which keeps the copy
 # rather than hash 2^n forms.
 print_delivered_hashes() {
-  local target=$1 blob=$2 work count mask index
+  local checkout=$1 target=$2 blob=$3 work count mask index
   local needs=() excluded=()
   if [[ "$target" != *.md ]]; then
-    git -C "$tools" cat-file blob "$blob" | to_delivered_form "$target" | git hash-object --stdin
+    git -C "$checkout" cat-file blob "$blob" | to_delivered_form "$target" | git hash-object --stdin
     return
   fi
   work=$(mktemp -d)
-  git -C "$tools" cat-file blob "$blob" > "$work/source.md"
+  git -C "$checkout" cat-file blob "$blob" > "$work/source.md"
   mapfile -t needs < <(sed -nE 's/^<!-- repo-sync needs ([^[:space:]]+) -->$/\1/p' "$work/source.md" | sort -u)
   count=${#needs[@]}
   if [ "$count" -gt 8 ]; then
@@ -94,15 +116,20 @@ while IFS= read -r name; do
   listed["$name"]=1
 done < <(jq -r '.[].name' "$tools/sync/manifest.json")
 
-# Each earlier path of a source that an entry delivers now, keyed by the entry
-# and that path, maps to the source's current target.
-while IFS=$'\t' read -r name source target; do
+# Each earlier path of a source that an entry delivers now, keyed by the entry,
+# the source's repo and that path, maps to the source's current target.
+while IFS=$'\t' read -r name repo source target; do
+  checkout=$(checkout_of "$repo")
+  if [ -z "$checkout" ]; then
+    continue
+  fi
   while IFS= read -r path; do
     if [ -n "$path" ] && [ "$path" != "$source" ]; then
-      moved["$name"$'\t'"$path"]="$target"
+      moved["$name"$'\t'"$repo"$'\t'"$path"]="$target"
     fi
-  done < <(git -C "$tools" log --follow --name-only --format= -- "$source" | sort -u)
-done < <(jq -r '.[] | .name as $name | .files[] | [$name, .source, .target] | @tsv' "$tools/sync/manifest.json")
+  done < <(git -C "$checkout" log --follow --name-only --format= -- "$source" | sort -u)
+done < <(jq -r '.[] | .name as $name | .files[]
+  | [$name, (.repo // "zgeoff/tools"), .source, .target] | @tsv' "$tools/sync/manifest.json")
 
 while IFS= read -r name; do
   if [ -n "$name" ]; then
@@ -125,18 +152,19 @@ done <<< "$copied_targets"
 rows=$(
   git -C "$tools" log --format=%H -- sync/manifest.json | while IFS= read -r commit; do
     git -C "$tools" show "$commit:sync/manifest.json" |
-      jq -r '.[] | .name as $name | .files[] | [.target, $name, .source] | @tsv'
+      jq -r '.[] | .name as $name | .files[]
+        | [.target, $name, (.repo // "zgeoff/tools"), .source] | @tsv'
   done | sort -u
 )
 
-while IFS=$'\t' read -r target name source; do
+while IFS=$'\t' read -r target name repo source; do
   if [ -z "$target" ] || [ -n "${current[$target]:-}" ]; then
     continue
   fi
   entries["$target"]+="$name"$'\n'
-  sources["$target"]+="$source"$'\n'
-  if [ -n "${moved[$name$'\t'$source]:-}" ]; then
-    renamed["$target"]="${moved[$name$'\t'$source]}"
+  sources["$target"]+="$repo"$'\t'"$source"$'\n'
+  if [ -n "${moved[$name$'\t'$repo$'\t'$source]:-}" ]; then
+    renamed["$target"]="${moved[$name$'\t'$repo$'\t'$source]}"
   fi
 done <<< "$rows"
 
@@ -162,10 +190,14 @@ while IFS= read -r target; do
     continue
   fi
   delivered=$(
-    printf '%s' "${sources[$target]}" | sort -u | while IFS= read -r source; do
-      git -C "$tools" log --format=%H -- "$source" | while IFS= read -r commit; do
-        if blob=$(git -C "$tools" rev-parse -q --verify "$commit:$source"); then
-          print_delivered_hashes "$target" "$blob"
+    printf '%s' "${sources[$target]}" | sort -u | while IFS=$'\t' read -r repo source; do
+      checkout=$(checkout_of "$repo")
+      if [ -z "$checkout" ]; then
+        continue
+      fi
+      git -C "$checkout" log --format=%H -- "$source" | while IFS= read -r commit; do
+        if blob=$(git -C "$checkout" rev-parse -q --verify "$commit:$source"); then
+          print_delivered_hashes "$checkout" "$target" "$blob"
         fi
       done
     done

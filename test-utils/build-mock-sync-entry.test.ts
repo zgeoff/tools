@@ -5,7 +5,7 @@ test('it builds a default sync entry', () => {
   expect(buildMockSyncEntry()).toStrictEqual({
     name: 'editorconfig',
     description: 'The editor config',
-    files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+    files: [{ repo: 'zgeoff/tools', source: 'sync/editorconfig', target: '.editorconfig' }],
     build: '',
     optIn: false,
     scripts: {},
@@ -18,7 +18,7 @@ test('it applies overrides on top of the defaults', () => {
   expect(entry).toStrictEqual({
     name: 'workflow-demo',
     description: 'The editor config',
-    files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+    files: [{ repo: 'zgeoff/tools', source: 'sync/editorconfig', target: '.editorconfig' }],
     build: '',
     optIn: true,
     scripts: {},

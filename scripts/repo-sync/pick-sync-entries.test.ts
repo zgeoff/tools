@@ -39,11 +39,13 @@ test('it leaves out a skipped entry and an opt-in entry that include does not li
       editorconfig,
       buildMockSyncEntry({
         name: 'socket',
-        files: [{ source: 'sync/socket.yml', target: 'socket.yml' }],
+        files: [{ repo: 'zgeoff/tools', source: 'sync/socket.yml', target: 'socket.yml' }],
       }),
       buildMockSyncEntry({
         name: 'workflow-demo',
-        files: [{ source: 'sync/demo.yml', target: '.github/workflows/demo.yml' }],
+        files: [
+          { repo: 'zgeoff/tools', source: 'sync/demo.yml', target: '.github/workflows/demo.yml' },
+        ],
         optIn: true,
       }),
     ],

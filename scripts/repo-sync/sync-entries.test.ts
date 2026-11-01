@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
+import { createGitCommit } from '../../test-utils/create-git-commit.ts';
 import { createSideGitCommit } from '../../test-utils/create-side-git-commit.ts';
 import { createStubPullRequestGH } from '../../test-utils/create-stub-pull-request-gh.ts';
 import { createTrackedGitCommit } from '../../test-utils/create-tracked-git-commit.ts';
@@ -20,6 +21,7 @@ async function setupTest() {
   const root = join(import.meta.dir, '..', '..');
   const origin = join(directory, 'origin.git');
   const tools = join(directory, 'tools');
+  const skills = join(directory, 'skills');
   const bin = join(directory, 'bin');
   const state = join(directory, 'pulls.json');
   const seed = join(directory, 'seed');
@@ -81,6 +83,10 @@ async function setupTest() {
     await afterClone();
     await cp(tools, join(caller, '.repo-sync'), { recursive: true });
 
+    if (existsSync(skills)) {
+      await cp(skills, join(caller, '.repo-sync-skills'), { recursive: true });
+    }
+
     return syncEntries({
       fileSystem: nodeFileSystem,
       runCommand,
@@ -107,6 +113,18 @@ async function setupTest() {
   const writeSource = async (path: string, content: string) => {
     await mkdir(dirname(join(tools, path)), { recursive: true });
     await writeFile(join(tools, path), content);
+  };
+
+  // Commits the files in a checkout of zgeoff/skills, which each later run copies in beside the
+  // tools checkout; returns the commit.
+  const writeSkillsCommit = async (files: Readonly<Record<string, string>>) => {
+    if (!existsSync(skills)) {
+      await mkdir(skills);
+
+      await $`git -C ${skills} init -q`.env(env).quiet();
+    }
+
+    return createGitCommit(skills, env, files);
   };
 
   const removeSource = async (path: string) => {
@@ -208,6 +226,7 @@ async function setupTest() {
     writeMainCommit,
     writeSource,
     writeManifestCommit,
+    writeSkillsCommit,
     removeSource,
     readBranch,
     readBranchFiles,
@@ -299,6 +318,148 @@ test('it opens one pull request that carries every changed file of every entry',
       state: 'open',
       autoMerge: { method: 'squash', head },
     },
+  ]);
+});
+
+test('it copies each file from the checkout of its repo and names both commits', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+  await ctx.writeSource('sync/kettle/check.sh', 'echo check\n');
+
+  const skillsCommit = await ctx.writeSkillsCommit({
+    'skills/kettle/SKILL.md': '# Kettle\n',
+    'skills/kettle/references/descaling.md': '# Descaling\n',
+  });
+
+  const exitCode = await ctx.runSync(
+    [
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+      },
+      {
+        name: 'skill-kettle',
+        description: 'The kettle skill',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/references/descaling.md',
+            target: '.claude/skills/kettle/references/descaling.md',
+          },
+          { source: 'sync/kettle/check.sh', target: '.claude/skills/kettle/scripts/check.sh' },
+        ],
+      },
+    ],
+    { SKILLS_REF: skillsCommit },
+  );
+
+  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
+  const skill = await ctx.readBranch('repo-sync/zgeoff-tools', '.claude/skills/kettle/SKILL.md');
+
+  const check = await ctx.readBranch(
+    'repo-sync/zgeoff-tools',
+    '.claude/skills/kettle/scripts/check.sh',
+  );
+
+  const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
+  const pulls = await ctx.readPullRequests();
+  const commit = await ctx.readToolsHead();
+  const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
+
+  expect(exitCode).toBe(0);
+
+  expect(files).toStrictEqual([
+    '.claude/skills/kettle/SKILL.md',
+    '.claude/skills/kettle/references/descaling.md',
+    '.claude/skills/kettle/scripts/check.sh',
+    '.editorconfig',
+    'README.md',
+  ]);
+
+  expect(skill).toBe('# Kettle\n');
+  expect(check).toBe('echo check\n');
+
+  expect(subjects).toStrictEqual([
+    'chore: sync editorconfig from zgeoff/tools',
+    'chore: sync skill-kettle from zgeoff/skills and zgeoff/tools',
+  ]);
+
+  expect(pulls).toStrictEqual([
+    {
+      number: 1,
+      base: 'main',
+      head: 'repo-sync/zgeoff-tools',
+      title: 'chore(sync): update the editorconfig and the kettle skill',
+      body:
+        `Copied from zgeoff/tools at ${commit}, and the skill text from zgeoff/skills at ${skillsCommit}, by the repo-sync workflow; edit the source there, not this copy. Each commit syncs one entry or pins the calls to zgeoff/tools workflows to that commit:\n\n` +
+        '- `editorconfig`: The editor config\n' +
+        '- `skill-kettle`: The kettle skill',
+      state: 'open',
+      autoMerge: { method: 'squash', head },
+    },
+  ]);
+});
+
+test('it deletes a retired copy of a zgeoff/skills source through that checkout', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeBranch('main', '.claude/skills/kettle/references/descaling.md', '# Descaling\n');
+
+  await ctx.writeManifestCommit([
+    {
+      name: 'skill-kettle',
+      description: 'The kettle skill',
+      files: [
+        {
+          repo: 'zgeoff/skills',
+          source: 'skills/kettle/references/descaling.md',
+          target: '.claude/skills/kettle/references/descaling.md',
+        },
+      ],
+    },
+  ]);
+
+  const entries = [
+    {
+      name: 'skill-kettle',
+      description: 'The kettle skill',
+      files: [
+        {
+          repo: 'zgeoff/skills',
+          source: 'skills/kettle/SKILL.md',
+          target: '.claude/skills/kettle/SKILL.md',
+        },
+      ],
+    },
+  ];
+
+  await ctx.writeManifestCommit(entries);
+
+  const skillsCommit = await ctx.writeSkillsCommit({
+    'skills/kettle/SKILL.md': '# Kettle\n',
+    'skills/kettle/references/descaling.md': '# Descaling\n',
+  });
+
+  const exitCode = await ctx.runSync(entries, { SKILLS_REF: skillsCommit });
+  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
+  const subjects = await ctx.readCommitSubjects('repo-sync/zgeoff-tools');
+
+  expect(exitCode).toBe(0);
+  expect(files).toStrictEqual(['.claude/skills/kettle/SKILL.md', 'README.md']);
+
+  expect(subjects).toStrictEqual([
+    'chore: sync skill-kettle from zgeoff/skills',
+    'chore: remove the files zgeoff/tools no longer syncs',
   ]);
 });
 
@@ -1046,6 +1207,36 @@ test('it refuses a ref that is not a full commit ID and pushes nothing', async (
   expect(branches).toStrictEqual(['main']);
   expect(pulls).toStrictEqual([]);
   expect(ctx.output).toStrictEqual(["::error::the tools ref 'main' is not a full commit ID\n"]);
+});
+
+test('it refuses a zgeoff/skills ref that is not a full commit ID and pushes nothing', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const exitCode = await ctx.runSync(
+    [
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+      },
+    ],
+    { SKILLS_REF: 'main' },
+  );
+
+  const branches = await ctx.readBranchNames();
+  const pulls = await ctx.readPullRequests();
+
+  expect(exitCode).toBe(1);
+  expect(branches).toStrictEqual(['main']);
+  expect(pulls).toStrictEqual([]);
+
+  expect(ctx.output).toStrictEqual([
+    "::error::the zgeoff/skills ref 'main' is not a full commit ID\n",
+  ]);
 });
 
 test('it refuses a commit that is not on main of zgeoff/tools before any build and pushes nothing', async () => {
