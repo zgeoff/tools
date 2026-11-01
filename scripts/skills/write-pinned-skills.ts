@@ -194,7 +194,7 @@ if (import.meta.main) {
     cwd: process.cwd(),
     env: process.env,
     archiveBaseURL: 'https://codeload.github.com/zgeoff/skills/tar.gz/',
-    skills: ['code-style', 'docs-writing'],
+    skills: ['code-style', 'docs-writing', 'skill-writing', 'deslop'],
     fileSystem: nodeFileSystem,
     renamePath: rename,
     runID: String(process.pid),

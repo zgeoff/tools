@@ -16,8 +16,8 @@ The rules a task needs are not repeated here. Load the skill for the work before
 | `ci-design`     | [`ci-design`](https://github.com/zgeoff/skills/tree/main/skills/ci-design)         | adding, changing, or reviewing a workflow, a job, or a trigger                              |
 
 Each source is a folder of zgeoff/skills; this repo reads it at the commit `sync/skills-pin.json`
-pins. Only `code-style` and `docs-writing` are installed as skills here, by
-`bun run skills:install`, which `bun install` runs. For the others, read the `SKILL.md` under
+pins. Only `code-style`, `docs-writing`, `skill-writing` and `deslop` are installed as skills here,
+by `bun run skills:install`, which `bun install` runs. For the others, read the `SKILL.md` under
 `.zgeoff-skills/<commit>/skills/<name>/`, which the same install unpacks.
 
 ## Repo structure
@@ -36,6 +36,8 @@ sync/               the sources that repo-sync delivers, listed in sync/manifest
   workflow-callers/ workflow stubs that call this repo's reusable workflows, all opt-in but the
                     repo-sync guard
   hooks/            the agent hooks' start-up stub and the skill gate's older entry point
+  skill-gate/       the skill gate's rules, which every repo takes as .claude/skill-gate.json and
+                    this repo links there
 e2e/                suites that drive the built product from outside, such as `rig browser` under
                     signals
 integration/        flows across packages, such as one lane limit read by rig and by the lint rules
