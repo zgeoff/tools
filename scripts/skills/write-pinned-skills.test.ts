@@ -1,11 +1,22 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, readlink, rm, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  readlink,
+  rename,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
+import type { InstallLockOptions } from './with-install-lock.ts';
+import { withInstallLock } from './with-install-lock.ts';
 import { writePinnedSkills } from './write-pinned-skills.ts';
 
 async function setupTest() {
@@ -33,20 +44,44 @@ async function setupTest() {
   const writePin = (commit: string) =>
     writeFile(join(tools, 'sync', 'skills-pin.json'), JSON.stringify({ commit }));
 
-  const install = (skills: readonly string[]) =>
+  const lockPath = join(tools, '.zgeoff-skills.lock');
+
+  // Every owner counts as running, and each wait lets the other runs move on.
+  const buildLockOptions = (
+    ownerID: string,
+    wait: () => Promise<void> = () =>
+      new Promise((resolve) => {
+        setImmediate(resolve);
+      }),
+  ): InstallLockOptions => ({
+    lockPath,
+    ownerID,
+    probeOwner: () => true,
+    wait,
+    attempts: 100_000,
+  });
+
+  const install = (
+    skills: readonly string[],
+    runID = 'run',
+    lockOptions: InstallLockOptions = buildLockOptions(runID),
+  ) =>
     writePinnedSkills({
       cwd: tools,
       env: process.env,
       archiveBaseURL: `file://${archives}/`,
       skills,
       fileSystem: nodeFileSystem,
+      renamePath: rename,
+      runID,
+      withLock: (path, work) => withInstallLock({ ...lockOptions, lockPath: path }, work),
       runCommand,
       writeOutput: (text) => {
         output.push(text);
       },
     });
 
-  return { tools, archives, output, writeArchive, writePin, install };
+  return { tools, archives, output, writeArchive, writePin, install, buildLockOptions };
 }
 
 test('it links each skill to its folder in the tree of the pinned commit', async () => {
@@ -165,4 +200,76 @@ test('it fails when the pin holds no full commit ID', async () => {
   expect(ctx.output).toStrictEqual([
     'skills: sync/skills-pin.json holds no full commit ID of zgeoff/skills\n',
   ]);
+});
+
+test('it lets two installs of the pinned commit run at once', async () => {
+  const ctx = await setupTest();
+
+  const commit = '0123456789abcdef0123456789abcdef01234567';
+
+  await ctx.writePin(commit);
+  await ctx.writeArchive(commit, { 'skills/kettle/SKILL.md': '# Kettle\n' });
+
+  const exitCodes = await Promise.all([
+    ctx.install(['kettle'], 'first'),
+    ctx.install(['kettle'], 'second'),
+  ]);
+
+  const text = await readFile(join(ctx.tools, '.claude', 'skills', 'kettle', 'SKILL.md'), 'utf8');
+  const trees = await readdir(join(ctx.tools, '.zgeoff-skills'));
+
+  expect(exitCodes).toStrictEqual([0, 0]);
+  expect(text).toBe('# Kettle\n');
+  expect(trees).toStrictEqual([commit]);
+});
+
+test('it removes the unpacking folder that a stopped run left', async () => {
+  const ctx = await setupTest();
+
+  const commit = '0123456789abcdef0123456789abcdef01234567';
+
+  await ctx.writePin(commit);
+  await ctx.writeArchive(commit, { 'skills/kettle/SKILL.md': '# Kettle\n' });
+
+  await mkdir(join(ctx.tools, '.zgeoff-skills', `${commit}.stopped.partial`), { recursive: true });
+
+  const exitCode = await ctx.install(['kettle']);
+  const trees = await readdir(join(ctx.tools, '.zgeoff-skills'));
+
+  expect(exitCode).toBe(0);
+  expect(trees).toStrictEqual([commit]);
+});
+
+test('it waits for the install that holds the lock before it unpacks', async () => {
+  const ctx = await setupTest();
+
+  const commit = '0123456789abcdef0123456789abcdef01234567';
+
+  await ctx.writePin(commit);
+  await ctx.writeArchive(commit, { 'skills/kettle/SKILL.md': '# Kettle\n' });
+
+  const waited = Promise.withResolvers<void>();
+
+  const waiting = ctx.buildLockOptions('waiting', () => {
+    waited.resolve();
+
+    return new Promise((resolve) => {
+      setImmediate(resolve);
+    });
+  });
+
+  // The install comes back wrapped, as awaiting it while the lock is held would never end.
+  const run = await withInstallLock(ctx.buildLockOptions('holding'), async () => {
+    const pending = ctx.install(['kettle'], 'waiting', waiting);
+
+    await waited.promise;
+
+    return { pending, hasTree: existsSync(join(ctx.tools, '.zgeoff-skills')) };
+  });
+
+  const exitCode = await run.pending;
+
+  expect(run.hasTree).toBeFalse();
+  expect(exitCode).toBe(0);
+  expect(existsSync(join(ctx.tools, '.claude', 'skills', 'kettle', 'SKILL.md'))).toBeTrue();
 });

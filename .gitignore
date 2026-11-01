@@ -11,5 +11,6 @@ test-utils/.test-*
 # zgeoff/skills at the pinned commit, which bun run skills:install unpacks and links this repo's
 # skills to.
 /.zgeoff-skills/
+/.zgeoff-skills.lock*
 /.claude/skills/code-style
 /.claude/skills/docs-writing

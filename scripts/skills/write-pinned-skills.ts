@@ -1,3 +1,4 @@
+import { rename } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { FileSystem } from '../ci/file-system.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
@@ -7,6 +8,8 @@ import { runCommand } from '../ci/run-command.ts';
 import { parseSkillsPin } from '../repo-sync/parse-skills-pin.ts';
 import { skillsPinPath } from '../repo-sync/skills-pin-path.ts';
 import { pinnedSkillsFolder } from './pinned-skills-folder.ts';
+import { probeRunningProcess } from './probe-running-process.ts';
+import { withInstallLock } from './with-install-lock.ts';
 
 export interface WritePinnedSkillsOptions {
   // The root of a tools checkout.
@@ -24,6 +27,17 @@ export interface WritePinnedSkillsOptions {
     FileSystem,
     'createDirectory' | 'probePath' | 'readDirectory' | 'readText' | 'removePath'
   >;
+
+  // Moves a path to another in one step, replacing a file or link there, and fails when a folder
+  // that holds files is there.
+  readonly renamePath: (from: string, to: string) => Promise<void>;
+
+  // Names this run's own scratch paths.
+  readonly runID: string;
+
+  // Runs the work while this run holds the lock on the path, so installs that share a checkout run
+  // one at a time.
+  readonly withLock: <T>(lockPath: string, work: () => Promise<T>) => Promise<T>;
 
   readonly runCommand: RunCommand;
   readonly writeOutput: (text: string) => void;
@@ -45,15 +59,24 @@ export async function writePinnedSkills(
     return 1;
   }
 
-  const folder = join(options.cwd, pinnedSkillsFolder);
-  const tree = join(folder, commit);
+  const lockPath = join(options.cwd, `${pinnedSkillsFolder}.lock`);
 
-  const hasTree = await options.fileSystem.probePath(tree);
+  return options.withLock(lockPath, () => writeLockedSkills(options, commit));
+}
+
+async function writeLockedSkills(
+  options: Readonly<WritePinnedSkillsOptions>,
+  commit: string,
+): Promise<number> {
+  const folder = join(options.cwd, pinnedSkillsFolder);
+
+  const hasTree = await options.fileSystem.probePath(join(folder, commit));
 
   if (!hasTree) {
     await writeSkillsTree(options, folder, commit);
   }
 
+  // Each other path is the tree of an older pin or the scratch of a stopped run.
   const trees = await options.fileSystem.readDirectory(folder);
 
   for (const stale of trees.filter((name) => name !== commit)) {
@@ -84,8 +107,8 @@ async function writeSkillsTree(
   folder: string,
   commit: string,
 ): Promise<void> {
-  const partial = join(folder, `${commit}.partial`);
-  const archive = join(folder, `${commit}.tar.gz`);
+  const partial = join(folder, `${commit}.${options.runID}.partial`);
+  const archive = join(folder, `${commit}.${options.runID}.tar.gz`);
 
   await options.fileSystem.removePath(partial);
   await options.fileSystem.createDirectory(partial);
@@ -96,8 +119,7 @@ async function writeSkillsTree(
   await runChecked(options, ['tar', '-xzf', archive, '--strip-components=1', '-C', partial]);
 
   await options.fileSystem.removePath(archive);
-
-  await runChecked(options, ['mv', partial, join(folder, commit)]);
+  await options.renamePath(partial, join(folder, commit));
 }
 
 function runChecked(
@@ -125,14 +147,13 @@ async function writeSkillLink(
 
   const link = join('.claude', 'skills', skill);
 
-  const isLink = await options.runCommand(['test', '-L', link], {
-    cwd: options.cwd,
-    env: options.env,
-  });
-
   const exists = await options.fileSystem.probePath(join(options.cwd, link));
 
-  if (exists && isLink.exitCode !== 0) {
+  const isLink = exists
+    ? await options.runCommand(['test', '-L', link], { cwd: options.cwd, env: options.env })
+    : null;
+
+  if (isLink !== null && isLink.exitCode !== 0) {
     options.writeOutput(
       `skills: ${link} is a folder of its own, so the skill is not linked; move it, then run bun run skills:install\n`,
     );
@@ -140,12 +161,18 @@ async function writeSkillLink(
     return false;
   }
 
+  // The link is made aside and renamed over the old one, so a stopped run never leaves the path
+  // half replaced.
+  const staged = join('.claude', 'skills', `.${skill}.${options.runID}`);
+
   await runChecked(options, [
     'ln',
     '-sfn',
     join('..', '..', pinnedSkillsFolder, commit, 'skills', skill),
-    link,
+    staged,
   ]);
+
+  await options.renamePath(join(options.cwd, staged), join(options.cwd, link));
 
   return true;
 }
@@ -157,6 +184,19 @@ if (import.meta.main) {
     archiveBaseURL: 'https://codeload.github.com/zgeoff/skills/tar.gz/',
     skills: ['code-style', 'docs-writing'],
     fileSystem: nodeFileSystem,
+    renamePath: rename,
+    runID: String(process.pid),
+    withLock: (lockPath, work) =>
+      withInstallLock(
+        {
+          lockPath,
+          ownerID: String(process.pid),
+          probeOwner: probeRunningProcess,
+          wait: () => Bun.sleep(250),
+          attempts: 480,
+        },
+        work,
+      ),
     runCommand,
     writeOutput: (text) => {
       process.stdout.write(text);
