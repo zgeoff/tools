@@ -70,6 +70,7 @@
     "ci:dispatch-publish": "bun scripts/publish/dispatch-release-publish.ts",
     "ci:plan-sync-dispatch": "bun scripts/repo-sync/write-sync-dispatch-plan.ts",
     "ci:send-sync-dispatches": "bun scripts/repo-sync/write-sync-dispatches.ts",
+    "ci:write-skills-pin-pull-request": "bun scripts/repo-sync/write-skills-pin-pull-request.ts",
     "ci:publish-packages": "bun scripts/publish/publish-packages.ts"
   },
   "devDependencies": {
