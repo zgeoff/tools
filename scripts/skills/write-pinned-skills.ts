@@ -72,21 +72,27 @@ async function writeLockedSkills(options: Readonly<WritePinnedSkillsOptions>): P
     await writeSkillsTree(options, folder, commit);
   }
 
-  // Each other path is the tree of an older pin or the scratch of a stopped run.
-  const trees = await options.fileSystem.readDirectory(folder);
+  // Every skill is checked before any link moves, so a failed run leaves each link where it was.
+  for (const skill of options.skills) {
+    const canLink = await probeSkillLink(options, commit, skill);
 
-  for (const stale of trees.filter((name) => name !== commit)) {
-    await options.fileSystem.removePath(join(folder, stale));
+    if (!canLink) {
+      return 1;
+    }
   }
 
   await options.fileSystem.createDirectory(join(options.cwd, '.claude', 'skills'));
 
   for (const skill of options.skills) {
-    const linked = await writeSkillLink(options, commit, skill);
+    await writeSkillLink(options, commit, skill);
+  }
 
-    if (!linked) {
-      return 1;
-    }
+  // Each other path is the tree of an older pin or the scratch of a stopped run, and no link points
+  // at it any more.
+  const trees = await options.fileSystem.readDirectory(folder);
+
+  for (const stale of trees.filter((name) => name !== commit)) {
+    await options.fileSystem.removePath(join(folder, stale));
   }
 
   options.writeOutput(
@@ -126,7 +132,7 @@ function runChecked(
 }
 
 // Returns false, with the reason in the output, when the skill cannot be linked.
-async function writeSkillLink(
+async function probeSkillLink(
   options: Readonly<WritePinnedSkillsOptions>,
   commit: string,
   skill: string,
@@ -157,8 +163,16 @@ async function writeSkillLink(
     return false;
   }
 
-  // The link is made aside and renamed over the old one, so a stopped run never leaves the path
-  // half replaced.
+  return true;
+}
+
+// The link is made aside and renamed over the old one, so a stopped run never leaves the path half
+// replaced.
+async function writeSkillLink(
+  options: Readonly<WritePinnedSkillsOptions>,
+  commit: string,
+  skill: string,
+): Promise<void> {
   const staged = join('.claude', 'skills', `.${skill}.${options.runID}`);
 
   await runChecked(options, [
@@ -168,9 +182,10 @@ async function writeSkillLink(
     staged,
   ]);
 
-  await options.renamePath(join(options.cwd, staged), join(options.cwd, link));
-
-  return true;
+  await options.renamePath(
+    join(options.cwd, staged),
+    join(options.cwd, '.claude', 'skills', skill),
+  );
 }
 
 if (import.meta.main) {

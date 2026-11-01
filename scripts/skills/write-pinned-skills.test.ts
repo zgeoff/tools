@@ -273,6 +273,32 @@ test('it waits for the install that holds the lock before it unpacks', async () 
   expect(existsSync(join(ctx.tools, '.claude', 'skills', 'kettle', 'SKILL.md'))).toBeTrue();
 });
 
+test('it keeps every link and the old tree when the new pin lacks a skill', async () => {
+  const ctx = await setupTest();
+
+  const older = '0123456789abcdef0123456789abcdef01234567';
+  const newer = '89abcdef0123456789abcdef0123456789abcdef';
+
+  await ctx.writeArchive(older, {
+    'skills/kettle/SKILL.md': '# Kettle\n',
+    'skills/teapot/SKILL.md': '# Teapot\n',
+  });
+
+  await ctx.writeArchive(newer, { 'skills/kettle/SKILL.md': '# Kettle, rewritten\n' });
+  await ctx.writePin(older);
+  await ctx.install(['kettle', 'teapot']);
+  await ctx.writePin(newer);
+
+  const exitCode = await ctx.install(['kettle', 'teapot']);
+  const kettle = await readlink(join(ctx.tools, '.claude', 'skills', 'kettle'));
+  const teapot = await readFile(join(ctx.tools, '.claude', 'skills', 'teapot', 'SKILL.md'), 'utf8');
+
+  expect(exitCode).toBe(1);
+  expect(kettle).toBe(`../../.zgeoff-skills/${older}/skills/kettle`);
+  expect(teapot).toBe('# Teapot\n');
+  expect(ctx.output.at(-1)).toBe(`skills: zgeoff/skills at ${newer} holds no teapot skill\n`);
+});
+
 test('it installs the pin as it stands once the lock is free', async () => {
   const ctx = await setupTest();
 
