@@ -4,6 +4,19 @@ The rules file, `.claude/skill-gate.json`, tells the [skill gate](../architectur
 which skills an edit needs and which skills and references a tool call needs. Path gates cover edits
 and Bash commands, and tool gates cover any other tool. A repo without the file has no gate.
 
+## The shared rules
+
+Every repo takes `.claude/skill-gate.json` from the `skill-gate-rules` entry of
+[repo-sync](../architecture/repo-sync.md), whose source is
+[`sync/skill-gate/skill-gate.json`](../../sync/skill-gate/skill-gate.json). Its rule makes an agent
+load `skill-writing`, `docs-writing` and `deslop` before it creates or changes a skill's `SKILL.md`,
+or a file under the skill's `references/`, in any `skills/` folder, such as `.claude/skills/`,
+`.agents/skills/` or `sync/skills/`. Each gate starts with `**/`, so the rule also covers a skill in
+a worktree under the repo, where an agent edits while the hook reads the main checkout's rules.
+
+Each sync overwrites the file. A repo that needs gates of its own adds `skill-gate-rules` to `skip`
+in its repo-sync stub, and copies the shared gates into its own file.
+
 ## Path gates
 
 Each entry of `gates` maps a path glob to the skills that a path needs. `match` is a glob over the

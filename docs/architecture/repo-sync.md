@@ -163,6 +163,9 @@ repo opts in with the changes that
 lists, which repo-sync never touches. `hook-skill-gate` delivers the skill gate's older entry point,
 which runs the gate from `@zgeoff/skill-gate`.
 
+The `skill-gate-rules` entry delivers the gate's rules to `.claude/skill-gate.json` in every repo,
+as [The shared rules](../guides/skill-gate-rules.md#the-shared-rules) describes.
+
 The pre-push baseline is an entry of its own kind, which
 [The pre-push baseline](./pre-push-baseline.md) describes.
 
