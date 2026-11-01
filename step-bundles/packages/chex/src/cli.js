@@ -1364,6 +1364,20 @@ function listKeys(value) {
   return isRecord(value) ? Object.keys(value) : [];
 }
 
+// packages/chex/src/parse-lefthook-config.ts
+function parseLefthookConfig(text) {
+  let parsed;
+  try {
+    parsed = Bun.YAML.parse(text);
+  } catch {
+    return;
+  }
+  if (parsed === null) {
+    return {};
+  }
+  return isRecord(parsed) ? parsed : undefined;
+}
+
 // packages/chex/src/build-lefthook-extends.ts
 var baselinePath = "node_modules/@zgeoff/chex/lefthook.yml";
 var extendsLine = /^extends:[ \t]*(?:#.*)?$/mu;
@@ -1374,7 +1388,7 @@ function buildLefthookExtends(text) {
   - ${baselinePath}
 ` };
   }
-  const config = parseConfig(text);
+  const config = parseLefthookConfig(text);
   if (config === undefined) {
     return { kind: "refused", reason: "lefthook.yml is not a YAML mapping" };
   }
@@ -1383,7 +1397,7 @@ function buildLefthookExtends(text) {
     return checkEdit(config, buildFirstExtends(text));
   }
   if (Array.isArray(extended) && extended.includes(baselinePath)) {
-    return { kind: "unchanged" };
+    return { kind: "unchanged", text };
   }
   const inline = inlineExtends.exec(text);
   if (Array.isArray(extended) && inline !== null) {
@@ -1400,20 +1414,8 @@ function buildLefthookExtends(text) {
   return checkEdit(config, `${text.slice(0, end)}
   - ${baselinePath}${text.slice(end)}`);
 }
-function parseConfig(text) {
-  let parsed;
-  try {
-    parsed = Bun.YAML.parse(text);
-  } catch {
-    return;
-  }
-  if (parsed === null) {
-    return {};
-  }
-  return isRecord(parsed) ? parsed : undefined;
-}
 function checkEdit(config, edited) {
-  const editedConfig = parseConfig(edited);
+  const editedConfig = parseLefthookConfig(edited);
   if (editedConfig !== undefined) {
     const { extends: editedExtends, ...editedRest } = editedConfig;
     const { extends: _, ...rest } = config;
@@ -1447,6 +1449,100 @@ function buildInlineExtends(text, inline) {
   const listed = items.trim() === "" ? baselinePath : `${items.trimEnd()}, ${baselinePath}`;
   const end = inline.index + inline[0].length;
   return `${text.slice(0, inline.index)}${groups["open"] ?? ""}${listed}${groups["close"] ?? ""}${text.slice(end)}`;
+}
+
+// packages/chex/src/build-lefthook-guard.ts
+var guardedHooks = ["pre-commit", "pre-push"];
+function buildLefthookGuard(text) {
+  let edited = text;
+  for (const hook of guardedHooks) {
+    const edit = buildHookEdit(edited, hook);
+    if (edit.kind === "refused") {
+      return edit;
+    }
+    edited = edit.text;
+  }
+  return edited === text ? { kind: "unchanged", text } : { kind: "changed", text: edited };
+}
+var guardName = "chex-baseline";
+var guardScript = [
+  `if [ ! -f ${baselinePath} ]; then`,
+  `  echo "${guardName}: ${baselinePath} is missing, so lefthook runs none of the chex baseline's jobs; run bun install, then try again"`,
+  "  exit 1",
+  "fi"
+];
+var guardJob = { name: guardName, run: `${guardScript.join(`
+`)}
+` };
+function buildHookEdit(text, hook) {
+  const config = parseLefthookConfig(text);
+  if (config === undefined) {
+    return { kind: "refused", reason: "lefthook.yml is not a YAML mapping" };
+  }
+  const hookConfig = config[hook];
+  if (hookConfig === undefined) {
+    const separator = text.endsWith(`
+`) ? "" : `
+`;
+    return checkHookEdit(config, hook, { jobs: [guardJob] }, `${text}${separator}
+${hook}:
+  jobs:
+${formatGuardJob("    ")}`);
+  }
+  const jobs = isRecord(hookConfig) ? hookConfig["jobs"] : undefined;
+  if (!isRecord(hookConfig) || !Array.isArray(jobs)) {
+    return refuseHook(hook);
+  }
+  const listed = jobs.find((job) => isRecord(job) && job["name"] === guardName);
+  if (listed !== undefined) {
+    return Bun.deepEquals(listed, guardJob, true) ? { kind: "guarded", text } : {
+      kind: "refused",
+      reason: `lefthook.yml has a ${guardName} job under ${hook} that differs from the one chex init writes; remove it, then run chex init again`
+    };
+  }
+  const insert = findGuardInsert(text, hook);
+  if (insert === undefined) {
+    return refuseHook(hook);
+  }
+  return checkHookEdit(config, hook, { ...hookConfig, jobs: [guardJob, ...jobs] }, `${text.slice(0, insert.offset)}${formatGuardJob(insert.indent)}${text.slice(insert.offset)}`);
+}
+function checkHookEdit(config, hook, hookConfig, edited) {
+  const editedConfig = parseLefthookConfig(edited);
+  if (editedConfig !== undefined && Bun.deepEquals(editedConfig, { ...config, [hook]: hookConfig }, true)) {
+    return { kind: "guarded", text: edited };
+  }
+  return refuseHook(hook);
+}
+function refuseHook(hook) {
+  return {
+    kind: "refused",
+    reason: `lefthook.yml writes ${hook} in a form chex init does not edit; write its ${hook} jobs as a block list, then run chex init again`
+  };
+}
+function formatGuardJob(indent) {
+  const lines = [`- name: ${guardName}`, "  run: |", ...guardScript.map((line) => `    ${line}`)];
+  return lines.map((line) => `${indent}${line}
+`).join("");
+}
+function findGuardInsert(text, hook) {
+  const hookLine = new RegExp(`^${hook}:[ \\t]*(?:#.*)?$`, "mu").exec(text);
+  if (hookLine === null) {
+    return;
+  }
+  const blockStart = hookLine.index + hookLine[0].length;
+  const blockEnd = /^[^\s#]/mu.exec(text.slice(blockStart + 1));
+  const blockStop = blockEnd === null ? text.length : blockStart + 1 + blockEnd.index;
+  const block = text.slice(blockStart, blockStop);
+  const jobsLine = /^[ \t]+jobs:[ \t]*(?:#.*)?$/mu.exec(block);
+  if (jobsLine === null) {
+    return;
+  }
+  const afterJobs = jobsLine.index + jobsLine[0].length;
+  const item = /^(?<indent>[ \t]*)- /mu.exec(block.slice(afterJobs));
+  if (item === null) {
+    return;
+  }
+  return { offset: blockStart + afterJobs + 1, indent: item.groups?.["indent"] ?? "" };
 }
 
 // packages/chex/src/build-init-plan.ts
@@ -1486,12 +1582,18 @@ function buildPlanFromSteps(steps) {
     notes: writes.length === 0 ? ["the repo already takes the baseline; nothing to change"] : steps.flatMap((step) => step.notes)
   };
 }
-var keptStep = { reasons: [], writes: [], notes: [] };
 function buildLefthookStep(lefthookText) {
-  return M(buildLefthookExtends(lefthookText)).with({ kind: "unchanged" }, () => keptStep).with({ kind: "changed" }, (outcome) => ({
+  return M(buildLefthookExtends(lefthookText)).with({ kind: "unchanged" }, (outcome) => buildGuardStep(outcome.text, [])).with({ kind: "changed" }, (outcome) => buildGuardStep(outcome.text, [`lefthook.yml extends ${baselinePath}`])).with({ kind: "refused" }, (outcome) => ({ reasons: [outcome.reason], writes: [], notes: [] })).exhaustive();
+}
+var keptStep = { reasons: [], writes: [], notes: [] };
+function buildGuardStep(text, notes) {
+  return M(buildLefthookGuard(text)).with({ kind: "unchanged" }, () => notes.length === 0 ? keptStep : { reasons: [], writes: [{ file: "lefthook.yml", text }], notes }).with({ kind: "changed" }, (outcome) => ({
     reasons: [],
     writes: [{ file: "lefthook.yml", text: outcome.text }],
-    notes: [`lefthook.yml extends ${baselinePath}`]
+    notes: [
+      ...notes,
+      `lefthook.yml runs ${guardName} first in ${guardedHooks.join(" and ")}, which fails when ${baselinePath} is missing`
+    ]
   })).with({ kind: "refused" }, (outcome) => ({ reasons: [outcome.reason], writes: [], notes: [] })).exhaustive();
 }
 
@@ -1872,12 +1974,12 @@ function parseLaneLimits(configText) {
   return limits;
 }
 function parseLanesOption(text) {
-  const config = parseConfig2(text);
+  const config = parseConfig(text);
   const setting = findMember(findMember(config, "rules"), "zgeoff/max-test-timeout");
   const ruleOptions = Array.isArray(setting) ? setting[1] : undefined;
   return findMember(ruleOptions, "lanes");
 }
-function parseConfig2(text) {
+function parseConfig(text) {
   try {
     return Bun.JSONC.parse(text);
   } catch (error) {

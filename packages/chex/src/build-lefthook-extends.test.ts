@@ -27,9 +27,9 @@ test('it adds the baseline to an extends list that lacks it, and keeps the other
 });
 
 test('it leaves a config that already extends the baseline unchanged', () => {
-  expect(
-    buildLefthookExtends('extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n'),
-  ).toStrictEqual({ kind: 'unchanged' });
+  const text = 'extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n';
+
+  expect(buildLefthookExtends(text)).toStrictEqual({ kind: 'unchanged', text });
 });
 
 test.each([

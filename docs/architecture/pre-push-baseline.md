@@ -9,6 +9,15 @@ to the repos that do not install chex, as [The delivered baseline](#the-delivere
 describes. The baseline runs its jobs one at a time, so a push fits a host with little memory or a
 machine shared by parallel agents. CI keeps every whole-tree check required.
 
+## A checkout without the baseline
+
+lefthook drops an `extends` entry whose file is missing, and prints nothing. In a checkout with no
+`node_modules`, such as a fresh worktree before `bun install`, a commit or a push would run only the
+repo's own jobs. So `chex init` writes a `chex-baseline` job first in the repo's own `pre-commit`
+and `pre-push` jobs, and this repo's `lefthook.yml` holds the same job. lefthook runs a repo's own
+jobs before the jobs of an extended file. When `node_modules/@zgeoff/chex/lefthook.yml` is missing,
+the job prints the path and `run bun install, then try again`, and fails the commit or the push.
+
 ## What the baseline runs
 
 The baseline runs `format:check`, `typecheck` and the
