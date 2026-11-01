@@ -88,11 +88,13 @@ jobs:
     if: github.event_name == 'repository_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Each run rewrites the one pin branch. GitHub drops a waiting run that a
-    # newer one replaces, and the newer commit covers the dropped one.
+    # Each run rewrites the one pin branch, so the runs take turns. Events can
+    # arrive out of commit order, and the default would let a waiting run for
+    # an older commit replace one for a newer commit, so queue: max keeps each.
     concurrency:
       group: skills-pin
       cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
     steps:
