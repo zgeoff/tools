@@ -89,7 +89,7 @@ test('it opens a pull request that moves the pin, with auto-merge on', async () 
       '-f',
       'ref=refs/heads/skills-pin',
       '-f',
-      'sha=fedcba9876543210fedcba9876543210fedcba98',
+      'sha=c0ffee0123456789abcdef0123456789abcdef01',
     ],
     { exitCode: 0, stdout: '', stderr: '' },
   );
@@ -98,7 +98,7 @@ test('it opens a pull request that moves the pin, with auto-merge on', async () 
     [
       'gh',
       'api',
-      'repos/example/tools/contents/sync/skills-pin.json?ref=skills-pin',
+      'repos/example/tools/contents/sync/skills-pin.json?ref=skills-pin-next',
       '--jq',
       '.sha',
     ],
@@ -119,7 +119,7 @@ test('it opens a pull request that moves the pin, with auto-merge on', async () 
       '-f',
       'sha=5d41402abc4b2a76b9719d911017c592ae0f2f0a',
       '-f',
-      'branch=skills-pin',
+      'branch=skills-pin-next',
       '--jq',
       '.commit.sha',
     ],
@@ -161,6 +161,31 @@ test('it opens a pull request that moves the pin, with auto-merge on', async () 
     { exitCode: 0, stdout: '', stderr: '' },
   );
 
+  ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin-next'], {
+    exitCode: 1,
+    stdout: '',
+    stderr: 'gh: Not Found (HTTP 404)',
+  });
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      '--silent',
+      'repos/example/tools/git/refs',
+      '-f',
+      'ref=refs/heads/skills-pin-next',
+      '-f',
+      'sha=fedcba9876543210fedcba9876543210fedcba98',
+    ],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', '--silent', '-X', 'DELETE', 'repos/example/tools/git/refs/heads/skills-pin-next'],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
   const exitCode = await ctx.pin(commit);
 
   expect(exitCode).toBe(0);
@@ -178,7 +203,7 @@ test('it opens a pull request that moves the pin, with auto-merge on', async () 
     '-f',
     'sha=5d41402abc4b2a76b9719d911017c592ae0f2f0a',
     '-f',
-    'branch=skills-pin',
+    'branch=skills-pin-next',
     '--jq',
     '.commit.sha',
   ]);
@@ -254,7 +279,7 @@ test('it opens its own pull request when only a fork holds a pin branch pull req
       '-f',
       'ref=refs/heads/skills-pin',
       '-f',
-      'sha=fedcba9876543210fedcba9876543210fedcba98',
+      'sha=c0ffee0123456789abcdef0123456789abcdef01',
     ],
     { exitCode: 0, stdout: '', stderr: '' },
   );
@@ -263,7 +288,7 @@ test('it opens its own pull request when only a fork holds a pin branch pull req
     [
       'gh',
       'api',
-      'repos/example/tools/contents/sync/skills-pin.json?ref=skills-pin',
+      'repos/example/tools/contents/sync/skills-pin.json?ref=skills-pin-next',
       '--jq',
       '.sha',
     ],
@@ -284,7 +309,7 @@ test('it opens its own pull request when only a fork holds a pin branch pull req
       '-f',
       'sha=5d41402abc4b2a76b9719d911017c592ae0f2f0a',
       '-f',
-      'branch=skills-pin',
+      'branch=skills-pin-next',
       '--jq',
       '.commit.sha',
     ],
@@ -323,6 +348,31 @@ test('it opens its own pull request when only a fork holds a pin branch pull req
       '--match-head-commit',
       'c0ffee0123456789abcdef0123456789abcdef01',
     ],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin-next'], {
+    exitCode: 1,
+    stdout: '',
+    stderr: 'gh: Not Found (HTTP 404)',
+  });
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      '--silent',
+      'repos/example/tools/git/refs',
+      '-f',
+      'ref=refs/heads/skills-pin-next',
+      '-f',
+      'sha=fedcba9876543210fedcba9876543210fedcba98',
+    ],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', '--silent', '-X', 'DELETE', 'repos/example/tools/git/refs/heads/skills-pin-next'],
     { exitCode: 0, stdout: '', stderr: '' },
   );
 
@@ -404,7 +454,7 @@ test('it moves the branch of the open pin pull request to a newer commit', async
       'PATCH',
       'repos/example/tools/git/refs/heads/skills-pin',
       '-f',
-      'sha=fedcba9876543210fedcba9876543210fedcba98',
+      'sha=c0ffee0123456789abcdef0123456789abcdef01',
       '-F',
       'force=true',
     ],
@@ -415,7 +465,7 @@ test('it moves the branch of the open pin pull request to a newer commit', async
     [
       'gh',
       'api',
-      'repos/example/tools/contents/sync/skills-pin.json?ref=skills-pin',
+      'repos/example/tools/contents/sync/skills-pin.json?ref=skills-pin-next',
       '--jq',
       '.sha',
     ],
@@ -436,7 +486,7 @@ test('it moves the branch of the open pin pull request to a newer commit', async
       '-f',
       'sha=5d41402abc4b2a76b9719d911017c592ae0f2f0a',
       '-f',
-      'branch=skills-pin',
+      'branch=skills-pin-next',
       '--jq',
       '.commit.sha',
     ],
@@ -475,6 +525,31 @@ test('it moves the branch of the open pin pull request to a newer commit', async
     { exitCode: 0, stdout: '', stderr: '' },
   );
 
+  ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin-next'], {
+    exitCode: 1,
+    stdout: '',
+    stderr: 'gh: Not Found (HTTP 404)',
+  });
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      '--silent',
+      'repos/example/tools/git/refs',
+      '-f',
+      'ref=refs/heads/skills-pin-next',
+      '-f',
+      'sha=fedcba9876543210fedcba9876543210fedcba98',
+    ],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', '--silent', '-X', 'DELETE', 'repos/example/tools/git/refs/heads/skills-pin-next'],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
   const exitCode = await ctx.pin(commit);
 
   expect(exitCode).toBe(0);
@@ -492,9 +567,29 @@ test('it moves the branch of the open pin pull request to a newer commit', async
     '-f',
     'sha=5d41402abc4b2a76b9719d911017c592ae0f2f0a',
     '-f',
-    'branch=skills-pin',
+    'branch=skills-pin-next',
     '--jq',
     '.commit.sha',
+  ]);
+
+  // The open pull request's branch moves straight to the new commit, never back to main.
+  const pinBranchMoves = ctx.commands.calls.filter((argv) =>
+    argv.includes('repos/example/tools/git/refs/heads/skills-pin'),
+  );
+
+  expect(pinBranchMoves).toStrictEqual([
+    [
+      'gh',
+      'api',
+      '--silent',
+      '-X',
+      'PATCH',
+      'repos/example/tools/git/refs/heads/skills-pin',
+      '-f',
+      'sha=c0ffee0123456789abcdef0123456789abcdef01',
+      '-F',
+      'force=true',
+    ],
   ]);
 
   expect(ctx.output).toStrictEqual(['Updated pull request #41 for skills-pin.\n']);

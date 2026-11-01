@@ -31,6 +31,9 @@ export interface WriteSkillsPinPullRequestOptions {
 
 const pinBranch = 'skills-pin';
 
+// Holds the next pin commit until the pin branch moves to it.
+const stagingBranch = 'skills-pin-next';
+
 // Opens, or moves, one pull request on the skills-pin branch that changes only the pin, with
 // auto-merge on, so the pin reaches main once the checks pass and the sync dispatch sends it on.
 export async function writeSkillsPinPullRequest(
@@ -188,8 +191,9 @@ async function readCompareStatus(
   return compared.exitCode === 0 ? compared.stdout.trim() : '';
 }
 
-// Returns the commit it wrote. The branch restarts from main on every move, so the pull request
-// holds one commit, which the contents API writes as the App, so GitHub signs it.
+// Returns the commit it wrote, which the contents API writes as the App on a staging branch, so
+// GitHub signs it. The pin branch moves to it in one step, as a pin branch reset to main would leave
+// the open pull request with no commits, and GitHub closes such a pull request.
 async function writePinBranch(
   options: Readonly<WriteSkillsPinPullRequestOptions>,
 ): Promise<string> {
@@ -200,35 +204,11 @@ async function writePinBranch(
     '.object.sha',
   ]);
 
-  const head = main.stdout.trim();
-
-  const branch = await runGH(options, ['api', `repos/${options.repo}/git/ref/heads/${pinBranch}`]);
-
-  await (branch.exitCode === 0
-    ? runCheckedGH(options, [
-        'api',
-        '--silent',
-        '-X',
-        'PATCH',
-        `repos/${options.repo}/git/refs/heads/${pinBranch}`,
-        '-f',
-        `sha=${head}`,
-        '-F',
-        'force=true',
-      ])
-    : runCheckedGH(options, [
-        'api',
-        '--silent',
-        `repos/${options.repo}/git/refs`,
-        '-f',
-        `ref=refs/heads/${pinBranch}`,
-        '-f',
-        `sha=${head}`,
-      ]));
+  await writeBranchRef(options, stagingBranch, main.stdout.trim());
 
   const file = await runCheckedGH(options, [
     'api',
-    `repos/${options.repo}/contents/${skillsPinPath}?ref=${pinBranch}`,
+    `repos/${options.repo}/contents/${skillsPinPath}?ref=${stagingBranch}`,
     '--jq',
     '.sha',
   ]);
@@ -247,12 +227,55 @@ async function writePinBranch(
     '-f',
     `sha=${file.stdout.trim()}`,
     '-f',
-    `branch=${pinBranch}`,
+    `branch=${stagingBranch}`,
     '--jq',
     '.commit.sha',
   ]);
 
-  return written.stdout.trim();
+  const head = written.stdout.trim();
+
+  await writeBranchRef(options, pinBranch, head);
+
+  await runCheckedGH(options, [
+    'api',
+    '--silent',
+    '-X',
+    'DELETE',
+    `repos/${options.repo}/git/refs/heads/${stagingBranch}`,
+  ]);
+
+  return head;
+}
+
+// Points the branch at the commit, and creates the branch when it does not exist.
+async function writeBranchRef(
+  options: Readonly<WriteSkillsPinPullRequestOptions>,
+  branch: string,
+  commit: string,
+): Promise<void> {
+  const current = await runGH(options, ['api', `repos/${options.repo}/git/ref/heads/${branch}`]);
+
+  await (current.exitCode === 0
+    ? runCheckedGH(options, [
+        'api',
+        '--silent',
+        '-X',
+        'PATCH',
+        `repos/${options.repo}/git/refs/heads/${branch}`,
+        '-f',
+        `sha=${commit}`,
+        '-F',
+        'force=true',
+      ])
+    : runCheckedGH(options, [
+        'api',
+        '--silent',
+        `repos/${options.repo}/git/refs`,
+        '-f',
+        `ref=refs/heads/${branch}`,
+        '-f',
+        `sha=${commit}`,
+      ]));
 }
 
 function renderPinTitle(commit: string): string {
