@@ -8,6 +8,7 @@ import { parseSyncEntries } from './parse-sync-entries.ts';
 import type { SyncDispatchRange } from './pick-sync-dispatch-range.ts';
 import { pickSyncDispatchRange } from './pick-sync-dispatch-range.ts';
 import { readCommitPinnedSources } from './read-commit-pinned-sources.ts';
+import { skillsPinPath } from './skills-pin-path.ts';
 
 export interface WriteSyncDispatchPlanOptions {
   // A checkout of zgeoff/tools with the history of main.
@@ -67,7 +68,7 @@ export async function writeSyncDispatchPlan(
     return 0;
   }
 
-  const changed = range.kind === 'always' ? true : await probeSyncedChange(options, range);
+  const changed = await probeSyncedChange(options, range);
 
   const message = changed
     ? `Dispatching ${range.commit} to every repo that syncs from zgeoff/tools.\n`
@@ -91,8 +92,8 @@ function runPlanCommand(
 }
 
 // A source of either manifest counts, so a change that drops an entry or moves its source sends the
-// sync that removes the retired copies. A file that a caller's pin decides counts too, because each
-// caller runs the reusable workflows at the commit it pins.
+// sync that removes the retired copies. A file a caller's pin decides counts, as each caller runs
+// the workflows it pins, and so does the skills pin, which decides each zgeoff/skills source.
 async function probeSyncedChange(
   options: Readonly<WriteSyncDispatchPlanOptions>,
   range: Extract<SyncDispatchRange, { readonly kind: 'range' }>,
@@ -123,6 +124,7 @@ async function probeSyncedChange(
 
   const sources = new Set([
     manifestPath,
+    skillsPinPath,
     ...(await readManifestSources(options, range.previous)),
     ...(await readManifestSources(options, range.commit)),
     ...(await readCommitPinnedSources({ ...tools, commit: range.previous })),
@@ -141,7 +143,10 @@ async function readManifestSources(
   const manifestValue: unknown = JSON.parse(shown.stdout);
   const entries = parseSyncEntries(manifestValue) ?? [];
 
-  return entries.flatMap((entry) => entry.files.map((file) => file.source));
+  return entries
+    .flatMap((entry) => entry.files)
+    .filter((file) => file.repo === 'zgeoff/tools')
+    .map((file) => file.source);
 }
 
 if (import.meta.main) {

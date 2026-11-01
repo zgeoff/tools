@@ -7,3 +7,4 @@ export { readOptionalText } from './read-optional-text.ts';
 export { type ExactOptional, toExactOptional } from './to-exact-optional.ts';
 export { type ReadonlyDeep, toReadonlyDeep } from './to-readonly-deep.ts';
 export { toTagged } from './to-tagged.ts';
+export { writeStdout } from './write-stdout.ts';

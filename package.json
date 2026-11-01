@@ -46,7 +46,7 @@
   },
   "type": "module",
   "scripts": {
-    "prepare": "lefthook install --force || true; bun run build",
+    "prepare": "lefthook install --force || true; bun run build && bun run skills:install",
     "typecheck": "bun run --filter '*' typecheck && tsrs -p . && tsrs -p scripts && tsrs -p sync && tsrs -p test-utils && tsrs -p e2e && tsrs -p integration",
     "test": "rig unit",
     "test:related": "rig related",
@@ -55,6 +55,7 @@
     "test:host": "rig host",
     "build": "bun run --filter '*' build",
     "build:step-bundles": "bun scripts/ci/write-step-bundles.ts",
+    "skills:install": "bun scripts/skills/write-pinned-skills.ts",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "lint:full": "tsgolint=$(tsrslint-path) && OXLINT_TSGOLINT_PATH=$tsgolint oxlint --type-aware --type-check --report-unused-disable-directives-severity error",
@@ -70,6 +71,7 @@
     "ci:dispatch-publish": "bun scripts/publish/dispatch-release-publish.ts",
     "ci:plan-sync-dispatch": "bun scripts/repo-sync/write-sync-dispatch-plan.ts",
     "ci:send-sync-dispatches": "bun scripts/repo-sync/write-sync-dispatches.ts",
+    "ci:write-skills-pin-pull-request": "bun scripts/repo-sync/write-skills-pin-pull-request.ts",
     "ci:publish-packages": "bun scripts/publish/publish-packages.ts"
   },
   "devDependencies": {

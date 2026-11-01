@@ -2,6 +2,8 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { nodeFileSystem } from '../../scripts/ci/node-file-system.ts';
+import { readPinnedSkillText } from '../../test-utils/read-pinned-skill-text.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'verb-contract-test-'));
@@ -24,6 +26,14 @@ async function setupTest() {
       cwd: directory,
       stdout: 'pipe',
       stderr: 'pipe',
+      detached: true,
+    });
+
+    // oxlint leads its own process group, so a test that ends before it exits stops the whole group.
+    onTestFinished(() => {
+      if (subprocess.exitCode === null && subprocess.signalCode === null) {
+        process.kill(-subprocess.pid, 'SIGKILL');
+      }
     });
 
     const [exitCode, stdout] = await Promise.all([
@@ -825,9 +835,10 @@ export const getName = (entry: { name: string }): string => entry.name;
 test('it holds the same no-I/O verbs as the role table in the shared skill', async () => {
   const ctx = await setupTest();
 
-  const markdown = await readFile(
-    join(import.meta.dir, '..', '..', '.claude', 'skills', 'code-style', 'SKILL.md'),
-    'utf8',
+  const markdown = await readPinnedSkillText(
+    nodeFileSystem,
+    join(import.meta.dir, '..', '..'),
+    'skills/code-style/SKILL.md',
   );
 
   const ruleSource = await readFile(join(import.meta.dir, 'verb-contract.js'), 'utf8');

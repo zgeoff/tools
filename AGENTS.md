@@ -7,16 +7,18 @@ to npm, and it holds the files that repo-sync copies into each other repo.
 
 The rules a task needs are not repeated here. Load the skill for the work before starting it.
 
-| Skill           | Source                       | Load before                                                                                 |
-| --------------- | ---------------------------- | ------------------------------------------------------------------------------------------- |
-| `code-style`    | `.claude/skills/code-style/` | writing, reviewing, or renaming any TypeScript — the function-naming role table lives there |
-| `testing`       | `sync/skills/testing/`       | designing, writing, or reviewing tests                                                      |
-| `docs-writing`  | `sync/skills/docs-writing/`  | writing or editing any committed prose: READMEs, this file, skills                          |
-| `skill-writing` | `sync/skills/skill-writing/` | writing or editing a skill                                                                  |
-| `ci-design`     | `sync/skills/ci-design/`     | adding, changing, or reviewing a workflow, a job, or a trigger                              |
+| Skill           | Source                                                                             | Load before                                                                                 |
+| --------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `code-style`    | [`code-style`](https://github.com/zgeoff/skills/tree/main/skills/code-style)       | writing, reviewing, or renaming any TypeScript — the function-naming role table lives there |
+| `testing`       | [`testing`](https://github.com/zgeoff/skills/tree/main/skills/testing)             | designing, writing, or reviewing tests                                                      |
+| `docs-writing`  | [`docs-writing`](https://github.com/zgeoff/skills/tree/main/skills/docs-writing)   | writing or editing any committed prose: READMEs, this file, skills                          |
+| `skill-writing` | [`skill-writing`](https://github.com/zgeoff/skills/tree/main/skills/skill-writing) | writing or editing a skill                                                                  |
+| `ci-design`     | [`ci-design`](https://github.com/zgeoff/skills/tree/main/skills/ci-design)         | adding, changing, or reviewing a workflow, a job, or a trigger                              |
 
-Only `code-style` and `docs-writing` are installed as skills here. For the others, read the
-`SKILL.md` in the source folder.
+Each source is a folder of zgeoff/skills; this repo reads it at the commit `sync/skills-pin.json`
+pins. Only `code-style` and `docs-writing` are installed as skills here, by
+`bun run skills:install`, which `bun install` runs. For the others, read the `SKILL.md` under
+`.zgeoff-skills/<commit>/skills/<name>/`, which the same install unpacks.
 
 ## Repo structure
 
@@ -27,8 +29,7 @@ packages/           the @zgeoff/* packages; release-please versions each one and
                     public ones to npm, as RELEASING.md describes
 sync/               the sources that repo-sync delivers, listed in sync/manifest.json; an edit here
                     reaches every repo that takes the entry, as docs/architecture/repo-sync.md
-                    describes
-  skills/           the shared skill bases, each delivered to .claude/skills/<name>/
+                    describes; skills-pin.json pins the zgeoff/skills commit of the skill text
   pre-push/         the pre-push baseline that the pre-push-baseline entry delivers; its check
                     scripts come from packages/chex, whose own baseline this repo's lefthook.yml
                     extends
@@ -45,12 +46,11 @@ step-bundles/       the bundle of each step script that a reusable workflow down
 .github/workflows/  this repo's CI, release and sync dispatch, and the reusable workflows that other repos call:
                     bun-checks, repo-sync and its guard, audit-fix, release-please and the
                     paths-changed gate
-.claude/skills/     the code-style skill, which is both this repo's skill and the shared base
 ```
 
 A manifest entry can name a source outside `sync/`. `.github/PULL_REQUEST_TEMPLATE.md`,
-`.github/ISSUE_TEMPLATE/`, `.editorconfig` and `.claude/skills/code-style/SKILL.md` ship to other
-repos too, so an edit to one of them changes every repo that takes it.
+`.github/ISSUE_TEMPLATE/` and `.editorconfig` ship to other repos too, so an edit to one of them
+changes every repo that takes it. Skill text is edited in zgeoff/skills, never here.
 
 ## Packages
 

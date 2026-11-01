@@ -1,20 +1,25 @@
 import { expect, test } from 'bun:test';
 import { collectBannedVerbs } from './collect-banned-verbs.ts';
 
-test('it collects each code-span verb of the banned verbs section, skipping those in parentheses', () => {
+test('it collects each code-span verb of the banned bullet up to the end of its first sentence', () => {
   const markdown = [
-    '### Free verbs',
+    '## Function names',
     '',
-    '`resolve` is free.',
-    '',
-    '### Banned verbs',
-    '',
-    'The vague ones: `process`, `manage`. The near-synonyms: `execute` (→ `run`), `fetch` (→ `read`).',
-    '',
-    '### Changing the table',
-    '',
-    'Ask before you ban `steep`.',
+    '- `make` and `with` take a suffix: `toPosixPath`.',
+    '- Banned: `process`, `manage`, `execute`,',
+    '  `fetch`, and `handle` outside a callback. `resolve` is free: it names a lookup.',
+    '- `steep` is next.',
   ].join('\n');
 
-  expect(collectBannedVerbs(markdown)).toStrictEqual(['process', 'manage', 'execute', 'fetch']);
+  expect(collectBannedVerbs(markdown)).toStrictEqual([
+    'process',
+    'manage',
+    'execute',
+    'fetch',
+    'handle',
+  ]);
+});
+
+test('it collects nothing from a skill with no banned bullet', () => {
+  expect(collectBannedVerbs('## Function names\n\n- `make` takes a suffix.\n')).toStrictEqual([]);
 });

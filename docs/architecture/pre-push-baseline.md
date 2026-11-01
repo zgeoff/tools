@@ -57,9 +57,10 @@ the hook shares with the workflows check in CI. After that date the check report
 until an actionlint release that knows the key replaces the ignore.
 
 The workflow lint checks the rules that the ci-design skill's
-[Step scripts](../../sync/skills/ci-design/SKILL.md#step-scripts) section lists, over the changed
-files under `.github/workflows/` and `sync/workflow-callers/`. It runs when the machine lacks
-actionlint or actionlint fails, and it prints each fault as a warning and passes the push.
+[Step scripts](https://github.com/zgeoff/skills/blob/main/skills/ci-design/SKILL.md#step-scripts)
+section lists, over the changed files under `.github/workflows/` and `sync/workflow-callers/`. It
+runs when the machine lacks actionlint or actionlint fails, and it prints each fault as a warning
+and passes the push.
 
 Each job runs its command under [`diet`](./memory-caps.md), so in a
 [mode](./memory-caps.md#the-modes) that caps, a job that outgrows the host fails alone, and every

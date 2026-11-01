@@ -1,24 +1,16 @@
+// Collects each code-span verb of the code-style skill's `- Banned:` bullet, up to the end of its
+// first sentence, where the free verbs begin.
 export function collectBannedVerbs(markdown: string): string[] {
-  const start = markdown.indexOf('### Banned verbs');
-  const end = markdown.indexOf('### Changing the table');
-  const paragraph = markdown.slice(start, end);
-  const banned: string[] = [];
+  const start = markdown.indexOf('\n- Banned:');
 
-  for (const match of paragraph.matchAll(/`(?<verb>[a-z]+)`/gu)) {
-    const preceding = paragraph.slice(0, match.index);
-    const verb = match.groups?.['verb'];
-
-    if (
-      verb !== undefined &&
-      countOccurrences(preceding, '(') === countOccurrences(preceding, ')')
-    ) {
-      banned.push(verb);
-    }
+  if (start === -1) {
+    return [];
   }
 
-  return banned;
-}
+  const bullet = markdown.slice(start + 1).split(/\n(?:- |\n)/u)[0] ?? '';
+  const [sentence] = bullet.split(/\.\s/u);
 
-function countOccurrences(text: string, part: string): number {
-  return text.split(part).length - 1;
+  return [...(sentence ?? '').matchAll(/`(?<verb>[a-z]+)`/gu)].map(
+    (match) => match.groups?.['verb'] ?? '',
+  );
 }

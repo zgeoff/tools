@@ -13,7 +13,7 @@ is green, as [Delivery](#delivery) describes.
 ## The sources
 
 The entries name their sources under [`sync/`](../../sync/), and a source can sit elsewhere in the
-repo:
+repo or in [zgeoff/skills](https://github.com/zgeoff/skills):
 
 - [`sync/manifest.json`](../../sync/manifest.json): the entries, which
   `scripts/check-sync-manifest.sh` checks in CI.
@@ -21,7 +21,8 @@ repo:
   pinned commit.
 - [`sync/workflow-callers/`](../../sync/workflow-callers/): workflows that each call a reusable
   workflow in this repo, all opt-in but the repo-sync guard.
-- [`sync/skills/`](../../sync/skills/): the shared base of each Claude skill.
+- [`sync/skills-pin.json`](../../sync/skills-pin.json): the commit of zgeoff/skills that each skill
+  entry copies its text from, as [Skills](#skills) describes.
 - [`sync/hooks/`](../../sync/hooks/): the agent hooks' start-up stub and the skill gate's older
   entry point.
 - [`sync/pre-push/`](../../sync/pre-push/): the [pre-push baseline](./pre-push-baseline.md) that the
@@ -34,9 +35,10 @@ repo:
 
 ```mermaid
 flowchart LR
+  skills[zgeoff/skills green main] -. zgeoff-skills-sync .-> pin[pin pull request]
+  pin --> merge
   merge[merge to tools main] --> main[Main run green]
   main --> dispatch[sync-dispatch]
-  skills[zgeoff/skills] -. zgeoff-skills-sync .-> dispatch
   dispatch -- zgeoff-tools-sync with the commit --> caller[repo-sync stub in each repo]
   caller --> run[repo-sync run at that commit]
   run --> pr[sync pull request that merges on green]
@@ -48,9 +50,17 @@ commit before that run's commit up to the newest green commit. When the diff tou
 source that either manifest lists, or a file whose content a repo's pin decides, the workflow sends
 a `repository_dispatch` event, `zgeoff-tools-sync`, to every repo that the sync App can reach, with
 the newest green commit in `client_payload.sha`. Two green runs that finish in either order cover
-every commit between them, because each run checks from the commit before its own. A
-`zgeoff-skills-sync` event from zgeoff/skills sends the newest green commit with no check. The
-dispatch needs only the App's contents write.
+every commit between them, because each run checks from the commit before its own. The pin file
+counts as a synced source, so a merge that moves it sends the dispatch. The dispatch needs only the
+App's contents write.
+
+A green push run on `main` of zgeoff/skills sends this repo a `zgeoff-skills-sync` event with its
+commit in `client_payload.sha`. The sync-dispatch workflow then moves `sync/skills-pin.json` to that
+commit in one pull request on the `skills-pin` branch, written as the App, with auto-merge on. It
+moves the pin only forward along `main` of zgeoff/skills, past both the pin on `main` here and the
+one the open pull request holds, so events may arrive in any order. An event that the open pull
+request already covers turns its auto-merge on, when the pull request changes only the pin. Its
+merge is a synced change like any other.
 
 Each repo pins every call to a tools workflow to one commit on `main`, with a `# main` comment, and
 never at `main` itself, so a run of a test or doc audit never sees the shared files change under it.
@@ -93,7 +103,8 @@ An entry holds:
 
 - `name` — the branch suffix and the name that `skip` and `include` take.
 - `description` — one line, which the workflow writes into the pull request body.
-- `files` — `source` (a path in this repo), `target` (a path in the downstream repo), an optional
+- `files` — `source` (a path in the source repo), `target` (a path in the downstream repo), an
+  optional `repo`, `zgeoff/tools` by default or `zgeoff/skills`, that holds the source, an optional
   `mode` such as `0755`, and an optional `except`, the `owner/repo` names of the repos that never
   receive the file. The workflow copies each file verbatim, except that a workflow target's calls to
   `zgeoff/tools` workflows move to the commit the run syncs from, and a Markdown target loses the
@@ -123,16 +134,23 @@ pull-request checks.
 
 ## Skills
 
-Files under [`skills/`](../../sync/skills/) are the shared base of a Claude skill, each delivered by
-its `skill-<name>` entry to `.claude/skills/<name>/`. A skill entry is opt-in, so a repo takes only
-the skills for the work it holds. One exception: `skill-pr-evidence` reaches every repo, because
-every agent that opens a pull request needs it. The code-style base lives in this repo's own
-[`.claude/skills/code-style/`](../../.claude/skills/code-style/), because this repo's agents load it
-there and the verb-contract lint rule's test reads its role table from it. A repo keeps its own
-rules for the same area in a `project-<name>` skill beside it, which repo-sync never touches, and
-the shared skill tells the reader to load both. The entry lists every file in its skill folder,
-since the skill links its references by relative path; `scripts/check-sync-manifest.sh` fails on a
-file the entry omits. A skill's tests sit beside its scripts and stay in tools.
+The text of each shared Claude skill lives in [zgeoff/skills](https://github.com/zgeoff/skills),
+under `skills/<name>/`, and its `skill-<name>` entry delivers it to `.claude/skills/<name>/`. The
+run checks out zgeoff/skills at the commit that `sync/skills-pin.json` holds in the tools commit it
+syncs, so a repo's sync pull request names both commits. A skill entry is opt-in, so a repo takes
+only the skills for the work it holds. One exception: `skill-pr-evidence` reaches every repo,
+because every agent that opens a pull request needs it. A repo keeps its own rules for the same area
+in a `project-<name>` skill beside it, which repo-sync never touches, and the shared skill tells the
+reader to load both. The entry lists every file in its skill folder, since the skill links its
+references by relative path; `scripts/check-sync-manifest.sh` fails on a file the entry omits, and
+reads zgeoff/skills from the tree that `bun run skills:install` unpacks. The docs-writing and
+skill-writing entries also deliver the docs check scripts from this repo.
+
+This repo takes `code-style` and `docs-writing` from the same pin. `bun run skills:install`, which
+`bun install` runs, unpacks zgeoff/skills at the pinned commit into the git-ignored
+`.zgeoff-skills/<commit>/` and links each skill there from `.claude/skills/`. Two installs in one
+checkout run one at a time, through the lock file `.zgeoff-skills.lock`. The verb-contract test
+reads code-style's role table from that tree, and the function-verb test reads its banned verbs.
 
 A reference that fits only some repos, such as one for a language a repo never uses, names the other
 repos in its `except`, so they never load it. Every link to it in the entry's Markdown files sits in
@@ -182,7 +200,8 @@ entry, because the entry's current files can still need it. That covers an entry
 leaves out of `include`, and an entry that failed. A retired file of an entry that the manifest no
 longer holds stays when the repo lists that entry in `skip`.
 [`scripts/remove-retired-sync-files.sh`](../../scripts/remove-retired-sync-files.sh) reads the
-earlier manifests from this repo's history, so the workflow checks out the full history.
+earlier manifests from this repo's history, and the versions of a zgeoff/skills source from that
+repo's history, so the workflow checks out the full history of both.
 
 ## Auto-merge
 

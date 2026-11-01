@@ -1,8 +1,8 @@
 export interface SyncDispatchFacts {
-  // The event that started the run: the completed Main run, or a dispatch from another repo.
+  // The event that started the run, which is the completed Main run.
   readonly event: string;
 
-  // The commit the completed Main run checked; empty for a dispatch from another repo.
+  // The commit the completed Main run checked.
   readonly runCommit: string;
 
   // The commits of the green Main push runs on main, newest first.
@@ -11,7 +11,6 @@ export interface SyncDispatchFacts {
 
 export type SyncDispatchRange =
   | { readonly kind: 'skip'; readonly reason: string }
-  | { readonly kind: 'always'; readonly commit: string }
   | { readonly kind: 'range'; readonly commit: string; readonly previous: string | null };
 
 // A newer push cancels the checks of an older one, so a commit can land with no green run of its
@@ -19,12 +18,6 @@ export type SyncDispatchRange =
 // two green commits cover every commit between them in whatever order they finish.
 export function pickSyncDispatchRange(facts: Readonly<SyncDispatchFacts>): SyncDispatchRange {
   const [newest] = facts.greenCommits;
-
-  if (facts.event === 'repository_dispatch') {
-    return newest === undefined
-      ? { kind: 'skip', reason: 'main of zgeoff/tools has no green commit' }
-      : { kind: 'always', commit: newest };
-  }
 
   if (facts.event !== 'workflow_run') {
     return { kind: 'skip', reason: `the ${facts.event} event starts no sync` };

@@ -238,26 +238,25 @@ test('it types runAgentHook from the shipped declarations for a TypeScript consu
     }),
   );
 
-  const result = await $`${ctx.tscPath} -p ${ctx.project} --listFilesOnly`
+  // One compile both lists the files it read and checks them, so the test pays for one tsc start.
+  const result = await $`${ctx.tscPath} -p ${ctx.project} --listFiles`
     .cwd(ctx.project)
     .env(ctx.env)
     .nothrow()
     .quiet();
 
-  const listed = result.stdout.toString();
+  const lines = result.stdout.toString().split('\n');
 
+  expect(lines.filter((line) => /error TS\d+/u.test(line))).toStrictEqual([]);
   expect(result.exitCode).toBe(0);
-  expect(listed).toContain('node_modules/@zgeoff/agent-hooks/dist/index.d.ts');
-  expect(listed).not.toContain('node_modules/@zgeoff/agent-hooks/src/');
 
-  const checked = await $`${ctx.tscPath} -p ${ctx.project}`
-    .cwd(ctx.project)
-    .env(ctx.env)
-    .nothrow()
-    .quiet();
+  expect(lines).toContainEqual(
+    expect.stringContaining('node_modules/@zgeoff/agent-hooks/dist/index.d.ts'),
+  );
 
-  expect(checked.stdout.toString()).toBe('');
-  expect(checked.exitCode).toBe(0);
+  expect(lines).not.toContainEqual(
+    expect.stringContaining('node_modules/@zgeoff/agent-hooks/src/'),
+  );
 });
 
 test('it writes the hook entries through the installed agent-hooks bin', async () => {

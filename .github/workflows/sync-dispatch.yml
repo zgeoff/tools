@@ -5,10 +5,13 @@
 #
 # A green Main push run on main sends the newest green commit when a synced
 # source changed between the green commit before its own and that commit. A
-# zgeoff-skills-sync event, which zgeoff/skills sends here, sends the newest
-# green commit with no check. The job mints the sync App's token from the
-# REPO_SYNC_APP_CLIENT_ID and REPO_SYNC_APP_PRIVATE_KEY secrets, and a dispatch
-# needs only its contents write.
+# zgeoff-skills-sync event, which zgeoff/skills sends from each green main with
+# its commit in client_payload.sha, opens a pull request here that moves
+# sync/skills-pin.json to that commit, with auto-merge on; its merge is the
+# synced change that the next green Main run sends. Each job mints the sync
+# App's token from the REPO_SYNC_APP_CLIENT_ID and REPO_SYNC_APP_PRIVATE_KEY
+# secrets: a dispatch needs only its contents write, and the pin pull request
+# its contents and pull-requests write on this repo.
 name: Sync dispatch
 
 on:
@@ -25,10 +28,9 @@ jobs:
     # The run holds an App token, so it starts only from a green push to main
     # of this repository, never from a fork's run or a republish.
     if: >-
-      github.event_name == 'repository_dispatch' || ( github.event.workflow_run.conclusion ==
-      'success' && github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main' &&
-      github.event.workflow_run.head_repository.full_name == github.repository)
+      github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'
+      && github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # No concurrency group: GitHub keeps one pending run per group and drops the
@@ -78,3 +80,46 @@ jobs:
           REPO: ${{ github.repository }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: bun run --silent ci:send-sync-dispatches
+
+  skills-pin:
+    name: Move the zgeoff/skills pin
+    # Only a token with write access to this repo can send the event, and the
+    # step moves the pin only to a commit on main of zgeoff/skills.
+    if: github.event_name == 'repository_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Each run rewrites the one pin branch, so the runs take turns. Events can
+    # arrive out of commit order, and the default would let a waiting run for
+    # an older commit replace one for a newer commit, so queue: max keeps each.
+    concurrency:
+      group: skills-pin
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+          no-cache: true
+
+      - name: Mint the sync App token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          client-id: ${{ secrets.REPO_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.REPO_SYNC_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Open the pin pull request
+        env:
+          SKILLS_COMMIT: ${{ github.event.client_payload.sha }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: bun run --silent ci:write-skills-pin-pull-request

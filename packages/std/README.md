@@ -75,6 +75,17 @@ import { readOptionalText } from '@zgeoff/std';
 const lefthook = await readOptionalText('lefthook.yml');
 ```
 
+### `writeStdout`
+
+Writes a text to stdout as it is, with no newline added. Pass it as the `writeOutput` of a command's
+options at its entry point, so a test hands in its own writer.
+
+```ts
+import { writeStdout } from '@zgeoff/std';
+
+process.exitCode = runCheck({ cwd: process.cwd(), writeOutput: writeStdout });
+```
+
 ## Typed helpers
 
 Each typed helper holds the one type assertion that its job needs, because TypeScript cannot prove

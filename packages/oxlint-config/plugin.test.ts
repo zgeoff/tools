@@ -1,6 +1,8 @@
 import { expect, test } from 'bun:test';
-import { readFile, symlink } from 'node:fs/promises';
+import { symlink } from 'node:fs/promises';
 import { join } from 'node:path';
+import { nodeFileSystem } from '../../scripts/ci/node-file-system.ts';
+import { readPinnedSkillText } from '../../test-utils/read-pinned-skill-text.ts';
 import { collectBannedVerbs } from './test-utils/collect-banned-verbs.ts';
 import { createLintTree } from './test-utils/create-lint-tree.ts';
 import { runLintIn } from './test-utils/run-lint-in.ts';
@@ -313,9 +315,10 @@ test('it skips names listed in the exemptNames option', async () => {
 });
 
 test('it rejects every verb the shared skill bans', async () => {
-  const markdown = await readFile(
-    join(import.meta.dir, '..', '..', '.claude', 'skills', 'code-style', 'SKILL.md'),
-    'utf8',
+  const markdown = await readPinnedSkillText(
+    nodeFileSystem,
+    join(import.meta.dir, '..', '..'),
+    'skills/code-style/SKILL.md',
   );
 
   const banned = collectBannedVerbs(markdown).filter((verb) => verb !== 'handle');

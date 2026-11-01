@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { parseSyncEntries } from './parse-sync-entries.ts';
 
-test('it reads each entry with its defaults for build, optIn and scripts', () => {
+test('it reads each entry with its defaults for build, optIn and scripts, and each file in tools', () => {
   const entries = parseSyncEntries([
     {
       name: 'editorconfig',
@@ -22,7 +22,7 @@ test('it reads each entry with its defaults for build, optIn and scripts', () =>
     {
       name: 'editorconfig',
       description: 'The editor config',
-      files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+      files: [{ repo: 'zgeoff/tools', source: 'sync/editorconfig', target: '.editorconfig' }],
       build: '',
       optIn: false,
       scripts: {},
@@ -30,10 +30,52 @@ test('it reads each entry with its defaults for build, optIn and scripts', () =>
     {
       name: 'hook-demo',
       description: 'The demo hook',
-      files: [{ source: 'sync/run.sh', target: 'run.sh', mode: '0755', except: ['Kettle'] }],
+      files: [
+        {
+          repo: 'zgeoff/tools',
+          source: 'sync/run.sh',
+          target: 'run.sh',
+          mode: '0755',
+          except: ['Kettle'],
+        },
+      ],
       build: 'bun install',
       optIn: true,
       scripts: { 'check:demo': 'true' },
+    },
+  ]);
+});
+
+test('it reads a file whose source sits in zgeoff/skills', () => {
+  const entries = parseSyncEntries([
+    {
+      name: 'skill-kettle',
+      description: 'The kettle skill',
+      files: [
+        {
+          repo: 'zgeoff/skills',
+          source: 'skills/kettle/SKILL.md',
+          target: '.claude/skills/kettle/SKILL.md',
+        },
+      ],
+      optIn: true,
+    },
+  ]);
+
+  expect(entries).toStrictEqual([
+    {
+      name: 'skill-kettle',
+      description: 'The kettle skill',
+      files: [
+        {
+          repo: 'zgeoff/skills',
+          source: 'skills/kettle/SKILL.md',
+          target: '.claude/skills/kettle/SKILL.md',
+        },
+      ],
+      build: '',
+      optIn: true,
+      scripts: {},
     },
   ]);
 });
@@ -92,6 +134,16 @@ test.each([
         name: 'editorconfig',
         description: 'The editor config',
         files: [{ source: 'a', target: 'b', mode: 644 }],
+      },
+    ],
+  ],
+  [
+    'a file whose repo is no repo the sync checks out',
+    [
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ repo: 'acme/kettle', source: 'a', target: 'b' }],
       },
     ],
   ],

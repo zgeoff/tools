@@ -4,18 +4,37 @@
 # every source whose target is a workflow, a string `build` when present, a
 # `scripts` field that matches the package.json scripts the build writes, an
 # `except` that lists owner/repo names, no link to an excepted file outside a
-# block that needs it, and every file under sync/skills/<name>/ listed by the
-# entry that ships that skill, except the tests, which stay here.
-# Usage: check-sync-manifest.sh [manifest]
+# block that needs it, a `repo` that names zgeoff/tools or zgeoff/skills, and
+# every file under skills/<name>/ in zgeoff/skills listed by the entry that
+# ships that skill, except the tests.
+#
+# A source whose `repo` is zgeoff/skills resolves in the zgeoff/skills tree at
+# the commit sync/skills-pin.json pins, which bun run skills:install unpacks
+# under .zgeoff-skills/, or in the tree the second argument names.
+# Usage: check-sync-manifest.sh [manifest [skills-tree]]
 set -euo pipefail
 
 manifest="${1:-sync/manifest.json}"
+skills_tree="${2:-}"
 marker='repo-sync delivers this file from zgeoff/tools'
 errors=0
 
 report() {
   echo "check-sync-manifest: $1" >&2
   errors=1
+}
+
+if [ -z "$skills_tree" ] && [ -f sync/skills-pin.json ]; then
+  skills_tree=".zgeoff-skills/$(jq -r '.commit' sync/skills-pin.json)"
+fi
+
+# Prints the path of a source, in this checkout or in the zgeoff/skills tree.
+source_path() {
+  if [ "$1" = zgeoff/skills ]; then
+    printf '%s/%s' "$skills_tree" "$2"
+  else
+    printf '%s' "$2"
+  fi
 }
 
 # A loop fed by a process substitution ignores the exit status of the jq that
@@ -84,16 +103,29 @@ while IFS= read -r name; do
 done < <(jq -r '.[] | select((.build | type) == "string" or has("scripts"))
   | select((has("scripts") | not) or (.scripts | type == "object" and all(.[]; type == "string"))) | .name' "$manifest")
 
-while IFS=$'\t' read -r name source target; do
-  if [ ! -f "$source" ]; then
-    report "entry '$name' lists source $source, which does not exist"
+while IFS=$'\t' read -r name source repo; do
+  report "entry '$name' gives $source the repo $repo, which is neither zgeoff/tools nor zgeoff/skills"
+done < <(jq -r '.[] | .name as $n | .files[] | select(has("repo"))
+  | select(.repo != "zgeoff/tools" and .repo != "zgeoff/skills")
+  | [$n, .source, (.repo | tojson)] | @tsv' "$manifest")
+
+if jq -e 'any(.[].files[]; .repo == "zgeoff/skills")' "$manifest" > /dev/null && [ ! -d "$skills_tree" ]; then
+  report "an entry reads zgeoff/skills, but its tree '$skills_tree' is missing; run bun run skills:install"
+  exit "$errors"
+fi
+
+while IFS=$'\t' read -r name repo source target; do
+  path=$(source_path "$repo" "$source")
+
+  if [ ! -f "$path" ]; then
+    report "entry '$name' lists source $source of $repo, which does not exist"
     continue
   fi
 
-  if [[ "$target" == .github/workflows/* ]] && ! grep -qF "$marker" "$source"; then
+  if [[ "$target" == .github/workflows/* ]] && ! grep -qF "$marker" "$path"; then
     report "entry '$name' targets $target, but $source lacks the line '$marker'"
   fi
-done < <(jq -r '.[] | .name as $n | .files[] | [$n, .source, .target] | @tsv' "$manifest")
+done < <(jq -r '.[] | .name as $n | .files[] | [$n, (.repo // "zgeoff/tools"), .source, .target] | @tsv' "$manifest")
 
 while IFS=$'\t' read -r name source; do
   report "entry '$name' gives $source an except that is not a list of owner/repo names"
@@ -117,11 +149,12 @@ while IFS=$'\t' read -r name repo; do
     '.[] | select(.name == $name) | .files[]
       | select((.except // []) | map(ascii_downcase) | index($repo)) | .target' "$manifest")
 
-  while IFS=$'\t' read -r source target; do
-    [ -f "$source" ] || continue
+  while IFS=$'\t' read -r source_repo source target; do
+    path=$(source_path "$source_repo" "$source")
+    [ -f "$path" ] || continue
     copy="$root/$target"
     mkdir -p "$(dirname "$copy")"
-    cp "$source" "$copy"
+    cp "$path" "$copy"
 
     if ! problem=$(bash "$scripts_dir/remove-excluded-blocks.sh" "$copy" "${excluded[@]}" 2>&1); then
       report "entry '$name' cannot strip $source: ${problem#remove-excluded-blocks: }"
@@ -140,32 +173,26 @@ while IFS=$'\t' read -r name repo; do
     '.[] | select(.name == $name) | .files[]
       | select(.target | endswith(".md"))
       | select((.except // []) | map(ascii_downcase) | index($repo) | not)
-      | [.source, .target] | @tsv' "$manifest")
+      | [(.repo // "zgeoff/tools"), .source, .target] | @tsv' "$manifest")
 done < <(jq -r '.[] | .name as $n
   | [.files[] | .except // [] | select(type == "array") | .[] | strings | ascii_downcase] | unique | .[]
   | [$n, .] | @tsv' "$manifest")
 
 # A skill links its references by relative path, so a file the entry omits
 # arrives downstream as a dead link. Each entry that ships a file from a skill
-# folder must ship the whole folder, since a caller can select it alone.
-if [ -d sync/skills ]; then
+# folder of zgeoff/skills must ship the whole folder, since a caller can select
+# it alone.
+while IFS= read -r prefix; do
   while IFS= read -r file; do
-    skill=${file#sync/skills/}
-    prefix="sync/skills/${skill%%/*}/"
-    owners=$(jq -r --arg prefix "$prefix" \
-      '.[] | select(any(.files[]; .source | startswith($prefix))) | .name' "$manifest")
-
-    if [ -z "$owners" ]; then
-      report "skill folder $prefix holds $file, but no entry lists a file from that folder"
-      continue
-    fi
+    source=${file#"$skills_tree"/}
 
     while IFS= read -r name; do
-      report "entry '$name' ships $prefix, but omits $file"
-    done < <(jq -r --arg prefix "$prefix" --arg file "$file" \
-      '.[] | select(any(.files[]; .source | startswith($prefix)))
-        | select(any(.files[]; .source == $file) | not) | .name' "$manifest")
-  done < <(find sync/skills -type f -not -name '*.test.ts' | sort)
-fi
+      report "entry '$name' ships $prefix of zgeoff/skills, but omits $source"
+    done < <(jq -r --arg prefix "$prefix" --arg file "$source" \
+      '.[] | select(any(.files[]; .repo == "zgeoff/skills" and (.source | startswith($prefix))))
+        | select(any(.files[]; .repo == "zgeoff/skills" and .source == $file) | not) | .name' "$manifest")
+  done < <(find "$skills_tree/$prefix" -type f -not -name '*.test.ts' | sort)
+done < <(jq -r '[.[].files[] | select(.repo == "zgeoff/skills") | .source
+  | select(startswith("skills/")) | split("/")[0:2] | join("/") + "/"] | unique | .[]' "$manifest")
 
 exit "$errors"

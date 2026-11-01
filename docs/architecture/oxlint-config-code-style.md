@@ -47,8 +47,9 @@ reads declared return types, since it runs without type information. It runs thr
   type the rule cannot see, such as an import, a type parameter or an indexed access, never fails a
   check.
 
-A test in this package reads the role table in the shared code-style skill and fails when the
-skill's no-I/O verbs and the rule's differ in either direction.
+A test in this package reads the role table in the shared code-style skill, at the zgeoff/skills
+commit that `sync/skills-pin.json` pins, and fails when the skill's no-I/O verbs and the rule's
+differ in either direction.
 
 ## `zgeoff/module-order`
 
