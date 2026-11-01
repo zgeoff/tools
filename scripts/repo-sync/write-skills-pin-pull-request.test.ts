@@ -891,3 +891,59 @@ test('it fails and writes nothing when the open pull request holds no full commi
     '::error::the open pin pull request #41 holds no full commit ID in sync/skills-pin.json\n',
   ]);
 });
+
+test('it fails and writes nothing when GitHub cannot compare the open pin', async () => {
+  const ctx = await setupTest();
+
+  const pinned = '0123456789abcdef0123456789abcdef01234567';
+  const proposed = '456789abcdef0123456789abcdef0123456789ab';
+  const commit = '89abcdef0123456789abcdef0123456789abcdef';
+
+  await ctx.writePin(pinned);
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'pr',
+      'list',
+      '--repo',
+      'example/tools',
+      '--head',
+      'skills-pin',
+      '--state',
+      'open',
+      '--json',
+      'number,isCrossRepository',
+    ],
+    { exitCode: 0, stdout: '[{"number":41,"isCrossRepository":false}]', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      'repos/example/tools/contents/sync/skills-pin.json?ref=skills-pin',
+      '-H',
+      'Accept: application/vnd.github.raw',
+    ],
+    { exitCode: 0, stdout: JSON.stringify({ commit: proposed }), stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', `repos/zgeoff/skills/compare/${pinned}...${commit}`, '--jq', '.status'],
+    { exitCode: 0, stdout: 'ahead\n', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', `repos/zgeoff/skills/compare/${proposed}...${commit}`, '--jq', '.status'],
+    { exitCode: 1, stdout: '', stderr: 'gh: Server Error (HTTP 502)' },
+  );
+
+  const pinning = ctx.pin(commit);
+
+  expect(pinning).rejects.toThrow(
+    `gh api compare ${proposed}...${commit} failed: gh: Server Error (HTTP 502)`,
+  );
+
+  expect(ctx.commands.calls).toHaveLength(4);
+});

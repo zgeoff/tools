@@ -174,7 +174,7 @@ async function readProposedPin(
   return parseSkillsPin(proposedValue);
 }
 
-// Returns empty when the API refuses, as it does for a commit that zgeoff/skills does not hold.
+// Returns empty when GitHub does not hold one of the commits.
 async function readCompareStatus(
   options: Readonly<WriteSkillsPinPullRequestOptions>,
   base: string,
@@ -187,7 +187,17 @@ async function readCompareStatus(
     '.status',
   ]);
 
-  return compared.exitCode === 0 ? compared.stdout.trim() : '';
+  if (compared.exitCode === 0) {
+    return compared.stdout.trim();
+  }
+
+  // A 404 is an answer, as GitHub gives it for a commit it does not hold. Any other failure stops
+  // the run, as a run that read it as a refusal could drop a pin move.
+  if (compared.stderr.includes('(HTTP 404)')) {
+    return '';
+  }
+
+  throw new Error(`gh api compare ${base}...${head} failed: ${compared.stderr.trim()}`);
 }
 
 function runGH(
