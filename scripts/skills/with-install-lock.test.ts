@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { existsSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { InstallLockOptions } from './with-install-lock.ts';
@@ -112,7 +112,7 @@ test('it fails and keeps the lock when its owner still runs after every try', as
   const run = withInstallLock(ctx.buildOptions({ attempts: 3 }), () => Promise.resolve());
 
   expect(run).rejects.toThrow(
-    `${ctx.lockPath} is held by another install; remove it if no install runs, then try again`,
+    `${ctx.lockPath} is held by another install; if no install runs, remove it and ${ctx.lockPath}.recovery, then try again`,
   );
 
   const owner = await readFile(ctx.lockPath, 'utf8');
@@ -122,12 +122,13 @@ test('it fails and keeps the lock when its owner still runs after every try', as
   expect(names).toStrictEqual(['install.lock']);
 });
 
-test('it puts back a lock that another owner made after the dead owner', async () => {
+test('it keeps a lock that a live owner made after the dead owner', async () => {
   const ctx = await setupTest();
 
   await writeFile(ctx.lockPath, '3003');
 
-  // Another waiter takes over the dead lock between this waiter's read of it and its move aside.
+  // Another waiter removes the dead lock and takes the lock between this waiter's first read and
+  // its read under the recovery lock.
   const probeOwner = (ownerID: string) => {
     if (ownerID === '3003') {
       writeFileSync(ctx.lockPath, '5005');
@@ -143,7 +144,28 @@ test('it puts back a lock that another owner made after the dead owner', async (
   expect(run).rejects.toThrow('is held by another install');
 
   const owner = await readFile(ctx.lockPath, 'utf8');
+  const names = await ctx.readNames();
 
   expect(owner).toBe('5005');
-  expect(existsSync(`${ctx.lockPath}.4242.dead`)).toBeFalse();
+  expect(names).toStrictEqual(['install.lock']);
+});
+
+test('it leaves a dead lock to the waiter that holds the recovery lock', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(ctx.lockPath, '3003');
+  await writeFile(`${ctx.lockPath}.recovery`, '6006');
+
+  const options = ctx.buildOptions({
+    probeOwner: (ownerID) => ownerID !== '3003',
+    attempts: 2,
+  });
+
+  const run = withInstallLock(options, () => Promise.resolve());
+
+  expect(run).rejects.toThrow('is held by another install');
+
+  const owner = await readFile(ctx.lockPath, 'utf8');
+
+  expect(owner).toBe('3003');
 });

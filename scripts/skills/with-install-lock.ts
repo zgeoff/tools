@@ -1,4 +1,4 @@
-import { link, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { link, readFile, rm, writeFile } from 'node:fs/promises';
 
 export interface InstallLockOptions {
   // The lock file; its folder must exist.
@@ -17,7 +17,7 @@ export interface InstallLockOptions {
 }
 
 // Runs the work while this process holds the lock. The lock file is a hard link to a file that
-// names its owner, so it never exists without one. A lock whose owner no longer runs is taken over.
+// names its owner, so it never exists without one. A lock whose owner no longer runs is removed.
 export async function withInstallLock<T>(
   options: Readonly<InstallLockOptions>,
   work: () => Promise<T>,
@@ -38,7 +38,7 @@ export async function withInstallLock<T>(
         }
       }
 
-      await removeDeadLock(options);
+      await removeDeadLock(options, claim);
 
       await options.wait();
     }
@@ -47,7 +47,7 @@ export async function withInstallLock<T>(
   }
 
   throw new Error(
-    `${options.lockPath} is held by another install; remove it if no install runs, then try again`,
+    `${options.lockPath} is held by another install; if no install runs, remove it and ${options.lockPath}.recovery, then try again`,
   );
 }
 
@@ -70,34 +70,33 @@ function isErrorCode(error: unknown, code: string): boolean {
   return error instanceof Error && 'code' in error && error.code === code;
 }
 
-// The lock moves aside before it goes, so of two waiters that find the same dead owner only one
-// takes the lock away. A waiter that moved a lock another waiter had just made puts it back.
-async function removeDeadLock(options: Readonly<InstallLockOptions>): Promise<void> {
+// Only a waiter that holds the recovery lock removes a dead lock, and it reads the owner again under
+// that lock. No other process can free the lock path while a dead owner holds it, so the lock it
+// removes is always a dead one. A waiter that finds the recovery lock held lets its holder recover.
+async function removeDeadLock(options: Readonly<InstallLockOptions>, claim: string): Promise<void> {
   const owner = await readLockOwner(options.lockPath);
 
   if (owner === null || options.probeOwner(owner)) {
     return;
   }
 
-  const aside = `${options.lockPath}.${options.ownerID}.dead`;
+  const recoveryPath = `${options.lockPath}.recovery`;
+
+  const isRecovering = await createLock(claim, recoveryPath);
+
+  if (!isRecovering) {
+    return;
+  }
 
   try {
-    await rename(options.lockPath, aside);
-  } catch (error) {
-    if (isErrorCode(error, 'ENOENT')) {
-      return;
+    const current = await readLockOwner(options.lockPath);
+
+    if (current !== null && !options.probeOwner(current)) {
+      await rm(options.lockPath, { force: true });
     }
-
-    throw error;
+  } finally {
+    await rm(recoveryPath, { force: true });
   }
-
-  const movedOwner = await readLockOwner(aside);
-
-  if (movedOwner !== owner) {
-    await createLock(aside, options.lockPath);
-  }
-
-  await rm(aside, { force: true });
 }
 
 // Returns null when no lock exists.
