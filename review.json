@@ -1,8 +1,9 @@
 {
   "extends": "github:zgeoff/noslop-config",
   "rules": [
+    "github:zgeoff/skills/skills/code-style/SKILL.md",
     {
-      "path": "sync/skills/testing/SKILL.md",
+      "path": "github:zgeoff/skills/skills/testing/SKILL.md",
       "references": {
         "references/nixos.md": ["**/*.nix"],
         "references/frontend.md": ["**/*.tsx", "**/*.jsx"],
@@ -32,7 +33,7 @@
       }
     },
     {
-      "path": "sync/skills/docs-writing/SKILL.md",
+      "path": "github:zgeoff/skills/skills/docs-writing/SKILL.md",
       "references": {
         "references/architecture-docs.md": ["docs/architecture/**"],
         "references/docs-tree.md": ["docs/**"],
@@ -45,7 +46,6 @@
     "**/CLAUDE.md",
     "**/SKILL.md",
     ".claude/**/*.md",
-    ".cursor/rules/**",
-    "sync/skills/**/*.md"
+    ".cursor/rules/**"
   ]
 }

@@ -8,3 +8,8 @@ packages/*/.test-*
 scripts/.test-*
 scripts/*/.test-*
 test-utils/.test-*
+# zgeoff/skills at the pinned commit, which bun run skills:install unpacks and links this repo's
+# skills to.
+/.zgeoff-skills/
+/.claude/skills/code-style
+/.claude/skills/docs-writing

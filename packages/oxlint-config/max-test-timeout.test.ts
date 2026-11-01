@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
-import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { readPinnedSkillText } from '../../test-utils/read-pinned-skill-text.ts';
 import { runLintTree } from './test-utils/run-lint-tree.ts';
 
 test.each([
@@ -307,9 +307,9 @@ test('it reports the timeout on the line of an options object after the callback
 });
 
 test('it accepts the disable comment that the testing skill shows', async () => {
-  const markdown = await readFile(
-    join(import.meta.dir, '..', '..', 'sync', 'skills', 'testing', 'references', 'slow-tests.md'),
-    'utf8',
+  const markdown = await readPinnedSkillText(
+    join(import.meta.dir, '..', '..'),
+    'skills/testing/references/slow-tests.md',
   );
 
   const example = /## A test over its limit\n[\s\S]*?```ts\n(?<code>[\s\S]*?)```/u.exec(markdown)
@@ -331,9 +331,9 @@ test('it accepts the disable comment that the testing skill shows', async () => 
 });
 
 test('it holds the same lane limits as the Lanes table in the shared testing skill', async () => {
-  const markdown = await readFile(
-    join(import.meta.dir, '..', '..', 'sync', 'skills', 'testing', 'references', 'slow-tests.md'),
-    'utf8',
+  const markdown = await readPinnedSkillText(
+    join(import.meta.dir, '..', '..'),
+    'skills/testing/references/slow-tests.md',
   );
 
   const rows = [

@@ -85,90 +85,81 @@
     "optIn": true,
     "files": [
       {
-        "source": "sync/skills/testing/SKILL.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/testing/SKILL.md",
         "target": ".claude/skills/testing/SKILL.md"
       },
       {
-        "source": "sync/skills/testing/references/assertions.md",
-        "target": ".claude/skills/testing/references/assertions.md"
-      },
-      {
-        "source": "sync/skills/testing/references/claude-code-mods.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/testing/references/claude-code-mods.md",
         "target": ".claude/skills/testing/references/claude-code-mods.md"
       },
       {
-        "source": "sync/skills/testing/references/cleanup.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/testing/references/cleanup.md",
         "target": ".claude/skills/testing/references/cleanup.md"
       },
       {
-        "source": "sync/skills/testing/references/database.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/testing/references/database.md",
         "target": ".claude/skills/testing/references/database.md"
       },
       {
-        "source": "sync/skills/testing/references/factories.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/testing/references/factories.md",
         "target": ".claude/skills/testing/references/factories.md"
       },
       {
-        "source": "sync/skills/testing/references/frontend.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/testing/references/frontend.md",
         "target": ".claude/skills/testing/references/frontend.md",
         "except": ["zgeoff/atc"]
       },
       {
-        "source": "sync/skills/testing/references/go.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/testing/references/go.md",
         "target": ".claude/skills/testing/references/go.md",
         "except": ["zgeoff/atc"]
       },
       {
-        "source": "sync/skills/testing/references/http.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/testing/references/http.md",
         "target": ".claude/skills/testing/references/http.md"
       },
       {
-        "source": "sync/skills/testing/references/loops.md",
-        "target": ".claude/skills/testing/references/loops.md"
-      },
-      {
-        "source": "sync/skills/testing/references/matchers.md",
-        "target": ".claude/skills/testing/references/matchers.md"
-      },
-      {
-        "source": "sync/skills/testing/references/nixos.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/testing/references/nixos.md",
         "target": ".claude/skills/testing/references/nixos.md",
         "except": ["zgeoff/atc"]
       },
       {
-        "source": "sync/skills/testing/references/observability.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/testing/references/observability.md",
         "target": ".claude/skills/testing/references/observability.md"
       },
       {
-        "source": "sync/skills/testing/references/schemas-and-parsers.md",
-        "target": ".claude/skills/testing/references/schemas-and-parsers.md"
+        "repo": "zgeoff/skills",
+        "source": "skills/testing/references/seeding.md",
+        "target": ".claude/skills/testing/references/seeding.md"
       },
       {
-        "source": "sync/skills/testing/references/shell.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/testing/references/shell.md",
         "target": ".claude/skills/testing/references/shell.md"
       },
       {
-        "source": "sync/skills/testing/references/slow-tests.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/testing/references/slow-tests.md",
         "target": ".claude/skills/testing/references/slow-tests.md"
       },
       {
-        "source": "sync/skills/testing/references/stored-state.md",
-        "target": ".claude/skills/testing/references/stored-state.md"
-      },
-      {
-        "source": "sync/skills/testing/references/system-tests.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/testing/references/system-tests.md",
         "target": ".claude/skills/testing/references/system-tests.md"
       },
       {
-        "source": "sync/skills/testing/references/test-data.md",
-        "target": ".claude/skills/testing/references/test-data.md"
-      },
-      {
-        "source": "sync/skills/testing/references/time-and-waiting.md",
-        "target": ".claude/skills/testing/references/time-and-waiting.md"
-      },
-      {
-        "source": "sync/skills/testing/references/workflows.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/testing/references/workflows.md",
         "target": ".claude/skills/testing/references/workflows.md"
       }
     ]
@@ -179,7 +170,8 @@
     "optIn": true,
     "files": [
       {
-        "source": ".claude/skills/code-style/SKILL.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/code-style/SKILL.md",
         "target": ".claude/skills/code-style/SKILL.md"
       }
     ]
@@ -190,28 +182,29 @@
     "optIn": true,
     "files": [
       {
-        "source": "sync/skills/docs-writing/SKILL.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/docs-writing/SKILL.md",
         "target": ".claude/skills/docs-writing/SKILL.md"
       },
       {
-        "source": "sync/skills/docs-writing/references/architecture-docs.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/docs-writing/references/architecture-docs.md",
         "target": ".claude/skills/docs-writing/references/architecture-docs.md"
       },
       {
-        "source": "sync/skills/docs-writing/references/copying-what-the-code-owns.md",
-        "target": ".claude/skills/docs-writing/references/copying-what-the-code-owns.md"
+        "repo": "zgeoff/skills",
+        "source": "skills/docs-writing/references/doc-files.md",
+        "target": ".claude/skills/docs-writing/references/doc-files.md"
       },
       {
-        "source": "sync/skills/docs-writing/references/docs-tree.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/docs-writing/references/docs-tree.md",
         "target": ".claude/skills/docs-writing/references/docs-tree.md"
       },
       {
-        "source": "sync/skills/docs-writing/references/readmes.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/docs-writing/references/readmes.md",
         "target": ".claude/skills/docs-writing/references/readmes.md"
-      },
-      {
-        "source": "sync/skills/docs-writing/references/reviewing-a-doc.md",
-        "target": ".claude/skills/docs-writing/references/reviewing-a-doc.md"
       },
       {
         "source": "packages/chex/src/docs/check-prose.sh",
@@ -236,7 +229,8 @@
     "optIn": true,
     "files": [
       {
-        "source": "sync/skills/skill-writing/SKILL.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/skill-writing/SKILL.md",
         "target": ".claude/skills/skill-writing/SKILL.md"
       },
       {
@@ -264,7 +258,8 @@
     "optIn": true,
     "files": [
       {
-        "source": "sync/skills/ci-design/SKILL.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/ci-design/SKILL.md",
         "target": ".claude/skills/ci-design/SKILL.md"
       }
     ]
@@ -274,7 +269,8 @@
     "description": "The shared pr-evidence skill, which has an agent upload a PR screenshot to the files.geoff.cloud file drop and link it, never commit it; every repo takes it, because every agent that opens a pull request needs it",
     "files": [
       {
-        "source": "sync/skills/pr-evidence/SKILL.md",
+        "repo": "zgeoff/skills",
+        "source": "skills/pr-evidence/SKILL.md",
         "target": ".claude/skills/pr-evidence/SKILL.md"
       }
     ]

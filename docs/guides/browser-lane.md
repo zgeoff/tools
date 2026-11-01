@@ -4,8 +4,8 @@ A repo that uses [`@zgeoff/rig`](../../packages/rig/README.md) gets a browser la
 script of its own: `rig browser` runs the repo's `.browser.test.ts` suites, each file in its own
 process, against Chrome through `Bun.WebView`.
 [How rig works](../architecture/rig.md#the-browser-lane) describes what the lane does for a run. The
-[testing skill](../../sync/skills/testing/references/system-tests.md#browser-suites) holds the rules
-for the suites themselves.
+[testing skill](https://github.com/zgeoff/skills/blob/main/skills/testing/references/system-tests.md#browser-suites)
+holds the rules for the suites themselves.
 
 ## Adopt the lane
 

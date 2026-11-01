@@ -84,8 +84,9 @@ test file is gone is not reported.
 
 Each lane has a per-test time limit, and a test in the unit run keeps the default timeout of
 `bun test`. A test that needs longer hides a cost that the testing skill's
-[Slow tests](../../sync/skills/testing/SKILL.md#slow-tests) table names a fix for, so the rule
-reports, in any linted file, a timeout above the limit of the file's lane:
+[Slow tests](https://github.com/zgeoff/skills/blob/main/skills/testing/references/slow-tests.md)
+table names a fix for, so the rule reports, in any linted file, a timeout above the limit of the
+file's lane:
 
 - a number argument after the name of a `test`, `it` or `describe` call, or of a chain of their
   modifiers, such as `test.skipIf(gate).each(rows)(…)`;
@@ -104,11 +105,12 @@ when the lane is a standard one or one that the `lanes` option declares, except 
 directory alone selects it. Any other file under an `e2e/` directory or a `-e2e` package that
 `zgeoff/test-beside-module` exempts is in the `e2e` lane, and every other file is in the unit run,
 `integration/` and `evals/` included. The standard lanes and their limits are the ones in the
-skill's [Lanes](../../sync/skills/testing/references/slow-tests.md#lanes) table, which a test of the
-rule pins. A repo with a `rig.config.ts` gets every lane and limit from the table that file
-resolves, and the rule reports a `lanes` option there as `zgeoff/test-beside-module` does. In a repo
-without one, the `lanes` option maps a lane to its limit in milliseconds, and an entry adds a
-project lane or changes the limit of a standard one:
+skill's
+[Lanes](https://github.com/zgeoff/skills/blob/main/skills/testing/references/slow-tests.md#lanes)
+table, which a test of the rule pins. A repo with a `rig.config.ts` gets every lane and limit from
+the table that file resolves, and the rule reports a `lanes` option there as
+`zgeoff/test-beside-module` does. In a repo without one, the `lanes` option maps a lane to its limit
+in milliseconds, and an entry adds a project lane or changes the limit of a standard one:
 
 ```json
 { "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": { "kvm": 60000 } }] } }
@@ -119,7 +121,7 @@ the `e2e` lane, so a config that lists lane names keeps passing lint until it st
 
 A test over its lane's limit carries a disable comment whose reason gives the measured time and
 either a ticket or `floor:` with the evidence that the time cannot move, as the skill's
-[A test over its limit](../../sync/skills/testing/references/slow-tests.md#a-test-over-its-limit)
+[A test over its limit](https://github.com/zgeoff/skills/blob/main/skills/testing/references/slow-tests.md#a-test-over-its-limit)
 shows. oxlint honours the comment with its reason, and `zgeoff/test-timeout-exception-ticket` reads
 the reason.
 
