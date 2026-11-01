@@ -7,6 +7,7 @@ import { createGitCommit } from '../../test-utils/create-git-commit.ts';
 import { createSideGitCommit } from '../../test-utils/create-side-git-commit.ts';
 import { createStubPullRequestGH } from '../../test-utils/create-stub-pull-request-gh.ts';
 import { createTrackedGitCommit } from '../../test-utils/create-tracked-git-commit.ts';
+import { createTrackedRepo } from '../../test-utils/create-tracked-repo.ts';
 import { moveGitCommitToRemote } from '../../test-utils/move-git-commit-to-remote.ts';
 import { readGitHead } from '../../test-utils/read-git-head.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
@@ -51,6 +52,11 @@ async function setupTest() {
   );
 
   await $`git -C ${tools} init -q`.env(env).quiet();
+
+  await mkdir(skills);
+  await createTrackedRepo(skills, {});
+  await createGitCommit(skills, env, {});
+
   await $`git init -q --bare -b main ${origin}`.env(env);
   await $`git clone -q ${origin} ${seed}`.env(env).quiet();
 
@@ -82,10 +88,7 @@ async function setupTest() {
 
     await afterClone();
     await cp(tools, join(caller, '.repo-sync'), { recursive: true });
-
-    if (existsSync(skills)) {
-      await cp(skills, join(caller, '.repo-sync-skills'), { recursive: true });
-    }
+    await cp(skills, join(caller, '.repo-sync-skills'), { recursive: true });
 
     return syncEntries({
       fileSystem: nodeFileSystem,
@@ -113,18 +116,6 @@ async function setupTest() {
   const writeSource = async (path: string, content: string) => {
     await mkdir(dirname(join(tools, path)), { recursive: true });
     await writeFile(join(tools, path), content);
-  };
-
-  // Commits the files in a checkout of zgeoff/skills, which each later run copies in beside the
-  // tools checkout; returns the commit.
-  const writeSkillsCommit = async (files: Readonly<Record<string, string>>) => {
-    if (!existsSync(skills)) {
-      await mkdir(skills);
-
-      await $`git -C ${skills} init -q`.env(env).quiet();
-    }
-
-    return createGitCommit(skills, env, files);
   };
 
   const removeSource = async (path: string) => {
@@ -221,12 +212,15 @@ async function setupTest() {
   return {
     origin,
     state,
+    env,
+
+    // The checkout of zgeoff/skills that each run copies in beside the tools checkout.
+    skills,
     output,
     runSync,
     writeMainCommit,
     writeSource,
     writeManifestCommit,
-    writeSkillsCommit,
     removeSource,
     readBranch,
     readBranchFiles,
@@ -329,7 +323,7 @@ test('it copies each file from the checkout of its repo and names both commits',
   await ctx.writeSource('sync/editorconfig', 'root = true\n');
   await ctx.writeSource('sync/kettle/check.sh', 'echo check\n');
 
-  const skillsCommit = await ctx.writeSkillsCommit({
+  const skillsCommit = await createGitCommit(ctx.skills, ctx.env, {
     'skills/kettle/SKILL.md': '# Kettle\n',
     'skills/kettle/references/descaling.md': '# Descaling\n',
   });
@@ -445,7 +439,7 @@ test('it deletes a retired copy of a zgeoff/skills source through that checkout'
 
   await ctx.writeManifestCommit(entries);
 
-  const skillsCommit = await ctx.writeSkillsCommit({
+  const skillsCommit = await createGitCommit(ctx.skills, ctx.env, {
     'skills/kettle/SKILL.md': '# Kettle\n',
     'skills/kettle/references/descaling.md': '# Descaling\n',
   });
