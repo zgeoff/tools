@@ -26,6 +26,14 @@ async function setupTest() {
       cwd: directory,
       stdout: 'pipe',
       stderr: 'pipe',
+      detached: true,
+    });
+
+    // oxlint leads its own process group, so a test that ends before it exits stops the whole group.
+    onTestFinished(() => {
+      if (subprocess.exitCode === null && subprocess.signalCode === null) {
+        process.kill(-subprocess.pid, 'SIGKILL');
+      }
     });
 
     const [exitCode, stdout] = await Promise.all([
