@@ -233,6 +233,9 @@ test.each([
   'git diff --no-ext-diff --no-textconv --stat',
   'git status',
   'cat "$(echo guide.md)"',
+  'cd packages && bun install',
+  'bun install 2>&1 | tail',
+  'bun install --verbose',
 ])('it refuses the Bash command %s when the install fails', async (command) => {
   const ctx = await setupTest();
 
@@ -276,27 +279,6 @@ test.each([
     'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n',
   );
 });
-
-test.each([
-  { label: 'a cd before it', command: 'cd packages && bun install' },
-  { label: 'a pipe after it', command: 'bun install 2>&1 | tail' },
-  { label: 'a flag the stub does not list', command: 'bun install --verbose' },
-])(
-  'it names the bun install it allows when it refuses bun install with $label and the install fails',
-  async (row) => {
-    const ctx = await setupTest();
-
-    await createStubInstall(ctx.fakeBin, { log: ctx.installLog, outcome: { kind: 'fails' } });
-
-    const result = ctx.runStub(ctx.buildPayload('Bash', { command: row.command }));
-
-    expect(result.status).toBe(2);
-
-    expect(result.stderr).toEndWith(
-      'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n',
-    );
-  },
-);
 
 test.each([
   'bun install',

@@ -71,6 +71,9 @@ test.each([
     { command: 'git diff --no-ext-diff --no-textconv --output=changes.patch' },
   ],
   ['bun install that adds a package', 'Bash', { command: 'bun install left-pad' }],
+  ['bun install after a cd', 'Bash', { command: 'cd packages && bun install' }],
+  ['bun install piped to tail', 'Bash', { command: 'bun install 2>&1 | tail' }],
+  ['bun install with a flag the gate does not list', 'Bash', { command: 'bun install --verbose' }],
   ['a plain git diff', 'Bash', { command: 'git diff' }],
   [
     'git diff with both flags that turn config programs off',
@@ -153,44 +156,6 @@ test.each([
     'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n',
   );
 });
-
-test.each([
-  ['a cd before it', 'cd packages && bun install'],
-  ['a pipe after it', 'bun install 2>&1 | tail'],
-  ['a flag the gate does not list', 'bun install --verbose'],
-])(
-  'it names the bun install it allows when it blocks bun install with %s and the gate cannot load',
-  async (_label, command) => {
-    const ctx = await setupTest();
-
-    const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
-
-    await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
-    await mkdir(join(ctx.directory, 'node_modules'));
-    await copyFile(ctx.hookPath, copiedHookPath);
-
-    const result = spawnSync('bun', ['--no-install', copiedHookPath], {
-      encoding: 'utf8',
-      env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: ctx.directory },
-      input: JSON.stringify({
-        hook_event_name: 'PreToolUse',
-        cwd: ctx.directory,
-        transcript_path: join(ctx.directory, 'transcript.jsonl'),
-        tool_name: 'Bash',
-        tool_input: { command },
-      }),
-    });
-
-    expect({ status: result.status, stdout: result.stdout }).toStrictEqual({
-      status: 2,
-      stdout: '',
-    });
-
-    expect(result.stderr).toEndWith(
-      'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n',
-    );
-  },
-);
 
 test.each([
   'bun install',
