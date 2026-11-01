@@ -165,6 +165,24 @@ test('it opens a pull request that moves the pin, with auto-merge on', async () 
 
   expect(exitCode).toBe(0);
 
+  expect(ctx.commands.calls).toContainEqual([
+    'gh',
+    'api',
+    '-X',
+    'PUT',
+    'repos/example/tools/contents/sync/skills-pin.json',
+    '-f',
+    'message=chore(skills): pin zgeoff/skills at 89abcdef0123',
+    '-f',
+    `content=${Buffer.from(`{\n  "commit": "${commit}"\n}\n`).toString('base64')}`,
+    '-f',
+    'sha=5d41402abc4b2a76b9719d911017c592ae0f2f0a',
+    '-f',
+    'branch=skills-pin',
+    '--jq',
+    '.commit.sha',
+  ]);
+
   expect(ctx.commands.calls.at(-1)).toStrictEqual([
     'gh',
     'pr',
@@ -460,6 +478,25 @@ test('it moves the branch of the open pin pull request to a newer commit', async
   const exitCode = await ctx.pin(commit);
 
   expect(exitCode).toBe(0);
+
+  expect(ctx.commands.calls).toContainEqual([
+    'gh',
+    'api',
+    '-X',
+    'PUT',
+    'repos/example/tools/contents/sync/skills-pin.json',
+    '-f',
+    'message=chore(skills): pin zgeoff/skills at 89abcdef0123',
+    '-f',
+    `content=${Buffer.from(`{\n  "commit": "${commit}"\n}\n`).toString('base64')}`,
+    '-f',
+    'sha=5d41402abc4b2a76b9719d911017c592ae0f2f0a',
+    '-f',
+    'branch=skills-pin',
+    '--jq',
+    '.commit.sha',
+  ]);
+
   expect(ctx.output).toStrictEqual(['Updated pull request #41 for skills-pin.\n']);
 });
 
