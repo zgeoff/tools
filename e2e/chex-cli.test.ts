@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import { buildInitGuardHooks } from '../test-utils/build-init-guard-hooks.ts';
 import { commitAllFiles } from '../test-utils/commit-all-files.ts';
 import { getChexE2EPack } from '../test-utils/get-chex-e2e-pack.ts';
 import { linkCommitlint } from '../test-utils/link-commitlint.ts';
@@ -356,7 +357,12 @@ test('it writes lefthook.yml and the check:docs script to disk for init', async 
   const packageJSON: unknown = await Bun.file(join(ctx.repo, 'package.json')).json();
 
   expect(run.exitCode).toBe(0);
-  expect(lefthook).toBe('extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n');
+
+  expect(lefthook).toBe(
+    `extends:
+  - node_modules/@zgeoff/chex/lefthook.yml
+${buildInitGuardHooks()}`,
+  );
 
   expect(packageJSON).toStrictEqual({
     name: 'kettle',
