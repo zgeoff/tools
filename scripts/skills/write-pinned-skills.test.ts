@@ -11,8 +11,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { join } from 'node:path';
-import { $ } from 'bun';
-import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import { writeSkillsArchive } from '../../test-utils/write-skills-archive.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { flockLockFile } from './flock-lock-file.ts';
@@ -33,14 +32,13 @@ async function setupTest() {
 
   const output: string[] = [];
 
-  // Packs the files as GitHub's archive of zgeoff/skills at the commit, under one top folder.
-  const writeArchive = async (commit: string, files: Readonly<Record<string, string>>) => {
-    const top = join(directory, 'pack', `skills-${commit}`);
-
-    await writeTreeFiles(top, files);
-
-    await $`tar -czf ${join(archives, commit)} -C ${join(directory, 'pack')} ${`skills-${commit}`}`.quiet();
-  };
+  const writeArchive = (commit: string, files: Readonly<Record<string, string>>) =>
+    writeSkillsArchive({
+      packDirectory: join(directory, 'pack'),
+      archivePath: join(archives, commit),
+      commit,
+      files,
+    });
 
   const writePin = (commit: string) =>
     writeFile(join(tools, 'sync', 'skills-pin.json'), JSON.stringify({ commit }));
