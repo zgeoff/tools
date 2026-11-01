@@ -60,6 +60,14 @@ export async function writeSkillsPinPullRequest(
 
   const proposed = openNumber === '' ? null : await readProposedPin(options);
 
+  if (openNumber !== '' && proposed === null) {
+    options.writeOutput(
+      `::error::the open pin pull request #${openNumber} holds no full commit ID in ${skillsPinPath}\n`,
+    );
+
+    return 1;
+  }
+
   const sincePin = await readCompareStatus(options, pinned, options.commit);
 
   const sinceProposed =
@@ -149,7 +157,8 @@ function runCheckedGH(
 }
 
 // The pin on the branch of the open pin pull request; null when the branch holds no full commit
-// ID. A failed read fails the run, as a run that skipped the check could replace a newer pin.
+// ID. The run stops on a failed read or a null, as a run that skipped the check could replace a
+// newer pin.
 async function readProposedPin(
   options: Readonly<WriteSkillsPinPullRequestOptions>,
 ): Promise<string | null> {
