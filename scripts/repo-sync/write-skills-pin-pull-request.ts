@@ -94,28 +94,18 @@ export async function writeSkillsPinPullRequest(
     return 1;
   }
 
+  // A run that stopped after it opened the pull request left auto-merge off, so a later run that
+  // finds the branch already covers its commit turns auto-merge on for the branch as it stands.
+  if (move.kind === 'covered') {
+    options.writeOutput(`Nothing to pin: ${move.reason}.\n`);
+
+    return writeCoveredAutoMerge(options, openNumber, proposed);
+  }
+
   const head = await writePinBranch(options);
   const number = await writePinPullRequest(options, pinned, openNumber);
 
-  // Auto-merge binds to the commit this run wrote, so a later push to the branch never merges
-  // unchecked.
-  const merge = await runGH(options, [
-    'pr',
-    'merge',
-    number,
-    '--repo',
-    options.repo,
-    '--auto',
-    '--squash',
-    '--match-head-commit',
-    head,
-  ]);
-
-  if (merge.exitCode !== 0) {
-    options.writeOutput(
-      '::warning::GitHub refused auto-merge; allow auto-merge in the repo settings, or merge the pull request by hand.\n',
-    );
-  }
+  await writePinAutoMerge(options, number, head);
 
   return 0;
 }
@@ -205,6 +195,78 @@ function runGH(
   args: readonly string[],
 ): Promise<CommandResult> {
   return options.runCommand(['gh', ...args], { cwd: options.cwd, env: options.env });
+}
+
+// The branch head is bound only after it shows the pin pull request's own change: the pin file
+// alone, at the pin the run compared. Anything else waits for a person.
+async function writeCoveredAutoMerge(
+  options: Readonly<WriteSkillsPinPullRequestOptions>,
+  number: string,
+  proposed: string | null,
+): Promise<number> {
+  const viewed = await runCheckedGH(options, [
+    'pr',
+    'view',
+    number,
+    '--repo',
+    options.repo,
+    '--json',
+    'headRefOid,files',
+  ]);
+
+  const view: unknown = JSON.parse(viewed.stdout);
+  const head = isRecord(view) && typeof view['headRefOid'] === 'string' ? view['headRefOid'] : '';
+  const files = isRecord(view) && Array.isArray(view['files']) ? view['files'] : [];
+  const paths = files.map((file: unknown) => (isRecord(file) ? file['path'] : null));
+
+  const shown = await runCheckedGH(options, [
+    'api',
+    `repos/${options.repo}/contents/${skillsPinPath}?ref=${head}`,
+    '-H',
+    'Accept: application/vnd.github.raw',
+  ]);
+
+  const headValue: unknown = JSON.parse(shown.stdout);
+  const isPinOnly = paths.length === 1 && paths[0] === skillsPinPath;
+
+  if (!isPinOnly || parseSkillsPin(headValue) !== proposed) {
+    options.writeOutput(
+      `::error::the open pin pull request #${number} changes more than ${skillsPinPath}, or moved since this run read it; check it by hand\n`,
+    );
+
+    return 1;
+  }
+
+  options.writeOutput(`Turning auto-merge on for pull request #${number} at ${head}.\n`);
+
+  await writePinAutoMerge(options, number, head);
+
+  return 0;
+}
+
+// Auto-merge binds to the commit given, so a later push to the branch never merges unchecked.
+async function writePinAutoMerge(
+  options: Readonly<WriteSkillsPinPullRequestOptions>,
+  number: string,
+  head: string,
+): Promise<void> {
+  const merge = await runGH(options, [
+    'pr',
+    'merge',
+    number,
+    '--repo',
+    options.repo,
+    '--auto',
+    '--squash',
+    '--match-head-commit',
+    head,
+  ]);
+
+  if (merge.exitCode !== 0) {
+    options.writeOutput(
+      '::warning::GitHub refused auto-merge; allow auto-merge in the repo settings, or merge the pull request by hand.\n',
+    );
+  }
 }
 
 // Returns the commit it wrote, which the contents API writes as the App on a staging branch, so

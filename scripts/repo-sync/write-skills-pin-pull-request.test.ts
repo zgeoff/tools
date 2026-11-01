@@ -653,93 +653,156 @@ test('it writes nothing for a commit that the pin on main already covers', async
   ]);
 });
 
-test('it leaves a newer open pin in place for an older dispatch and writes nothing', async () => {
-  const ctx = await setupTest();
+// A retry after a run that stopped before its auto-merge call finds the branch identical, and a
+// late, older dispatch finds it behind; either one turns auto-merge on for the branch as it stands.
+test.each([
+  ['a newer open pin, for an older dispatch', 'behind', ['sync/skills-pin.json'], 0],
+  ['the same open pin, for a retried dispatch', 'identical', ['sync/skills-pin.json'], 0],
+  [
+    'an open pin branch that changes another file',
+    'identical',
+    ['sync/skills-pin.json', 'README.md'],
+    1,
+  ],
+])(
+  'it keeps the branch for %s and binds auto-merge only to a pin-only head',
+  async (_label, sinceProposed, paths, expectedExitCode) => {
+    const ctx = await setupTest();
 
-  const pinned = '0123456789abcdef0123456789abcdef01234567';
-  const commit = '456789abcdef0123456789abcdef0123456789ab';
-  const proposed = '89abcdef0123456789abcdef0123456789abcdef';
+    const pinned = '0123456789abcdef0123456789abcdef01234567';
+    const commit = '456789abcdef0123456789abcdef0123456789ab';
+    const proposed = '89abcdef0123456789abcdef0123456789abcdef';
+    const head = 'c0ffee0123456789abcdef0123456789abcdef01';
 
-  await ctx.writePin(pinned);
+    await ctx.writePin(pinned);
 
-  const listOpen = [
-    'gh',
-    'pr',
-    'list',
-    '--repo',
-    'example/tools',
-    '--head',
-    'skills-pin',
-    '--state',
-    'open',
-    '--json',
-    'number,isCrossRepository',
-  ];
+    const listOpen = [
+      'gh',
+      'pr',
+      'list',
+      '--repo',
+      'example/tools',
+      '--head',
+      'skills-pin',
+      '--state',
+      'open',
+      '--json',
+      'number,isCrossRepository',
+    ];
 
-  const readProposed = [
-    'gh',
-    'api',
-    'repos/example/tools/contents/sync/skills-pin.json?ref=skills-pin',
-    '-H',
-    'Accept: application/vnd.github.raw',
-  ];
+    const readProposed = [
+      'gh',
+      'api',
+      'repos/example/tools/contents/sync/skills-pin.json?ref=skills-pin',
+      '-H',
+      'Accept: application/vnd.github.raw',
+    ];
 
-  const compareToPin = [
-    'gh',
-    'api',
-    `repos/zgeoff/skills/compare/${pinned}...${commit}`,
-    '--jq',
-    '.status',
-  ];
+    const compareToPin = [
+      'gh',
+      'api',
+      `repos/zgeoff/skills/compare/${pinned}...${commit}`,
+      '--jq',
+      '.status',
+    ];
 
-  const compareToProposed = [
-    'gh',
-    'api',
-    `repos/zgeoff/skills/compare/${proposed}...${commit}`,
-    '--jq',
-    '.status',
-  ];
+    const compareToProposed = [
+      'gh',
+      'api',
+      `repos/zgeoff/skills/compare/${proposed}...${commit}`,
+      '--jq',
+      '.status',
+    ];
 
-  const compareToMain = [
-    'gh',
-    'api',
-    `repos/zgeoff/skills/compare/${commit}...main`,
-    '--jq',
-    '.status',
-  ];
+    const compareToMain = [
+      'gh',
+      'api',
+      `repos/zgeoff/skills/compare/${commit}...main`,
+      '--jq',
+      '.status',
+    ];
 
-  ctx.commands.answer(listOpen, {
-    exitCode: 0,
-    stdout: '[{"number":41,"isCrossRepository":false}]',
-    stderr: '',
-  });
+    const viewOpen = [
+      'gh',
+      'pr',
+      'view',
+      '41',
+      '--repo',
+      'example/tools',
+      '--json',
+      'headRefOid,files',
+    ];
 
-  ctx.commands.answer(readProposed, {
-    exitCode: 0,
-    stdout: JSON.stringify({ commit: proposed }),
-    stderr: '',
-  });
+    const readHeadPin = [
+      'gh',
+      'api',
+      `repos/example/tools/contents/sync/skills-pin.json?ref=${head}`,
+      '-H',
+      'Accept: application/vnd.github.raw',
+    ];
 
-  ctx.commands.answer(compareToPin, { exitCode: 0, stdout: 'ahead\n', stderr: '' });
-  ctx.commands.answer(compareToProposed, { exitCode: 0, stdout: 'behind\n', stderr: '' });
-  ctx.commands.answer(compareToMain, { exitCode: 0, stdout: 'ahead\n', stderr: '' });
+    const merge = [
+      'gh',
+      'pr',
+      'merge',
+      '41',
+      '--repo',
+      'example/tools',
+      '--auto',
+      '--squash',
+      '--match-head-commit',
+      head,
+    ];
 
-  const exitCode = await ctx.pin(commit);
+    ctx.commands.answer(listOpen, {
+      exitCode: 0,
+      stdout: '[{"number":41,"isCrossRepository":false}]',
+      stderr: '',
+    });
 
-  expect(exitCode).toBe(0);
+    ctx.commands.answer(readProposed, {
+      exitCode: 0,
+      stdout: JSON.stringify({ commit: proposed }),
+      stderr: '',
+    });
 
-  expect(ctx.commands.calls).toStrictEqual([
-    listOpen,
-    readProposed,
-    compareToPin,
-    compareToProposed,
-    compareToMain,
-  ]);
+    ctx.commands.answer(compareToPin, { exitCode: 0, stdout: 'ahead\n', stderr: '' });
 
-  expect(ctx.output).toStrictEqual([
-    `Nothing to pin: the open pin pull request already pins ${commit} or a newer commit.\n`,
-  ]);
-});
+    ctx.commands.answer(compareToProposed, {
+      exitCode: 0,
+      stdout: `${sinceProposed}\n`,
+      stderr: '',
+    });
+
+    ctx.commands.answer(compareToMain, { exitCode: 0, stdout: 'ahead\n', stderr: '' });
+
+    ctx.commands.answer(viewOpen, {
+      exitCode: 0,
+      stdout: JSON.stringify({ headRefOid: head, files: paths.map((path) => ({ path })) }),
+      stderr: '',
+    });
+
+    ctx.commands.answer(readHeadPin, {
+      exitCode: 0,
+      stdout: JSON.stringify({ commit: proposed }),
+      stderr: '',
+    });
+
+    ctx.commands.answer(merge, { exitCode: 0, stdout: '', stderr: '' });
+
+    const exitCode = await ctx.pin(commit);
+
+    const reads = [listOpen, readProposed, compareToPin, compareToProposed, compareToMain];
+    const merged = expectedExitCode === 0 ? [merge] : [];
+
+    expect(exitCode).toBe(expectedExitCode);
+    expect(ctx.commands.calls).toStrictEqual([...reads, viewOpen, readHeadPin, ...merged]);
+
+    expect(ctx.output[0]).toBe(
+      `Nothing to pin: the open pin pull request already pins ${commit} or a newer commit.\n`,
+    );
+  },
+);
 
 test('it fails and writes nothing for a commit that is not on main of zgeoff/skills', async () => {
   const ctx = await setupTest();

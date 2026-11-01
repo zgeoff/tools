@@ -34,7 +34,7 @@ test.each(['identical', 'behind'])(
 );
 
 test.each(['identical', 'behind'])(
-  'it skips a commit that is %s to the pin of the open pin branch',
+  'it leaves the branch of the open pin pull request for a commit that is %s to its pin',
   (sinceProposed) => {
     const move = pickSkillsPinMove({
       commit: '89abcdef0123456789abcdef0123456789abcdef',
@@ -44,7 +44,7 @@ test.each(['identical', 'behind'])(
     });
 
     expect(move).toStrictEqual({
-      kind: 'skip',
+      kind: 'covered',
       reason:
         'the open pin pull request already pins 89abcdef0123456789abcdef0123456789abcdef or a newer commit',
     });

@@ -15,9 +15,12 @@ export interface SkillsPinFacts {
   readonly mainSinceCommit: string;
 }
 
+// `covered`: the open pin pull request already pins the commit or a newer one, so only its
+// auto-merge needs to be on.
 export type SkillsPinMove =
   | { readonly kind: 'move' }
   | { readonly kind: 'skip'; readonly reason: string }
+  | { readonly kind: 'covered'; readonly reason: string }
   | { readonly kind: 'refused'; readonly message: string };
 
 // Dispatches may arrive in any order, so the pin only moves forward along main of zgeoff/skills,
@@ -43,7 +46,7 @@ export function pickSkillsPinMove(facts: Readonly<SkillsPinFacts>): SkillsPinMov
 
   if (facts.sinceProposed !== null && facts.sinceProposed !== 'ahead') {
     return {
-      kind: 'skip',
+      kind: 'covered',
       reason: `the open pin pull request already pins ${facts.commit} or a newer commit`,
     };
   }

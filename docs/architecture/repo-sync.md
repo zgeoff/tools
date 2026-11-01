@@ -58,8 +58,9 @@ A green push run on `main` of zgeoff/skills sends this repo a `zgeoff-skills-syn
 commit in `client_payload.sha`. The sync-dispatch workflow then moves `sync/skills-pin.json` to that
 commit in one pull request on the `skills-pin` branch, written as the App, with auto-merge on. It
 moves the pin only forward along `main` of zgeoff/skills, past both the pin on `main` here and the
-one the open pull request holds, so events may arrive in any order. Its merge is a synced change
-like any other.
+one the open pull request holds, so events may arrive in any order. An event that the open pull
+request already covers turns its auto-merge on, when the pull request changes only the pin. Its
+merge is a synced change like any other.
 
 Each repo pins every call to a tools workflow to one commit on `main`, with a `# main` comment, and
 never at `main` itself, so a run of a test or doc audit never sees the shared files change under it.
