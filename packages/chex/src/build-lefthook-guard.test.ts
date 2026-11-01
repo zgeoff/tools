@@ -97,9 +97,3 @@ test.each([
       'lefthook.yml writes pre-commit in a form chex init does not edit; write its pre-commit jobs as a block list, then run chex init again',
   });
 });
-
-test("it finds the guard that chex init writes in both hooks of this repo's lefthook.yml", async () => {
-  const text = await Bun.file(`${import.meta.dir}/../../../lefthook.yml`).text();
-
-  expect(buildLefthookGuard(text)).toStrictEqual({ kind: 'unchanged', text });
-});

@@ -17,8 +17,8 @@ jobs:
     uses: ./.github/workflows/bun-checks.yml
     with:
       scripts:
-        check:sync check:release-workflow check:repo-sync-workflows check:step-bundles format:check
-        lint:full typecheck test test:browser test:e2e test:host
+        check:sync check:release-workflow check:repo-sync-workflows check:step-bundles
+        check:lefthook-guard format:check lint:full typecheck test test:browser test:e2e test:host
       # oxlint runs its JS plugin under Node, which reads rig.config.ts and
       # strips its types from Node 22.18.
       node-version: 24

@@ -52,6 +52,11 @@ pre-push:
         - '.github/workflows/repo-sync.yml'
         - 'sync/repo-sync.yml'
       run: bun run --silent check:repo-sync-workflows
+    - name: lefthook-guard
+      glob:
+        - 'lefthook.yml'
+        - 'packages/chex/src/build-lefthook-guard.ts'
+      run: bun run --silent check:lefthook-guard
     - name: step-bundles
       glob:
         - '*.ts'
