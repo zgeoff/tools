@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { buildMockSyncEntry } from '../../test-utils/build-mock-sync-entry.ts';
+import { buildMockSyncEntry } from '../test-utils/build-mock-sync-entry.ts';
 import { renderSyncCommitSubject } from './render-sync-commit-subject.ts';
 
 test('it names the one repo of an entry whose files all come from it', () => {

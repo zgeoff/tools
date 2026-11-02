@@ -1,6 +1,6 @@
 import { join } from 'node:path';
-import { runCheckedCommand } from '../scripts/ci/run-checked-command.ts';
-import type { RunCommand } from '../scripts/ci/run-command.ts';
+import { runCheckedCommand } from '../ci/run-checked-command.ts';
+import type { RunCommand } from '../ci/run-command.ts';
 
 export interface SkillsArchiveOptions {
   // The folder the files are laid out in before tar packs them.
