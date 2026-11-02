@@ -123,13 +123,20 @@ test.each([
   ['test', '', ['test', 'test:slow']],
   ['lane', 'e2e', ['test:e2e']],
   ['lane', 'agent-sdk', ['test:agent-sdk']],
+  ['lane', 'crash', ['test:crash']],
 ] as const)('it gives a public %s job only its own scripts', (part, lane, expected) => {
   const plan = planCheckScripts({
-    scripts: 'lint test:e2e test test:slow check',
-    defined: ['check', 'lint', 'test', 'test:e2e', 'test:slow'],
+    scripts: 'lint test:e2e test test:agent-sdk test:slow test:crash check',
+    defined: ['check', 'lint', 'test', 'test:agent-sdk', 'test:crash', 'test:e2e', 'test:slow'],
     part,
     lane,
   });
 
-  expect(plan).toMatchObject({ kind: 'planned', scripts: expected });
+  expect(plan).toStrictEqual({
+    kind: 'planned',
+    scripts: expected,
+    static: ['lint', 'check'],
+    test: ['test', 'test:slow'],
+    lanes: ['e2e', 'agent-sdk', 'crash'],
+  });
 });
