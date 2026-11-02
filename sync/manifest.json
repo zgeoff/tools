@@ -291,8 +291,19 @@
     ]
   },
   {
+    "name": "skill-deslop",
+    "description": "The shared deslop skill, which edits existing prose so it reads plainly; every repo takes it, because the skill-gate-rules entry makes an agent load it before a skill edit",
+    "files": [
+      {
+        "repo": "zgeoff/skills",
+        "source": "skills/deslop/SKILL.md",
+        "target": ".claude/skills/deslop/SKILL.md"
+      }
+    ]
+  },
+  {
     "name": "hook-skill-gate",
-    "description": "The skill-gate hook's entry point, which runs the gate from the @zgeoff/skill-gate package for Claude Code and Codex; the repo installs the package, keeps its path and tool gates in .claude/skill-gate.json, registers the hook in .claude/settings.json as a bun --no-install command with a PreToolUse matcher that names each gated tool, and for Codex registers it in .codex/hooks.json with --harness codex and trusts the hook definitions",
+    "description": "The skill-gate hook's entry point, which runs the gate from the @zgeoff/skill-gate package for Claude Code and Codex; the repo installs the package, takes its path and tool gates in .claude/skill-gate.json from the skill-gate-rules entry, registers the hook in .claude/settings.json as a bun --no-install command with a PreToolUse matcher that names each gated tool, and for Codex registers it in .codex/hooks.json with --harness codex and trusts the hook definitions",
     "optIn": true,
     "packages": ["@zgeoff/skill-gate"],
     "files": [
@@ -311,6 +322,29 @@
       {
         "source": "sync/hooks/start.ts",
         "target": ".claude/hooks/start.ts"
+      }
+    ]
+  },
+  {
+    "name": "skill-gate-rules",
+    "description": "The skill gate's rules, which make an agent load skill-writing, docs-writing and deslop before it creates or changes a skill's SKILL.md or a file under its references/; every repo takes them but those the except list holds, which kept rules of their own before this entry and add these gates by hand",
+    "files": [
+      {
+        "source": "sync/skill-gate/skill-gate.json",
+        "target": ".claude/skill-gate.json",
+        "except": [
+          "zgeoff/atc",
+          "zgeoff/auto-mode",
+          "zgeoff/cloud",
+          "zgeoff/hq",
+          "zgeoff/impz",
+          "zgeoff/nixie",
+          "zgeoff/noslop",
+          "zgeoff/osrs",
+          "zgeoff/pepys",
+          "zgeoff/vers",
+          "zgeoff/wringer"
+        ]
       }
     ]
   },

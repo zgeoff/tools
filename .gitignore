@@ -14,3 +14,5 @@ test-utils/.test-*
 /.zgeoff-skills.lock
 /.claude/skills/code-style
 /.claude/skills/docs-writing
+/.claude/skills/skill-writing
+/.claude/skills/deslop
