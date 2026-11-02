@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { buildInitGuardHooks } from '../../../test-utils/build-init-guard-hooks.ts';
+import { buildInitGuardHooks } from '../test-utils/build-init-guard-hooks.ts';
 import { buildLefthookGuard } from './build-lefthook-guard.ts';
 
 test('it adds pre-commit and pre-push hooks that run only the guard to a config that has neither', () => {

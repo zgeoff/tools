@@ -2,9 +2,9 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { makeRejectingStub } from '../../../../test-utils/make-rejecting-stub.ts';
-import { makeResolvingStub } from '../../../../test-utils/make-resolving-stub.ts';
-import { writeTreeFiles } from '../../../../test-utils/write-tree-files.ts';
+import { makeRejectingStub } from '../../test-utils/make-rejecting-stub.ts';
+import { makeResolvingStub } from '../../test-utils/make-resolving-stub.ts';
+import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import { bunFileSystem } from './bun-file-system.ts';
 import { runInit } from './run-init.ts';
 

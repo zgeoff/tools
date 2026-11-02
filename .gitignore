@@ -7,5 +7,6 @@ dist/
 packages/*/.test-*
 scripts/.test-*
 scripts/*/.test-*
+packages/*/test-utils/.test-*
 sync/test-utils/.test-*
 test-utils/.test-*

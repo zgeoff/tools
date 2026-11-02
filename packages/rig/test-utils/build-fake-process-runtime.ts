@@ -1,8 +1,5 @@
 import { mock } from 'bun:test';
-import type {
-  ProcessRuntime,
-  SpawnedProcess,
-} from '../packages/rig/src/browser/process-runtime.ts';
+import type { ProcessRuntime, SpawnedProcess } from '../src/browser/process-runtime.ts';
 import { buildSteppingClock } from './build-stepping-clock.ts';
 
 // A runtime whose spawned leader has the process ID and settles with the exit promise, such as one

@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildRigConfigSource } from '../packages/oxlint-config/test-utils/build-rig-config-source.ts';
+import { buildRigConfigSource } from './build-rig-config-source.ts';
 import { readRigLaneLimit } from './read-rig-lane-limit.ts';
 import { writeTreeFiles } from './write-tree-files.ts';
 

@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'bun:test';
-import { buildStubProgramRunner } from '../../../../test-utils/build-stub-program-runner.ts';
+import { buildStubProgramRunner } from '../../test-utils/build-stub-program-runner.ts';
 import type { ProgramResult } from '../run-program.ts';
 import { readDependencyGateFindings } from './read-dependency-gate-findings.ts';
 
