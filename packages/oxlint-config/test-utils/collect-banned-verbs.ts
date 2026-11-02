@@ -1,16 +1,26 @@
-// Collects each code-span verb of the code-style skill's `- Banned:` bullet, up to the end of its
-// first sentence, where the free verbs begin.
-export function collectBannedVerbs(markdown: string): string[] {
-  const start = markdown.indexOf('\n- Banned:');
+// The bullet's lead, then its list up to the sentence after it; Markdown may wrap that sentence
+// at any space.
+const bulletPattern = /\n- Never start a name with (?<list>[\s\S]*?)These\s+verbs\s+say\s+nothing/u;
 
-  if (start === -1) {
-    return [];
+// Collects each code-span verb of the code-style skill's banned-verb bullet. The skills repo keeps
+// that lead and that sentence, so a reworded bullet throws here, where a quiet empty list would let
+// the ban test pass with nothing to check.
+export function collectBannedVerbs(markdown: string): string[] {
+  const list = bulletPattern.exec(markdown)?.groups?.['list'];
+
+  if (list === undefined) {
+    throw new Error(
+      "the code-style skill has no bullet from '- Never start a name with' to 'These verbs say nothing'",
+    );
   }
 
-  const bullet = markdown.slice(start + 1).split(/\n(?:- |\n)/u)[0] ?? '';
-  const [sentence] = bullet.split(/\.\s/u);
-
-  return [...(sentence ?? '').matchAll(/`(?<verb>[a-z]+)`/gu)].map(
+  const verbs = [...list.matchAll(/`(?<verb>[a-z]+)`/gu)].map(
     (match) => match.groups?.['verb'] ?? '',
   );
+
+  if (verbs.length === 0) {
+    throw new Error('the code-style skill bans no verb in its banned-verb bullet');
+  }
+
+  return verbs;
 }
