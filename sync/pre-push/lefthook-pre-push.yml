@@ -20,7 +20,9 @@
 # reads before a -C path, so a job command that runs git in a folder of its
 # own, such as a temp clone, would write to this repository instead. Each job
 # starts with clear-git-env, which unsets every variable git lists as local to
-# a repository; git then finds the repository from the job's folder.
+# a repository; git then finds the repository from the job's folder. lefthook
+# expands a template in run only, so each files command that runs a program
+# unsets the same variables itself.
 templates:
   clear-git-env: unset $(git rev-parse --local-env-vars);
 
@@ -47,7 +49,7 @@ pre-push:
     # Plain oxlint, without the unused-directive check: a directive for a
     # type-aware rule reads as unused in plain mode.
     - name: lint
-      files: bun run --silent files:branch
+      files: unset $(git rev-parse --local-env-vars); bun run --silent files:branch
       glob: '*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}'
       run: '{clear-git-env} bun run --silent memory-capped bun run lint:files {files}'
     # Each file check reads only the files the branch changes that match its
@@ -55,7 +57,7 @@ pre-push:
     # whose program the machine lacks prints a notice and passes: CI installs
     # the program and runs the check on every pull request.
     - name: shell
-      files: bun run --silent files:branch
+      files: unset $(git rev-parse --local-env-vars); bun run --silent files:branch
       glob: '*.sh'
       run: |
         {clear-git-env}
@@ -74,7 +76,7 @@ pre-push:
     # the docs-vision-check entry put it beside them, and the skill check when
     # the repo takes the skill-writing skill.
     - name: docs
-      files: bun run --silent files:branch
+      files: unset $(git rev-parse --local-env-vars); bun run --silent files:branch
       glob: '*.md'
       run: |
         {clear-git-env}
@@ -102,7 +104,7 @@ pre-push:
     # The workflow lint runs after actionlint, even when actionlint is missing
     # or fails.
     - name: workflows
-      files: bun run --silent files:branch
+      files: unset $(git rev-parse --local-env-vars); bun run --silent files:branch
       glob:
         - '.github/workflows/*.{yml,yaml}'
         - 'sync/workflow-callers/*.{yml,yaml}'
@@ -149,6 +151,6 @@ pre-push:
     # A bunfig.toml reaches the job too, because a change to it skips the
     # related tests.
     - name: test
-      files: bun run --silent files:branch
+      files: unset $(git rev-parse --local-env-vars); bun run --silent files:branch
       glob: '*.{ts,tsx,toml}'
       run: '{clear-git-env} bun run --silent memory-capped bun run test:related {files}'

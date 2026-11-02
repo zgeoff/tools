@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 import { copyNamedFiles } from '../test-utils/copy-named-files.ts';
+import { writeStubPrograms } from '../test-utils/write-stub-programs.ts';
 
 // Bun's skipIf takes a boolean at collection time. A host without actionlint skips the test that
 // needs it, as the hook skips the check there; CI installs actionlint, so a CI run without it fails.
@@ -242,14 +243,14 @@ test('it runs the pre-commit jobs without git repository variables in a commit f
   expect(recorded).toBe('');
 });
 
-test('it runs the pre-push jobs without git repository variables in a push from a worktree', async () => {
+test('it runs every pre-push job and file list without git repository variables in a push from a worktree', async () => {
   const ctx = await setupTest();
 
   const leaks = join(ctx.directory, 'git-variable-leaks');
   const recorder = join(ctx.directory, 'record-git-variables.sh');
 
-  // Every job runs its command through the memory-capped script, so this one records each git
-  // repository variable the job hands it, then runs the command.
+  // Records each git repository variable that the command it runs inherits. The file list, the
+  // memory-capped script that runs every other job's tools, and the docs scripts all run through it.
   await writeFile(
     recorder,
     `for name in $(git rev-parse --local-env-vars); do\n  if printenv "$name" > /dev/null; then echo "$name: $*" >> ${leaks}; fi\ndone\nexec "$@"\n`,
@@ -258,12 +259,20 @@ test('it runs the pre-push jobs without git repository variables in a push from 
   await writeFile(leaks, '');
   await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
   await writeFile(join(ctx.worktree, 'fixture.ts'), 'export {};\n');
+  await writeFile(join(ctx.worktree, 'guide.md'), '# Guide\n\nA short guide.\n');
+  await writeFile(join(ctx.worktree, 'greet.sh'), '#!/usr/bin/env bash\necho hi\n');
   await mkdir(join(ctx.worktree, '.github/workflows'), { recursive: true });
 
   await writeFile(
     join(ctx.worktree, '.github/workflows/greet.yml'),
     'on: workflow_dispatch\njobs:\n  greet:\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    steps:\n      - run: echo hi\n',
   );
+
+  await writeStubPrograms(join(ctx.worktree, '.claude/skills/docs-writing/scripts'), {
+    'check-prose.sh': `exec sh ${recorder} true check-prose`,
+    'check-length.sh': `exec sh ${recorder} true check-length`,
+    'check-links.sh': `exec sh ${recorder} true check-links`,
+  });
 
   await writeFile(
     join(ctx.worktree, 'package.json'),
@@ -272,7 +281,7 @@ test('it runs the pre-push jobs without git repository variables in a push from 
         'format:check': 'true',
         'lint:files': 'true',
         typecheck: 'true',
-        'files:branch': String.raw`printf "%s\n" fixture.ts .github/workflows/greet.yml`,
+        'files:branch': String.raw`sh ${recorder} printf "%s\n" fixture.ts .github/workflows/greet.yml guide.md greet.sh`,
         'test:related': 'true',
         'check:commits': 'true',
         'check:local-paths': 'true',
@@ -286,7 +295,10 @@ test('it runs the pre-push jobs without git repository variables in a push from 
   );
 
   await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
-  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixtures'}`.cwd(ctx.worktree).env(ctx.env);
+
+  // actionlint reads shellcheck's JSON report of each run script.
+  await writeStubPrograms(ctx.bin, { shellcheck: "echo '[]'", shfmt: 'exit 0' });
 
   await writeFile(
     join(ctx.main, '.git/hooks/pre-push'),
@@ -295,10 +307,10 @@ test('it runs the pre-push jobs without git repository variables in a push from 
 
   await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
 
-  await $`git push --quiet origin feature`.cwd(ctx.worktree).env(ctx.env);
-
+  const result = await $`git push origin feature`.cwd(ctx.worktree).env(ctx.env).nothrow().quiet();
   const recorded = await readFile(leaks, 'utf8');
 
+  expect(result.exitCode).toBe(0);
   expect(recorded).toBe('');
 });
 
