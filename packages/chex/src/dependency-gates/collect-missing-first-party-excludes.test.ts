@@ -3,6 +3,7 @@ import { collectMissingFirstPartyExcludes } from './collect-missing-first-party-
 
 test('it reports each first-party package with no exclude', () => {
   const findings = collectMissingFirstPartyExcludes({ isOn: true, excludes: ['@zgeoff/std'] }, [
+    '@heynixie/lantern',
     '@impz/client',
     '@wringer/core',
     '@zgeoff/std',
@@ -10,6 +11,12 @@ test('it reports each first-party package with no exclude', () => {
   ]);
 
   expect(findings).toStrictEqual([
+    {
+      path: 'bunfig.toml',
+      entry: '@heynixie/lantern',
+      problem:
+        'the first-party package has no age-gate exclude, so bun install refuses each release younger than the gate',
+    },
     {
       path: 'bunfig.toml',
       entry: '@impz/client',
