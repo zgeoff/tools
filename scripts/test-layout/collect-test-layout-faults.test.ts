@@ -165,3 +165,22 @@ test('it reports an import of the test-utils folder of another package', () => {
     "packages/kettle/src/boil.test.ts imports packages/teapot/test-utils, a test helper of packages/teapot; copy the helper into the importer's own test-utils/",
   ]);
 });
+
+test.each([
+  ['scripts', '../../../scripts/test-utils/create-stub-tap.ts'],
+  ['sync', '../../../sync/test-utils/create-stub-tap.ts'],
+])('it reports a package that imports a test helper of %s', (owner, specifier) => {
+  const faults = collectTestLayoutFaults(
+    [],
+    [
+      {
+        path: 'packages/kettle/src/boil.test.ts',
+        text: `import { createStubTap } from '${specifier}';\n`,
+      },
+    ],
+  );
+
+  expect(faults).toStrictEqual([
+    `packages/kettle/src/boil.test.ts imports ${owner}/test-utils/create-stub-tap.ts, a test helper of ${owner}; copy the helper into the importer's own test-utils/`,
+  ]);
+});
