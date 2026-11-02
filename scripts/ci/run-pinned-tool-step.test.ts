@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createStubFileServer } from '../../test-utils/create-stub-file-server.ts';
+import { createStubFileServer } from '../test-utils/create-stub-file-server.ts';
 import { nodeFileSystem } from './node-file-system.ts';
 import { runCommand } from './run-command.ts';
 import { runPinnedToolStep } from './run-pinned-tool-step.ts';

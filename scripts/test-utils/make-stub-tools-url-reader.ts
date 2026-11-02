@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { URLOutcome } from '../scripts/ci/download-step-scripts.ts';
+import type { URLOutcome } from '../ci/download-step-scripts.ts';
 
 // Stands in for raw.githubusercontent.com at a tools commit: it serves each URL under the tools URL
 // from the same path in a local checkout, as the download step reads a step script and its imports.

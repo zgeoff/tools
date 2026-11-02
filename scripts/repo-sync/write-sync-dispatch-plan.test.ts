@@ -2,10 +2,10 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { buildCommandStub } from '../../test-utils/build-command-stub.ts';
-import { createPushedGitCommit } from '../../test-utils/create-pushed-git-commit.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { buildCommandStub } from '../test-utils/build-command-stub.ts';
+import { createPushedGitCommit } from '../test-utils/create-pushed-git-commit.ts';
 import { writeSyncDispatchPlan } from './write-sync-dispatch-plan.ts';
 
 async function setupTest() {

@@ -1,4 +1,4 @@
-import type { CommandResult, RunCommand } from '../scripts/ci/run-command.ts';
+import type { CommandResult, RunCommand } from '../ci/run-command.ts';
 
 export interface CommandStub {
   readonly runCommand: RunCommand;

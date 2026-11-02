@@ -2,10 +2,10 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
-import { makeAnswerQueue } from '../../test-utils/make-answer-queue.ts';
-import { makeStubToolsURLReader } from '../../test-utils/make-stub-tools-url-reader.ts';
-import { server } from '../../test-utils/mocks/node.ts';
-import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import { makeAnswerQueue } from '../test-utils/make-answer-queue.ts';
+import { makeStubToolsURLReader } from '../test-utils/make-stub-tools-url-reader.ts';
+import { server } from '../test-utils/mocks/node.ts';
+import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import {
   downloadStepScripts,
   isToolsURL,

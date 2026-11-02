@@ -2,9 +2,9 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { readGitEnv } from '../../test-utils/read-git-env.ts';
-import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { readGitEnv } from '../test-utils/read-git-env.ts';
+import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { matchChangedFiles } from './match-changed-files.ts';
 
 async function setupTest() {
