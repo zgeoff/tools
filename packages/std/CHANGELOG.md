@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/zgeoff/tools/compare/@zgeoff/std@0.3.1...@zgeoff/std@0.3.2) (2026-11-02)
+
+
+### Features
+
+* **sync:** take the shared skill text from zgeoff/skills ([#427](https://github.com/zgeoff/tools/issues/427)) ([94cb4b5](https://github.com/zgeoff/tools/commit/94cb4b531c6018c099d251e7bf7ded846416d910))
+
 ## [0.3.1](https://github.com/zgeoff/tools/compare/@zgeoff/std@0.3.0...@zgeoff/std@0.3.1) (2026-10-31)
 
 ### Features

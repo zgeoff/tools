@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.4](https://github.com/zgeoff/tools/compare/@zgeoff/agent-hooks@0.1.3...@zgeoff/agent-hooks@0.1.4) (2026-11-02)
+
+
+### Features
+
+* **sync:** take the shared skill text from zgeoff/skills ([#427](https://github.com/zgeoff/tools/issues/427)) ([94cb4b5](https://github.com/zgeoff/tools/commit/94cb4b531c6018c099d251e7bf7ded846416d910))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/std bumped to 0.3.2
+
 ## [0.1.3](https://github.com/zgeoff/tools/compare/@zgeoff/agent-hooks@0.1.2...@zgeoff/agent-hooks@0.1.3) (2026-10-31)
 
 ### Dependencies
