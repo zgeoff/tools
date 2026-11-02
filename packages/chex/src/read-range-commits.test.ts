@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { readGitEnv } from '../../../test-utils/read-git-env.ts';
+import { readGitEnv } from '../test-utils/read-git-env.ts';
 import { readRangeCommits } from './read-range-commits.ts';
 import { runProgram } from './run-program.ts';
 

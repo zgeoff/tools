@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'bun:test';
-import { makeRecordingStub } from '../../../test-utils/make-recording-stub.ts';
+import { makeRecordingStub } from '../test-utils/make-recording-stub.ts';
 import { defineRig } from './define-rig.ts';
 import { runCLI } from './run-cli.ts';
 import type { CommandOptions } from './run-command.ts';

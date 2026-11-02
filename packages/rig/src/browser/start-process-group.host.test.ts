@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { readStreamUntil } from '../../../../test-utils/read-stream-until.ts';
-import { trackSettled } from '../../../../test-utils/track-settled.ts';
+import { readStreamUntil } from '../../test-utils/read-stream-until.ts';
+import { trackSettled } from '../../test-utils/track-settled.ts';
 import { processGroups } from './process-groups.ts';
 import { processRuntime } from './process-runtime.ts';
 import { startProcessGroup } from './start-process-group.ts';

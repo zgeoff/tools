@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runProgram } from '../packages/chex/src/run-program.ts';
+import { runProgram } from '../src/run-program.ts';
 import { buildStubCommitlint } from './build-stub-commitlint.ts';
 import { readGitEnv } from './read-git-env.ts';
 
@@ -11,7 +11,7 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const root = join(import.meta.dir, '..');
+  const root = join(import.meta.dir, '..', '..', '..');
 
   return {
     directory,
@@ -119,7 +119,11 @@ test.each([
     await mkdir(join(ctx.directory, 'config'));
     await writeFile(join(ctx.directory, 'config/package.json'), '{ "type": "module" }');
     await writeFile(join(ctx.directory, 'config/index.js'), source);
-    await symlink(join(import.meta.dir, '../node_modules'), join(ctx.directory, 'node_modules'));
+
+    await symlink(
+      join(import.meta.dir, '../../../node_modules'),
+      join(ctx.directory, 'node_modules'),
+    );
 
     const result = runProgram(
       [ctx.commitlint, '--config', join(ctx.directory, 'config/index.js'), '--color=false'],

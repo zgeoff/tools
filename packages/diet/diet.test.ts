@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
-import { readStreamUntil } from '../../test-utils/read-stream-until.ts';
+import { readStreamUntil } from './test-utils/read-stream-until.ts';
 
 // Bun's skipIf takes a boolean at collection time, so the modes this host supports are probed once
 // here: a GitHub runner has the systemd-sudo mode, a root shell without systemd the cgroupfs one.
