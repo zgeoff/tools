@@ -46,3 +46,8 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 
 - [Setting up a downstream repo](./runbooks/downstream-repo-setup.md): wire a repo up, and opt in to
   the agent hooks and the pre-push baseline.
+
+## Designs
+
+- [Spike: one skills folder for Claude Code and Codex](./design/agents-skills-folder/spikes/skill-discovery/README.md):
+  which skills folder layouts each agent loads, and the layout every repo moves to.
