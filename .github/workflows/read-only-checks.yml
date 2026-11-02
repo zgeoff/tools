@@ -1,0 +1,12 @@
+name: Read-only checks
+
+on:
+  pull_request:
+
+jobs:
+  read-only:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/bun-checks.yml
+    with:
+      scripts: format:check
