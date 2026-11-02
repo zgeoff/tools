@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { $ } from 'bun';
+import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'check-sync-manifest-'));
@@ -15,23 +16,224 @@ async function setupTest() {
   return { directory, scriptPath };
 }
 
-test('it fails when a skill folder holds a file its entry omits', async () => {
+test('it fails when a zgeoff/skills folder holds a file its entry omits', async () => {
   const ctx = await setupTest();
 
-  await mkdir(join(ctx.directory, 'sync/skills/demo/references'), { recursive: true });
-  await writeFile(join(ctx.directory, 'sync/skills/demo/SKILL.md'), '# Demo\n');
-  await writeFile(join(ctx.directory, 'sync/skills/demo/references/go.md'), '# Go\n');
-
-  await writeFile(
-    join(ctx.directory, 'sync/manifest.json'),
-    JSON.stringify([
+  await writeTreeFiles(ctx.directory, {
+    'tree/skills/kettle/SKILL.md': '# Kettle\n',
+    'tree/skills/kettle/references/descaling.md': '# Descaling\n',
+    'sync/manifest.json': JSON.stringify([
       {
-        name: 'skill-demo',
-        description: 'The demo skill',
-        files: [{ source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' }],
+        name: 'skill-kettle',
+        description: 'The kettle skill',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+        ],
       },
     ]),
-  );
+  });
+
+  const result = await $`bash ${ctx.scriptPath} sync/manifest.json tree`
+    .cwd(ctx.directory)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      "check-sync-manifest: entry 'skill-kettle' ships skills/kettle/ of zgeoff/skills, but omits skills/kettle/references/descaling.md\n",
+  });
+});
+
+test('it fails when two entries split one zgeoff/skills folder between them', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'tree/skills/kettle/SKILL.md': '# Kettle\n',
+    'tree/skills/kettle/references/descaling.md': '# Descaling\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-kettle',
+        description: 'The kettle skill',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+        ],
+      },
+      {
+        name: 'skill-kettle-descaling',
+        description: 'The kettle skill descaling reference',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/references/descaling.md',
+            target: '.claude/skills/kettle/references/descaling.md',
+          },
+        ],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath} sync/manifest.json tree`
+    .cwd(ctx.directory)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      "check-sync-manifest: entry 'skill-kettle-descaling' ships skills/kettle/ of zgeoff/skills, but omits skills/kettle/SKILL.md\ncheck-sync-manifest: entry 'skill-kettle' ships skills/kettle/ of zgeoff/skills, but omits skills/kettle/references/descaling.md\n",
+  });
+});
+
+test('it passes when each entry lists every file of its zgeoff/skills folder but the tests', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'tree/skills/kettle/SKILL.md': '# Kettle\n',
+    'tree/skills/kettle/scripts/boil.sh': 'exit 0\n',
+    'tree/skills/kettle/scripts/boil.test.ts': '',
+    'tree/skills/teapot/SKILL.md': '# Teapot\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-kettle',
+        description: 'The kettle skill',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/scripts/boil.sh',
+            target: '.claude/skills/kettle/scripts/boil.sh',
+          },
+        ],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath} sync/manifest.json tree`
+    .cwd(ctx.directory)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+});
+
+test('it fails when a zgeoff/skills source is missing from the tree', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'tree/skills/kettle/SKILL.md': '# Kettle\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-kettle',
+        description: 'The kettle skill',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/references/gone.md',
+            target: '.claude/skills/kettle/references/gone.md',
+          },
+        ],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath} sync/manifest.json tree`
+    .cwd(ctx.directory)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      "check-sync-manifest: entry 'skill-kettle' lists source skills/kettle/references/gone.md of zgeoff/skills, which does not exist\n",
+  });
+});
+
+test('it reads zgeoff/skills from the unpacked tree of the pinned commit', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/skills-pin.json': JSON.stringify({ commit: '0123456789abcdef0123456789abcdef01234567' }),
+    '.zgeoff-skills/0123456789abcdef0123456789abcdef01234567/skills/kettle/SKILL.md': '# Kettle\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-kettle',
+        description: 'The kettle skill',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+        ],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+});
+
+test('it fails and names the install command when the pinned tree is missing', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/skills-pin.json': JSON.stringify({ commit: '0123456789abcdef0123456789abcdef01234567' }),
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-kettle',
+        description: 'The kettle skill',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+        ],
+      },
+    ]),
+  });
 
   const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
 
@@ -43,37 +245,23 @@ test('it fails when a skill folder holds a file its entry omits', async () => {
     exitCode: 1,
     stdout: '',
     stderr:
-      "check-sync-manifest: entry 'skill-demo' ships sync/skills/demo/, but omits sync/skills/demo/references/go.md\n",
+      "check-sync-manifest: an entry reads zgeoff/skills, but its tree '.zgeoff-skills/0123456789abcdef0123456789abcdef01234567' is missing; run bun run skills:install\n",
   });
 });
 
-test('it fails when two entries split one skill folder between them', async () => {
+test('it fails when a file names a repo the sync does not check out', async () => {
   const ctx = await setupTest();
 
-  await mkdir(join(ctx.directory, 'sync/skills/demo/references'), { recursive: true });
-  await writeFile(join(ctx.directory, 'sync/skills/demo/SKILL.md'), '# Demo\n');
-  await writeFile(join(ctx.directory, 'sync/skills/demo/references/go.md'), '# Go\n');
-
-  await writeFile(
-    join(ctx.directory, 'sync/manifest.json'),
-    JSON.stringify([
+  await writeTreeFiles(ctx.directory, {
+    'sync/editorconfig': 'root = true\n',
+    'sync/manifest.json': JSON.stringify([
       {
-        name: 'skill-demo',
-        description: 'The demo skill',
-        files: [{ source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' }],
-      },
-      {
-        name: 'skill-demo-go',
-        description: 'The demo skill Go reference',
-        files: [
-          {
-            source: 'sync/skills/demo/references/go.md',
-            target: '.claude/skills/demo/references/go.md',
-          },
-        ],
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ repo: 'acme/kettle', source: 'sync/editorconfig', target: '.editorconfig' }],
       },
     ]),
-  );
+  });
 
   const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
 
@@ -85,103 +273,7 @@ test('it fails when two entries split one skill folder between them', async () =
     exitCode: 1,
     stdout: '',
     stderr:
-      "check-sync-manifest: entry 'skill-demo-go' ships sync/skills/demo/, but omits sync/skills/demo/SKILL.md\ncheck-sync-manifest: entry 'skill-demo' ships sync/skills/demo/, but omits sync/skills/demo/references/go.md\n",
-  });
-});
-
-test('it fails when no entry lists a file from a skill folder', async () => {
-  const ctx = await setupTest();
-
-  await mkdir(join(ctx.directory, 'sync/skills/demo'), { recursive: true });
-  await writeFile(join(ctx.directory, 'sync/skills/demo/SKILL.md'), '# Demo\n');
-  await writeFile(join(ctx.directory, 'sync/manifest.json'), JSON.stringify([]));
-
-  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
-
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  }).toStrictEqual({
-    exitCode: 1,
-    stdout: '',
-    stderr:
-      'check-sync-manifest: skill folder sync/skills/demo/ holds sync/skills/demo/SKILL.md, but no entry lists a file from that folder\n',
-  });
-});
-
-test('it passes when the entry lists every file in its skill folder', async () => {
-  const ctx = await setupTest();
-
-  await mkdir(join(ctx.directory, 'sync/skills/demo/references'), { recursive: true });
-  await writeFile(join(ctx.directory, 'sync/skills/demo/SKILL.md'), '# Demo\n');
-  await writeFile(join(ctx.directory, 'sync/skills/demo/references/go.md'), '# Go\n');
-
-  await writeFile(
-    join(ctx.directory, 'sync/manifest.json'),
-    JSON.stringify([
-      {
-        name: 'skill-demo',
-        description: 'The demo skill',
-        files: [
-          { source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' },
-          {
-            source: 'sync/skills/demo/references/go.md',
-            target: '.claude/skills/demo/references/go.md',
-          },
-        ],
-      },
-    ]),
-  );
-
-  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
-
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  }).toStrictEqual({
-    exitCode: 0,
-    stdout: '',
-    stderr: '',
-  });
-});
-
-test('it passes when the entry omits only a test beside a skill script', async () => {
-  const ctx = await setupTest();
-
-  await mkdir(join(ctx.directory, 'sync/skills/demo/scripts'), { recursive: true });
-  await writeFile(join(ctx.directory, 'sync/skills/demo/SKILL.md'), '# Demo\n');
-  await writeFile(join(ctx.directory, 'sync/skills/demo/scripts/check.sh'), 'exit 0\n');
-  await writeFile(join(ctx.directory, 'sync/skills/demo/scripts/check.test.ts'), '');
-
-  await writeFile(
-    join(ctx.directory, 'sync/manifest.json'),
-    JSON.stringify([
-      {
-        name: 'skill-demo',
-        description: 'The demo skill',
-        files: [
-          { source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' },
-          {
-            source: 'sync/skills/demo/scripts/check.sh',
-            target: '.claude/skills/demo/scripts/check.sh',
-          },
-        ],
-      },
-    ]),
-  );
-
-  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
-
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  }).toStrictEqual({
-    exitCode: 0,
-    stdout: '',
-    stderr: '',
+      'check-sync-manifest: entry \'editorconfig\' gives sync/editorconfig the repo "acme/kettle", which is neither zgeoff/tools nor zgeoff/skills\n',
   });
 });
 
@@ -724,5 +816,49 @@ test('it passes when the scripts field declares each script the build writes, wi
     exitCode: 0,
     stdout: '',
     stderr: '',
+  });
+});
+
+test('it fails when a zgeoff/skills Markdown file links an excepted file outside a block', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'tree/skills/kettle/SKILL.md': '# Kettle\n\nFor Go, read [Go](./references/go.md).\n',
+    'tree/skills/kettle/references/go.md': '# Go\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-kettle',
+        description: 'The kettle skill',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/references/go.md',
+            target: '.claude/skills/kettle/references/go.md',
+            except: ['acme/ledger'],
+          },
+        ],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath} sync/manifest.json tree`
+    .cwd(ctx.directory)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      "check-sync-manifest: entry 'skill-kettle' links ./references/go.md from skills/kettle/SKILL.md outside a 'repo-sync needs ./references/go.md' block, so acme/ledger gets a dead link\n",
   });
 });

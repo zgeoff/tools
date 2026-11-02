@@ -1,5 +1,7 @@
 import { isRecord } from '../../packages/std/src/is-record.ts';
 import type { SyncFile } from './select-sync-files.ts';
+import type { SyncSourceRepo } from './sync-source-checkouts.ts';
+import { syncSourceCheckouts } from './sync-source-checkouts.ts';
 
 // One entry of sync/manifest.json. The prepare job reads the manifest into these, and the sync job
 // reads the entries the prepare job picked through the same parse.
@@ -68,8 +70,13 @@ function parseSyncFile(file: unknown): SyncFile | null {
     return null;
   }
 
+  const repo = file['repo'] ?? 'zgeoff/tools';
   const mode = file['mode'];
   const except = file['except'];
+
+  if (!isSyncSourceRepo(repo)) {
+    return null;
+  }
 
   if (mode !== undefined && typeof mode !== 'string') {
     return null;
@@ -80,11 +87,16 @@ function parseSyncFile(file: unknown): SyncFile | null {
   }
 
   return {
+    repo,
     source: file['source'],
     target: file['target'],
     ...(mode === undefined ? {} : { mode }),
     ...(except === undefined ? {} : { except }),
   };
+}
+
+function isSyncSourceRepo(value: unknown): value is SyncSourceRepo {
+  return typeof value === 'string' && Object.hasOwn(syncSourceCheckouts, value);
 }
 
 function isStringList(value: unknown): value is string[] {

@@ -66,14 +66,164 @@ test('it outputs the entries it keeps as compact JSON in the sync entry contract
     buildMockSyncEntry({
       name: 'workflow-demo',
       description: 'The demo workflow',
-      files: [{ source: 'sync/workflow-demo.yml', target: '.github/workflows/demo.yml' }],
+      files: [
+        {
+          repo: 'zgeoff/tools',
+          source: 'sync/workflow-demo.yml',
+          target: '.github/workflows/demo.yml',
+        },
+      ],
       optIn: true,
     }),
   ];
 
   expect(exitCode).toBe(0);
-  expect(outputs).toBe(`entries=${JSON.stringify(entries)}\n`);
+  expect(outputs).toBe(`entries=${JSON.stringify(entries)}\nskills-ref=\n`);
   expect(ctx.output).toStrictEqual([]);
+});
+
+test('it outputs the pinned commit of zgeoff/skills beside the entries that read it', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    ctx.manifestPath,
+    JSON.stringify([
+      {
+        name: 'skill-kettle',
+        description: 'The kettle skill',
+        optIn: true,
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+        ],
+      },
+    ]),
+  );
+
+  await writeFile(
+    join(ctx.directory, 'sync', 'skills-pin.json'),
+    JSON.stringify({ commit: '0123456789abcdef0123456789abcdef01234567' }),
+  );
+
+  await writeFile(ctx.outputPath, '');
+
+  const exitCode = await writeSyncEntries({
+    cwd: ctx.directory,
+    skip: '',
+    include: 'skill-kettle',
+    outputPath: ctx.outputPath,
+    fileSystem: nodeFileSystem,
+    writeOutput: ctx.writeOutput,
+  });
+
+  const outputs = await readFile(ctx.outputPath, 'utf8');
+
+  const entries = [
+    buildMockSyncEntry({
+      name: 'skill-kettle',
+      description: 'The kettle skill',
+      files: [
+        {
+          repo: 'zgeoff/skills',
+          source: 'skills/kettle/SKILL.md',
+          target: '.claude/skills/kettle/SKILL.md',
+        },
+      ],
+      optIn: true,
+    }),
+  ];
+
+  expect(exitCode).toBe(0);
+
+  expect(outputs).toBe(
+    `entries=${JSON.stringify(entries)}\nskills-ref=0123456789abcdef0123456789abcdef01234567\n`,
+  );
+
+  expect(ctx.output).toStrictEqual([]);
+});
+
+test('it fails with an error and writes no output when an entry reads zgeoff/skills and the ref has no pin', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    ctx.manifestPath,
+    JSON.stringify([
+      {
+        name: 'skill-kettle',
+        description: 'The kettle skill',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+        ],
+      },
+    ]),
+  );
+
+  await writeFile(ctx.outputPath, '');
+
+  const exitCode = await writeSyncEntries({
+    cwd: ctx.directory,
+    skip: '',
+    include: '',
+    outputPath: ctx.outputPath,
+    fileSystem: nodeFileSystem,
+    writeOutput: ctx.writeOutput,
+  });
+
+  const outputs = await readFile(ctx.outputPath, 'utf8');
+
+  expect(exitCode).toBe(1);
+  expect(outputs).toBe('');
+
+  expect(ctx.output).toStrictEqual([
+    '::error::An entry takes its sources from zgeoff/skills, but the tools ref has no sync/skills-pin.json\n',
+  ]);
+});
+
+test('it fails with an error and writes no output when the pin holds no full commit ID', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    ctx.manifestPath,
+    JSON.stringify([
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+      },
+    ]),
+  );
+
+  await writeFile(
+    join(ctx.directory, 'sync', 'skills-pin.json'),
+    JSON.stringify({ commit: 'main' }),
+  );
+
+  await writeFile(ctx.outputPath, '');
+
+  const exitCode = await writeSyncEntries({
+    cwd: ctx.directory,
+    skip: '',
+    include: '',
+    outputPath: ctx.outputPath,
+    fileSystem: nodeFileSystem,
+    writeOutput: ctx.writeOutput,
+  });
+
+  const outputs = await readFile(ctx.outputPath, 'utf8');
+
+  expect(exitCode).toBe(1);
+  expect(outputs).toBe('');
+
+  expect(ctx.output).toStrictEqual([
+    '::error::sync/skills-pin.json holds no full commit ID of zgeoff/skills\n',
+  ]);
 });
 
 test('it fails with an error and writes no output when include names an entry that is not opt-in', async () => {

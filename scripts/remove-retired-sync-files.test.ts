@@ -289,7 +289,7 @@ test('it fails on a shallow checkout of tools', async () => {
   }).toStrictEqual({
     exitCode: 1,
     stdout: '',
-    stderr: `remove-retired-sync-files: ${shallow} is a shallow clone, so it lacks the earlier manifests\n`,
+    stderr: `remove-retired-sync-files: ${shallow} is a shallow clone, so it lacks the history the cleanup reads\n`,
   });
 });
 
@@ -621,4 +621,227 @@ test('it deletes a retired workflow whose quoted call the sync pinned to a commi
   });
 
   expect(existsSync(join(ctx.caller, '.github/workflows/lint.yml'))).toBeFalse();
+});
+
+test('it deletes a retired copy of a source that an earlier manifest took from zgeoff/skills', async () => {
+  const ctx = await setupTest();
+
+  const skills = join(ctx.directory, 'skills');
+
+  await mkdir(skills);
+  await runGit(skills, ctx.env, ['init', '-q']);
+
+  await createGitCommit(skills, ctx.env, {
+    'skills/kettle/SKILL.md': '# Kettle\n',
+    'skills/kettle/references/descaling.md': '# Descaling\n',
+  });
+
+  await createGitCommit(ctx.tools, ctx.env, {
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-kettle',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/references/descaling.md',
+            target: '.claude/skills/kettle/references/descaling.md',
+          },
+        ],
+      },
+    ]),
+  });
+
+  await createGitCommit(ctx.tools, ctx.env, {
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-kettle',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+        ],
+      },
+    ]),
+  });
+
+  await writeTreeFiles(ctx.caller, {
+    '.claude/skills/kettle/SKILL.md': '# Kettle\n',
+    '.claude/skills/kettle/references/descaling.md': '# Descaling\n',
+  });
+
+  const result = await $`bash ${ctx.scriptPath} ${ctx.tools} skill-kettle ${''} ${''} ${skills}`
+    .cwd(ctx.caller)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: '.claude/skills/kettle/references/descaling.md\n',
+    stderr: '',
+  });
+
+  expect(existsSync(join(ctx.caller, '.claude/skills/kettle/references/descaling.md'))).toBeFalse();
+});
+
+test('it keeps a retired copy of a zgeoff/skills source when the run has no zgeoff/skills checkout', async () => {
+  const ctx = await setupTest();
+
+  await createGitCommit(ctx.tools, ctx.env, {
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-kettle',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/references/descaling.md',
+            target: '.claude/skills/kettle/references/descaling.md',
+          },
+        ],
+      },
+    ]),
+  });
+
+  await createGitCommit(ctx.tools, ctx.env, {
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-kettle',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+        ],
+      },
+    ]),
+  });
+
+  await writeTreeFiles(ctx.caller, {
+    '.claude/skills/kettle/references/descaling.md': '# Descaling\n',
+  });
+
+  const result = await $`bash ${ctx.scriptPath} ${ctx.tools} skill-kettle`
+    .cwd(ctx.caller)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+
+  expect(existsSync(join(ctx.caller, '.claude/skills/kettle/references/descaling.md'))).toBeTrue();
+});
+
+test('it deletes the copy of a tools source that an entry dropped when it moved to zgeoff/skills', async () => {
+  const ctx = await setupTest();
+
+  const skills = join(ctx.directory, 'skills');
+
+  await mkdir(skills);
+  await runGit(skills, ctx.env, ['init', '-q']);
+  await createGitCommit(skills, ctx.env, { 'skills/kettle/SKILL.md': '# Kettle, rewritten\n' });
+
+  await createGitCommit(ctx.tools, ctx.env, {
+    'sync/skills/kettle/SKILL.md': '# Kettle\n',
+    'sync/skills/kettle/references/descaling.md': '# Descaling\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-kettle',
+        files: [
+          { source: 'sync/skills/kettle/SKILL.md', target: '.claude/skills/kettle/SKILL.md' },
+          {
+            source: 'sync/skills/kettle/references/descaling.md',
+            target: '.claude/skills/kettle/references/descaling.md',
+          },
+        ],
+      },
+    ]),
+  });
+
+  await runGit(ctx.tools, ctx.env, ['rm', '-q', '-r', 'sync/skills']);
+
+  await createGitCommit(ctx.tools, ctx.env, {
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-kettle',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+        ],
+      },
+    ]),
+  });
+
+  await writeTreeFiles(ctx.caller, {
+    '.claude/skills/kettle/SKILL.md': '# Kettle, rewritten\n',
+    '.claude/skills/kettle/references/descaling.md': '# Descaling\n',
+  });
+
+  const result =
+    await $`bash ${ctx.scriptPath} ${ctx.tools} skill-kettle ${''} ${'.claude/skills/kettle/SKILL.md'} ${skills}`
+      .cwd(ctx.caller)
+      .nothrow()
+      .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: '.claude/skills/kettle/references/descaling.md\n',
+    stderr: '',
+  });
+
+  expect(existsSync(join(ctx.caller, '.claude/skills/kettle/SKILL.md'))).toBeTrue();
+});
+
+test('it fails on a shallow checkout of zgeoff/skills', async () => {
+  const ctx = await setupTest();
+
+  const origin = join(ctx.directory, 'skills-origin');
+  const skills = join(ctx.directory, 'skills');
+
+  await mkdir(origin);
+  await runGit(origin, ctx.env, ['init', '-q']);
+  await createGitCommit(origin, ctx.env, { 'skills/kettle/SKILL.md': '# Kettle\n' });
+  await createGitCommit(origin, ctx.env, { 'skills/kettle/SKILL.md': '# Kettle, again\n' });
+  await runGit(ctx.directory, ctx.env, ['clone', '-q', '--depth', '1', `file://${origin}`, skills]);
+  await createGitCommit(ctx.tools, ctx.env, { 'sync/manifest.json': '[]' });
+
+  const result = await $`bash ${ctx.scriptPath} ${ctx.tools} ${''} ${''} ${''} ${skills}`
+    .cwd(ctx.caller)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr: `remove-retired-sync-files: ${skills} is a shallow clone, so it lacks the history the cleanup reads\n`,
+  });
 });

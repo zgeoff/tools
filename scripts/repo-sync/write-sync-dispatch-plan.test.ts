@@ -248,26 +248,67 @@ test('it sends when a commit drops an entry, so the repos remove the retired cop
   expect(outputs).toBe(`send=true\ncommit=${commit}\n`);
 });
 
-test('it sends the newest green commit for a dispatch from another repo', async () => {
+test('it sends when a commit moves only the zgeoff/skills pin', async () => {
   const ctx = await setupTest();
 
-  const commit = await ctx.writeToolsCommit({
+  const previous = await ctx.writeToolsCommit({
     'sync/manifest.json': JSON.stringify([
       {
-        name: 'skill-demo',
-        description: 'The demo skill',
-        files: [{ source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' }],
+        name: 'skill-kettle',
+        description: 'The kettle skill',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+        ],
       },
     ]),
+    'sync/skills-pin.json': JSON.stringify({ commit: '0123456789abcdef0123456789abcdef01234567' }),
   });
 
-  ctx.answerGreenCommits([commit]);
+  const commit = await ctx.writeToolsCommit({
+    'sync/skills-pin.json': JSON.stringify({ commit: '89abcdef0123456789abcdef0123456789abcdef' }),
+  });
 
-  await ctx.plan('repository_dispatch', '');
+  ctx.answerGreenCommits([commit, previous]);
+
+  await ctx.plan('workflow_run', commit);
 
   const outputs = await ctx.readOutputs();
 
   expect(outputs).toBe(`send=true\ncommit=${commit}\n`);
+});
+
+test('it sends nothing when a commit changes a file here at the path of a zgeoff/skills source', async () => {
+  const ctx = await setupTest();
+
+  const previous = await ctx.writeToolsCommit({
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-kettle',
+        description: 'The kettle skill',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+        ],
+      },
+    ]),
+  });
+
+  const commit = await ctx.writeToolsCommit({ 'skills/kettle/SKILL.md': '# Kettle\n' });
+
+  ctx.answerGreenCommits([commit, previous]);
+
+  await ctx.plan('workflow_run', commit);
+
+  const outputs = await ctx.readOutputs();
+
+  expect(outputs).toBe(`send=false\ncommit=${commit}\n`);
 });
 
 test('it sends the newest green commit from the run of an older one that changed a synced source', async () => {

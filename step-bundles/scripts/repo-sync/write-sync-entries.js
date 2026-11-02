@@ -70,6 +70,21 @@ function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+// scripts/repo-sync/parse-skills-pin.ts
+function parseSkillsPin(value) {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const commit = value["commit"];
+  return typeof commit === "string" && /^[0-9a-f]{40}$/u.test(commit) ? commit : null;
+}
+
+// scripts/repo-sync/sync-source-checkouts.ts
+var syncSourceCheckouts = {
+  "zgeoff/tools": ".repo-sync",
+  "zgeoff/skills": ".repo-sync-skills"
+};
+
 // scripts/repo-sync/parse-sync-entries.ts
 function parseSyncEntries(value) {
   if (!Array.isArray(value)) {
@@ -102,8 +117,12 @@ function parseSyncFile(file) {
   if (!isRecord(file) || typeof file["source"] !== "string" || typeof file["target"] !== "string") {
     return null;
   }
+  const repo = file["repo"] ?? "zgeoff/tools";
   const mode = file["mode"];
   const except = file["except"];
+  if (!isSyncSourceRepo(repo)) {
+    return null;
+  }
   if (mode !== undefined && typeof mode !== "string") {
     return null;
   }
@@ -111,11 +130,15 @@ function parseSyncFile(file) {
     return null;
   }
   return {
+    repo,
     source: file["source"],
     target: file["target"],
     ...mode === undefined ? {} : { mode },
     ...except === undefined ? {} : { except }
   };
+}
+function isSyncSourceRepo(value) {
+  return typeof value === "string" && Object.hasOwn(syncSourceCheckouts, value);
 }
 function isStringList(value) {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
@@ -150,6 +173,9 @@ function formatLogNames(names) {
   return names.join(", ").replaceAll(":", " ");
 }
 
+// scripts/repo-sync/skills-pin-path.ts
+var skillsPinPath = "sync/skills-pin.json";
+
 // scripts/repo-sync/write-sync-entries.ts
 async function writeSyncEntries(options) {
   const manifestText = await options.fileSystem.readText(join(options.cwd, "sync/manifest.json"));
@@ -166,10 +192,34 @@ async function writeSyncEntries(options) {
 `);
     return 1;
   }
+  const skillsPin = await readSkillsPin(options);
+  if (skillsPin.kind === "refused") {
+    options.writeOutput(`::error::${skillsPin.message}
+`);
+    return 1;
+  }
+  const needsSkills = picked.entries.some((entry) => entry.files.some((file) => file.repo === "zgeoff/skills"));
+  if (needsSkills && skillsPin.commit === "") {
+    options.writeOutput(`::error::An entry takes its sources from zgeoff/skills, but the tools ref has no ${skillsPinPath}
+`);
+    return 1;
+  }
   await writeStepOutputs(options.fileSystem, options.outputPath, {
-    entries: JSON.stringify(picked.entries)
+    entries: JSON.stringify(picked.entries),
+    "skills-ref": skillsPin.commit
   });
   return 0;
+}
+async function readSkillsPin(options) {
+  const path = join(options.cwd, skillsPinPath);
+  const exists = await options.fileSystem.probePath(path);
+  if (!exists) {
+    return { kind: "read", commit: "" };
+  }
+  const pinText = await options.fileSystem.readText(path);
+  const pinValue = JSON.parse(pinText);
+  const commit = parseSkillsPin(pinValue);
+  return commit === null ? { kind: "refused", message: `${skillsPinPath} holds no full commit ID of zgeoff/skills` } : { kind: "read", commit };
 }
 if (import.meta.main) {
   process.exitCode = await writeSyncEntries({

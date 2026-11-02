@@ -1,8 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
+import { nodeFileSystem } from '../../../scripts/ci/node-file-system.ts';
+import { readPinnedSkillText } from '../../../test-utils/read-pinned-skill-text.ts';
 import { runProgram } from './run-program.ts';
 import { runTestTimeoutsCheck } from './run-test-timeouts-check.ts';
 
@@ -297,9 +299,10 @@ test('it reads the limit of a lane that the object form of the lanes option decl
 test('it holds the same lane limits as the Lanes table in the shared testing skill', async () => {
   const ctx = await setupTest();
 
-  const markdown = await readFile(
-    join(import.meta.dir, '../../../sync/skills/testing/references/slow-tests.md'),
-    'utf8',
+  const markdown = await readPinnedSkillText(
+    nodeFileSystem,
+    join(import.meta.dir, '..', '..', '..'),
+    'skills/testing/references/slow-tests.md',
   );
 
   const rows = [

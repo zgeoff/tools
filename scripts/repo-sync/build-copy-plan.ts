@@ -3,6 +3,8 @@ import { isWorkflowPath } from './is-workflow-path.ts';
 
 export interface SyncFileRow {
   readonly action: 'copy' | 'skip';
+
+  // The source's path in the caller's checkout.
   readonly source: string;
   readonly target: string;
   readonly mode: string;

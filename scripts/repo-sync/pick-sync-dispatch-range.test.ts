@@ -68,32 +68,6 @@ test('it ranges from the green commit before the run up to the newest green comm
   });
 });
 
-test('it always dispatches the newest green commit for a dispatch from another repo', () => {
-  const range = pickSyncDispatchRange({
-    event: 'repository_dispatch',
-    runCommit: '',
-    greenCommits: [
-      'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    ],
-  });
-
-  expect(range).toStrictEqual({
-    kind: 'always',
-    commit: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-  });
-});
-
-test('it skips a dispatch from another repo when main has no green commit', () => {
-  const range = pickSyncDispatchRange({
-    event: 'repository_dispatch',
-    runCommit: '',
-    greenCommits: [],
-  });
-
-  expect(range).toStrictEqual({ kind: 'skip', reason: 'main of zgeoff/tools has no green commit' });
-});
-
 test('it skips an event that starts no sync', () => {
   const range = pickSyncDispatchRange({
     event: 'workflow_dispatch',

@@ -20,13 +20,7 @@ export async function writeCopyPlan(context: CopyPlanContext, plan: CopyPlan): P
 
     await context.fileSystem.createDirectory(join(context.cwd, dirname(copy.target)));
 
-    await runChecked(context, [
-      'install',
-      '-m',
-      copy.mode,
-      `.repo-sync/${copy.source}`,
-      copy.target,
-    ]);
+    await runChecked(context, ['install', '-m', copy.mode, copy.source, copy.target]);
 
     if (copy.isPinned) {
       const text = await context.fileSystem.readText(path);

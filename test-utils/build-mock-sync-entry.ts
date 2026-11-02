@@ -5,7 +5,7 @@ export function buildMockSyncEntry(overrides: Partial<SyncEntry> = {}): SyncEntr
   return {
     name: 'editorconfig',
     description: 'The editor config',
-    files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+    files: [{ repo: 'zgeoff/tools', source: 'sync/editorconfig', target: '.editorconfig' }],
     build: '',
     optIn: false,
     scripts: {},

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { writeStdout } from '@zgeoff/std';
 import { runProgram } from '../run-program.ts';
 import type { DependencyGateSources } from './read-dependency-gate-findings.ts';
 import { readDependencyGateFindings } from './read-dependency-gate-findings.ts';
@@ -40,9 +41,7 @@ export function runDependencyGatesCommand(): number {
 
       return existsSync(fullPath) ? readFileSync(fullPath, 'utf8') : null;
     },
-    writeOutput: (text) => {
-      process.stdout.write(text);
-    },
+    writeOutput: writeStdout,
     writeError: (text) => {
       process.stderr.write(text);
     },
