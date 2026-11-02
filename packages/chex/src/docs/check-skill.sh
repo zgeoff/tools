@@ -13,7 +13,9 @@
 # Warns on: a SKILL.md body over 1,500 words, or over 4,000 for a rule set, a SKILL.md over 500
 # lines, a reference that SKILL.md does not list under ## References, a reference over 100 lines
 # with two or more headings and no contents list near its top, a reference that links to another
-# reference, and a code-formatted span outside a table that names an existing repo file.
+# reference, a code-formatted span outside a table that names an existing repo file, and a bullet in
+# a rule set's SKILL.md that opens with an article or "Each" and a noun, a code span and a verb, or a
+# label and a colon.
 set -uo pipefail
 
 if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
@@ -118,7 +120,7 @@ sub check_skill {
 
   warn_about($skill, scalar(@lines) . " lines, over 500; check that each section is one most tasks need")
     if @lines > 500;
-  check_words($skill, @lines);
+  check_bullets($skill, @lines) if check_words($skill, @lines);
   check_frontmatter($dir, $skill, @lines);
 
   open my $list, "-|", "git", "-c", "core.quotePath=false", "ls-files", "--cached", "--others",
@@ -180,6 +182,42 @@ sub check_words {
     fail($skill, "body is $words words, over the limit of $limit; cut it, or move what only some tasks need into a reference");
   } elsif ($words > $warn) {
     warn_about($skill, "body is $words words, over $warn; cut it, or move what only some tasks need into a reference");
+  }
+  return $limit == 5000;
+}
+
+# A rule set is a list of bullets the agent applies while it does other work, so each bullet opens
+# with what the agent does, a ban or a condition. A bullet that opens with a thing as its subject,
+# or with a label and a colon, leaves the agent to work out the action.
+sub check_bullets {
+  my ($skill, @lines) = @_;
+  my ($open, $line_number, $in_frontmatter) = ("", 0, @lines && $lines[0] eq "---");
+  for my $line (@lines) {
+    $line_number++;
+    if ($in_frontmatter) {
+      $in_frontmatter = 0 if $line_number > 1 && $line eq "---";
+      next;
+    }
+    if ($line =~ /^\s*(`{3,}|~{3,})(.*)$/) {
+      my ($marker, $rest) = ($1, $2);
+      if ($open eq "") { $open = $marker }
+      elsif (substr($marker, 0, 1) eq substr($open, 0, 1) && length($marker) >= length($open)
+        && $rest =~ /^\s*$/) { $open = "" }
+      next;
+    }
+    next if $open ne "";
+    next unless $line =~ /^\s*[-*+]\s+(.*)$/;
+    my $text = $1 =~ s/^\*\*//r;
+    my $problem;
+    if ($text =~ /^(A|An|The|Each|Every)\s+[\w`]/) {
+      $problem = "opens with \"$1\" and a noun";
+    } elsif (($text =~ /^`[^`]+`\s+([a-z]+)\b/ ? $1 : "") =~ /^(?!(?:as|this|its)\z)(?:are|have|can|may|must|do|[a-z]+s)\z/) {
+      $problem = "opens with a code span and a verb";
+    } elsif ($text =~ /^([A-Z][\w-]*(?:\s[\w-]+){0,2}):(?:\*\*)?\s/ && $1 !~ /^(?:When|If|In|Never|No)\b/) {
+      $problem = "opens with the label \"$1:\"";
+    }
+    warn_about("$skill:$line_number", "bullet $problem; open it with what the agent does, a ban such as \"Never\", or a condition such as \"When\"")
+      if $problem;
   }
 }
 

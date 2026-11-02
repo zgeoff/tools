@@ -1281,3 +1281,89 @@ test('it exits 2 and checks nothing when git cannot list the files', async () =>
     stderr: expect.stringContaining('check-skill: git ls-files failed, so no skill was checked\n'),
   });
 });
+
+test('it warns on a rule-set bullet that opens with a thing or a label', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Rules for every demo change. Load it before writing or reviewing one.',
+    'metadata:',
+    '  kind: rule-set',
+    '---',
+    '',
+    '# Demo',
+    '',
+    '- A kettle boils water before the tea goes in.',
+    '- **Each mug** holds one bag.',
+    '- `brew.ts` runs the timer.',
+    '- Mugs: rinse them first.',
+  ]);
+
+  const result = await ctx.run();
+
+  const fix =
+    '; open it with what the agent does, a ban such as "Never", or a condition such as "When" (warning)\n';
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      `skills/demo/SKILL.md:11: bullet opens with "A" and a noun${fix}` +
+      `skills/demo/SKILL.md:12: bullet opens with "Each" and a noun${fix}` +
+      `skills/demo/SKILL.md:13: bullet opens with a code span and a verb${fix}` +
+      `skills/demo/SKILL.md:14: bullet opens with the label "Mugs:"${fix}` +
+      'check-skill: 1 skills, 0 errors, 4 warnings\n',
+  });
+});
+
+test('it passes a rule-set bullet that opens with an action, a ban or a condition', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Rules for every demo change. Load it before writing or reviewing one.',
+    'metadata:',
+    '  kind: rule-set',
+    '---',
+    '',
+    '# Demo',
+    '',
+    '- Boil the water before the tea goes in.',
+    '- Never reuse a bag.',
+    '- No sugar in the pot.',
+    '- When the mug is cold: warm it first.',
+    '- `steep`, `pour` and `stir` name each step.',
+    '',
+    '```text',
+    '- A line inside a code block.',
+    '```',
+  ]);
+
+  const result = await ctx.run();
+
+  expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
+});
+
+test('it ignores the bullet openers of a skill that is not a rule set', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Commands and traps for the demo service. Load it before running a demo test.',
+    '---',
+    '',
+    '# Demo',
+    '',
+    '- A kettle boils water before the tea goes in.',
+  ]);
+
+  const result = await ctx.run();
+
+  expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
+});
