@@ -120,6 +120,90 @@ test('it runs the related tests through rig under diet, and leaves the main chec
   expect(rigCalls).toStrictEqual(['under diet: related fixture.ts']);
 });
 
+test('it runs the pre-commit typecheck without git repository variables in a commit from a worktree', async () => {
+  const ctx = await setupTest();
+
+  const leaks = join(ctx.directory, 'git-variable-leaks');
+  const recorder = join(ctx.directory, 'record-git-variables.sh');
+
+  // Records each git repository variable that the command it runs inherits.
+  await writeFile(
+    recorder,
+    `for name in $(git rev-parse --local-env-vars); do\n  if printenv "$name" > /dev/null; then echo "$name: $*" >> ${leaks}; fi\ndone\nexec "$@"\n`,
+  );
+
+  await writeFile(leaks, '');
+
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
+    realChecks: [],
+    scripts: { 'format:check': 'true', typecheck: 'true', 'check:docs': 'true' },
+    files: { 'fixture.ts': 'export {};\n' },
+    rig: 'true',
+    oxlint: 'exit 0',
+    withCommitlint: false,
+  });
+
+  // Every job runs its command through diet, so this diet records what each command inherits.
+  await writeStubPrograms(join(ctx.worktree, 'node_modules/.bin'), {
+    diet: `[ "$1" = -- ] && shift\nexec sh ${recorder} "$@"`,
+  });
+
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixture');
+
+  const recorded = await readFile(leaks, 'utf8');
+
+  expect(recorded).toBe('');
+});
+
+test('it runs every job and file list without git repository variables in a pre-push from a worktree', async () => {
+  const ctx = await setupTest();
+
+  const leaks = join(ctx.directory, 'git-variable-leaks');
+  const recorder = join(ctx.directory, 'record-git-variables.sh');
+
+  // Records each git repository variable that the command it runs inherits.
+  await writeFile(
+    recorder,
+    `for name in $(git rev-parse --local-env-vars); do\n  if printenv "$name" > /dev/null; then echo "$name: $*" >> ${leaks}; fi\ndone\nexec "$@"\n`,
+  );
+
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
+    realChecks: [],
+    scripts: { 'format:check': 'true', typecheck: 'true', 'check:docs': 'true' },
+    files: {
+      'fixture.ts': 'export {};\n',
+      'guide.md': '# Guide\n\nA short guide.\n',
+      'greet.sh': '#!/usr/bin/env bash\necho hi\n',
+      '.github/workflows/greet.yml':
+        'on: workflow_dispatch\njobs:\n  greet:\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    steps:\n      - run: echo hi\n',
+    },
+    rig: 'true',
+    oxlint: 'exit 0',
+    withCommitlint: false,
+  });
+
+  // Every job runs its command through diet, so this diet records what each command inherits.
+  await writeStubPrograms(join(ctx.worktree, 'node_modules/.bin'), {
+    diet: `[ "$1" = -- ] && shift\nexec sh ${recorder} "$@"`,
+  });
+
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixtures');
+  await writeFile(leaks, '');
+
+  // A hook puts git's own folder first on the PATH, so the file list's script is recorded at bun.
+  await writeStubPrograms(ctx.bin, {
+    bun: `case "$*" in\n  *read-branch-files*) sh ${recorder} true read-branch-files ;;\nesac\nexec ${process.execPath} "$@"`,
+    shellcheck: "echo '[]'",
+    shfmt: 'exit 0',
+  });
+
+  const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
+  const recorded = await readFile(leaks, 'utf8');
+
+  expect(result.exitCode).toBe(0);
+  expect(recorded).toBe('');
+});
+
 test('it fails a commit in a checkout with no node_modules, and names the missing baseline', async () => {
   const ctx = await setupTest();
 
