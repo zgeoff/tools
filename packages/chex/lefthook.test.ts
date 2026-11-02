@@ -9,7 +9,7 @@ import type { BaselineJobDeps } from './test-utils/run-baseline-job.ts';
 import { runBaselineJob } from './test-utils/run-baseline-job.ts';
 import { writeStubPrograms } from './test-utils/write-stub-programs.ts';
 
-// The PATH holds only bun, env and the stubs a test writes, so a program the host has, such as
+// The PATH holds only bun, env, date and the stubs a test writes, so a program the host has, such as
 // shfmt or actionlint, is missing unless the test stubs it.
 async function setupTest() {
   const repo = await mkdtemp(join(tmpdir(), 'chex-lefthook-job-'));
@@ -25,11 +25,13 @@ async function setupTest() {
   await writeStubPrograms(bin, {});
   await symlink(process.execPath, join(bin, 'bun'));
 
-  const envPath = Bun.which('env');
+  for (const program of ['env', 'date']) {
+    const programPath = Bun.which(program);
 
-  invariant(envPath !== null, 'install env');
+    invariant(programPath !== null, `install ${program}`);
 
-  await symlink(envPath, join(bin, 'env'));
+    await symlink(programPath, join(bin, program));
+  }
 
   const deps: BaselineJobDeps = {
     readConfigText: () => readFile(join(import.meta.dir, 'lefthook.yml'), 'utf8'),
@@ -111,6 +113,28 @@ test('it runs the workflow lint with a notice when the machine lacks actionlint,
       'bounced: workflows',
       '',
     ].join('\n'),
+  });
+});
+
+test('it fails the workflows job when actionlint fails a file that the workflow lint passes', async () => {
+  const ctx = await setupTest();
+
+  await writeStubPrograms(ctx.bin, {
+    actionlint: 'echo ".github/workflows/brew.yml:3:5: unknown key \\"stepz\\""\nexit 1',
+  });
+
+  await writeStubPrograms(join(ctx.repo, 'node_modules/.bin'), { chex: 'exit 0' });
+
+  const run = await runBaselineJob(
+    ctx.deps,
+    ctx.repo,
+    { hook: 'pre-push', name: 'workflows', files: ['.github/workflows/brew.yml'] },
+    ctx.env,
+  );
+
+  expect(run).toStrictEqual({
+    exitCode: 1,
+    output: '.github/workflows/brew.yml:3:5: unknown key "stepz"\n',
   });
 });
 
