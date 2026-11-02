@@ -114,8 +114,8 @@ of job. An edge case runs as a unit test of the logic it reaches.
 - `bun run check:lefthook-guard` checks that `lefthook.yml` holds the `chex-baseline` job that
   `chex init` writes. CI and the pre-push hook run it.
 - `bun run check:test-layout` fails when the repo root holds `e2e/`, `integration/` or
-  `test-utils/`, or when a file imports a test helper from another workspace's `test-utils/`. CI
-  runs it.
+  `test-utils/`, when a file imports a test helper from another workspace's `test-utils/`, or when a
+  source file does not parse, so the check cannot read its imports. CI runs it.
 - `bun x chex workflows` runs the shared workflow lint over the workflows HEAD holds, so commit a
   workflow change before you run it. CI runs it. `bun run check:docs` runs the docs checks that this
   repo takes, which the pre-push hook and CI run too.

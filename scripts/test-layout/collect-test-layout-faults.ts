@@ -1,6 +1,6 @@
 import { dirname, join, normalize } from 'node:path';
 import { Visitor, parseSync } from 'oxc-parser';
-import type { Expression, StringLiteral } from 'oxc-parser';
+import type { Expression, Program, StringLiteral } from 'oxc-parser';
 
 export interface SourceFile {
   readonly path: string;
@@ -24,20 +24,29 @@ export function collectTestLayoutFaults(
 
   const importFaults = sources
     .filter((source) => sourcePattern.test(source.path))
-    .flatMap((source) =>
-      collectRelativeImports(source)
+    .flatMap((source) => {
+      const parsed = parseSync(source.path, source.text);
+      const [parseError] = parsed.errors;
+
+      if (parseError !== undefined) {
+        return [
+          `${source.path} does not parse, so the layout check cannot read its imports: ${parseError.message}`,
+        ];
+      }
+
+      return collectRelativeImports(parsed.program)
         .map((specifier) => normalize(join(dirname(source.path), specifier)))
         .filter((target) => isForeignHelper(source.path, target))
         .map(
           (target) =>
             `${source.path} imports ${target}, a test helper of ${getWorkspaceRoot(target)}; copy the helper into the importer's own test-utils/`,
-        ),
-    );
+        );
+    });
 
   return [...rootDirFaults, ...importFaults];
 }
 
-function collectRelativeImports(source: SourceFile): string[] {
+function collectRelativeImports(program: Program): string[] {
   const specifiers: string[] = [];
 
   const addLiteral = (node: Expression | StringLiteral | null | undefined): void => {
@@ -85,7 +94,7 @@ function collectRelativeImports(source: SourceFile): string[] {
     },
   });
 
-  visitor.visit(parseSync(source.path, source.text).program);
+  visitor.visit(program);
 
   return specifiers.filter((path) => path.startsWith('./') || path.startsWith('../'));
 }
