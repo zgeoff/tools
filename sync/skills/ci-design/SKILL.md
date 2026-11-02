@@ -226,14 +226,20 @@ A dependency gate holds a package back on purpose: it pins a version, skips the 
 releases, or ignores an advisory. When its reason is gone, the gate keeps holding the package back,
 and nobody notices unless a check fails.
 
+The release-age gate is `minimumReleaseAge` in `bunfig.toml`: `bun install` refuses each release
+younger than that age. A release-age exclude is a name in the same file's
+`minimumReleaseAgeExcludes` list. It lets that package through the gate.
+
 The
 [dependency gates check](https://github.com/zgeoff/tools/blob/main/docs/architecture/dependency-updates.md#the-dependency-gates-check)
-fails on three kinds of stale gate, and on a missing first-party exclude:
+fails on three kinds of stale gate:
 
 - An override whose pinned version every range in the lockfile allows.
 - A release-age exclude whose removal date has passed.
 - An ignored advisory that is gone, or that a release in range fixes.
-- A first-party package in the lockfile that the release-age gate does not exclude.
+
+It also fails on a first-party package that the lockfile installs and the release-age gate does not
+exclude, as [First-party packages](#first-party-packages) describes.
 
 ## Dependency exceptions
 
@@ -242,16 +248,14 @@ release-age exclude, a root override, or an audit ignore. Add one only when it i
 carries its own cleanup. Every zgeoff repo follows this rule, so a repo's AGENTS.md or project skill
 links here and states no exception rule of its own.
 
-A first-party package, one under `@zgeoff/`, `@impz/` or `@wringer/`, is no exception: exclude every
-one that the lockfile installs, by its full name, with no removal comment. Renovate bumps these
-packages as soon as they publish, and `bun install` refuses each release younger than the gate
-without the exclude. Bun takes no scope in the exclude list.
+A first-party exclude follows [First-party packages](#first-party-packages), and none of the rules
+below apply to it.
 
 An exception is de-risked when its pull request shows three things:
 
 - A named reason: the change the exception unblocks, such as a fix the repo needs or a tool that
   nothing older provides. Convenience is no reason: when an older release does the job, pin the
-  newest version that passes the gate.
+  newest version that passes the release-age gate.
 - The narrowest scope: each package by its full name, and the catalog or the override pinning one
   exact version.
 - Provenance for a release-age exclude: every excluded release has an npm provenance attestation, so
@@ -269,6 +273,20 @@ Each kind of exception carries the record that takes it out:
   audits the advisory again.
 - A root override needs no record: the dependency gates check fails once every range in the lockfile
   admits the pinned version.
+
+### First-party packages
+
+A first-party package is one under `@zgeoff/`, `@impz/` or `@wringer/`. The owner of these repos
+publishes them and trusts each release, so they skip the release-age wait. Renovate bumps them as
+soon as they publish, and `bun install` refuses each new release until the release-age gate excludes
+the package.
+
+- Exclude every first-party package that the lockfile installs, including one that only another
+  package depends on. `bun run check:dependency-gates` names each one with no exclude.
+- Write each exclude as the full package name, such as `@zgeoff/std`. Bun accepts a scope entry such
+  as `@zgeoff/*` with no warning, and the entry lets no package through.
+- Give the exclude no removal comment. The audit-fix workflow removes an exclude on its comment's
+  date, so delete the comment from a first-party exclude that has one.
 
 ## Path gates
 
