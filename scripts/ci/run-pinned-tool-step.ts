@@ -66,10 +66,15 @@ async function runToolInstall(name: string, step: Readonly<PinnedToolStep>): Pro
     throw new Error(`${name}: the argument parse accepted a tool with no pin`);
   }
 
-  if (!shouldInstallTool(step.env['PART'] ?? '', step.env['SETUP_TOOL'] ?? '')) {
+  if (
+    !shouldInstallTool(step.env['PART'] ?? '', step.env['SETUP_TOOL'] ?? '', pin.neededBy !== null)
+  ) {
     return {
       exitCode: 0,
-      output: `${name}: not needed, because this job runs no ${pin.neededBy}\n`,
+      output:
+        pin.neededBy === null
+          ? `${name}: not needed, because the caller did not ask for it\n`
+          : `${name}: not needed, because this job runs no ${pin.neededBy}\n`,
     };
   }
 
