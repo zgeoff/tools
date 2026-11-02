@@ -53,6 +53,43 @@ test('it adds each lane script the repo defines to the standard list', () => {
   });
 });
 
+test('it plans test:agent-sdk and test:crash as lanes, so the test job runs test alone', () => {
+  const plan = planCheckScripts({
+    scripts: '',
+    defined: [
+      'audit',
+      'deadcode',
+      'format:check',
+      'lint',
+      'test',
+      'test:agent-sdk',
+      'test:crash',
+      'test:e2e',
+      'typecheck',
+    ],
+    part: 'all',
+    lane: '',
+  });
+
+  expect(plan).toStrictEqual({
+    kind: 'planned',
+    scripts: [
+      'audit',
+      'deadcode',
+      'format:check',
+      'lint',
+      'typecheck',
+      'test',
+      'test:e2e',
+      'test:agent-sdk',
+      'test:crash',
+    ],
+    static: ['audit', 'deadcode', 'format:check', 'lint', 'typecheck'],
+    test: ['test'],
+    lanes: ['e2e', 'agent-sdk', 'crash'],
+  });
+});
+
 test('it sorts the listed scripts into static checks, tests and lanes', () => {
   const plan = planCheckScripts({
     scripts: 'lint test:e2e test test:slow check',
@@ -85,13 +122,21 @@ test.each([
   ['static', '', ['lint', 'check']],
   ['test', '', ['test', 'test:slow']],
   ['lane', 'e2e', ['test:e2e']],
+  ['lane', 'agent-sdk', ['test:agent-sdk']],
+  ['lane', 'crash', ['test:crash']],
 ] as const)('it gives a public %s job only its own scripts', (part, lane, expected) => {
   const plan = planCheckScripts({
-    scripts: 'lint test:e2e test test:slow check',
-    defined: ['check', 'lint', 'test', 'test:e2e', 'test:slow'],
+    scripts: 'lint test:e2e test test:agent-sdk test:slow test:crash check',
+    defined: ['check', 'lint', 'test', 'test:agent-sdk', 'test:crash', 'test:e2e', 'test:slow'],
     part,
     lane,
   });
 
-  expect(plan).toMatchObject({ kind: 'planned', scripts: expected });
+  expect(plan).toStrictEqual({
+    kind: 'planned',
+    scripts: expected,
+    static: ['lint', 'check'],
+    test: ['test', 'test:slow'],
+    lanes: ['e2e', 'agent-sdk', 'crash'],
+  });
 });

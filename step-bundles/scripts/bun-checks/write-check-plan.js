@@ -356,7 +356,7 @@ function planCheckScripts(request) {
     lanes
   };
 }
-var laneNames = ["e2e", "browser", "docker", "host"];
+var laneNames = ["e2e", "browser", "docker", "host", "agent-sdk", "crash"];
 function buildStandardList(defined) {
   const optional = (name) => defined.has(name) ? [name] : [];
   return [

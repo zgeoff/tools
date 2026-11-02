@@ -51,7 +51,7 @@ export function planCheckScripts(request: CheckPlanRequest): CheckPlan {
   };
 }
 
-const laneNames = ['e2e', 'browser', 'docker', 'host'];
+const laneNames = ['e2e', 'browser', 'docker', 'host', 'agent-sdk', 'crash'];
 
 function buildStandardList(defined: ReadonlySet<string>): string[] {
   const optional = (name: string) => (defined.has(name) ? [name] : []);
