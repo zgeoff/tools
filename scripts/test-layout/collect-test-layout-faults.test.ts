@@ -144,3 +144,19 @@ test('it reads the imports of a script that starts with a shebang line', () => {
     "scripts/brew/run-brew.ts imports packages/kettle/test-utils/run-git.ts, a test helper of packages/kettle; copy the helper into the importer's own test-utils/",
   ]);
 });
+
+test('it reports an import of the test-utils folder of another package', () => {
+  const faults = collectTestLayoutFaults(
+    [],
+    [
+      {
+        path: 'packages/kettle/src/boil.test.ts',
+        text: "import { buildWater } from '../../teapot/test-utils';\n",
+      },
+    ],
+  );
+
+  expect(faults).toStrictEqual([
+    "packages/kettle/src/boil.test.ts imports packages/teapot/test-utils, a test helper of packages/teapot; copy the helper into the importer's own test-utils/",
+  ]);
+});

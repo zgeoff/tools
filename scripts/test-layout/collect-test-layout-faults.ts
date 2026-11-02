@@ -85,9 +85,10 @@ function collectRelativeImports(source: SourceFile): string[] {
 
 function isForeignHelper(importer: string, target: string): boolean {
   const targetRoot = getWorkspaceRoot(target);
-  const helperPrefix = targetRoot === '' ? 'test-utils/' : `${targetRoot}/test-utils/`;
+  const helperFolder = targetRoot === '' ? 'test-utils' : `${targetRoot}/test-utils`;
+  const isHelper = target === helperFolder || target.startsWith(`${helperFolder}/`);
 
-  return target.startsWith(helperPrefix) && targetRoot !== getWorkspaceRoot(importer);
+  return isHelper && targetRoot !== getWorkspaceRoot(importer);
 }
 
 function getWorkspaceRoot(path: string): string {
