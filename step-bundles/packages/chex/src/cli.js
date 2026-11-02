@@ -44,7 +44,7 @@ function runProgram(argv, options) {
 }
 
 // packages/chex/src/dependency-gates/first-party-scopes.ts
-var firstPartyScopes = ["@zgeoff/", "@impz/", "@wringer/"];
+var firstPartyScopes = ["@zgeoff/", "@impz/", "@wringer/", "@heynixie/"];
 
 // packages/chex/src/dependency-gates/collect-missing-first-party-excludes.ts
 function collectMissingFirstPartyExcludes(ageGate, registryNames) {
