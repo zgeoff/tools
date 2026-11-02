@@ -1,10 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createGitCommit } from '../../test-utils/create-git-commit.ts';
-import { readGitEnv } from '../../test-utils/read-git-env.ts';
-import { runGit } from '../../test-utils/run-git.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { createGitCommit } from '../test-utils/create-git-commit.ts';
+import { readGitEnv } from '../test-utils/read-git-env.ts';
+import { runGit } from '../test-utils/run-git.ts';
 import { readCommitPinnedSources } from './read-commit-pinned-sources.ts';
 
 async function setupTest() {

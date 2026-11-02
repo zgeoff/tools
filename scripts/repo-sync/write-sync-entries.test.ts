@@ -1,8 +1,8 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { buildMockSyncEntry } from '../../test-utils/build-mock-sync-entry.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
+import { buildMockSyncEntry } from '../test-utils/build-mock-sync-entry.ts';
 import { writeSyncEntries } from './write-sync-entries.ts';
 
 async function setupTest() {

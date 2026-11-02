@@ -1,8 +1,8 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createStubCommand } from '../../test-utils/create-stub-command.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { createStubCommand } from '../test-utils/create-stub-command.ts';
 import { holdHandPushedSync } from './hold-hand-pushed-sync.ts';
 
 async function setupTest() {

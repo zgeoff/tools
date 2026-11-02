@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { nodeFileSystem } from './node-file-system.ts';
 import type { BundleConfig } from './write-step-bundles.ts';
 import {

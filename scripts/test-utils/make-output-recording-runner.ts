@@ -1,4 +1,4 @@
-import type { RunCommand } from '../scripts/ci/run-command.ts';
+import type { RunCommand } from '../ci/run-command.ts';
 
 export interface OutputRecordingRunner {
   readonly runCommand: RunCommand;
