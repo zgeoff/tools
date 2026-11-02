@@ -38,9 +38,10 @@ Each line links the section that explains it.
   TypeScript script under `scripts/<area>/`, and the workflow lint checks the rules a parser can
   see.
 - [Dependency gates](#dependency-gates): run the shared check that fails on a stale override,
-  release-age exclude or audit ignore, and never a copy of it.
+  release-age exclude or audit ignore, or a missing first-party exclude, and never a copy of it.
 - [Dependency exceptions](#dependency-exceptions): add an exclude, an override or an audit ignore
-  only with a named reason, the narrowest scope, provenance for an exclude, and its cleanup record.
+  only with a named reason, the narrowest scope, provenance for an exclude, and its cleanup record;
+  a first-party package is always excluded, with no record.
 - [Path gates](#path-gates): a pull-request job runs only when its input paths change, through a
   `changes` job, and every push to main runs it in full.
 - [Cancelling runs](#cancelling-runs): checks cancel when a newer commit arrives; release, deploy
@@ -227,11 +228,12 @@ and nobody notices unless a check fails.
 
 The
 [dependency gates check](https://github.com/zgeoff/tools/blob/main/docs/architecture/dependency-updates.md#the-dependency-gates-check)
-fails on three kinds of stale gate:
+fails on three kinds of stale gate, and on a missing first-party exclude:
 
 - An override whose pinned version every range in the lockfile allows.
 - A release-age exclude whose removal date has passed.
 - An ignored advisory that is gone, or that a release in range fixes.
+- A first-party package in the lockfile that the release-age gate does not exclude.
 
 ## Dependency exceptions
 
@@ -239,6 +241,11 @@ A dependency exception is a dependency gate that you add by hand, outside the au
 release-age exclude, a root override, or an audit ignore. Add one only when it is de-risked and
 carries its own cleanup. Every zgeoff repo follows this rule, so a repo's AGENTS.md or project skill
 links here and states no exception rule of its own.
+
+A first-party package, one under `@zgeoff/`, `@impz/` or `@wringer/`, is no exception: exclude every
+one that the lockfile installs, by its full name, with no removal comment. Renovate bumps these
+packages as soon as they publish, and `bun install` refuses each release younger than the gate
+without the exclude. Bun takes no scope in the exclude list.
 
 An exception is de-risked when its pull request shows three things:
 
