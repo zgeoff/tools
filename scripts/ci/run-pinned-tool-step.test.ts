@@ -114,3 +114,43 @@ test('it fails the step with an error when the runner gives no RUNNER_TEMP or GI
   expect(result.exitCode).toBe(1);
   expect(result.output).toBe('::error::shfmt: the install needs RUNNER_TEMP and GITHUB_PATH\n');
 });
+
+test.each([
+  ['the static job', 'static'],
+  ['the private checks job', 'all'],
+])(
+  'it downloads a tool that no check runs nothing for %s whose caller does not ask for it',
+  async (_label, part) => {
+    const ctx = await setupTest();
+
+    const server = createStubFileServer({ '/scanner': [{ status: 200, body: 'fake scanner\n' }] });
+
+    const result = await runPinnedToolStep({
+      args: ['scanner'],
+      env: {
+        ...process.env,
+        PART: part,
+        SETUP_TOOL: 'false',
+        RUNNER_TEMP: ctx.runnerTemp,
+        GITHUB_PATH: ctx.githubPath,
+      },
+      pins: {
+        scanner: {
+          url: `${server.url}/scanner`,
+          sha256: new Bun.CryptoHasher('sha256').update('fake scanner\n').digest('hex'),
+          packaging: 'binary',
+          neededBy: null,
+        },
+      },
+      fileSystem: nodeFileSystem,
+      runCommand,
+    });
+
+    const runnerFiles = await readdir(ctx.runnerTemp);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toBe('scanner: not needed, because the caller did not ask for it\n');
+    expect(server.requests).toStrictEqual([]);
+    expect(runnerFiles).toStrictEqual([]);
+  },
+);

@@ -77,6 +77,11 @@ on:
         type: boolean
         required: false
         default: false
+      setup-gitleaks:
+        description: Install gitleaks in the test jobs, for a suite whose tests run it
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   # Public profile.
@@ -209,7 +214,8 @@ jobs:
       # The shell check runs shfmt and the workflows check runs actionlint,
       # which the runner image lacks. Each step installs its pinned binary in a
       # job that runs the check, or when the caller asks for it, into a folder
-      # the runner owns, put on the PATH of the later steps.
+      # the runner owns, put on the PATH of the later steps. No check runs
+      # gitleaks, so its step installs it only when the caller asks.
       - &setup-shfmt
         name: Setup shfmt
         env: &shfmt-env
@@ -347,6 +353,11 @@ jobs:
       - *plan
       - *setup-shfmt
       - *setup-actionlint
+      - &setup-gitleaks
+        name: Setup gitleaks
+        env: &gitleaks-env
+          SETUP_TOOL: ${{ inputs.setup-gitleaks }}
+        run: &gitleaks-body bun "$RUNNER_TEMP/tools/scripts/ci/run-pinned-tool-step.js" gitleaks
       - *run-scripts
 
   test-lane:
@@ -377,6 +388,7 @@ jobs:
       - *plan
       - *setup-shfmt
       - *setup-actionlint
+      - *setup-gitleaks
       - *run-scripts
 
   # The one check a caller requires, in either profile. In a private repo it
@@ -461,6 +473,11 @@ jobs:
         if: env.PROFILE == 'private'
         env: *shfmt-env
         run: *shfmt-body
+
+      - name: Setup gitleaks
+        if: env.PROFILE == 'private'
+        env: *gitleaks-env
+        run: *gitleaks-body
 
       # Each step after this one runs only when it succeeds, so in a public
       # repo, where it skips, they skip too.

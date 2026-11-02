@@ -135,13 +135,14 @@ async function runCommand(argv, options) {
 }
 
 // scripts/ci/should-install-tool.ts
-function shouldInstallTool(part, requested) {
-  return requested === "true" || part === "static" || part === "all";
+function shouldInstallTool(part, requested, checkTool) {
+  return requested === "true" || checkTool && (part === "static" || part === "all");
 }
 
 // scripts/ci/tool-pins.ts
 var shfmtVersion = "v3.13.1";
 var actionlintVersion = "1.7.12";
+var gitleaksVersion = "8.30.1";
 var toolPins = {
   shfmt: {
     url: `https://github.com/mvdan/sh/releases/download/${shfmtVersion}/shfmt_${shfmtVersion}_linux_amd64`,
@@ -154,6 +155,12 @@ var toolPins = {
     sha256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8",
     packaging: "tar.gz",
     neededBy: "workflows check"
+  },
+  gitleaks: {
+    url: `https://github.com/gitleaks/gitleaks/releases/download/v${gitleaksVersion}/gitleaks_${gitleaksVersion}_linux_x64.tar.gz`,
+    sha256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb",
+    packaging: "tar.gz",
+    neededBy: null
   }
 };
 
@@ -175,10 +182,11 @@ async function runToolInstall(name, step) {
   if (pin === undefined) {
     throw new Error(`${name}: the argument parse accepted a tool with no pin`);
   }
-  if (!shouldInstallTool(step.env["PART"] ?? "", step.env["SETUP_TOOL"] ?? "")) {
+  if (!shouldInstallTool(step.env["PART"] ?? "", step.env["SETUP_TOOL"] ?? "", pin.neededBy !== null)) {
     return {
       exitCode: 0,
-      output: `${name}: not needed, because this job runs no ${pin.neededBy}
+      output: pin.neededBy === null ? `${name}: not needed, because the caller did not ask for it
+` : `${name}: not needed, because this job runs no ${pin.neededBy}
 `
     };
   }
