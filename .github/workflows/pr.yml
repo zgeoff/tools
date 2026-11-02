@@ -21,7 +21,7 @@ jobs:
         check:lefthook-guard format:check lint:full typecheck test test:browser test:e2e test:host
       # oxlint runs its JS plugin under Node, which reads rig.config.ts and
       # strips its types from Node 22.18.
-      node-version: 24
+      node-version: 26
       # The tests of the check steps and the pre-push jobs run shfmt and
       # actionlint, in the test job, which runs no check step.
       setup-shfmt: true
@@ -42,7 +42,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: 26
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: .bun-version
