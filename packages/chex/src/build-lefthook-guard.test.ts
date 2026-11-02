@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import invariant from 'tiny-invariant';
 import { buildInitGuardHooks } from '../test-utils/build-init-guard-hooks.ts';
 import { readGitEnv } from '../test-utils/read-git-env.ts';
 import { buildLefthookGuard } from './build-lefthook-guard.ts';
@@ -18,11 +19,14 @@ async function setupTest() {
 
   await $`git init --quiet --initial-branch=main ${repo}`.env({ ...env });
 
-  await writeFile(
-    join(repo, 'lefthook.yml'),
-    `extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n${buildInitGuardHooks()}`,
+  const guarded = buildLefthookGuard('extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n');
+
+  invariant(
+    guarded.kind === 'changed',
+    'chex adds the guard to a config that extends the baseline',
   );
 
+  await writeFile(join(repo, 'lefthook.yml'), guarded.text);
   await writeFile(join(repo, 'package.json'), '{ "name": "kettle" }\n');
 
   return { repo, env, lefthook: join(import.meta.dir, '../../../node_modules/.bin/lefthook') };
