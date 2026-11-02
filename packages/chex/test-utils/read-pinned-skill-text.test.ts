@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { nodeFileSystem } from '../scripts/ci/node-file-system.ts';
+import { nodeFileSystem } from '../../../scripts/ci/node-file-system.ts';
 import { readPinnedSkillText } from './read-pinned-skill-text.ts';
 import { writeTreeFiles } from './write-tree-files.ts';
 
