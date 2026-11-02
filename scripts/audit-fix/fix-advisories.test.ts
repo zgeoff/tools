@@ -1,11 +1,11 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createGitCommit } from '../../test-utils/create-git-commit.ts';
-import { readGitEnv } from '../../test-utils/read-git-env.ts';
-import { runGit } from '../../test-utils/run-git.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { createGitCommit } from '../test-utils/create-git-commit.ts';
+import { readGitEnv } from '../test-utils/read-git-env.ts';
+import { runGit } from '../test-utils/run-git.ts';
 import { fixAdvisories } from './fix-advisories.ts';
 
 async function setupTest() {

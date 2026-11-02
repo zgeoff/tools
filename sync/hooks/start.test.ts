@@ -3,11 +3,11 @@ import { spawnSync } from 'node:child_process';
 import { chmod, copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildPreToolUsePayload } from '../../test-utils/build-pre-tool-use-payload.ts';
-import { createStubInstall } from '../../test-utils/create-stub-install.ts';
-import { readStreamUntil } from '../../test-utils/read-stream-until.ts';
-import { readTextOrEmpty } from '../../test-utils/read-text-or-empty.ts';
-import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import { buildPreToolUsePayload } from '../test-utils/build-pre-tool-use-payload.ts';
+import { createStubInstall } from '../test-utils/create-stub-install.ts';
+import { readStreamUntil } from '../test-utils/read-stream-until.ts';
+import { readTextOrEmpty } from '../test-utils/read-text-or-empty.ts';
+import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { pickClaimStep } from './start.ts';
 
 // Root ignores file modes, so a folder or a lock with no permissions cannot stop root from using it.

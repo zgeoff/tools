@@ -2,14 +2,14 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { createGitCommit } from '../../test-utils/create-git-commit.ts';
-import { createStubGH } from '../../test-utils/create-stub-gh.ts';
-import { readGitEnv } from '../../test-utils/read-git-env.ts';
-import { runGit } from '../../test-utils/run-git.ts';
-import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { createGitCommit } from '../test-utils/create-git-commit.ts';
+import { createStubGH } from '../test-utils/create-stub-gh.ts';
+import { readGitEnv } from '../test-utils/read-git-env.ts';
+import { runGit } from '../test-utils/run-git.ts';
+import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { commitAuditFix } from './commit-audit-fix.ts';
 
 async function setupTest() {

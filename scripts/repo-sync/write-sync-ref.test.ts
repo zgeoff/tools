@@ -1,8 +1,8 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { buildCommandStub } from '../../test-utils/build-command-stub.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
+import { buildCommandStub } from '../test-utils/build-command-stub.ts';
 import { writeSyncRef } from './write-sync-ref.ts';
 
 async function setupTest() {
