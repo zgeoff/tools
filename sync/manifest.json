@@ -426,6 +426,10 @@
         "target": "scripts/find-install-cache-path.ts"
       },
       {
+        "source": "packages/chex/src/dependency-gates/collect-missing-first-party-excludes.ts",
+        "target": "scripts/dependency-gates/collect-missing-first-party-excludes.ts"
+      },
+      {
         "source": "packages/chex/src/dependency-gates/collect-stale-age-gate-excludes.ts",
         "target": "scripts/dependency-gates/collect-stale-age-gate-excludes.ts"
       },
@@ -446,6 +450,10 @@
         "target": "scripts/dependency-gates/is-record.ts"
       },
       {
+        "source": "packages/chex/src/dependency-gates/parse-age-gate.ts",
+        "target": "scripts/dependency-gates/parse-age-gate.ts"
+      },
+      {
         "source": "packages/chex/src/dependency-gates/parse-audit-advisories.ts",
         "target": "scripts/dependency-gates/parse-audit-advisories.ts"
       },
@@ -460,6 +468,10 @@
       {
         "source": "packages/chex/src/dependency-gates/parse-lockfile-dependents.ts",
         "target": "scripts/dependency-gates/parse-lockfile-dependents.ts"
+      },
+      {
+        "source": "packages/chex/src/dependency-gates/parse-lockfile-registry-names.ts",
+        "target": "scripts/dependency-gates/parse-lockfile-registry-names.ts"
       },
       {
         "source": "packages/chex/src/dependency-gates/parse-root-manifest.ts",

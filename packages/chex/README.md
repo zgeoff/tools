@@ -52,14 +52,14 @@ The docs checks read the repo's READMEs, its `docs/` tree and its skills:
 
 The repo checks read the branch, the pushed commits and the repo's config:
 
-| Check              | Fails on                                                                    | Arguments       |
-| ------------------ | --------------------------------------------------------------------------- | --------------- |
-| `commits`          | a pushed commit whose message fails `@zgeoff/commitlint-config`             | `--pushed-refs` |
-| `local-paths`      | a line a pushed commit adds that holds the home folder or the host name     | `--pushed-refs` |
-| `test-timeouts`    | a `bun test` timeout above its lane's limit, in a script or a `bunfig.toml` | none            |
-| `workflows`        | nothing: it warns on each fault of the shared workflow lint, and passes     | the paths       |
-| `dependency-gates` | a stale age-gate exclude, an override or an audit ignore that nothing needs | none            |
-| `uncommitted`      | a file the branch changes that holds a change the push does not send        | none            |
+| Check              | Fails on                                                                                                                       | Arguments       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ | --------------- |
+| `commits`          | a pushed commit whose message fails `@zgeoff/commitlint-config`                                                                | `--pushed-refs` |
+| `local-paths`      | a line a pushed commit adds that holds the home folder or the host name                                                        | `--pushed-refs` |
+| `test-timeouts`    | a `bun test` timeout above its lane's limit, in a script or a `bunfig.toml`                                                    | none            |
+| `workflows`        | nothing: it warns on each fault of the shared workflow lint, and passes                                                        | the paths       |
+| `dependency-gates` | a stale age-gate exclude, an override or an audit ignore that nothing needs, or a first-party package with no age-gate exclude | none            |
+| `uncommitted`      | a file the branch changes that holds a change the push does not send                                                           | none            |
 
 With no path, `prose` and `links` read every README outside `.claude/` and `.agents/`, every file
 under `docs/`, each spike's `results.md`, and the Markdown under `.agents/skills/`,
