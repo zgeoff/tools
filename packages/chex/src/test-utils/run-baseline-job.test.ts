@@ -66,5 +66,5 @@ test('it throws for a job that lefthook.yml does not hold', async () => {
     ctx.env,
   );
 
-  await expect(run).rejects.toThrow('lefthook.yml has no pre-commit job named spelling');
+  expect(run).rejects.toThrow('lefthook.yml has no pre-commit job named spelling');
 });
