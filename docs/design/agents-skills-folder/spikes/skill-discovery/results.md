@@ -212,7 +212,7 @@ Answer: symlinks. Every CI job checks out on Linux, and a Windows checkout can t
 | Files in `.agents/skills/`, `.claude/skills` a folder link (recommended) | four small tools PRs, then one small PR per repo        | Claude Code relies on the link; a Windows checkout without symlinks loses it     |
 | Files in `.agents/skills/`, a per-skill link in `.claude/skills/`        | the same, and a new link each time a repo gains a skill | repo-sync has to write links; a missed link hides a skill from Claude Code only  |
 | Files in `.claude/skills/`, `.agents/skills` a folder link               | one link per repo, no tools change                      | Codex and Gemini CLI rely on the link; the files sit outside the standard folder |
-| Copies in both folders                                                   | repo-sync writes each file twice                        | the two copies drift, and the skill gate and chex see each skill twice           |
+| Copies in both folders                                                   | repo-sync writes each file twice                        | the two copies drift, and chex checks each skill twice                           |
 
 The recommended layout keeps the one copy where the standard and five of the six agents look,
 matches the `skills` installer, and leaves only Claude Code on the link, which its docs and the
