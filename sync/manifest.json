@@ -266,6 +266,10 @@
       {
         "source": "sync/skills/ci-design/SKILL.md",
         "target": ".claude/skills/ci-design/SKILL.md"
+      },
+      {
+        "source": "sync/skills/ci-design/references/workflow-lint.md",
+        "target": ".claude/skills/ci-design/references/workflow-lint.md"
       }
     ]
   },
