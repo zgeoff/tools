@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.9](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.8...@zgeoff/chex@0.0.9) (2026-11-02)
+
+
+### Bug Fixes
+
+* **sync:** keep synced code free of packages a repo does not list ([#455](https://github.com/zgeoff/tools/issues/455)) ([470d99b](https://github.com/zgeoff/tools/commit/470d99ba12d17cb4ea460433dd4771272e32b09d))
+
 ## [0.0.8](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.7...@zgeoff/chex@0.0.8) (2026-11-02)
 
 ### Features
