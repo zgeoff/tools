@@ -91,6 +91,11 @@
       },
       {
         "repo": "zgeoff/skills",
+        "source": "skills/testing/references/boundaries.md",
+        "target": ".claude/skills/testing/references/boundaries.md"
+      },
+      {
+        "repo": "zgeoff/skills",
         "source": "skills/testing/references/claude-code-mods.md",
         "target": ".claude/skills/testing/references/claude-code-mods.md"
       },
@@ -125,6 +130,11 @@
         "repo": "zgeoff/skills",
         "source": "skills/testing/references/http.md",
         "target": ".claude/skills/testing/references/http.md"
+      },
+      {
+        "repo": "zgeoff/skills",
+        "source": "skills/testing/references/matchers.md",
+        "target": ".claude/skills/testing/references/matchers.md"
       },
       {
         "repo": "zgeoff/skills",
@@ -232,6 +242,11 @@
         "repo": "zgeoff/skills",
         "source": "skills/skill-writing/SKILL.md",
         "target": ".claude/skills/skill-writing/SKILL.md"
+      },
+      {
+        "repo": "zgeoff/skills",
+        "source": "skills/skill-writing/references/skill-kinds.md",
+        "target": ".claude/skills/skill-writing/references/skill-kinds.md"
       },
       {
         "source": "packages/chex/src/docs/check-skill.sh",
