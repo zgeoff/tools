@@ -2,10 +2,11 @@
 
 ## [0.7.6](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.7.5...@zgeoff/oxlint-config@0.7.6) (2026-11-02)
 
-
 ### Features
 
-* **sync:** take the shared skill text from zgeoff/skills ([#427](https://github.com/zgeoff/tools/issues/427)) ([94cb4b5](https://github.com/zgeoff/tools/commit/94cb4b531c6018c099d251e7bf7ded846416d910))
+- **sync:** take the shared skill text from zgeoff/skills
+  ([#427](https://github.com/zgeoff/tools/issues/427))
+  ([94cb4b5](https://github.com/zgeoff/tools/commit/94cb4b531c6018c099d251e7bf7ded846416d910))
 
 ## [0.7.5](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.7.4...@zgeoff/oxlint-config@0.7.5) (2026-10-31)
 

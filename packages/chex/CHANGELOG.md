@@ -2,17 +2,17 @@
 
 ## [0.0.7](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.6...@zgeoff/chex@0.0.7) (2026-11-02)
 
-
 ### Features
 
-* **sync:** take the shared skill text from zgeoff/skills ([#427](https://github.com/zgeoff/tools/issues/427)) ([94cb4b5](https://github.com/zgeoff/tools/commit/94cb4b531c6018c099d251e7bf7ded846416d910))
-
+- **sync:** take the shared skill text from zgeoff/skills
+  ([#427](https://github.com/zgeoff/tools/issues/427))
+  ([94cb4b5](https://github.com/zgeoff/tools/commit/94cb4b531c6018c099d251e7bf7ded846416d910))
 
 ### Dependencies
 
-* The following workspace dependencies were updated
-  * dependencies
-    * @zgeoff/std bumped to 0.3.2
+- The following workspace dependencies were updated
+  - dependencies
+    - @zgeoff/std bumped to 0.3.2
 
 ## [0.0.6](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.5...@zgeoff/chex@0.0.6) (2026-11-02)
 
