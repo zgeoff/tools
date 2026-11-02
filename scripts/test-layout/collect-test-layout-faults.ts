@@ -44,6 +44,13 @@ function collectRelativeImports(source: SourceFile): string[] {
     if (node?.type === 'Literal' && typeof node.value === 'string') {
       specifiers.push(node.value);
     }
+
+    const [onlyPart] =
+      node?.type === 'TemplateLiteral' && node.expressions.length === 0 ? node.quasis : [];
+
+    if (typeof onlyPart?.value.cooked === 'string') {
+      specifiers.push(onlyPart.value.cooked);
+    }
   };
 
   const visitor = new Visitor({

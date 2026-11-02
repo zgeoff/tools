@@ -59,6 +59,11 @@ test.each([
     "import water = require('../../teapot/test-utils/build-water.ts');\n",
   ],
   ['a require call', "const water = require('../../teapot/test-utils/build-water.ts');\n"],
+  ['a dynamic import of a template', 'await import(`../../teapot/test-utils/build-water.ts`);\n'],
+  [
+    'a require call of a template',
+    'const water = require(`../../teapot/test-utils/build-water.ts`);\n',
+  ],
 ])('it reports %s of another package test helper', (_label, text) => {
   const faults = collectTestLayoutFaults([], [{ path: 'packages/kettle/src/boil.test.ts', text }]);
 
