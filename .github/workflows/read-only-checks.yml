@@ -1,0 +1,13 @@
+name: Read-only checks
+
+on:
+  pull_request:
+
+jobs:
+  read-only:
+    permissions:
+      contents: read
+    uses: zgeoff/tools/.github/workflows/bun-checks.yml@main
+    with:
+      scripts: format:check
+      gitleaks: false
