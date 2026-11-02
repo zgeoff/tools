@@ -276,10 +276,10 @@ Each kind of exception carries the record that takes it out:
 
 ### First-party packages
 
-A first-party package is one under `@zgeoff/`, `@impz/` or `@wringer/`. The owner of these repos
-publishes them and trusts each release, so they skip the release-age wait. Renovate bumps them as
-soon as they publish, and `bun install` refuses each new release until the release-age gate excludes
-the package.
+A first-party package is one under `@zgeoff/`, `@impz/`, `@wringer/` or `@heynixie/`. The owner of
+these repos publishes them and trusts each release, so they skip the release-age wait. Renovate
+bumps them as soon as they publish, and `bun install` refuses each new release until the release-age
+gate excludes the package.
 
 - Exclude every first-party package that the lockfile installs, including one that only another
   package depends on. `bun run check:dependency-gates` names each one with no exclude.
