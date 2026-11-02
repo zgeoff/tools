@@ -117,6 +117,11 @@ An entry holds:
   writes, with the value it writes, so a check of a sync pull request can hold its `package.json`
   change to those lines. `scripts/check-sync-manifest.sh` runs each `build` on an empty
   `package.json` and fails when the scripts it writes there differ from this field.
+- `packages` (needed when a code file of the entry imports a package) — each npm package that the
+  entry's TypeScript and JavaScript files import, which a repo that takes the entry must list in its
+  `package.json`. A file that imports a package the repo lacks fails the repo's dead-code check, and
+  fails to run. `scripts/check-sync-manifest.sh` fails on an import of any package this field does
+  not list, other than a `node:` or `bun` module.
 
 A target under `.github/workflows/` needs the line `repo-sync delivers this file from zgeoff/tools`
 in its source. Without it, the workflow never overwrites a workflow file the repo wrote itself.
