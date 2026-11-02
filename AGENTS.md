@@ -14,11 +14,22 @@ The rules a task needs are not repeated here. Load the skill for the work before
 | `docs-writing`  | [`docs-writing`](https://github.com/zgeoff/skills/tree/main/skills/docs-writing)   | writing or editing any committed prose: READMEs, this file, skills                          |
 | `skill-writing` | [`skill-writing`](https://github.com/zgeoff/skills/tree/main/skills/skill-writing) | writing or editing a skill                                                                  |
 | `ci-design`     | [`ci-design`](https://github.com/zgeoff/skills/tree/main/skills/ci-design)         | adding, changing, or reviewing a workflow, a job, or a trigger                              |
+| `cold-read`     | [`cold-read`](https://github.com/zgeoff/skills/tree/main/skills/cold-read)         | checking a skill you wrote or changed, before its PR                                        |
+| `deslop`        | [`deslop`](https://github.com/zgeoff/skills/tree/main/skills/deslop)               | editing the prose of a skill you wrote or changed, before its PR                            |
 
 Each source is a folder of zgeoff/skills; this repo reads it at the commit `sync/skills-pin.json`
-pins. Only `code-style`, `docs-writing`, `skill-writing` and `deslop` are installed as skills here,
-by `bun run skills:install`, which `bun install` runs. For the others, read the `SKILL.md` under
-`.zgeoff-skills/<commit>/skills/<name>/`, which the same install unpacks.
+pins. Only `code-style`, `docs-writing`, `skill-writing`, `deslop` and `cold-read` are installed as
+skills here, by `bun run skills:install`, which `bun install` runs. For the others, read the
+`SKILL.md` under `.zgeoff-skills/<commit>/skills/<name>/`, which the same install unpacks.
+
+This repo holds no skill text: you write or edit a skill in zgeoff/skills. When you do:
+
+1. Load the `skill-writing`, `cold-read` and `deslop` skills.
+2. Do every step in the "Check it" section of skill-writing.
+3. In the PR description, after the sections of that repo's PR template, add three `##` headings:
+   - "Skill checks": the check output.
+   - "Cold read": each cold-read finding, and how you answered it.
+   - "Deslop": each change deslop made, or "none".
 
 ## Repo structure
 

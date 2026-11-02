@@ -190,7 +190,13 @@ async function writeSkillLink(
 }
 
 // The skills that `bun run skills:install` links into this repo's .claude/skills/.
-export const defaultPinnedSkills = ['code-style', 'docs-writing', 'skill-writing', 'deslop'];
+export const defaultPinnedSkills = [
+  'code-style',
+  'docs-writing',
+  'skill-writing',
+  'deslop',
+  'cold-read',
+];
 
 if (import.meta.main) {
   process.exitCode = await writePinnedSkills({

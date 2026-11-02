@@ -340,7 +340,7 @@ test('it installs the pin as it stands once the lock is free', async () => {
   expect(existsSync(join(ctx.tools, '.zgeoff-skills', older))).toBeFalse();
 });
 
-test('it links each default skill when the pinned tree holds all four', async () => {
+test('it links each default skill when the pinned tree holds all five', async () => {
   const ctx = await setupTest();
 
   const commit = '89abcdef0123456789abcdef0123456789abcdef';
@@ -352,6 +352,7 @@ test('it links each default skill when the pinned tree holds all four', async ()
     'skills/docs-writing/SKILL.md': '# Docs writing\n',
     'skills/skill-writing/SKILL.md': '# Skill writing\n',
     'skills/deslop/SKILL.md': '# Deslop\n',
+    'skills/cold-read/SKILL.md': '# Cold read\n',
   });
 
   const exitCode = await ctx.install(defaultPinnedSkills);
@@ -359,7 +360,7 @@ test('it links each default skill when the pinned tree holds all four', async ()
   const skillsFolder = join(ctx.tools, '.claude', 'skills');
 
   const links = await Promise.all(
-    ['code-style', 'docs-writing', 'skill-writing', 'deslop'].map((skill) =>
+    ['code-style', 'docs-writing', 'skill-writing', 'deslop', 'cold-read'].map((skill) =>
       readlink(join(skillsFolder, skill)),
     ),
   );
@@ -371,5 +372,6 @@ test('it links each default skill when the pinned tree holds all four', async ()
     `../../.zgeoff-skills/${commit}/skills/docs-writing`,
     `../../.zgeoff-skills/${commit}/skills/skill-writing`,
     `../../.zgeoff-skills/${commit}/skills/deslop`,
+    `../../.zgeoff-skills/${commit}/skills/cold-read`,
   ]);
 });

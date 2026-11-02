@@ -302,6 +302,22 @@
     ]
   },
   {
+    "name": "skill-cold-read",
+    "description": "The shared cold-read skill and the brief its fresh subagent follows; every repo takes it, because each repo's AGENTS.md has an agent run a cold read on a skill it changed, and put the findings in the PR description",
+    "files": [
+      {
+        "repo": "zgeoff/skills",
+        "source": "skills/cold-read/SKILL.md",
+        "target": ".claude/skills/cold-read/SKILL.md"
+      },
+      {
+        "repo": "zgeoff/skills",
+        "source": "skills/cold-read/references/cold-reader.md",
+        "target": ".claude/skills/cold-read/references/cold-reader.md"
+      }
+    ]
+  },
+  {
     "name": "hook-skill-gate",
     "description": "The skill-gate hook's entry point, which runs the gate from the @zgeoff/skill-gate package for Claude Code and Codex; the repo installs the package, takes its path and tool gates in .claude/skill-gate.json from the skill-gate-rules entry, registers the hook in .claude/settings.json as a bun --no-install command with a PreToolUse matcher that names each gated tool, and for Codex registers it in .codex/hooks.json with --harness codex and trusts the hook definitions",
     "optIn": true,

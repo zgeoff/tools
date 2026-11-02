@@ -143,13 +143,19 @@ The text of each shared Claude skill lives in [zgeoff/skills](https://github.com
 under `skills/<name>/`, and its `skill-<name>` entry delivers it to `.claude/skills/<name>/`. The
 run checks out zgeoff/skills at the commit that `sync/skills-pin.json` holds in the tools commit it
 syncs, so a repo's sync pull request names both commits. A skill entry is opt-in, so a repo takes
-only the skills for the work it holds. One exception: `skill-pr-evidence` reaches every repo,
-because every agent that opens a pull request needs it. A repo keeps its own rules for the same area
-in a `project-<name>` skill beside it, which repo-sync never touches, and the shared skill tells the
-reader to load both. The entry lists every file in its skill folder, since the skill links its
-references by relative path; `scripts/check-sync-manifest.sh` fails on a file the entry omits, and
-reads zgeoff/skills from the tree that `bun run skills:install` unpacks. The docs-writing and
-skill-writing entries also deliver the docs check scripts from this repo.
+only the skills for the work it holds. These skill entries are not opt-in, and reach every repo:
+
+- `skill-pr-evidence`, because every agent that opens a pull request needs it.
+- `skill-deslop`, because the skill gate makes an agent load it before a skill edit.
+- `skill-cold-read`, because each repo's AGENTS.md has an agent run a cold read on a skill it
+  changed.
+
+A repo keeps its own rules for the same area in a `project-<name>` skill beside it, which repo-sync
+never touches, and the shared skill tells the reader to load both. The entry lists every file in its
+skill folder, since the skill links its references by relative path;
+`scripts/check-sync-manifest.sh` fails on a file the entry omits, and reads zgeoff/skills from the
+tree that `bun run skills:install` unpacks. The docs-writing and skill-writing entries also deliver
+the docs check scripts from this repo.
 
 This repo takes `code-style` and `docs-writing` from the same pin. `bun run skills:install`, which
 `bun install` runs, unpacks zgeoff/skills at the pinned commit into the git-ignored

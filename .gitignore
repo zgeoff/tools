@@ -16,3 +16,4 @@ test-utils/.test-*
 /.claude/skills/docs-writing
 /.claude/skills/skill-writing
 /.claude/skills/deslop
+/.claude/skills/cold-read
