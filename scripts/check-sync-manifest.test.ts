@@ -870,6 +870,7 @@ test.each([
   { line: "export { pourTea } from '@acme/teapot';" },
   { line: "const teapot = await import('@acme/teapot');" },
   { line: "const teapot = require('@acme/teapot');" },
+  { line: "const teapot = await import(\n  '@acme/teapot'\n);" },
 ])(
   'it fails when a code source holds $line and its entry does not list the package',
   async (row) => {
@@ -919,6 +920,29 @@ test('it passes a code source that imports only built-in modules, relative paths
         name: 'brew',
         description: 'The brew script',
         packages: ['@acme/teapot', 'cup-warmer'],
+        files: [{ source: 'sync/brew.ts', target: 'scripts/brew.ts' }],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+});
+
+test('it passes a code source whose strings name the import keywords', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/brew.ts': "const keywords = ['from','import','require'];\nconst pot = `import`;\n",
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'brew',
+        description: 'The brew script',
         files: [{ source: 'sync/brew.ts', target: 'scripts/brew.ts' }],
       },
     ]),

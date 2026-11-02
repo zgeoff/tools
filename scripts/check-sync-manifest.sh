@@ -135,7 +135,8 @@ done < <(jq -r '.[] | .name as $n | .files[] | [$n, (.repo // "zgeoff/tools"), .
 
 # A repo that takes an entry lists only the packages the entry's `packages`
 # names, so a code source that imports any other package fails the repo's
-# dead-code check, and its run where the package is not installed.
+# dead-code check, and its run where the package is not installed. Each file
+# is read whole, so an import split over several lines counts too.
 while IFS=$'\t' read -r name repo source packages; do
   path=$(source_path "$repo" "$source")
   [ -f "$path" ] || continue
@@ -144,8 +145,9 @@ while IFS=$'\t' read -r name repo source packages; do
     if ! jq -e --arg package "$package" 'index($package)' <<< "$packages" > /dev/null; then
       report "entry '$name' delivers $source, which imports $package, a package its packages field does not list"
     fi
-  done < <(grep -ohE "(^|[^[:alnum:]_.\$])(from|import|require)[[:space:]]*\(?[[:space:]]*['\"][^'\"]+['\"]" "$path" |
-    sed -E "s/.*['\"]([^'\"]+)['\"]$/\1/" |
+  done < <(grep -ozE "(^|[^[:alnum:]_.\$'\"\`])(from|import|require)[[:space:]]*\(?[[:space:]]*['\"][^'\"[:space:]]+['\"]" "$path" |
+    sed -zE "s/.*['\"]([^'\"]+)['\"]$/\1/" |
+    tr '\0' '\n' |
     grep -vE '^(\.|/|node:|bun:|bun$)' |
     sed -E 's#^(@[^/]+/[^/]+|[^/]+).*#\1#' |
     sort -u)
