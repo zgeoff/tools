@@ -14,11 +14,7 @@ bun add -d @zgeoff/bun-test-react @testing-library/react react react-dom
 ```toml
 # bunfig.toml — order matters: the zustand preload must wrap `createStore` before any store exists
 [test]
-preload = [
-  "@zgeoff/bun-test-extended",
-  "@zgeoff/bun-test-react/zustand",
-  "@zgeoff/bun-test-react",
-]
+preload = ["@zgeoff/bun-test-extended", "@zgeoff/bun-test-react/zustand", "@zgeoff/bun-test-react"]
 ```
 
 ```jsonc
