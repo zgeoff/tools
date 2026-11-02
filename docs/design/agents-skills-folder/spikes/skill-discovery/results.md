@@ -111,7 +111,9 @@ repo-sync reads a manifest in zgeoff/tools that lists each shared file with its 
 takes in a repo. Its workflow copies each file to its target with the `install` command, deletes
 each retired copy (a copy whose target the manifest no longer lists), and opens one pull request. It
 turns on auto-merge only when every path the pull request changes is a target it copied or a retired
-copy it deleted [read in the code: `scripts/repo-sync/write-sync-auto-merge.ts`].
+copy it deleted. One more change also qualifies: a `package.json` change that only sets the scripts
+the manifest declares [read in the code: `scripts/repo-sync/write-sync-auto-merge.ts` and
+`collect-undelivered-paths.ts`].
 
 In a repo where `.claude/skills` is a folder link, `install` writes the target
 `.claude/skills/testing/SKILL.md` through the link, and git stages the file as
