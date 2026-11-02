@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { runCommand } from '../scripts/ci/run-command.ts';
+import { runCommand } from '../ci/run-command.ts';
 import { writeSkillsArchive } from './write-skills-archive.ts';
 import { writeTreeFiles } from './write-tree-files.ts';
 
