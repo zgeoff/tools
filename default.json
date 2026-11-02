@@ -128,6 +128,11 @@
       "automerge": true
     },
     {
+      "description": "wringer packages are first party too, so their bumps wait for no release age. The wringer packages group still holds their patch and minor bumps in one pull request. bun install still needs each package in the repo's minimumReleaseAgeExcludes.",
+      "matchPackageNames": ["@wringer/**"],
+      "minimumReleaseAge": null
+    },
+    {
       "description": "A bump of @zgeoff/agent-hooks runs its init, so the pull request carries the wiring the new version writes. bun run --if-present skips a version that has no agent-hooks bin. The task replaces the catalog rule's, so it runs bun install itself, and the self-hosted run must allow both commands. Renovate merges the pull request itself, because the platform's native auto-merge waits only for the checks a repo requires, and would merge a branch whose init failed.",
       "matchPackageNames": ["@zgeoff/agent-hooks"],
       "platformAutomerge": false,

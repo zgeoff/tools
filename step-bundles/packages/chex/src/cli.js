@@ -43,21 +43,51 @@ function runProgram(argv, options) {
   };
 }
 
+// packages/chex/src/dependency-gates/first-party-scopes.ts
+var firstPartyScopes = ["@zgeoff/", "@impz/", "@wringer/"];
+
+// packages/chex/src/dependency-gates/collect-missing-first-party-excludes.ts
+function collectMissingFirstPartyExcludes(ageGate, registryNames) {
+  if (!ageGate.isOn) {
+    return [];
+  }
+  return registryNames.filter((name) => firstPartyScopes.some((scope) => name.startsWith(scope))).filter((name) => !ageGate.excludes.includes(name)).map((name) => ({
+    path: "bunfig.toml",
+    entry: name,
+    problem: "the first-party package has no age-gate exclude, so bun install refuses each release younger than the gate"
+  }));
+}
+
 // packages/chex/src/dependency-gates/collect-stale-age-gate-excludes.ts
 import assert from "assert/strict";
-
-// packages/chex/src/dependency-gates/first-party-scopes.ts
-var firstPartyScopes = ["@zgeoff/", "@impz/"];
 
 // packages/chex/src/dependency-gates/is-record.ts
 function isRecord2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+// packages/chex/src/dependency-gates/parse-age-gate.ts
+function parseAgeGate(bunfig) {
+  const parsed = Bun.TOML.parse(bunfig);
+  const install = isRecord2(parsed) ? parsed["install"] : undefined;
+  const minimumReleaseAge = isRecord2(install) ? install["minimumReleaseAge"] : undefined;
+  const excludes = isRecord2(install) ? install["minimumReleaseAgeExcludes"] : undefined;
+  if (excludes !== undefined && !isStringList(excludes)) {
+    throw new TypeError("bunfig.toml sets a minimumReleaseAgeExcludes that is not a list of names");
+  }
+  return {
+    isOn: minimumReleaseAge !== undefined && minimumReleaseAge !== 0 && minimumReleaseAge !== "0",
+    excludes: excludes ?? []
+  };
+}
+function isStringList(value) {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
 // packages/chex/src/dependency-gates/collect-stale-age-gate-excludes.ts
 function collectStaleAgeGateExcludes(bunfig, today) {
   const removalDates = collectRemovalDates(bunfig);
-  return parseAgeGateExcludes(bunfig).filter((name) => !firstPartyScopes.some((scope) => name.startsWith(scope))).flatMap((name) => {
+  return parseAgeGate(bunfig).excludes.filter((name) => !firstPartyScopes.some((scope) => name.startsWith(scope))).flatMap((name) => {
     const removalDate = removalDates.get(name);
     if (removalDate === undefined) {
       return [
@@ -93,21 +123,6 @@ function collectRemovalDates(bunfig) {
     }
   }
   return removalDates;
-}
-function parseAgeGateExcludes(bunfig) {
-  const parsed = Bun.TOML.parse(bunfig);
-  const install = isRecord2(parsed) ? parsed["install"] : undefined;
-  const excludes = isRecord2(install) ? install["minimumReleaseAgeExcludes"] : undefined;
-  if (excludes === undefined) {
-    return [];
-  }
-  if (!isStringList(excludes)) {
-    throw new TypeError("bunfig.toml sets a minimumReleaseAgeExcludes that is not a list of names");
-  }
-  return excludes;
-}
-function isStringList(value) {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
 // packages/chex/src/dependency-gates/collect-unneeded-audit-ignores.ts
@@ -714,6 +729,25 @@ function isList(value) {
   return Array.isArray(value);
 }
 
+// packages/chex/src/dependency-gates/parse-lockfile-registry-names.ts
+function parseLockfileRegistryNames(lockfile) {
+  const parsed = Bun.JSONC.parse(lockfile);
+  const packages = isRecord2(parsed) ? parsed["packages"] : undefined;
+  if (!isRecord2(packages)) {
+    throw new TypeError("bun.lock has no packages object");
+  }
+  const names = Object.values(packages).flatMap((entry) => {
+    const id = Array.isArray(entry) ? entry[0] : undefined;
+    if (typeof id !== "string") {
+      throw new TypeError("bun.lock has a package entry that does not start with its id");
+    }
+    const versionStart = id.lastIndexOf("@");
+    const version = id.slice(versionStart + 1);
+    return versionStart > 0 && !version.includes(":") ? [id.slice(0, versionStart)] : [];
+  });
+  return [...new Set(names)].toSorted();
+}
+
 // packages/chex/src/dependency-gates/parse-root-manifest.ts
 function parseRootManifest(text) {
   const manifest = JSON.parse(text);
@@ -767,17 +801,19 @@ function readDependencyGateFindings(sources) {
   }
   const manifest = parseRootManifest(manifestText);
   const ignoreIDs = parseAuditIgnoreIDs(manifest.auditScript);
+  const bunfig = sources.readRepoFile("bunfig.toml") ?? "";
+  const lockfile = sources.readRepoFile("bun.lock");
   return [
-    ...collectStaleAgeGateExcludes(sources.readRepoFile("bunfig.toml") ?? "", sources.today),
-    ...readOverrideFindings(sources, manifest),
+    ...collectStaleAgeGateExcludes(bunfig, sources.today),
+    ...lockfile === null ? [] : collectMissingFirstPartyExcludes(parseAgeGate(bunfig), parseLockfileRegistryNames(lockfile)),
+    ...collectOverrideFindings(manifest, lockfile),
     ...ignoreIDs.length === 0 ? [] : readIgnoreFindings(sources, ignoreIDs)
   ];
 }
-function readOverrideFindings(sources, manifest) {
+function collectOverrideFindings(manifest, lockfile) {
   if (Object.keys(manifest.overrides).length === 0) {
     return [];
   }
-  const lockfile = sources.readRepoFile("bun.lock");
   if (lockfile === null) {
     throw new Error("package.json sets overrides, and the repo has no bun.lock");
   }

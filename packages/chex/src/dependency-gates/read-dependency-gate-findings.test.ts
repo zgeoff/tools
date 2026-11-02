@@ -113,6 +113,42 @@ test("it keeps an override of a workspace's own dependency that the workspace's 
   expect(findings).toStrictEqual([]);
 });
 
+test('it reports a first-party package in bun.lock that bunfig.toml does not exclude', () => {
+  const files: Record<string, string> = {
+    'package.json': JSON.stringify({ name: 'kettle', dependencies: { '@zgeoff/chex': '0.0.5' } }),
+    'bunfig.toml': [
+      '[install]',
+      'minimumReleaseAge = 604800',
+      'minimumReleaseAgeExcludes = ["@zgeoff/chex"]',
+    ].join('\n'),
+    'bun.lock': `{
+      "lockfileVersion": 1,
+      "workspaces": { "": { "name": "kettle", "dependencies": { "@zgeoff/chex": "0.0.5" } } },
+      "packages": {
+        "@zgeoff/chex": ["@zgeoff/chex@0.0.5", "", { "dependencies": { "@zgeoff/std": "0.4.0" } }, "sha512-a"],
+        "@zgeoff/std": ["@zgeoff/std@0.4.0", "", {}, "sha512-b"],
+      },
+    }`,
+  };
+
+  const findings = readDependencyGateFindings({
+    cwd: '/repo',
+    env: {},
+    today: '2026-03-09',
+    runProgram: mock(() => ({ exitCode: 0, stdout: '{}', stderr: '' })),
+    readRepoFile: (path) => files[path] ?? null,
+  });
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'bunfig.toml',
+      entry: '@zgeoff/std',
+      problem:
+        'the first-party package has no age-gate exclude, so bun install refuses each release younger than the gate',
+    },
+  ]);
+});
+
 test('it fails a repo with no package.json', () => {
   const runProgram = mock(() => ({ exitCode: 0, stdout: '{}', stderr: '' }));
 

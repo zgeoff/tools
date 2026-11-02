@@ -18,7 +18,7 @@ The preset sorts each update by its kind:
 | Patch                 | the gate         | the weekly `patch updates` group             | on green checks |
 | Dev-tool minor        | the gate         | the weekly `dev tools` group                 | on green checks |
 | TanStack router       | the gate         | the `tanstack-router monorepo` group         | on green checks |
-| `@wringer/*` package  | the gate         | the `wringer packages` group                 | on green checks |
+| `@wringer/*` package  | none             | the `wringer packages` group                 | on green checks |
 | Other minor           | the gate         | one per package                              | on green checks |
 | Major                 | the gate         | one per package, opened weekly               | after review    |
 | `@zgeoff/*` package   | none             | one per package, at any level                | on green checks |
@@ -44,9 +44,12 @@ The release-age wait matches the `minimumReleaseAge = 604800` gate in each repo'
 Renovate proposes no version that `bun install` would refuse. Security fixes come from OSV, through
 `osvVulnerabilityAlerts`, for every package Renovate finds. Their lock refresh runs
 `bun install --minimum-release-age=0`, so a fix younger than the gate installs, and so do the new
-dependencies it brings. A `@zgeoff/*` or `@impz/*` bump keeps the gate for its dependencies:
-`bun install` accepts the new release only when the repo lists the package in
-`minimumReleaseAgeExcludes`.
+dependencies it brings. A first-party package, one under `@zgeoff/`, `@impz/` or `@wringer/`, keeps
+the gate in `bun install`: the new release installs only when the repo lists the package in
+`minimumReleaseAgeExcludes`, and so does each first-party dependency it brings. The
+[dependency gates check](#the-dependency-gates-check) fails while a first-party package in
+`bun.lock` has no exclude. Bun takes only a full package name in that list, never a scope, so each
+package gets its own entry.
 
 The preset sets `rebaseWhen` to `conflicted`, so Renovate rebases an open pull request only when it
 conflicts with the base branch. Renovate's default rebases every auto-merge pull request that falls
@@ -183,8 +186,11 @@ working tree, and fails on each entry the repo can remove:
 
 - An age-gate exclude whose removal comment, in the form the audit-fix workflow writes, names a day
   before today. An exclude with no such comment fails too, because the audit-fix workflow never
-  removes it. An exclude of a `@zgeoff/` or `@impz/` package never fails: the Renovate preset bumps
-  those packages as soon as they publish, so each one keeps its exclude.
+  removes it. An exclude of a first-party package never fails: the Renovate preset bumps those
+  packages as soon as they publish, so each one keeps its exclude.
+- A first-party package that `bun.lock` installs from the registry, with no exclude of its full name
+  in `bunfig.toml`. An exclude that names a version, such as `@zgeoff/std@0.4.0`, lets only that
+  release through, so it does not count. A repo that sets no `minimumReleaseAge` passes.
 - A root override that every range in `bun.lock` admits, or one of a package that nothing in
   `bun.lock` depends on. An override that pins the version the root `workspaces.catalog` holds
   stays, because without it a dependent's range can resolve to a newer release than the catalog's.
