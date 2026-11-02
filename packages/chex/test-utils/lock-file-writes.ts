@@ -1,6 +1,6 @@
 import { chmod } from 'node:fs/promises';
 import { $ } from 'bun';
-import { hasErrorCode } from '../packages/rig/src/browser/has-error-code.ts';
+import { hasErrorCode } from '../../rig/src/browser/has-error-code.ts';
 
 // Root writes past a file's mode bits, so as root the file takes ext4's immutable flag instead.
 // Returns the call that makes the file writable again, which passes when the file has gone.

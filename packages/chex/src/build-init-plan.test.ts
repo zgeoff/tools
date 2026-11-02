@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { buildInitGuardHooks } from '../../../test-utils/build-init-guard-hooks.ts';
+import { buildInitGuardHooks } from '../test-utils/build-init-guard-hooks.ts';
 import { buildInitPlan } from './build-init-plan.ts';
 
 test('it plans the extends line and the check:docs script for a repo that has neither', () => {

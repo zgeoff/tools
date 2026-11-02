@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'bun:test';
-import { buildStubCheckRunner } from '../../../test-utils/build-stub-check-runner.ts';
+import { buildStubCheckRunner } from '../test-utils/build-stub-check-runner.ts';
 import { runChex } from './run-chex.ts';
 
 function setupTest() {

@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
-import { createGitCommit } from '../../../test-utils/create-git-commit.ts';
-import { createStubCommand } from '../../../test-utils/create-stub-command.ts';
-import { readGitEnv } from '../../../test-utils/read-git-env.ts';
+import { createGitCommit } from '../test-utils/create-git-commit.ts';
+import { createStubCommand } from '../test-utils/create-stub-command.ts';
+import { readGitEnv } from '../test-utils/read-git-env.ts';
 import { runProgram } from './run-program.ts';
 import { runWorkflowsCheck } from './run-workflows-check.ts';
 

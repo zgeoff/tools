@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { readStreamUntil } from '../../../../test-utils/read-stream-until.ts';
+import { readStreamUntil } from '../../test-utils/read-stream-until.ts';
 import { processGroups } from './process-groups.ts';
 
 test('it finds a group that runs, and finds none once the group is stopped', async () => {
