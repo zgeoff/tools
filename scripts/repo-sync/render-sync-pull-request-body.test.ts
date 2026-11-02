@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { buildMockSyncEntry } from '../../test-utils/build-mock-sync-entry.ts';
+import { buildMockSyncEntry } from '../test-utils/build-mock-sync-entry.ts';
 import { renderSyncPullRequestBody } from './render-sync-pull-request-body.ts';
 
 test('it names only the tools commit when no entry reads zgeoff/skills', () => {
