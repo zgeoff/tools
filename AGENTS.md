@@ -49,6 +49,17 @@ A manifest entry can name a source outside `sync/`. `.github/PULL_REQUEST_TEMPLA
 `.github/ISSUE_TEMPLATE/`, `.editorconfig` and `.claude/skills/code-style/SKILL.md` ship to other
 repos too, so an edit to one of them changes every repo that takes it.
 
+## Tests
+
+Each test and each test helper lives in the workspace it tests. A package keeps its helpers in
+`packages/<name>/test-utils/` and its e2e suite in `packages/<name>/e2e/`, and `scripts/` and
+`sync/` keep their helpers in `scripts/test-utils/` and `sync/test-utils/`. When two workspaces need
+the same helper, each keeps its own copy. The repo root holds no `e2e/`, `integration/` or
+`test-utils/` folder.
+
+The e2e suites of rig and chex stay a smoke set: one passing run, and one failing run for each kind
+of job. An edge case runs as a unit test of the logic it reaches.
+
 ## Packages
 
 - Every external version lives once, in the root `workspaces.catalog`. A package writes `"catalog:"`
@@ -87,6 +98,9 @@ repos too, so an edit to one of them changes every repo that takes it.
   and the alarm job asks for `actions: read`. CI and the pre-push hook run it.
 - `bun run check:lefthook-guard` checks that `lefthook.yml` holds the `chex-baseline` job that
   `chex init` writes. CI and the pre-push hook run it.
+- `bun run check:test-layout` fails when the repo root holds `e2e/`, `integration/` or
+  `test-utils/`, or when a file imports a test helper from another workspace's `test-utils/`. CI
+  runs it.
 - `bun x chex workflows` runs the shared workflow lint over the workflows HEAD holds, so commit a
   workflow change before you run it. CI runs it. `bun run check:docs` runs the docs checks that this
   repo takes, which the pre-push hook and CI run too.
