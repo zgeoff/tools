@@ -7,6 +7,7 @@ dist/
 packages/*/.test-*
 scripts/.test-*
 scripts/*/.test-*
+packages/*/test-utils/.test-*
 sync/test-utils/.test-*
 test-utils/.test-*
 # zgeoff/skills at the pinned commit, which bun run skills:install unpacks and links this repo's
