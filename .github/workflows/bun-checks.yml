@@ -35,6 +35,11 @@
 # The profile comes from github.event.repository.private, which in a reusable
 # workflow reads the caller's event. The private input is the fallback for an
 # event whose payload has no repository.
+#
+# A caller grants contents: read, which is enough on a push. On a pull
+# request, the gitleaks scan comments each finding when the caller grants
+# pull-requests: write too, and a private repo's scan needs at least
+# pull-requests: read to list the pull request's commits.
 name: Bun checks (reusable)
 
 on:
@@ -92,10 +97,10 @@ jobs:
       (!github.event.repository && inputs.private)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # The action comments findings on the PR, which needs write on pull-requests.
-    permissions:
-      contents: read
-      pull-requests: write
+    # No permissions block, so the job gets the caller's grant: GitHub checks a
+    # declared permission against the grant even when the job skips. The scan
+    # comments findings on a pull request when the grant has pull-requests:
+    # write, and a private repo's scan reads the pull request's commits.
     steps:
       # The scan reads every commit of the pull request, and the commits and
       # local paths checks read the base branch and every commit since it; a
@@ -406,10 +411,8 @@ jobs:
       (!github.event.repository && inputs.private)) }}
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout-minutes }}
-    # The scan comments findings on the PR, which needs write on pull-requests.
-    permissions:
-      contents: read
-      pull-requests: write
+    # No permissions block, as in the gitleaks job: in a private repo this job
+    # runs the scan.
     env:
       LEFTHOOK: 0
       PART: all
