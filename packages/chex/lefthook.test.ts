@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 import { readGitEnv } from './test-utils/read-git-env.ts';
+import type { BaselineJobDeps } from './test-utils/run-baseline-job.ts';
 import { runBaselineJob } from './test-utils/run-baseline-job.ts';
 import { writeStubPrograms } from './test-utils/write-stub-programs.ts';
 
@@ -30,7 +31,23 @@ async function setupTest() {
 
   await symlink(envPath, join(bin, 'env'));
 
-  return { repo, bin, env: { PATH: bin, HOME: repo } };
+  const deps: BaselineJobDeps = {
+    readConfigText: () => readFile(join(import.meta.dir, 'lefthook.yml'), 'utf8'),
+    runScript: async (script, cwd, env) => {
+      const result = await $`/bin/sh -c ${script}`
+        .cwd(cwd)
+        .env({ ...env })
+        .nothrow()
+        .quiet();
+
+      return {
+        exitCode: result.exitCode,
+        output: `${result.stdout.toString()}${result.stderr.toString()}`,
+      };
+    },
+  };
+
+  return { repo, bin, deps, env: { PATH: bin, HOME: repo } };
 }
 
 test('it passes the shell job with a notice when the machine lacks shfmt', async () => {
@@ -39,6 +56,7 @@ test('it passes the shell job with a notice when the machine lacks shfmt', async
   await writeStubPrograms(ctx.bin, { shellcheck: 'exit 1' });
 
   const run = await runBaselineJob(
+    ctx.deps,
     ctx.repo,
     { hook: 'pre-push', name: 'shell', files: ['brew.sh'] },
     ctx.env,
@@ -59,6 +77,7 @@ test('it fails the shell job when shellcheck fails a file that shfmt passes', as
   });
 
   const run = await runBaselineJob(
+    ctx.deps,
     ctx.repo,
     { hook: 'pre-push', name: 'shell', files: ['brew.sh'] },
     ctx.env,
@@ -78,6 +97,7 @@ test('it runs the workflow lint with a notice when the machine lacks actionlint,
   });
 
   const run = await runBaselineJob(
+    ctx.deps,
     ctx.repo,
     { hook: 'pre-push', name: 'workflows', files: ['.github/workflows/brew.yml'] },
     ctx.env,
@@ -100,6 +120,7 @@ test('it fails the docs job of a repo with no check:docs script, since the repo 
   await writeFile(join(ctx.repo, 'package.json'), JSON.stringify({ scripts: {} }));
 
   const run = await runBaselineJob(
+    ctx.deps,
     ctx.repo,
     { hook: 'pre-push', name: 'docs', files: ['README.md'] },
     ctx.env,
@@ -113,6 +134,7 @@ test('it fails the uncommitted job and downloads nothing when the repo does not 
   const ctx = await setupTest();
 
   const run = await runBaselineJob(
+    ctx.deps,
     ctx.repo,
     { hook: 'pre-push', name: 'uncommitted', files: [] },
     ctx.env,
@@ -133,6 +155,7 @@ test("it runs the related tests through rig without git's repository variables t
   });
 
   const run = await runBaselineJob(
+    ctx.deps,
     ctx.repo,
     { hook: 'pre-push', name: 'test', files: ['kettle.ts'] },
     { ...ctx.env, GIT_DIR: '/srv/kettle/.git/worktrees/lid', GIT_WORK_TREE: '/srv/lid' },

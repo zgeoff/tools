@@ -1,7 +1,4 @@
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { isRecord } from '@zgeoff/std';
-import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 
 export interface BaselineJobRun {
@@ -20,27 +17,27 @@ export interface BaselineJob {
   readonly files: readonly string[];
 }
 
-// Runs one job of chex's lefthook.yml as lefthook runs it: its run script under sh, with {files}
-// replaced by the quoted file list, in the repo folder.
+export interface BaselineJobDeps {
+  readonly readConfigText: () => Promise<string>;
+
+  readonly runScript: (
+    script: string,
+    repo: string,
+    env: Readonly<Record<string, string | undefined>>,
+  ) => Promise<BaselineJobRun>;
+}
+
+// Runs one job of chex's lefthook.yml as lefthook runs it: its run script, with {files} replaced by
+// the quoted file list, in the repo folder.
 export async function runBaselineJob(
+  deps: BaselineJobDeps,
   repo: string,
   job: BaselineJob,
   env: Readonly<Record<string, string | undefined>>,
 ): Promise<BaselineJobRun> {
-  const configText = await readFile(join(import.meta.dir, '../lefthook.yml'), 'utf8');
+  const configText = await deps.readConfigText();
 
-  const script = buildJobScript(configText, job);
-
-  const result = await $`/bin/sh -c ${script}`
-    .cwd(repo)
-    .env({ ...env })
-    .nothrow()
-    .quiet();
-
-  return {
-    exitCode: result.exitCode,
-    output: `${result.stdout.toString()}${result.stderr.toString()}`,
-  };
+  return deps.runScript(buildJobScript(configText, job), repo, env);
 }
 
 function buildJobScript(configText: string, job: BaselineJob): string {
