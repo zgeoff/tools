@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.5](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.4...@zgeoff/chex@0.0.5) (2026-11-02)
+
+
+### Features
+
+* **chex:** fail on a first-party package with no age-gate exclude ([#438](https://github.com/zgeoff/tools/issues/438)) ([d056cc1](https://github.com/zgeoff/tools/commit/d056cc1a67bf12d9179059dfde434a7914908206))
+
 ## [0.0.4](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.3...@zgeoff/chex@0.0.4) (2026-11-02)
 
 ### Bug Fixes
