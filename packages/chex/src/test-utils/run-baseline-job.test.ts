@@ -1,69 +1,73 @@
-import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { expect, test } from 'bun:test';
+import type { BaselineJobRun } from './run-baseline-job.ts';
 import { runBaselineJob } from './run-baseline-job.ts';
-import { writeStubPrograms } from './write-stub-programs.ts';
 
-async function setupTest() {
-  const repo = await mkdtemp(join(tmpdir(), 'run-baseline-job-'));
+function setupTest() {
+  const scripts: {
+    script: string;
+    repo: string;
+    env: Readonly<Record<string, string | undefined>>;
+  }[] = [];
 
-  onTestFinished(() => rm(repo, { recursive: true, force: true }));
+  const deps = {
+    readConfigText: () =>
+      Promise.resolve(
+        'pre-push:\n  jobs:\n    - name: lint\n      run: oxlint {files}\n    - name: test\n      run: rig related {files}\n',
+      ),
+    runScript: (
+      script: string,
+      repo: string,
+      env: Readonly<Record<string, string | undefined>>,
+    ): Promise<BaselineJobRun> => {
+      scripts.push({ script, repo, env });
 
-  // `bun run` puts the tools repo's node_modules/.bin on the PATH, where bun x would find its own
-  // diet in place of the stub.
-  const searchPath = (process.env['PATH'] ?? '')
-    .split(':')
-    .filter((entry) => !entry.endsWith('node_modules/.bin'))
-    .join(':');
+      return Promise.resolve({ exitCode: 1, output: 'kettle.ts: unused import\n' });
+    },
+  };
 
-  return { repo, env: { PATH: searchPath, HOME: repo } };
+  return { deps, scripts };
 }
 
-test('it runs the job script in the repo with the files quoted in place of {files}', async () => {
-  const ctx = await setupTest();
+test("it runs the named job's script in the repo, with the files quoted in place of {files}", async () => {
+  const ctx = setupTest();
 
-  await writeStubPrograms(join(ctx.repo, 'node_modules/.bin'), {
-    diet: '[ "$1" = -- ] && shift\nexec "$@"',
-    oxlint: 'printf "%s\\n" "$@" > oxlint-args\necho "linted"',
-  });
-
-  const run = await runBaselineJob(
-    ctx.repo,
-    { hook: 'pre-push', name: 'lint', files: ["src/kettle's lid.ts"] },
-    ctx.env,
+  await runBaselineJob(
+    ctx.deps,
+    '/srv/kettle',
+    { hook: 'pre-push', name: 'lint', files: ["src/kettle's lid.ts", 'src/spout.ts'] },
+    { HOME: '/srv/kettle' },
   );
 
-  const args = await readFile(join(ctx.repo, 'oxlint-args'), 'utf8');
-
-  expect(run).toStrictEqual({ exitCode: 0, output: 'linted\n' });
-  expect(args).toBe("--no-error-on-unmatched-pattern\nsrc/kettle's lid.ts\n");
+  expect(ctx.scripts).toStrictEqual([
+    {
+      script: String.raw`oxlint 'src/kettle'\''s lid.ts' 'src/spout.ts'`,
+      repo: '/srv/kettle',
+      env: { HOME: '/srv/kettle' },
+    },
+  ]);
 });
 
-test('it returns the exit code and output of a job that fails', async () => {
-  const ctx = await setupTest();
-
-  await writeStubPrograms(join(ctx.repo, 'node_modules/.bin'), {
-    diet: '[ "$1" = -- ] && shift\nexec "$@"',
-    oxlint: 'echo "kettle.ts: unused import" >&2\nexit 1',
-  });
+test('it returns the run of the script', async () => {
+  const ctx = setupTest();
 
   const run = await runBaselineJob(
-    ctx.repo,
-    { hook: 'pre-push', name: 'lint', files: ['kettle.ts'] },
-    ctx.env,
+    ctx.deps,
+    '/srv/kettle',
+    { hook: 'pre-push', name: 'test', files: ['kettle.ts'] },
+    {},
   );
 
   expect(run).toStrictEqual({ exitCode: 1, output: 'kettle.ts: unused import\n' });
 });
 
-test('it throws for a job that lefthook.yml does not hold', async () => {
-  const ctx = await setupTest();
+test('it throws for a job that lefthook.yml does not hold', () => {
+  const ctx = setupTest();
 
   const run = runBaselineJob(
-    ctx.repo,
+    ctx.deps,
+    '/srv/kettle',
     { hook: 'pre-commit', name: 'spelling', files: [] },
-    ctx.env,
+    {},
   );
 
   expect(run).rejects.toThrow('lefthook.yml has no pre-commit job named spelling');
