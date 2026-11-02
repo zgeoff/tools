@@ -1,5 +1,5 @@
-import { readFile } from 'node:fs/promises';
 import { $ } from 'bun';
+import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { collectTestLayoutFaults } from './collect-test-layout-faults.ts';
 
 export interface TestLayoutCheckOptions {
@@ -47,7 +47,7 @@ async function runCLI(): Promise<void> {
 
       return listing.split('\0').filter((path) => path !== '');
     },
-    readText: (path) => readFile(path, 'utf8'),
+    readText: nodeFileSystem.readText,
     writeOutput: (text) => {
       process.stdout.write(text);
     },
