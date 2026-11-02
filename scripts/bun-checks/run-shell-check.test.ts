@@ -2,10 +2,10 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { readGitEnv } from '../../test-utils/read-git-env.ts';
-import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { readGitEnv } from '../test-utils/read-git-env.ts';
+import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { runShellCheck } from './run-shell-check.ts';
 
 async function setupTest() {

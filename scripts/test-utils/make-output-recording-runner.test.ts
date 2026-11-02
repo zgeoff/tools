@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import type { CommandResult } from '../scripts/ci/run-command.ts';
+import type { CommandResult } from '../ci/run-command.ts';
 import { makeOutputRecordingRunner } from './make-output-recording-runner.ts';
 
 test('it returns each result of the runner it wraps and records what each command printed', async () => {

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { buildMockSyncEntry } from '../../test-utils/build-mock-sync-entry.ts';
+import { buildMockSyncEntry } from '../test-utils/build-mock-sync-entry.ts';
 import { pickSyncEntries } from './pick-sync-entries.ts';
 
 test('it refuses an include name that no opt-in entry holds, with its colons replaced', () => {

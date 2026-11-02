@@ -1,10 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createStubGH } from '../../test-utils/create-stub-gh.ts';
-import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { createStubGH } from '../test-utils/create-stub-gh.ts';
+import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { openAuditFixPullRequest } from './open-audit-fix-pull-request.ts';
 
 async function setupTest() {

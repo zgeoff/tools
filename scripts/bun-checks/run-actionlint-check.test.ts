@@ -3,10 +3,10 @@ import { cp, mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
-import { readGitEnv } from '../../test-utils/read-git-env.ts';
-import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { readGitEnv } from '../test-utils/read-git-env.ts';
+import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { runActionlintCheck } from './run-actionlint-check.ts';
 
 async function setupTest() {

@@ -1,10 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createStubCommand } from '../../test-utils/create-stub-command.ts';
-import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { createStubCommand } from '../test-utils/create-stub-command.ts';
+import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { publishPackages } from './publish-packages.ts';
 
 async function setupTest() {

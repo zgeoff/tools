@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { readOptionalText } from './read-optional-text.ts';
 import { readWorkerCount } from './read-worker-count.ts';
 

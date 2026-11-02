@@ -3,13 +3,13 @@ import { existsSync } from 'node:fs';
 import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
-import { createSideGitCommit } from '../../test-utils/create-side-git-commit.ts';
-import { createStubPullRequestGH } from '../../test-utils/create-stub-pull-request-gh.ts';
-import { createTrackedGitCommit } from '../../test-utils/create-tracked-git-commit.ts';
-import { moveGitCommitToRemote } from '../../test-utils/move-git-commit-to-remote.ts';
-import { readGitHead } from '../../test-utils/read-git-head.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { createSideGitCommit } from '../test-utils/create-side-git-commit.ts';
+import { createStubPullRequestGH } from '../test-utils/create-stub-pull-request-gh.ts';
+import { createTrackedGitCommit } from '../test-utils/create-tracked-git-commit.ts';
+import { moveGitCommitToRemote } from '../test-utils/move-git-commit-to-remote.ts';
+import { readGitHead } from '../test-utils/read-git-head.ts';
 import { syncEntries } from './sync-entries.ts';
 
 async function setupTest() {

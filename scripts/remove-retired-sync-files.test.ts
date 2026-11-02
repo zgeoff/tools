@@ -5,10 +5,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { $ } from 'bun';
-import { createGitCommit } from '../test-utils/create-git-commit.ts';
-import { readGitEnv } from '../test-utils/read-git-env.ts';
-import { runGit } from '../test-utils/run-git.ts';
-import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
+import { createGitCommit } from './test-utils/create-git-commit.ts';
+import { readGitEnv } from './test-utils/read-git-env.ts';
+import { runGit } from './test-utils/run-git.ts';
+import { writeTreeFiles } from './test-utils/write-tree-files.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'remove-retired-sync-files-'));
