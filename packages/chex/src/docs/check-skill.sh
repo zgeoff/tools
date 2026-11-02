@@ -198,8 +198,10 @@ sub check_bullets {
       $in_frontmatter = 0 if $line_number > 1 && $line eq "---";
       next;
     }
-    # A fence may open inside a list item, after its marker.
-    if ($line =~ /^\s*(?:[-*+]\s+|\d+[.)]\s+)?(`{3,}|~{3,})(.*)$/) {
+    # A fence may open inside a list item, after its marker, but closes only on a line of its own.
+    my $marker_pattern = $open eq "" ? qr/^\s*(?:[-*+]\s+|\d+[.)]\s+)?(`{3,}|~{3,})(.*)$/
+      : qr/^\s*(`{3,}|~{3,})(.*)$/;
+    if ($line =~ $marker_pattern) {
       my ($marker, $rest) = ($1, $2);
       if ($open eq "") { $open = $marker }
       elsif (substr($marker, 0, 1) eq substr($open, 0, 1) && length($marker) >= length($open)

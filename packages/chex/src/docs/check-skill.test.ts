@@ -1344,6 +1344,8 @@ test('it passes a rule-set bullet that opens with an action, a ban or a conditio
     '',
     '- ```text',
     '  - A line inside a code block that opens in a list item.',
+    '  - ```',
+    '  - The line above stays inside the code block.',
     '  ```',
   ]);
 
