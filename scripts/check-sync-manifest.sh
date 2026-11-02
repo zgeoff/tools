@@ -4,9 +4,10 @@
 # every source whose target is a workflow, a string `build` when present, a
 # `scripts` field that matches the package.json scripts the build writes, an
 # `except` that lists owner/repo names, no link to an excepted file outside a
-# block that needs it, a `repo` that names zgeoff/tools or zgeoff/skills, and
+# block that needs it, a `repo` that names zgeoff/tools or zgeoff/skills,
 # every file under skills/<name>/ in zgeoff/skills listed by the entry that
-# ships that skill, except the tests.
+# ships that skill, except the tests, and every package a code source imports
+# listed in its entry's `packages`.
 #
 # A source whose `repo` is zgeoff/skills resolves in the zgeoff/skills tree at
 # the commit sync/skills-pin.json pins, which bun run skills:install unpacks
@@ -61,6 +62,11 @@ while IFS= read -r name; do
   report "entry '$name' has a scripts field that is not an object of strings"
 done < <(jq -r '.[] | select(has("scripts"))
   | select((.scripts | type) != "object" or any(.scripts[]; type != "string")) | .name' "$manifest")
+
+while IFS= read -r name; do
+  report "entry '$name' has a packages field that is not a list of strings"
+done < <(jq -r '.[] | select(has("packages"))
+  | select((.packages | type) != "array" or any(.packages[]; type != "string")) | .name' "$manifest")
 
 scripts_dir=$(dirname "$0")
 staging=$(mktemp -d)
@@ -126,6 +132,28 @@ while IFS=$'\t' read -r name repo source target; do
     report "entry '$name' targets $target, but $source lacks the line '$marker'"
   fi
 done < <(jq -r '.[] | .name as $n | .files[] | [$n, (.repo // "zgeoff/tools"), .source, .target] | @tsv' "$manifest")
+
+# A repo that takes an entry lists only the packages the entry's `packages`
+# names, so a code source that imports any other package fails the repo's
+# dead-code check, and its run where the package is not installed.
+while IFS=$'\t' read -r name repo source packages; do
+  path=$(source_path "$repo" "$source")
+  [ -f "$path" ] || continue
+
+  if ! imported=$(bun "$scripts_dir/collect-package-imports.ts" "$path"); then
+    report "entry '$name' delivers $source, whose imports cannot be read"
+    continue
+  fi
+
+  while IFS= read -r package; do
+    if [ -n "$package" ] && ! jq -e --arg package "$package" 'index($package)' <<< "$packages" > /dev/null; then
+      report "entry '$name' delivers $source, which imports $package, a package its packages field does not list"
+    fi
+  done <<< "$imported"
+done < <(jq -r '.[] | .name as $n
+  | (.packages // [] | if type == "array" then tojson else "[]" end) as $p
+  | .files[] | select(.source | test("\\.[cm]?[jt]sx?$"))
+  | [$n, (.repo // "zgeoff/tools"), .source, $p] | @tsv' "$manifest")
 
 while IFS=$'\t' read -r name source; do
   report "entry '$name' gives $source an except that is not a list of owner/repo names"

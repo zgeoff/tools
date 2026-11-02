@@ -862,3 +862,219 @@ test('it fails when a zgeoff/skills Markdown file links an excepted file outside
       "check-sync-manifest: entry 'skill-kettle' links ./references/go.md from skills/kettle/SKILL.md outside a 'repo-sync needs ./references/go.md' block, so acme/ledger gets a dead link\n",
   });
 });
+
+test.each([
+  { line: "import { pourTea } from '@acme/teapot';" },
+  { line: "import type { Teapot } from '@acme/teapot/types';" },
+  { line: "import '@acme/teapot';" },
+  { line: "export { pourTea } from '@acme/teapot';" },
+  { line: "const teapot = await import('@acme/teapot');" },
+  { line: "const teapot = require('@acme/teapot');" },
+  { line: "const teapot = await import(\n  '@acme/teapot'\n);" },
+  { line: 'const teapot = await import(`@acme/teapot`);' },
+  { line: 'const teapot = require(`@acme/teapot`);' },
+  { line: "type Teapot = typeof import(/* the pot */ '@acme/teapot');" },
+])(
+  'it fails when a code source holds $line and its entry does not list the package',
+  async (row) => {
+    const ctx = await setupTest();
+
+    await writeTreeFiles(ctx.directory, {
+      'sync/brew.ts': `${row.line}\n`,
+      'sync/manifest.json': JSON.stringify([
+        {
+          name: 'brew',
+          description: 'The brew script',
+          files: [{ source: 'sync/brew.ts', target: 'scripts/brew.ts' }],
+        },
+      ]),
+    });
+
+    const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+    expect({
+      exitCode: result.exitCode,
+      stdout: result.stdout.toString(),
+      stderr: result.stderr.toString(),
+    }).toStrictEqual({
+      exitCode: 1,
+      stdout: '',
+      stderr:
+        "check-sync-manifest: entry 'brew' delivers sync/brew.ts, which imports @acme/teapot, a package its packages field does not list\n",
+    });
+  },
+);
+
+test('it passes a code source that imports only built-in modules, relative paths and the packages its entry lists', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/brew.ts': [
+      "import { readFileSync } from 'node:fs';",
+      "import { expect } from 'bun:test';",
+      "import { $ } from 'bun';",
+      "import { steep } from './steep.ts';",
+      "import { pourTea } from '@acme/teapot';",
+      "import { warmCup } from 'cup-warmer/sync';",
+      '',
+    ].join('\n'),
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'brew',
+        description: 'The brew script',
+        packages: ['@acme/teapot', 'cup-warmer'],
+        files: [{ source: 'sync/brew.ts', target: 'scripts/brew.ts' }],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+});
+
+test('it passes a code source whose strings name the import keywords', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/brew.ts': "const keywords = ['from','import','require'];\nconst pot = `import`;\n",
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'brew',
+        description: 'The brew script',
+        files: [{ source: 'sync/brew.ts', target: 'scripts/brew.ts' }],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+});
+
+test('it passes a code source that names a package only in comments and strings', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/brew.ts': [
+      "// import '@acme/teapot';",
+      "/* import { pourTea } from '@acme/teapot'; */",
+      'const note = "import \'@acme/teapot\'";',
+      "const hint = `require('@acme/teapot')`;",
+      '',
+    ].join('\n'),
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'brew',
+        description: 'The brew script',
+        files: [{ source: 'sync/brew.ts', target: 'scripts/brew.ts' }],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+});
+
+test('it fails when a code source does not parse', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/brew.ts': 'const = ;\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'brew',
+        description: 'The brew script',
+        files: [{ source: 'sync/brew.ts', target: 'scripts/brew.ts' }],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      "collect-package-imports: sync/brew.ts does not parse\ncheck-sync-manifest: entry 'brew' delivers sync/brew.ts, whose imports cannot be read\n",
+  });
+});
+
+test('it fails when another entry lists the package a code source imports', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/brew.ts': "import { pourTea } from '@acme/teapot';\n",
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'brew',
+        description: 'The brew script',
+        files: [{ source: 'sync/brew.ts', target: 'scripts/brew.ts' }],
+      },
+      {
+        name: 'teapot',
+        description: 'The teapot config',
+        packages: ['@acme/teapot'],
+        files: [],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      "check-sync-manifest: entry 'brew' delivers sync/brew.ts, which imports @acme/teapot, a package its packages field does not list\n",
+  });
+});
+
+test('it fails when the packages field is not a list of strings', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'brew',
+        description: 'The brew script',
+        packages: '@acme/teapot',
+        files: [],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      "check-sync-manifest: entry 'brew' has a packages field that is not a list of strings\n",
+  });
+});

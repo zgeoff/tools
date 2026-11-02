@@ -294,6 +294,7 @@
     "name": "hook-skill-gate",
     "description": "The skill-gate hook's entry point, which runs the gate from the @zgeoff/skill-gate package for Claude Code and Codex; the repo installs the package, keeps its path and tool gates in .claude/skill-gate.json, registers the hook in .claude/settings.json as a bun --no-install command with a PreToolUse matcher that names each gated tool, and for Codex registers it in .codex/hooks.json with --harness codex and trusts the hook definitions",
     "optIn": true,
+    "packages": ["@zgeoff/skill-gate"],
     "files": [
       {
         "source": "sync/hooks/skill-gate/skill-gate.ts",
@@ -305,6 +306,7 @@
     "name": "hook-start",
     "description": "The agent hooks' start-up stub, which every hook entry runs: it runs the hooks from the @zgeoff/agent-hooks package, runs bun install --frozen-lockfile once under a lock when the package is missing, and refuses each tool call but a read-only Bash command or a plain bun install with exit 2 when the package still cannot load, and names the install commands it allows; the repo installs the package and writes its hook entries with agent-hooks init",
     "optIn": true,
+    "packages": ["@zgeoff/agent-hooks"],
     "files": [
       {
         "source": "sync/hooks/start.ts",
