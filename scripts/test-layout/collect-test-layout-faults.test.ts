@@ -184,3 +184,19 @@ test.each([
     `packages/kettle/src/boil.test.ts imports ${owner}/test-utils/create-stub-tap.ts, a test helper of ${owner}; copy the helper into the importer's own test-utils/`,
   ]);
 });
+
+test('it reports a source file that does not parse, whose imports it cannot read', () => {
+  const faults = collectTestLayoutFaults(
+    [],
+    [
+      {
+        path: 'packages/kettle/src/view.test.js',
+        text: "import { buildWater } from '../../teapot/test-utils/build-water.ts';\nexport const View = () => <p>{buildWater()}</p>;\n",
+      },
+    ],
+  );
+
+  expect(faults).toStrictEqual([
+    'packages/kettle/src/view.test.js does not parse, so the layout check cannot read its imports: Unexpected JSX expression',
+  ]);
+});
