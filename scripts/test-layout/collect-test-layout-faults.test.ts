@@ -44,6 +44,21 @@ test.each([
   ],
   ['a re-export', "export { buildWater } from '../../teapot/test-utils/build-water.ts';\n"],
   ['a dynamic import', "await import('../../teapot/test-utils/build-water.ts');\n"],
+  ['a type re-export', "export type { Water } from '../../teapot/test-utils/build-water.ts';\n"],
+  ['a star re-export', "export * from '../../teapot/test-utils/build-water.ts';\n"],
+  [
+    'an import type reference',
+    "type Water = import('../../teapot/test-utils/build-water.ts').Water;\n",
+  ],
+  [
+    'a typeof import reference',
+    "type Helpers = typeof import('../../teapot/test-utils/build-water.ts');\n",
+  ],
+  [
+    'an import-equals require',
+    "import water = require('../../teapot/test-utils/build-water.ts');\n",
+  ],
+  ['a require call', "const water = require('../../teapot/test-utils/build-water.ts');\n"],
 ])('it reports %s of another package test helper', (_label, text) => {
   const faults = collectTestLayoutFaults([], [{ path: 'packages/kettle/src/boil.test.ts', text }]);
 
