@@ -123,5 +123,7 @@ tell which calls to let through. It refuses them until you fix the path, as
 [the skill gate's Failing closed](../architecture/skill-gate.md#failing-closed) describes.
 
 The start-up stub, `.claude/hooks/start.ts`, runs the hook from the package. When the package cannot
-load, the stub refuses calls in the same way, as
-[the agent hooks' Failing closed](../architecture/agent-hooks.md#failing-closed) describes.
+load, the stub refuses every tool call but two kinds of Bash command, each written as plain words:
+the install that repairs it, `bun install` or `bun install --frozen-lockfile`, and a read-only `ls`,
+`cat` or `pwd`, as [the agent hooks' Failing closed](../architecture/agent-hooks.md#failing-closed)
+describes.

@@ -189,12 +189,15 @@ async function writeSkillLink(
   );
 }
 
+// The skills that `bun run skills:install` links into this repo's .claude/skills/.
+export const defaultPinnedSkills = ['code-style', 'docs-writing', 'skill-writing', 'deslop'];
+
 if (import.meta.main) {
   process.exitCode = await writePinnedSkills({
     cwd: process.cwd(),
     env: process.env,
     archiveBaseURL: 'https://codeload.github.com/zgeoff/skills/tar.gz/',
-    skills: ['code-style', 'docs-writing', 'skill-writing', 'deslop'],
+    skills: defaultPinnedSkills,
     fileSystem: nodeFileSystem,
     renamePath: rename,
     runID: String(process.pid),

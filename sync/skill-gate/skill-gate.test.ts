@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildCopyPlan } from '../../scripts/repo-sync/build-copy-plan.ts';
 import { parseSyncEntries } from '../../scripts/repo-sync/parse-sync-entries.ts';
+import { pickSyncEntries } from '../../scripts/repo-sync/pick-sync-entries.ts';
 import { selectSyncFiles } from '../../scripts/repo-sync/select-sync-files.ts';
 
 async function setupTest() {
@@ -42,21 +43,22 @@ async function setupTest() {
       },
     );
 
-  const planSyncTargets = async (repo: string) => {
-    const manifest: unknown = await Bun.file(manifestPath).json();
+  // The copies that repo-sync plans for a repo whose stub has empty skip and include inputs.
+  const planSyncCopies = async (repo: string) => {
+    const manifestJSON: unknown = await Bun.file(manifestPath).json();
 
-    const entry = parseSyncEntries(manifest)?.find(
-      (candidate) => candidate.name === 'skill-gate-rules',
-    );
+    const manifest = parseSyncEntries(manifestJSON);
+    const picked = pickSyncEntries({ manifest: manifest ?? [], skip: '', include: '' });
+    const entries = picked.kind === 'picked' ? picked.entries : [];
 
     return buildCopyPlan({
-      rows: selectSyncFiles(entry?.files ?? [], repo),
+      rows: entries.flatMap((entry) => selectSyncFiles(entry.files, repo)),
       existingWorkflows: new Map(),
       marker: '',
-    }).copies.map((copy) => copy.target);
+    }).copies.map((copy) => ({ source: copy.source, target: copy.target }));
   };
 
-  return { project, transcriptPath, rulesPath, runEdit, planSyncTargets };
+  return { project, transcriptPath, rulesPath, runEdit, planSyncCopies };
 }
 
 test.each([
@@ -179,17 +181,30 @@ test.each([
   'zgeoff/wringer',
 ])('it leaves the own .claude/skill-gate.json of %s out of the sync', async (repo) => {
   const ctx = await setupTest();
-  const targets = await ctx.planSyncTargets(repo);
+  const copies = await ctx.planSyncCopies(repo);
 
-  expect(targets).toStrictEqual([]);
+  expect(copies.map((copy) => copy.target)).not.toContain('.claude/skill-gate.json');
 });
 
 test.each(['zgeoff/llm', 'zgeoff/dotfiles', 'zgeoff/nixie-definitions'])(
   'it syncs the shared .claude/skill-gate.json into %s, which keeps no rules of its own',
   async (repo) => {
     const ctx = await setupTest();
-    const targets = await ctx.planSyncTargets(repo);
+    const copies = await ctx.planSyncCopies(repo);
 
-    expect(targets).toStrictEqual(['.claude/skill-gate.json']);
+    expect(copies).toContainEqual({
+      source: '.repo-sync/sync/skill-gate/skill-gate.json',
+      target: '.claude/skill-gate.json',
+    });
   },
 );
+
+test('it syncs deslop from the pinned skills source into a repo with an empty include list', async () => {
+  const ctx = await setupTest();
+  const copies = await ctx.planSyncCopies('zgeoff/llm');
+
+  expect(copies).toContainEqual({
+    source: '.repo-sync-skills/skills/deslop/SKILL.md',
+    target: '.claude/skills/deslop/SKILL.md',
+  });
+});

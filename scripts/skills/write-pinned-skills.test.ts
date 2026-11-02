@@ -18,7 +18,7 @@ import { runCommand } from '../ci/run-command.ts';
 import { flockLockFile } from './flock-lock-file.ts';
 import type { InstallLockOptions } from './with-install-lock.ts';
 import { withInstallLock } from './with-install-lock.ts';
-import { writePinnedSkills } from './write-pinned-skills.ts';
+import { defaultPinnedSkills, writePinnedSkills } from './write-pinned-skills.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(import.meta.dir, '.test-write-pinned-skills-'));
@@ -338,4 +338,38 @@ test('it installs the pin as it stands once the lock is free', async () => {
   expect(exitCode).toBe(0);
   expect(text).toBe('# Kettle, rewritten\n');
   expect(existsSync(join(ctx.tools, '.zgeoff-skills', older))).toBeFalse();
+});
+
+test('it links each default skill when the pinned tree holds all four', async () => {
+  const ctx = await setupTest();
+
+  const commit = '89abcdef0123456789abcdef0123456789abcdef';
+
+  await ctx.writePin(commit);
+
+  await ctx.writeArchive(commit, {
+    'skills/code-style/SKILL.md': '# Code style\n',
+    'skills/docs-writing/SKILL.md': '# Docs writing\n',
+    'skills/skill-writing/SKILL.md': '# Skill writing\n',
+    'skills/deslop/SKILL.md': '# Deslop\n',
+  });
+
+  const exitCode = await ctx.install(defaultPinnedSkills);
+
+  const skillsFolder = join(ctx.tools, '.claude', 'skills');
+
+  const links = await Promise.all(
+    ['code-style', 'docs-writing', 'skill-writing', 'deslop'].map((skill) =>
+      readlink(join(skillsFolder, skill)),
+    ),
+  );
+
+  expect(exitCode).toBe(0);
+
+  expect(links).toStrictEqual([
+    `../../.zgeoff-skills/${commit}/skills/code-style`,
+    `../../.zgeoff-skills/${commit}/skills/docs-writing`,
+    `../../.zgeoff-skills/${commit}/skills/skill-writing`,
+    `../../.zgeoff-skills/${commit}/skills/deslop`,
+  ]);
 });
