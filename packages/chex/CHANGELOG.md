@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.3...@zgeoff/chex@0.0.4) (2026-11-02)
+
+### Bug Fixes
+
+- **chex:** fail a commit or push when the chex baseline file is missing
+  ([#429](https://github.com/zgeoff/tools/issues/429))
+  ([26cadb8](https://github.com/zgeoff/tools/commit/26cadb80bf7a2d203d03ff4d4c753b62be786ae3))
+
 ## [0.0.3](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.2...@zgeoff/chex@0.0.3) (2026-10-31)
 
 ### Bug Fixes
