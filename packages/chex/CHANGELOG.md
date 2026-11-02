@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.8](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.7...@zgeoff/chex@0.0.8) (2026-11-02)
+
+
+### Features
+
+* **chex:** one word limit for every skill, and check rule-set bullets ([#443](https://github.com/zgeoff/tools/issues/443)) ([560622d](https://github.com/zgeoff/tools/commit/560622d52584a4881af9454f241eca7c6932ca27))
+
 ## [0.0.7](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.6...@zgeoff/chex@0.0.7) (2026-11-02)
 
 ### Features
