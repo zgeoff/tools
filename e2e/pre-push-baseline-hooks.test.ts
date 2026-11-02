@@ -64,6 +64,7 @@ async function setupTest() {
     );
 
   return {
+    directory,
     env,
     bin,
     main,
@@ -118,6 +119,187 @@ test('it leaves the main checkout non-bare when the test job runs in a pre-push 
 
   expect(bare).toBe('false\n');
   expect(existsSync(join(ctx.worktree, 'sandbox/.git'))).toBeTrue();
+});
+
+test('it leaves the repo HEAD and config unchanged when the workflow lint checks out another repo in a pre-push from a worktree', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await mkdir(join(ctx.worktree, '.github/workflows'), { recursive: true });
+
+  await writeFile(
+    join(ctx.worktree, '.github/workflows/greet.yml'),
+    'on: workflow_dispatch\njobs:\n  greet:\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    steps:\n      - run: echo hi\n',
+  );
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': 'echo .github/workflows/greet.yml',
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
+
+        // A lint that checks out its rules into a folder of its own, as a repo's own lint can. The
+        // trailing true swallows the file name the hook appends.
+        'check:workflows':
+          'git init --quiet lint-rules && git -C lint-rules sparse-checkout set rules && true',
+        'check:uncommitted': 'true',
+        'memory-capped': 'exec',
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'ci: add the greet workflow'}`.cwd(ctx.worktree).env(ctx.env);
+
+  const readRepoState = async () => ({
+    head: await $`git rev-parse HEAD`.cwd(ctx.worktree).env(ctx.env).text(),
+    config: await readFile(join(ctx.main, '.git/config'), 'utf8'),
+    mainWorktreeConfig: existsSync(join(ctx.main, '.git/config.worktree')),
+    linkedWorktreeConfig: existsSync(join(ctx.main, '.git/worktrees/worktree/config.worktree')),
+  });
+
+  const before = await readRepoState();
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  await $`git push --quiet origin feature`.cwd(ctx.worktree).env(ctx.env);
+
+  const after = await readRepoState();
+
+  expect(after).toStrictEqual(before);
+  expect(existsSync(join(ctx.worktree, 'lint-rules/.git/info/sparse-checkout'))).toBeTrue();
+});
+
+test('it runs the pre-commit jobs without git repository variables in a commit from a worktree', async () => {
+  const ctx = await setupTest();
+
+  const leaks = join(ctx.directory, 'git-variable-leaks');
+  const recorder = join(ctx.directory, 'record-git-variables.sh');
+
+  // Every job runs its command through the memory-capped script, so this one records each git
+  // repository variable the job hands it, then runs the command.
+  await writeFile(
+    recorder,
+    `for name in $(git rev-parse --local-env-vars); do\n  if printenv "$name" > /dev/null; then echo "$name: $*" >> ${leaks}; fi\ndone\nexec "$@"\n`,
+  );
+
+  await writeFile(leaks, '');
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.worktree, 'fixture.ts'), 'export {};\n');
+  await mkdir(join(ctx.worktree, '.github/workflows'), { recursive: true });
+
+  await writeFile(
+    join(ctx.worktree, '.github/workflows/greet.yml'),
+    'on: workflow_dispatch\njobs:\n  greet:\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    steps:\n      - run: echo hi\n',
+  );
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': String.raw`printf "%s\n" fixture.ts .github/workflows/greet.yml`,
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
+        'check:workflows': 'true',
+        'check:uncommitted': 'true',
+        'memory-capped': `sh ${recorder}`,
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-commit'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-commit "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-commit'), 0o755);
+
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  const recorded = await readFile(leaks, 'utf8');
+
+  expect(recorded).toBe('');
+});
+
+test('it runs the pre-push jobs without git repository variables in a push from a worktree', async () => {
+  const ctx = await setupTest();
+
+  const leaks = join(ctx.directory, 'git-variable-leaks');
+  const recorder = join(ctx.directory, 'record-git-variables.sh');
+
+  // Every job runs its command through the memory-capped script, so this one records each git
+  // repository variable the job hands it, then runs the command.
+  await writeFile(
+    recorder,
+    `for name in $(git rev-parse --local-env-vars); do\n  if printenv "$name" > /dev/null; then echo "$name: $*" >> ${leaks}; fi\ndone\nexec "$@"\n`,
+  );
+
+  await writeFile(leaks, '');
+  await writeFile(join(ctx.worktree, 'lefthook.yml'), `extends:\n  - ${ctx.baseline}\n`);
+  await writeFile(join(ctx.worktree, 'fixture.ts'), 'export {};\n');
+  await mkdir(join(ctx.worktree, '.github/workflows'), { recursive: true });
+
+  await writeFile(
+    join(ctx.worktree, '.github/workflows/greet.yml'),
+    'on: workflow_dispatch\njobs:\n  greet:\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    steps:\n      - run: echo hi\n',
+  );
+
+  await writeFile(
+    join(ctx.worktree, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'format:check': 'true',
+        'lint:files': 'true',
+        typecheck: 'true',
+        'files:branch': String.raw`printf "%s\n" fixture.ts .github/workflows/greet.yml`,
+        'test:related': 'true',
+        'check:commits': 'true',
+        'check:local-paths': 'true',
+        'check:test-timeouts': 'true',
+        'check:dependency-gates': 'true',
+        'check:workflows': 'true',
+        'check:uncommitted': 'true',
+        'memory-capped': `sh ${recorder}`,
+      },
+    }),
+  );
+
+  await $`git add -A`.cwd(ctx.worktree).env(ctx.env);
+  await $`git commit --quiet -m ${'test: add the fixture'}`.cwd(ctx.worktree).env(ctx.env);
+
+  await writeFile(
+    join(ctx.main, '.git/hooks/pre-push'),
+    `#!/bin/sh\nexec ${process.execPath} ${ctx.lefthook} run pre-push "$@"\n`,
+  );
+
+  await chmod(join(ctx.main, '.git/hooks/pre-push'), 0o755);
+
+  await $`git push --quiet origin feature`.cwd(ctx.worktree).env(ctx.env);
+
+  const recorded = await readFile(leaks, 'utf8');
+
+  expect(recorded).toBe('');
 });
 
 test('it fails the push on the uncommitted job and names the file when a file the branch changes holds an uncommitted change', async () => {

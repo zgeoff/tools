@@ -120,6 +120,77 @@ test('it runs the related tests through rig under diet, and leaves the main chec
   expect(rigCalls).toStrictEqual(['under diet: related fixture.ts']);
 });
 
+test('it runs the pre-commit typecheck without git repository variables in a commit from a worktree', async () => {
+  const ctx = await setupTest();
+
+  const leaks = join(ctx.directory, 'git-variable-leaks');
+  const recorder = join(ctx.directory, 'record-git-variables.sh');
+
+  // Records each git repository variable that the command it runs inherits.
+  await writeFile(
+    recorder,
+    `for name in $(git rev-parse --local-env-vars); do\n  if printenv "$name" > /dev/null; then echo "$name: $*" >> ${leaks}; fi\ndone\nexec "$@"\n`,
+  );
+
+  await writeFile(leaks, '');
+
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
+    realChecks: [],
+    scripts: {
+      'format:check': `sh ${recorder} true format:check`,
+      typecheck: `sh ${recorder} true typecheck`,
+      'check:docs': `sh ${recorder} true check:docs`,
+    },
+    files: { 'fixture.ts': 'export {};\n', 'guide.md': '# Guide\n\nA short guide.\n' },
+    rig: `sh ${recorder} true rig`,
+    oxlint: 'exit 0',
+    withCommitlint: false,
+  });
+
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixture');
+
+  const recorded = await readFile(leaks, 'utf8');
+
+  expect(recorded).toBe('');
+});
+
+test('it runs the package scripts and rig without git repository variables in a pre-push from a worktree', async () => {
+  const ctx = await setupTest();
+
+  const leaks = join(ctx.directory, 'git-variable-leaks');
+  const recorder = join(ctx.directory, 'record-git-variables.sh');
+
+  // Records each git repository variable that the command it runs inherits.
+  await writeFile(
+    recorder,
+    `for name in $(git rev-parse --local-env-vars); do\n  if printenv "$name" > /dev/null; then echo "$name: $*" >> ${leaks}; fi\ndone\nexec "$@"\n`,
+  );
+
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
+    realChecks: [],
+    scripts: {
+      'format:check': `sh ${recorder} true format:check`,
+      typecheck: `sh ${recorder} true typecheck`,
+      'check:docs': `sh ${recorder} true check:docs`,
+    },
+    files: { 'fixture.ts': 'export {};\n', 'guide.md': '# Guide\n\nA short guide.\n' },
+    rig: `sh ${recorder} true rig`,
+    oxlint: 'exit 0',
+    withCommitlint: false,
+  });
+
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixture');
+  await writeFile(leaks, '');
+
+  const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
+
+  expect(result.exitCode).toBe(0);
+
+  const recorded = await readFile(leaks, 'utf8');
+
+  expect(recorded).toBe('');
+});
+
 test('it fails a commit in a checkout with no node_modules, and names the missing baseline', async () => {
   const ctx = await setupTest();
 
