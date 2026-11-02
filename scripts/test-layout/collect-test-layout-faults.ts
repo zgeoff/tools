@@ -1,4 +1,6 @@
 import { dirname, join, normalize } from 'node:path';
+import { Visitor, parseSync } from 'oxc-parser';
+import type { Expression, StringLiteral } from 'oxc-parser';
 
 export interface SourceFile {
   readonly path: string;
@@ -35,40 +37,38 @@ export function collectTestLayoutFaults(
   return [...rootDirFaults, ...importFaults];
 }
 
-// Bun's scanner leaves out a type-only import, which still ties the importer to the helper, so each
-// `type` keyword of an import or export goes before the scan.
-const typeImportPattern = /\bimport\s+type\s+(?=[{*]|[\w$]+\s+from\b)/gu;
-const typeExportPattern = /\bexport\s+type\s+(?=[{*])/gu;
-const inlineTypePattern = /(?<opener>[{,]\s*)type\s+(?=[\w$]+\s*(?:[,}]|\bas\b))/gu;
-
-// Bun's scanner throws on a script's shebang line, which Bun's runtime skips.
-const shebangPattern = /^#!.*/u;
-
 function collectRelativeImports(source: SourceFile): string[] {
-  const transpiler = new Bun.Transpiler({ loader: pickLoader(source.path) });
+  const specifiers: string[] = [];
 
-  const text = source.text
-    .replace(shebangPattern, '')
-    .replaceAll(typeImportPattern, 'import ')
-    .replaceAll(typeExportPattern, 'export ')
-    .replaceAll(inlineTypePattern, '$<opener>');
+  const addLiteral = (node: Expression | StringLiteral | null | undefined): void => {
+    if (node?.type === 'Literal' && typeof node.value === 'string') {
+      specifiers.push(node.value);
+    }
+  };
 
-  return transpiler
-    .scanImports(text)
-    .map((entry) => entry.path)
-    .filter((path) => path.startsWith('./') || path.startsWith('../'));
-}
+  const visitor = new Visitor({
+    ImportDeclaration: (node) => addLiteral(node.source),
+    ExportNamedDeclaration: (node) => addLiteral(node.source),
+    ExportAllDeclaration: (node) => addLiteral(node.source),
+    ImportExpression: (node) => addLiteral(node.source),
+    TSImportType: (node) => addLiteral(node.source),
+    TSExternalModuleReference: (node) => addLiteral(node.expression),
+    CallExpression: (node) => {
+      const [first] = node.arguments;
 
-function pickLoader(path: string): 'js' | 'jsx' | 'ts' | 'tsx' {
-  if (path.endsWith('.tsx')) {
-    return 'tsx';
-  }
+      if (
+        node.callee.type === 'Identifier' &&
+        node.callee.name === 'require' &&
+        first?.type !== 'SpreadElement'
+      ) {
+        addLiteral(first);
+      }
+    },
+  });
 
-  if (path.endsWith('.jsx')) {
-    return 'jsx';
-  }
+  visitor.visit(parseSync(source.path, source.text).program);
 
-  return /\.[cm]?ts$/u.test(path) ? 'ts' : 'js';
+  return specifiers.filter((path) => path.startsWith('./') || path.startsWith('../'));
 }
 
 function isForeignHelper(importer: string, target: string): boolean {
