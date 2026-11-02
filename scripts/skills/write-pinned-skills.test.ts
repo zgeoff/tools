@@ -12,6 +12,7 @@ import {
 } from 'node:fs/promises';
 import { join } from 'node:path';
 import { writeSkillsArchive } from '../../test-utils/write-skills-archive.ts';
+import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { flockLockFile } from './flock-lock-file.ts';
@@ -38,6 +39,9 @@ async function setupTest() {
       archivePath: join(archives, commit),
       commit,
       files,
+      writeTree: writeTreeFiles,
+      runCommand,
+      env: process.env,
     });
 
   const writePin = (commit: string) =>

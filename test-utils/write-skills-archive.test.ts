@@ -3,7 +3,9 @@ import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import { runCommand } from '../scripts/ci/run-command.ts';
 import { writeSkillsArchive } from './write-skills-archive.ts';
+import { writeTreeFiles } from './write-tree-files.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'write-skills-archive-'));
@@ -27,6 +29,9 @@ test('it packs every file under one skills-<commit> top folder', async () => {
       'skills/watering/SKILL.md': '# Watering\n',
       'README.md': '# Garden skills\n',
     },
+    writeTree: writeTreeFiles,
+    runCommand,
+    env: process.env,
   });
 
   const listed = await $`tar -tzf ${archivePath}`.text();
