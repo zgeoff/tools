@@ -27,7 +27,7 @@
       "jest-matcher-utils": "30.5.2",
       "kysely": "0.29.7",
       "lefthook": "2.2.2",
-      "msw": "2.15.0",
+      "msw": "3.0.3",
       "oxfmt": "0.72.0",
       "oxlint": "1.87.0",
       "picomatch": "4.0.7",
