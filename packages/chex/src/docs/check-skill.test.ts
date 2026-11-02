@@ -628,7 +628,7 @@ test('it accepts a long reference that opens with a contents list', async () => 
   });
 });
 
-test('it warns about a reference that links to another reference', async () => {
+test('it passes a reference that links to a sibling reference', async () => {
   const ctx = await setupTest();
 
   await ctx.writePage('.claude/skills/demo/SKILL.md', [
@@ -651,10 +651,9 @@ test('it warns about a reference that links to another reference', async () => {
   }).toStrictEqual({
     exitCode: 0,
     stdout:
-      '.claude/skills/demo/references/frontend.md:1: links to another reference (.claude/skills/demo/references/http.md); link it from SKILL.md instead (warning)\n' +
       '.claude/skills/demo/references/frontend.md: SKILL.md does not list it under ## References; add a line naming the task that needs it (warning)\n' +
       '.claude/skills/demo/references/http.md: SKILL.md does not list it under ## References; add a line naming the task that needs it (warning)\n' +
-      'check-skill: 1 skills, 0 errors, 3 warnings\n',
+      'check-skill: 1 skills, 0 errors, 2 warnings\n',
     stderr: '',
   });
 });
@@ -964,178 +963,89 @@ test('it fails a SKILL.md body over 1,700 words, and counts no word of the front
   });
 });
 
-test('it passes a rule set of 4,000 words', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writePage(
-    'skills/demo/SKILL.md',
-    buildSkillPageLines({
-      name: 'demo',
-      description: 'Rules for every demo change. Load it before writing or reviewing one.',
-      kind: 'rule-set',
-      bodyWords: 4000,
-    }),
-  );
-
-  const result = await ctx.run();
-
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  }).toStrictEqual({
-    exitCode: 0,
-    stdout: 'check-skill: 1 skills, 0 errors, 0 warnings\n',
-    stderr: '',
-  });
-});
-
-test('it warns on a rule set over 4,000 words and fails one over 5,000', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writePage(
-    'skills/demo/SKILL.md',
-    buildSkillPageLines({
-      name: 'demo',
-      description: 'Rules for every demo change. Load it before writing or reviewing one.',
-      kind: 'rule-set',
-      bodyWords: 4005,
-    }),
-  );
-
-  await ctx.writePage(
-    'skills/other/SKILL.md',
-    buildSkillPageLines({
-      name: 'other',
-      description: 'Rules for every other change. Load it before writing or reviewing one.',
-      kind: 'rule-set',
-      bodyWords: 5005,
-    }),
-  );
-
-  const result = await ctx.run();
-
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  }).toStrictEqual({
-    exitCode: 1,
-    stdout:
-      'skills/demo/SKILL.md: body is 4005 words, over 4000; cut it, or move what only some tasks need into a reference (warning)\n' +
-      'skills/other/SKILL.md: body is 5005 words, over the limit of 5000; cut it, or move what only some tasks need into a reference\n' +
-      'check-skill: 2 skills, 1 errors, 1 warnings\n',
-    stderr: '',
-  });
-});
-
-test('it reads a quoted rule-set kind', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writePage('skills/demo/SKILL.md', [
-    '---',
-    'name: demo',
-    'description:',
-    '  Rules for every demo change. Load it before writing or reviewing one.',
-    'metadata:',
-    '  kind: "rule-set"',
-    '---',
-    '',
-    ...Array.from({ length: 80 }, () => 'The tool reads one file. '.repeat(10).trim()),
-  ]);
-
-  const result = await ctx.run();
-
-  expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
-});
-
-test('it reads the rule-set kind under a metadata key with a comment after it', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writePage('skills/demo/SKILL.md', [
-    '---',
-    'name: demo',
-    'description:',
-    '  Rules for every demo change. Load it before writing or reviewing one.',
-    'metadata: # how the checks treat the skill',
-    '  kind: rule-set',
-    '---',
-    '',
-    ...Array.from({ length: 40 }, () => 'The tool reads one file. '.repeat(10).trim()),
-  ]);
-
-  const result = await ctx.run();
-
-  expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
-});
-
-test('it reads the rule-set kind from a metadata flow mapping', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writePage('skills/demo/SKILL.md', [
-    '---',
-    'name: demo',
-    'description:',
-    '  Rules for every demo change. Load it before writing or reviewing one.',
-    "metadata: { owner: docs, kind: 'rule-set' } # how the checks treat the skill",
-    '---',
-    '',
-    ...Array.from({ length: 40 }, () => 'The tool reads one file. '.repeat(10).trim()),
-  ]);
-
-  const result = await ctx.run();
-
-  expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
-});
-
-test('it keeps the plain limit for a metadata flow mapping whose quoted value holds a kind', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writePage('skills/demo/SKILL.md', [
-    '---',
-    'name: demo',
-    'description:',
-    '  Rules for every demo change. Load it before writing or reviewing one.',
-    "metadata: { note: 'example, kind: rule-set, end' }",
-    '---',
-    '',
-    ...Array.from({ length: 40 }, () => 'The tool reads one file. '.repeat(10).trim()),
-  ]);
-
-  const result = await ctx.run();
-
-  expect(result.stdout.toString()).toBe(
-    'skills/demo/SKILL.md: body is 2000 words, over the limit of 1700; cut it, or move what only some tasks need into a reference\n' +
-      'check-skill: 1 skills, 1 errors, 0 warnings\n',
-  );
-});
-
-test('it keeps the plain limit for a metadata flow mapping of another kind', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writePage('skills/demo/SKILL.md', [
-    '---',
-    'name: demo',
-    'description:',
-    '  Rules for every demo change. Load it before writing or reviewing one.',
-    'metadata: { kind: guide }',
-    '---',
-    '',
-    ...Array.from({ length: 341 }, () => 'The tool reads one file.'),
-  ]);
-
-  const result = await ctx.run();
-
-  expect(result.stdout.toString()).toBe(
+test.each([
+  [
+    1505,
+    0,
+    'skills/demo/SKILL.md: body is 1505 words, over 1500; cut it, or move what only some tasks need into a reference (warning)\n' +
+      'check-skill: 1 skills, 0 errors, 1 warnings\n',
+  ],
+  [
+    1705,
+    1,
     'skills/demo/SKILL.md: body is 1705 words, over the limit of 1700; cut it, or move what only some tasks need into a reference\n' +
       'check-skill: 1 skills, 1 errors, 0 warnings\n',
+  ],
+])(
+  'it gives a rule set of %i words the same word limits as any skill',
+  async (bodyWords, exitCode, stdout) => {
+    const ctx = await setupTest();
+
+    await ctx.writePage(
+      'skills/demo/SKILL.md',
+      buildSkillPageLines({
+        name: 'demo',
+        description: 'Rules for every demo change. Load it before writing or reviewing one.',
+        kind: 'rule-set',
+        bodyWords,
+      }),
+    );
+
+    const result = await ctx.run();
+
+    expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+      exitCode,
+      stdout,
+    });
+  },
+);
+
+test.each([
+  ['a quoted kind', ['metadata:', '  kind: "rule-set"'], 9],
+  [
+    'a comment after the metadata key',
+    ['metadata: # how the checks treat the skill', '  kind: rule-set'],
+    9,
+  ],
+  [
+    'a flow mapping',
+    ["metadata: { owner: docs, kind: 'rule-set' } # how the checks treat the skill"],
+    8,
+  ],
+  ['a deeper comment', ['metadata:', '    # The checks read this policy.', '  kind: rule-set'], 10],
+  [
+    'a comment at the left edge',
+    ['metadata:', '# The checks read this policy.', '  kind: rule-set'],
+    10,
+  ],
+])('it reads the rule-set kind from %s', async (_label, metadata, bulletLine) => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Rules for every demo change. Load it before writing or reviewing one.',
+    ...metadata,
+    '---',
+    '',
+    '- A kettle boils water before the tea goes in.',
+  ]);
+
+  const result = await ctx.run();
+
+  expect(result.stdout.toString()).toBe(
+    `skills/demo/SKILL.md:${bulletLine}: bullet opens with "A" and a noun; open it with what the agent does, a ban such as "Never", or a condition such as "When" (warning)\n` +
+      'check-skill: 1 skills, 0 errors, 1 warnings\n',
   );
 });
 
 test.each([
-  ['deeper', '    # The checks read this policy.'],
-  ['at the left edge', '# The checks read this policy.'],
-])('it reads the rule-set kind past a metadata comment indented %s', async (_label, comment) => {
+  ['a kind inside a quoted flow value', ["metadata: { note: 'example, kind: rule-set, end' }"]],
+  ['a flow mapping of another kind', ['metadata: { kind: guide }']],
+  ['a kind inside another metadata value', ['metadata:', '  note: |-', '    kind: rule-set']],
+  ['a kind under another key than metadata', ['labels:', '  kind: rule-set']],
+])('it reads no rule-set kind from %s', async (_label, metadata) => {
   const ctx = await setupTest();
 
   await ctx.writePage('skills/demo/SKILL.md', [
@@ -1143,64 +1053,15 @@ test.each([
     'name: demo',
     'description:',
     '  Rules for every demo change. Load it before writing or reviewing one.',
-    'metadata:',
-    comment,
-    '  kind: rule-set',
+    ...metadata,
     '---',
     '',
-    ...Array.from({ length: 40 }, () => 'The tool reads one file. '.repeat(10).trim()),
+    '- A kettle boils water before the tea goes in.',
   ]);
 
   const result = await ctx.run();
 
   expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
-});
-
-test('it keeps the plain limit when the kind line sits inside another metadata value', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writePage('skills/demo/SKILL.md', [
-    '---',
-    'name: demo',
-    'description:',
-    '  Rules for every demo change. Load it before writing or reviewing one.',
-    'metadata:',
-    '  note: |-',
-    '    kind: rule-set',
-    '---',
-    '',
-    ...Array.from({ length: 341 }, () => 'The tool reads one file.'),
-  ]);
-
-  const result = await ctx.run();
-
-  expect(result.stdout.toString()).toBe(
-    'skills/demo/SKILL.md: body is 1705 words, over the limit of 1700; cut it, or move what only some tasks need into a reference\n' +
-      'check-skill: 1 skills, 1 errors, 0 warnings\n',
-  );
-});
-
-test('it keeps the plain limit for a kind under another key than metadata', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writePage('skills/demo/SKILL.md', [
-    '---',
-    'name: demo',
-    'description:',
-    '  Rules for every demo change. Load it before writing or reviewing one.',
-    'labels:',
-    '  kind: rule-set',
-    '---',
-    '',
-    ...Array.from({ length: 341 }, () => 'The tool reads one file.'),
-  ]);
-
-  const result = await ctx.run();
-
-  expect(result.stdout.toString()).toBe(
-    'skills/demo/SKILL.md: body is 1705 words, over the limit of 1700; cut it, or move what only some tasks need into a reference\n' +
-      'check-skill: 1 skills, 1 errors, 0 warnings\n',
-  );
 });
 
 test('it accepts a long reference with fewer than two headings to list', async () => {
@@ -1280,4 +1141,99 @@ test('it exits 2 and checks nothing when git cannot list the files', async () =>
     stdout: '',
     stderr: expect.stringContaining('check-skill: git ls-files failed, so no skill was checked\n'),
   });
+});
+
+test('it warns on a rule-set bullet that opens with a thing or a label', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Rules for every demo change. Load it before writing or reviewing one.',
+    'metadata:',
+    '  kind: rule-set',
+    '---',
+    '',
+    '# Demo',
+    '',
+    '- A kettle boils water before the tea goes in.',
+    '- **Each mug** holds one bag.',
+    '- `brew.ts` runs the timer.',
+    '- Mugs: rinse them first.',
+    '- ```timer``` and `` ` `` are inline code spans, not a code fence.',
+    '- The kettle cools after the spans above.',
+  ]);
+
+  const result = await ctx.run();
+
+  const fix =
+    '; open it with what the agent does, a ban such as "Never", or a condition such as "When" (warning)\n';
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      `skills/demo/SKILL.md:11: bullet opens with "A" and a noun${fix}` +
+      `skills/demo/SKILL.md:12: bullet opens with "Each" and a noun${fix}` +
+      `skills/demo/SKILL.md:13: bullet opens with a code span and a verb${fix}` +
+      `skills/demo/SKILL.md:14: bullet opens with the label "Mugs:"${fix}` +
+      `skills/demo/SKILL.md:16: bullet opens with "The" and a noun${fix}` +
+      'check-skill: 1 skills, 0 errors, 5 warnings\n',
+  });
+});
+
+test('it passes a rule-set bullet that opens with an action, a ban or a condition', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Rules for every demo change. Load it before writing or reviewing one.',
+    'metadata:',
+    '  kind: rule-set',
+    '---',
+    '',
+    '# Demo',
+    '',
+    '- Boil the water before the tea goes in.',
+    '- Never reuse a bag.',
+    '- No sugar in the pot.',
+    '- When the mug is cold: warm it first.',
+    '- `steep`, `pour` and `stir` name each step.',
+    '',
+    '```text',
+    '- A line inside a code block.',
+    '```',
+    '',
+    '- ```text',
+    '  - A line inside a code block that opens in a list item.',
+    '  - ```',
+    '  - The line above stays inside the code block.',
+    '  ```',
+  ]);
+
+  const result = await ctx.run();
+
+  expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
+});
+
+test('it ignores the bullet openers of a skill that is not a rule set', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description:',
+    '  Commands and traps for the demo service. Load it before running a demo test.',
+    '---',
+    '',
+    '# Demo',
+    '',
+    '- A kettle boils water before the tea goes in.',
+  ]);
+
+  const result = await ctx.run();
+
+  expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
 });
