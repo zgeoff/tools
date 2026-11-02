@@ -199,12 +199,19 @@ test.each(['zgeoff/llm', 'zgeoff/dotfiles', 'zgeoff/nixie-definitions'])(
   },
 );
 
-test('it syncs deslop from the pinned skills source into a repo with an empty include list', async () => {
-  const ctx = await setupTest();
-  const copies = await ctx.planSyncCopies('zgeoff/llm');
+test.each([
+  'skills/deslop/SKILL.md',
+  'skills/cold-read/SKILL.md',
+  'skills/cold-read/references/cold-reader.md',
+])(
+  'it syncs %s from the pinned skills source into a repo with an empty include list',
+  async (path) => {
+    const ctx = await setupTest();
+    const copies = await ctx.planSyncCopies('zgeoff/llm');
 
-  expect(copies).toContainEqual({
-    source: '.repo-sync-skills/skills/deslop/SKILL.md',
-    target: '.claude/skills/deslop/SKILL.md',
-  });
-});
+    expect(copies).toContainEqual({
+      source: `.repo-sync-skills/${path}`,
+      target: `.claude/${path}`,
+    });
+  },
+);

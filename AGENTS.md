@@ -14,11 +14,23 @@ The rules a task needs are not repeated here. Load the skill for the work before
 | `docs-writing`  | [`docs-writing`](https://github.com/zgeoff/skills/tree/main/skills/docs-writing)   | writing or editing any committed prose: READMEs, this file, skills                          |
 | `skill-writing` | [`skill-writing`](https://github.com/zgeoff/skills/tree/main/skills/skill-writing) | writing or editing a skill                                                                  |
 | `ci-design`     | [`ci-design`](https://github.com/zgeoff/skills/tree/main/skills/ci-design)         | adding, changing, or reviewing a workflow, a job, or a trigger                              |
+| `cold-read`     | [`cold-read`](https://github.com/zgeoff/skills/tree/main/skills/cold-read)         | checking a skill you wrote or changed, before its PR                                        |
+| `deslop`        | [`deslop`](https://github.com/zgeoff/skills/tree/main/skills/deslop)               | editing the prose of a skill you wrote or changed, before its PR                            |
 
-Each source is a folder of zgeoff/skills; this repo reads it at the commit `sync/skills-pin.json`
-pins. Only `code-style`, `docs-writing`, `skill-writing` and `deslop` are installed as skills here,
-by `bun run skills:install`, which `bun install` runs. For the others, read the `SKILL.md` under
-`.zgeoff-skills/<commit>/skills/<name>/`, which the same install unpacks.
+Each source is a folder of zgeoff/skills, at the commit that `sync/skills-pin.json` pins.
+`bun run skills:install`, which `bun install` runs, unpacks that commit into
+`.zgeoff-skills/<commit>/` and links the skills that `defaultPinnedSkills` in
+[`write-pinned-skills.ts`](scripts/skills/write-pinned-skills.ts) lists into `.claude/skills/`. For
+a skill that list leaves out, read its `SKILL.md` under `.zgeoff-skills/<commit>/skills/<name>/`.
+
+## Skill changes
+
+Skill text lives in zgeoff/skills, so edit a skill in a checkout of that repo and open its PR there.
+Then:
+
+1. Load the `skill-writing`, `cold-read` and `deslop` skills from that checkout.
+2. Do every step in the "Check it" section of its skill-writing. In its last step, you give the PR
+   description three headings: "Skill checks", "Cold read" and "Deslop".
 
 ## Repo structure
 
@@ -52,7 +64,8 @@ step-bundles/       the bundle of each step script that a reusable workflow down
 
 A manifest entry can name a source outside `sync/`. `.github/PULL_REQUEST_TEMPLATE.md`,
 `.github/ISSUE_TEMPLATE/` and `.editorconfig` ship to other repos too, so an edit to one of them
-changes every repo that takes it. Skill text is edited in zgeoff/skills, never here.
+changes every repo that takes it. Skill text never changes here, as [Skill changes](#skill-changes)
+says.
 
 ## Packages
 
