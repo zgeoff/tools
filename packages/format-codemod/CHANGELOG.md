@@ -2,10 +2,11 @@
 
 ## [0.3.5](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.3.4...@zgeoff/format-codemod@0.3.5) (2026-11-02)
 
-
 ### Bug Fixes
 
-* **sync:** keep synced code free of packages a repo does not list ([#455](https://github.com/zgeoff/tools/issues/455)) ([470d99b](https://github.com/zgeoff/tools/commit/470d99ba12d17cb4ea460433dd4771272e32b09d))
+- **sync:** keep synced code free of packages a repo does not list
+  ([#455](https://github.com/zgeoff/tools/issues/455))
+  ([470d99b](https://github.com/zgeoff/tools/commit/470d99ba12d17cb4ea460433dd4771272e32b09d))
 
 ## [0.3.4](https://github.com/zgeoff/tools/compare/@zgeoff/format-codemod@0.3.3...@zgeoff/format-codemod@0.3.4) (2026-10-30)
 

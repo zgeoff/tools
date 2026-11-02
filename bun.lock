@@ -98,7 +98,7 @@
     },
     "packages/chex": {
       "name": "@zgeoff/chex",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "bin": {
         "chex": "./src/cli.ts",
       },
@@ -143,7 +143,7 @@
     },
     "packages/format-codemod": {
       "name": "@zgeoff/format-codemod",
-      "version": "0.3.4",
+      "version": "0.3.5",
       "bin": {
         "format-codemod": "./dist/cli.js",
       },
