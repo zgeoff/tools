@@ -741,7 +741,7 @@ function parseLockfileRegistryNames(lockfile) {
     if (typeof id !== "string") {
       throw new TypeError("bun.lock has a package entry that does not start with its id");
     }
-    const versionStart = id.lastIndexOf("@");
+    const versionStart = id.indexOf("@", 1);
     const version = id.slice(versionStart + 1);
     return versionStart > 0 && !version.includes(":") ? [id.slice(0, versionStart)] : [];
   });

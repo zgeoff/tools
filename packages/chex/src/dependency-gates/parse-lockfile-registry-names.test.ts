@@ -11,6 +11,7 @@ test('it lists each registry package once, sorted, and leaves out workspace, fil
       "pad-tools/left-pad": ["left-pad@1.2.0", "", {}, "sha512-c"],
       "@zgeoff/chex": ["@zgeoff/chex@workspace:packages/chex"],
       "local-pad": ["local-pad@file:../local-pad", {}],
+      "@zgeoff/vendored": ["@zgeoff/vendored@file:../vendor/@zgeoff/vendored", {}],
       "git-pad": ["git-pad@github:example/git-pad#1a2b3c4", {}, "1a2b3c4"],
     },
   }`;
