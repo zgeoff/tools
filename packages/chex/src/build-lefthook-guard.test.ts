@@ -1,6 +1,32 @@
-import { expect, test } from 'bun:test';
+import { expect, onTestFinished, test } from 'bun:test';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { $ } from 'bun';
 import { buildInitGuardHooks } from '../test-utils/build-init-guard-hooks.ts';
+import { readGitEnv } from '../test-utils/read-git-env.ts';
 import { buildLefthookGuard } from './build-lefthook-guard.ts';
+
+// A repo as chex init leaves it before its first install: lefthook.yml extends the baseline, and
+// node_modules does not exist.
+async function setupTest() {
+  const repo = await mkdtemp(join(tmpdir(), 'build-lefthook-guard-'));
+
+  onTestFinished(() => rm(repo, { recursive: true, force: true }));
+
+  const env = readGitEnv(repo);
+
+  await $`git init --quiet --initial-branch=main ${repo}`.env({ ...env });
+
+  await writeFile(
+    join(repo, 'lefthook.yml'),
+    `extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n${buildInitGuardHooks()}`,
+  );
+
+  await writeFile(join(repo, 'package.json'), '{ "name": "kettle" }\n');
+
+  return { repo, env, lefthook: join(import.meta.dir, '../../../node_modules/.bin/lefthook') };
+}
 
 test('it adds pre-commit and pre-push hooks that run only the guard to a config that has neither', () => {
   const text = 'extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n';
@@ -97,3 +123,24 @@ test.each([
       'lefthook.yml writes pre-commit in a form chex init does not edit; write its pre-commit jobs as a block list, then run chex init again',
   });
 });
+
+test.each([['pre-commit'], ['pre-push']])(
+  'it fails the %s hook and names the missing baseline in a checkout with no node_modules, though the hook gets no file',
+  async (hook) => {
+    const ctx = await setupTest();
+
+    const result = await $`${process.execPath} ${ctx.lefthook} run ${hook}`
+      .cwd(ctx.repo)
+      .env({ ...ctx.env })
+      .nothrow()
+      .quiet();
+
+    const output = `${result.stdout.toString()}${result.stderr.toString()}`;
+
+    expect(result.exitCode).toBe(1);
+
+    expect(output).toInclude(
+      "chex-baseline: node_modules/@zgeoff/chex/lefthook.yml is missing, so lefthook runs none of the chex baseline's jobs; run bun install, then try again",
+    );
+  },
+);

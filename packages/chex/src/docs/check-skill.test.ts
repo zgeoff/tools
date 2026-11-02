@@ -1237,3 +1237,22 @@ test('it ignores the bullet openers of a skill that is not a rule set', async ()
 
   expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
 });
+
+test('it exits 2 and asks for a git work tree when run outside one', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'check-skill-outside-'));
+
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+
+  const scriptPath = fileURLToPath(new URL('check-skill.sh', import.meta.url));
+
+  const result = await $`bash ${scriptPath}`
+    .cwd(directory)
+    .env({ PATH: process.env['PATH'], HOME: directory })
+    .nothrow()
+    .quiet();
+
+  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
+    exitCode: 2,
+    stderr: 'check-skill: run it inside a git work tree, because it lists the files with git\n',
+  });
+});
