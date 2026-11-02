@@ -1,5 +1,6 @@
 import { mkdir, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
+import { buildInitGuardHooks } from './build-init-guard-hooks.ts';
 import type { ChexE2EPack } from './get-chex-e2e-pack.ts';
 import { linkCommitlint } from './link-commitlint.ts';
 import { writeStubPrograms } from './write-stub-programs.ts';
@@ -34,6 +35,10 @@ export interface ChexBaselineFixture {
   readonly withCommitlint: boolean;
 }
 
+const initLefthook = `extends:
+  - node_modules/@zgeoff/chex/lefthook.yml
+${buildInitGuardHooks()}`;
+
 // Writes a repo as `chex init` leaves it, with the baseline's programs installed: the packed chex,
 // and stubs of diet, rig and oxlint. The stub diet marks what it runs, so the stub
 // rig logs "under diet:" before a call that diet wraps.
@@ -60,7 +65,7 @@ export async function createChexBaselineRepo(
   }
 
   await writeTreeFiles(root, {
-    'lefthook.yml': 'extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n',
+    'lefthook.yml': initLefthook,
     '.gitignore': 'node_modules/\n',
     'package.json': JSON.stringify({ scripts: fixture.scripts }),
     ...fixture.files,

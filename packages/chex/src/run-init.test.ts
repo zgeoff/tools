@@ -3,6 +3,7 @@ import { mkdtemp, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
+import { buildInitGuardHooks } from '../../../test-utils/build-init-guard-hooks.ts';
 import { lockFileWrites } from '../../../test-utils/lock-file-writes.ts';
 import { makeFailOnCall } from '../../../test-utils/make-fail-on-call.ts';
 import type { InitDeps } from './run-init.ts';
@@ -73,11 +74,15 @@ test('it writes lefthook.yml and package.json to the repo folder, and reports ea
     exitCode: 0,
     lines: [
       'out chex init: lefthook.yml extends node_modules/@zgeoff/chex/lefthook.yml\n' +
+        'chex init: lefthook.yml runs chex-baseline first in pre-commit and pre-push, which fails when node_modules/@zgeoff/chex/lefthook.yml is missing\n' +
         'chex init: package.json runs "chex prose length links skill" as check:docs\n',
     ],
   });
 
-  expect(files[1]).toBe('extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n');
+  expect(files[1]).toBe(
+    `extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n${buildInitGuardHooks()}`,
+  );
+
   expect(files[0]).toInclude('"check:docs": "chex prose length links skill"');
 });
 
@@ -130,12 +135,13 @@ test('it adds the chex baseline to the end of the one-entry inline list that the
     exitCode: 0,
     lines: [
       'out chex init: lefthook.yml extends node_modules/@zgeoff/chex/lefthook.yml\n' +
+        'chex init: lefthook.yml runs chex-baseline first in pre-commit and pre-push, which fails when node_modules/@zgeoff/chex/lefthook.yml is missing\n' +
         'chex init: package.json runs "chex prose length links skill" as check:docs\n',
     ],
   });
 
   expect(files[1]).toBe(
-    'extends: [.lefthook/pre-push-baseline.yml, node_modules/@zgeoff/chex/lefthook.yml]\n',
+    `extends: [.lefthook/pre-push-baseline.yml, node_modules/@zgeoff/chex/lefthook.yml]\n${buildInitGuardHooks()}`,
   );
 });
 

@@ -65,6 +65,7 @@
     "check:release-workflow": "bun scripts/release/run-release-workflow-check.ts",
     "check:repo-sync-workflows": "bun scripts/repo-sync/run-repo-sync-workflows-check.ts",
     "check:step-bundles": "bun scripts/ci/write-step-bundles.ts --check",
+    "check:lefthook-guard": "bun scripts/lefthook/run-lefthook-guard-check.ts",
     "check:renovate-config": "bun scripts/renovate/run-renovate-config-check.ts",
     "ci:install-tool": "bun scripts/ci/run-pinned-tool-step.ts",
     "ci:dispatch-publish": "bun scripts/publish/dispatch-release-publish.ts",

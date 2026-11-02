@@ -89,6 +89,8 @@ repos too, so an edit to one of them changes every repo that takes it.
   `.github/workflows/repo-sync.yml`: two dispatches of different tools commits get two concurrency
   groups, the sync job queues every waiting run, the stub grants every permission a job asks for,
   and the alarm job asks for `actions: read`. CI and the pre-push hook run it.
+- `bun run check:lefthook-guard` checks that `lefthook.yml` holds the `chex-baseline` job that
+  `chex init` writes. CI and the pre-push hook run it.
 - `bun x chex workflows` runs the shared workflow lint over the workflows HEAD holds, so commit a
   workflow change before you run it. CI runs it. `bun run check:docs` runs the docs checks that this
   repo takes, which the pre-push hook and CI run too.

@@ -4,6 +4,7 @@ import { mkdtemp, readFile, readlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import { buildInitGuardHooks } from '../test-utils/build-init-guard-hooks.ts';
 import { createChexBaselineRepo } from '../test-utils/create-chex-baseline-repo.ts';
 import { getChexE2EPack } from '../test-utils/get-chex-e2e-pack.ts';
 import { readCallLog } from '../test-utils/read-call-log.ts';
@@ -45,7 +46,12 @@ test('it writes the files chex init leaves, with the fixture files and scripts a
   const notes = await readFile(join(ctx.root, 'notes.txt'), 'utf8');
   const chexLink = await readlink(join(ctx.root, 'node_modules/@zgeoff/chex'));
 
-  expect(lefthook).toBe('extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n');
+  expect(lefthook).toBe(
+    `extends:
+  - node_modules/@zgeoff/chex/lefthook.yml
+${buildInitGuardHooks()}`,
+  );
+
   expect(packageJSON).toStrictEqual({ scripts: { 'format:check': 'true', typecheck: 'tsc' } });
   expect(notes).toBe('The kettle boils.\n');
   expect(chexLink).toBe(ctx.chex.packageDir);

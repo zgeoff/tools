@@ -1,9 +1,9 @@
-import { isRecord } from '@zgeoff/std';
+import { parseLefthookConfig } from './parse-lefthook-config.ts';
 
 export const baselinePath = 'node_modules/@zgeoff/chex/lefthook.yml';
 
 export type LefthookOutcome =
-  | { readonly kind: 'unchanged' }
+  | { readonly kind: 'unchanged'; readonly text: string }
   | { readonly kind: 'changed'; readonly text: string }
   | { readonly kind: 'refused'; readonly reason: string };
 
@@ -18,7 +18,7 @@ export function buildLefthookExtends(text: string | undefined): LefthookOutcome 
     return { kind: 'changed', text: `extends:\n  - ${baselinePath}\n` };
   }
 
-  const config = parseConfig(text);
+  const config = parseLefthookConfig(text);
 
   if (config === undefined) {
     return { kind: 'refused', reason: 'lefthook.yml is not a YAML mapping' };
@@ -31,7 +31,7 @@ export function buildLefthookExtends(text: string | undefined): LefthookOutcome 
   }
 
   if (Array.isArray(extended) && extended.includes(baselinePath)) {
-    return { kind: 'unchanged' };
+    return { kind: 'unchanged', text };
   }
 
   const inline = inlineExtends.exec(text);
@@ -54,25 +54,9 @@ export function buildLefthookExtends(text: string | undefined): LefthookOutcome 
   return checkEdit(config, `${text.slice(0, end)}\n  - ${baselinePath}${text.slice(end)}`);
 }
 
-function parseConfig(text: string): Record<string, unknown> | undefined {
-  let parsed: unknown;
-
-  try {
-    parsed = Bun.YAML.parse(text);
-  } catch {
-    return undefined;
-  }
-
-  if (parsed === null) {
-    return {};
-  }
-
-  return isRecord(parsed) ? parsed : undefined;
-}
-
 // A flow mapping or a second YAML document reads differently once a block key joins the text.
 function checkEdit(config: Record<string, unknown>, edited: string): LefthookOutcome {
-  const editedConfig = parseConfig(edited);
+  const editedConfig = parseLefthookConfig(edited);
 
   if (editedConfig !== undefined) {
     const { extends: editedExtends, ...editedRest } = editedConfig;

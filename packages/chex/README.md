@@ -79,8 +79,10 @@ skipped file back:
 - `prose`, `links`, `readmes` and `skill` skip each file that `.gitattributes` marks
   `linguist-vendored`.
 
-`chex init` writes the `extends` line into `lefthook.yml` and adds a `check:docs` script of
-`chex prose length links skill` when the repo has none. A second run changes nothing.
+`chex init` writes the `extends` line and a
+[`chex-baseline` job](../../docs/architecture/pre-push-baseline.md#a-checkout-without-the-baseline)
+into `lefthook.yml`, and adds a `check:docs` script of `chex prose length links skill` when the repo
+has none. A second run changes nothing.
 
 ## The pre-push baseline
 

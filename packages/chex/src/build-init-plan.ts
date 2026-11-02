@@ -3,6 +3,7 @@ import type { PackageOutcome } from './build-init-package.ts';
 import { buildInitPackage, docsScript } from './build-init-package.ts';
 import type { LefthookOutcome } from './build-lefthook-extends.ts';
 import { baselinePath, buildLefthookExtends } from './build-lefthook-extends.ts';
+import { buildLefthookGuard, guardName, guardedHooks } from './build-lefthook-guard.ts';
 
 export interface InitWrite {
   readonly file: 'lefthook.yml' | 'package.json';
@@ -81,15 +82,32 @@ function buildPlanFromSteps(steps: readonly InitStep[]): InitPlan {
   };
 }
 
-const keptStep: InitStep = { reasons: [], writes: [], notes: [] };
-
 function buildLefthookStep(lefthookText: string | undefined): InitStep {
   return match<LefthookOutcome, InitStep>(buildLefthookExtends(lefthookText))
-    .with({ kind: 'unchanged' }, () => keptStep)
+    .with({ kind: 'unchanged' }, (outcome) => buildGuardStep(outcome.text, []))
+    .with({ kind: 'changed' }, (outcome) =>
+      buildGuardStep(outcome.text, [`lefthook.yml extends ${baselinePath}`]),
+    )
+    .with({ kind: 'refused' }, (outcome) => ({ reasons: [outcome.reason], writes: [], notes: [] }))
+    .exhaustive();
+}
+
+const keptStep: InitStep = { reasons: [], writes: [], notes: [] };
+
+function buildGuardStep(text: string, notes: readonly string[]): InitStep {
+  return match<LefthookOutcome, InitStep>(buildLefthookGuard(text))
+    .with({ kind: 'unchanged' }, () =>
+      notes.length === 0
+        ? keptStep
+        : { reasons: [], writes: [{ file: 'lefthook.yml', text }], notes },
+    )
     .with({ kind: 'changed' }, (outcome) => ({
       reasons: [],
       writes: [{ file: 'lefthook.yml', text: outcome.text }],
-      notes: [`lefthook.yml extends ${baselinePath}`],
+      notes: [
+        ...notes,
+        `lefthook.yml runs ${guardName} first in ${guardedHooks.join(' and ')}, which fails when ${baselinePath} is missing`,
+      ],
     }))
     .with({ kind: 'refused' }, (outcome) => ({ reasons: [outcome.reason], writes: [], notes: [] }))
     .exhaustive();
