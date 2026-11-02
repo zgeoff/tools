@@ -208,9 +208,11 @@ sub check_bullets {
       next;
     }
     # A fence may open inside a list item, after its marker, but closes only on a line of its own.
+    # The info string of a backtick fence never holds a backtick, so a line such as
+    # "```name``` runs" is an inline code span, not a fence.
     my $marker_pattern = $open eq "" ? qr/^\s*(?:[-*+]\s+|\d+[.)]\s+)?(`{3,}|~{3,})(.*)$/
       : qr/^\s*(`{3,}|~{3,})(.*)$/;
-    if ($line =~ $marker_pattern) {
+    if ($line =~ $marker_pattern && !($open eq "" && substr($1, 0, 1) eq "`" && $2 =~ /`/)) {
       my ($marker, $rest) = ($1, $2);
       if ($open eq "") { $open = $marker }
       elsif (substr($marker, 0, 1) eq substr($open, 0, 1) && length($marker) >= length($open)

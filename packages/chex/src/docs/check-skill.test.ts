@@ -963,26 +963,42 @@ test('it fails a SKILL.md body over 1,700 words, and counts no word of the front
   });
 });
 
-test('it gives a rule set the same word limits as any skill', async () => {
-  const ctx = await setupTest();
-
-  await ctx.writePage(
-    'skills/demo/SKILL.md',
-    buildSkillPageLines({
-      name: 'demo',
-      description: 'Rules for every demo change. Load it before writing or reviewing one.',
-      kind: 'rule-set',
-      bodyWords: 1705,
-    }),
-  );
-
-  const result = await ctx.run();
-
-  expect(result.stdout.toString()).toBe(
+test.each([
+  [
+    1505,
+    0,
+    'skills/demo/SKILL.md: body is 1505 words, over 1500; cut it, or move what only some tasks need into a reference (warning)\n' +
+      'check-skill: 1 skills, 0 errors, 1 warnings\n',
+  ],
+  [
+    1705,
+    1,
     'skills/demo/SKILL.md: body is 1705 words, over the limit of 1700; cut it, or move what only some tasks need into a reference\n' +
       'check-skill: 1 skills, 1 errors, 0 warnings\n',
-  );
-});
+  ],
+])(
+  'it gives a rule set of %i words the same word limits as any skill',
+  async (bodyWords, exitCode, stdout) => {
+    const ctx = await setupTest();
+
+    await ctx.writePage(
+      'skills/demo/SKILL.md',
+      buildSkillPageLines({
+        name: 'demo',
+        description: 'Rules for every demo change. Load it before writing or reviewing one.',
+        kind: 'rule-set',
+        bodyWords,
+      }),
+    );
+
+    const result = await ctx.run();
+
+    expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+      exitCode,
+      stdout,
+    });
+  },
+);
 
 test.each([
   ['a quoted kind', ['metadata:', '  kind: "rule-set"'], 9],
@@ -1145,6 +1161,8 @@ test('it warns on a rule-set bullet that opens with a thing or a label', async (
     '- **Each mug** holds one bag.',
     '- `brew.ts` runs the timer.',
     '- Mugs: rinse them first.',
+    '- ```timer``` and `` ` `` are inline code spans, not a code fence.',
+    '- The kettle cools after the spans above.',
   ]);
 
   const result = await ctx.run();
@@ -1159,7 +1177,8 @@ test('it warns on a rule-set bullet that opens with a thing or a label', async (
       `skills/demo/SKILL.md:12: bullet opens with "Each" and a noun${fix}` +
       `skills/demo/SKILL.md:13: bullet opens with a code span and a verb${fix}` +
       `skills/demo/SKILL.md:14: bullet opens with the label "Mugs:"${fix}` +
-      'check-skill: 1 skills, 0 errors, 4 warnings\n',
+      `skills/demo/SKILL.md:16: bullet opens with "The" and a noun${fix}` +
+      'check-skill: 1 skills, 0 errors, 5 warnings\n',
   });
 });
 
