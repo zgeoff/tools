@@ -1,4 +1,11 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>zgeoff/tools"]
+  "extends": ["github>zgeoff/tools"],
+  "packageRules": [
+    {
+      "description": "Hold msw below 3. msw 3 intercepts fetch at node:net, which Bun's native fetch never uses, so the test mock server catches nothing under Bun and its tests reach the real network. Remove this rule once msw's fetch interception works under Bun.",
+      "matchPackageNames": ["msw"],
+      "allowedVersions": "<3"
+    }
+  ]
 }
