@@ -2,10 +2,11 @@
 
 ## [0.0.6](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.5...@zgeoff/chex@0.0.6) (2026-11-02)
 
-
 ### Features
 
-* **chex:** treat [@heynixie](https://github.com/heynixie) packages as first party ([#441](https://github.com/zgeoff/tools/issues/441)) ([bafbfb0](https://github.com/zgeoff/tools/commit/bafbfb087ef4495ace20b448775beb6f55486a4c))
+- **chex:** treat [@heynixie](https://github.com/heynixie) packages as first party
+  ([#441](https://github.com/zgeoff/tools/issues/441))
+  ([bafbfb0](https://github.com/zgeoff/tools/commit/bafbfb087ef4495ace20b448775beb6f55486a4c))
 
 ## [0.0.5](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.4...@zgeoff/chex@0.0.5) (2026-11-02)
 
