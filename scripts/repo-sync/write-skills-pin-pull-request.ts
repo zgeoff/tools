@@ -103,12 +103,25 @@ export async function writeSkillsPinPullRequest(
     return writeCoveredAutoMerge(options, openNumber, proposed);
   }
 
-  const head = await writePinBranch(options);
-  const number = await writePinPullRequest(options, pinned, openNumber);
+  // The branch starts from the checkout the pin was read from, not from main as it is now. A pin
+  // that merged since then changes the same line, so the pull request conflicts and never merges an
+  // older pin over it.
+  const checkedOut = await runCheckedCommand(options.runCommand, ['git', 'rev-parse', 'HEAD'], {
+    cwd: options.cwd,
+    env: options.env,
+  });
 
-  await writePinAutoMerge(options, number, head);
+  const head = await writePinBranch(options, checkedOut.stdout.trim());
 
-  return 0;
+  if (openNumber === '') {
+    const number = await writePinPullRequest(options, pinned, '');
+
+    await writePinAutoMerge(options, number, head);
+
+    return 0;
+  }
+
+  return writeReusedPinPullRequest(options, { pinned, number: openNumber, proposed, head });
 }
 
 // Returns the number of the open pin pull request from this repo's own branch, or empty for none.
@@ -275,16 +288,9 @@ async function writePinAutoMerge(
 // the open pull request with no commits, and GitHub closes such a pull request.
 async function writePinBranch(
   options: Readonly<WriteSkillsPinPullRequestOptions>,
+  base: string,
 ): Promise<string> {
-  // The branch starts from the checkout the pin was read from, not from main as it is now. A pin
-  // that merged since then changes the same line, so the pull request conflicts and never merges an
-  // older pin over it.
-  const checkedOut = await runCheckedCommand(options.runCommand, ['git', 'rev-parse', 'HEAD'], {
-    cwd: options.cwd,
-    env: options.env,
-  });
-
-  await writeBranchRef(options, stagingBranch, checkedOut.stdout.trim());
+  await writeBranchRef(options, stagingBranch, base);
 
   const file = await runCheckedGH(options, [
     'api',
@@ -409,6 +415,103 @@ async function writePinPullRequest(
   const url = created.stdout.trim();
 
   return url.slice(url.lastIndexOf('/') + 1);
+}
+
+interface ReusedPinPullRequest {
+  // The pin on main of the checkout, and the one the open pull request held when the run read it.
+  readonly pinned: string;
+  readonly proposed: string | null;
+
+  readonly number: string;
+
+  // The commit the run wrote to the pin branch.
+  readonly head: string;
+}
+
+// The open pull request can merge, or close, at any time before this run moves its branch. A pull
+// request that is no longer open takes no edit, so the run opens a new one. After a merge, main has
+// moved, so the new pull request starts from main as it is now, once main shows the pin that merged.
+async function writeReusedPinPullRequest(
+  options: Readonly<WriteSkillsPinPullRequestOptions>,
+  reused: Readonly<ReusedPinPullRequest>,
+): Promise<number> {
+  const viewed = await runCheckedGH(options, [
+    'pr',
+    'view',
+    reused.number,
+    '--repo',
+    options.repo,
+    '--json',
+    'state',
+    '--jq',
+    '.state',
+  ]);
+
+  const state = viewed.stdout.trim();
+
+  if (state === 'OPEN') {
+    const number = await writePinPullRequest(options, reused.pinned, reused.number);
+
+    await writePinAutoMerge(options, number, reused.head);
+
+    return 0;
+  }
+
+  if (state !== 'MERGED') {
+    options.writeOutput(
+      `Pull request #${reused.number} is ${state}, so the run opens a new one.\n`,
+    );
+
+    const number = await writePinPullRequest(options, reused.pinned, '');
+
+    await writePinAutoMerge(options, number, reused.head);
+
+    return 0;
+  }
+
+  const main = await runCheckedGH(options, [
+    'api',
+    `repos/${options.repo}/git/ref/heads/main`,
+    '--jq',
+    '.object.sha',
+  ]);
+
+  const mainCommit = main.stdout.trim();
+
+  const shown = await runCheckedGH(options, [
+    'api',
+    `repos/${options.repo}/contents/${skillsPinPath}?ref=${mainCommit}`,
+    '-H',
+    'Accept: application/vnd.github.raw',
+  ]);
+
+  const mainValue: unknown = JSON.parse(shown.stdout);
+  const mainPin = parseSkillsPin(mainValue);
+
+  if (mainPin === options.commit) {
+    options.writeOutput(`Pull request #${reused.number} merged with ${options.commit} already.\n`);
+
+    return 0;
+  }
+
+  if (mainPin === null || mainPin !== reused.proposed) {
+    options.writeOutput(
+      `::error::pull request #${reused.number} merged, and main pins ${mainPin ?? 'no full commit ID'}, not ${reused.proposed ?? 'its pin'}; the next dispatch moves the pin\n`,
+    );
+
+    return 1;
+  }
+
+  options.writeOutput(
+    `Pull request #${reused.number} merged, so the run opens a new one from main at ${mainCommit}.\n`,
+  );
+
+  const head = await writePinBranch(options, mainCommit);
+  const number = await writePinPullRequest(options, mainPin, '');
+
+  await writePinAutoMerge(options, number, head);
+
+  return 0;
 }
 
 if (import.meta.main) {

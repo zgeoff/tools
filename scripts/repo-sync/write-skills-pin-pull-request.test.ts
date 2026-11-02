@@ -563,6 +563,11 @@ test('it moves the branch of the open pin pull request to a newer commit', async
     { exitCode: 0, stdout: '', stderr: '' },
   );
 
+  ctx.commands.answer(
+    ['gh', 'pr', 'view', '41', '--repo', 'example/tools', '--json', 'state', '--jq', '.state'],
+    { exitCode: 0, stdout: 'OPEN\n', stderr: '' },
+  );
+
   const exitCode = await ctx.pin(commit);
 
   expect(exitCode).toBe(0);
@@ -606,6 +611,294 @@ test('it moves the branch of the open pin pull request to a newer commit', async
   ]);
 
   expect(ctx.output).toStrictEqual(['Updated pull request #41 for skills-pin.\n']);
+});
+
+// The open pull request can merge or close after the run read it. An edit would then change a pull
+// request that is no longer open and leave the new pin with none.
+test.each([
+  {
+    label: 'opens a new one from main once main shows the merged pin',
+    state: 'MERGED',
+    mainPinKind: 'proposed',
+    expectedExitCode: 0,
+    opensNew: true,
+  },
+  {
+    label: 'stops with nothing to do once main shows its own pin',
+    state: 'MERGED',
+    mainPinKind: 'commit',
+    expectedExitCode: 0,
+    opensNew: false,
+  },
+  {
+    label: 'fails when main shows another pin',
+    state: 'MERGED',
+    mainPinKind: 'other',
+    expectedExitCode: 1,
+    opensNew: false,
+  },
+  {
+    label: 'opens a new one from the checkout',
+    state: 'CLOSED',
+    mainPinKind: 'proposed',
+    expectedExitCode: 0,
+    opensNew: true,
+  },
+])('it $label, when the open pin pull request is no longer open', async (row) => {
+  const ctx = await setupTest();
+
+  const pinned = '0123456789abcdef0123456789abcdef01234567';
+  const proposed = '456789abcdef0123456789abcdef0123456789ab';
+  const commit = '89abcdef0123456789abcdef0123456789abcdef';
+
+  const mainPins: Readonly<Record<string, string>> = {
+    proposed,
+    commit,
+    other: '0fedcba987654321fedcba987654321fedcba98',
+  };
+
+  const compareBase = row.state === 'MERGED' ? proposed : pinned;
+
+  await ctx.writePin(pinned);
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'pr',
+      'list',
+      '--repo',
+      'example/tools',
+      '--head',
+      'skills-pin',
+      '--state',
+      'open',
+      '--json',
+      'number,isCrossRepository',
+    ],
+    { exitCode: 0, stdout: '[{"number":41,"isCrossRepository":false}]', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      'repos/example/tools/contents/sync/skills-pin.json?ref=skills-pin',
+      '-H',
+      'Accept: application/vnd.github.raw',
+    ],
+    { exitCode: 0, stdout: JSON.stringify({ commit: proposed }), stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', `repos/zgeoff/skills/compare/${pinned}...${commit}`, '--jq', '.status'],
+    { exitCode: 0, stdout: 'ahead\n', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', `repos/zgeoff/skills/compare/${proposed}...${commit}`, '--jq', '.status'],
+    { exitCode: 0, stdout: 'ahead\n', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', `repos/zgeoff/skills/compare/${commit}...main`, '--jq', '.status'],
+    { exitCode: 0, stdout: 'identical\n', stderr: '' },
+  );
+
+  ctx.commands.answer(['git', 'rev-parse', 'HEAD'], {
+    exitCode: 0,
+    stdout: 'fedcba9876543210fedcba9876543210fedcba98\n',
+    stderr: '',
+  });
+
+  ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin'], {
+    exitCode: 0,
+    stdout: '{"object":{"sha":"aaaa"}}',
+    stderr: '',
+  });
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      '--silent',
+      '-X',
+      'PATCH',
+      'repos/example/tools/git/refs/heads/skills-pin',
+      '-f',
+      'sha=c0ffee0123456789abcdef0123456789abcdef01',
+      '-F',
+      'force=true',
+    ],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      'repos/example/tools/contents/sync/skills-pin.json?ref=skills-pin-next',
+      '--jq',
+      '.sha',
+    ],
+    { exitCode: 0, stdout: '5d41402abc4b2a76b9719d911017c592ae0f2f0a\n', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      '-X',
+      'PUT',
+      'repos/example/tools/contents/sync/skills-pin.json',
+      '-f',
+      'message=chore(skills): pin zgeoff/skills at 89abcdef0123',
+      '-f',
+      `content=${Buffer.from(`{\n  "commit": "${commit}"\n}\n`).toString('base64')}`,
+      '-f',
+      'sha=5d41402abc4b2a76b9719d911017c592ae0f2f0a',
+      '-f',
+      'branch=skills-pin-next',
+      '--jq',
+      '.commit.sha',
+    ],
+    { exitCode: 0, stdout: 'c0ffee0123456789abcdef0123456789abcdef01\n', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'pr',
+      'merge',
+      '41',
+      '--repo',
+      'example/tools',
+      '--auto',
+      '--squash',
+      '--match-head-commit',
+      'c0ffee0123456789abcdef0123456789abcdef01',
+    ],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin-next'], {
+    exitCode: 1,
+    stdout: '',
+    stderr: 'gh: Not Found (HTTP 404)',
+  });
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      '--silent',
+      'repos/example/tools/git/refs',
+      '-f',
+      'ref=refs/heads/skills-pin-next',
+      '-f',
+      'sha=fedcba9876543210fedcba9876543210fedcba98',
+    ],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', '--silent', '-X', 'DELETE', 'repos/example/tools/git/refs/heads/skills-pin-next'],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'pr', 'view', '41', '--repo', 'example/tools', '--json', 'state', '--jq', '.state'],
+    { exitCode: 0, stdout: `${row.state}\n`, stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', 'repos/example/tools/git/ref/heads/main', '--jq', '.object.sha'],
+    { exitCode: 0, stdout: 'abad1dea0123456789abcdef0123456789abcdef\n', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      'repos/example/tools/contents/sync/skills-pin.json?ref=abad1dea0123456789abcdef0123456789abcdef',
+      '-H',
+      'Accept: application/vnd.github.raw',
+    ],
+    { exitCode: 0, stdout: JSON.stringify({ commit: mainPins[row.mainPinKind] }), stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      '--silent',
+      'repos/example/tools/git/refs',
+      '-f',
+      'ref=refs/heads/skills-pin-next',
+      '-f',
+      'sha=abad1dea0123456789abcdef0123456789abcdef',
+    ],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'pr',
+      'create',
+      '--repo',
+      'example/tools',
+      '--base',
+      'main',
+      '--head',
+      'skills-pin',
+      '--title',
+      'chore(skills): pin zgeoff/skills at 89abcdef0123',
+      '--body',
+      `Moves \`sync/skills-pin.json\` to zgeoff/skills ${commit}, which zgeoff/skills sent from its green main. Once this merges and main is green, the sync dispatch sends the new skill text to every repo that takes it.\n\nChanges: https://github.com/zgeoff/skills/compare/${compareBase}...${commit}`,
+    ],
+    { exitCode: 0, stdout: 'https://github.com/example/tools/pull/42\n', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'pr',
+      'merge',
+      '42',
+      '--repo',
+      'example/tools',
+      '--auto',
+      '--squash',
+      '--match-head-commit',
+      'c0ffee0123456789abcdef0123456789abcdef01',
+    ],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  const exitCode = await ctx.pin(commit);
+
+  const merges = ctx.commands.calls.filter((argv) => argv[1] === 'pr' && argv[2] === 'merge');
+
+  expect(exitCode).toBe(row.expectedExitCode);
+
+  const expectedMerges = row.opensNew
+    ? [
+        [
+          'gh',
+          'pr',
+          'merge',
+          '42',
+          '--repo',
+          'example/tools',
+          '--auto',
+          '--squash',
+          '--match-head-commit',
+          'c0ffee0123456789abcdef0123456789abcdef01',
+        ],
+      ]
+    : [];
+
+  expect(merges).toStrictEqual(expectedMerges);
 });
 
 test('it writes nothing for a commit that the pin on main already covers', async () => {
