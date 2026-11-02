@@ -9,15 +9,19 @@ the agent's session has loaded the skills that the call needs. The hook reads it
 - `tools`, the tool gates: each one lists the skills and the reference files that a call to one tool
   needs. A reference file is a file inside a skill's folder, such as a skill's `references/` file.
 
-A repo without `.claude/skill-gate.json` has no gate. Repo-sync writes the file in every repo, so
+A repo without `.claude/skill-gate.json` has no gate. Repo-sync writes the file in most repos, so
 read [The shared rules](#the-shared-rules) before you change it.
 
 ## The shared rules
 
 Repo-sync copies [`sync/skill-gate/skill-gate.json`](../../sync/skill-gate/skill-gate.json) to
-`.claude/skill-gate.json` in every repo, through the `skill-gate-rules` entry of its
+`.claude/skill-gate.json`, through the `skill-gate-rules` entry of its
 [manifest](../architecture/repo-sync.md#manifest-entries). Each sync overwrites the copy, so change
 the shared gates in the source file in this repo.
+
+The entry's `except` list holds each repo that kept rules of its own before the entry existed.
+Repo-sync leaves that repo's file alone, so add the two shared gates to the file by hand, and copy
+each later change to them too.
 
 The shared file holds two path gates. They refuse an edit of a skill's `SKILL.md`, or of a file
 under the skill's `references/`, until the session loads `skill-writing`, `docs-writing` and

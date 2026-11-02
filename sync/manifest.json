@@ -325,11 +325,24 @@
   },
   {
     "name": "skill-gate-rules",
-    "description": "The skill gate's rules, which make an agent load skill-writing, docs-writing and deslop before it creates or changes a skill's SKILL.md or a file under its references/; every repo takes them, and a repo that keeps its own rules skips the entry and copies these into its own file",
+    "description": "The skill gate's rules, which make an agent load skill-writing, docs-writing and deslop before it creates or changes a skill's SKILL.md or a file under its references/; every repo takes them but those the except list holds, which kept rules of their own before this entry and add these gates by hand",
     "files": [
       {
         "source": "sync/skill-gate/skill-gate.json",
-        "target": ".claude/skill-gate.json"
+        "target": ".claude/skill-gate.json",
+        "except": [
+          "zgeoff/atc",
+          "zgeoff/auto-mode",
+          "zgeoff/cloud",
+          "zgeoff/hq",
+          "zgeoff/impz",
+          "zgeoff/nixie",
+          "zgeoff/noslop",
+          "zgeoff/osrs",
+          "zgeoff/pepys",
+          "zgeoff/vers",
+          "zgeoff/wringer"
+        ]
       }
     ]
   },

@@ -4,6 +4,9 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildCopyPlan } from '../../scripts/repo-sync/build-copy-plan.ts';
+import { parseSyncEntries } from '../../scripts/repo-sync/parse-sync-entries.ts';
+import { selectSyncFiles } from '../../scripts/repo-sync/select-sync-files.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'skill-gate-rules-'));
@@ -13,6 +16,7 @@ async function setupTest() {
   const project = join(directory, 'project');
   const transcriptPath = join(directory, 'transcript.jsonl');
   const rulesPath = join(import.meta.dir, 'skill-gate.json');
+  const manifestPath = join(import.meta.dir, '../manifest.json');
 
   const indexPath = fileURLToPath(
     new URL('../../packages/agent-hooks/src/index.ts', import.meta.url),
@@ -38,7 +42,21 @@ async function setupTest() {
       },
     );
 
-  return { project, transcriptPath, rulesPath, runEdit };
+  const planSyncTargets = async (repo: string) => {
+    const manifest: unknown = await Bun.file(manifestPath).json();
+
+    const entry = parseSyncEntries(manifest)?.find(
+      (candidate) => candidate.name === 'skill-gate-rules',
+    );
+
+    return buildCopyPlan({
+      rows: selectSyncFiles(entry?.files ?? [], repo),
+      existingWorkflows: new Map(),
+      marker: '',
+    }).copies.map((copy) => copy.target);
+  };
+
+  return { project, transcriptPath, rulesPath, runEdit, planSyncTargets };
 }
 
 test.each([
@@ -146,3 +164,32 @@ test.each([
   expect(result.status).toBe(0);
   expect(result.stdout).toBe('');
 });
+
+test.each([
+  'zgeoff/atc',
+  'zgeoff/auto-mode',
+  'zgeoff/cloud',
+  'zgeoff/hq',
+  'zgeoff/impz',
+  'zgeoff/nixie',
+  'zgeoff/noslop',
+  'zgeoff/osrs',
+  'zgeoff/pepys',
+  'zgeoff/vers',
+  'zgeoff/wringer',
+])('it leaves the own .claude/skill-gate.json of %s out of the sync', async (repo) => {
+  const ctx = await setupTest();
+  const targets = await ctx.planSyncTargets(repo);
+
+  expect(targets).toStrictEqual([]);
+});
+
+test.each(['zgeoff/llm', 'zgeoff/dotfiles', 'zgeoff/nixie-definitions'])(
+  'it syncs the shared .claude/skill-gate.json into %s, which keeps no rules of its own',
+  async (repo) => {
+    const ctx = await setupTest();
+    const targets = await ctx.planSyncTargets(repo);
+
+    expect(targets).toStrictEqual(['.claude/skill-gate.json']);
+  },
+);

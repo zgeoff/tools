@@ -48,7 +48,7 @@ A repo opts in to the `hook-start` entry in five steps, plus a sixth for a repo 
 2. Dispatch repo-sync with `gh workflow run repo-sync.yml -R zgeoff/<repo>`, and merge its pull
    request. Expect the default branch to hold `.claude/hooks/start.ts`.
 3. Run `bun add -d @zgeoff/agent-hooks` at the repo root. Expect `bun.lock` to list the package.
-4. Check that the default branch holds `.claude/skill-gate.json`, which every repo takes from
+4. Check that the default branch holds `.claude/skill-gate.json`, which a new repo takes from
    repo-sync. For gates of the repo's own, follow
    [The shared rules](../guides/skill-gate-rules.md#the-shared-rules).
 5. Run `bunx agent-hooks init` at the repo root. Expect

@@ -36,8 +36,8 @@ sync/               the sources that repo-sync delivers, listed in sync/manifest
   workflow-callers/ workflow stubs that call this repo's reusable workflows, all opt-in but the
                     repo-sync guard
   hooks/            the agent hooks' start-up stub and the skill gate's older entry point
-  skill-gate/       the skill gate's rules, which every repo takes as .claude/skill-gate.json and
-                    this repo links there
+  skill-gate/       the skill gate's rules, which repo-sync writes to .claude/skill-gate.json in
+                    each repo its except list leaves out, and which this repo links there
 e2e/                suites that drive the built product from outside, such as `rig browser` under
                     signals
 integration/        flows across packages, such as one lane limit read by rig and by the lint rules
