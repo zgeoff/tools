@@ -397,3 +397,22 @@ test('it exits 2 and checks nothing when git cannot list the files', async () =>
     stderr: expect.stringContaining('check-links: git ls-files failed, so no link was checked\n'),
   });
 });
+
+test('it exits 2 and asks for a git work tree when run outside one', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'check-links-outside-'));
+
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+
+  const scriptPath = fileURLToPath(new URL('check-links.sh', import.meta.url));
+
+  const result = await $`bash ${scriptPath}`
+    .cwd(directory)
+    .env({ PATH: process.env['PATH'], HOME: directory })
+    .nothrow()
+    .quiet();
+
+  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
+    exitCode: 2,
+    stderr: 'check-links: run it inside a git work tree, because it lists the files with git\n',
+  });
+});
