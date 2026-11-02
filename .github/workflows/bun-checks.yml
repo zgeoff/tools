@@ -1,11 +1,11 @@
 # Reusable workflow: the pull-request checks every zgeoff Bun repo runs, in
 # one of two profiles that the calling repo's visibility picks. A public repo
-# runs for wall time: a gitleaks job, a static job for every check that is not
-# a test, a test job, and a test-<lane> job for each lane, at most 8 jobs. A
-# private repo runs for minutes: one checks job that holds the scan, the static
-# checks, the tests and each lane as named steps, because each job bills at
-# least a full minute there. Every job installs with the frozen lockfile and no
-# install cache.
+# runs for wall time: a gitleaks job, a plan job, a static job for every check
+# that is not a test, a test job, a test-<lane> job for each lane and the
+# checks job, at most 11 jobs. A private repo runs for minutes: one checks job
+# that holds the scan, the static checks, the tests and each lane as named
+# steps, because each job bills at least a full minute there. Every job
+# installs with the frozen lockfile and no install cache.
 #
 # The checks job is the one check a caller requires, in either profile. In a
 # public repo it runs after the other jobs and fails when one of them failed or
@@ -20,16 +20,17 @@
 # the job downloads from the commit of zgeoff/tools that defines it, so a
 # caller pinned to a commit runs that commit's scripts.
 #
-# `scripts` is a space-separated list of package.json script names. Empty means
-# the standard list: audit deadcode format:check lint typecheck test, then each
-# lane script the repo defines. A lane script is test:e2e, test:browser, test:docker or
-# test:host; test and any other test:<name> run with the tests, and every other
-# script runs with the static checks, each group in the list's order. Any name
-# the repo's package.json does not define fails the run before any script
-# runs, so a renamed script cannot drop a check without notice. The synced
-# caller passes the BUN_CHECK_SCRIPTS, NODE_VERSION and
-# BUN_CHECK_TIMEOUT_MINUTES repo variables, so a repo changes the list, adds
-# Node or sets the jobs' time limit without editing the caller.
+# `scripts` is a space-separated list of package.json script names. Empty
+# means the standard list: audit deadcode format:check lint typecheck test,
+# then each lane script the repo defines. A lane script is test:e2e,
+# test:browser, test:docker, test:host, test:agent-sdk or test:crash; test and
+# any other test:<name> run with the tests, and every other script runs with
+# the static checks, each group in the list's order. Any name the repo's
+# package.json does not define fails the run before any script runs, so a
+# renamed script cannot drop a check without notice. The synced caller passes
+# the BUN_CHECK_SCRIPTS, NODE_VERSION and BUN_CHECK_TIMEOUT_MINUTES repo
+# variables, so a repo changes the list, adds Node or sets the jobs' time
+# limit without editing the caller.
 #
 # The profile comes from github.event.repository.private, which in a reusable
 # workflow reads the caller's event. The private input is the fallback for an
@@ -544,6 +545,22 @@ jobs:
           contains(steps.plan.outputs.lanes, '"host"') }}
         env:
           SCRIPTS: test:host
+        run: *run-body
+
+      - name: Lane agent-sdk
+        if:
+          ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' &&
+          contains(steps.plan.outputs.lanes, '"agent-sdk"') }}
+        env:
+          SCRIPTS: test:agent-sdk
+        run: *run-body
+
+      - name: Lane crash
+        if:
+          ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' &&
+          contains(steps.plan.outputs.lanes, '"crash"') }}
+        env:
+          SCRIPTS: test:crash
         run: *run-body
 
       # Every check step skips in a public repo, and this one runs even after a

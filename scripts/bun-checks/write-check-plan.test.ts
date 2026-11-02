@@ -150,6 +150,8 @@ test('it plans the static checks, the tests and each lane once for the private c
         'test:browser': 'true',
         'test:docker': 'true',
         'test:host': 'true',
+        'test:agent-sdk': 'true',
+        'test:crash': 'true',
       },
     }),
   );
@@ -158,7 +160,7 @@ test('it plans the static checks, the tests and each lane once for the private c
     cwd: ctx.directory,
     outputPath: ctx.outputPath,
     part: 'all',
-    scripts: 'lint test test:e2e test:browser test:docker test:host',
+    scripts: 'lint test test:e2e test:browser test:docker test:host test:agent-sdk test:crash',
     lane: '',
     fileSystem: nodeFileSystem,
   });
@@ -167,10 +169,10 @@ test('it plans the static checks, the tests and each lane once for the private c
 
   expect(output).toBe(
     [
-      'scripts= lint test test:e2e test:browser test:docker test:host ',
+      'scripts= lint test test:e2e test:browser test:docker test:host test:agent-sdk test:crash ',
       'static= lint ',
       'test= test ',
-      'lanes=["e2e","browser","docker","host"]',
+      'lanes=["e2e","browser","docker","host","agent-sdk","crash"]',
       'docs=',
       '',
     ].join('\n'),
