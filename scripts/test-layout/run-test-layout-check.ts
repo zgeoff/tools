@@ -1,4 +1,5 @@
 import { $ } from 'bun';
+import { writeStdout } from '../../packages/std/src/write-stdout.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { collectTestLayoutFaults } from './collect-test-layout-faults.ts';
 
@@ -48,9 +49,7 @@ async function runCLI(): Promise<void> {
       return listing.split('\0').filter((path) => path !== '');
     },
     readText: nodeFileSystem.readText,
-    writeOutput: (text) => {
-      process.stdout.write(text);
-    },
+    writeOutput: writeStdout,
     writeError: (text) => {
       process.stderr.write(text);
     },
