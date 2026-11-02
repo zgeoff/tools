@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.10](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.9...@zgeoff/chex@0.0.10) (2026-11-02)
+
+
+### Bug Fixes
+
+* **chex:** run the baseline hook jobs without git's repository variables ([#459](https://github.com/zgeoff/tools/issues/459)) ([cd6d675](https://github.com/zgeoff/tools/commit/cd6d67541a554bb4c0a29ae24cbd2b633075a7fb))
+
 ## [0.0.9](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.8...@zgeoff/chex@0.0.9) (2026-11-02)
 
 ### Bug Fixes
