@@ -159,7 +159,7 @@ jobs:
         with:
           bun-version-file: .bun-version
       # npm does the publishing, not bun: trusted publishing (OIDC) needs
-      # npm >= 11.5.1 — node 24 bundles at least 11.16 — and bun publish has
+      # npm >= 11.5.1 — node 26 bundles at least 11.12 — and bun publish has
       # no OIDC support (oven-sh/bun#15601). Never upgrade the bundled npm in
       # place: a cross-major overlay prunes transitive deps that
       # libnpmpublish needs at publish time (sigstore).

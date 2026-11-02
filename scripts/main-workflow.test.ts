@@ -33,9 +33,8 @@ test('it sets up the Node on main that the pull request checks pass to bun-check
   const prText = await Bun.file(new URL('../.github/workflows/pr.yml', import.meta.url)).text();
 
   const main: unknown = Bun.YAML.parse(mainText);
-  const pr: unknown = Bun.YAML.parse(prText);
-
-  expect(pr).toMatchObject({ jobs: { pr: { with: { 'node-version': 24 } } } });
+  const prJobSchema = z.object({ with: z.object({ 'node-version': z.number() }) });
+  const pr = z.object({ jobs: z.object({ pr: prJobSchema }) }).parse(Bun.YAML.parse(prText));
 
   expect(main).toMatchObject({
     jobs: {
@@ -43,7 +42,7 @@ test('it sets up the Node on main that the pull request checks pass to bun-check
         steps: expect.arrayContaining([
           {
             uses: expect.stringMatching(/^actions\/setup-node@/u),
-            with: { 'node-version': 24 },
+            with: { 'node-version': pr.jobs.pr.with['node-version'] },
           },
         ]),
       },
