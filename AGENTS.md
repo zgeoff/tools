@@ -91,7 +91,8 @@ says.
 - `bun run check:sync` checks `sync/manifest.json` against the rules repo-sync assumes. Run it after
   you change the manifest or a file an entry lists. CI runs it, and the pre-push hook does not.
 - `bun run check:release-workflow` checks the tag step of the shared release job in
-  `.github/workflows/release-please.yml`. CI and the pre-push hook run it.
+  `.github/workflows/release-please.yml`, and fails on a dependency cycle between the workspace
+  packages, in any dependency field, which stops release-please. CI and the pre-push hook run it.
 - `bun run build:step-bundles` rebuilds `step-bundles/` from the step scripts. Run it, and commit
   the bundles, after you change a step script, a file one imports, or a package it uses.
   `bun run check:step-bundles` fails on a stale bundle and on a set of bundles that a runner could
