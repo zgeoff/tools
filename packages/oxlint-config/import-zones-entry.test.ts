@@ -6,7 +6,7 @@ import type { ImportZonesOptions } from '@zgeoff/oxlint-config/import-zones';
 import { collectRefusingEdges, importZonesSchema } from '@zgeoff/oxlint-config/import-zones';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'import-zones-entry-test-'));
+  const directory = await mkdtemp(join(tmpdir(), `import-zones-entry-test-${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
