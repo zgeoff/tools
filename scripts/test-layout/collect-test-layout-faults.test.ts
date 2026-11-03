@@ -21,7 +21,6 @@ test('it passes a tree whose tests import only the helpers of their own workspac
 
 test.each([
   ['e2e', 'e2e/boil.test.ts', 'e2e'],
-  ['integration', 'integration/pour.test.ts', 'integration'],
   ['test-utils', 'test-utils/build-water.ts', 'src/test-utils'],
 ])('it reports a %s folder at the repo root', (directory, path, target) => {
   expect(collectTestLayoutFaults(['package.json', path], [])).toStrictEqual([
@@ -292,26 +291,22 @@ test('it reports a source that a package ships from its root when it imports a t
   ]);
 });
 
-test.each([
-  'e2e/pour.ts',
-  'integration/pour.ts',
-  'evals/pour.ts',
-  'bench/pour.ts',
-  'pour.test.ts',
-  'src/pour.bench.ts',
-])('it passes a package file at %s that imports a test helper by name', (file) => {
-  const faults = collectTestLayoutFaults(
-    [],
-    [
-      {
-        path: `packages/kettle/${file}`,
-        text: "import { buildWater } from '@acme/teapot/test-utils/build-water';\n",
-      },
-    ],
-  );
+test.each(['e2e/pour.ts', 'evals/pour.ts', 'bench/pour.ts', 'pour.test.ts', 'src/pour.bench.ts'])(
+  'it passes a package file at %s that imports a test helper by name',
+  (file) => {
+    const faults = collectTestLayoutFaults(
+      [],
+      [
+        {
+          path: `packages/kettle/${file}`,
+          text: "import { buildWater } from '@acme/teapot/test-utils/build-water';\n",
+        },
+      ],
+    );
 
-  expect(faults).toStrictEqual([]);
-});
+    expect(faults).toStrictEqual([]);
+  },
+);
 
 test.each([
   [
@@ -333,3 +328,19 @@ test.each([
     ]);
   },
 );
+
+test.each([
+  ['the repo root', 'integration/pour.test.ts', ''],
+  ['a package', 'packages/kettle/integration/pour.test.ts', 'packages/kettle/'],
+  ['scripts', 'scripts/integration/pour.test.ts', 'scripts/'],
+])('it reports an integration folder at %s', (_label, path, root) => {
+  expect(collectTestLayoutFaults([path, `${root}integration/spill.test.ts`], [])).toStrictEqual([
+    `${root}integration/ holds tests; move each one beside the module it tests, in the package that wires together the packages it imports`,
+  ]);
+});
+
+test('it passes a source folder named integration inside src/', () => {
+  expect(collectTestLayoutFaults(['packages/kettle/src/integration/connect.ts'], [])).toStrictEqual(
+    [],
+  );
+});

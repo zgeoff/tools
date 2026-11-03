@@ -8,9 +8,10 @@ export interface SourceFile {
   readonly text: string;
 }
 
-const rootTestDirs = ['e2e', 'integration', 'test-utils'] as const;
+const rootTestDirs = ['e2e', 'test-utils'] as const;
 const sourcePattern = /\.(?:[cm]?[jt]s|[jt]sx)$/u;
 const oldHelperPattern = /^(?<root>packages\/[^/]+)\/test-utils\//u;
+const integrationPattern = /^(?<root>(?:packages\/[^/]+|scripts|sync)\/)?integration\//u;
 
 export function collectTestLayoutFaults(
   trackedPaths: readonly string[],
@@ -30,6 +31,19 @@ export function collectTestLayoutFaults(
       `${root}/test-utils/ holds test helpers outside src/; move each file into ${root}/src/test-utils/`,
   );
 
+  const integrationFaults = [
+    ...new Set(
+      trackedPaths.flatMap((path) => {
+        const match = integrationPattern.exec(path);
+
+        return match === null ? [] : [match.groups?.['root'] ?? ''];
+      }),
+    ),
+  ].map(
+    (root) =>
+      `${root}integration/ holds tests; move each one beside the module it tests, in the package that wires together the packages it imports`,
+  );
+
   const importFaults = sources
     .filter((source) => sourcePattern.test(source.path))
     .flatMap((source) => {
@@ -47,7 +61,7 @@ export function collectTestLayoutFaults(
       );
     });
 
-  return [...rootDirFaults, ...packageDirFaults, ...importFaults];
+  return [...rootDirFaults, ...integrationFaults, ...packageDirFaults, ...importFaults];
 }
 
 function collectImportSpecifiers(program: Program): string[] {
@@ -159,7 +173,7 @@ function getWorkspaceRoot(path: string): string {
     : (segments[0] ?? '');
 }
 
-const packageTestDirs = new Set(['e2e', 'integration', 'evals', 'bench', 'test-utils']);
+const packageTestDirs = new Set(['e2e', 'evals', 'bench', 'test-utils']);
 
 function isProductionCode(path: string): boolean {
   const root = getWorkspaceRoot(path);
