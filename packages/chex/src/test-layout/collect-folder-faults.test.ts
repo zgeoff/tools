@@ -102,18 +102,13 @@ test.each([
   ['the repo root', 'integration/pour.test.ts', ''],
   ['a package', 'packages/kettle/integration/pour.test.ts', 'packages/kettle/'],
   ['scripts', 'scripts/integration/pour.test.ts', 'scripts/'],
+  ['src', 'packages/kettle/src/integration/pour.test.ts', 'packages/kettle/src/'],
 ])('it reports an integration folder at %s', (_label, path, root) => {
   const ctx = setupTest();
 
   expect(ctx.collect([path, `${root}integration/spill.test.ts`])).toStrictEqual([
     `${root}integration/ holds tests; move each one beside the module it tests, in the package that wires together the packages it imports`,
   ]);
-});
-
-test('it passes a source folder named integration inside src/', () => {
-  const ctx = setupTest();
-
-  expect(ctx.collect(['packages/kettle/src/integration/connect.ts'])).toStrictEqual([]);
 });
 
 test.each(['test', 'tests', '__tests__'])('it reports a folder named %s', (name) => {

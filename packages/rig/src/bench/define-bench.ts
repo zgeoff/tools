@@ -1,28 +1,37 @@
 import { parseDuration } from '../parse-duration.ts';
 
-export interface BenchOptions {
+interface BenchBaseOptions {
   readonly name: string;
 
   // A duration such as `'50ms'` or `'2s'` that the median of a measured run must not pass.
   readonly budget: string;
-
-  readonly setup?: () => Promise<unknown>;
-
-  readonly run: (context: unknown) => Promise<void> | void;
 }
+
+interface BenchSetupOptions<Context> extends BenchBaseOptions {
+  readonly setup: () => Promise<Context>;
+
+  readonly run: (context: Context) => Promise<void> | void;
+}
+
+interface BenchPlainOptions extends BenchBaseOptions {
+  readonly setup?: undefined;
+
+  readonly run: () => Promise<void> | void;
+}
+
+export type BenchOptions<Context> = BenchSetupOptions<Context> | BenchPlainOptions;
 
 export interface BenchDefinition {
   readonly name: string;
 
   readonly budgetMs: number;
 
-  readonly setup: (() => Promise<unknown>) | null;
-
-  readonly run: (context: unknown) => Promise<void> | void;
+  // Runs `setup` and returns the step to measure, which holds the setup result.
+  readonly prepare: () => Promise<() => Promise<void> | void>;
 }
 
 // A bench file default-exports the result, which `rig bench` imports and measures.
-export function defineBench(options: BenchOptions): BenchDefinition {
+export function defineBench<Context>(options: BenchOptions<Context>): BenchDefinition {
   const budgetMs = parseDuration(options.budget);
 
   if (budgetMs === null) {
@@ -31,5 +40,17 @@ export function defineBench(options: BenchOptions): BenchDefinition {
     );
   }
 
-  return { name: options.name, budgetMs, setup: options.setup ?? null, run: options.run };
+  return {
+    name: options.name,
+    budgetMs,
+    prepare: async () => {
+      if (options.setup === undefined) {
+        return () => options.run();
+      }
+
+      const context = await options.setup();
+
+      return () => options.run(context);
+    },
+  };
 }

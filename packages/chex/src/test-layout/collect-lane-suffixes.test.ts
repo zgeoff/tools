@@ -31,3 +31,18 @@ test('it adds the lanes of the oxlint config', () => {
 
   expect(suffixes).toContain('.radar');
 });
+
+test('it drops the standard suffix of a lane whose suffix rig.config.ts replaces', () => {
+  const suffixes = collectLaneSuffixes(null, {
+    lanes: [{ name: 'host', suffix: '.machine' }],
+  });
+
+  expect(suffixes).toContain('.machine');
+  expect(suffixes).not.toContain('.host');
+});
+
+test('it drops the suffix of a standard lane that rig.config.ts gives none', () => {
+  const suffixes = collectLaneSuffixes(null, { lanes: [{ name: 'host', suffix: null }] });
+
+  expect(suffixes).not.toContain('.host');
+});

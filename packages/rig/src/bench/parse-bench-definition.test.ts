@@ -11,8 +11,8 @@ test('it accepts what defineBench returns', () => {
 test.each([
   ['null', null],
   ['a string', 'boil'],
-  ['an object with no run', { name: 'boil', budgetMs: 5, setup: null }],
-  ['an object whose budget is text', { name: 'boil', budgetMs: '5ms', setup: null, run: () => 1 }],
+  ['an object with no prepare', { name: 'boil', budgetMs: 5 }],
+  ['an object whose budget is text', { name: 'boil', budgetMs: '5ms', prepare: () => 1 }],
 ])('it refuses %s', (_title, value) => {
   expect(parseBenchDefinition(value)).toStrictEqual({
     kind: 'refused',
@@ -20,11 +20,12 @@ test.each([
   });
 });
 
-test('it refuses a setup that is no function', () => {
-  const value = { name: 'boil', budgetMs: 5, setup: 1, run: () => 1 };
+test('it fails to prepare when prepare yields no step', async () => {
+  const parsed = parseBenchDefinition({ name: 'boil', budgetMs: 5, prepare: () => 1 });
 
-  expect(parseBenchDefinition(value)).toStrictEqual({
-    kind: 'refused',
-    reason: 'its setup is no function',
-  });
+  expect(parsed.kind).toBe('parsed');
+
+  const prepare = parsed.kind === 'parsed' ? parsed.definition.prepare() : Promise.resolve();
+
+  await expect(prepare).rejects.toThrow('the benchmark "boil" prepared no step to measure');
 });

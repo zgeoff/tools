@@ -13,15 +13,10 @@ export function parseBenchDefinition(value: unknown): ParsedBenchDefinition {
 
   const name: unknown = Reflect.get(value, 'name');
   const budgetMs: unknown = Reflect.get(value, 'budgetMs');
-  const setup: unknown = Reflect.get(value, 'setup');
-  const run: unknown = Reflect.get(value, 'run');
+  const prepare: unknown = Reflect.get(value, 'prepare');
 
-  if (typeof name !== 'string' || typeof budgetMs !== 'number' || !isFunction(run)) {
+  if (typeof name !== 'string' || typeof budgetMs !== 'number' || !isFunction(prepare)) {
     return { kind: 'refused', reason: 'the default export is no defineBench result' };
-  }
-
-  if (setup !== null && !isFunction(setup)) {
-    return { kind: 'refused', reason: 'its setup is no function' };
   }
 
   return {
@@ -29,9 +24,16 @@ export function parseBenchDefinition(value: unknown): ParsedBenchDefinition {
     definition: {
       name,
       budgetMs,
-      setup: setup === null ? null : () => Promise.resolve(setup()),
-      run: async (context) => {
-        await run(context);
+      prepare: async () => {
+        const step: unknown = await prepare();
+
+        if (!isFunction(step)) {
+          throw new Error(`the benchmark "${name}" prepared no step to measure`);
+        }
+
+        return async () => {
+          await step();
+        };
       },
     },
   };

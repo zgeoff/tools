@@ -8,16 +8,16 @@ export interface BenchmarkResult {
   readonly medianMs: number;
 }
 
-// `setup` runs once, then `run` warms up before the measured runs, and the median of those is the
+// `prepare` runs once, then `run` warms up before the measured runs, and the median of those is the
 // result.
 export async function runBenchmark(
   definition: BenchDefinition,
   now: () => number,
 ): Promise<BenchmarkResult> {
-  const context = await definition.setup?.();
+  const step = await definition.prepare();
 
   for (let index = 0; index < warmUpRuns; index += 1) {
-    await definition.run(context);
+    await step();
   }
 
   const samples: number[] = [];
@@ -25,7 +25,7 @@ export async function runBenchmark(
   for (let index = 0; index < measuredRuns; index += 1) {
     const start = now();
 
-    await definition.run(context);
+    await step();
 
     samples.push(now() - start);
   }

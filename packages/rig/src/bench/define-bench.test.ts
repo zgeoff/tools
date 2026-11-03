@@ -5,7 +5,6 @@ test('it reads the budget as milliseconds', () => {
   const definition = defineBench({ name: 'boil', budget: '2s', run: () => {} });
 
   expect(definition.budgetMs).toBe(2000);
-  expect(definition.setup).toBeNull();
 });
 
 test('it refuses a budget that is no duration', () => {
@@ -13,4 +12,23 @@ test('it refuses a budget that is no duration', () => {
     Error,
     'defineBench: the benchmark "boil" has the budget "fast", which is no duration such as \'50ms\' or \'2s\'',
   );
+});
+
+test('it types the run context from what setup returns', async () => {
+  const seen: number[] = [];
+
+  const definition = defineBench({
+    name: 'pour',
+    budget: '1s',
+    setup: () => Promise.resolve({ kettle: { litres: 2 } }),
+    run: (context) => {
+      seen.push(context.kettle.litres);
+    },
+  });
+
+  const step = await definition.prepare();
+
+  await step();
+
+  expect(seen).toStrictEqual([2]);
 });

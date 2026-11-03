@@ -47,12 +47,9 @@ function hasFolder(trackedPaths: readonly string[], folder: string): boolean {
   return trackedPaths.some((path) => path.startsWith(`${folder}/`));
 }
 
-// A folder named integration inside a src/ folder is source code, not a test folder.
 function collectIntegrationFaults(trackedPaths: readonly string[]): string[] {
   return collectFolderPaths(trackedPaths)
-    .filter(
-      (folder) => posix.basename(folder) === 'integration' && !folder.split('/').includes('src'),
-    )
+    .filter((folder) => posix.basename(folder) === 'integration')
     .map(
       (folder) =>
         `${folder}/ holds tests; move each one beside the module it tests, in the package that wires together the packages it imports`,
