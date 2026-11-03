@@ -7,7 +7,7 @@ import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
 import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
-import { readBaselineJobs } from './src/test-utils/read-baseline-jobs.ts';
+import { parseBaselineJobs } from './src/test-utils/parse-baseline-jobs.ts';
 import type { BaselineJobDeps } from './src/test-utils/run-baseline-job.ts';
 import { runBaselineJob } from './src/test-utils/run-baseline-job.ts';
 import { writeStubPrograms } from './src/test-utils/write-stub-programs.ts';
@@ -196,7 +196,7 @@ test("it runs the related tests through rig without git's repository variables t
   expect(rigCall).toBe('related kettle.ts\n');
 });
 
-test.each(readBaselineJobs(() => readFileSync(`${import.meta.dir}/lefthook.yml`, 'utf8')))(
+test.each(parseBaselineJobs(readFileSync(`${import.meta.dir}/lefthook.yml`, 'utf8')))(
   "it runs the $hook job $name without git's repository variables that a hook in a worktree exports",
   async (job) => {
     const ctx = await setupTest();
@@ -231,7 +231,7 @@ test.each(readBaselineJobs(() => readFileSync(`${import.meta.dir}/lefthook.yml`,
 );
 
 test.each(
-  readBaselineJobs(() => readFileSync(`${import.meta.dir}/lefthook.yml`, 'utf8')).filter(
+  parseBaselineJobs(readFileSync(`${import.meta.dir}/lefthook.yml`, 'utf8')).filter(
     (job) => job.listsBranchFiles,
   ),
 )(

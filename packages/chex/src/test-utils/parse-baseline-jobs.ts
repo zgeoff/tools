@@ -11,9 +11,8 @@ export interface BaselineJobEntry {
 
 const hooks = ['pre-commit', 'pre-push'] as const;
 
-// The reader is synchronous, because test.each needs the jobs before any test runs.
-export function readBaselineJobs(readConfigText: () => string): BaselineJobEntry[] {
-  const config: unknown = Bun.YAML.parse(readConfigText());
+export function parseBaselineJobs(configText: string): BaselineJobEntry[] {
+  const config: unknown = Bun.YAML.parse(configText);
 
   return hooks.flatMap((hook) => {
     const value = isRecord(config) ? config[hook] : undefined;
