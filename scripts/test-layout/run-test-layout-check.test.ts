@@ -7,7 +7,15 @@ import { readGitEnv } from '../test-utils/read-git-env.ts';
 import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { runTestLayoutCheck } from './run-test-layout-check.ts';
 
-function setupTest() {
+async function setupTest() {
+  const directory = await mkdtemp(join(tmpdir(), `run-test-layout-check-pid${process.pid}-`));
+
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+
+  const env = readGitEnv(directory);
+
+  await $`git init --quiet ${directory}`.env({ ...env });
+
   const output: string[] = [];
   const errors: string[] = [];
 
@@ -29,11 +37,11 @@ function setupTest() {
       },
     });
 
-  return { output, errors, run };
+  return { output, errors, run, directory, env };
 }
 
 test('it exits 0 and prints nothing for a tree with no layout fault', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
   const exitCode = await ctx.run({
     'packages/kettle/src/boil.test.ts':
@@ -49,7 +57,7 @@ test('it exits 0 and prints nothing for a tree with no layout fault', async () =
 });
 
 test('it prints each fault on its own line and exits 1', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
   const exitCode = await ctx.run({
     'test-utils/build-water.ts': 'export const buildWater = () => 1;\n',
@@ -68,7 +76,7 @@ test('it prints each fault on its own line and exits 1', async () => {
 });
 
 test('it exits 2 and prints the error when a tracked file cannot be read', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
   const exitCode = await runTestLayoutCheck({
     readTrackedPaths: () => Promise.resolve(['packages/kettle/src/boil.ts']),
@@ -89,21 +97,15 @@ test('it exits 2 and prints the error when a tracked file cannot be read', async
 });
 
 test('it reports a root test-utils file of the git repo it runs in when run as a script', async () => {
-  const directory = await mkdtemp(join(tmpdir(), `run-test-layout-check-pid${process.pid}-`));
+  const ctx = await setupTest();
 
-  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+  await writeTreeFiles(ctx.directory, { 'test-utils/build-water.ts': 'export {};\n' });
 
-  const env = readGitEnv(directory);
-
-  await $`git init --quiet ${directory}`.env({ ...env });
-
-  await writeTreeFiles(directory, { 'test-utils/build-water.ts': 'export {};\n' });
-
-  await $`git add -A`.cwd(directory).env({ ...env });
+  await $`git add -A`.cwd(ctx.directory).env({ ...ctx.env });
 
   const result = await $`${process.execPath} ${join(import.meta.dir, 'run-test-layout-check.ts')}`
-    .cwd(directory)
-    .env({ ...env })
+    .cwd(ctx.directory)
+    .env({ ...ctx.env })
     .nothrow()
     .quiet();
 
