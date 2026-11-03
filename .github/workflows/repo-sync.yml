@@ -80,6 +80,7 @@ jobs:
     outputs:
       entries: ${{ steps.manifest.outputs.entries }}
       skills-ref: ${{ steps.manifest.outputs.skills-ref }}
+      unread: ${{ steps.manifest.outputs.unread }}
       ref: ${{ steps.ref.outputs.ref }}
     steps:
       # The step scripts download from the commit of this workflow, whatever
@@ -126,6 +127,9 @@ jobs:
             sync/skills-pin.json
           sparse-checkout-cone-mode: false
 
+      # The synced commit can be newer than this workflow, so its manifest can
+      # hold keys these scripts do not read. Each entry that holds one stays out,
+      # and the sync job fails it once the pull request is open.
       - name: Drop the skipped and the unrequested entries
         id: manifest
         env:
@@ -248,6 +252,7 @@ jobs:
           MARKER: repo-sync delivers this file from zgeoff/tools
           TOOLS_REF: ${{ needs.prepare.outputs.ref }}
           SKILLS_REF: ${{ needs.prepare.outputs.skills-ref }}
+          UNREAD: ${{ needs.prepare.outputs.unread }}
           REPO: ${{ github.repository }}
           SKIP: ${{ inputs.skip }}
           BASE: ${{ github.ref_name }}

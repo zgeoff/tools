@@ -1,7 +1,9 @@
 import { join } from 'node:path';
+import { isRecord } from '../../packages/std/src/is-record.ts';
 import type { FileSystem } from '../ci/file-system.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { writeStepOutputs } from '../ci/write-step-outputs.ts';
+import { collectUnreadManifestKeys } from './collect-unread-manifest-keys.ts';
 import { parseSkillsPin } from './parse-skills-pin.ts';
 import { parseSyncEntries } from './parse-sync-entries.ts';
 import { pickSyncEntries } from './pick-sync-entries.ts';
@@ -40,6 +42,22 @@ export async function writeSyncEntries(
     return 1;
   }
 
+  const unread = picked.entries
+    .map((entry) => ({
+      name: entry.name,
+      keys: collectUnreadManifestKeys(findManifestEntry(manifestValue, entry.name)),
+    }))
+    .filter((found) => found.keys.length > 0);
+
+  for (const found of unread) {
+    options.writeOutput(
+      `::error::${found.name} holds ${found.keys.join(', ')}, which these repo-sync scripts do not read, so the sync leaves it out; a run on a newer repo-sync pin reads it.\n`,
+    );
+  }
+
+  const unreadNames = unread.map((found) => found.name);
+  const entries = picked.entries.filter((entry) => !unreadNames.includes(entry.name));
+
   const skillsPin = await readSkillsPin(options);
 
   if (skillsPin.kind === 'refused') {
@@ -48,7 +66,7 @@ export async function writeSyncEntries(
     return 1;
   }
 
-  const needsSkills = picked.entries.some((entry) =>
+  const needsSkills = entries.some((entry) =>
     entry.files.some((file) => file.repo === 'zgeoff/skills'),
   );
 
@@ -61,11 +79,18 @@ export async function writeSyncEntries(
   }
 
   await writeStepOutputs(options.fileSystem, options.outputPath, {
-    entries: JSON.stringify(picked.entries),
+    entries: JSON.stringify(entries),
     'skills-ref': skillsPin.commit,
+    unread: unreadNames.join(','),
   });
 
   return 0;
+}
+
+function findManifestEntry(manifest: unknown, name: string): unknown {
+  return Array.isArray(manifest)
+    ? manifest.find((entry: unknown) => isRecord(entry) && entry['name'] === name)
+    : undefined;
 }
 
 type SkillsPin =

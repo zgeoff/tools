@@ -605,6 +605,34 @@ test('it leaves a failing entry out, syncs the others, and fails the run', async
   ]);
 });
 
+test('it fails each entry the prepare job left out as unread, after the others sync', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+  await ctx.writeSource('sync/editorconfig', 'root = true\n');
+
+  const exitCode = await ctx.runSync(
+    [
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+      },
+    ],
+    { UNREAD: 'skill-kettle' },
+  );
+
+  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
+
+  expect(exitCode).toBe(1);
+  expect(files).toStrictEqual(['.editorconfig', 'README.md']);
+
+  expect(ctx.output.at(-1)).toBe(
+    '::error::These entries failed and are not in the sync: skill-kettle\n',
+  );
+});
+
 test('it keeps the sync/<name> branch of a failed entry and deletes the others', async () => {
   const ctx = await setupTest();
 

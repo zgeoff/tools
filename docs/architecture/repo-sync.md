@@ -89,7 +89,10 @@ dispatches may arrive in any order. A run that cannot read those pins, or cannot
 newer, fails rather than guess, and the next run tries again.
 
 The step scripts of a run come from the pinned commit, never from `ref`, so a change to the scripts
-reaches a repo once its next sync pull request merges.
+reaches a repo once its next sync pull request merges. A run can then read a manifest newer than its
+scripts. An entry that holds a key those scripts do not read fails, and stays out of the pull
+request, so the scripts never copy it with the key ignored. The run fails after the other entries
+sync, and the first run on a pin that reads the key syncs the entry.
 
 When the open sync pull request has a failing check and is more than a day old, the workflow's alarm
 job opens one issue for it in the repo, so a red sync never waits unseen. The alarm runs with the

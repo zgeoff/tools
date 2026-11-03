@@ -50,6 +50,10 @@ export interface SyncEntriesOptions {
 interface SyncSettings {
   readonly kind: 'parsed';
   readonly entries: readonly SyncEntry[];
+
+  // The entries the prepare job left out, because they hold keys these scripts do not read.
+  readonly unread: readonly string[];
+
   readonly branch: string;
   readonly marker: string;
   readonly commit: string;
@@ -165,9 +169,12 @@ function parseSyncSettings(env: Readonly<Record<string, string | undefined>>): S
     return { kind: 'refused', message: 'ENTRIES holds no list of manifest entries' };
   }
 
+  const unreadText = env['UNREAD'] ?? '';
+
   return {
     kind: 'parsed',
     entries,
+    unread: unreadText.split(',').filter((name) => name !== ''),
     branch: env['BRANCH'] ?? '',
     marker: env['MARKER'] ?? '',
     commit,
@@ -198,7 +205,7 @@ interface CommittedEntries {
 
 async function commitEntries(context: SyncContext): Promise<CommittedEntries> {
   const synced: SyncedEntry[] = [];
-  const failed: string[] = [];
+  const failed = [...context.unread];
   const taken: string[] = [];
   const copied: string[] = [];
   const scripts: Record<string, string> = {};
