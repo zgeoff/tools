@@ -42,10 +42,13 @@ export function buildJobLeakCases(configText: string): BaselineJobCase[] {
 
         // diet writes no file when the job never reaches it.
         const dietEnv = await readFile(join(sandbox.repo, 'diet-env'), 'utf8').catch(
-          (error: unknown) =>
-            error instanceof Error && 'code' in error && error.code === 'ENOENT'
-              ? ''
-              : Promise.reject(error),
+          (error: unknown) => {
+            if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+              return '';
+            }
+
+            throw error;
+          },
         );
 
         return findGitVariableFault(dietEnv, 'it never ran diet');
@@ -92,7 +95,7 @@ function findGitVariableFault(envText: string, missing: string): string | null {
   const kept = envText
     .split('\n')
     .filter((line) => line.startsWith('GIT_'))
-    .map((line) => line.split('=')[0]);
+    .map((line) => line.slice(0, line.indexOf('=')));
 
   return kept.length === 0 ? null : `it kept ${[...new Set(kept)].toSorted().join(', ')}`;
 }
