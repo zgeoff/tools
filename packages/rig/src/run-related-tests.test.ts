@@ -30,6 +30,7 @@ test('it runs the unit lane on the related test and returns its exit code', asyn
     { repoRoot: '/repo', environment: { PATH: '/usr/bin' }, signal: ctx.signal, runID: '4417' },
     {
       dietScript: '/diet.sh',
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve([]),
       sources: { cwd: '/repo', probeFile: () => true },
       readWorkerCount: ctx.readWorkerCount,
@@ -66,6 +67,7 @@ test('it leaves every lane out of the run, as the unit run does', async () => {
     { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
     {
       dietScript: '/diet.sh',
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve([]),
       sources: { cwd: '/repo', probeFile: () => true },
       readWorkerCount: ctx.readWorkerCount,
@@ -91,6 +93,7 @@ test('it adds the slow-host timeout when the host gets 1 worker', async () => {
     { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
     {
       dietScript: '/diet.sh',
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve([]),
       sources: { cwd: '/repo', probeFile: () => true },
       readWorkerCount: ctx.readWorkerCount,
@@ -117,6 +120,7 @@ test('it says so and exits 0 when no path has a related test', async () => {
     { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
     {
       dietScript: '/diet.sh',
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve([]),
       sources: { cwd: '/repo', probeFile: () => false },
       readWorkerCount: ctx.readWorkerCount,
@@ -143,6 +147,7 @@ test('it runs 50 related test files, the default cap', async () => {
     { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
     {
       dietScript: '/diet.sh',
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve([]),
       sources: { cwd: '/repo', probeFile: () => true },
       readWorkerCount: ctx.readWorkerCount,
@@ -171,6 +176,7 @@ test('it skips with the CI notice past 50 related test files', async () => {
     { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
     {
       dietScript: '/diet.sh',
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve([]),
       sources: { cwd: '/repo', probeFile: () => true },
       readWorkerCount: ctx.readWorkerCount,
@@ -205,6 +211,7 @@ test.each([
       { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
       {
         dietScript: '/diet.sh',
+        probeWorkspaceRepo: () => Promise.resolve(false),
         readTrackedFiles: () => Promise.resolve([]),
         sources: { cwd: '/repo', probeFile: () => true },
         readWorkerCount: ctx.readWorkerCount,
@@ -236,6 +243,7 @@ test('it names the shared test input over the file cap when the branch changes b
     { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
     {
       dietScript: '/diet.sh',
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve([]),
       sources: { cwd: '/repo', probeFile: () => true },
       readWorkerCount: ctx.readWorkerCount,
@@ -262,6 +270,7 @@ test.each([['--max-files=2'], ['--max-file=2']])(
       { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
       {
         dietScript: '/diet.sh',
+        probeWorkspaceRepo: () => Promise.resolve(false),
         readTrackedFiles: () => Promise.resolve([]),
         sources: { cwd: '/repo', probeFile: () => true },
         readWorkerCount: ctx.readWorkerCount,
@@ -294,6 +303,7 @@ test('it exits 2 with the reason and runs no test for a worker count it refuses'
     { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
     {
       dietScript: '/diet.sh',
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve([]),
       sources: { cwd: '/repo', probeFile: () => true },
       readWorkerCount: ctx.readWorkerCount,

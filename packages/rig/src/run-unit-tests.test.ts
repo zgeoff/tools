@@ -25,6 +25,7 @@ test('it runs the unit command under diet in the repo and returns its exit code'
     {
       dietScript: '/diet.sh',
       runCommand: ctx.runCommand,
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve([]),
     },
   );
@@ -60,6 +61,7 @@ test('it gives diet the memory that the config declares for the unit lane', asyn
     {
       dietScript: '/diet.sh',
       runCommand: ctx.runCommand,
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve([]),
     },
   );
@@ -83,6 +85,7 @@ test('it leaves out the e2e folders that git tracks and runs a src/e2e folder th
     {
       dietScript: '/diet.sh',
       runCommand: ctx.runCommand,
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve(['e2e/login.test.ts', 'src/e2e/codec.test.ts']),
     },
   );

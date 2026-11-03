@@ -17,6 +17,8 @@ export interface TestSelectionRequest {
 
   readonly repoRoot: string;
 
+  readonly isWorkspaceRepo: boolean;
+
   readonly trackedFiles: readonly string[];
 
   readonly args: TestArgs;
@@ -26,7 +28,7 @@ export interface TestSelectionRequest {
 // narrows the paths to the lane's own files and hands bun test that exact list.
 export function buildTestSelection(request: TestSelectionRequest): TestSelection {
   const split = request.args;
-  const laneFiles = collectLaneTestFiles(request.config, request.lane, request.trackedFiles);
+  const laneFiles = collectLaneTestFiles(request);
 
   if (split.paths.length === 0) {
     return laneFiles.length === 0 ? { kind: 'empty' } : { kind: 'lane', flags: split.flags };
@@ -49,12 +51,11 @@ const testFilePattern = /[._](?:test|spec)\.[jt]sx?$/u;
 
 // The unit lane takes every test file that no other lane claims, the e2e lane the ones under its
 // folders, and any other lane the ones with its suffix.
-function collectLaneTestFiles(
-  config: RigConfig,
-  lane: Pick<ResolvedLane, 'name' | 'suffix'>,
-  trackedFiles: readonly string[],
-): readonly string[] {
-  const e2eDirs = pickE2EDirs(trackedFiles);
+function collectLaneTestFiles(request: TestSelectionRequest): readonly string[] {
+  const config = request.config;
+  const lane = request.lane;
+  const trackedFiles = request.trackedFiles;
+  const e2eDirs = pickE2EDirs(trackedFiles, request.isWorkspaceRepo);
 
   const isUnderE2EDir = (file: string) =>
     e2eDirs.some((directory) => file.startsWith(`${directory}/`));

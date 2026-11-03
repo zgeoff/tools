@@ -43,6 +43,7 @@ test('it runs the unit lane for rig unit, with the paths after it', async () => 
     ...ctx.deps,
     sources: { cwd: '/repo', probeFile: () => true },
     readConfig: () => Promise.resolve(defineRig({ lanes: { kiln: { limit: '15s' } } })),
+    probeWorkspaceRepo: () => Promise.resolve(false),
     readTrackedFiles: () => Promise.resolve(['src/a.test.ts']),
   });
 
@@ -62,6 +63,7 @@ test('it passes a flag after rig unit on to bun test', async () => {
     ...ctx.deps,
     sources: { cwd: '/repo', probeFile: () => true },
     readConfig: () => Promise.resolve(defineRig({})),
+    probeWorkspaceRepo: () => Promise.resolve(false),
     readTrackedFiles: () => Promise.resolve(['src/a.test.ts']),
   });
 
@@ -82,6 +84,7 @@ test.each([
       ...ctx.deps,
       sources: { cwd: '/repo', probeFile: () => true },
       readConfig: () => Promise.resolve(defineRig({ lanes: { kiln: { limit: '15s' } } })),
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () =>
         Promise.resolve(['src/a.test.ts', 'src/a.kiln.test.ts', 'src/a.browser.test.ts']),
     });
@@ -103,6 +106,7 @@ test('it runs a lane that the config declares for rig <lane>', async () => {
     ...ctx.deps,
     sources: { cwd: '/repo', probeFile: () => true },
     readConfig: () => Promise.resolve(defineRig({ lanes: { kiln: { limit: '15s' } } })),
+    probeWorkspaceRepo: () => Promise.resolve(false),
     readTrackedFiles: () => Promise.resolve(['src/a.kiln.test.ts']),
   });
 
@@ -121,6 +125,7 @@ test('it runs the related tests for rig related', async () => {
     ...ctx.deps,
     sources: { cwd: '/repo', probeFile: () => true },
     readConfig: () => Promise.resolve(defineRig({})),
+    probeWorkspaceRepo: () => Promise.resolve(false),
     readTrackedFiles: () => Promise.resolve([]),
   });
 
@@ -135,6 +140,7 @@ test('it exits 2 and names the commands for a command it does not know', async (
     ...ctx.deps,
     sources: { cwd: '/repo', probeFile: () => true },
     readConfig: () => Promise.resolve(defineRig({ lanes: { kiln: { limit: '15s' } } })),
+    probeWorkspaceRepo: () => Promise.resolve(false),
     readTrackedFiles: () => Promise.resolve([]),
   });
 
@@ -154,6 +160,7 @@ test('it exits 2 with the parser message for a command line it refuses', async (
     ...ctx.deps,
     sources: { cwd: '/repo', probeFile: () => true },
     readConfig: () => Promise.resolve(defineRig({})),
+    probeWorkspaceRepo: () => Promise.resolve(false),
     readTrackedFiles: () => Promise.resolve([]),
   });
 

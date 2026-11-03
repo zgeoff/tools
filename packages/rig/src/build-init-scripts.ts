@@ -10,9 +10,10 @@ export function buildInitScripts(
   oldScripts: PackageScripts,
   config: RigConfig,
   trackedFiles: readonly string[],
+  isWorkspaceRepo: boolean,
 ): PackageScripts {
   const laneScripts = config.lanes
-    .filter((lane) => lane.name !== 'unit' && isLaneWanted(lane, trackedFiles))
+    .filter((lane) => lane.name !== 'unit' && isLaneWanted(lane, trackedFiles, isWorkspaceRepo))
     .map((lane): [string, string] => [`test:${lane.name}`, `rig ${lane.name}`]);
 
   return {
@@ -23,13 +24,17 @@ export function buildInitScripts(
   };
 }
 
-function isLaneWanted(lane: ResolvedLane, trackedFiles: readonly string[]): boolean {
+function isLaneWanted(
+  lane: ResolvedLane,
+  trackedFiles: readonly string[],
+  isWorkspaceRepo: boolean,
+): boolean {
   if (!standardLanes.some((standard) => standard.name === lane.name)) {
     return true;
   }
 
   if (lane.suffix === null) {
-    return pickE2EDirs(trackedFiles).length > 0;
+    return pickE2EDirs(trackedFiles, isWorkspaceRepo).length > 0;
   }
 
   const suffix = lane.suffix;

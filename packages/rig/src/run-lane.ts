@@ -19,6 +19,8 @@ export interface LaneDeps {
 
   readonly output: RigOutput;
 
+  readonly probeWorkspaceRepo: (repoRoot: string) => Promise<boolean>;
+
   readonly readTrackedFiles: (repoRoot: string) => Promise<readonly string[]>;
 
   readonly importModule: (path: string) => Promise<unknown>;
@@ -42,11 +44,13 @@ export async function runLane(request: LaneRequest, run: RigRun, deps: LaneDeps)
   const lane = request.lane;
 
   const trackedFiles = await deps.readTrackedFiles(run.repoRoot);
+  const isWorkspaceRepo = await deps.probeWorkspaceRepo(run.repoRoot);
 
   const selection = buildTestSelection({
     config: request.config,
     lane,
     repoRoot: run.repoRoot,
+    isWorkspaceRepo,
     trackedFiles,
     args: parseTestArgs(request.extraArgs),
   });
@@ -63,7 +67,12 @@ export async function runLane(request: LaneRequest, run: RigRun, deps: LaneDeps)
     return 0;
   }
 
-  const testArgs = pickLaneTestArgs(request.config, lane, selection, trackedFiles);
+  const testArgs = pickLaneTestArgs(
+    request.config,
+    lane,
+    selection,
+    pickE2EDirs(trackedFiles, isWorkspaceRepo),
+  );
 
   const hooks = await wireLaneHooks(lane, run, deps);
   const exitCode = await runLaneHooks(testArgs, hooks);
@@ -76,7 +85,7 @@ function pickLaneTestArgs(
   config: RigConfig,
   lane: ResolvedLane,
   selection: Extract<TestSelection, { kind: 'files' | 'lane' }>,
-  trackedFiles: readonly string[],
+  e2eDirs: readonly string[],
 ): readonly string[] {
   const timeoutArg = `--timeout=${lane.limitMs}`;
 
@@ -84,7 +93,7 @@ function pickLaneTestArgs(
     .with({ kind: 'files' }, (files) => [timeoutArg, ...files.files, ...files.flags])
     .with({ kind: 'lane' }, (laneRun) => [
       timeoutArg,
-      ...pickLaneSelection(lane, pickE2EDirs(trackedFiles)),
+      ...pickLaneSelection(lane, e2eDirs),
       ...pickOtherLaneIgnoreArgs(config, lane),
       ...laneRun.flags,
     ])

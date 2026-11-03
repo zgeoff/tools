@@ -48,11 +48,12 @@ that matches no file. Otherwise it runs three steps, and the last one always run
    environment variables for the tests.
 2. `run` starts `bun test` under `diet`, with the lane's limit as `--timeout`, its process count as
    `--parallel`, and its memory as `diet`'s budget. The lane's suffix filter or its `e2e` folders
-   select the files. The folders are the `e2e` folders at the repo root or an app root and the
-   `-e2e` packages that git tracks. When the arguments name paths, rig narrows them to the lane's
-   own tracked test files and hands `bun test` that exact list, because `bun test` runs any file a
-   path names, whatever its lane. Paths that select none of the lane's files fail the run with exit
-   code 1, so a mistyped path never passes as a run with no tests.
+   select the files. The folders are the `e2e` folders that git tracks in a folder that holds a
+   `package.json`, and at the repo root only when the root `package.json` has no `workspaces` field.
+   When the arguments name paths, rig narrows them to the lane's own tracked test files and hands
+   `bun test` that exact list, because `bun test` runs any file a path names, whatever its lane.
+   Paths that select none of the lane's files fail the run with exit code 1, so a mistyped path
+   never passes as a run with no tests.
 3. `stop` cleans up, whether the tests passed, failed or never started. When `stop` throws, rig
    exits 1, and what it reports depends on how the lane ended:
    - after `start` or `run` threw, that error first and the stop error second;
@@ -66,13 +67,13 @@ running. The abort sends the group SIGTERM, then SIGKILL after a deadline, and t
 no member of the group runs, so that `stop` can clean up. An aborted run exits 1 whatever the tests'
 exit code was. A command that exits on its own has the rest of its group stopped the same way.
 
-`rig unit` builds its `bun test` command from the same table: one path ignore for every lane suffix
-and for the `e2e` folders. A lane declared in `rig.config.ts` therefore leaves the unit run without
-any ignore list in `package.json`. Like a lane, `rig unit` exits 0 when git tracks no unit test
-file. `rig related` runs the unit lane in its own process on the tests beside the changed files,
-takes the lane suffixes from the table, and skips when the branch changes a shared test input or has
-more than 50 related files. `rig init` writes the package scripts for the lanes the repo has and a
-starter config, and a second run changes nothing.
+`rig unit` builds its `bun test` command from the same table: `--no-isolate` unless the arguments
+hold `--isolate`, one path ignore for every lane suffix and for the `e2e` folders. A lane declared
+in `rig.config.ts` therefore leaves the unit run without any ignore list in `package.json`. Like a
+lane, `rig unit` exits 0 when git tracks no unit test file. `rig related` runs the unit lane in its
+own process on the tests beside the changed files, takes the lane suffixes from the table, and skips
+when the branch changes a shared test input or has more than 50 related files. `rig init` writes the
+package scripts for the lanes the repo has and a starter config, and a second run changes nothing.
 
 ## The browser lane
 

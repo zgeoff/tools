@@ -58,6 +58,7 @@ test('it runs a repo lane under diet with its limit, its suffix filter and the s
     {
       dietScript: '/diet.sh',
       output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve(['pkg/src/fire.kiln.test.ts']),
       importModule: ctx.importModule,
       runCommand: ctx.runCommand,
@@ -105,6 +106,7 @@ test('it runs the e2e lane on the e2e folders that git tracks', async () => {
     {
       dietScript: '/diet.sh',
       output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () =>
         Promise.resolve([
           'e2e/login.test.ts',
@@ -139,6 +141,7 @@ test('it says so and exits 0 for the e2e lane of a repo with no e2e folder', asy
     {
       dietScript: '/diet.sh',
       output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve(['src/a.test.ts']),
       importModule: ctx.importModule,
       runCommand: ctx.runCommand,
@@ -166,6 +169,7 @@ test('it runs only the lane files that a path selects, in place of the suffix fi
     {
       dietScript: '/diet.sh',
       output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () =>
         Promise.resolve(['pkg/src/fire.kiln.test.ts', 'pkg/src/fire.test.ts', 'pkg/src/fire.ts']),
       importModule: ctx.importModule,
@@ -208,6 +212,7 @@ test('it says so and exits 0 before the start hook for a suffix lane that git tr
     {
       dietScript: '/diet.sh',
       output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve(['pkg/src/fire.test.ts', 'pkg/src/fire.kiln.ts']),
       importModule: ctx.importModule,
       runCommand: ctx.runCommand,
@@ -240,6 +245,7 @@ test('it names the paths and exits 1 when they select none of the lane files', a
     {
       dietScript: '/diet.sh',
       output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () =>
         Promise.resolve(['pkg/src/fire.kiln.test.ts', 'pkg/src/fire.test.ts']),
       importModule: ctx.importModule,
@@ -275,6 +281,7 @@ test('it runs the browser lane through its built-in hooks, with the lane memory 
     {
       dietScript: '/diet.sh',
       output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve(['pkg/src/page.browser.test.ts']),
       importModule: ctx.importModule,
       runCommand: ctx.runCommand,
@@ -317,6 +324,7 @@ test('it leaves the files of the other lanes out of the e2e run', async () => {
     {
       dietScript: '/diet.sh',
       output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve(['e2e/login.test.ts', 'e2e/live.model-api.test.ts']),
       importModule: ctx.importModule,
       runCommand: ctx.runCommand,
@@ -355,6 +363,7 @@ test('it exits 1 when a signal arrives while the stop hook cleans up after passi
     {
       dietScript: '/diet.sh',
       output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve(['pkg/src/page.browser.test.ts']),
       importModule: ctx.importModule,
       runCommand: ctx.runCommand,

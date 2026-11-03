@@ -29,6 +29,7 @@ test('it runs the unit tests with the worker count the host gets', async () => {
     { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
     {
       dietScript: '/diet.sh',
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve(['pkg/src/oven.test.ts']),
       runCommand: ctx.runCommand,
       output: ctx.output,
@@ -51,6 +52,7 @@ test('it says so and exits 0 when git tracks no unit test file', async () => {
     { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
     {
       dietScript: '/diet.sh',
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve(['pkg/src/oven.ts', 'pkg/src/oven.host.test.ts']),
       runCommand: ctx.runCommand,
       output: ctx.output,
@@ -74,6 +76,7 @@ test('it runs only the unit files that a path selects', async () => {
     { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
     {
       dietScript: '/diet.sh',
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () =>
         Promise.resolve(['pkg/src/oven.test.ts', 'pkg/src/oven.host.test.ts']),
       runCommand: ctx.runCommand,
@@ -101,6 +104,7 @@ test('it names the path, exits 1 and runs nothing for a unit run given only the 
     { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
     {
       dietScript: '/diet.sh',
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () =>
         Promise.resolve(['pkg/src/oven.test.ts', 'pkg/src/oven.host.test.ts']),
       runCommand: ctx.runCommand,
@@ -132,6 +136,7 @@ test('it exits 2 with the reason and runs no test for a worker count it refuses'
     { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
     {
       dietScript: '/diet.sh',
+      probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve(['pkg/src/oven.test.ts']),
       runCommand: ctx.runCommand,
       output: ctx.output,
