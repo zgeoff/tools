@@ -3,10 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { collectStoppedRunFolders } from './collect-stopped-run-folders.ts';
+import { readPIDNamespace } from './read-pid-namespace.ts';
 
 export interface TestFolderSweepOptions {
   // The folders that hold test temp folders, such as the system temp folder.
   readonly readCandidatePaths: () => Promise<readonly string[]>;
+
+  readonly namespace: string;
 
   readonly isRunning: (pid: number) => boolean;
 
@@ -17,7 +20,7 @@ export interface TestFolderSweepOptions {
 export async function runTestFolderSweep(options: TestFolderSweepOptions): Promise<string[]> {
   const candidates = await options.readCandidatePaths();
 
-  const stopped = collectStoppedRunFolders(candidates, options.isRunning);
+  const stopped = collectStoppedRunFolders(candidates, options.namespace, options.isRunning);
 
   for (const path of stopped) {
     await options.removePath(path);
@@ -45,6 +48,7 @@ async function runCLI(): Promise<void> {
           .map((path) => path.replace(/\/$/u, '')),
       ];
     },
+    namespace: readPIDNamespace(),
     isRunning: (pid) => {
       try {
         process.kill(pid, 0);
