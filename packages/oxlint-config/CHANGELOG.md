@@ -2,17 +2,17 @@
 
 ## [0.7.7](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.7.6...@zgeoff/oxlint-config@0.7.7) (2026-11-03)
 
-
 ### Features
 
-* **rig:** add programs, bench and eval, and the chex test-layout check ([#470](https://github.com/zgeoff/tools/issues/470)) ([20cee2e](https://github.com/zgeoff/tools/commit/20cee2eb9d8951ef40b5e7cd507082a4b1fda853))
-
+- **rig:** add programs, bench and eval, and the chex test-layout check
+  ([#470](https://github.com/zgeoff/tools/issues/470))
+  ([20cee2e](https://github.com/zgeoff/tools/commit/20cee2eb9d8951ef40b5e7cd507082a4b1fda853))
 
 ### Dependencies
 
-* The following workspace dependencies were updated
-  * devDependencies
-    * @zgeoff/rig bumped to 0.0.6
+- The following workspace dependencies were updated
+  - devDependencies
+    - @zgeoff/rig bumped to 0.0.6
 
 ## [0.7.6](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.7.5...@zgeoff/oxlint-config@0.7.6) (2026-11-02)
 

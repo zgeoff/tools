@@ -2,24 +2,26 @@
 
 ## [0.0.11](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.10...@zgeoff/chex@0.0.11) (2026-11-03)
 
-
 ### Features
 
-* **rig:** add programs, bench and eval, and the chex test-layout check ([#470](https://github.com/zgeoff/tools/issues/470)) ([20cee2e](https://github.com/zgeoff/tools/commit/20cee2eb9d8951ef40b5e7cd507082a4b1fda853))
-* **testing:** add the @zgeoff/testing package ([#473](https://github.com/zgeoff/tools/issues/473)) ([5277195](https://github.com/zgeoff/tools/commit/527719528ee223b97babb8cd12bac7959a4d255a))
-
+- **rig:** add programs, bench and eval, and the chex test-layout check
+  ([#470](https://github.com/zgeoff/tools/issues/470))
+  ([20cee2e](https://github.com/zgeoff/tools/commit/20cee2eb9d8951ef40b5e7cd507082a4b1fda853))
+- **testing:** add the @zgeoff/testing package ([#473](https://github.com/zgeoff/tools/issues/473))
+  ([5277195](https://github.com/zgeoff/tools/commit/527719528ee223b97babb8cd12bac7959a4d255a))
 
 ### Bug Fixes
 
-* **rig:** break the rig and chex dependency cycle that stops releases ([#474](https://github.com/zgeoff/tools/issues/474)) ([43229b1](https://github.com/zgeoff/tools/commit/43229b1e34950e07a0e6f116f8052bf2a40b95a4))
-
+- **rig:** break the rig and chex dependency cycle that stops releases
+  ([#474](https://github.com/zgeoff/tools/issues/474))
+  ([43229b1](https://github.com/zgeoff/tools/commit/43229b1e34950e07a0e6f116f8052bf2a40b95a4))
 
 ### Dependencies
 
-* The following workspace dependencies were updated
-  * devDependencies
-    * @zgeoff/rig bumped to 0.0.6
-    * @zgeoff/testing bumped to 0.1.0
+- The following workspace dependencies were updated
+  - devDependencies
+    - @zgeoff/rig bumped to 0.0.6
+    - @zgeoff/testing bumped to 0.1.0
 
 ## [0.0.10](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.9...@zgeoff/chex@0.0.10) (2026-11-02)
 

@@ -2,10 +2,11 @@
 
 ## [0.2.3](https://github.com/zgeoff/tools/compare/@zgeoff/bun-test-react@0.2.2...@zgeoff/bun-test-react@0.2.3) (2026-11-03)
 
-
 ### Features
 
-* **rig:** add programs, bench and eval, and the chex test-layout check ([#470](https://github.com/zgeoff/tools/issues/470)) ([20cee2e](https://github.com/zgeoff/tools/commit/20cee2eb9d8951ef40b5e7cd507082a4b1fda853))
+- **rig:** add programs, bench and eval, and the chex test-layout check
+  ([#470](https://github.com/zgeoff/tools/issues/470))
+  ([20cee2e](https://github.com/zgeoff/tools/commit/20cee2eb9d8951ef40b5e7cd507082a4b1fda853))
 
 ## [0.2.2](https://github.com/zgeoff/tools/compare/@zgeoff/bun-test-react@0.2.1...@zgeoff/bun-test-react@0.2.2) (2026-10-23)
 
