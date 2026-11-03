@@ -261,6 +261,7 @@ var checkNames = [
   "commits",
   "local-paths",
   "test-timeouts",
+  "test-layout",
   "workflows",
   "dependency-gates",
   "uncommitted"

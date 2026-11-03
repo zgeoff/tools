@@ -6,7 +6,9 @@ export type { PageResultSchema } from './browser/run-in-page.ts';
 
 export type {
   LaneContext,
+  BenchDeclaration,
   LaneDeclaration,
+  ProgramDeclaration,
   LaneStart,
   ResolvedLane,
   RigConfig,

@@ -126,7 +126,7 @@ test('it exits 2 with the usage and runs nothing for an unknown check', async ()
     lines: [
       'err chex: unknown check "spelling"\n' +
         'usage: chex <check>... | chex <check> [args...] | chex init\n' +
-        'checks: prose, length, links, readmes, vision, skill, commits, local-paths, test-timeouts, workflows, dependency-gates, uncommitted\n',
+        'checks: prose, length, links, readmes, vision, skill, commits, local-paths, test-timeouts, test-layout, workflows, dependency-gates, uncommitted\n',
     ],
   });
 

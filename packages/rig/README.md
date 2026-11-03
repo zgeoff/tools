@@ -35,17 +35,24 @@ so a run that outgrows its memory budget fails alone when `diet` finds a
 
 ## Commands
 
-- `rig unit` runs the unit tests in random order with the host's worker count.
+- `rig unit` runs the unit tests in random order with the host's worker count, with `--no-isolate`
+  so the files of a worker share one module graph. Pass `--isolate` to turn that off.
 - `rig related <paths...>` runs the unit tests beside the changed files, for a pre-push hook.
 - `rig <lane>` runs one lane: `e2e`, `browser`, `docker`, `host`, `agent-sdk`, `model-api`, or a
   lane the repo declares.
-- `rig init` writes the `test`, `test:related` and `test:<lane>` scripts and a starter config.
+- `rig bench [name]` and `rig eval [name]` run the benchmarks and the evaluation suites, or the one
+  named `name`.
+- `rig init` writes the `test`, `test:related`, `test:<lane>`, `bench` and `eval` scripts the repo
+  has files for, and a starter config.
 
 `rig unit` and the lane commands pass every argument after the command on to `bun test`, so
 `bun run test --seed=1` replays a run's order, and rig drops one `--` among them. The exception is
 `--timeout`: the lane's limit in `rig.config.ts` is its one per-test timeout, so rig exits 2 on a
 `--timeout` or `--timeout=<ms>` argument and runs nothing. `rig related` takes changed file paths
 only, and exits 2 on an option.
+
+An `e2e/` folder is the e2e lane's in a folder that holds a `package.json`, and at the repo root
+only when the root `package.json` has no `workspaces` field.
 
 Among those arguments, a path keeps only the lane's own files that it selects: a file, the files
 under a folder, or, for a bare word, the files whose path holds it. rig resolves a path, with its
@@ -69,6 +76,11 @@ export default defineRig({
 
 Oxlint's plugin reads this file under Node 22.18 or later, or under Bun, because it imports the
 config to take the limits from it.
+
+A repo declares the programs its `e2e/` folders and benchmarks run in `programs`, which `rig e2e`
+and `rig bench` build first; `resolveProgram` gives each one's command. `rig bench` and `rig eval`
+run the benchmarks and evaluation suites. [Programs in e2e tests](../../docs/guides/e2e-programs.md)
+and [benchmarks and evaluations](../../docs/guides/benchmarks-and-evals.md) describe each.
 
 ## Testing in a page
 

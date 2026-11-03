@@ -1,3 +1,5 @@
+import { collectBenchFiles } from './collect-bench-files.ts';
+import { collectEvalFiles } from './collect-eval-files.ts';
 import { pickE2EDirs } from './pick-e2e-dirs.ts';
 import { standardLanes } from './standard-lanes.ts';
 import type { ResolvedLane, RigConfig } from './types.ts';
@@ -10,26 +12,38 @@ export function buildInitScripts(
   oldScripts: PackageScripts,
   config: RigConfig,
   trackedFiles: readonly string[],
+  isWorkspaceRepo: boolean,
 ): PackageScripts {
   const laneScripts = config.lanes
-    .filter((lane) => lane.name !== 'unit' && isLaneWanted(lane, trackedFiles))
+    .filter((lane) => lane.name !== 'unit' && isLaneWanted(lane, trackedFiles, isWorkspaceRepo))
     .map((lane): [string, string] => [`test:${lane.name}`, `rig ${lane.name}`]);
+
+  const benchScripts =
+    collectBenchFiles(trackedFiles, isWorkspaceRepo).length > 0 ? { bench: 'rig bench' } : {};
+
+  const evalScripts = collectEvalFiles(trackedFiles).length > 0 ? { eval: 'rig eval' } : {};
 
   return {
     ...oldScripts,
     test: 'rig unit',
     'test:related': 'rig related',
     ...Object.fromEntries(laneScripts),
+    ...benchScripts,
+    ...evalScripts,
   };
 }
 
-function isLaneWanted(lane: ResolvedLane, trackedFiles: readonly string[]): boolean {
+function isLaneWanted(
+  lane: ResolvedLane,
+  trackedFiles: readonly string[],
+  isWorkspaceRepo: boolean,
+): boolean {
   if (!standardLanes.some((standard) => standard.name === lane.name)) {
     return true;
   }
 
   if (lane.suffix === null) {
-    return pickE2EDirs(trackedFiles).length > 0;
+    return pickE2EDirs(trackedFiles, isWorkspaceRepo).length > 0;
   }
 
   const suffix = lane.suffix;

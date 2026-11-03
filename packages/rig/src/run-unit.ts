@@ -38,6 +38,7 @@ export async function runUnit(
     config,
     lane: unitLane,
     repoRoot: run.repoRoot,
+    isWorkspaceRepo: await deps.probeWorkspaceRepo(run.repoRoot),
     trackedFiles: await deps.readTrackedFiles(run.repoRoot),
     args: parseTestArgs(extraArgs),
   });

@@ -2,14 +2,14 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { resolveProgram } from '@zgeoff/rig/e2e';
 import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
 import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { $ } from 'bun';
 import { buildInitGuardHooks } from '../src/test-utils/build-init-guard-hooks.ts';
 import { commitAllFiles } from '../src/test-utils/commit-all-files.ts';
-import { getChexE2EPack } from '../src/test-utils/get-chex-e2e-pack.ts';
-import { runChexCLI } from '../src/test-utils/run-chex-cli.ts';
+import { runToExit } from '../src/test-utils/run-to-exit.ts';
 
 // The repo has an origin and a feature branch, as a pushed branch does.
 async function setupTest() {
@@ -28,7 +28,17 @@ async function setupTest() {
   await $`git push --quiet -u origin main`.cwd(repo).env({ ...env });
   await $`git switch --quiet -c feature`.cwd(repo).env({ ...env });
 
-  return { repo, env, chexBin: getChexE2EPack(process.env).binPath };
+  const chex = await resolveProgram('chex');
+
+  return {
+    repo,
+    env,
+    runChex: async (args: readonly string[]) => {
+      const result = await runToExit([...chex.command, ...args], { cwd: repo, env });
+
+      return { ...result, lastLine: result.stdout.trimEnd().split('\n').at(-1) };
+    },
+  };
 }
 
 test('it prints cleared and exits 0 when the check passes', async () => {
@@ -37,7 +47,7 @@ test('it prints cleared and exits 0 when the check passes', async () => {
   await writeTreeFiles(ctx.repo, { 'README.md': '# Kettle\n\nThe kettle boils water.\n' });
   await commitAllFiles(ctx.repo, ctx.env, 'docs: add the readme');
 
-  const run = await runChexCLI(ctx.chexBin, ctx.repo, ctx.env, ['prose']);
+  const run = await ctx.runChex(['prose']);
 
   expect({ exitCode: run.exitCode, lastLine: run.lastLine }).toStrictEqual({
     exitCode: 0,
@@ -51,7 +61,7 @@ test('it prints each check of a list on its own line and exits 1 when one bounce
   await writeTreeFiles(ctx.repo, { 'README.md': '# Kettle\n\nRead the [guide](./guide.md).\n' });
   await commitAllFiles(ctx.repo, ctx.env, 'docs: add the readme');
 
-  const run = await runChexCLI(ctx.chexBin, ctx.repo, ctx.env, ['length', 'links']);
+  const run = await ctx.runChex(['length', 'links']);
 
   expect({ exitCode: run.exitCode, stdout: run.stdout }).toStrictEqual({
     exitCode: 1,
@@ -69,7 +79,7 @@ test('it writes lefthook.yml and the check:docs script to disk for init', async 
     }),
   });
 
-  const run = await runChexCLI(ctx.chexBin, ctx.repo, ctx.env, ['init']);
+  const run = await ctx.runChex(['init']);
   const lefthook = await Bun.file(join(ctx.repo, 'lefthook.yml')).text();
   const packageJSON: unknown = await Bun.file(join(ctx.repo, 'package.json')).json();
 

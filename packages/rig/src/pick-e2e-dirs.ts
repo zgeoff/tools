@@ -1,6 +1,9 @@
-// An `e2e` folder counts at the repo root or in an app root, which holds a package.json, and a
-// folder whose name ends in `-e2e` counts as a package of its own.
-export function pickE2EDirs(trackedFiles: readonly string[]): readonly string[] {
+// An `e2e` folder counts in a folder that holds a package.json, and at the repo root only in a
+// single-package repo: a workspace repo keeps each e2e folder in the package it tests.
+export function pickE2EDirs(
+  trackedFiles: readonly string[],
+  isWorkspaceRepo: boolean,
+): readonly string[] {
   const tracked = new Set(trackedFiles);
   const dirs = new Set<string>();
 
@@ -10,10 +13,10 @@ export function pickE2EDirs(trackedFiles: readonly string[]): readonly string[] 
     for (const [index, name] of segments.entries()) {
       const parent = segments.slice(0, index).join('/');
       const prefix = parent === '' ? '' : `${parent}/`;
+      const isRoot = parent === '';
 
       const isE2EDir =
-        (name === 'e2e' && (parent === '' || tracked.has(`${prefix}package.json`))) ||
-        (name.endsWith('-e2e') && tracked.has(`${prefix}${name}/package.json`));
+        name === 'e2e' && (isRoot ? !isWorkspaceRepo : tracked.has(`${prefix}package.json`));
 
       if (isE2EDir) {
         dirs.add(`${prefix}${name}`);

@@ -4,6 +4,8 @@ import { isCommandName } from './is-command-name.ts';
 test.each([
   ['init', true],
   ['related', true],
+  ['bench', true],
+  ['eval', true],
   ['unit', false],
   ['kiln', false],
 ])('it answers whether %s names a built-in command', (name, expected) => {

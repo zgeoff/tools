@@ -14,8 +14,33 @@ export interface LaneDeclaration {
   readonly stop?: string;
 }
 
+// A program that the e2e tests run: the entry file, the command that builds it, and the file the
+// build leaves.
+export interface ProgramDeclaration {
+  // The package folder, relative to the repo root.
+  readonly package: string;
+
+  // The entry file, relative to the package.
+  readonly source: string;
+
+  // A shell command that rig runs from the package folder.
+  readonly build: string;
+
+  // The built file, relative to the package.
+  readonly artifact: string;
+}
+
+export interface BenchDeclaration {
+  // The lane whose start and stop hooks surround the benchmarks.
+  readonly lane?: string;
+}
+
 export interface RigDeclaration {
   readonly lanes?: Readonly<Record<string, LaneDeclaration>>;
+
+  readonly programs?: Readonly<Record<string, ProgramDeclaration>>;
+
+  readonly bench?: BenchDeclaration;
 }
 
 export type LaneParallelism = 'workers' | number;
@@ -40,6 +65,11 @@ export interface ResolvedLane {
 
 export interface RigConfig {
   readonly lanes: readonly ResolvedLane[];
+
+  readonly programs: Readonly<Record<string, ProgramDeclaration>>;
+
+  // The lane whose hooks surround the benchmarks, or null.
+  readonly benchLane: string | null;
 }
 
 export interface LaneContext {

@@ -5,6 +5,8 @@ import type { InitFiles } from './init-files.ts';
 import type { RigConfig, RigOutput } from './types.ts';
 
 export interface InitDeps {
+  readonly probeWorkspaceRepo: (repoRoot: string) => Promise<boolean>;
+
   readonly readTrackedFiles: (repoRoot: string) => Promise<readonly string[]>;
 
   readonly initFiles: InitFiles;
@@ -36,7 +38,10 @@ export async function runInit(
   const trackedFiles = await deps.readTrackedFiles(repoRoot);
 
   const oldScripts = readScripts(manifest['scripts']);
-  const newScripts = buildInitScripts(oldScripts, config, trackedFiles);
+
+  const isWorkspaceRepo = await deps.probeWorkspaceRepo(repoRoot);
+
+  const newScripts = buildInitScripts(oldScripts, config, trackedFiles, isWorkspaceRepo);
 
   if (JSON.stringify(oldScripts) !== JSON.stringify(newScripts)) {
     await deps.initFiles.writeText(

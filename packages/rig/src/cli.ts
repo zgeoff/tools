@@ -1,9 +1,11 @@
 #!/usr/bin/env bun
 import { existsSync } from 'node:fs';
 import { availableParallelism, totalmem } from 'node:os';
+import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
 import { wireBrowserLaneHooks } from './browser/wire-browser-lane-hooks.ts';
 import { initFiles } from './init-files.ts';
+import { probeWorkspaceRepo } from './probe-workspace-repo.ts';
 import { readRigConfig } from './read-rig-config.ts';
 import { readTrackedFiles } from './read-tracked-files.ts';
 import { readWorkerCount } from './read-worker-count.ts';
@@ -46,10 +48,12 @@ try {
     },
     {
       dietScript: resolveDietScript(),
+      benchScript: join(import.meta.dir, 'run-bench-file.ts'),
       output,
       sources: { cwd: repoRoot, probeFile: existsSync },
       readConfig: (root) =>
         readRigConfig(root, { probeFile: existsSync, importModule: (path) => import(path) }),
+      probeWorkspaceRepo,
       readTrackedFiles,
       initFiles,
       readWorkerCount: () =>

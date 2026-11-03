@@ -10,6 +10,7 @@ test('it runs the unit tests in random order with the worker count and leaves ev
     'test',
     '--parallel=3',
     '--randomize',
+    '--no-isolate',
     '--path-ignore-patterns=**/*.browser.test.ts',
     '--path-ignore-patterns=**/*.browser.test.tsx',
     '--path-ignore-patterns=**/*.docker.test.ts',
@@ -51,3 +52,12 @@ test('it leaves out only the folders that the e2e lane selects', () => {
 
   expect(command.filter((argument) => argument.includes('e2e'))).toBeEmpty();
 });
+
+test.each(['--isolate', '--no-isolate'])(
+  'it adds no --no-isolate when the arguments hold %s',
+  (flag) => {
+    const command = buildUnitCommand(defineRig({}), [], 1, [flag]);
+
+    expect(command.filter((argument) => argument.endsWith('isolate'))).toStrictEqual([flag]);
+  },
+);

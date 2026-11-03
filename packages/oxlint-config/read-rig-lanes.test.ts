@@ -173,7 +173,10 @@ test('it keys each lane but unit by its suffix, and a directory lane by its name
     { ...lane, name: 'kiln', suffix: '.kiln', limitMs: 15_000 },
   ];
 
-  const parseRigConfig = (): ParsedRigConfig => ({ kind: 'parsed', config: { lanes } });
+  const parseRigConfig = (): ParsedRigConfig => ({
+    kind: 'parsed',
+    config: { lanes, programs: {}, benchLane: null },
+  });
 
   const modules: Readonly<Record<string, unknown>> = {
     [pathToFileURL('/bakery/rig.config.ts').href]: { default: { lanes: { kiln: {} } } },

@@ -29,6 +29,14 @@
       "bun": "./src/index.ts",
       "default": "./dist/index.js"
     },
+    "./e2e": {
+      "types": "./dist/e2e.d.ts",
+      "bun": "./src/e2e.ts"
+    },
+    "./bench": {
+      "types": "./dist/bench.d.ts",
+      "bun": "./src/bench.ts"
+    },
     "./test-utils/*": "./src/test-utils/*.ts"
   },
   "publishConfig": {

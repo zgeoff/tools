@@ -13,6 +13,8 @@ export interface UnitRequest {
 export interface UnitRunDeps {
   readonly dietScript: string;
 
+  readonly probeWorkspaceRepo: (repoRoot: string) => Promise<boolean>;
+
   readonly readTrackedFiles: (repoRoot: string) => Promise<readonly string[]>;
 
   readonly runCommand: (command: readonly string[], options: CommandOptions) => Promise<number>;
@@ -27,8 +29,9 @@ export async function runUnitTests(
   deps: UnitRunDeps,
 ): Promise<number> {
   const trackedFiles = await deps.readTrackedFiles(run.repoRoot);
+  const isWorkspaceRepo = await deps.probeWorkspaceRepo(run.repoRoot);
 
-  const e2eDirs = pickE2EDirs(trackedFiles);
+  const e2eDirs = pickE2EDirs(trackedFiles, isWorkspaceRepo);
   const memory = config.lanes.find((lane) => lane.name === 'unit')?.memory ?? null;
 
   return deps.runCommand(

@@ -20,6 +20,9 @@ async function setupTest() {
     repoRoot,
     output,
     deps: {
+      probeWorkspaceRepo: mock<(repoRoot: string) => Promise<boolean>>(() =>
+        Promise.resolve(false),
+      ),
       readTrackedFiles: mock<(repoRoot: string) => Promise<readonly string[]>>(),
       initFiles,
       output,

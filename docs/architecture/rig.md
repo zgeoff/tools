@@ -48,11 +48,12 @@ that matches no file. Otherwise it runs three steps, and the last one always run
    environment variables for the tests.
 2. `run` starts `bun test` under `diet`, with the lane's limit as `--timeout`, its process count as
    `--parallel`, and its memory as `diet`'s budget. The lane's suffix filter or its `e2e` folders
-   select the files. The folders are the `e2e` folders at the repo root or an app root and the
-   `-e2e` packages that git tracks. When the arguments name paths, rig narrows them to the lane's
-   own tracked test files and hands `bun test` that exact list, because `bun test` runs any file a
-   path names, whatever its lane. Paths that select none of the lane's files fail the run with exit
-   code 1, so a mistyped path never passes as a run with no tests.
+   select the files. The folders are the `e2e` folders that git tracks in a folder that holds a
+   `package.json`, and at the repo root only when the root `package.json` has no `workspaces` field.
+   When the arguments name paths, rig narrows them to the lane's own tracked test files and hands
+   `bun test` that exact list, because `bun test` runs any file a path names, whatever its lane.
+   Paths that select none of the lane's files fail the run with exit code 1, so a mistyped path
+   never passes as a run with no tests.
 3. `stop` cleans up, whether the tests passed, failed or never started. When `stop` throws, rig
    exits 1, and what it reports depends on how the lane ended:
    - after `start` or `run` threw, that error first and the stop error second;
@@ -66,13 +67,13 @@ running. The abort sends the group SIGTERM, then SIGKILL after a deadline, and t
 no member of the group runs, so that `stop` can clean up. An aborted run exits 1 whatever the tests'
 exit code was. A command that exits on its own has the rest of its group stopped the same way.
 
-`rig unit` builds its `bun test` command from the same table: one path ignore for every lane suffix
-and for the `e2e` folders. A lane declared in `rig.config.ts` therefore leaves the unit run without
-any ignore list in `package.json`. Like a lane, `rig unit` exits 0 when git tracks no unit test
-file. `rig related` runs the unit lane in its own process on the tests beside the changed files,
-takes the lane suffixes from the table, and skips when the branch changes a shared test input or has
-more than 50 related files. `rig init` writes the package scripts for the lanes the repo has and a
-starter config, and a second run changes nothing.
+`rig unit` builds its `bun test` command from the same table: `--no-isolate` unless the arguments
+hold `--isolate`, one path ignore for every lane suffix and for the `e2e` folders. A lane declared
+in `rig.config.ts` therefore leaves the unit run without any ignore list in `package.json`. Like a
+lane, `rig unit` exits 0 when git tracks no unit test file. `rig related` runs the unit lane in its
+own process on the tests beside the changed files, takes the lane suffixes from the table, and skips
+when the branch changes a shared test input or has more than 50 related files. `rig init` writes the
+package scripts for the lanes the repo has and a starter config, and a second run changes nothing.
 
 ## The browser lane
 
@@ -136,6 +137,30 @@ fails under a cap that the lane's memory use never reaches. A cgroup cap counts 
 process uses. The recorded shell runs `bash` on `diet`'s script, which rig resolves from its own
 `@zgeoff/diet` dependency, so a repo's `PATH` never decides which cap runs.
 
+## Programs, benchmarks and evaluations
+
+An e2e test runs the program it checks. `rig.config.ts` declares each program with its package,
+source, build command and artifact, and `defineRig` checks every entry. `rig e2e` refuses an `e2e`
+folder in a package that no program names, builds each program once in its package folder before the
+tests start, and sets `RIG_PROGRAM_<NAME>` to the artifact's absolute path in the tests'
+environment. rig owns only which command runs: `resolveProgram` in `@zgeoff/rig/e2e` reads that
+variable and gives the command and the repo root, and the test spawns the command itself. With the
+variable unset, `resolveProgram` throws when `CI` is set, so CI never tests an unbuilt program, and
+otherwise gives a command that runs the source with bun. It finds the repo root by walking up to
+`rig.config.ts`.
+
+`rig bench` runs each tracked `bench/*.bench.ts` file of a package in a process of its own, under
+`diet`, because a benchmark's heap must not leak into the next one. The process runs the file's
+`defineBench` result through `run-bench-file.ts`: `setup` once, 5 warm-up runs, 20 measured runs,
+and a median that is compared to the budget. A `finally` then calls the `setup` result's
+`Symbol.asyncDispose` when it has one, so a program that `setup` started stops even when a run
+throws. Before the first file, `rig bench` builds each program and sets `RIG_PROGRAM_<NAME>` through
+the same code as `rig e2e`, so a benchmark that starts a program from `resolveProgram` runs the
+artifact in CI. When `bench.lane` names a lane, the lane's `start` hook runs before the first file
+and its environment reaches every file, and the `stop` hook runs after the last, whether the
+benchmarks pass or not. `rig eval` runs each tracked `evals/<name>/run-<name>-eval.ts` script with
+`bun` from the repo root, one after another.
+
 ## One source for the limits
 
 `@zgeoff/oxlint-config` reads `rig.config.ts` when oxlint loads its plugin. Its `max-test-timeout`
@@ -158,14 +183,14 @@ each rule. A repo without the file keeps the rules' own table.
 
 ## The journeys that test rig
 
-rig's own e2e journeys run the package that npm publishes, not its source. This repo's
-`rig.config.ts` gives the e2e lane a start hook that builds rig once per run, packs it with
-`bun pm pack`, unpacks the tarball, and hands the tests the unpacked bin in `RIG_E2E_BIN`. A broken
-build, a `files` list that drops a module the CLI loads, or a bin that the tarball lacks therefore
-fails the lane. The pack sits in a cache folder under rig's own `node_modules`, because the repo's
-isolated linker links rig's dependencies there and not at the repo root. The stop hook removes the
-run's pack, and the next run's start removes any pack whose run has exited. A journey that runs
-outside the lane fails at once, because nothing set `RIG_E2E_BIN`.
+rig's own e2e journeys run rig through the command that `resolveProgram` gives for the `rig` program
+in this repo's `rig.config.ts`. The config also gives the e2e lane a start hook that builds rig once
+per run, packs it with `bun pm pack`, and unpacks the tarball, and its Chrome warm-up runs the
+unpacked bin. A broken build, a `files` list that drops a module the CLI loads, or a bin that the
+tarball lacks therefore fails the lane. The pack sits in a cache folder under rig's own
+`node_modules`, because the repo's isolated linker links rig's dependencies there and not at the
+repo root. The stop hook removes the run's pack, and the next run's start removes any pack whose run
+has exited.
 
 A fresh CI runner's first Chrome start is the slow one, so after it unpacks the bin, the start hook
 starts Chrome once and the journeys that start Chrome never pay for that first start. The hook
