@@ -4,11 +4,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { readGitEnv } from '../test-utils/read-git-env.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { runTestLayoutCheck } from './run-test-layout-check.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `run-test-layout-check-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('run-test-layout-check-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
