@@ -49,8 +49,6 @@ export interface BrowserLaneOptions {
   ) => Promise<number>;
 }
 
-// The build and the run ID come from here, once per run, because the lane makes the run's folders
-// before `bun test` starts and removes them after it ends.
 export function makeBrowserLaneHooks(options: BrowserLaneOptions): LaneHooks {
   const state = { hasRunFolders: false, keepsFolders: false };
 

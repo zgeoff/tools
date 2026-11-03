@@ -62,7 +62,6 @@ export async function runCLI(argv: readonly string[], run: RigRun, deps: CLIDeps
     return 2;
   }
 
-  // Each file of a lane shares its process's global, so a leak between files fails the run.
   const isolateArg = findIsolateArg(args.extraArgs);
 
   if (isolateArg !== undefined) {

@@ -12,8 +12,6 @@ await startBrowser({
   hostName: hostname(),
   environment: process.env,
 
-  // A profile of the process's own, so a Chrome never starts on a profile that another Chrome
-  // still holds.
   profileName: crypto.randomUUID(),
   readDirNames: laneFiles.readDirNames,
   openView: openChromeView,
