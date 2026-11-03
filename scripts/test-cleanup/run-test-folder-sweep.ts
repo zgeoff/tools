@@ -46,7 +46,13 @@ async function runCLI(): Promise<void> {
     readCandidatePaths: async () => {
       const temp = tmpdir();
 
-      const tempNames = await readdir(temp).catch(() => []);
+      const tempNames = await readdir(temp).catch((error: unknown) => {
+        process.stderr.write(
+          `test-folder-sweep: skipped ${temp}, which it could not read: ${String(error)}\n`,
+        );
+
+        return [];
+      });
 
       const ignored = await $`git ls-files --others --ignored --exclude-standard --directory -z`
         .quiet()

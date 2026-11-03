@@ -142,3 +142,25 @@ test.if(process.getuid?.() !== 0)(
     expect(names).toStrictEqual([basename(stuck)]);
   },
 );
+
+test.if(process.getuid?.() !== 0)(
+  'it says so when it cannot read the temp folder, and exits 0 when run as a script',
+  async () => {
+    const temp = await mkdtemp(join(tmpdir(), readRunFolderPrefix('test-folder-sweep-')));
+
+    onTestFinished(async () => {
+      await chmod(temp, 0o700);
+      await rm(temp, { recursive: true, force: true });
+    });
+
+    await chmod(temp, 0o000);
+
+    const result = await $`${process.execPath} ${join(import.meta.dir, 'run-test-folder-sweep.ts')}`
+      .env({ ...process.env, TMPDIR: temp })
+      .nothrow()
+      .quiet();
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr.toString()).toInclude(`test-folder-sweep: skipped ${temp}`);
+  },
+);
