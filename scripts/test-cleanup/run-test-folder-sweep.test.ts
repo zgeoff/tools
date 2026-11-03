@@ -170,3 +170,48 @@ test.if(process.getuid?.() !== 0)(
     expect(result.stderr.toString()).toInclude(`test-folder-sweep: skipped ${temp}`);
   },
 );
+
+test("it removes an ignored repo folder of an exited process and keeps a live one's when run as a script", async () => {
+  const temp = await mkdtemp(join(tmpdir(), readRunFolderPrefix('test-folder-sweep-')));
+
+  onTestFinished(() => rm(temp, { recursive: true, force: true }));
+
+  const repo = join(temp, 'repo');
+  const emptyTemp = join(temp, 'empty-temp');
+
+  const gitFreeEnv = Object.fromEntries(
+    Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_')),
+  );
+
+  await mkdir(emptyTemp);
+  await mkdir(repo);
+
+  await $`git init --quiet`.cwd(repo).env(gitFreeEnv).quiet();
+
+  await writeFile(join(repo, '.gitignore'), '.test-*\n');
+
+  const exited = Bun.spawn(['true']);
+
+  await exited.exited;
+
+  const namespace = readPIDNamespace({ platform: process.platform, readLink: readlinkSync });
+
+  await mkdir(join(repo, `.test-kettle-pid${exited.pid}-ns${namespace}-Ab12Cd`));
+  await mkdir(join(repo, `.test-kettle-pid${process.pid}-ns${namespace}-Ef34Gh`));
+
+  const result = await $`${process.execPath} ${join(import.meta.dir, 'run-test-folder-sweep.ts')}`
+    .cwd(repo)
+    .env({ ...gitFreeEnv, TMPDIR: emptyTemp })
+    .nothrow()
+    .quiet();
+
+  const names = await readdir(repo);
+
+  expect(result.exitCode).toBe(0);
+
+  expect(names).toIncludeSameMembers([
+    '.git',
+    '.gitignore',
+    `.test-kettle-pid${process.pid}-ns${namespace}-Ef34Gh`,
+  ]);
+});
