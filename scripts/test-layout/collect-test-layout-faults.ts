@@ -10,6 +10,7 @@ export interface SourceFile {
 
 const rootTestDirs = ['e2e', 'integration', 'test-utils'] as const;
 const sourcePattern = /\.(?:[cm]?[jt]s|[jt]sx)$/u;
+const oldHelperPattern = /^(?<root>packages\/[^/]+)\/test-utils\//u;
 
 export function collectTestLayoutFaults(
   trackedPaths: readonly string[],
@@ -19,8 +20,15 @@ export function collectTestLayoutFaults(
     .filter((directory) => trackedPaths.some((path) => path.startsWith(`${directory}/`)))
     .map(
       (directory) =>
-        `${directory}/ sits at the repo root; move each file into the workspace it tests, such as packages/<name>/${directory}/`,
+        `${directory}/ sits at the repo root; move each file into the workspace it tests, such as packages/<name>/${directory === 'test-utils' ? 'src/' : ''}${directory}/`,
     );
+
+  const packageDirFaults = [
+    ...new Set(trackedPaths.flatMap((path) => oldHelperPattern.exec(path)?.groups?.['root'] ?? [])),
+  ].map(
+    (root) =>
+      `${root}/test-utils/ holds test helpers outside src/; move each file into ${root}/src/test-utils/`,
+  );
 
   const importFaults = sources
     .filter((source) => sourcePattern.test(source.path))
@@ -34,19 +42,15 @@ export function collectTestLayoutFaults(
         ];
       }
 
-      return collectRelativeImports(parsed.program)
-        .map((specifier) => normalize(join(dirname(source.path), specifier)))
-        .filter((target) => isForeignHelper(source.path, target))
-        .map(
-          (target) =>
-            `${source.path} imports ${target}, a test helper of ${getWorkspaceRoot(target)}; copy the helper into the importer's own test-utils/`,
-        );
+      return collectImportSpecifiers(parsed.program).flatMap((specifier) =>
+        collectImportFaults(source.path, specifier),
+      );
     });
 
-  return [...rootDirFaults, ...importFaults];
+  return [...rootDirFaults, ...packageDirFaults, ...importFaults];
 }
 
-function collectRelativeImports(program: Program): string[] {
+function collectImportSpecifiers(program: Program): string[] {
   const specifiers: string[] = [];
 
   const addLiteral = (node: Expression | StringLiteral | null | undefined): void => {
@@ -96,15 +100,51 @@ function collectRelativeImports(program: Program): string[] {
 
   visitor.visit(program);
 
-  return specifiers.filter((path) => path.startsWith('./') || path.startsWith('../'));
+  return specifiers;
 }
 
-function isForeignHelper(importer: string, target: string): boolean {
-  const targetRoot = getWorkspaceRoot(target);
-  const helperFolder = targetRoot === '' ? 'test-utils' : `${targetRoot}/test-utils`;
-  const isHelper = target === helperFolder || target.startsWith(`${helperFolder}/`);
+const packageHelperPattern = /^@[^/]+\/[^/]+\/test-utils(?:\/|$)/u;
 
-  return isHelper && targetRoot !== getWorkspaceRoot(importer);
+function collectImportFaults(importer: string, specifier: string): string[] {
+  const isRelative = specifier.startsWith('./') || specifier.startsWith('../');
+  const target = isRelative ? normalize(join(dirname(importer), specifier)) : specifier;
+  const isHelper = isRelative ? isHelperPath(target) : packageHelperPattern.test(specifier);
+
+  if (isHelper && isProductionCode(importer)) {
+    return [
+      `${importer} imports ${target}, a test helper, from production code; import test helpers only from tests and other test helpers`,
+    ];
+  }
+
+  if (!isRelative || !isHelper) {
+    return [];
+  }
+
+  const targetRoot = getWorkspaceRoot(target);
+
+  if (targetRoot === getWorkspaceRoot(importer)) {
+    return [];
+  }
+
+  const fix = targetRoot.startsWith('packages/')
+    ? "import it by the package's name, with the package as a workspace:* dev dependency"
+    : "copy the helper into the importer's own test-utils/";
+
+  return [`${importer} imports ${target}, a test helper of ${targetRoot}; ${fix}`];
+}
+
+function isHelperPath(path: string): boolean {
+  const folder = getHelperFolder(getWorkspaceRoot(path));
+
+  return path === folder || path.startsWith(`${folder}/`);
+}
+
+function getHelperFolder(root: string): string {
+  if (root === '') {
+    return 'test-utils';
+  }
+
+  return root.startsWith('packages/') ? `${root}/src/test-utils` : `${root}/test-utils`;
 }
 
 function getWorkspaceRoot(path: string): string {
@@ -117,4 +157,16 @@ function getWorkspaceRoot(path: string): string {
   return segments[0] === 'packages' && segments.length > 2
     ? `packages/${segments[1]}`
     : (segments[0] ?? '');
+}
+
+// A package's production code is its src/, less its tests and its test helpers.
+function isProductionCode(path: string): boolean {
+  const root = getWorkspaceRoot(path);
+
+  return (
+    root.startsWith('packages/') &&
+    path.startsWith(`${root}/src/`) &&
+    !isHelperPath(path) &&
+    !/\.test\.[^/]+$/u.test(path)
+  );
 }
