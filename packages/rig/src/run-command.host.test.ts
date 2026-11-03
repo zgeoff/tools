@@ -3,8 +3,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { probeProcess } from '../test-utils/probe-process.ts';
 import { runCommand } from './run-command.ts';
+import { probeProcess } from './test-utils/probe-process.ts';
 
 async function setupTest() {
   const stack = new AsyncDisposableStack();

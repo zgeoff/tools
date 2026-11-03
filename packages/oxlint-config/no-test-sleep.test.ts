@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { runLintTree } from './test-utils/run-lint-tree.ts';
+import { runLintTree } from './src/test-utils/run-lint-tree.ts';
 
 test.each([
   ['Bun.sleep', "test('it brews', async () => {\n  await Bun.sleep(50);\n});\n"],

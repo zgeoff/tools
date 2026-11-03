@@ -20,7 +20,8 @@
   "files": [
     "src",
     "!src/**/*.test.ts",
-    "lefthook.yml"
+    "lefthook.yml",
+    "!src/test-utils"
   ],
   "type": "module",
   "publishConfig": {

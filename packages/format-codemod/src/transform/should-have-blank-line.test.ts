@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { parseStatementPair } from '../../test-utils/parse-statement-pair.ts';
+import { parseStatementPair } from '../test-utils/parse-statement-pair.ts';
 import { collectASTNodes } from './collect-ast-nodes.ts';
 import { isASTNode } from './is-ast-node.ts';
 import { parseSource } from './parse-source.ts';

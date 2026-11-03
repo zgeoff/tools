@@ -10,6 +10,6 @@
     "test-timeout-exception-ticket.test.ts",
     "no-test-sleep.test.ts",
     "read-rig-lanes.test.ts",
-    "test-utils"
+    "src"
   ]
 }

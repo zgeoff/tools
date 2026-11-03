@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { parseSourceOrThrow } from '../../test-utils/parse-source-or-throw.ts';
+import { parseSourceOrThrow } from '../test-utils/parse-source-or-throw.ts';
 import { buildEditsFromAST } from './build-edits-from-ast.ts';
 
 test('it returns edits sorted last-to-first', () => {

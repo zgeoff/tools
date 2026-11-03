@@ -3,9 +3,9 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { buildTextWithBlobPrefix } from '../test-utils/build-text-with-blob-prefix.ts';
 import { runLocalPathsCheck } from './run-local-paths-check.ts';
 import { runProgram } from './run-program.ts';
+import { buildTextWithBlobPrefix } from './test-utils/build-text-with-blob-prefix.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'run-local-paths-check-'));

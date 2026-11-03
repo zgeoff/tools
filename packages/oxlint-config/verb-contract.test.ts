@@ -2,8 +2,8 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readPinnedSkillText } from '@zgeoff/std/test-utils/read-pinned-skill-text';
 import { nodeFileSystem } from '../../scripts/ci/node-file-system.ts';
-import { readPinnedSkillText } from './test-utils/read-pinned-skill-text.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'verb-contract-test-'));

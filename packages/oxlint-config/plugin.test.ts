@@ -1,14 +1,14 @@
 import { expect, test } from 'bun:test';
 import { symlink } from 'node:fs/promises';
 import { join } from 'node:path';
+import { readPinnedSkillText } from '@zgeoff/std/test-utils/read-pinned-skill-text';
 import { nodeFileSystem } from '../../scripts/ci/node-file-system.ts';
-import { collectBannedVerbs } from './test-utils/collect-banned-verbs.ts';
-import { createLintTree } from './test-utils/create-lint-tree.ts';
-import { readPinnedSkillText } from './test-utils/read-pinned-skill-text.ts';
-import { runLintIn } from './test-utils/run-lint-in.ts';
-import { runLintTree } from './test-utils/run-lint-tree.ts';
-import { runLint } from './test-utils/run-lint.ts';
-import { runOxlint } from './test-utils/run-oxlint.ts';
+import { collectBannedVerbs } from './src/test-utils/collect-banned-verbs.ts';
+import { createLintTree } from './src/test-utils/create-lint-tree.ts';
+import { runLintIn } from './src/test-utils/run-lint-in.ts';
+import { runLintTree } from './src/test-utils/run-lint-tree.ts';
+import { runLint } from './src/test-utils/run-lint.ts';
+import { runOxlint } from './src/test-utils/run-oxlint.ts';
 
 test('it flags a multi-line JSDoc block', async () => {
   const source = '/**\n * Documents the export.\n */\nexport const answer = 42;\n';

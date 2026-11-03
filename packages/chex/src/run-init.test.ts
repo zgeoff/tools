@@ -3,11 +3,11 @@ import { mkdtemp, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
-import { buildInitGuardHooks } from '../test-utils/build-init-guard-hooks.ts';
-import { lockFileWrites } from '../test-utils/lock-file-writes.ts';
-import { makeFailOnCall } from '../test-utils/make-fail-on-call.ts';
 import type { InitDeps } from './run-init.ts';
 import { runInit } from './run-init.ts';
+import { buildInitGuardHooks } from './test-utils/build-init-guard-hooks.ts';
+import { lockFileWrites } from './test-utils/lock-file-writes.ts';
+import { makeFailOnCall } from './test-utils/make-fail-on-call.ts';
 import { writeTextFile } from './write-text-file.ts';
 
 async function setupTest() {

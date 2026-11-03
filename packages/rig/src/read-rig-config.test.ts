@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
+import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { defineRig } from './define-rig.ts';
 import { readRigConfig } from './read-rig-config.ts';
 import type { RigConfigSources } from './read-rig-config.ts';

@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'bun:test';
-import { buildStubCheckRunner } from '../test-utils/build-stub-check-runner.ts';
 import { runChex } from './run-chex.ts';
+import { buildStubCheckRunner } from './test-utils/build-stub-check-runner.ts';
 
 function setupTest() {
   const lines: string[] = [];

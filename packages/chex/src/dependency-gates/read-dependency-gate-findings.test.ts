@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'bun:test';
-import { buildStubProgramRunner } from '../../test-utils/build-stub-program-runner.ts';
 import type { ProgramResult } from '../run-program.ts';
+import { buildStubProgramRunner } from '../test-utils/build-stub-program-runner.ts';
 import { readDependencyGateFindings } from './read-dependency-gate-findings.ts';
 
 test('it passes a repo with no override, exclude or audit ignore, and runs no audit', () => {

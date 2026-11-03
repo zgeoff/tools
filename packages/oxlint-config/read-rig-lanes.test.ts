@@ -2,9 +2,9 @@ import { expect, test } from 'bun:test';
 import { pathToFileURL } from 'node:url';
 import { defineRig, parseRigConfig } from '../rig/src/index.ts';
 import readRigLanes from './read-rig-lanes.js';
-import { buildRigConfigSource } from './test-utils/build-rig-config-source.ts';
-import { buildTimeoutSource } from './test-utils/build-timeout-source.ts';
-import { runLintTree } from './test-utils/run-lint-tree.ts';
+import { buildRigConfigSource } from './src/test-utils/build-rig-config-source.ts';
+import { buildTimeoutSource } from './src/test-utils/build-timeout-source.ts';
+import { runLintTree } from './src/test-utils/run-lint-tree.ts';
 
 test('it reads the limit of a lane that rig.config.ts declares', async () => {
   const files = {

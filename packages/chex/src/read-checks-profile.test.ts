@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'bun:test';
-import { buildStubProgramRunner } from '../test-utils/build-stub-program-runner.ts';
 import { readChecksProfile } from './read-checks-profile.ts';
+import { buildStubProgramRunner } from './test-utils/build-stub-program-runner.ts';
 
 test.each([['public' as const], ['private' as const]])(
   'it takes CHECKS_PROFILE=%s and never asks GitHub',

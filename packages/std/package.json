@@ -11,14 +11,16 @@
   "files": [
     "src",
     "!src/*.test.ts",
-    "dist"
+    "dist",
+    "!src/test-utils"
   ],
   "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
-    }
+    },
+    "./test-utils/*": "./src/test-utils/*.ts"
   },
   "publishConfig": {
     "access": "public"

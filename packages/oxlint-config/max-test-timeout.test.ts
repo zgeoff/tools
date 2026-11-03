@@ -1,14 +1,14 @@
 import { expect, test } from 'bun:test';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { readPinnedSkillText } from '@zgeoff/std/test-utils/read-pinned-skill-text';
 import { nodeFileSystem } from '../../scripts/ci/node-file-system.ts';
-import { buildRigConfigSource } from './test-utils/build-rig-config-source.ts';
-import { buildTimeoutSource } from './test-utils/build-timeout-source.ts';
-import { createLintTree } from './test-utils/create-lint-tree.ts';
-import { readPinnedSkillText } from './test-utils/read-pinned-skill-text.ts';
-import { readRigLaneLimit } from './test-utils/read-rig-lane-limit.ts';
-import { runLintIn } from './test-utils/run-lint-in.ts';
-import { runLintTree } from './test-utils/run-lint-tree.ts';
+import { buildRigConfigSource } from './src/test-utils/build-rig-config-source.ts';
+import { buildTimeoutSource } from './src/test-utils/build-timeout-source.ts';
+import { createLintTree } from './src/test-utils/create-lint-tree.ts';
+import { readRigLaneLimit } from './src/test-utils/read-rig-lane-limit.ts';
+import { runLintIn } from './src/test-utils/run-lint-in.ts';
+import { runLintTree } from './src/test-utils/run-lint-tree.ts';
 
 test.each([
   ['a trailing number', "test('it brews', () => {}, 20_000);\n"],
