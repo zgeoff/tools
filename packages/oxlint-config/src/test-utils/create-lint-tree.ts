@@ -2,6 +2,7 @@ import { onTestFinished } from 'bun:test';
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 
 export type RuleSettings = Readonly<Record<string, unknown>>;
 
@@ -10,7 +11,7 @@ export type FileTree = Readonly<Record<string, string>>;
 const rigPackageDir = join(import.meta.dir, '..', '..', '..', 'rig');
 
 export async function createLintTree(files: FileTree, rules: RuleSettings): Promise<string> {
-  const parent = await mkdtemp(join(tmpdir(), `oxlint-config-test-pid${process.pid}-`));
+  const parent = await mkdtemp(join(tmpdir(), readRunFolderPrefix('oxlint-config-test-')));
 
   onTestFinished(() => rm(parent, { recursive: true, force: true }));
 

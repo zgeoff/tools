@@ -3,10 +3,11 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readPinnedSkillText } from '@zgeoff/std/test-utils/read-pinned-skill-text';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { nodeFileSystem } from '../../scripts/ci/node-file-system.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `verb-contract-test-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('verb-contract-test-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

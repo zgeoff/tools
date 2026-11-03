@@ -2,6 +2,7 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { defineRig } from './define-rig.ts';
 import { initFiles } from './init-files.ts';
@@ -9,7 +10,7 @@ import { runInit } from './run-init.ts';
 import { makeRecordingStub } from './test-utils/make-recording-stub.ts';
 
 async function setupTest() {
-  const repoRoot = await mkdtemp(join(tmpdir(), `rig-init-pid${process.pid}-`));
+  const repoRoot = await mkdtemp(join(tmpdir(), readRunFolderPrefix('rig-init-')));
 
   onTestFinished(() => rm(repoRoot, { recursive: true, force: true }));
 

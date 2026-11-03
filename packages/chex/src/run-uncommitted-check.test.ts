@@ -4,12 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createGitCommit } from '@zgeoff/std/test-utils/create-git-commit';
 import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { runGit } from '@zgeoff/std/test-utils/run-git';
 import { runProgram } from './run-program.ts';
 import { runUncommittedCheck } from './run-uncommitted-check.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `run-uncommitted-check-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('run-uncommitted-check-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

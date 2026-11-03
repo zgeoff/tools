@@ -3,12 +3,13 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { makeResolvingStub } from '@zgeoff/std/test-utils/make-resolving-stub';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { buildBrowserRun } from './build-browser-run.ts';
 import { laneFiles } from './lane-files.ts';
 import { startBrowser } from './start-browser.ts';
 
 async function setupTest() {
-  const repoRoot = await mkdtemp(join(tmpdir(), `browser-start-pid${process.pid}-`));
+  const repoRoot = await mkdtemp(join(tmpdir(), readRunFolderPrefix('browser-start-')));
 
   onTestFinished(() => rm(repoRoot, { recursive: true, force: true }));
 

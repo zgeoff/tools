@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { defineRig } from './define-rig.ts';
 import { readRigConfig } from './read-rig-config.ts';
@@ -67,7 +68,7 @@ test('it refuses a rig.config.ts with no default export', async () => {
 });
 
 test('it reads a rig.config.ts from disk through the real file probe and importer', async () => {
-  const repoRoot = await mkdtemp(join(tmpdir(), `rig-config-test-pid${process.pid}-`));
+  const repoRoot = await mkdtemp(join(tmpdir(), readRunFolderPrefix('rig-config-test-')));
 
   onTestFinished(() => rm(repoRoot, { recursive: true, force: true }));
 

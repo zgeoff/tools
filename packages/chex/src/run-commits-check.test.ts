@@ -2,13 +2,14 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
 import { runCommitsCheck } from './run-commits-check.ts';
 import { runProgram } from './run-program.ts';
 import { buildStubCommitlint } from './test-utils/build-stub-commitlint.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `run-commits-check-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('run-commits-check-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

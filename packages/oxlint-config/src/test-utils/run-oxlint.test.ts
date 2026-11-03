@@ -2,10 +2,11 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { runOxlint } from './run-oxlint.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `run-oxlint-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('run-oxlint-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

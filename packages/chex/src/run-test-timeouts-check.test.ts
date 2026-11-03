@@ -3,13 +3,14 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { readPinnedSkillText } from '@zgeoff/std/test-utils/read-pinned-skill-text';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
 import { nodeFileSystem } from '../../../scripts/ci/node-file-system.ts';
 import { runProgram } from './run-program.ts';
 import { runTestTimeoutsCheck } from './run-test-timeouts-check.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `run-test-timeouts-check-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('run-test-timeouts-check-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

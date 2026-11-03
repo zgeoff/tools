@@ -2,10 +2,11 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { createListingStubKit } from './create-listing-stub-kit.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `listing-stub-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('listing-stub-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

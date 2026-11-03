@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { probeProcess } from '@zgeoff/rig/test-utils/probe-process';
 import { systemClock } from '@zgeoff/rig/test-utils/system-clock';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 import { fileLocks } from './src/test-utils/file-locks.ts';
@@ -22,7 +23,7 @@ async function setupTest() {
     new Bun.Glob('packages/{agent-hooks,std}/src/**').scan({ cwd: repoRoot, absolute: true }),
   );
 
-  const directory = await mkdtemp(join(tmpdir(), `agent-hooks-package-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('agent-hooks-package-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

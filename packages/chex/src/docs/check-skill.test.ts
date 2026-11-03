@@ -3,11 +3,12 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
 import { buildSkillPageLines } from '../test-utils/build-skill-page-lines.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `check-skill-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-skill-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

@@ -2,10 +2,11 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { makeBlockingTestRun } from './make-blocking-test-run.ts';
 
 test('it replaces the folder with a file, so a removal inside it fails with ENOTDIR, and passes', async () => {
-  const directory = await mkdtemp(join(tmpdir(), `blocking-test-run-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('blocking-test-run-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

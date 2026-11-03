@@ -6,6 +6,7 @@ import { buildSteppingClock } from '@zgeoff/rig/test-utils/build-stepping-clock'
 import { systemClock } from '@zgeoff/rig/test-utils/system-clock';
 import { makeRejectingStub } from '@zgeoff/std/test-utils/make-rejecting-stub';
 import { makeResolvingStub } from '@zgeoff/std/test-utils/make-resolving-stub';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { buildSignallingClock } from './build-signalling-clock.ts';
 import { createBlockingStubKit } from './create-blocking-stub-kit.ts';
 import { createLockHolder } from './create-lock-holder.ts';
@@ -13,7 +14,7 @@ import { fileLocks } from './file-locks.ts';
 import { withFileLock } from './with-file-lock.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `file-lock-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('file-lock-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

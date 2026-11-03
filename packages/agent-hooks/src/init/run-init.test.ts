@@ -4,12 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { makeRejectingStub } from '@zgeoff/std/test-utils/make-rejecting-stub';
 import { makeResolvingStub } from '@zgeoff/std/test-utils/make-resolving-stub';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { bunFileSystem } from './bun-file-system.ts';
 import { runInit } from './run-init.ts';
 
 async function setupTest() {
-  const project = await mkdtemp(join(tmpdir(), `agent-hooks-init-pid${process.pid}-`));
+  const project = await mkdtemp(join(tmpdir(), readRunFolderPrefix('agent-hooks-init-')));
 
   onTestFinished(() => rm(project, { recursive: true, force: true }));
 

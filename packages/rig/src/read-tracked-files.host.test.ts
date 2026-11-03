@@ -4,12 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createGitCommit } from '@zgeoff/std/test-utils/create-git-commit';
 import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { runGit } from '@zgeoff/std/test-utils/run-git';
 import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { readTrackedFiles } from './read-tracked-files.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `rig-tracked-files-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('rig-tracked-files-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

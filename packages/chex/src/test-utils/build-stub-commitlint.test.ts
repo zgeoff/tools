@@ -3,11 +3,12 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { runProgram } from '../run-program.ts';
 import { buildStubCommitlint } from './build-stub-commitlint.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `build-stub-commitlint-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('build-stub-commitlint-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

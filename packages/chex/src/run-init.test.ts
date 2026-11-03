@@ -3,6 +3,7 @@ import { mkdtemp, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import type { InitDeps } from './run-init.ts';
 import { runInit } from './run-init.ts';
 import { buildInitGuardHooks } from './test-utils/build-init-guard-hooks.ts';
@@ -11,7 +12,7 @@ import { makeFailOnCall } from './test-utils/make-fail-on-call.ts';
 import { writeTextFile } from './write-text-file.ts';
 
 async function setupTest() {
-  const repoRoot = await mkdtemp(join(tmpdir(), `chex-init-pid${process.pid}-`));
+  const repoRoot = await mkdtemp(join(tmpdir(), readRunFolderPrefix('chex-init-')));
 
   const unlocks: (() => Promise<void>)[] = [];
 

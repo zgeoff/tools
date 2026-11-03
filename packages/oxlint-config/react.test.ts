@@ -2,10 +2,11 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { runOxlint } from './src/test-utils/run-oxlint.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `react-overlay-test-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('react-overlay-test-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

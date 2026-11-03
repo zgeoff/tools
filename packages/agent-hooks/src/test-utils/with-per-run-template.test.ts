@@ -6,6 +6,7 @@ import { probeProcess } from '@zgeoff/rig/test-utils/probe-process';
 import { systemClock } from '@zgeoff/rig/test-utils/system-clock';
 import { makeRejectingStub } from '@zgeoff/std/test-utils/make-rejecting-stub';
 import { makeResolvingStub } from '@zgeoff/std/test-utils/make-resolving-stub';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { createBlockingStubKit } from './create-blocking-stub-kit.ts';
 import { fileLocks } from './file-locks.ts';
 import { makeFileWritingStub } from './make-file-writing-stub.ts';
@@ -13,7 +14,7 @@ import { templateFiles } from './template-files.ts';
 import { withPerRunTemplate } from './with-per-run-template.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `per-run-template-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('per-run-template-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
