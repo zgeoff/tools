@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { hostname, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { buildBrowserRun } from '../src/browser/build-browser-run.ts';
 import { pickChromeDirs } from '../src/browser/pick-chrome-dirs.ts';
 import type { StubBuildRepo } from '../src/test-utils/create-stub-build-repo.ts';
@@ -17,7 +18,7 @@ async function setupTest() {
 
   // The build's process ID file sits in the repo, so one cleanup stops the processes before it
   // removes the repo.
-  const repoParent = await mkdtemp(join(tmpdir(), `rig-browser-repo-pid${process.pid}-`));
+  const repoParent = await mkdtemp(join(tmpdir(), readRunFolderPrefix('rig-browser-repo-')));
 
   const started: {
     repo: StubBuildRepo | null;
@@ -59,7 +60,7 @@ async function setupTest() {
   // The lane moves Chrome's temp folder to /tmp when TMPDIR is too long for Chrome's socket path,
   // so the lane gets a TMPDIR of its own that the test owns, and the test asks the lane's own rule
   // where the Chrome folder goes.
-  const laneTmpdir = await mkdtemp(join(tmpdir(), `rb-pid${process.pid}-`));
+  const laneTmpdir = await mkdtemp(join(tmpdir(), readRunFolderPrefix('rb-')));
 
   started.laneTmpdir = laneTmpdir;
 

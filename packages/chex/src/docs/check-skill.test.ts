@@ -1240,7 +1240,7 @@ test('it ignores the bullet openers of a skill that is not a rule set', async ()
 });
 
 test('it exits 2 and asks for a git work tree when run outside one', async () => {
-  const directory = await mkdtemp(join(tmpdir(), `check-skill-outside-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-skill-outside-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

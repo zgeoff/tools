@@ -3,12 +3,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { $ } from 'bun';
 import { runChexCLI } from './run-chex-cli.ts';
 
 async function setupTest() {
-  const repo = await mkdtemp(join(tmpdir(), `run-chex-cli-pid${process.pid}-`));
+  const repo = await mkdtemp(join(tmpdir(), readRunFolderPrefix('run-chex-cli-')));
 
   onTestFinished(() => rm(repo, { recursive: true, force: true }));
 

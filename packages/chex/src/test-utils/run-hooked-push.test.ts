@@ -3,12 +3,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
 import { runHookedPush } from './run-hooked-push.ts';
 import { writeStubPrograms } from './write-stub-programs.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `run-hooked-push-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('run-hooked-push-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { $ } from 'bun';
 import { commitAllFiles } from '../src/test-utils/commit-all-files.ts';
@@ -18,7 +19,7 @@ import { writeStubPrograms } from '../src/test-utils/write-stub-programs.ts';
 async function setupTest() {
   const repoRoot = join(import.meta.dir, '../../..');
 
-  const directory = await mkdtemp(join(tmpdir(), `chex-lefthook-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('chex-lefthook-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

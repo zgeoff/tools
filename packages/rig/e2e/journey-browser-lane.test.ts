@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { hostname, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { buildBrowserRun } from '../src/browser/build-browser-run.ts';
 import { pickChromeDirs } from '../src/browser/pick-chrome-dirs.ts';
 import { createTrackedRepo } from '../src/test-utils/create-tracked-repo.ts';
@@ -16,14 +17,14 @@ async function setupTest() {
 
   const rigBin = getRigE2EBin(process.env);
 
-  const repoRoot = await mkdtemp(join(tmpdir(), `rig-browser-build-pid${process.pid}-`));
+  const repoRoot = await mkdtemp(join(tmpdir(), readRunFolderPrefix('rig-browser-build-')));
 
   stack.defer(() => rm(repoRoot, { recursive: true, force: true }));
 
   // Chrome's socket path must fit a Unix socket address, so the lane gets a TMPDIR of its own,
   // and the test asks the lane's own rule where the Chrome folder goes. A long TMPDIR sends that
   // folder to the /tmp that every user shares, which the removal of laneTmpdir does not reach.
-  const laneTmpdir = await mkdtemp(join(tmpdir(), `rb-pid${process.pid}-`));
+  const laneTmpdir = await mkdtemp(join(tmpdir(), readRunFolderPrefix('rb-')));
 
   stack.defer(() => rm(laneTmpdir, { recursive: true, force: true }));
 

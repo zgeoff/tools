@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { $ } from 'bun';
 import { buildInitGuardHooks } from '../src/test-utils/build-init-guard-hooks.ts';
@@ -12,7 +13,7 @@ import { runChexCLI } from '../src/test-utils/run-chex-cli.ts';
 
 // The repo has an origin and a feature branch, as a pushed branch does.
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `chex-cli-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('chex-cli-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

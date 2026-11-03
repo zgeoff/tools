@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 import { readBaselineJobs } from './src/test-utils/read-baseline-jobs.ts';
@@ -14,7 +15,7 @@ import { writeStubPrograms } from './src/test-utils/write-stub-programs.ts';
 // The PATH holds only bun, env, date, git and the stubs a test writes, so a program the host has, such as
 // shfmt or actionlint, is missing unless the test stubs it.
 async function setupTest() {
-  const repo = await mkdtemp(join(tmpdir(), `chex-lefthook-job-pid${process.pid}-`));
+  const repo = await mkdtemp(join(tmpdir(), readRunFolderPrefix('chex-lefthook-job-')));
 
   onTestFinished(() => rm(repo, { recursive: true, force: true }));
 

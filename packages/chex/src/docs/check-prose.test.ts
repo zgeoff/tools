@@ -3,10 +3,11 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `check-prose-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-prose-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
@@ -50,7 +51,7 @@ async function setupTest() {
       .quiet();
 
   const createOrigin = async () => {
-    const originDir = await mkdtemp(join(tmpdir(), `check-prose-origin-pid${process.pid}-`));
+    const originDir = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-prose-origin-')));
 
     onTestFinished(() => rm(originDir, { recursive: true, force: true }));
 
@@ -63,7 +64,7 @@ async function setupTest() {
 
   // actions/checkout clones one branch with no history for a pull request.
   const createShallowClone = async (originDir: string, branch: string) => {
-    const cloneDir = await mkdtemp(join(tmpdir(), `check-prose-clone-pid${process.pid}-`));
+    const cloneDir = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-prose-clone-')));
 
     onTestFinished(() => rm(cloneDir, { recursive: true, force: true }));
 
@@ -1488,7 +1489,7 @@ test('it exits 2 and checks nothing when git cannot list the files', async () =>
 });
 
 test('it exits 2 and asks for a git work tree when run outside one', async () => {
-  const directory = await mkdtemp(join(tmpdir(), `check-prose-outside-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-prose-outside-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

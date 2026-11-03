@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { readStreamUntil } from '@zgeoff/std/test-utils/read-stream-until';
 import { createStubBuildRepo } from './create-stub-build-repo.ts';
 import { stopProcessGroups } from './stop-process-groups.ts';
@@ -13,7 +14,7 @@ async function setupTest() {
 
   onTestFinished(() => stack.disposeAsync());
 
-  const directory = await mkdtemp(join(tmpdir(), `stub-build-repo-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('stub-build-repo-')));
 
   stack.defer(() => rm(directory, { recursive: true, force: true }));
 

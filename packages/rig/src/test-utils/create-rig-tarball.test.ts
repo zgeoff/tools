@@ -4,13 +4,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createBlockingStubKit } from '@zgeoff/std/test-utils/create-blocking-stub-kit';
 import { makeResolvingStub } from '@zgeoff/std/test-utils/make-resolving-stub';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { buildSignallingClock } from './build-signalling-clock.ts';
 import { createRigTarball } from './create-rig-tarball.ts';
 import { fileLocks } from './file-locks.ts';
 import { systemClock } from './system-clock.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `rig-tarball-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('rig-tarball-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

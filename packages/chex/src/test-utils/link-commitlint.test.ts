@@ -2,10 +2,11 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { linkCommitlint } from './link-commitlint.ts';
 
 async function setupTest() {
-  const root = await mkdtemp(join(tmpdir(), `link-commitlint-pid${process.pid}-`));
+  const root = await mkdtemp(join(tmpdir(), readRunFolderPrefix('link-commitlint-')));
 
   onTestFinished(() => rm(root, { recursive: true, force: true }));
 

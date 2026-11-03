@@ -2,12 +2,13 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { initFiles } from '../init-files.ts';
 import { readPackedBin } from './read-packed-bin.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `read-packed-bin-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('read-packed-bin-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

@@ -2,11 +2,12 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { readTextOrEmpty } from './read-text-or-empty.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `read-text-or-empty-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('read-text-or-empty-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

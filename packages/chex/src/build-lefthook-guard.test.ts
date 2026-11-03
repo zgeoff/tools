@@ -3,13 +3,14 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 import { buildLefthookGuard } from './build-lefthook-guard.ts';
 import { buildInitGuardHooks } from './test-utils/build-init-guard-hooks.ts';
 
 async function setupTest() {
-  const repo = await mkdtemp(join(tmpdir(), `build-lefthook-guard-pid${process.pid}-`));
+  const repo = await mkdtemp(join(tmpdir(), readRunFolderPrefix('build-lefthook-guard-')));
 
   onTestFinished(() => rm(repo, { recursive: true, force: true }));
 
