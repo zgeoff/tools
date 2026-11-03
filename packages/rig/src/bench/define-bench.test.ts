@@ -43,5 +43,5 @@ test('it disposes of nothing when the setup result has no async dispose', async 
 
   const prepared = await definition.prepare();
 
-  await expect(prepared.dispose()).resolves.toBeUndefined();
+  expect(prepared.dispose()).resolves.toBeUndefined();
 });

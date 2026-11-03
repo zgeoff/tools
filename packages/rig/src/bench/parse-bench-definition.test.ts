@@ -20,14 +20,14 @@ test.each([
   });
 });
 
-test('it fails to prepare when prepare yields no step', async () => {
+test('it fails to prepare when prepare yields no step', () => {
   const parsed = parseBenchDefinition({ name: 'boil', budgetMs: 5, prepare: () => 1 });
 
   expect(parsed.kind).toBe('parsed');
 
   const prepare = parsed.kind === 'parsed' ? parsed.definition.prepare() : Promise.resolve();
 
-  await expect(prepare).rejects.toThrow('the benchmark "boil" prepared no step to measure');
+  expect(prepare).rejects.toThrow('the benchmark "boil" prepared no step to measure');
 });
 
 test('it keeps the disposal of the setup result', async () => {

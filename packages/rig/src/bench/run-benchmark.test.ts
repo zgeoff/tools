@@ -76,7 +76,11 @@ test('it disposes of the setup result when a run throws', async () => {
     },
   });
 
-  await expect(runBenchmark(definition, () => 0)).rejects.toThrow('the kettle cracked');
+  const running = runBenchmark(definition, () => 0);
+
+  expect(running).rejects.toThrow('the kettle cracked');
+
+  await Promise.allSettled([running]);
 
   expect(disposals).toStrictEqual(['dispose']);
 });
