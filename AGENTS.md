@@ -102,6 +102,8 @@ says.
   and the alarm job asks for `actions: read`. CI and the pre-push hook run it.
 - `bun run check:lefthook-guard` checks that `lefthook.yml` holds the `chex-baseline` job that
   `chex init` writes. CI and the pre-push hook run it.
+- `bun run check:baseline-jobs` runs each job of `packages/chex/lefthook.yml` in a sandbox and fails
+  a job that keeps git's repository variables or breaks the behaviour its case expects. CI runs it.
 - `bun x chex workflows` runs the shared workflow lint over the workflows HEAD holds, so commit a
   workflow change before you run it. CI runs it. `bun run check:docs` runs the docs checks that this
   repo takes, which the pre-push hook and CI run too.

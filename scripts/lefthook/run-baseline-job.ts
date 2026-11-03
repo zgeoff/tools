@@ -1,5 +1,5 @@
-import { isRecord } from '@zgeoff/std';
 import invariant from 'tiny-invariant';
+import { isRecord } from '../../packages/std/src/is-record.ts';
 
 export interface BaselineJobRun {
   readonly exitCode: number;
