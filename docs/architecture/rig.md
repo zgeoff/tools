@@ -13,9 +13,11 @@ The testing skill's
 [Lanes](https://github.com/zgeoff/skills/blob/main/skills/testing/references/slow-tests.md#lanes)
 table lists the built-in lanes, and `standard-lanes.ts` in the package holds the same table as data,
 which a test pins to the skill. A lane has a name, a file suffix (the unit and e2e lanes have none),
-a per-test limit, and a process count. Every lane but unit runs one process per file, because each
-needs a real system that two files cannot share, and the unit lane runs as many workers as the
-host's worker count allows.
+a per-test limit, and a process count. Every lane but unit runs its files one at a time in one
+process, because each needs a real system that two files cannot share, and the unit lane runs as
+many workers as the host's worker count allows. Every lane runs its files in random order with
+`--no-isolate`, so the files of a process share one global, and a leak between files fails the run.
+rig exits 2 on an `--isolate` argument and runs nothing.
 
 A repo changes the table in `rig.config.ts`. `defineRig` merges the declared lanes over the built-in
 ones and returns the resolved table. A declaration adds a lane with its own suffix and limit, or
@@ -47,13 +49,13 @@ that matches no file. Otherwise it runs three steps, and the last one always run
    that takes the lane context (repo root, lane, run ID and environment) and may return extra
    environment variables for the tests.
 2. `run` starts `bun test` under `diet`, with the lane's limit as `--timeout`, its process count as
-   `--parallel`, and its memory as `diet`'s budget. The lane's suffix filter or its `e2e` folders
-   select the files. The folders are the `e2e` folders that git tracks in a folder that holds a
-   `package.json`, and at the repo root only when the root `package.json` has no `workspaces` field.
-   When the arguments name paths, rig narrows them to the lane's own tracked test files and hands
-   `bun test` that exact list, because `bun test` runs any file a path names, whatever its lane.
-   Paths that select none of the lane's files fail the run with exit code 1, so a mistyped path
-   never passes as a run with no tests.
+   `--parallel`, `--randomize --no-isolate`, and its memory as `diet`'s budget. The lane's suffix
+   filter or its `e2e` folders select the files. The folders are the `e2e` folders that git tracks
+   in a folder that holds a `package.json`, and at the repo root only when the root `package.json`
+   has no `workspaces` field. When the arguments name paths, rig narrows them to the lane's own
+   tracked test files and hands `bun test` that exact list, because `bun test` runs any file a path
+   names, whatever its lane. Paths that select none of the lane's files fail the run with exit code
+   1, so a mistyped path never passes as a run with no tests.
 3. `stop` cleans up, whether the tests passed, failed or never started. When `stop` throws, rig
    exits 1, and what it reports depends on how the lane ended:
    - after `start` or `run` threw, that error first and the stop error second;
@@ -67,19 +69,19 @@ running. The abort sends the group SIGTERM, then SIGKILL after a deadline, and t
 no member of the group runs, so that `stop` can clean up. An aborted run exits 1 whatever the tests'
 exit code was. A command that exits on its own has the rest of its group stopped the same way.
 
-`rig unit` builds its `bun test` command from the same table: `--no-isolate` unless the arguments
-hold `--isolate`, one path ignore for every lane suffix and for the `e2e` folders. A lane declared
-in `rig.config.ts` therefore leaves the unit run without any ignore list in `package.json`. Like a
-lane, `rig unit` exits 0 when git tracks no unit test file. `rig related` runs the unit lane in its
-own process on the tests beside the changed files, takes the lane suffixes from the table, and skips
-when the branch changes a shared test input or has more than 50 related files. `rig init` writes the
-package scripts for the lanes the repo has and a starter config, and a second run changes nothing.
+`rig unit` builds its `bun test` command from the same table: `--randomize --no-isolate`, and one
+path ignore for every lane suffix and for the `e2e` folders. A lane declared in `rig.config.ts`
+therefore leaves the unit run without any ignore list in `package.json`. Like a lane, `rig unit`
+exits 0 when git tracks no unit test file. `rig related` runs the unit lane in its own process on
+the tests beside the changed files, takes the lane suffixes from the table, and skips when the
+branch changes a shared test input or has more than 50 related files. `rig init` writes the package
+scripts for the lanes the repo has and a starter config, and a second run changes nothing.
 
 ## The browser lane
 
-The browser lane runs `.browser.test.ts` suites against Chrome through `Bun.WebView`, one process
-per file. It is built into rig, so its three steps are code in the package, and a repo declares no
-hooks for it.
+The browser lane runs `.browser.test.ts` suites against Chrome through `Bun.WebView`, one file at a
+time in one process. It is built into rig, so its three steps are code in the package, and a repo
+declares no hooks for it.
 
 ### Folders
 
@@ -87,8 +89,8 @@ The run folders sit in the repo's git-ignored cache, at
 `node_modules/.cache/rig/browser/<host name>/<run ID>`, never in `TMPDIR`, because a host's `TMPDIR`
 can sit in memory and each Chrome profile takes megabytes. Each host name keeps its own runs,
 because a container that mounts the repo sees other process IDs than its host. The run ID is the rig
-process's ID, and the lane passes it to the tests in `RIG_BROWSER_RUN_ID`, because the preload runs
-again in each file's process and an ID it made would differ in each file.
+process's ID, and the lane passes it to the tests in `RIG_BROWSER_RUN_ID`, because the lane makes
+the run's folders before the tests start and removes them after the tests end.
 
 ### Chrome's temp folder
 
@@ -102,18 +104,20 @@ mode before it writes there.
 ### The build and the preload
 
 The lane runs the repo's `build:browser` script once, when the repo defines one, with the build
-folder's path in `RIG_BROWSER_BUILD_DIR`. A build in the preload would run again in every file,
-because `--parallel=1` isolates each file. The preload fails a file when the lane set no run ID, or
-when the lane ran a build and its folder is empty, and it starts Chrome on a profile folder of the
-file's own inside the run folder. `Bun.WebView` never removes the temporary profile that it makes
-under `bun test` ([oven-sh/bun#45389](https://github.com/oven-sh/bun/issues/45389)), so a Chrome on
-its own profile would leave a folder per file.
+folder's path in `RIG_BROWSER_BUILD_DIR`, before the tests start. The preload runs once in the test
+process. It fails the run when the lane set no run ID, or when the lane ran a build and its folder
+is empty, and it starts Chrome on a profile folder of the process's own inside the run folder. Every
+later view in the process, in every file, reuses that Chrome. `Bun.WebView` never removes the
+temporary profile that it makes under `bun test`
+([oven-sh/bun#45389](https://github.com/oven-sh/bun/issues/45389)), so a Chrome on its own profile
+would leave a folder behind on each run.
 
 ### Run and stop
 
-The run is `bun test --parallel=1` over the suites, with the lane's preload and the lane's limit.
-Afterwards the lane removes both run folders, unless it could not stop a process group, because that
-group can still write there and a later sweep needs its record.
+The run is `bun test --parallel=1 --randomize --no-isolate` over the suites, with the lane's preload
+and the lane's limit. A test closes each view it opens in `onTestFinished`, because the next file
+runs in the same process. Afterwards the lane removes both run folders, unless it could not stop a
+process group, because that group can still write there and a later sweep needs its record.
 
 ### Process groups and the sweep
 

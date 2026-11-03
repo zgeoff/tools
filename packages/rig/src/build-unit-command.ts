@@ -1,6 +1,5 @@
+import { testRunArgs } from './test-run-args.ts';
 import type { RigConfig } from './types.ts';
-
-const isolationFlags: ReadonlySet<string> = new Set(['--isolate', '--no-isolate']);
 
 // The e2e lane has no suffix, so the unit run leaves out the folders that the e2e lane selects,
 // from the same list, and nothing else.
@@ -20,17 +19,5 @@ export function buildUnitCommand(
     (pattern) => `--path-ignore-patterns=${pattern}`,
   );
 
-  const isolationArgs = extraArgs.some((argument) => isolationFlags.has(argument))
-    ? []
-    : ['--no-isolate'];
-
-  return [
-    'bun',
-    'test',
-    `--parallel=${workerCount}`,
-    '--randomize',
-    ...isolationArgs,
-    ...ignoreArgs,
-    ...extraArgs,
-  ];
+  return ['bun', 'test', `--parallel=${workerCount}`, ...testRunArgs, ...ignoreArgs, ...extraArgs];
 }

@@ -1,4 +1,5 @@
 import { match } from 'ts-pattern';
+import { findIsolateArg } from './find-isolate-arg.ts';
 import { findTimeoutArg } from './find-timeout-arg.ts';
 import { commandNames, isCommandName } from './is-command-name.ts';
 import { readCLIArgs } from './read-cli-args.ts';
@@ -56,6 +57,17 @@ export async function runCLI(argv: readonly string[], run: RigRun, deps: CLIDeps
   if (timeoutArg !== undefined) {
     deps.output.err(
       `rig: rig ${command} refuses ${timeoutArg}, because the lane limit lives in rig.config.ts\n`,
+    );
+
+    return 2;
+  }
+
+  // Each file of a lane shares its process's global, so a leak between files fails the run.
+  const isolateArg = findIsolateArg(args.extraArgs);
+
+  if (isolateArg !== undefined) {
+    deps.output.err(
+      `rig: rig ${command} refuses ${isolateArg}, because every lane runs its files in one global per process\n`,
     );
 
     return 2;

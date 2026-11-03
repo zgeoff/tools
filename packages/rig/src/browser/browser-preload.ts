@@ -1,6 +1,6 @@
 // A cold Chrome start on a fresh CI runner can run past the test timeout, so the preload starts
-// Chrome before the file's first test. Bun spawns one Chrome per process, on the options of the
-// first view, and every later view in the file reuses it.
+// Chrome before the first test. Bun spawns one Chrome per process, on the options of the first
+// view, and every later view in the process, in every file, reuses it.
 
 import { hostname } from 'node:os';
 import { laneFiles } from './lane-files.ts';
@@ -12,8 +12,8 @@ await startBrowser({
   hostName: hostname(),
   environment: process.env,
 
-  // `bun test --parallel=1` stops each file's Chrome and loads this module again for the next
-  // file. A new Chrome on the last one's profile can start before the last one lets go of it.
+  // A profile of the process's own, so a Chrome never starts on a profile that another Chrome
+  // still holds.
   profileName: crypto.randomUUID(),
   readDirNames: laneFiles.readDirNames,
   openView: openChromeView,

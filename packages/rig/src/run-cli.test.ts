@@ -100,6 +100,34 @@ test.each([
   },
 );
 
+test.each([
+  ['unit', '--isolate', ['--isolate']],
+  ['kiln', '--isolate=true', ['--bail', '--isolate=true']],
+  ['browser', '--isolate', ['--isolate']],
+])(
+  'it exits 2 and runs nothing for rig %s given %s, because every lane shares one global per process',
+  async (command, isolateArg, extraArgs) => {
+    const ctx = setupTest();
+
+    const exitCode = await runCLI([command, ...extraArgs], ctx.run, {
+      ...ctx.deps,
+      sources: { cwd: '/repo', probeFile: () => true },
+      readConfig: () => Promise.resolve(defineRig({ lanes: { kiln: { limit: '15s' } } })),
+      probeWorkspaceRepo: () => Promise.resolve(false),
+      readTrackedFiles: () =>
+        Promise.resolve(['src/a.test.ts', 'src/a.kiln.test.ts', 'src/a.browser.test.ts']),
+    });
+
+    expect(exitCode).toBe(2);
+
+    expect(ctx.output.err).toHaveBeenCalledExactlyOnceWith(
+      `rig: rig ${command} refuses ${isolateArg}, because every lane runs its files in one global per process\n`,
+    );
+
+    expect(ctx.runCommand).not.toHaveBeenCalled();
+  },
+);
+
 test('it runs a lane that the config declares for rig <lane>', async () => {
   const ctx = setupTest();
 
