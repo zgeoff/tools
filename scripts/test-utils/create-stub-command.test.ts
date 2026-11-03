@@ -3,10 +3,11 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { createStubCommand } from './create-stub-command.ts';
+import { readRunFolderPrefix } from './read-run-folder-prefix.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(
-    join(import.meta.dir, `.test-create-stub-command-pid${process.pid}-`),
+    join(import.meta.dir, readRunFolderPrefix('.test-create-stub-command-')),
   );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));

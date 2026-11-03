@@ -5,12 +5,13 @@ import { fileURLToPath } from 'node:url';
 import { buildMockHeadResponse } from './test-utils/build-mock-head-response.ts';
 import { createStubClock } from './test-utils/create-stub-clock.ts';
 import { createStubGH } from './test-utils/create-stub-gh.ts';
+import { readRunFolderPrefix } from './test-utils/read-run-folder-prefix.ts';
 import { runBashScript } from './test-utils/run-bash-script.ts';
 
 async function setupTest() {
   // Inside the checkout, not the system temp dir: the folder is git-ignored.
   const directory = await mkdtemp(
-    join(import.meta.dir, `.test-merge-release-prs-pid${process.pid}-`),
+    join(import.meta.dir, readRunFolderPrefix('.test-merge-release-prs-')),
   );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));

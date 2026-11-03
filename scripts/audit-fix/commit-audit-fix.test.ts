@@ -8,13 +8,14 @@ import { runCommand } from '../ci/run-command.ts';
 import { createGitCommit } from '../test-utils/create-git-commit.ts';
 import { createStubGH } from '../test-utils/create-stub-gh.ts';
 import { readGitEnv } from '../test-utils/read-git-env.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { runGit } from '../test-utils/run-git.ts';
 import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { commitAuditFix } from './commit-audit-fix.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(
-    join(import.meta.dir, `.test-commit-audit-fix-pid${process.pid}-`),
+    join(import.meta.dir, readRunFolderPrefix('.test-commit-audit-fix-')),
   );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));

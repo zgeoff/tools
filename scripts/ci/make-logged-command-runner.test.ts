@@ -2,12 +2,13 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { buildStubOutputSink } from '../test-utils/build-stub-output-sink.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { makeLoggedCommandRunner } from './make-logged-command-runner.ts';
 import type { CommandResult } from './run-command.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(
-    join(import.meta.dir, `.test-make-logged-command-runner-pid${process.pid}-`),
+    join(import.meta.dir, readRunFolderPrefix('.test-make-logged-command-runner-')),
   );
 
   const stopping = new AbortController();

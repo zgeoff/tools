@@ -5,12 +5,13 @@ import { $ } from 'bun';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { readGitEnv } from '../test-utils/read-git-env.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { runChangedFilesStep } from './run-changed-files-step.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(
-    join(import.meta.dir, `.test-run-changed-files-step-pid${process.pid}-`),
+    join(import.meta.dir, readRunFolderPrefix('.test-run-changed-files-step-')),
   );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));

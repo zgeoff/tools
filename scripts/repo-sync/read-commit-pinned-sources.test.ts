@@ -4,12 +4,13 @@ import { join } from 'node:path';
 import { runCommand } from '../ci/run-command.ts';
 import { createGitCommit } from '../test-utils/create-git-commit.ts';
 import { readGitEnv } from '../test-utils/read-git-env.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { runGit } from '../test-utils/run-git.ts';
 import { readCommitPinnedSources } from './read-commit-pinned-sources.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(
-    join(import.meta.dir, `.test-read-commit-pinned-sources-pid${process.pid}-`),
+    join(import.meta.dir, readRunFolderPrefix('.test-read-commit-pinned-sources-')),
   );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));

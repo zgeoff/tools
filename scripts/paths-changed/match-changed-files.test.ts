@@ -4,12 +4,13 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 import { runCommand } from '../ci/run-command.ts';
 import { readGitEnv } from '../test-utils/read-git-env.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { matchChangedFiles } from './match-changed-files.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(
-    join(import.meta.dir, `.test-match-changed-files-pid${process.pid}-`),
+    join(import.meta.dir, readRunFolderPrefix('.test-match-changed-files-')),
   );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));

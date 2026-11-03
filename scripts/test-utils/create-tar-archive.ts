@@ -1,6 +1,7 @@
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import { readRunFolderPrefix } from './read-run-folder-prefix.ts';
 
 export interface ArchiveFile {
   readonly content: string;
@@ -13,7 +14,7 @@ export async function createTarArchive(
   directory: string,
   files: Readonly<Record<string, ArchiveFile>>,
 ): Promise<Uint8Array> {
-  const folder = await mkdtemp(join(directory, `archive-pid${process.pid}-`));
+  const folder = await mkdtemp(join(directory, readRunFolderPrefix('archive-')));
 
   const release = join(folder, 'release');
   const archive = join(folder, 'release.tar.gz');

@@ -2,10 +2,11 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from './read-run-folder-prefix.ts';
 import { runBashScript } from './run-bash-script.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `run-bash-script-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('run-bash-script-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

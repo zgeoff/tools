@@ -4,9 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { createStubClock } from './create-stub-clock.ts';
+import { readRunFolderPrefix } from './read-run-folder-prefix.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `create-stub-clock-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('create-stub-clock-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

@@ -4,12 +4,13 @@ import { join } from 'node:path';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { createStubCommand } from '../test-utils/create-stub-command.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { publishPackages } from './publish-packages.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(
-    join(import.meta.dir, `.test-publish-packages-pid${process.pid}-`),
+    join(import.meta.dir, readRunFolderPrefix('.test-publish-packages-')),
   );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));

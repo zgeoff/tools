@@ -6,6 +6,7 @@ import invariant from 'tiny-invariant';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { readGitEnv } from '../test-utils/read-git-env.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { runActionlintCheck } from './run-actionlint-check.ts';
 
@@ -13,7 +14,7 @@ async function setupTest() {
   invariant(Bun.which('actionlint') !== null, 'install actionlint');
 
   const directory = await mkdtemp(
-    join(import.meta.dir, `.test-run-actionlint-check-pid${process.pid}-`),
+    join(import.meta.dir, readRunFolderPrefix('.test-run-actionlint-check-')),
   );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));

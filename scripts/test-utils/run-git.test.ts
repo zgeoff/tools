@@ -4,10 +4,11 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readGitEnv } from './read-git-env.ts';
+import { readRunFolderPrefix } from './read-run-folder-prefix.ts';
 import { runGit } from './run-git.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `run-git-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('run-git-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

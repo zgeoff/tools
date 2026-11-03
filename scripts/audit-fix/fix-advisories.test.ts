@@ -5,11 +5,14 @@ import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { createGitCommit } from '../test-utils/create-git-commit.ts';
 import { readGitEnv } from '../test-utils/read-git-env.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { runGit } from '../test-utils/run-git.ts';
 import { fixAdvisories } from './fix-advisories.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, `.test-fix-advisories-pid${process.pid}-`));
+  const directory = await mkdtemp(
+    join(import.meta.dir, readRunFolderPrefix('.test-fix-advisories-')),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

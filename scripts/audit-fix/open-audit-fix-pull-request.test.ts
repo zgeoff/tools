@@ -4,12 +4,13 @@ import { join } from 'node:path';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { createStubGH } from '../test-utils/create-stub-gh.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { openAuditFixPullRequest } from './open-audit-fix-pull-request.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(
-    join(import.meta.dir, `.test-open-audit-fix-pull-request-pid${process.pid}-`),
+    join(import.meta.dir, readRunFolderPrefix('.test-open-audit-fix-pull-request-')),
   );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));

@@ -13,6 +13,7 @@ import {
 import { join } from 'node:path';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { writeSkillsArchive } from '../test-utils/write-skills-archive.ts';
 import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { flockLockFile } from './flock-lock-file.ts';
@@ -22,7 +23,7 @@ import { defaultPinnedSkills, writePinnedSkills } from './write-pinned-skills.ts
 
 async function setupTest() {
   const directory = await mkdtemp(
-    join(import.meta.dir, `.test-write-pinned-skills-pid${process.pid}-`),
+    join(import.meta.dir, readRunFolderPrefix('.test-write-pinned-skills-')),
   );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));

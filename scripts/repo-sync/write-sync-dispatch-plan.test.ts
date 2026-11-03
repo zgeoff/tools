@@ -6,11 +6,12 @@ import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { buildCommandStub } from '../test-utils/build-command-stub.ts';
 import { createPushedGitCommit } from '../test-utils/create-pushed-git-commit.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { writeSyncDispatchPlan } from './write-sync-dispatch-plan.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(
-    join(import.meta.dir, `.test-write-sync-dispatch-plan-pid${process.pid}-`),
+    join(import.meta.dir, readRunFolderPrefix('.test-write-sync-dispatch-plan-')),
   );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));

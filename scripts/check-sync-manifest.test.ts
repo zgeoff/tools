@@ -4,10 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { $ } from 'bun';
+import { readRunFolderPrefix } from './test-utils/read-run-folder-prefix.ts';
 import { writeTreeFiles } from './test-utils/write-tree-files.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `check-sync-manifest-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-sync-manifest-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

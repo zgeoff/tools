@@ -2,13 +2,14 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createStubFileServer } from '../test-utils/create-stub-file-server.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { nodeFileSystem } from './node-file-system.ts';
 import { runCommand } from './run-command.ts';
 import { runPinnedToolStep } from './run-pinned-tool-step.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(
-    join(import.meta.dir, `.test-run-pinned-tool-step-pid${process.pid}-`),
+    join(import.meta.dir, readRunFolderPrefix('.test-run-pinned-tool-step-')),
   );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));

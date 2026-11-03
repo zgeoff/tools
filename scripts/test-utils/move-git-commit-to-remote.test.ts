@@ -4,11 +4,12 @@ import { join } from 'node:path';
 import { createGitCommit } from './create-git-commit.ts';
 import { moveGitCommitToRemote } from './move-git-commit-to-remote.ts';
 import { readGitEnv } from './read-git-env.ts';
+import { readRunFolderPrefix } from './read-run-folder-prefix.ts';
 import { runGit } from './run-git.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(
-    join(import.meta.dir, `.test-move-git-commit-to-remote-pid${process.pid}-`),
+    join(import.meta.dir, readRunFolderPrefix('.test-move-git-commit-to-remote-')),
   );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));

@@ -7,11 +7,14 @@ import { runCommand } from '../ci/run-command.ts';
 import { copyNamedFiles } from '../test-utils/copy-named-files.ts';
 import { makeOutputRecordingRunner } from '../test-utils/make-output-recording-runner.ts';
 import { readGitEnv } from '../test-utils/read-git-env.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { runDocsCheck } from './run-docs-check.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, `.test-run-docs-check-pid${process.pid}-`));
+  const directory = await mkdtemp(
+    join(import.meta.dir, readRunFolderPrefix('.test-run-docs-check-')),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

@@ -4,11 +4,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { runCommand } from '../ci/run-command.ts';
+import { readRunFolderPrefix } from './read-run-folder-prefix.ts';
 import { writeSkillsArchive } from './write-skills-archive.ts';
 import { writeTreeFiles } from './write-tree-files.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `write-skills-archive-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('write-skills-archive-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

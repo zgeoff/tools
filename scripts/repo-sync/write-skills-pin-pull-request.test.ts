@@ -3,11 +3,12 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { buildCommandStub } from '../test-utils/build-command-stub.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { writeSkillsPinPullRequest } from './write-skills-pin-pull-request.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(
-    join(import.meta.dir, `.test-write-skills-pin-pull-request-pid${process.pid}-`),
+    join(import.meta.dir, readRunFolderPrefix('.test-write-skills-pin-pull-request-')),
   );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));

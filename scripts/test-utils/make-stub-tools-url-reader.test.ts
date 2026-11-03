@@ -3,10 +3,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { makeStubToolsURLReader } from './make-stub-tools-url-reader.ts';
+import { readRunFolderPrefix } from './read-run-folder-prefix.ts';
 import { writeTreeFiles } from './write-tree-files.ts';
 
 async function setupTest() {
-  const checkout = await mkdtemp(join(tmpdir(), `make-stub-tools-url-reader-pid${process.pid}-`));
+  const checkout = await mkdtemp(
+    join(tmpdir(), readRunFolderPrefix('make-stub-tools-url-reader-')),
+  );
 
   onTestFinished(() => rm(checkout, { recursive: true, force: true }));
 

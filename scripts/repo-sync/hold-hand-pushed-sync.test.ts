@@ -3,11 +3,12 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runCommand } from '../ci/run-command.ts';
 import { createStubCommand } from '../test-utils/create-stub-command.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { holdHandPushedSync } from './hold-hand-pushed-sync.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(
-    join(import.meta.dir, `.test-hold-hand-pushed-sync-pid${process.pid}-`),
+    join(import.meta.dir, readRunFolderPrefix('.test-hold-hand-pushed-sync-')),
   );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));

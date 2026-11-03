@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildPreToolUsePayload } from '../test-utils/build-pre-tool-use-payload.ts';
 import { createStubInstall } from '../test-utils/create-stub-install.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { readStreamUntil } from '../test-utils/read-stream-until.ts';
 import { readTextOrEmpty } from '../test-utils/read-text-or-empty.ts';
 import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
@@ -17,7 +18,7 @@ const isRoot = process.getuid?.() === 0;
 // first on PATH stands in for the install alone. Its installed package re-exports this repo's
 // source, so the gate that runs after the install is the real one.
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `agent-hooks-start-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('agent-hooks-start-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

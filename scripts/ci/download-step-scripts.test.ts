@@ -5,6 +5,7 @@ import { HttpResponse, http } from 'msw';
 import { makeAnswerQueue } from '../test-utils/make-answer-queue.ts';
 import { makeStubToolsURLReader } from '../test-utils/make-stub-tools-url-reader.ts';
 import { server } from '../test-utils/mocks/node.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import {
   downloadStepScripts,
@@ -21,7 +22,7 @@ import { nodeFileSystem } from './node-file-system.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(
-    join(import.meta.dir, `.test-download-step-scripts-pid${process.pid}-`),
+    join(import.meta.dir, readRunFolderPrefix('.test-download-step-scripts-')),
   );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));

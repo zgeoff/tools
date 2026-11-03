@@ -12,10 +12,13 @@ import { createTrackedGitCommit } from '../test-utils/create-tracked-git-commit.
 import { createTrackedRepo } from '../test-utils/create-tracked-repo.ts';
 import { moveGitCommitToRemote } from '../test-utils/move-git-commit-to-remote.ts';
 import { readGitHead } from '../test-utils/read-git-head.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { syncEntries } from './sync-entries.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, `.test-sync-entries-pid${process.pid}-`));
+  const directory = await mkdtemp(
+    join(import.meta.dir, readRunFolderPrefix('.test-sync-entries-')),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
@@ -82,7 +85,7 @@ async function setupTest() {
     afterClone: () => Promise<void> = () => Promise.resolve(),
   ) => {
     const toolsRef = await writeToolsCommit();
-    const caller = await mkdtemp(join(directory, `caller-pid${process.pid}-`));
+    const caller = await mkdtemp(join(directory, readRunFolderPrefix('caller-')));
 
     await $`git clone -q ${origin} ${caller}`.env(env).quiet();
 
