@@ -1,7 +1,8 @@
-import { readdir, rm } from 'node:fs/promises';
+import { readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import { removePath } from '../../packages/rig/src/browser/remove-path.ts';
 import { collectStoppedRunFolders } from './collect-stopped-run-folders.ts';
 import { readPIDNamespace } from './read-pid-namespace.ts';
 
@@ -70,7 +71,7 @@ async function runCLI(): Promise<void> {
         return !(error instanceof Error && 'code' in error && error.code === 'ESRCH');
       }
     },
-    removePath: (path) => rm(path, { recursive: true, force: true }),
+    removePath,
     reportFailure: (path, error) => {
       process.stderr.write(
         `test-folder-sweep: kept ${path}, which it could not remove: ${String(error)}\n`,
