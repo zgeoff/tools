@@ -5,16 +5,16 @@ import { join } from 'node:path';
 import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { buildBrowserRun } from '../src/browser/build-browser-run.ts';
 import { pickChromeDirs } from '../src/browser/pick-chrome-dirs.ts';
+import { resolveProgram } from '../src/e2e.ts';
 import type { StubBuildRepo } from '../src/test-utils/create-stub-build-repo.ts';
 import { createStubBuildRepo } from '../src/test-utils/create-stub-build-repo.ts';
-import { getRigE2EBin } from '../src/test-utils/get-rig-e2e-bin.ts';
 import { probeProcess } from '../src/test-utils/probe-process.ts';
 import { stopProcessGroups } from '../src/test-utils/stop-process-groups.ts';
 import { templateFiles } from '../src/test-utils/template-files.ts';
 import { testProcesses } from '../src/test-utils/test-processes.ts';
 
 async function setupTest() {
-  const rigBin = getRigE2EBin(process.env);
+  const rig = await resolveProgram('rig');
 
   // The build's process ID file sits in the repo, so one cleanup stops the processes before it
   // removes the repo.
@@ -82,7 +82,7 @@ async function setupTest() {
     laneTmpdir,
     chromeRunsDir,
     startLane: () => {
-      const lane = Bun.spawn([rigBin, 'browser'], {
+      const lane = Bun.spawn([...rig.command, 'browser'], {
         cwd: repoRoot,
         env: { ...process.env, TMPDIR: laneTmpdir },
         stdout: 'pipe',

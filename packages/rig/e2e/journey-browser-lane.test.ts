@@ -5,8 +5,9 @@ import { join } from 'node:path';
 import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { buildBrowserRun } from '../src/browser/build-browser-run.ts';
 import { pickChromeDirs } from '../src/browser/pick-chrome-dirs.ts';
-import { runProgram } from '../src/e2e.ts';
+import { resolveProgram } from '../src/e2e.ts';
 import { createTrackedRepo } from '../src/test-utils/create-tracked-repo.ts';
+import { runToExit } from '../src/test-utils/run-to-exit.ts';
 
 async function setupTest() {
   const stack = new AsyncDisposableStack();
@@ -32,10 +33,12 @@ async function setupTest() {
 
   stack.defer(() => rm(chromeRunsDir, { recursive: true, force: true }));
 
+  const rig = await resolveProgram('rig');
+
   return {
     repoRoot,
     runLane: () =>
-      runProgram('rig', { args: ['browser'], cwd: repoRoot, env: { TMPDIR: laneTmpdir } }),
+      runToExit([...rig.command, 'browser'], { cwd: repoRoot, env: { TMPDIR: laneTmpdir } }),
   };
 }
 

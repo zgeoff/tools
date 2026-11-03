@@ -6,14 +6,14 @@ import { buildRigPackRun } from './build-rig-pack-run.ts';
 import { createRigTarball } from './create-rig-tarball.ts';
 import type { E2EPackDependencies } from './e2e-pack-dependencies.ts';
 import { fileLocks } from './file-locks.ts';
-import { rigE2EBinVariable } from './get-rig-e2e-bin.ts';
 import { readPackedBin } from './read-packed-bin.ts';
 import { removeExitedRigPacks } from './remove-exited-rig-packs.ts';
 import { runBrowserWarmUp } from './run-browser-warm-up.ts';
 import { systemClock } from './system-clock.ts';
 
 // rig's bin runs from its source, so the tarball, shaped by the files list and the rewritten
-// dependency ranges, is the product a user installs, and the journeys run its bin.
+// dependency ranges, is the product a user installs. The Chrome warm-up runs its bin, so a broken
+// pack fails the lane.
 export default async function createRigPack(
   context: LaneContext,
   dependencies: E2EPackDependencies,
@@ -54,5 +54,5 @@ export default async function createRigPack(
     runRigBrowser: (repoRoot) => dependencies.runCommand([binPath, 'browser'], repoRoot),
   });
 
-  return { environment: { [rigE2EBinVariable]: binPath } };
+  return { environment: {} };
 }

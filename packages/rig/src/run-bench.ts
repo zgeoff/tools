@@ -25,7 +25,7 @@ export interface BenchDeps extends ProgramBuildDeps {
 
 // Builds each program once, as `rig e2e` does, then runs each bench file in a process of its own,
 // between the start and stop hooks of the bench lane when the config names one. The bench process
-// gets RIG_PROGRAM_<NAME> for each program, so startProgram runs the built artifact.
+// gets RIG_PROGRAM_<NAME> for each program, so resolveProgram gives the built artifact.
 export async function runBench(
   args: readonly string[],
   config: RigConfig,

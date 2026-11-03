@@ -2,13 +2,14 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runProgram } from '@zgeoff/rig/e2e';
+import { resolveProgram } from '@zgeoff/rig/e2e';
 import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
 import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { $ } from 'bun';
 import { buildInitGuardHooks } from '../src/test-utils/build-init-guard-hooks.ts';
 import { commitAllFiles } from '../src/test-utils/commit-all-files.ts';
+import { runToExit } from '../src/test-utils/run-to-exit.ts';
 
 // The repo has an origin and a feature branch, as a pushed branch does.
 async function setupTest() {
@@ -27,11 +28,13 @@ async function setupTest() {
   await $`git push --quiet -u origin main`.cwd(repo).env({ ...env });
   await $`git switch --quiet -c feature`.cwd(repo).env({ ...env });
 
+  const chex = await resolveProgram('chex');
+
   return {
     repo,
     env,
     runChex: async (args: readonly string[]) => {
-      const result = await runProgram('chex', { args, cwd: repo, env });
+      const result = await runToExit([...chex.command, ...args], { cwd: repo, env });
 
       return { ...result, lastLine: result.stdout.trimEnd().split('\n').at(-1) };
     },

@@ -33,29 +33,27 @@ the artifact. `rig e2e` exits 2 when an `e2e/` folder sits in a package that no 
 
 ## Run a program in a test
 
-`@zgeoff/rig/e2e` runs a declared program from an e2e test:
+rig owns only which command runs. `resolveProgram(name)` from `@zgeoff/rig/e2e` resolves to
+`{ command, cwd }`: the command that runs the program, and the repo root to run it from. The test
+spawns the command itself, with its own arguments after it:
 
 ```ts
-import { runProgram, startProgram } from '@zgeoff/rig/e2e';
+import { resolveProgram } from '@zgeoff/rig/e2e';
 
-const result = await runProgram('kettle-cli', { args: ['boil', '--cups=2'] });
+const kettle = await resolveProgram('kettle-cli');
 
-await using server = await startProgram('kettle-server', { ready: { url: '/health' } });
-const response = await fetch(`${server.url}/health`);
+const child = Bun.spawn([...kettle.command, 'boil', '--cups=2'], { cwd: kettle.cwd });
+const exitCode = await child.exited;
 ```
 
-Both find the program through `RIG_PROGRAM_<NAME>`, which `rig e2e` sets. A program run to the end
-returns its exit code, stdout and stderr:
+- When `RIG_PROGRAM_<NAME>` is set, the command runs that artifact: with `bun` when it ends in `.js`
+  or `.ts`, otherwise as an executable.
+- When it's unset and `CI` is set to a non-empty value, `resolveProgram` throws, because CI must run
+  the built artifact.
+- When both are unset, the command runs `bun <package>/<source>`, so a test runs under `bun test`
+  with no build.
 
-- `runProgram(name, { args?, env?, cwd? })` resolves to `{ exitCode, stdout, stderr }`.
-- `startProgram(name, { args?, env?, ready? })` passes a free port as `PORT`, waits for `ready`, and
-  resolves to a handle with `url`, `port`, `stop(signal?)`, `output()` and `Symbol.asyncDispose`.
-  `ready.url` is polled, resolved against the handle's `url`, until it answers 2xx. `ready.stdout`
-  waits for a matching output line. Either throws with the program's output when the program exits
-  first or the wait passes 10 s. `stop` sends `SIGTERM` by default and returns the exit code, which
-  is 128 plus the signal number when the signal killed the program. Disposing a handle stops it with
-  `SIGKILL`.
-
-With `RIG_PROGRAM_<NAME>` unset, a run with `CI` set to a non-empty value throws, because CI must
-run the built artifact. A run without `CI` runs `bun <package>/<source>` from the repo root, so a
-test runs under `bun test` with no build.
+`cwd` is the repo root in each case. rig finds it by walking up from the test process's working
+directory to the folder that holds `rig.config.ts`, so it throws when that directory sits outside
+the repo. Put a helper that a package's e2e tests share, such as one that runs the command to its
+exit or waits for it to be ready, in that package's `src/test-utils/`.

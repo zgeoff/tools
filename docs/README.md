@@ -40,7 +40,7 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 - [Setting up the browser lane](./guides/browser-lane.md): adopt rig's browser lane, its build
   script, page code and memory cap.
 - [Programs in e2e tests](./guides/e2e-programs.md): declare the programs an `e2e/` folder runs, and
-  run them with `runProgram` and `startProgram`.
+  find each one's command with `resolveProgram`.
 - [Benchmarks and evaluations](./guides/benchmarks-and-evals.md): `defineBench`, `rig bench` and
   `rig eval`.
 - [The test layout](./guides/test-layout.md): the faults `chex test-layout` reports and how to fix

@@ -9,7 +9,7 @@ import { resolveRepoRoot } from './resolve-repo-root.ts';
 export interface ProgramLaunch {
   readonly command: readonly string[];
 
-  // The folder to run in when the caller names none.
+  // The repo root, which the command runs from unless the caller picks another folder.
   readonly cwd: string;
 }
 
@@ -32,18 +32,19 @@ export function readLaunchSources(): ProgramLaunchSources {
   };
 }
 
-// `rig e2e` builds the program and names its artifact in the environment. Outside CI, a test
-// without that variable runs the source with bun, so the file runs under `bun test` with no build.
-export async function resolveProgramLaunch(
+// The command that runs a program rig.config.ts declares, and the repo root; the test spawns it.
+// `rig e2e` names the built artifact in the environment. Outside CI, without that variable, the
+// command runs the source with bun, so the test runs under `bun test` with no build.
+export async function resolveProgram(
   name: string,
-  sources: ProgramLaunchSources,
+  sources: ProgramLaunchSources = readLaunchSources(),
 ): Promise<ProgramLaunch> {
   const artifact = sources.environment[buildProgramVariable(name)];
 
   if (artifact !== undefined && artifact !== '') {
     return {
       command: /\.(?:js|ts)$/u.test(artifact) ? ['bun', artifact] : [artifact],
-      cwd: sources.cwd,
+      cwd: resolveRepoRoot(sources.cwd, sources.probeFile),
     };
   }
 

@@ -63,8 +63,8 @@ export function defineBench<Context>(options: BenchOptions<Context>): BenchDefin
   };
 }
 
-// A setup result that holds a resource, such as the handle startProgram returns, is disposed of
-// through its `Symbol.asyncDispose`, so the program it started stops.
+// A setup result that holds a resource, such as a handle to a program that setup started, is
+// disposed of through its `Symbol.asyncDispose`, so the program stops.
 async function runContextDispose(context: unknown): Promise<void> {
   if ((typeof context !== 'object' && typeof context !== 'function') || context === null) {
     return;

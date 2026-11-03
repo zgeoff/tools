@@ -143,9 +143,11 @@ An e2e test runs the program it checks. `rig.config.ts` declares each program wi
 source, build command and artifact, and `defineRig` checks every entry. `rig e2e` refuses an `e2e`
 folder in a package that no program names, builds each program once in its package folder before the
 tests start, and sets `RIG_PROGRAM_<NAME>` to the artifact's absolute path in the tests'
-environment. `runProgram` and `startProgram` in `@zgeoff/rig/e2e` read that variable. With it unset,
-they throw when `CI` is set, so CI never tests an unbuilt program, and otherwise run the source with
-bun from the repo root, which they find by walking up to `rig.config.ts`.
+environment. rig owns only which command runs: `resolveProgram` in `@zgeoff/rig/e2e` reads that
+variable and gives the command and the repo root, and the test spawns the command itself. With the
+variable unset, `resolveProgram` throws when `CI` is set, so CI never tests an unbuilt program, and
+otherwise gives a command that runs the source with bun. It finds the repo root by walking up to
+`rig.config.ts`.
 
 `rig bench` runs each tracked `bench/*.bench.ts` file of a package in a process of its own, under
 `diet`, because a benchmark's heap must not leak into the next one. The process runs the file's
@@ -153,11 +155,11 @@ bun from the repo root, which they find by walking up to `rig.config.ts`.
 and a median that is compared to the budget. A `finally` then calls the `setup` result's
 `Symbol.asyncDispose` when it has one, so a program that `setup` started stops even when a run
 throws. Before the first file, `rig bench` builds each program and sets `RIG_PROGRAM_<NAME>` through
-the same code as `rig e2e`, so a benchmark that calls `startProgram` runs the artifact in CI. When
-`bench.lane` names a lane, the lane's `start` hook runs before the first file and its environment
-reaches every file, and the `stop` hook runs after the last, whether the benchmarks pass or not.
-`rig eval` runs each tracked `evals/<name>/run-<name>-eval.ts` script with `bun` from the repo root,
-one after another.
+the same code as `rig e2e`, so a benchmark that starts a program from `resolveProgram` runs the
+artifact in CI. When `bench.lane` names a lane, the lane's `start` hook runs before the first file
+and its environment reaches every file, and the `stop` hook runs after the last, whether the
+benchmarks pass or not. `rig eval` runs each tracked `evals/<name>/run-<name>-eval.ts` script with
+`bun` from the repo root, one after another.
 
 ## One source for the limits
 
@@ -181,14 +183,14 @@ each rule. A repo without the file keeps the rules' own table.
 
 ## The journeys that test rig
 
-rig's own e2e journeys run the package that npm publishes, not its source. This repo's
-`rig.config.ts` gives the e2e lane a start hook that builds rig once per run, packs it with
-`bun pm pack`, unpacks the tarball, and hands the tests the unpacked bin in `RIG_E2E_BIN`. A broken
-build, a `files` list that drops a module the CLI loads, or a bin that the tarball lacks therefore
-fails the lane. The pack sits in a cache folder under rig's own `node_modules`, because the repo's
-isolated linker links rig's dependencies there and not at the repo root. The stop hook removes the
-run's pack, and the next run's start removes any pack whose run has exited. A journey that runs
-outside the lane fails at once, because nothing set `RIG_E2E_BIN`.
+rig's own e2e journeys run rig through the command that `resolveProgram` gives for the `rig` program
+in this repo's `rig.config.ts`. The config also gives the e2e lane a start hook that builds rig once
+per run, packs it with `bun pm pack`, and unpacks the tarball, and its Chrome warm-up runs the
+unpacked bin. A broken build, a `files` list that drops a module the CLI loads, or a bin that the
+tarball lacks therefore fails the lane. The pack sits in a cache folder under rig's own
+`node_modules`, because the repo's isolated linker links rig's dependencies there and not at the
+repo root. The stop hook removes the run's pack, and the next run's start removes any pack whose run
+has exited.
 
 A fresh CI runner's first Chrome start is the slow one, so after it unpacks the bin, the start hook
 starts Chrome once and the journeys that start Chrome never pay for that first start. The hook

@@ -28,21 +28,22 @@ lane's `start` hook first, hands its environment to the benchmarks, and runs its
 
 Before the benchmarks run, `rig bench` builds each program in `programs` in `rig.config.ts` once, as
 `rig e2e` does, and sets `RIG_PROGRAM_<NAME>` to each artifact path. A failed build fails the run,
-with the program's name, and runs no benchmark. So a benchmark of a running program can start it
-with `startProgram` from `@zgeoff/rig/e2e`, and gets the built artifact in CI too.
+with the program's name, and runs no benchmark. So a benchmark of a running program can spawn the
+command that `resolveProgram` from `@zgeoff/rig/e2e` gives, and gets the built artifact in CI too.
 
 After the measured runs, `rig bench` disposes of the `setup` result: when the result has a
-`Symbol.asyncDispose` method, `rig bench` calls it, even when a run throws. A `setup` that returns
-the handle from `startProgram` stops the program this way:
+`Symbol.asyncDispose` method, `rig bench` calls it, even when a run throws. A `setup` that returns a
+handle to the program it started stops the program this way. Here `startKettleServer` is a helper in
+the package's `src/test-utils/` that spawns the `resolveProgram` command and returns that handle:
 
 ```ts
 import { defineBench } from '@zgeoff/rig/bench';
-import { startProgram } from '@zgeoff/rig/e2e';
+import { startKettleServer } from '../src/test-utils/start-kettle-server.ts';
 
 export default defineBench({
   name: 'health check',
   budget: '20ms',
-  setup: () => startProgram('kettle-server', { ready: { url: '/health' } }),
+  setup: () => startKettleServer(),
   run: async (kettle) => {
     await fetch(`${kettle.url}/health`);
   },
