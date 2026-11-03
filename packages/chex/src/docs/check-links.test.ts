@@ -3,10 +3,17 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'check-links-'));
+  const outsideDirectory = await mkdtemp(
+    join(tmpdir(), readRunFolderPrefix('check-links-outside-')),
+  );
+
+  onTestFinished(() => rm(outsideDirectory, { recursive: true, force: true }));
+
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-links-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
@@ -31,7 +38,7 @@ async function setupTest() {
   const run = (...args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`.cwd(directory).env(env).nothrow().quiet();
 
-  return { writePage, run };
+  return { outsideDirectory, writePage, run };
 }
 
 test('it passes when every relative link and anchor resolves', async () => {
@@ -395,5 +402,22 @@ test('it exits 2 and checks nothing when git cannot list the files', async () =>
     exitCode: 2,
     stdout: '',
     stderr: expect.stringContaining('check-links: git ls-files failed, so no link was checked\n'),
+  });
+});
+
+test('it exits 2 and asks for a git work tree when run outside one', async () => {
+  const ctx = await setupTest();
+
+  const scriptPath = fileURLToPath(new URL('check-links.sh', import.meta.url));
+
+  const result = await $`bash ${scriptPath}`
+    .cwd(ctx.outsideDirectory)
+    .env({ PATH: process.env['PATH'], HOME: ctx.outsideDirectory })
+    .nothrow()
+    .quiet();
+
+  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
+    exitCode: 2,
+    stderr: 'check-links: run it inside a git work tree, because it lists the files with git\n',
   });
 });

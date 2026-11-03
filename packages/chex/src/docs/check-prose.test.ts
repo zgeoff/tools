@@ -3,10 +3,17 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'check-prose-'));
+  const outsideDirectory = await mkdtemp(
+    join(tmpdir(), readRunFolderPrefix('check-prose-outside-')),
+  );
+
+  onTestFinished(() => rm(outsideDirectory, { recursive: true, force: true }));
+
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-prose-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
@@ -50,7 +57,7 @@ async function setupTest() {
       .quiet();
 
   const createOrigin = async () => {
-    const originDir = await mkdtemp(join(tmpdir(), 'check-prose-origin-'));
+    const originDir = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-prose-origin-')));
 
     onTestFinished(() => rm(originDir, { recursive: true, force: true }));
 
@@ -63,7 +70,7 @@ async function setupTest() {
 
   // actions/checkout clones one branch with no history for a pull request.
   const createShallowClone = async (originDir: string, branch: string) => {
-    const cloneDir = await mkdtemp(join(tmpdir(), 'check-prose-clone-'));
+    const cloneDir = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-prose-clone-')));
 
     onTestFinished(() => rm(cloneDir, { recursive: true, force: true }));
 
@@ -75,6 +82,7 @@ async function setupTest() {
   };
 
   return {
+    outsideDirectory,
     directory,
     runGit,
     writeText,
@@ -1484,5 +1492,22 @@ test('it exits 2 and checks nothing when git cannot list the files', async () =>
     exitCode: 2,
     stdout: '',
     stderr: expect.stringContaining('check-prose: git ls-files failed, so no doc was checked\n'),
+  });
+});
+
+test('it exits 2 and asks for a git work tree when run outside one', async () => {
+  const ctx = await setupTest();
+
+  const scriptPath = fileURLToPath(new URL('check-prose.sh', import.meta.url));
+
+  const result = await $`bash ${scriptPath}`
+    .cwd(ctx.outsideDirectory)
+    .env({ PATH: process.env['PATH'], HOME: ctx.outsideDirectory })
+    .nothrow()
+    .quiet();
+
+  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
+    exitCode: 2,
+    stderr: 'check-prose: run it inside a git work tree, because it lists the files with git\n',
   });
 });

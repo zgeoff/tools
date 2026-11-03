@@ -3,10 +3,17 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'check-length-'));
+  const outsideDirectory = await mkdtemp(
+    join(tmpdir(), readRunFolderPrefix('check-length-outside-')),
+  );
+
+  onTestFinished(() => rm(outsideDirectory, { recursive: true, force: true }));
+
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-length-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
@@ -31,7 +38,7 @@ async function setupTest() {
   const run = (...args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`.cwd(directory).env(env).nothrow().quiet();
 
-  return { directory, writeText, run };
+  return { outsideDirectory, directory, writeText, run };
 }
 
 test('it fails when the root README is over the front page limit', async () => {
@@ -378,5 +385,22 @@ test('it exits 2 and checks nothing when git cannot list the files', async () =>
     exitCode: 2,
     stdout: '',
     stderr: expect.stringContaining('check-length: git ls-files failed, so no file was checked\n'),
+  });
+});
+
+test('it exits 2 and asks for a git work tree when run outside one', async () => {
+  const ctx = await setupTest();
+
+  const scriptPath = fileURLToPath(new URL('check-length.sh', import.meta.url));
+
+  const result = await $`bash ${scriptPath}`
+    .cwd(ctx.outsideDirectory)
+    .env({ PATH: process.env['PATH'], HOME: ctx.outsideDirectory })
+    .nothrow()
+    .quiet();
+
+  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
+    exitCode: 2,
+    stderr: 'check-length: run it inside a git work tree, because it lists the files with git\n',
   });
 });

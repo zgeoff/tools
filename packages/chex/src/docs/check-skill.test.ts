@@ -8,6 +8,12 @@ import { $ } from 'bun';
 import { buildSkillPageLines } from '../test-utils/build-skill-page-lines.ts';
 
 async function setupTest() {
+  const outsideDirectory = await mkdtemp(
+    join(tmpdir(), readRunFolderPrefix('check-skill-outside-')),
+  );
+
+  onTestFinished(() => rm(outsideDirectory, { recursive: true, force: true }));
+
   const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-skill-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
@@ -33,7 +39,7 @@ async function setupTest() {
   const run = (...args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`.cwd(directory).env(env).nothrow().quiet();
 
-  return { writePage, run };
+  return { outsideDirectory, writePage, run };
 }
 
 test('it passes a skill with a name, a description, and short files', async () => {
@@ -1237,4 +1243,21 @@ test('it ignores the bullet openers of a skill that is not a rule set', async ()
   const result = await ctx.run();
 
   expect(result.stdout.toString()).toBe('check-skill: 1 skills, 0 errors, 0 warnings\n');
+});
+
+test('it exits 2 and asks for a git work tree when run outside one', async () => {
+  const ctx = await setupTest();
+
+  const scriptPath = fileURLToPath(new URL('check-skill.sh', import.meta.url));
+
+  const result = await $`bash ${scriptPath}`
+    .cwd(ctx.outsideDirectory)
+    .env({ PATH: process.env['PATH'], HOME: ctx.outsideDirectory })
+    .nothrow()
+    .quiet();
+
+  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
+    exitCode: 2,
+    stderr: 'check-skill: run it inside a git work tree, because it lists the files with git\n',
+  });
 });

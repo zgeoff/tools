@@ -24,6 +24,10 @@
     "!src/test-utils"
   ],
   "type": "module",
+  "exports": {
+    "./test-utils/*": "./src/test-utils/*.ts",
+    "./*": "./*"
+  },
   "publishConfig": {
     "access": "public"
   },

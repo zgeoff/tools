@@ -50,9 +50,6 @@ sync/               the sources that repo-sync delivers, listed in sync/manifest
   hooks/            the agent hooks' start-up stub and the skill gate's older entry point
   skill-gate/       the skill gate's rules, which repo-sync writes to .claude/skill-gate.json in
                     each repo its except list leaves out, and which this repo links there
-e2e/                suites that drive the built product from outside, such as `rig browser` under
-                    signals
-integration/        flows across packages, such as one lane limit read by rig and by the lint rules
 scripts/            the step scripts that this repo's workflows run, one folder per area, and the
                     shell scripts that repo-sync and the release job run; tests sit beside them
 step-bundles/       the bundle of each step script that a reusable workflow downloads, which
@@ -89,9 +86,8 @@ says.
   oxlint runs both through tsrslint (`@maschwenk/tsrslint`), a Rust port of tsgolint, in tsgolint's
   place, because stock tsgolint runs out of memory under 2 GiB on impz. `lint:full` is CI-only:
   never run it locally.
-- `bun run typecheck` runs `tsrs` per package and over the root `rig.config.ts`, `scripts/`,
-  `sync/`, `test-utils/`, `e2e/` and `integration/`. CI runs it beside `lint:full`, and when the two
-  type checks disagree, `tsrs` is right.
+- `bun run typecheck` runs `tsrs` per package and over the root `rig.config.ts`, `scripts/` and
+  `sync/`. CI runs it beside `lint:full`, and when the two type checks disagree, `tsrs` is right.
 - `bun run check:sync` checks `sync/manifest.json` against the rules repo-sync assumes. Run it after
   you change the manifest or a file an entry lists. CI runs it, and the pre-push hook does not.
 - `bun run check:release-workflow` checks the tag step of the shared release job in
@@ -106,6 +102,8 @@ says.
   and the alarm job asks for `actions: read`. CI and the pre-push hook run it.
 - `bun run check:lefthook-guard` checks that `lefthook.yml` holds the `chex-baseline` job that
   `chex init` writes. CI and the pre-push hook run it.
+- `bun run check:baseline-jobs` runs each job of `packages/chex/lefthook.yml` in a sandbox and fails
+  a job that keeps git's repository variables or breaks the behaviour its case expects. CI runs it.
 - `bun x chex workflows` runs the shared workflow lint over the workflows HEAD holds, so commit a
   workflow change before you run it. CI runs it. `bun run check:docs` runs the docs checks that this
   repo takes, which the pre-push hook and CI run too.

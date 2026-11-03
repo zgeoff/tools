@@ -2,13 +2,13 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { makeAnswerQueue } from '@zgeoff/std/test-utils/make-answer-queue';
 import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
 import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
 import { readBranchBase } from './read-branch-base.ts';
 import type { ProgramResult, RunProgram } from './run-program.ts';
 import { runProgram } from './run-program.ts';
-import { makeAnswerQueue } from './test-utils/make-answer-queue.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('read-branch-base-')));
