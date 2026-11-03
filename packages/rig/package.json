@@ -29,6 +29,10 @@
       "bun": "./src/index.ts",
       "default": "./dist/index.js"
     },
+    "./e2e": {
+      "types": "./dist/e2e.d.ts",
+      "bun": "./src/e2e.ts"
+    },
     "./test-utils/*": "./src/test-utils/*.ts"
   },
   "publishConfig": {
