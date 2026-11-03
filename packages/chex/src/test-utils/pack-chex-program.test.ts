@@ -19,18 +19,18 @@ async function setupTest() {
 
   const running = new Set<number>();
 
-  const pack = (buildID: string, ownerPID: number) =>
-    runChexPack({ packageDir, buildID, ownerPID, isRunning: (pid) => running.has(pid) });
+  const pack = (ownerPID: number) =>
+    runChexPack({ packageDir, ownerPID, stamp: 's', isRunning: (pid) => running.has(pid) });
 
   return { packageDir, builds: join(packageDir, chexPackDir, 'builds'), running, pack };
 }
 
 test('it extracts the pack and points the package link at this build', async () => {
   const ctx = await setupTest();
-  const linkPath = await ctx.pack('b1', 101);
+  const linkPath = await ctx.pack(101);
   const target = await readlink(linkPath);
 
-  expect(target).toBe(join('builds', 'b1', 'package'));
+  expect(target).toBe(join('builds', '101-s', 'package'));
   expect(existsSync(join(linkPath, 'src/cli.ts'))).toBeTrue();
 });
 
@@ -39,42 +39,54 @@ test("it keeps a build's files while its rig process still runs", async () => {
 
   ctx.running.add(101);
 
-  await ctx.pack('b1', 101);
+  await ctx.pack(101);
 
-  const linkPath = await ctx.pack('b2', 202);
+  const linkPath = await ctx.pack(202);
   const target = await readlink(linkPath);
 
-  expect(target).toBe(join('builds', 'b2', 'package'));
-  expect(existsSync(join(ctx.builds, 'b1/package/src/cli.ts'))).toBeTrue();
+  expect(target).toBe(join('builds', '202-s', 'package'));
+  expect(existsSync(join(ctx.builds, '101-s/package/src/cli.ts'))).toBeTrue();
 });
 
 test('it removes a build whose rig process has stopped', async () => {
   const ctx = await setupTest();
 
-  await ctx.pack('b1', 101);
-  await ctx.pack('b2', 202);
+  await ctx.pack(101);
+  await ctx.pack(202);
 
-  expect(existsSync(join(ctx.builds, 'b1'))).toBeFalse();
+  expect(existsSync(join(ctx.builds, '101-s'))).toBeFalse();
 });
 
 test('it removes a build folder that names no owner', async () => {
   const ctx = await setupTest();
 
-  await writeTreeFiles(ctx.builds, { 'stray/owner': 'none' });
+  await writeTreeFiles(ctx.builds, { 'stray/chex.tgz': '' });
 
-  await ctx.pack('b1', 101);
+  await ctx.pack(101);
 
   expect(existsSync(join(ctx.builds, 'stray'))).toBeFalse();
+});
+
+test('it keeps a build that a running rig process has started but not yet packed', async () => {
+  const ctx = await setupTest();
+
+  ctx.running.add(303);
+
+  await writeTreeFiles(ctx.builds, { '303-s/chex.tgz': '' });
+
+  await ctx.pack(101);
+
+  expect(existsSync(join(ctx.builds, '303-s'))).toBeTrue();
 });
 
 test('it skips a build folder that another build removes first', async () => {
   const ctx = await setupTest();
 
-  const strays = Array.from({ length: 50 }, (_, index) => `stray-${index}/owner`);
+  const strays = Array.from({ length: 50 }, (_, index) => `${9000 + index}-s/chex.tgz`);
 
-  await writeTreeFiles(ctx.builds, Object.fromEntries(strays.map((path) => [path, '0'])));
+  await writeTreeFiles(ctx.builds, Object.fromEntries(strays.map((path) => [path, ''])));
 
-  const results = await Promise.allSettled([ctx.pack('b1', 101), ctx.pack('b2', 202)]);
+  const results = await Promise.allSettled([ctx.pack(101), ctx.pack(202)]);
 
   expect(results.map((result) => result.status)).toStrictEqual(['fulfilled', 'fulfilled']);
 });
@@ -85,8 +97,8 @@ test('it replaces a package folder that an older build extracted in place', asyn
   await writeTreeFiles(join(ctx.packageDir, chexPackDir), { 'package/src/cli.ts': '' });
   await writeFile(join(ctx.packageDir, chexPackDir, 'package/README.md'), '');
 
-  const linkPath = await ctx.pack('b1', 101);
+  const linkPath = await ctx.pack(101);
   const target = await readlink(linkPath);
 
-  expect(target).toBe(join('builds', 'b1', 'package'));
+  expect(target).toBe(join('builds', '101-s', 'package'));
 });

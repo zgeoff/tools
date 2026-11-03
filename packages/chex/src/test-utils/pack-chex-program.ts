@@ -1,4 +1,4 @@
-import { lstat, mkdir, readFile, readdir, rename, rm, symlink, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readdir, rename, rm, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
 
@@ -6,11 +6,11 @@ export interface PackChexOptions {
   // The package folder to pack, which `rig e2e` runs the build from.
   readonly packageDir: string;
 
-  // A name no other build uses, for this build's own folder.
-  readonly buildID: string;
-
   // The rig process that runs the tests against this build.
   readonly ownerPID: number;
+
+  // Tells this build's folder apart from another build for the same rig process.
+  readonly stamp: string;
 
   readonly isRunning: (pid: number) => boolean;
 }
@@ -23,10 +23,10 @@ export const chexPackDir = 'node_modules/.cache/chex-e2e';
 // where the isolated linker puts chex's dependencies.
 export async function runChexPack(options: PackChexOptions): Promise<string> {
   const packRoot = join(options.packageDir, chexPackDir);
-  const buildDir = join(packRoot, 'builds', options.buildID);
+  const buildID = `${options.ownerPID}-${options.stamp}`;
+  const buildDir = join(packRoot, 'builds', buildID);
 
   await mkdir(buildDir, { recursive: true });
-  await writeFile(join(buildDir, 'owner'), String(options.ownerPID));
 
   await $`bun pm pack --filename ${join(buildDir, 'chex.tgz')} --quiet`
     .cwd(options.packageDir)
@@ -35,12 +35,12 @@ export async function runChexPack(options: PackChexOptions): Promise<string> {
   await $`tar -xzf ${join(buildDir, 'chex.tgz')} -C ${buildDir}`;
 
   const linkPath = join(packRoot, 'package');
-  const pendingLink = join(packRoot, `package.${options.buildID}`);
+  const pendingLink = join(packRoot, `package.${buildID}`);
 
   await removeUnlinkedPackage(linkPath);
-  await symlink(join('builds', options.buildID, 'package'), pendingLink);
+  await symlink(join('builds', buildID, 'package'), pendingLink);
   await rename(pendingLink, linkPath);
-  await removeOrphanBuilds(join(packRoot, 'builds'), options);
+  await removeOrphanBuilds(join(packRoot, 'builds'), buildID, options.isRunning);
 
   return linkPath;
 }
@@ -54,17 +54,20 @@ async function removeUnlinkedPackage(linkPath: string): Promise<void> {
   }
 }
 
-// A build whose rig process has stopped serves no run, so its folder goes.
-async function removeOrphanBuilds(buildsDir: string, options: PackChexOptions): Promise<void> {
+// A build whose rig process has stopped serves no run, so its folder goes. The folder name starts
+// with that process id, so a folder names its owner from the moment it exists.
+async function removeOrphanBuilds(
+  buildsDir: string,
+  buildID: string,
+  isRunning: (pid: number) => boolean,
+): Promise<void> {
   const builds = await readdir(buildsDir);
 
   for (const build of builds) {
-    const ownerText = await readFile(join(buildsDir, build, 'owner'), 'utf8').catch(() => '');
+    const ownerPID = Number(build.split('-')[0]);
+    const isOrphan = !Number.isInteger(ownerPID) || ownerPID <= 0 || !isRunning(ownerPID);
 
-    const ownerPID = Number(ownerText);
-    const isOrphan = !Number.isInteger(ownerPID) || ownerPID <= 0 || !options.isRunning(ownerPID);
-
-    if (build !== options.buildID && isOrphan) {
+    if (build !== buildID && isOrphan) {
       await rm(join(buildsDir, build), { recursive: true, force: true });
     }
   }
@@ -89,8 +92,8 @@ if (import.meta.main) {
 
   await runChexPack({
     packageDir: process.cwd(),
-    buildID: `${ownerPID}-${Date.now()}`,
     ownerPID,
+    stamp: String(Date.now()),
     isRunning: isProcessRunning,
   });
 }
