@@ -1,3 +1,4 @@
+import { readlinkSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -66,7 +67,7 @@ async function runCLI(): Promise<void> {
           .map((path) => path.replace(/\/$/u, '')),
       ];
     },
-    namespace: readPIDNamespace(),
+    namespace: readPIDNamespace({ platform: process.platform, readLink: readlinkSync }),
     isRunning: (pid) => {
       try {
         process.kill(pid, 0);

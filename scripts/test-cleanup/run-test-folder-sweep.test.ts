@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { readlinkSync } from 'node:fs';
 import { chmod, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
@@ -89,7 +90,7 @@ test('it removes the temp folder of an exited process and keeps a live or foreig
 
   await exited.exited;
 
-  const namespace = readPIDNamespace();
+  const namespace = readPIDNamespace({ platform: process.platform, readLink: readlinkSync });
 
   await mkdir(join(temp, `kettle-pid${exited.pid}-ns${namespace}-Ab12Cd`));
   await mkdir(join(temp, `kettle-pid${process.pid}-ns${namespace}-Ef34Gh`));
@@ -119,7 +120,10 @@ test.if(process.getuid?.() !== 0)(
 
     await exited.exited;
 
-    const stuck = join(temp, `kettle-pid${exited.pid}-ns${readPIDNamespace()}-Op90Qr`);
+    const stuck = join(
+      temp,
+      `kettle-pid${exited.pid}-ns${readPIDNamespace({ platform: process.platform, readLink: readlinkSync })}-Op90Qr`,
+    );
 
     await mkdir(join(stuck, 'locked'), { recursive: true });
     await writeFile(join(stuck, 'locked', 'lid.txt'), 'lid');
