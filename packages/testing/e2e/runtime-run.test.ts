@@ -34,6 +34,14 @@ test('it adds the environment the caller names', async () => {
   expect(result.stdout).toBe('rolling\n');
 });
 
+test('it removes a variable that the caller sets to undefined', async () => {
+  const ctx = setupTest();
+
+  const result = await run(ctx.command, { args: ['env', 'HOME'], env: { HOME: undefined } });
+
+  expect(result.stdout).toBe('\n');
+});
+
 test('it runs the program in the folder the caller names', async () => {
   const ctx = setupTest();
 

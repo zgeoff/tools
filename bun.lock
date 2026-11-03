@@ -112,6 +112,7 @@
         "@types/bun": "catalog:",
         "@zgeoff/rig": "workspace:*",
         "@zgeoff/std": "workspace:*",
+        "@zgeoff/testing": "workspace:*",
         "tiny-invariant": "catalog:",
         "tsrs": "catalog:",
         "typescript": "catalog:",
@@ -229,6 +230,7 @@
       "devDependencies": {
         "@types/bun": "catalog:",
         "@zgeoff/std": "workspace:*",
+        "@zgeoff/testing": "workspace:*",
         "tiny-invariant": "catalog:",
         "tsrs": "catalog:",
         "typescript": "catalog:",

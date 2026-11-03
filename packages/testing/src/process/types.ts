@@ -1,9 +1,12 @@
 export type Signal = 'SIGTERM' | 'SIGINT' | 'SIGHUP' | 'SIGKILL';
 
+// Added to the test process's environment. An undefined value removes the variable.
+type Environment = Readonly<Record<string, string | undefined>>;
+
 export interface RunOptions {
   readonly args?: readonly string[];
 
-  readonly env?: Readonly<Record<string, string>>;
+  readonly env?: Environment;
 
   readonly cwd?: string;
 
@@ -26,8 +29,6 @@ export type Ready =
   | { readonly url: string }
   | { readonly stdout: string | RegExp }
   | { readonly check: () => Promise<boolean> };
-
-type Environment = Readonly<Record<string, string>>;
 
 export interface StartOptions {
   // A function gets the picked port, for a program that takes it by flag.

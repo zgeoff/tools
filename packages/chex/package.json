@@ -43,6 +43,7 @@
     "@types/bun": "catalog:",
     "@zgeoff/rig": "workspace:*",
     "@zgeoff/std": "workspace:*",
+    "@zgeoff/testing": "workspace:*",
     "tiny-invariant": "catalog:",
     "tsrs": "catalog:",
     "typescript": "catalog:"

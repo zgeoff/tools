@@ -34,16 +34,22 @@ the artifact. `rig e2e` exits 2 when an `e2e/` folder sits in a package that no 
 ## Run a program in a test
 
 rig owns only which command runs. `resolveProgram(name)` from `@zgeoff/rig/e2e` resolves to
-`{ command, cwd }`: the command that runs the program, and the repo root to run it from. The test
-spawns the command itself, with its own arguments after it:
+`{ command, cwd }`: the command that runs the program, and the repo root to run it from.
+[`@zgeoff/testing`](./testing-package.md) runs that command, with the test's own arguments after it:
 
 ```ts
 import { resolveProgram } from '@zgeoff/rig/e2e';
+import { run, start } from '@zgeoff/testing/process';
 
 const kettle = await resolveProgram('kettle-cli');
 
-const child = Bun.spawn([...kettle.command, 'boil', '--cups=2'], { cwd: kettle.cwd });
-const exitCode = await child.exited;
+const { exitCode } = await run(kettle.command, { args: ['boil', '--cups=2'], cwd: kettle.cwd });
+
+await using server = await start(kettle.command, {
+  args: ['serve'],
+  cwd: kettle.cwd,
+  ready: { url: '/health' },
+});
 ```
 
 - When `RIG_PROGRAM_<NAME>` is set, the command runs that artifact: with `bun` when it ends in `.js`
@@ -55,5 +61,5 @@ const exitCode = await child.exited;
 
 `cwd` is the repo root in each case. rig finds it by walking up from the test process's working
 directory to the folder that holds `rig.config.ts`, so it throws when that directory sits outside
-the repo. Put a helper that a package's e2e tests share, such as one that runs the command to its
-exit or waits for it to be ready, in that package's `src/test-utils/`.
+the repo. Add `@zgeoff/testing` to the package's dev dependencies, rather than a helper of its own
+that runs the command to its exit or waits for it to be ready.

@@ -3,13 +3,15 @@
 [`@zgeoff/testing`](../../packages/testing/README.md) drives a real program from a Bun test. It
 takes the program's command, a `readonly string[]`, and a `cwd`, and it never looks the program up.
 In a repo that uses [`@zgeoff/rig`](../../packages/rig/README.md), `resolveProgram` from
-`@zgeoff/rig/e2e` returns the command:
+`@zgeoff/rig/e2e` returns the command and the repo root to run it from:
 
 ```ts
 import { resolveProgram } from '@zgeoff/rig/e2e';
 import { start } from '@zgeoff/testing/process';
 
-await using ledger = await start(await resolveProgram('ledger'), { ready: { url: '/health' } });
+const ledger = await resolveProgram('ledger');
+
+await using server = await start(ledger.command, { cwd: ledger.cwd, ready: { url: '/health' } });
 ```
 
 Put these tests in `e2e/`, as the
