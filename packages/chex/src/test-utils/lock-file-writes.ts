@@ -1,6 +1,5 @@
 import { chmod } from 'node:fs/promises';
 import { $ } from 'bun';
-import { hasErrorCode } from '../../../rig/src/browser/has-error-code.ts';
 
 // Root writes past a file's mode bits, so as root the file takes ext4's immutable flag instead.
 // Returns the call that makes the file writable again, which passes when the file has gone.
@@ -17,7 +16,7 @@ export async function lockFileWrites(path: string): Promise<() => Promise<void>>
 
   return async () => {
     await chmod(path, 0o644).catch((error: unknown) => {
-      if (!hasErrorCode(error, 'ENOENT')) {
+      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
         throw error;
       }
     });
