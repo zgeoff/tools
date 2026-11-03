@@ -10,6 +10,10 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
+  // The plugin takes the nearest folder with a .git entry as the repo root, and the temp folder
+  // may sit inside a repo.
+  await mkdir(join(directory, '.git'));
+
   return {
     directory,
     oxlintBin: join(import.meta.dir, '..', '..', 'node_modules', '.bin', 'oxlint'),
