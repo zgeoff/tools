@@ -2,6 +2,10 @@ import { match } from 'ts-pattern';
 import { findTimeoutArg } from './find-timeout-arg.ts';
 import { commandNames, isCommandName } from './is-command-name.ts';
 import { readCLIArgs } from './read-cli-args.ts';
+import { runBench } from './run-bench.ts';
+import type { BenchDeps } from './run-bench.ts';
+import { runEval } from './run-eval.ts';
+import type { EvalDeps } from './run-eval.ts';
 import { runInit } from './run-init.ts';
 import type { InitDeps } from './run-init.ts';
 import type { LaneDeps } from './run-lane.ts';
@@ -12,7 +16,8 @@ import { runUnit } from './run-unit.ts';
 import type { UnitDeps } from './run-unit.ts';
 import type { RigConfig, RigRun } from './types.ts';
 
-export interface CLIDeps extends LaneDeps, UnitDeps, RelatedTestDeps, InitDeps {
+export interface CLIDeps
+  extends LaneDeps, UnitDeps, RelatedTestDeps, InitDeps, BenchDeps, EvalDeps {
   readonly readConfig: (repoRoot: string) => Promise<RigConfig>;
 }
 
@@ -31,6 +36,8 @@ export async function runCLI(argv: readonly string[], run: RigRun, deps: CLIDeps
 
   if (isCommandName(command)) {
     return match(command)
+      .with('bench', () => runBench(args.extraArgs, config, run, deps))
+      .with('eval', () => runEval(args.extraArgs, run, deps))
       .with('init', () => runInit(run.repoRoot, config, deps))
       .with('related', () => runRelatedTests(args.extraArgs, config, run, deps))
       .exhaustive();

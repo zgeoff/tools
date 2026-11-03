@@ -1,6 +1,6 @@
 // The built-in commands that `rig` dispatches before it looks for a lane, so no lane may take one
 // of these names.
-export const commandNames = ['init', 'related'] as const;
+export const commandNames = ['bench', 'eval', 'init', 'related'] as const;
 
 export type CommandName = (typeof commandNames)[number];
 

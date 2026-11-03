@@ -22,6 +22,7 @@ function setupTest() {
     },
     deps: {
       dietScript: '/diet.sh',
+      benchScript: '/run-bench-file.ts',
       output,
       initFiles: {
         readJSON: () => Promise.reject(new Error('no init here')),
@@ -147,7 +148,7 @@ test('it exits 2 and names the commands for a command it does not know', async (
   expect(exitCode).toBe(2);
 
   expect(ctx.output.err).toHaveBeenCalledExactlyOnceWith(
-    'rig: unknown command "kilm"; use one of init, related, unit, e2e, browser, docker, host, agent-sdk, model-api, kiln\n',
+    'rig: unknown command "kilm"; use one of bench, eval, init, related, unit, e2e, browser, docker, host, agent-sdk, model-api, kiln\n',
   );
 
   expect(ctx.runCommand).not.toHaveBeenCalled();

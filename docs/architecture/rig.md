@@ -137,6 +137,24 @@ fails under a cap that the lane's memory use never reaches. A cgroup cap counts 
 process uses. The recorded shell runs `bash` on `diet`'s script, which rig resolves from its own
 `@zgeoff/diet` dependency, so a repo's `PATH` never decides which cap runs.
 
+## Programs, benchmarks and evaluations
+
+An e2e test runs the program it checks. `rig.config.ts` declares each program with its package,
+source, build command and artifact, and `defineRig` checks every entry. `rig e2e` refuses an `e2e`
+folder in a package that no program names, builds each program once in its package folder before the
+tests start, and sets `RIG_PROGRAM_<NAME>` to the artifact's absolute path in the tests'
+environment. `runProgram` and `startProgram` in `@zgeoff/rig/e2e` read that variable. With it unset,
+they throw when `CI` is set, so CI never tests an unbuilt program, and otherwise run the source with
+bun from the repo root, which they find by walking up to `rig.config.ts`.
+
+`rig bench` runs each tracked `bench/*.bench.ts` file of a package in a process of its own, under
+`diet`, because a benchmark's heap must not leak into the next one. The process runs the file's
+`defineBench` result through `run-bench-file.ts`: `setup` once, 5 warm-up runs, 20 measured runs,
+and a median that is compared to the budget. When `bench.lane` names a lane, the lane's `start` hook
+runs before the first file and its environment reaches every file, and the `stop` hook runs after
+the last, whether the benchmarks pass or not. `rig eval` runs each tracked
+`evals/<name>/run-<name>-eval.ts` script with `bun` from the repo root, one after another.
+
 ## One source for the limits
 
 `@zgeoff/oxlint-config` reads `rig.config.ts` when oxlint loads its plugin. Its `max-test-timeout`

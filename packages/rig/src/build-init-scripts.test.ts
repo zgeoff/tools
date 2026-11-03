@@ -50,3 +50,22 @@ test('it replaces a lane script that runs something else', () => {
 
   expect(scripts['test:host']).toBe('rig host');
 });
+
+test('it adds the bench and eval scripts when git tracks benchmarks and evaluations', () => {
+  const scripts = buildInitScripts(
+    {},
+    defineRig({}),
+    ['bench/boil.bench.ts', 'evals/taste/run-taste-eval.ts'],
+    false,
+  );
+
+  expect(scripts['bench']).toBe('rig bench');
+  expect(scripts['eval']).toBe('rig eval');
+});
+
+test('it adds no bench or eval script to a repo with neither', () => {
+  const scripts = buildInitScripts({}, defineRig({}), ['src/a.test.ts'], false);
+
+  expect(scripts['bench']).toBeUndefined();
+  expect(scripts['eval']).toBeUndefined();
+});

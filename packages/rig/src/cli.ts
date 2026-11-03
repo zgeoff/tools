@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { existsSync } from 'node:fs';
 import { availableParallelism, totalmem } from 'node:os';
+import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
 import { wireBrowserLaneHooks } from './browser/wire-browser-lane-hooks.ts';
 import { initFiles } from './init-files.ts';
@@ -47,6 +48,7 @@ try {
     },
     {
       dietScript: resolveDietScript(),
+      benchScript: join(import.meta.dir, 'run-bench-file.ts'),
       output,
       sources: { cwd: repoRoot, probeFile: existsSync },
       readConfig: (root) =>

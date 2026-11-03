@@ -1,3 +1,5 @@
+import { collectBenchFiles } from './collect-bench-files.ts';
+import { collectEvalFiles } from './collect-eval-files.ts';
 import { pickE2EDirs } from './pick-e2e-dirs.ts';
 import { standardLanes } from './standard-lanes.ts';
 import type { ResolvedLane, RigConfig } from './types.ts';
@@ -16,11 +18,18 @@ export function buildInitScripts(
     .filter((lane) => lane.name !== 'unit' && isLaneWanted(lane, trackedFiles, isWorkspaceRepo))
     .map((lane): [string, string] => [`test:${lane.name}`, `rig ${lane.name}`]);
 
+  const benchScripts =
+    collectBenchFiles(trackedFiles, isWorkspaceRepo).length > 0 ? { bench: 'rig bench' } : {};
+
+  const evalScripts = collectEvalFiles(trackedFiles).length > 0 ? { eval: 'rig eval' } : {};
+
   return {
     ...oldScripts,
     test: 'rig unit',
     'test:related': 'rig related',
     ...Object.fromEntries(laneScripts),
+    ...benchScripts,
+    ...evalScripts,
   };
 }
 
