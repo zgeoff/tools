@@ -10,6 +10,14 @@ export default defineRig({
       build: 'bun src/test-utils/pack-chex-program.ts "$PPID"',
       artifact: 'node_modules/.cache/chex-e2e/package/src/cli.ts',
     },
+
+    // testing ships its source and drives fixture programs, so it has nothing to build.
+    testing: {
+      package: 'packages/testing',
+      source: 'src/cli/index.ts',
+      build: 'true',
+      artifact: 'src/cli/index.ts',
+    },
     rig: { package: 'packages/rig', source: 'src/cli.ts', build: 'true', artifact: 'src/cli.ts' },
   },
   lanes: {
