@@ -89,7 +89,7 @@ test('it exits 2 and prints the error when a tracked file cannot be read', async
 });
 
 test('it reports a root test-utils file of the git repo it runs in when run as a script', async () => {
-  const directory = await mkdtemp(join(tmpdir(), `run-test-layout-check-${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), `run-test-layout-check-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
