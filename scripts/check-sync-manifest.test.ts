@@ -7,7 +7,7 @@ import { $ } from 'bun';
 import { writeTreeFiles } from './test-utils/write-tree-files.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'check-sync-manifest-'));
+  const directory = await mkdtemp(join(tmpdir(), `check-sync-manifest-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

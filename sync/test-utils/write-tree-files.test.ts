@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { writeTreeFiles } from './write-tree-files.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'write-tree-files-'));
+  const directory = await mkdtemp(join(tmpdir(), `write-tree-files-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

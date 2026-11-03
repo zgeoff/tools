@@ -6,7 +6,9 @@ import { makeLoggedCommandRunner } from './make-logged-command-runner.ts';
 import type { CommandResult } from './run-command.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-make-logged-command-runner-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-make-logged-command-runner-pid${process.pid}-`),
+  );
 
   const stopping = new AbortController();
 

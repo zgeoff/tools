@@ -9,7 +9,7 @@ import { runGit } from '../test-utils/run-git.ts';
 import { fixAdvisories } from './fix-advisories.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-fix-advisories-'));
+  const directory = await mkdtemp(join(import.meta.dir, `.test-fix-advisories-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

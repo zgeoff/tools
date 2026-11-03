@@ -7,7 +7,9 @@ import { runCommand } from './run-command.ts';
 import { runPinnedToolStep } from './run-pinned-tool-step.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-run-pinned-tool-step-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-run-pinned-tool-step-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

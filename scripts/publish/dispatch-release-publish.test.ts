@@ -6,7 +6,9 @@ import { createStubGH } from '../test-utils/create-stub-gh.ts';
 import { dispatchReleasePublish } from './dispatch-release-publish.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-dispatch-release-publish-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-dispatch-release-publish-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

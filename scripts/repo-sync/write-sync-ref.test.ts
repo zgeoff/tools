@@ -6,7 +6,7 @@ import { buildCommandStub } from '../test-utils/build-command-stub.ts';
 import { writeSyncRef } from './write-sync-ref.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-write-sync-ref-'));
+  const directory = await mkdtemp(join(import.meta.dir, `.test-write-sync-ref-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

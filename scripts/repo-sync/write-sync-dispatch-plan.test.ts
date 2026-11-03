@@ -9,7 +9,9 @@ import { createPushedGitCommit } from '../test-utils/create-pushed-git-commit.ts
 import { writeSyncDispatchPlan } from './write-sync-dispatch-plan.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-write-sync-dispatch-plan-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-write-sync-dispatch-plan-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

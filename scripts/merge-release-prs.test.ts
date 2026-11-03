@@ -9,7 +9,9 @@ import { runBashScript } from './test-utils/run-bash-script.ts';
 
 async function setupTest() {
   // Inside the checkout, not the system temp dir: the folder is git-ignored.
-  const directory = await mkdtemp(join(import.meta.dir, '.test-merge-release-prs-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-merge-release-prs-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

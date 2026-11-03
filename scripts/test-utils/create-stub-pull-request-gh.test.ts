@@ -5,7 +5,9 @@ import { $ } from 'bun';
 import { createStubPullRequestGH } from './create-stub-pull-request-gh.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-create-stub-pull-request-gh-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-create-stub-pull-request-gh-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

@@ -6,7 +6,7 @@ import { copyNamedFiles } from './copy-named-files.ts';
 import { writeTreeFiles } from './write-tree-files.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'copy-named-files-'));
+  const directory = await mkdtemp(join(tmpdir(), `copy-named-files-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

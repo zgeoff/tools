@@ -6,7 +6,9 @@ import { readGitEnv } from './read-git-env.ts';
 import { runGit } from './run-git.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-create-pushed-git-commit-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-create-pushed-git-commit-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

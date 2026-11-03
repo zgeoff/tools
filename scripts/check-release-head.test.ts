@@ -7,7 +7,9 @@ import { runBashScript } from './test-utils/run-bash-script.ts';
 
 async function setupTest() {
   // Inside the checkout, not the system temp dir: the folder is git-ignored.
-  const directory = await mkdtemp(join(import.meta.dir, '.test-check-release-head-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-check-release-head-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

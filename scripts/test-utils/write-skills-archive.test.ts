@@ -8,7 +8,7 @@ import { writeSkillsArchive } from './write-skills-archive.ts';
 import { writeTreeFiles } from './write-tree-files.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'write-skills-archive-'));
+  const directory = await mkdtemp(join(tmpdir(), `write-skills-archive-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

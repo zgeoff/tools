@@ -5,7 +5,9 @@ import { $ } from 'bun';
 import { createStubCommand } from './create-stub-command.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-create-stub-command-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-create-stub-command-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

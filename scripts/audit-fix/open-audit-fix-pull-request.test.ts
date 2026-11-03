@@ -8,7 +8,9 @@ import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { openAuditFixPullRequest } from './open-audit-fix-pull-request.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-open-audit-fix-pull-request-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-open-audit-fix-pull-request-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

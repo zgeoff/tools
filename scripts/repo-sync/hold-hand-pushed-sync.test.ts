@@ -6,7 +6,9 @@ import { createStubCommand } from '../test-utils/create-stub-command.ts';
 import { holdHandPushedSync } from './hold-hand-pushed-sync.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-hold-hand-pushed-sync-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-hold-hand-pushed-sync-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

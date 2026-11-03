@@ -5,7 +5,9 @@ import { createStubInstall } from './create-stub-install.ts';
 import { readStreamUntil } from './read-stream-until.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-create-stub-install-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-create-stub-install-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

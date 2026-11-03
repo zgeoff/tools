@@ -17,7 +17,7 @@ const isRoot = process.getuid?.() === 0;
 // first on PATH stands in for the install alone. Its installed package re-exports this repo's
 // source, so the gate that runs after the install is the real one.
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'agent-hooks-start-'));
+  const directory = await mkdtemp(join(tmpdir(), `agent-hooks-start-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

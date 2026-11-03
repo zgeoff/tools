@@ -21,7 +21,9 @@ import { withInstallLock } from './with-install-lock.ts';
 import { defaultPinnedSkills, writePinnedSkills } from './write-pinned-skills.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-write-pinned-skills-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-write-pinned-skills-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

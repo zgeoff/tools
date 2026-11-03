@@ -20,7 +20,9 @@ import type { URLOutcome } from './download-step-scripts.ts';
 import { nodeFileSystem } from './node-file-system.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-download-step-scripts-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-download-step-scripts-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

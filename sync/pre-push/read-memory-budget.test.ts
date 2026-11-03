@@ -12,7 +12,7 @@ import { readOptionalText } from './read-optional-text.ts';
 const capModes = await $`bash ${join(import.meta.dir, 'run-memory-capped.sh')} --modes`.text();
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'read-memory-budget-'));
+  const directory = await mkdtemp(join(tmpdir(), `read-memory-budget-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

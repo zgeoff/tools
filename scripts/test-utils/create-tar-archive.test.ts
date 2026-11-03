@@ -5,7 +5,9 @@ import { $ } from 'bun';
 import { createTarArchive } from './create-tar-archive.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-create-tar-archive-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-create-tar-archive-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

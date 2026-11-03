@@ -15,7 +15,7 @@ import { readGitHead } from '../test-utils/read-git-head.ts';
 import { syncEntries } from './sync-entries.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-sync-entries-'));
+  const directory = await mkdtemp(join(import.meta.dir, `.test-sync-entries-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
@@ -82,7 +82,7 @@ async function setupTest() {
     afterClone: () => Promise<void> = () => Promise.resolve(),
   ) => {
     const toolsRef = await writeToolsCommit();
-    const caller = await mkdtemp(join(directory, 'caller-'));
+    const caller = await mkdtemp(join(directory, `caller-pid${process.pid}-`));
 
     await $`git clone -q ${origin} ${caller}`.env(env).quiet();
 

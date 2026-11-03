@@ -12,7 +12,9 @@ import { runActionlintCheck } from './run-actionlint-check.ts';
 async function setupTest() {
   invariant(Bun.which('actionlint') !== null, 'install actionlint');
 
-  const directory = await mkdtemp(join(import.meta.dir, '.test-run-actionlint-check-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-run-actionlint-check-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

@@ -8,7 +8,9 @@ import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { runRenovateConfigCheck } from './run-renovate-config-check.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-run-renovate-config-check-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-run-renovate-config-check-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

@@ -7,7 +7,7 @@ import { readGitHead } from './read-git-head.ts';
 import { runGit } from './run-git.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-read-git-head-'));
+  const directory = await mkdtemp(join(import.meta.dir, `.test-read-git-head-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

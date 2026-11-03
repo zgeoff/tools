@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { runBashScript } from './run-bash-script.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'run-bash-script-'));
+  const directory = await mkdtemp(join(tmpdir(), `run-bash-script-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

@@ -8,7 +8,9 @@ import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { publishPackages } from './publish-packages.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-publish-packages-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-publish-packages-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

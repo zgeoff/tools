@@ -6,7 +6,7 @@ import { makeStubToolsURLReader } from './make-stub-tools-url-reader.ts';
 import { writeTreeFiles } from './write-tree-files.ts';
 
 async function setupTest() {
-  const checkout = await mkdtemp(join(tmpdir(), 'make-stub-tools-url-reader-'));
+  const checkout = await mkdtemp(join(tmpdir(), `make-stub-tools-url-reader-pid${process.pid}-`));
 
   onTestFinished(() => rm(checkout, { recursive: true, force: true }));
 

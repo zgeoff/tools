@@ -11,7 +11,7 @@ import { runGit } from './test-utils/run-git.ts';
 import { writeTreeFiles } from './test-utils/write-tree-files.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'remove-retired-sync-files-'));
+  const directory = await mkdtemp(join(tmpdir(), `remove-retired-sync-files-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

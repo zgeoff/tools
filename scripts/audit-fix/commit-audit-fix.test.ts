@@ -13,7 +13,9 @@ import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { commitAuditFix } from './commit-audit-fix.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-commit-audit-fix-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-commit-audit-fix-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

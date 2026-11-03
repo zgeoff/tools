@@ -6,7 +6,7 @@ import { $ } from 'bun';
 import { createStubClock } from './create-stub-clock.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'create-stub-clock-'));
+  const directory = await mkdtemp(join(tmpdir(), `create-stub-clock-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

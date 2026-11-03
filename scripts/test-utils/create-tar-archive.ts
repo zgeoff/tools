@@ -13,7 +13,7 @@ export async function createTarArchive(
   directory: string,
   files: Readonly<Record<string, ArchiveFile>>,
 ): Promise<Uint8Array> {
-  const folder = await mkdtemp(join(directory, 'archive-'));
+  const folder = await mkdtemp(join(directory, `archive-pid${process.pid}-`));
 
   const release = join(folder, 'release');
   const archive = join(folder, 'release.tar.gz');

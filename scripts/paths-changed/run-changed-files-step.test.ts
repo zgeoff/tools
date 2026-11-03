@@ -9,7 +9,9 @@ import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { runChangedFilesStep } from './run-changed-files-step.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-run-changed-files-step-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-run-changed-files-step-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

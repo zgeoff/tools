@@ -8,7 +8,9 @@ import { nodeFileSystem } from './node-file-system.ts';
 import { runCommand } from './run-command.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-install-pinned-tool-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-install-pinned-tool-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

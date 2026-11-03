@@ -6,7 +6,9 @@ import { buildMockSyncEntry } from '../test-utils/build-mock-sync-entry.ts';
 import { writeSyncEntries } from './write-sync-entries.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-write-sync-entries-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-write-sync-entries-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

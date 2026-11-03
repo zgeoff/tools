@@ -7,7 +7,9 @@ import { readGitEnv } from './read-git-env.ts';
 import { runGit } from './run-git.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-move-git-commit-to-remote-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, `.test-move-git-commit-to-remote-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
