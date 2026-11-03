@@ -66,14 +66,20 @@ says.
 
 ## Tests
 
-Each test and each test helper lives in the workspace it tests. A package keeps its helpers in
-`packages/<name>/test-utils/` and its e2e suite in `packages/<name>/e2e/`, and `scripts/` and
-`sync/` keep their helpers in `scripts/test-utils/` and `sync/test-utils/`. When two workspaces need
-the same helper, each keeps its own copy. The repo root holds no `e2e/`, `integration/` or
-`test-utils/` folder.
+Each test and each test helper lives in the workspace it tests. In a package:
 
-The e2e suites of rig and chex stay a smoke set: one passing run, and one failing run for each kind
-of job. An edge case runs as a unit test of the logic it reaches.
+- Unit tests sit beside the code they test, in `src/`.
+- Each test helper, with its own test file, sits in `src/test-utils/`.
+- The `e2e/` and `integration/` suites sit at the package root.
+
+When several packages need one helper, it lives in the package that owns what it starts, builds or
+fakes. Each other package adds that package as a `workspace:*` dev dependency and imports the helper
+by name, as in `@zgeoff/std/test-utils/run-git`. The owner's `exports` maps `./test-utils/*` to
+`./src/test-utils/*.ts`, and its `files` leaves `src/test-utils` out of the npm tarball. Production
+code never imports a test helper.
+
+`scripts/` and `sync/` keep their helpers in `scripts/test-utils/` and `sync/test-utils/`, and copy
+a helper they share. The repo root holds no `e2e/`, `integration/` or `test-utils/` folder.
 
 ## Packages
 
@@ -115,9 +121,11 @@ of job. An edge case runs as a unit test of the logic it reaches.
   `chex init` writes. CI and the pre-push hook run it.
 - `bun run check:baseline-jobs` runs each job of `packages/chex/lefthook.yml` in a sandbox and fails
   a job that keeps git's repository variables or breaks the behaviour its case expects. CI runs it.
-- `bun run check:test-layout` fails when the repo root holds `e2e/`, `integration/` or
-  `test-utils/`, when a file imports a test helper from another workspace's `test-utils/`, or when a
-  source file does not parse, so the check cannot read its imports. CI runs it.
+- `bun run check:test-layout` checks the layout that [Tests](#tests) sets out. It fails on a root
+  `e2e/`, `integration/` or `test-utils/` folder, and on a package helper outside `src/test-utils/`.
+  It fails on a relative import of another workspace's helper, and on production code that imports
+  any helper. It also fails on a source file that does not parse, whose imports it cannot read. CI
+  runs it.
 - `bun x chex workflows` runs the shared workflow lint over the workflows HEAD holds, so commit a
   workflow change before you run it. CI runs it. `bun run check:docs` runs the docs checks that this
   repo takes, which the pre-push hook and CI run too.

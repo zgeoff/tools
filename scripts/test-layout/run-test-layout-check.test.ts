@@ -37,8 +37,8 @@ test('it exits 0 and prints nothing for a tree with no layout fault', async () =
 
   const exitCode = await ctx.run({
     'packages/kettle/src/boil.test.ts':
-      "import { buildWater } from '../test-utils/build-water.ts';\n",
-    'packages/kettle/test-utils/build-water.ts': 'export const buildWater = () => 1;\n',
+      "import { buildWater } from './test-utils/build-water.ts';\n",
+    'packages/kettle/src/test-utils/build-water.ts': 'export const buildWater = () => 1;\n',
   });
 
   expect({ exitCode, output: ctx.output, errors: ctx.errors }).toStrictEqual({
@@ -54,14 +54,14 @@ test('it prints each fault on its own line and exits 1', async () => {
   const exitCode = await ctx.run({
     'test-utils/build-water.ts': 'export const buildWater = () => 1;\n',
     'scripts/brew/run-brew.test.ts':
-      "import { buildWater } from '../../packages/kettle/test-utils/build-water.ts';\n",
+      "import { buildWater } from '../../packages/kettle/src/test-utils/build-water.ts';\n",
   });
 
   expect({ exitCode, output: ctx.output, errors: ctx.errors }).toStrictEqual({
     exitCode: 1,
     output: [
-      'test-utils/ sits at the repo root; move each file into the workspace it tests, such as packages/<name>/test-utils/\n',
-      "scripts/brew/run-brew.test.ts imports packages/kettle/test-utils/build-water.ts, a test helper of packages/kettle; copy the helper into the importer's own test-utils/\n",
+      'test-utils/ sits at the repo root; move each file into the workspace it tests, such as packages/<name>/src/test-utils/\n',
+      "scripts/brew/run-brew.test.ts imports packages/kettle/src/test-utils/build-water.ts, a test helper of packages/kettle; import it by the package's name, with the package as a workspace:* dev dependency\n",
     ],
     errors: [],
   });
@@ -110,6 +110,6 @@ test('it reports a root test-utils file of the git repo it runs in when run as a
   expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
     exitCode: 1,
     stdout:
-      'test-utils/ sits at the repo root; move each file into the workspace it tests, such as packages/<name>/test-utils/\n',
+      'test-utils/ sits at the repo root; move each file into the workspace it tests, such as packages/<name>/src/test-utils/\n',
   });
 });
