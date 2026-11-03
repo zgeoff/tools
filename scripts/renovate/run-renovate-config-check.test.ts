@@ -2,13 +2,16 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { firstPartyScopes } from '../../packages/chex/src/dependency-gates/first-party-scopes.ts';
-import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import type { CommandOptions, CommandResult } from '../ci/run-command.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
+import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { runRenovateConfigCheck } from './run-renovate-config-check.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-run-renovate-config-check-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, readRunFolderPrefix('.test-run-renovate-config-check-')),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

@@ -1,7 +1,8 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
+import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { nodeFileSystem } from './node-file-system.ts';
 import type { BundleConfig } from './write-step-bundles.ts';
 import {
@@ -13,7 +14,9 @@ import {
 } from './write-step-bundles.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-write-step-bundles-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, readRunFolderPrefix('.test-write-step-bundles-')),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

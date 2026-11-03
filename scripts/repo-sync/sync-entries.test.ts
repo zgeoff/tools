@@ -3,19 +3,22 @@ import { existsSync } from 'node:fs';
 import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
-import { createGitCommit } from '../../test-utils/create-git-commit.ts';
-import { createSideGitCommit } from '../../test-utils/create-side-git-commit.ts';
-import { createStubPullRequestGH } from '../../test-utils/create-stub-pull-request-gh.ts';
-import { createTrackedGitCommit } from '../../test-utils/create-tracked-git-commit.ts';
-import { createTrackedRepo } from '../../test-utils/create-tracked-repo.ts';
-import { moveGitCommitToRemote } from '../../test-utils/move-git-commit-to-remote.ts';
-import { readGitHead } from '../../test-utils/read-git-head.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { createGitCommit } from '../test-utils/create-git-commit.ts';
+import { createSideGitCommit } from '../test-utils/create-side-git-commit.ts';
+import { createStubPullRequestGH } from '../test-utils/create-stub-pull-request-gh.ts';
+import { createTrackedGitCommit } from '../test-utils/create-tracked-git-commit.ts';
+import { createTrackedRepo } from '../test-utils/create-tracked-repo.ts';
+import { moveGitCommitToRemote } from '../test-utils/move-git-commit-to-remote.ts';
+import { readGitHead } from '../test-utils/read-git-head.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { syncEntries } from './sync-entries.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-sync-entries-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, readRunFolderPrefix('.test-sync-entries-')),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
@@ -82,7 +85,7 @@ async function setupTest() {
     afterClone: () => Promise<void> = () => Promise.resolve(),
   ) => {
     const toolsRef = await writeToolsCommit();
-    const caller = await mkdtemp(join(directory, 'caller-'));
+    const caller = await mkdtemp(join(directory, readRunFolderPrefix('caller-')));
 
     await $`git clone -q ${origin} ${caller}`.env(env).quiet();
 

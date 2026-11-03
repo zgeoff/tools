@@ -2,14 +2,17 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { buildCommandStub } from '../../test-utils/build-command-stub.ts';
-import { createPushedGitCommit } from '../../test-utils/create-pushed-git-commit.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { buildCommandStub } from '../test-utils/build-command-stub.ts';
+import { createPushedGitCommit } from '../test-utils/create-pushed-git-commit.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { writeSyncDispatchPlan } from './write-sync-dispatch-plan.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-write-sync-dispatch-plan-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, readRunFolderPrefix('.test-write-sync-dispatch-plan-')),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

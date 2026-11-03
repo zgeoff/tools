@@ -3,7 +3,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { writeTreeFiles } from '../../test-utils/write-tree-files.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
+import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { readMemoryBudget } from './read-memory-budget.ts';
 import { readOptionalText } from './read-optional-text.ts';
 
@@ -12,7 +13,7 @@ import { readOptionalText } from './read-optional-text.ts';
 const capModes = await $`bash ${join(import.meta.dir, 'run-memory-capped.sh')} --modes`.text();
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'read-memory-budget-'));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('read-memory-budget-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

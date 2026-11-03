@@ -1,0 +1,14 @@
+import type { SyncEntry } from '../repo-sync/parse-sync-entries.ts';
+
+// The sync's outputs are pinned as golden text, so every default is fixed.
+export function buildMockSyncEntry(overrides: Partial<SyncEntry> = {}): SyncEntry {
+  return {
+    name: 'editorconfig',
+    description: 'The editor config',
+    files: [{ repo: 'zgeoff/tools', source: 'sync/editorconfig', target: '.editorconfig' }],
+    build: '',
+    optIn: false,
+    scripts: {},
+    ...overrides,
+  };
+}

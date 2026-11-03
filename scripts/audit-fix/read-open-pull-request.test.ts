@@ -1,12 +1,15 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createStubGH } from '../../test-utils/create-stub-gh.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { createStubGH } from '../test-utils/create-stub-gh.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { readOpenPullRequest } from './read-open-pull-request.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-read-open-pull-request-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, readRunFolderPrefix('.test-read-open-pull-request-')),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

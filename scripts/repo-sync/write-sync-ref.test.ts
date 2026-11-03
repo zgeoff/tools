@@ -1,12 +1,15 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { buildCommandStub } from '../../test-utils/build-command-stub.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
+import { buildCommandStub } from '../test-utils/build-command-stub.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { writeSyncRef } from './write-sync-ref.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-write-sync-ref-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, readRunFolderPrefix('.test-write-sync-ref-')),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

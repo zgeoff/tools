@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { buildCommandStub } from '../../test-utils/build-command-stub.ts';
+import { buildCommandStub } from '../test-utils/build-command-stub.ts';
 import { writeSyncDispatches } from './write-sync-dispatches.ts';
 
 function setupTest() {

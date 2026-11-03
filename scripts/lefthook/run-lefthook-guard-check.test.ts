@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { buildInitGuardHooks } from '../../test-utils/build-init-guard-hooks.ts';
+import { buildInitGuardHooks } from '../test-utils/build-init-guard-hooks.ts';
 import { runLefthookGuardCheck } from './run-lefthook-guard-check.ts';
 
 function setupTest() {

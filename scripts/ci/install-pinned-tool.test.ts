@@ -1,14 +1,17 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createStubFileServer } from '../../test-utils/create-stub-file-server.ts';
-import { createTarArchive } from '../../test-utils/create-tar-archive.ts';
+import { createStubFileServer } from '../test-utils/create-stub-file-server.ts';
+import { createTarArchive } from '../test-utils/create-tar-archive.ts';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { installPinnedTool } from './install-pinned-tool.ts';
 import { nodeFileSystem } from './node-file-system.ts';
 import { runCommand } from './run-command.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(import.meta.dir, '.test-install-pinned-tool-'));
+  const directory = await mkdtemp(
+    join(import.meta.dir, readRunFolderPrefix('.test-install-pinned-tool-')),
+  );
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
