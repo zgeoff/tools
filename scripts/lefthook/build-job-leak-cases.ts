@@ -40,7 +40,13 @@ export function buildJobLeakCases(configText: string): BaselineJobCase[] {
           { ...sandbox.env, ...worktreeGitEnv },
         );
 
-        const dietEnv = await readFile(join(sandbox.repo, 'diet-env'), 'utf8').catch(() => '');
+        // diet writes no file when the job never reaches it.
+        const dietEnv = await readFile(join(sandbox.repo, 'diet-env'), 'utf8').catch(
+          (error: unknown) =>
+            error instanceof Error && 'code' in error && error.code === 'ENOENT'
+              ? ''
+              : Promise.reject(error),
+        );
 
         return findGitVariableFault(dietEnv, 'it never ran diet');
       },
