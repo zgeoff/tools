@@ -17,7 +17,8 @@ export async function start(
   command: readonly string[],
   options: StartOptions = {},
 ): Promise<ProcessHandle> {
-  const port = options.port === undefined ? await readFreePort() : options.port;
+  const port = await (options.port === undefined ? readFreePort() : Promise.resolve(options.port));
+
   const name = command.join(' ');
   const args = typeof options.args === 'function' ? options.args(port) : (options.args ?? []);
   const env = typeof options.env === 'function' ? options.env(port) : options.env;
@@ -116,8 +117,7 @@ export async function start(
     port,
     pid: child.pid,
     write: async (text) => {
-      child.stdin.write(text);
-
+      await child.stdin.write(text);
       await child.stdin.flush();
     },
     waitForLine,

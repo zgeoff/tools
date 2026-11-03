@@ -288,7 +288,12 @@ test('it throws at the time limit when ready.check never settles', async () => {
     readyTimeoutMs: 100,
   });
 
-  await expect(started).rejects.toThrow(/was not ready after 100 ms/u);
+  const failure = await started.then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(String(failure)).toMatch(/was not ready after 100 ms/u);
 });
 
 test('it throws when a slow ready.check answers true after the time limit', async () => {
@@ -312,5 +317,10 @@ test('it throws when a slow ready.check answers true after the time limit', asyn
     readyTimeoutMs: 50,
   });
 
-  await expect(started).rejects.toThrow(/was not ready after 50 ms/u);
+  const failure = await started.then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(String(failure)).toMatch(/was not ready after 50 ms/u);
 });

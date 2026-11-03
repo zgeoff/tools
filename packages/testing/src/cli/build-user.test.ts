@@ -4,7 +4,12 @@ import { buildUser } from './build-user.ts';
 function setupTest() {
   const written: string[] = [];
 
-  return { written, user: buildUser((text) => written.push(text)) };
+  return {
+    written,
+    user: buildUser((text) => {
+      written.push(text);
+    }),
+  };
 }
 
 test('#type writes the text as it is', async () => {

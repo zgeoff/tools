@@ -81,7 +81,11 @@ test('it fails at the time limit when a descendant holds the output pipes after 
   const startedAt = Date.now();
   const running = run(['sh', '-c', 'sleep 5 & echo parent-exited'], { timeoutMs: 300 });
 
-  await expect(running).rejects.toThrow(/did not exit in 300 ms; its output:\nparent-exited\n$/u);
+  const failure = await running.then(
+    () => null,
+    (error: unknown) => error,
+  );
 
+  expect(String(failure)).toMatch(/did not exit in 300 ms; its output:\nparent-exited\n$/u);
   expect(Date.now() - startedAt).toBeLessThan(2000);
 });
