@@ -3,11 +3,11 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { hostname, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
+import { run } from '@zgeoff/testing/process';
 import { buildBrowserRun } from '../src/browser/build-browser-run.ts';
 import { pickChromeDirs } from '../src/browser/pick-chrome-dirs.ts';
 import { resolveProgram } from '../src/e2e.ts';
 import { createTrackedRepo } from '../src/test-utils/create-tracked-repo.ts';
-import { runToExit } from '../src/test-utils/run-to-exit.ts';
 
 async function setupTest() {
   const stack = new AsyncDisposableStack();
@@ -38,7 +38,7 @@ async function setupTest() {
   return {
     repoRoot,
     runLane: () =>
-      runToExit([...rig.command, 'browser'], { cwd: repoRoot, env: { TMPDIR: laneTmpdir } }),
+      run(rig.command, { args: ['browser'], cwd: repoRoot, env: { TMPDIR: laneTmpdir } }),
   };
 }
 

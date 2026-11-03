@@ -6,10 +6,10 @@ import { resolveProgram } from '@zgeoff/rig/e2e';
 import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
 import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
+import { run } from '@zgeoff/testing/process';
 import { $ } from 'bun';
 import { buildInitGuardHooks } from '../src/test-utils/build-init-guard-hooks.ts';
 import { commitAllFiles } from '../src/test-utils/commit-all-files.ts';
-import { runToExit } from '../src/test-utils/run-to-exit.ts';
 
 // The repo has an origin and a feature branch, as a pushed branch does.
 async function setupTest() {
@@ -34,7 +34,7 @@ async function setupTest() {
     repo,
     env,
     runChex: async (args: readonly string[]) => {
-      const result = await runToExit([...chex.command, ...args], { cwd: repo, env });
+      const result = await run(chex.command, { args, cwd: repo, env });
 
       return { ...result, lastLine: result.stdout.trimEnd().split('\n').at(-1) };
     },
@@ -47,9 +47,9 @@ test('it prints cleared and exits 0 when the check passes', async () => {
   await writeTreeFiles(ctx.repo, { 'README.md': '# Kettle\n\nThe kettle boils water.\n' });
   await commitAllFiles(ctx.repo, ctx.env, 'docs: add the readme');
 
-  const run = await ctx.runChex(['prose']);
+  const result = await ctx.runChex(['prose']);
 
-  expect({ exitCode: run.exitCode, lastLine: run.lastLine }).toStrictEqual({
+  expect({ exitCode: result.exitCode, lastLine: result.lastLine }).toStrictEqual({
     exitCode: 0,
     lastLine: 'cleared: prose',
   });
@@ -61,9 +61,9 @@ test('it prints each check of a list on its own line and exits 1 when one bounce
   await writeTreeFiles(ctx.repo, { 'README.md': '# Kettle\n\nRead the [guide](./guide.md).\n' });
   await commitAllFiles(ctx.repo, ctx.env, 'docs: add the readme');
 
-  const run = await ctx.runChex(['length', 'links']);
+  const result = await ctx.runChex(['length', 'links']);
 
-  expect({ exitCode: run.exitCode, stdout: run.stdout }).toStrictEqual({
+  expect({ exitCode: result.exitCode, stdout: result.stdout }).toStrictEqual({
     exitCode: 1,
     stdout: expect.stringMatching(/cleared: length\n[\s\S]*bounced: links\n$/u),
   });
@@ -79,11 +79,11 @@ test('it writes lefthook.yml and the check:docs script to disk for init', async 
     }),
   });
 
-  const run = await ctx.runChex(['init']);
+  const result = await ctx.runChex(['init']);
   const lefthook = await Bun.file(join(ctx.repo, 'lefthook.yml')).text();
   const packageJSON: unknown = await Bun.file(join(ctx.repo, 'package.json')).json();
 
-  expect(run.exitCode).toBe(0);
+  expect(result.exitCode).toBe(0);
 
   expect(lefthook).toBe(
     `extends:

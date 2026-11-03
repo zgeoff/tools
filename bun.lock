@@ -112,6 +112,7 @@
         "@types/bun": "catalog:",
         "@zgeoff/rig": "workspace:*",
         "@zgeoff/std": "workspace:*",
+        "@zgeoff/testing": "workspace:*",
         "tiny-invariant": "catalog:",
         "tsrs": "catalog:",
         "typescript": "catalog:",
@@ -229,6 +230,7 @@
       "devDependencies": {
         "@types/bun": "catalog:",
         "@zgeoff/std": "workspace:*",
+        "@zgeoff/testing": "workspace:*",
         "tiny-invariant": "catalog:",
         "tsrs": "catalog:",
         "typescript": "catalog:",
@@ -256,6 +258,19 @@
         "type-fest": "catalog:",
         "typescript": "catalog:",
         "xstate": "catalog:",
+      },
+    },
+    "packages/testing": {
+      "name": "@zgeoff/testing",
+      "version": "0.0.0",
+      "dependencies": {
+        "bun-pty": "catalog:",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "@zgeoff/std": "workspace:*",
+        "tsrs": "catalog:",
+        "typescript": "catalog:",
       },
     },
     "packages/tsconfig": {
@@ -287,6 +302,7 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "ajv": "8.20.0",
+    "bun-pty": "0.5.2",
     "gunshi": "1.0.0-rc.1",
     "happy-dom": "21.0.4",
     "jest-extended": "7.0.0",
@@ -675,6 +691,8 @@
 
     "@zgeoff/std": ["@zgeoff/std@workspace:packages/std"],
 
+    "@zgeoff/testing": ["@zgeoff/testing@workspace:packages/testing"],
+
     "@zgeoff/tsconfig": ["@zgeoff/tsconfig@workspace:packages/tsconfig"],
 
     "acorn": ["acorn@8.19.0", "", { "bin": { "acorn": "bin/acorn" } }, "sha512-oJlA3XiRm7Cyk6qFD2Jn8ak9B7jSy0qy00ADO3+8dpT0LSjFihQYv4C02LFCSYJV3Q37xYwwRy5m+IpIiUzqWw=="],
@@ -698,6 +716,8 @@
     "brace-expansion": ["brace-expansion@5.0.12", "", { "dependencies": { "balanced-match": "^4.0.2" } }, "sha512-YovQ3rzhaLMIrDjNDMkNS01tea93qhEhG5xy8f6+R0l+dw3Ki+5sCoIoI942iuLZTHWogWktgwVDhU09iNEimQ=="],
 
     "buffer-image-size": ["buffer-image-size@0.6.4", "", { "dependencies": { "@types/node": "*" } }, "sha512-nEh+kZOPY1w+gcCMobZ6ETUp9WfibndnosbpwB1iJk/8Gt5ZF2bhS6+B6bPYz424KtwsR6Rflc3tCz1/ghX2dQ=="],
+
+    "bun-pty": ["bun-pty@0.5.2", "", {}, "sha512-3CbZE6qgNevRf5HkbTsxudwxWyJqGgqfwXsKy3fmOD8/wirEfmOmVADdMhHihU3k7hFaG+tktpKSUdQBfU4ZWA=="],
 
     "bun-types": ["bun-types@1.4.4", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-yjrJh5oGX7mMPKGd19YXyIjmEuj4G4zNC30bs7PM9Az7NQ3ndF3j6hbeRdvJTRQEhJ/FYQwW0a2moweEi2hMxQ=="],
 

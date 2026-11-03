@@ -1,0 +1,56 @@
+{
+  "name": "@zgeoff/testing",
+  "version": "0.0.0",
+  "description": "Drive a real program from a Bun test, in a pseudo-terminal or as a process with a ready check",
+  "keywords": [
+    "bun",
+    "e2e",
+    "process",
+    "pty",
+    "test"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zgeoff/tools.git",
+    "directory": "packages/testing"
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.ts",
+    "dist",
+    "!src/test-utils"
+  ],
+  "type": "module",
+  "exports": {
+    "./cli": {
+      "types": "./dist/cli/index.d.ts",
+      "bun": "./src/cli/index.ts",
+      "default": "./src/cli/index.ts"
+    },
+    "./process": {
+      "types": "./dist/process/index.d.ts",
+      "bun": "./src/process/index.ts",
+      "default": "./src/process/index.ts"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "typecheck": "tsrs"
+  },
+  "dependencies": {
+    "bun-pty": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@zgeoff/std": "workspace:*",
+    "tsrs": "catalog:",
+    "typescript": "catalog:"
+  },
+  "engines": {
+    "bun": ">=1.3"
+  }
+}
