@@ -2411,7 +2411,8 @@ function runTestLayoutCommand() {
     readText: (path) => Bun.file(join6(cwd, path)).text(),
     readRigConfig: async () => {
       const loaded = await import(join6(cwd, "rig.config.ts"));
-      return typeof loaded === "object" && loaded !== null ? Reflect.get(loaded, "default") : null;
+      const defaultExport = typeof loaded === "object" && loaded !== null ? Reflect.get(loaded, "default") : null;
+      return defaultExport;
     },
     readParser: readOxcParser,
     writeOutput: (text) => {
