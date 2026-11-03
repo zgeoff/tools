@@ -14,6 +14,8 @@ export interface TestFolderSweepOptions {
   readonly isRunning: (pid: number) => boolean;
 
   readonly removePath: (path: string) => Promise<void>;
+
+  readonly reportFailure: (path: string, error: unknown) => void;
 }
 
 // Runs before each test lane starts, so it never meets a folder of the run it precedes.
@@ -21,12 +23,21 @@ export async function runTestFolderSweep(options: TestFolderSweepOptions): Promi
   const candidates = await options.readCandidatePaths();
 
   const stopped = collectStoppedRunFolders(candidates, options.namespace, options.isRunning);
+  const removed: string[] = [];
 
+  // A leftover the sweep cannot remove, such as a folder a test made read-only, must not stop the
+  // test lane that follows.
   for (const path of stopped) {
-    await options.removePath(path);
+    try {
+      await options.removePath(path);
+
+      removed.push(path);
+    } catch (error) {
+      options.reportFailure(path, error);
+    }
   }
 
-  return stopped;
+  return removed;
 }
 
 async function runCLI(): Promise<void> {
@@ -60,6 +71,11 @@ async function runCLI(): Promise<void> {
       }
     },
     removePath: (path) => rm(path, { recursive: true, force: true }),
+    reportFailure: (path, error) => {
+      process.stderr.write(
+        `test-folder-sweep: kept ${path}, which it could not remove: ${String(error)}\n`,
+      );
+    },
   });
 }
 
