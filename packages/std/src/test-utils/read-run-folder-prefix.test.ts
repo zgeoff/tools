@@ -7,6 +7,12 @@ test("it ends the name with the test process's ID and PID namespace", () => {
   );
 });
 
+test('it names the host namespace where there are no PID namespaces', () => {
+  expect(readRunFolderPrefix('kettle-', { platform: 'darwin', readLink: () => '' })).toBe(
+    `kettle-pid${process.pid}-nshost-`,
+  );
+});
+
 test('it names an unknown namespace when the namespace link cannot be read', () => {
   const source = {
     platform: 'linux' as const,
