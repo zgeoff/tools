@@ -164,7 +164,7 @@ const packageTestDirs = new Set(['e2e', 'integration', 'evals', 'bench', 'test-u
 function isProductionCode(path: string): boolean {
   const root = getWorkspaceRoot(path);
 
-  if (root === '' || isHelperPath(path) || /\.test\.[^/]+$/u.test(path)) {
+  if (root === '' || isHelperPath(path) || /\.(?:test|bench)\.[^/]+$/u.test(path)) {
     return false;
   }
 

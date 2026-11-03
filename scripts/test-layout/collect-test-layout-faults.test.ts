@@ -292,22 +292,26 @@ test('it reports a source that a package ships from its root when it imports a t
   ]);
 });
 
-test.each(['e2e/pour.ts', 'integration/pour.ts', 'evals/pour.ts', 'bench/pour.ts', 'pour.test.ts'])(
-  'it passes a package file at %s that imports a test helper by name',
-  (file) => {
-    const faults = collectTestLayoutFaults(
-      [],
-      [
-        {
-          path: `packages/kettle/${file}`,
-          text: "import { buildWater } from '@acme/teapot/test-utils/build-water';\n",
-        },
-      ],
-    );
+test.each([
+  'e2e/pour.ts',
+  'integration/pour.ts',
+  'evals/pour.ts',
+  'bench/pour.ts',
+  'pour.test.ts',
+  'src/pour.bench.ts',
+])('it passes a package file at %s that imports a test helper by name', (file) => {
+  const faults = collectTestLayoutFaults(
+    [],
+    [
+      {
+        path: `packages/kettle/${file}`,
+        text: "import { buildWater } from '@acme/teapot/test-utils/build-water';\n",
+      },
+    ],
+  );
 
-    expect(faults).toStrictEqual([]);
-  },
-);
+  expect(faults).toStrictEqual([]);
+});
 
 test.each([
   [
