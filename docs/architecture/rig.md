@@ -116,8 +116,10 @@ would leave a folder behind on each run.
 
 The run is `bun test --parallel=1 --randomize --no-isolate` over the suites, with the lane's preload
 and the lane's limit. A test closes each view it opens in `onTestFinished`, because the next file
-runs in the same process. Afterwards the lane removes both run folders, unless it could not stop a
-process group, because that group can still write there and a later sweep needs its record.
+runs in the same process. After the last file, the preload kills each process that the test process
+started and waits until they exit, because Chrome's helper processes outlive `bun test`, and `diet`
+keeps its cgroup while one runs. Afterwards the lane removes both run folders, unless it could not
+stop a process group, because that group can still write there and a later sweep needs its record.
 
 ### Process groups and the sweep
 

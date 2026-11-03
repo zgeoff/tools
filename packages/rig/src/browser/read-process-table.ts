@@ -1,6 +1,8 @@
 export interface ProcessEntry {
   readonly pid: number;
 
+  readonly parentID: number;
+
   readonly groupID: number;
 
   readonly state: string;
@@ -19,16 +21,16 @@ export function readProcessTable(): readonly ProcessEntry[] | null {
     .toString()
     .split('\n')
     .map((line) => line.trim().split(/\s+/u))
-    .flatMap(([pid, groupID, state]) =>
-      pid === undefined || groupID === undefined || state === undefined
+    .flatMap(([pid, parentID, groupID, state]) =>
+      pid === undefined || parentID === undefined || groupID === undefined || state === undefined
         ? []
-        : [{ pid: Number(pid), groupID: Number(groupID), state }],
+        : [{ pid: Number(pid), parentID: Number(parentID), groupID: Number(groupID), state }],
     );
 }
 
 function runListing() {
   try {
-    return Bun.spawnSync(['ps', '-A', '-o', 'pid=,pgid=,stat=']);
+    return Bun.spawnSync(['ps', '-A', '-o', 'pid=,ppid=,pgid=,stat=']);
   } catch {
     return null;
   }

@@ -2,9 +2,27 @@
 // Chrome before the first test. Bun spawns one Chrome per process, on the options of the first
 // view, and every later view in the process, in every file, reuses it.
 
+import { afterAll } from 'bun:test';
 import { hostname } from 'node:os';
+import { systemClock } from '../system-clock.ts';
 import { laneFiles } from './lane-files.ts';
+import { readProcessTable } from './read-process-table.ts';
 import { startBrowser } from './start-browser.ts';
+import { stopDescendantProcesses } from './stop-descendant-processes.ts';
+
+// Chrome's helper processes outlive the `bun test` that starts them, and diet then keeps its cgroup
+// for them, so the preload stops them after the last file.
+afterAll(() =>
+  stopDescendantProcesses({
+    rootPID: process.pid,
+    deadlineMs: 5000,
+    clock: systemClock,
+    readProcessTable,
+    signalProcess: (pid, signal) => {
+      process.kill(pid, signal);
+    },
+  }),
+);
 
 await startBrowser({
   // The lane starts each test process in the repo's root.
