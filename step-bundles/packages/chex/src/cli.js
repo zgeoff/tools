@@ -3,7 +3,7 @@
 
 // packages/chex/src/cli.ts
 import { rename, rm } from "fs/promises";
-import { join as join6 } from "path";
+import { join as join8 } from "path";
 // packages/std/src/is-record.ts
 function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -1090,6 +1090,7 @@ var checkNames = [
   "commits",
   "local-paths",
   "test-timeouts",
+  "test-layout",
   "workflows",
   "dependency-gates",
   "uncommitted"
@@ -1986,8 +1987,8 @@ async function runLocalPathsCommand(args) {
 }
 if (false) {}
 
-// packages/chex/src/run-test-timeouts-check.ts
-import { basename, dirname as dirname2, posix } from "path";
+// packages/chex/src/run-test-layout-check.ts
+import { join as join6 } from "path";
 
 // packages/chex/src/parse-lane-limits.ts
 var standardLaneLimits = [
@@ -2034,12 +2035,374 @@ function findMember(value, key) {
   return typeof value === "object" && value !== null && Object.hasOwn(value, key) ? Reflect.get(value, key) : undefined;
 }
 
+// packages/chex/src/test-layout/collect-lane-suffixes.ts
+function collectLaneSuffixes(oxlintConfigText, rigConfig) {
+  const names = [...parseLaneLimits(oxlintConfigText).keys()].filter((name) => name !== "e2e");
+  const lanes = typeof rigConfig === "object" && rigConfig !== null ? Reflect.get(rigConfig, "lanes") : undefined;
+  const rigSuffixes = Array.isArray(lanes) ? lanes.flatMap((lane) => {
+    const suffix = typeof lane === "object" && lane !== null ? Reflect.get(lane, "suffix") : undefined;
+    return typeof suffix === "string" ? [suffix] : [];
+  }) : [];
+  return [...new Set([...names.map((name) => `.${name}`), ...rigSuffixes])].toSorted();
+}
+
+// packages/chex/src/test-layout/collect-folder-faults.ts
+import { posix } from "path";
+var rootFolders = ["e2e", "evals", "bench"];
+var testFolderNames = new Set(["test", "tests", "__tests__"]);
+function collectFolderFaults(layout) {
+  return [
+    ...collectRootFolderFaults(layout),
+    ...collectIntegrationFaults(layout.trackedPaths),
+    ...collectTestFolderFaults(layout.trackedPaths),
+    ...collectHelperFolderFaults(layout),
+    ...collectSubfolderFaults(layout)
+  ];
+}
+function collectRootFolderFaults(layout) {
+  const example = pickExampleWorkspace(layout.workspaces);
+  const faults = rootFolders.filter((folder) => layout.isWorkspaceRepo && hasFolder(layout.trackedPaths, folder)).map((folder) => `${folder}/ sits at the repo root; move each file into the workspace it tests, such as ${example}/${folder}/`);
+  if (hasFolder(layout.trackedPaths, "test-utils")) {
+    faults.push(layout.isWorkspaceRepo ? `test-utils/ sits at the repo root; move each file into the workspace it tests, such as ${example}/src/test-utils/` : "test-utils/ sits at the repo root; move each file into src/test-utils/");
+  }
+  return faults;
+}
+function hasFolder(trackedPaths, folder) {
+  return trackedPaths.some((path) => path.startsWith(`${folder}/`));
+}
+function pickExampleWorkspace(workspaces) {
+  const [first] = workspaces;
+  const parent = first === undefined ? "." : posix.dirname(first);
+  return parent === "." ? "packages/<name>" : `${parent}/<name>`;
+}
+function collectIntegrationFaults(trackedPaths) {
+  return collectFolderPaths(trackedPaths).filter((folder) => posix.basename(folder) === "integration" && !folder.split("/").includes("src")).map((folder) => `${folder}/ holds tests; move each one beside the module it tests, in the package that wires together the packages it imports`);
+}
+function collectTestFolderFaults(trackedPaths) {
+  return collectFolderPaths(trackedPaths).filter((folder) => testFolderNames.has(posix.basename(folder))).map((folder) => `${folder}/ is a test folder; move its tests beside the modules they test, its end-to-end tests into the package's e2e/, and its helpers into src/test-utils/`);
+}
+function collectHelperFolderFaults(layout) {
+  return layout.workspaces.filter((root) => layout.trackedPaths.some((path) => path.startsWith(`${root}/test-utils/`))).map((root) => `${root}/test-utils/ holds test helpers outside src/; move each file into ${root}/src/test-utils/`);
+}
+function collectFolderPaths(trackedPaths) {
+  const folders = new Set;
+  for (const path of trackedPaths) {
+    const segments = path.split("/").slice(0, -1);
+    for (let length = 1;length <= segments.length; length += 1) {
+      folders.add(segments.slice(0, length).join("/"));
+    }
+  }
+  return [...folders].toSorted();
+}
+function collectSubfolderFaults(layout) {
+  const tracked = new Set(layout.trackedPaths);
+  const isPackageFolder = (parent) => parent === "" ? !layout.isWorkspaceRepo : tracked.has(posix.join(parent, "package.json"));
+  const faults = new Set;
+  for (const path of layout.trackedPaths) {
+    const segments = path.split("/");
+    for (const [index, name] of segments.entries()) {
+      const parent = segments.slice(0, index).join("/");
+      const rest = segments.slice(index + 1);
+      const folder = posix.join(parent, name);
+      if (!isPackageFolder(parent)) {
+        continue;
+      }
+      const [first, second] = rest;
+      if (name === "e2e" && second !== undefined && first !== "fixtures") {
+        faults.add(`${folder}/${first}/ is a subfolder of ${folder}/; keep the tests flat in ${folder}/, with fixtures in ${folder}/fixtures/ and helpers in src/test-utils/`);
+      }
+      if (name === "bench" && second !== undefined) {
+        faults.add(`${folder}/${first}/ is a subfolder of ${folder}/; keep the bench files flat in ${folder}/, with helpers in src/test-utils/`);
+      }
+      const [suite, subfolder, inner] = rest;
+      if (name === "evals" && suite !== undefined && inner !== undefined) {
+        faults.add(`${folder}/${suite}/${subfolder}/ is a subfolder of ${folder}/${suite}/; keep that suite's files flat in ${folder}/${suite}/, with helpers in src/test-utils/`);
+      }
+    }
+  }
+  return [...faults].toSorted();
+}
+
+// packages/chex/src/test-layout/collect-import-faults.ts
+import { dirname as dirname2, join as join5, normalize } from "path";
+
+// packages/chex/src/test-layout/collect-import-specifiers.ts
+function collectImportSpecifiers(oxc, program) {
+  const specifiers = [];
+  const addLiteral = (node) => {
+    if (node?.type === "Literal" && typeof node.value === "string") {
+      specifiers.push(node.value);
+    }
+    const [onlyPart] = node?.type === "TemplateLiteral" && node.expressions.length === 0 ? node.quasis : [];
+    if (typeof onlyPart?.value.cooked === "string") {
+      specifiers.push(onlyPart.value.cooked);
+    }
+  };
+  const visitor = new oxc.Visitor({
+    ImportDeclaration: (node) => {
+      addLiteral(node.source);
+    },
+    ExportNamedDeclaration: (node) => {
+      addLiteral(node.source);
+    },
+    ExportAllDeclaration: (node) => {
+      addLiteral(node.source);
+    },
+    ImportExpression: (node) => {
+      addLiteral(node.source);
+    },
+    TSImportType: (node) => {
+      addLiteral(node.source);
+    },
+    TSExternalModuleReference: (node) => {
+      addLiteral(node.expression);
+    },
+    CallExpression: (node) => {
+      const [first] = node.arguments;
+      if (node.callee.type === "Identifier" && node.callee.name === "require" && first?.type !== "SpreadElement") {
+        addLiteral(first);
+      }
+    }
+  });
+  visitor.visit(program);
+  return specifiers;
+}
+
+// packages/chex/src/test-layout/collect-import-faults.ts
+var sourcePattern = /\.(?:[cm]?[jt]s|[jt]sx)$/u;
+var packageHelperPattern = /^@[^/]+\/[^/]+\/test-utils(?:\/|$)/u;
+var packageTestFolders = new Set(["e2e", "evals", "bench", "test-utils"]);
+function collectImportFaults(oxc, layout, sources) {
+  return sources.filter((source) => sourcePattern.test(source.path)).flatMap((source) => {
+    const parsed = oxc.parseSync(source.path, source.text);
+    const [parseError] = parsed.errors;
+    if (parseError !== undefined) {
+      return [
+        `${source.path} does not parse, so the layout check cannot read its imports: ${parseError.message}`
+      ];
+    }
+    return collectImportSpecifiers(oxc, parsed.program).flatMap((specifier) => collectSpecifierFaults(layout, source.path, specifier));
+  });
+}
+function collectSpecifierFaults(layout, importer, specifier) {
+  const isRelative = specifier.startsWith("./") || specifier.startsWith("../");
+  const target = isRelative ? normalize(join5(dirname2(importer), specifier)) : specifier;
+  const isHelper = isRelative ? isHelperPath(layout, target) : packageHelperPattern.test(specifier);
+  if (isHelper && isProductionCode(layout, importer)) {
+    return [
+      `${importer} imports ${target}, a test helper, from production code; import test helpers only from tests and other test helpers`
+    ];
+  }
+  if (!isRelative || !isHelper) {
+    return [];
+  }
+  const targetRoot = getWorkspaceRoot(layout, target);
+  if (targetRoot === getWorkspaceRoot(layout, importer)) {
+    return [];
+  }
+  const fix = layout.workspaces.includes(targetRoot) ? "import it by the package's name, with the package as a workspace:* dev dependency" : "copy the helper into the importer's own test-utils/";
+  return [`${importer} imports ${target}, a test helper of ${targetRoot}; ${fix}`];
+}
+function isHelperPath(layout, path) {
+  const folder = getHelperFolder(layout, getWorkspaceRoot(layout, path));
+  return path === folder || path.startsWith(`${folder}/`);
+}
+function getWorkspaceRoot(layout, path) {
+  const workspace = layout.workspaces.find((root) => path.startsWith(`${root}/`));
+  if (workspace !== undefined) {
+    return workspace;
+  }
+  const segments = path.split("/");
+  if (!layout.isWorkspaceRepo || segments.length === 1) {
+    return "";
+  }
+  return segments[0] ?? "";
+}
+function getHelperFolder(layout, root) {
+  if (layout.workspaces.includes(root)) {
+    return `${root}/src/test-utils`;
+  }
+  if (root === "") {
+    return layout.isWorkspaceRepo ? "test-utils" : "src/test-utils";
+  }
+  return `${root}/test-utils`;
+}
+function isProductionCode(layout, path) {
+  const root = getWorkspaceRoot(layout, path);
+  if (root === "" && layout.isWorkspaceRepo || isHelperPath(layout, path)) {
+    return false;
+  }
+  if (/\.(?:test|bench)\.[^/]+$/u.test(path)) {
+    return false;
+  }
+  const isPackage = layout.workspaces.includes(root) || root === "" && !layout.isWorkspaceRepo;
+  if (!isPackage) {
+    return true;
+  }
+  const [folder] = path.slice(root === "" ? 0 : root.length + 1).split("/");
+  return !packageTestFolders.has(folder ?? "");
+}
+
+// packages/chex/src/test-layout/collect-name-faults.ts
+import { posix as posix2 } from "path";
+var e2ePrefixes = [
+  "start-",
+  "stop-",
+  "recover-",
+  "cli-",
+  "build-",
+  "runtime-",
+  "enforce-",
+  "compat-",
+  "journey-"
+];
+var testSuffix = ".test.ts";
+function collectNameFaults(layout) {
+  const namesByFolder = Map.groupBy(layout.trackedPaths, (path) => posix2.dirname(path));
+  return layout.trackedPaths.filter((path) => path.endsWith(testSuffix)).flatMap((path) => [
+    ...collectE2ENameFaults(path, layout),
+    ...collectModuleTestFaults(path, layout, namesByFolder.get(posix2.dirname(path)) ?? [])
+  ]);
+}
+function collectE2ENameFaults(path, layout) {
+  const folder = posix2.dirname(path);
+  const parent = posix2.dirname(folder);
+  const isE2EFolder = posix2.basename(folder) === "e2e" && (parent === "." ? !layout.isWorkspaceRepo : layout.trackedPaths.includes(posix2.join(parent, "package.json")));
+  const name = posix2.basename(path);
+  if (!isE2EFolder || e2ePrefixes.some((prefix) => name.startsWith(prefix))) {
+    return [];
+  }
+  return [
+    `${path} doesn't start with an e2e prefix; rename it to start with ${e2ePrefixes.slice(0, -1).join(", ")} or ${e2ePrefixes.at(-1)}`
+  ];
+}
+function collectModuleTestFaults(path, layout, siblings) {
+  const stem = posix2.basename(path).slice(0, -testSuffix.length);
+  const dotIndex = stem.lastIndexOf(".");
+  const base = dotIndex === -1 ? stem : stem.slice(0, dotIndex);
+  const word = dotIndex === -1 ? null : stem.slice(dotIndex + 1);
+  const names = siblings.map((sibling) => posix2.basename(sibling));
+  const hasModule = (prefix) => names.some((name) => name.startsWith(`${prefix}.`) && !name.slice(prefix.length + 1).includes("."));
+  const isInSrc = posix2.dirname(path).split("/").includes("src");
+  const isLaneTest = word !== null && layout.laneSuffixes.includes(`.${word}`);
+  if (word !== null && !isLaneTest) {
+    return hasModule(`${base}.${word}`) ? [] : [
+      `${path} uses the suffix .${word}, which no lane in rig.config.ts declares, and ${base}.${word}.<ext> isn't beside it; declare the lane in rig.config.ts lanes, or rename the test after the module it tests`
+    ];
+  }
+  if (isInSrc && !hasModule(base)) {
+    return [
+      `${path} has no ${base}.<ext> beside it; move the test next to the module it tests, or rename it after that module`
+    ];
+  }
+  return [];
+}
+
+// packages/chex/src/test-layout/collect-test-layout-faults.ts
+function collectTestLayoutFaults(oxc, layout, sources) {
+  return [
+    ...collectFolderFaults(layout),
+    ...collectNameFaults(layout),
+    ...collectImportFaults(oxc, layout, sources)
+  ];
+}
+
+// packages/chex/src/test-layout/collect-workspace-roots.ts
+import { posix as posix3 } from "path";
+function collectWorkspaceRoots(trackedPaths, patterns) {
+  const included = patterns.filter((pattern) => !pattern.startsWith("!"));
+  const excluded = patterns.filter((pattern) => pattern.startsWith("!")).map((pattern) => pattern.slice(1));
+  return trackedPaths.filter((path) => posix3.basename(path) === "package.json" && path !== "package.json").map((path) => posix3.dirname(path)).filter((folder) => included.some((pattern) => new Bun.Glob(pattern).match(folder)) && !excluded.some((pattern) => new Bun.Glob(pattern).match(folder))).toSorted();
+}
+
+// packages/chex/src/test-layout/parse-workspace-patterns.ts
+function parseWorkspacePatterns(manifest) {
+  const workspaces = typeof manifest === "object" && manifest !== null ? Reflect.get(manifest, "workspaces") : undefined;
+  if (workspaces === undefined) {
+    return { kind: "single" };
+  }
+  const list = typeof workspaces === "object" && workspaces !== null && !Array.isArray(workspaces) ? Reflect.get(workspaces, "packages") : workspaces;
+  return {
+    kind: "workspaces",
+    patterns: Array.isArray(list) ? list.filter((pattern) => typeof pattern === "string") : []
+  };
+}
+
+// packages/chex/src/test-layout/read-oxc-parser.ts
+async function readOxcParser() {
+  const loaded = await import(["oxc", "parser"].join("-"));
+  if (!isOxcParserModule(loaded)) {
+    throw new Error("oxc-parser exports no parseSync and no Visitor");
+  }
+  return loaded;
+}
+function isOxcParserModule(value) {
+  return typeof value === "object" && value !== null && typeof Reflect.get(value, "parseSync") === "function" && typeof Reflect.get(value, "Visitor") === "function";
+}
+
+// packages/chex/src/run-test-layout-check.ts
+var sourcePattern2 = /\.(?:[cm]?[jt]s|[jt]sx)$/u;
+async function runTestLayoutCheck(options) {
+  let faults;
+  try {
+    const trackedPaths = await options.readTrackedPaths();
+    const tracked = new Set(trackedPaths);
+    const manifestText = tracked.has("package.json") ? await options.readText("package.json") : "{}";
+    const manifest = JSON.parse(manifestText);
+    const workspaces = parseWorkspacePatterns(manifest);
+    const oxlintConfigText = tracked.has(".oxlintrc.json") ? await options.readText(".oxlintrc.json") : null;
+    const rigConfig = tracked.has("rig.config.ts") ? await options.readRigConfig() : null;
+    const sources = await Promise.all(trackedPaths.filter((path) => sourcePattern2.test(path)).map(async (path) => ({ path, text: await options.readText(path) })));
+    faults = collectTestLayoutFaults(await options.readParser(), {
+      trackedPaths,
+      workspaces: workspaces.kind === "single" ? [] : collectWorkspaceRoots(trackedPaths, workspaces.patterns),
+      isWorkspaceRepo: workspaces.kind === "workspaces",
+      laneSuffixes: collectLaneSuffixes(oxlintConfigText, rigConfig)
+    }, sources);
+  } catch (error) {
+    options.writeError(`test-layout: ${error instanceof Error ? error.message : String(error)}
+`);
+    return 2;
+  }
+  for (const fault of faults) {
+    options.writeOutput(`${fault}
+`);
+  }
+  return faults.length === 0 ? 0 : 1;
+}
+function runTestLayoutCommand() {
+  const cwd = process.cwd();
+  return runTestLayoutCheck({
+    readTrackedPaths: () => {
+      const listing = runProgram(["git", "ls-files", "-z"], { cwd, env: process.env });
+      if (listing.exitCode !== 0) {
+        return Promise.reject(new Error(`git ls-files failed: ${listing.stderr.trim()}`));
+      }
+      return Promise.resolve(listing.stdout.split("\x00").filter((path) => path !== ""));
+    },
+    readText: (path) => Bun.file(join6(cwd, path)).text(),
+    readRigConfig: async () => {
+      const loaded = await import(join6(cwd, "rig.config.ts"));
+      return typeof loaded === "object" && loaded !== null ? Reflect.get(loaded, "default") : null;
+    },
+    readParser: readOxcParser,
+    writeOutput: (text) => {
+      process.stdout.write(text);
+    },
+    writeError: (text) => {
+      process.stderr.write(text);
+    }
+  });
+}
+if (false) {}
+
 // packages/chex/src/run-test-timeouts-check.ts
+import { basename, dirname as dirname3, posix as posix4 } from "path";
 function runTestTimeoutsCheck(options) {
   const paths = runGit2(options, ["ls-tree", "-r", "-z", "--name-only", "HEAD"]).split("\x00");
   const configText = paths.includes(oxlintConfigPath) ? runGit2(options, ["show", `HEAD:${oxlintConfigPath}`]) : null;
   const limits = parseLaneLimits(configText);
-  const appRoots = new Set(paths.filter((path) => basename(path) === "package.json").map((path) => dirname2(path)));
+  const appRoots = new Set(paths.filter((path) => basename(path) === "package.json").map((path) => dirname3(path)));
   return paths.filter((path) => checkedFiles.has(basename(path)) || configPattern.test(basename(path))).flatMap((path) => {
     const text = runGit2(options, ["show", `HEAD:${path}`]);
     if (configPattern.test(basename(path))) {
@@ -2300,7 +2663,7 @@ function collectBunfigFindings(path, text, limit) {
   ];
 }
 function findDirectoryLane(path, appRoots) {
-  const directories = posix.dirname(path).split("/");
+  const directories = posix4.dirname(path).split("/");
   for (const [index, name] of directories.entries()) {
     const parent = index === 0 ? "." : directories.slice(0, index).join("/");
     if (name === "e2e" && (parent === "." || appRoots.has(parent))) {
@@ -2333,7 +2696,7 @@ if (false) {}
 
 // packages/chex/src/run-uncommitted-check.ts
 import { existsSync as existsSync2 } from "fs";
-import { join as join5 } from "path";
+import { join as join7 } from "path";
 
 // packages/chex/src/read-branch-files.ts
 function readBranchFiles(options) {
@@ -2359,7 +2722,7 @@ if (false) {}
 function runUncommittedCheck(options) {
   const changed = new Set(runGit3(options, ["status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=no"]).split("\x00").map((entry) => entry.slice(3)));
   const tracked = new Set(runGit3(options, ["ls-tree", "-r", "-z", "--full-tree", "--name-only", "HEAD"]).split("\x00"));
-  return options.files.filter((path) => changed.has(path) || !tracked.has(path) && options.probeFile(join5(options.cwd, path)));
+  return options.files.filter((path) => changed.has(path) || !tracked.has(path) && options.probeFile(join7(options.cwd, path)));
 }
 function runGit3(options, args) {
   const result = options.runProgram(["git", ...args], { cwd: options.cwd, env: options.env });
@@ -3053,21 +3416,22 @@ if (false) {}
 
 // packages/chex/src/write-text-file.ts
 import { mkdir, writeFile } from "fs/promises";
-import { dirname as dirname3 } from "path";
+import { dirname as dirname4 } from "path";
 async function writeTextFile(path, text) {
-  await mkdir(dirname3(path), { recursive: true });
+  await mkdir(dirname4(path), { recursive: true });
   await writeFile(path, text);
 }
 
 // packages/chex/src/cli.ts
 process.exitCode = await runChex(process.argv.slice(2), {
   runCheck: makeCheckRunner({
-    docsFolder: join6(import.meta.dir, "docs"),
+    docsFolder: join8(import.meta.dir, "docs"),
     runScript: (argv) => Bun.spawn([...argv], { stdio: ["inherit", "inherit", "inherit"] }).exited,
     repoChecks: {
       commits: runCommitsCommand,
       "local-paths": runLocalPathsCommand,
       "test-timeouts": runTestTimeoutsCommand,
+      "test-layout": runTestLayoutCommand,
       workflows: runWorkflowsCommand,
       "dependency-gates": runDependencyGatesCommand,
       uncommitted: runUncommittedCommand

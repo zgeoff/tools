@@ -13,6 +13,7 @@ test('it reads each docs check and each repo check as a check name', () => {
       'commits',
       'local-paths',
       'test-timeouts',
+      'test-layout',
       'workflows',
       'dependency-gates',
       'uncommitted',

@@ -8,6 +8,7 @@ import { runChex } from './run-chex.ts';
 import { runCommitsCommand } from './run-commits-check.ts';
 import { runInit } from './run-init.ts';
 import { runLocalPathsCommand } from './run-local-paths-check.ts';
+import { runTestLayoutCommand } from './run-test-layout-check.ts';
 import { runTestTimeoutsCommand } from './run-test-timeouts-check.ts';
 import { runUncommittedCommand } from './run-uncommitted-check.ts';
 import { runWorkflowsCommand } from './run-workflows-check.ts';
@@ -21,6 +22,7 @@ process.exitCode = await runChex(process.argv.slice(2), {
       commits: runCommitsCommand,
       'local-paths': runLocalPathsCommand,
       'test-timeouts': runTestTimeoutsCommand,
+      'test-layout': runTestLayoutCommand,
       workflows: runWorkflowsCommand,
       'dependency-gates': runDependencyGatesCommand,
       uncommitted: runUncommittedCommand,
