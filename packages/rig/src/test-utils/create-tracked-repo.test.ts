@@ -6,7 +6,7 @@ import { readTrackedFiles } from '../read-tracked-files.ts';
 import { createTrackedRepo } from './create-tracked-repo.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `create-tracked-repo-${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), `create-tracked-repo-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

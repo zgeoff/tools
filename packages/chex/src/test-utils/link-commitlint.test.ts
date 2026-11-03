@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { linkCommitlint } from './link-commitlint.ts';
 
 async function setupTest() {
-  const root = await mkdtemp(join(tmpdir(), `link-commitlint-${process.pid}-`));
+  const root = await mkdtemp(join(tmpdir(), `link-commitlint-pid${process.pid}-`));
 
   onTestFinished(() => rm(root, { recursive: true, force: true }));
 

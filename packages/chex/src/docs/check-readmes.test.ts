@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { $ } from 'bun';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `check-readmes-${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), `check-readmes-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
@@ -225,7 +225,7 @@ test('it exits 2 and checks nothing when git cannot list the files', async () =>
 });
 
 test('it exits 2 and asks for a git work tree when run outside one', async () => {
-  const directory = await mkdtemp(join(tmpdir(), `check-readmes-outside-${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), `check-readmes-outside-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

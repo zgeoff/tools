@@ -8,7 +8,7 @@ import { $ } from 'bun';
 import { runChexCLI } from './run-chex-cli.ts';
 
 async function setupTest() {
-  const repo = await mkdtemp(join(tmpdir(), `run-chex-cli-${process.pid}-`));
+  const repo = await mkdtemp(join(tmpdir(), `run-chex-cli-pid${process.pid}-`));
 
   onTestFinished(() => rm(repo, { recursive: true, force: true }));
 

@@ -18,7 +18,7 @@ import { writeStubPrograms } from '../src/test-utils/write-stub-programs.ts';
 async function setupTest() {
   const repoRoot = join(import.meta.dir, '../../..');
 
-  const directory = await mkdtemp(join(tmpdir(), `chex-lefthook-${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), `chex-lefthook-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

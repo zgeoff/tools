@@ -8,7 +8,7 @@ import { $ } from 'bun';
 import { commitAllFiles } from './commit-all-files.ts';
 
 async function setupTest() {
-  const repo = await mkdtemp(join(tmpdir(), `commit-all-files-${process.pid}-`));
+  const repo = await mkdtemp(join(tmpdir(), `commit-all-files-pid${process.pid}-`));
 
   onTestFinished(() => rm(repo, { recursive: true, force: true }));
 

@@ -10,7 +10,7 @@ import { buildStubCommandRunner } from './build-stub-command-runner.ts';
 import { createChexPack } from './create-chex-pack.ts';
 
 async function setupTest() {
-  const repoRoot = await mkdtemp(join(tmpdir(), `create-chex-pack-${process.pid}-`));
+  const repoRoot = await mkdtemp(join(tmpdir(), `create-chex-pack-pid${process.pid}-`));
 
   onTestFinished(() => rm(repoRoot, { recursive: true, force: true }));
 

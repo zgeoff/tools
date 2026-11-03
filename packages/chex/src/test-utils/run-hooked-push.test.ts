@@ -8,7 +8,7 @@ import { runHookedPush } from './run-hooked-push.ts';
 import { writeStubPrograms } from './write-stub-programs.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `run-hooked-push-${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), `run-hooked-push-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

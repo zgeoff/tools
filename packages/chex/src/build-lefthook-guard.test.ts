@@ -9,7 +9,7 @@ import { buildLefthookGuard } from './build-lefthook-guard.ts';
 import { buildInitGuardHooks } from './test-utils/build-init-guard-hooks.ts';
 
 async function setupTest() {
-  const repo = await mkdtemp(join(tmpdir(), `build-lefthook-guard-${process.pid}-`));
+  const repo = await mkdtemp(join(tmpdir(), `build-lefthook-guard-pid${process.pid}-`));
 
   onTestFinished(() => rm(repo, { recursive: true, force: true }));
 

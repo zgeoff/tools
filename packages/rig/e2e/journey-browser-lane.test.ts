@@ -16,14 +16,14 @@ async function setupTest() {
 
   const rigBin = getRigE2EBin(process.env);
 
-  const repoRoot = await mkdtemp(join(tmpdir(), `rig-browser-build-${process.pid}-`));
+  const repoRoot = await mkdtemp(join(tmpdir(), `rig-browser-build-pid${process.pid}-`));
 
   stack.defer(() => rm(repoRoot, { recursive: true, force: true }));
 
   // Chrome's socket path must fit a Unix socket address, so the lane gets a TMPDIR of its own,
   // and the test asks the lane's own rule where the Chrome folder goes. A long TMPDIR sends that
   // folder to the /tmp that every user shares, which the removal of laneTmpdir does not reach.
-  const laneTmpdir = await mkdtemp(join(tmpdir(), `rb-${process.pid}-`));
+  const laneTmpdir = await mkdtemp(join(tmpdir(), `rb-pid${process.pid}-`));
 
   stack.defer(() => rm(laneTmpdir, { recursive: true, force: true }));
 

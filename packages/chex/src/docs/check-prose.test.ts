@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { $ } from 'bun';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `check-prose-${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), `check-prose-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
@@ -50,7 +50,7 @@ async function setupTest() {
       .quiet();
 
   const createOrigin = async () => {
-    const originDir = await mkdtemp(join(tmpdir(), `check-prose-origin-${process.pid}-`));
+    const originDir = await mkdtemp(join(tmpdir(), `check-prose-origin-pid${process.pid}-`));
 
     onTestFinished(() => rm(originDir, { recursive: true, force: true }));
 
@@ -63,7 +63,7 @@ async function setupTest() {
 
   // actions/checkout clones one branch with no history for a pull request.
   const createShallowClone = async (originDir: string, branch: string) => {
-    const cloneDir = await mkdtemp(join(tmpdir(), `check-prose-clone-${process.pid}-`));
+    const cloneDir = await mkdtemp(join(tmpdir(), `check-prose-clone-pid${process.pid}-`));
 
     onTestFinished(() => rm(cloneDir, { recursive: true, force: true }));
 
@@ -1488,7 +1488,7 @@ test('it exits 2 and checks nothing when git cannot list the files', async () =>
 });
 
 test('it exits 2 and asks for a git work tree when run outside one', async () => {
-  const directory = await mkdtemp(join(tmpdir(), `check-prose-outside-${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), `check-prose-outside-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

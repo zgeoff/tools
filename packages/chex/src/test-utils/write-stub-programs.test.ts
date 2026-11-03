@@ -6,7 +6,7 @@ import { $ } from 'bun';
 import { writeStubPrograms } from './write-stub-programs.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `write-stub-programs-${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), `write-stub-programs-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
