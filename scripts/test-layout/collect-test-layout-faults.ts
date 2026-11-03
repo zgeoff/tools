@@ -164,11 +164,11 @@ const packageTestDirs = new Set(['e2e', 'integration', 'evals', 'bench', 'test-u
 function isProductionCode(path: string): boolean {
   const root = getWorkspaceRoot(path);
 
-  if (!root.startsWith('packages/') || isHelperPath(path) || /\.test\.[^/]+$/u.test(path)) {
+  if (root === '' || isHelperPath(path) || /\.test\.[^/]+$/u.test(path)) {
     return false;
   }
 
   const [folder] = path.slice(root.length + 1).split('/');
 
-  return !packageTestDirs.has(folder ?? '');
+  return !root.startsWith('packages/') || !packageTestDirs.has(folder ?? '');
 }

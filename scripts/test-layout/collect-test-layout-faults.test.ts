@@ -152,7 +152,7 @@ test('it reads the imports of a script that starts with a shebang line', () => {
   );
 
   expect(faults).toStrictEqual([
-    "scripts/brew/run-brew.ts imports packages/kettle/src/test-utils/run-git.ts, a test helper of packages/kettle; import it by the package's name, with the package as a workspace:* dev dependency",
+    'scripts/brew/run-brew.ts imports packages/kettle/src/test-utils/run-git.ts, a test helper, from production code; import test helpers only from tests and other test helpers',
   ]);
 });
 
@@ -306,5 +306,26 @@ test.each(['e2e/pour.ts', 'integration/pour.ts', 'evals/pour.ts', 'bench/pour.ts
     );
 
     expect(faults).toStrictEqual([]);
+  },
+);
+
+test.each([
+  [
+    'scripts/brew/run-brew.ts',
+    '../test-utils/create-stub-tap.ts',
+    'scripts/test-utils/create-stub-tap.ts',
+  ],
+  ['sync/hooks/start.ts', '../test-utils/read-tap.ts', 'sync/test-utils/read-tap.ts'],
+])(
+  'it reports %s, production code that imports its own workspace helper',
+  (path, specifier, target) => {
+    const faults = collectTestLayoutFaults(
+      [],
+      [{ path, text: `import { helper } from '${specifier}';\n` }],
+    );
+
+    expect(faults).toStrictEqual([
+      `${path} imports ${target}, a test helper, from production code; import test helpers only from tests and other test helpers`,
+    ]);
   },
 );
