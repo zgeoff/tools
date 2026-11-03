@@ -85,9 +85,14 @@ test('it throws with the descendants that are no zombie and still run at the dea
     [...ctx.startingTable, buildProcessEntry(4140, 4130, 'Z')],
   ]);
 
-  await expect(stopDescendantProcesses(ctx.stop)).rejects.toThrow(
-    'the processes 4120, 4130 still run 5000 ms after SIGKILL',
+  const failure = await stopDescendantProcesses(ctx.stop).then(
+    () => null,
+    (error: unknown) => error,
   );
+
+  expect(failure).toMatchObject({
+    message: 'the processes 4120, 4130 still run 5000 ms after SIGKILL',
+  });
 
   expect(ctx.clock.now()).toBe(5000);
 });
@@ -115,7 +120,12 @@ test('it throws a signal failure other than a process that has exited', async ()
     throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
   });
 
-  await expect(stopDescendantProcesses(ctx.stop)).rejects.toMatchObject({ code: 'EPERM' });
+  const failure = await stopDescendantProcesses(ctx.stop).then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(failure).toMatchObject({ code: 'EPERM' });
 });
 
 test('it kills nothing when the first listing fails', async () => {
@@ -133,7 +143,12 @@ test('it counts every descendant as running while a later listing fails', async 
 
   ctx.queueListings([ctx.startingTable, null]);
 
-  await expect(stopDescendantProcesses(ctx.stop)).rejects.toThrow(
-    'the processes 4120, 4130 still run 5000 ms after SIGKILL',
+  const failure = await stopDescendantProcesses(ctx.stop).then(
+    () => null,
+    (error: unknown) => error,
   );
+
+  expect(failure).toMatchObject({
+    message: 'the processes 4120, 4130 still run 5000 ms after SIGKILL',
+  });
 });
