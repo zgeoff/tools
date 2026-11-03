@@ -7,6 +7,12 @@ import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-pref
 import { $ } from 'bun';
 
 async function setupTest() {
+  const outsideDirectory = await mkdtemp(
+    join(tmpdir(), readRunFolderPrefix('check-readmes-outside-')),
+  );
+
+  onTestFinished(() => rm(outsideDirectory, { recursive: true, force: true }));
+
   const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-readmes-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
@@ -32,7 +38,7 @@ async function setupTest() {
   const run = (...args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`.cwd(directory).env(env).nothrow().quiet();
 
-  return { writeText, run };
+  return { outsideDirectory, writeText, run };
 }
 
 test('it passes the root, package, docs index and design READMEs', async () => {
@@ -226,15 +232,13 @@ test('it exits 2 and checks nothing when git cannot list the files', async () =>
 });
 
 test('it exits 2 and asks for a git work tree when run outside one', async () => {
-  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-readmes-outside-')));
-
-  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+  const ctx = await setupTest();
 
   const scriptPath = fileURLToPath(new URL('check-readmes.sh', import.meta.url));
 
   const result = await $`bash ${scriptPath}`
-    .cwd(directory)
-    .env({ PATH: process.env['PATH'], HOME: directory })
+    .cwd(ctx.outsideDirectory)
+    .env({ PATH: process.env['PATH'], HOME: ctx.outsideDirectory })
     .nothrow()
     .quiet();
 
