@@ -4,11 +4,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ImportZonesOptions } from '@zgeoff/oxlint-config/import-zones';
 import { collectRefusingEdges, importZonesSchema } from '@zgeoff/oxlint-config/import-zones';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'import-zones-entry-test-'));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('import-zones-entry-test-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
+
+  // The plugin takes the nearest folder with a .git entry as the repo root, and the temp folder
+  // may sit inside a repo.
+  await mkdir(join(directory, '.git'));
 
   return {
     directory,

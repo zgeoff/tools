@@ -70,6 +70,7 @@
     "check:lefthook-guard": "bun scripts/lefthook/run-lefthook-guard-check.ts",
     "check:baseline-jobs": "bun scripts/lefthook/run-baseline-jobs-check.ts",
     "check:renovate-config": "bun scripts/renovate/run-renovate-config-check.ts",
+    "check:test-layout": "bun scripts/test-layout/run-test-layout-check.ts",
     "ci:install-tool": "bun scripts/ci/run-pinned-tool-step.ts",
     "ci:dispatch-publish": "bun scripts/publish/dispatch-release-publish.ts",
     "ci:plan-sync-dispatch": "bun scripts/repo-sync/write-sync-dispatch-plan.ts",
