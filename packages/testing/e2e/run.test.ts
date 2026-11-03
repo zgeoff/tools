@@ -76,3 +76,12 @@ test('it stops a child that the program forks when the time limit passes', async
   expect(childPid).toBeGreaterThan(0);
   expect(probeProcess(childPid)).toBeFalse();
 });
+
+test('it fails at the time limit when a descendant holds the output pipes after the exit', async () => {
+  const startedAt = Date.now();
+  const running = run(['sh', '-c', 'sleep 5 & echo parent-exited'], { timeoutMs: 300 });
+
+  await expect(running).rejects.toThrow(/did not exit in 300 ms; its output:\nparent-exited\n$/u);
+
+  expect(Date.now() - startedAt).toBeLessThan(2000);
+});

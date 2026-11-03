@@ -1,5 +1,5 @@
 import { toExitCode } from '../to-exit-code.ts';
-import { defaultWaitMs, drainGraceMs } from './constants.ts';
+import { defaultWaitMs, drainGraceMs, groupDeadlineMs } from './constants.ts';
 import { drainStream } from './drain-stream.ts';
 import { isLineMatch } from './is-line-match.ts';
 import { probeGroup } from './probe-group.ts';
@@ -50,9 +50,21 @@ export async function start(
   const stop = async (signal: Signal = 'SIGTERM'): Promise<number> => {
     signalGroup(child.pid, signal);
 
-    const exitCode = await child.exited;
+    // A leader that ignores the signal must not hold the stop past the deadline.
+    const escalation = setTimeout(() => {
+      signalGroup(child.pid, 'SIGKILL');
+    }, groupDeadlineMs);
 
-    await waitForGroupExit(child.pid);
+    let exitCode: number | null;
+
+    try {
+      exitCode = await child.exited;
+
+      await waitForGroupExit(child.pid);
+    } finally {
+      clearTimeout(escalation);
+    }
+
     await settleOutput();
 
     return toExitCode(exitCode, child.signalCode);

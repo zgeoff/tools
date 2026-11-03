@@ -40,6 +40,17 @@ if (mode === 'echo') {
   setInterval(() => {
     // keeps the process alive until SIGTERM
   }, 1000);
+} else if (mode === 'stubborn') {
+  // Ignores SIGTERM, so only SIGKILL stops it.
+  process.on('SIGTERM', () => {
+    // ignored on purpose
+  });
+
+  setInterval(() => {
+    // keeps the process alive
+  }, 1000);
+
+  process.stdout.write('stubborn\n');
 } else if (mode === 'fork') {
   // The child stays in the program's process group and outlives the program unless a signal
   // reaches the whole group.

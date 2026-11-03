@@ -31,14 +31,23 @@ export async function run(
     }),
   ]);
 
+  // The wait covers the output pipes too, which a descendant can hold open past the exit.
+  const finished = (async () => {
+    await child.exited;
+    await drained;
+
+    return true;
+  })();
+
   const timeoutMs = options.timeoutMs;
 
   const hasFinished =
     timeoutMs === undefined
-      ? await child.exited.then(() => true)
-      : await Promise.race([child.exited.then(() => true), Bun.sleep(timeoutMs).then(() => false)]);
+      ? await finished
+      : await Promise.race([finished, Bun.sleep(timeoutMs).then(() => false)]);
 
   if (!hasFinished) {
+    // The leader may be gone while a descendant of its group still runs.
     signalGroup(child.pid, 'SIGKILL');
 
     await child.exited;
@@ -50,8 +59,6 @@ export async function run(
       `${command.join(' ')} did not exit in ${timeoutMs} ms; its output:\n${log.stdout}${log.stderr}`,
     );
   }
-
-  await drained;
 
   const exitCode = await child.exited;
 

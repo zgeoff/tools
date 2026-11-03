@@ -260,3 +260,33 @@ test('it throws when the program exits before a line matches', async () => {
     `${ctx.command.join(' ')} exited before it printed a line that matches cup; its output:\nkettle\n`,
   );
 });
+
+test('it sends SIGKILL after 5 s when the program ignores the stop signal', async () => {
+  const ctx = setupTest();
+
+  await using program = await start(ctx.command, {
+    args: ['stubborn'],
+    ready: { stdout: 'stubborn' },
+  });
+
+  const exitCode = await program.stop();
+
+  expect(exitCode).toBe(137);
+}, 10_000);
+
+test('it throws at the time limit when ready.check never settles', async () => {
+  const ctx = setupTest();
+
+  const started = start(ctx.command, {
+    args: ['mute'],
+    ready: {
+      check: () =>
+        new Promise<boolean>(() => {
+          // never settles
+        }),
+    },
+    readyTimeoutMs: 100,
+  });
+
+  await expect(started).rejects.toThrow(/was not ready after 100 ms/u);
+});
