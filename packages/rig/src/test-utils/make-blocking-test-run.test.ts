@@ -5,12 +5,18 @@ import { join } from 'node:path';
 import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { makeBlockingTestRun } from './make-blocking-test-run.ts';
 
-test('it replaces the folder with a file, so a removal inside it fails with ENOTDIR, and passes', async () => {
+async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('blocking-test-run-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const chromeDir = join(directory, 'chrome');
+  return { directory };
+}
+
+test('it replaces the folder with a file, so a removal inside it fails with ENOTDIR, and passes', async () => {
+  const ctx = await setupTest();
+
+  const chromeDir = join(ctx.directory, 'chrome');
 
   await mkdir(join(chromeDir, '4417'), { recursive: true });
 
