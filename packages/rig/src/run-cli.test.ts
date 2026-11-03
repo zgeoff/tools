@@ -106,7 +106,7 @@ test.each([
   ['browser', '--isolate', ['--isolate']],
 ])(
   'it exits 2 and runs nothing for rig %s given %s, because every lane shares one global per process',
-  async (command, isolateArg, extraArgs) => {
+  async (command, isolateArgument, extraArgs) => {
     const ctx = setupTest();
 
     const exitCode = await runCLI([command, ...extraArgs], ctx.run, {
@@ -121,7 +121,7 @@ test.each([
     expect(exitCode).toBe(2);
 
     expect(ctx.output.err).toHaveBeenCalledExactlyOnceWith(
-      `rig: rig ${command} refuses ${isolateArg}, because every lane runs its files in one global per process\n`,
+      `rig: rig ${command} refuses ${isolateArgument}, because every lane runs its files in one global per process\n`,
     );
 
     expect(ctx.runCommand).not.toHaveBeenCalled();

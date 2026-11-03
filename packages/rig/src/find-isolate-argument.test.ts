@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { findIsolateArg } from './find-isolate-arg.ts';
+import { findIsolateArgument } from './find-isolate-argument.ts';
 
 test.each([
   ['a bare isolate', ['--bail', '--isolate'], '--isolate'],
@@ -8,5 +8,5 @@ test.each([
   ['the no-isolate that rig passes itself', ['--no-isolate'], undefined],
   ['an option that only starts like isolate', ['--isolated'], undefined],
 ])('it finds %s among the arguments', (_, args, expected) => {
-  expect(findIsolateArg(args)).toBe(expected);
+  expect(findIsolateArgument(args)).toBe(expected);
 });
