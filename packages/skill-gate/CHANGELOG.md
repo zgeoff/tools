@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.15](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.14...@zgeoff/skill-gate@0.2.15) (2026-11-03)
+
+### Dependencies
+
+- The following workspace dependencies were updated
+  - dependencies
+    - @zgeoff/agent-hooks bumped to 0.1.5
+
 ## [0.2.14](https://github.com/zgeoff/tools/compare/@zgeoff/skill-gate@0.2.13...@zgeoff/skill-gate@0.2.14) (2026-11-02)
 
 ### Dependencies
