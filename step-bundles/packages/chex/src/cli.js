@@ -2037,13 +2037,34 @@ function findMember(value, key) {
 
 // packages/chex/src/test-layout/collect-lane-suffixes.ts
 function collectLaneSuffixes(oxlintConfigText, rigConfig) {
+  const resolved = collectResolvedSuffixes(rigConfig);
   const names = [...parseLaneLimits(oxlintConfigText).keys()].filter((name) => name !== "e2e");
-  const lanes = typeof rigConfig === "object" && rigConfig !== null ? Reflect.get(rigConfig, "lanes") : undefined;
-  const rigSuffixes = Array.isArray(lanes) ? lanes.flatMap((lane) => {
-    const suffix = typeof lane === "object" && lane !== null ? Reflect.get(lane, "suffix") : undefined;
+  const fromNames = names.flatMap((name) => {
+    const suffix = resolved.has(name) ? resolved.get(name) : `.${name}`;
     return typeof suffix === "string" ? [suffix] : [];
-  }) : [];
-  return [...new Set([...names.map((name) => `.${name}`), ...rigSuffixes])].toSorted();
+  });
+  const fromConfig = [...resolved.values()].filter((suffix) => suffix !== null);
+  return [...new Set([...fromNames, ...fromConfig])].toSorted();
+}
+function collectResolvedSuffixes(rigConfig) {
+  const lanes = typeof rigConfig === "object" && rigConfig !== null ? Reflect.get(rigConfig, "lanes") : undefined;
+  const suffixes = new Map;
+  if (!Array.isArray(lanes)) {
+    return suffixes;
+  }
+  for (const entry of lanes) {
+    const lane = entry;
+    if (typeof lane !== "object" || lane === null) {
+      continue;
+    }
+    const name = Reflect.get(lane, "name");
+    const suffix = Reflect.get(lane, "suffix");
+    const laneSuffix = typeof suffix === "string" ? suffix : null;
+    if (typeof name === "string") {
+      suffixes.set(name, laneSuffix);
+    }
+  }
+  return suffixes;
 }
 
 // packages/chex/src/test-layout/collect-folder-faults.ts
@@ -2076,7 +2097,7 @@ function hasFolder(trackedPaths, folder) {
   return trackedPaths.some((path) => path.startsWith(`${folder}/`));
 }
 function collectIntegrationFaults(trackedPaths) {
-  return collectFolderPaths(trackedPaths).filter((folder) => posix.basename(folder) === "integration" && !folder.split("/").includes("src")).map((folder) => `${folder}/ holds tests; move each one beside the module it tests, in the package that wires together the packages it imports`);
+  return collectFolderPaths(trackedPaths).filter((folder) => posix.basename(folder) === "integration").map((folder) => `${folder}/ holds tests; move each one beside the module it tests, in the package that wires together the packages it imports`);
 }
 function collectFolderPaths(trackedPaths) {
   const folders = new Set;
