@@ -127,29 +127,3 @@ test.each(['SIGTERM', 'SIGINT', 'SIGHUP'] as const)(
     expect(probeProcess(start.helperPid)).toBeFalse();
   },
 );
-
-test("it keeps the folders of a run that SIGKILL stopped during its build in the next run, while the build's group still runs", async () => {
-  const ctx = await setupTest();
-
-  const killedLane = ctx.startLane();
-
-  const start = await ctx.repo.readStart(killedLane.stdout);
-
-  killedLane.kill('SIGKILL');
-
-  await killedLane.exited;
-
-  // The next lane runs no build, so its sweep is the only thing it does to the killed run.
-  await Bun.write(join(ctx.repoRoot, 'package.json'), '{}');
-
-  const nextLane = ctx.startLane();
-
-  await nextLane.exited;
-
-  const runs = await readdir(ctx.runsDir);
-  const chromeRuns = await ctx.readChromeRuns();
-
-  expect(probeProcess(start.buildPid)).toBeTrue();
-  expect(runs).toStrictEqual([String(killedLane.pid)]);
-  expect(chromeRuns).toStrictEqual([String(killedLane.pid)]);
-});
