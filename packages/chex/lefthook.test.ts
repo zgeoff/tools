@@ -2,14 +2,15 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
-import { readGitEnv } from './test-utils/read-git-env.ts';
-import type { BaselineJobDeps } from './test-utils/run-baseline-job.ts';
-import { runBaselineJob } from './test-utils/run-baseline-job.ts';
-import { writeStubPrograms } from './test-utils/write-stub-programs.ts';
+import { readBaselineJobs } from './src/test-utils/read-baseline-jobs.ts';
+import type { BaselineJobDeps } from './src/test-utils/run-baseline-job.ts';
+import { runBaselineJob } from './src/test-utils/run-baseline-job.ts';
+import { writeStubPrograms } from './src/test-utils/write-stub-programs.ts';
 
-// The PATH holds only bun, env, date and the stubs a test writes, so a program the host has, such as
+// The PATH holds only bun, env, date, git and the stubs a test writes, so a program the host has, such as
 // shfmt or actionlint, is missing unless the test stubs it.
 async function setupTest() {
   const repo = await mkdtemp(join(tmpdir(), 'chex-lefthook-job-'));
@@ -25,7 +26,7 @@ async function setupTest() {
   await writeStubPrograms(bin, {});
   await symlink(process.execPath, join(bin, 'bun'));
 
-  for (const program of ['env', 'date']) {
+  for (const program of ['env', 'date', 'git']) {
     const programPath = Bun.which(program);
 
     invariant(programPath !== null, `install ${program}`);
@@ -192,6 +193,71 @@ test("it runs the related tests through rig without git's repository variables t
   expect(rigEnv.split('\n').filter((line) => line.startsWith('GIT_'))).toStrictEqual([]);
   expect(rigCall).toBe('related kettle.ts\n');
 });
+
+test.each(readBaselineJobs())(
+  "it runs the $hook job $name without git's repository variables that a hook in a worktree exports",
+  async (job) => {
+    const ctx = await setupTest();
+
+    await writeStubPrograms(join(ctx.repo, 'node_modules/.bin'), {
+      diet: 'env >> diet-env\necho --- >> diet-env',
+    });
+
+    await writeStubPrograms(ctx.bin, {
+      shellcheck: 'exit 0',
+      shfmt: 'exit 0',
+      actionlint: 'exit 0',
+    });
+
+    await runBaselineJob(
+      ctx.deps,
+      ctx.repo,
+      { hook: job.hook, name: job.name, files: ['kettle.ts'] },
+      {
+        ...ctx.env,
+        GIT_DIR: '/srv/kettle/.git/worktrees/lid',
+        GIT_WORK_TREE: '/srv/lid',
+        GIT_INDEX_FILE: '/srv/kettle/.git/worktrees/lid/index',
+      },
+    );
+
+    const dietEnv = await readFile(join(ctx.repo, 'diet-env'), 'utf8');
+
+    expect(dietEnv).toInclude('---');
+    expect(dietEnv.split('\n').filter((line) => line.startsWith('GIT_'))).toStrictEqual([]);
+  },
+);
+
+test.each(readBaselineJobs().filter((job) => job.listsBranchFiles))(
+  "it lists the files of the $hook job $name without git's repository variables that a hook in a worktree exports",
+  async (job) => {
+    const ctx = await setupTest();
+
+    await mkdir(join(ctx.repo, 'node_modules/@zgeoff/chex/src'), { recursive: true });
+
+    await writeFile(
+      join(ctx.repo, 'node_modules/@zgeoff/chex/src/read-branch-files.ts'),
+      "await Bun.write('files-env', Object.keys(process.env).filter((key) => key.startsWith('GIT_')).join(','));\n",
+    );
+
+    const run = await runBaselineJob(
+      ctx.deps,
+      ctx.repo,
+      { hook: job.hook, name: job.name, files: [], part: 'files' },
+      {
+        ...ctx.env,
+        GIT_DIR: '/srv/kettle/.git/worktrees/lid',
+        GIT_WORK_TREE: '/srv/lid',
+        GIT_INDEX_FILE: '/srv/kettle/.git/worktrees/lid/index',
+      },
+    );
+
+    const filesEnv = await readFile(join(ctx.repo, 'files-env'), 'utf8');
+
+    expect(run.exitCode).toBe(0);
+    expect(filesEnv).toBe('');
+  },
+);
 
 test('it skips typecheck on a commit that stages no code or config file', async () => {
   const ctx = await setupTest();
