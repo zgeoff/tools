@@ -65,6 +65,10 @@
     "packages/chex": {
       "component": "@zgeoff/chex",
       "initial-version": "0.0.1"
+    },
+    "packages/testing": {
+      "component": "@zgeoff/testing",
+      "initial-version": "0.0.1"
     }
   }
 }
