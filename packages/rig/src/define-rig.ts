@@ -2,7 +2,13 @@ import { isCommandName } from './is-command-name.ts';
 import { parseDuration } from './parse-duration.ts';
 import { standardLanes } from './standard-lanes.ts';
 import type { StandardLane } from './standard-lanes.ts';
-import type { LaneDeclaration, ResolvedLane, RigConfig, RigDeclaration } from './types.ts';
+import type {
+  LaneDeclaration,
+  ProgramDeclaration,
+  ResolvedLane,
+  RigConfig,
+  RigDeclaration,
+} from './types.ts';
 
 const laneNamePattern = /^[a-z][a-z0-9-]*$/u;
 
@@ -35,7 +41,14 @@ export function defineRig(declaration: RigDeclaration): RigConfig {
 
   assertDistinctSuffixes(lanes);
 
-  return { lanes };
+  const programs = Object.fromEntries(
+    Object.entries(declaration.programs ?? {}).map(([name, program]) => [
+      name,
+      readProgram(name, program),
+    ]),
+  );
+
+  return { lanes, programs, benchLane: readBenchLane(declaration.bench?.lane, lanes) };
 }
 
 function resolveStandardLane(
@@ -192,4 +205,54 @@ function assertDistinctSuffixes(lanes: readonly ResolvedLane[]): void {
 
     owners.set(lane.suffix, lane.name);
   }
+}
+
+const programNamePattern = /^[a-z][a-z0-9-]*$/u;
+const programPathFields = ['package', 'source', 'artifact'] as const;
+
+function readProgram(name: string, program: ProgramDeclaration): ProgramDeclaration {
+  if (!programNamePattern.test(name)) {
+    throw new Error(
+      `rig.config.ts: the program name "${name}" must be lowercase letters, digits and dashes, starting with a letter`,
+    );
+  }
+
+  for (const field of programPathFields) {
+    const path: unknown = program[field];
+
+    if (typeof path !== 'string' || path === '') {
+      throw new Error(`rig.config.ts: program "${name}" needs a ${field}, a non-empty path`);
+    }
+
+    if (path.startsWith('/') || path.split('/').includes('..')) {
+      throw new Error(
+        `rig.config.ts: program "${name}" has the ${field} "${path}", which must be a relative path with no ".." segment`,
+      );
+    }
+  }
+
+  const build: unknown = program.build;
+
+  if (typeof build !== 'string' || build.trim() === '') {
+    throw new Error(`rig.config.ts: program "${name}" needs a build, a shell command`);
+  }
+
+  return {
+    package: program.package,
+    source: program.source,
+    build: program.build,
+    artifact: program.artifact,
+  };
+}
+
+function readBenchLane(lane: string | undefined, lanes: readonly ResolvedLane[]): string | null {
+  if (lane === undefined) {
+    return null;
+  }
+
+  if (!lanes.some((candidate) => candidate.name === lane)) {
+    throw new Error(`rig.config.ts: bench.lane "${lane}" names no lane`);
+  }
+
+  return lane;
 }

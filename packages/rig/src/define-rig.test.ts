@@ -140,3 +140,71 @@ test.each([
 ])('it refuses the declaration %j', (lanes, message) => {
   expect(() => defineRig({ lanes })).toThrow(message);
 });
+
+function setupTest() {
+  const cliProgram = {
+    package: 'packages/kettle',
+    source: 'src/cli.ts',
+    build: 'bun build src/cli.ts --outfile dist/cli.js',
+    artifact: 'dist/cli.js',
+  };
+
+  return { cliProgram };
+}
+
+test('it resolves a declared program and a bench lane', () => {
+  const ctx = setupTest();
+
+  const config = defineRig({
+    lanes: { kiln: { limit: '15s' } },
+    programs: { 'kettle-cli': ctx.cliProgram },
+    bench: { lane: 'kiln' },
+  });
+
+  expect(config.programs).toStrictEqual({ 'kettle-cli': ctx.cliProgram });
+  expect(config.benchLane).toBe('kiln');
+});
+
+test('it resolves no programs and no bench lane when none is declared', () => {
+  const config = defineRig({});
+
+  expect(config.programs).toStrictEqual({});
+  expect(config.benchLane).toBeNull();
+});
+
+test.each([
+  ['a name with a capital', 'Kettle', {}, 'the program name "Kettle" must be lowercase'],
+  ['a name that starts with a digit', '1kettle', {}, 'the program name "1kettle" must be'],
+  [
+    'an empty package',
+    'kettle',
+    { package: '' },
+    'program "kettle" needs a package, a non-empty path',
+  ],
+  [
+    'an absolute source',
+    'kettle',
+    { source: '/src/cli.ts' },
+    'program "kettle" has the source "/src/cli.ts", which must be a relative path',
+  ],
+  [
+    'an artifact that climbs out of the package',
+    'kettle',
+    { artifact: '../dist/cli.js' },
+    'program "kettle" has the artifact "../dist/cli.js", which must be a relative path',
+  ],
+  ['a blank build', 'kettle', { build: ' ' }, 'program "kettle" needs a build, a shell command'],
+])('it refuses a program with %s', (_title, name, override, message) => {
+  const ctx = setupTest();
+
+  expect(() =>
+    defineRig({ programs: { [name]: { ...ctx.cliProgram, ...override } } }),
+  ).toThrowWithMessage(Error, new RegExp(`^rig\\.config\\.ts: ${message}`, 'u'));
+});
+
+test('it refuses a bench lane that names no lane', () => {
+  expect(() => defineRig({ bench: { lane: 'kiln' } })).toThrowWithMessage(
+    Error,
+    'rig.config.ts: bench.lane "kiln" names no lane',
+  );
+});

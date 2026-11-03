@@ -1,4 +1,4 @@
-import type { LaneParallelism, ResolvedLane, RigConfig } from './types.ts';
+import type { LaneParallelism, ProgramDeclaration, ResolvedLane, RigConfig } from './types.ts';
 
 export type ParsedRigConfig =
   | { readonly kind: 'parsed'; readonly config: RigConfig }
@@ -29,7 +29,22 @@ export function parseRigConfig(value: unknown): ParsedRigConfig {
     resolved.push(parsed.lane);
   }
 
-  return { kind: 'parsed', config: { lanes: resolved } };
+  const programs = parsePrograms(Reflect.get(value, 'programs'));
+
+  if (programs === null) {
+    return { kind: 'refused', reason: 'its programs are no record of program declarations' };
+  }
+
+  const benchLane: unknown = Reflect.get(value, 'benchLane');
+
+  if (benchLane !== undefined && !isNullableString(benchLane)) {
+    return { kind: 'refused', reason: `its benchLane is ${JSON.stringify(benchLane)}` };
+  }
+
+  return {
+    kind: 'parsed',
+    config: { lanes: resolved, programs, benchLane: benchLane ?? null },
+  };
 }
 
 type ParsedLane =
@@ -93,4 +108,51 @@ function refuseField(lane: string, field: keyof ResolvedLane, value: unknown): P
 
 function isParallelism(value: unknown): value is LaneParallelism {
   return value === 'workers' || (typeof value === 'number' && Number.isInteger(value) && value > 0);
+}
+
+// A config from before programs existed has none, and means no programs.
+function parsePrograms(value: unknown): Record<string, ProgramDeclaration> | null {
+  if (value === undefined) {
+    return {};
+  }
+
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const programs: Record<string, ProgramDeclaration> = {};
+
+  for (const [name, program] of Object.entries(value)) {
+    const parsed = parseProgram(program);
+
+    if (parsed === null) {
+      return null;
+    }
+
+    programs[name] = parsed;
+  }
+
+  return programs;
+}
+
+function parseProgram(value: unknown): ProgramDeclaration | null {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const packageFolder: unknown = Reflect.get(value, 'package');
+  const source: unknown = Reflect.get(value, 'source');
+  const build: unknown = Reflect.get(value, 'build');
+  const artifact: unknown = Reflect.get(value, 'artifact');
+
+  if (
+    typeof packageFolder !== 'string' ||
+    typeof source !== 'string' ||
+    typeof build !== 'string' ||
+    typeof artifact !== 'string'
+  ) {
+    return null;
+  }
+
+  return { package: packageFolder, source, build, artifact };
 }

@@ -103,3 +103,24 @@ test('it refuses a config by its first bad lane', () => {
     reason: 'lane "b" has the limitMs "5s", which defineRig never resolves',
   });
 });
+
+test('it reads a config from before programs existed as having none', () => {
+  const parsed = parseRigConfig({ lanes: defineRig({}).lanes });
+
+  expect(parsed).toStrictEqual({
+    kind: 'parsed',
+    config: { lanes: defineRig({}).lanes, programs: {}, benchLane: null },
+  });
+});
+
+test('it refuses a program that lacks a field', () => {
+  const parsed = parseRigConfig({
+    lanes: [],
+    programs: { kettle: { package: 'packages/kettle' } },
+  });
+
+  expect(parsed).toStrictEqual({
+    kind: 'refused',
+    reason: 'its programs are no record of program declarations',
+  });
+});

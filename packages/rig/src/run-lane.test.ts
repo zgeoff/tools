@@ -26,7 +26,28 @@ function setupTest() {
   const output = { out: makeRecordingStub(), err: makeRecordingStub() };
   const startKiln = mock<() => Promise<unknown>>();
 
+  const e2eConfig = defineRig({
+    programs: {
+      'kettle-cli': {
+        package: 'packages/kettle',
+        source: 'src/cli.ts',
+        build: 'bun build src/cli.ts --outfile dist/cli.js',
+        artifact: 'dist/cli.js',
+      },
+    },
+  });
+
+  const e2eLane = e2eConfig.lanes.find((candidate) => candidate.name === 'e2e');
+
+  if (e2eLane === undefined) {
+    throw new Error('the config holds no e2e lane');
+  }
+
+  const kettleFiles = ['packages/kettle/package.json', 'packages/kettle/e2e/cli-boil.test.ts'];
+
   return {
+    e2eRequest: { config: e2eConfig, lane: e2eLane, extraArgs: [] },
+    kettleFiles,
     signal,
     runCommand,
     output,
@@ -93,7 +114,14 @@ test('it runs a repo lane under diet with its limit, its suffix filter and the s
 
 test('it runs the e2e lane on the e2e folders that git tracks', async () => {
   const ctx = setupTest();
-  const config = defineRig({});
+
+  const config = defineRig({
+    programs: {
+      shell: { package: '.', source: 'src/cli.ts', build: 'true', artifact: 'dist/cli.js' },
+      shop: { package: 'apps/shop', source: 'src/cli.ts', build: 'true', artifact: 'dist/cli.js' },
+    },
+  });
+
   const lane = config.lanes.find((candidate) => candidate.name === 'e2e');
 
   if (lane === undefined) {
@@ -119,7 +147,7 @@ test('it runs the e2e lane on the e2e folders that git tracks', async () => {
     },
   );
 
-  expect(ctx.runCommand.mock.calls[0]?.[0]).toIncludeAllMembers([
+  expect(ctx.runCommand.mock.calls.at(-1)?.[0]).toIncludeAllMembers([
     '--timeout=15000',
     './apps/shop/e2e/',
     './e2e/',
@@ -311,7 +339,14 @@ test('it runs the browser lane through its built-in hooks, with the lane memory 
 
 test('it leaves the files of the other lanes out of the e2e run', async () => {
   const ctx = setupTest();
-  const config = defineRig({ lanes: { kiln: { limit: '15s' } } });
+
+  const config = defineRig({
+    lanes: { kiln: { limit: '15s' } },
+    programs: {
+      shell: { package: '.', source: 'src/cli.ts', build: 'true', artifact: 'dist/cli.js' },
+    },
+  });
+
   const lane = config.lanes.find((candidate) => candidate.name === 'e2e');
 
   if (lane === undefined) {
@@ -332,7 +367,7 @@ test('it leaves the files of the other lanes out of the e2e run', async () => {
     },
   );
 
-  expect(ctx.runCommand.mock.calls[0]?.[0]).toIncludeAllMembers([
+  expect(ctx.runCommand.mock.calls.at(-1)?.[0]).toIncludeAllMembers([
     './e2e/',
     '--path-ignore-patterns=**/*.model-api.test.ts',
     '--path-ignore-patterns=**/*.kiln.test.ts',
@@ -372,4 +407,95 @@ test('it exits 1 when a signal arrives while the stop hook cleans up after passi
   );
 
   expect(exitCode).toBe(1);
+});
+
+test('it builds each program once in its package folder and sets its artifact path for the tests', async () => {
+  const ctx = setupTest();
+
+  const exitCode = await runLane(
+    ctx.e2eRequest,
+    { repoRoot: '/repo', environment: { PATH: '/usr/bin' }, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(true),
+      readTrackedFiles: () => Promise.resolve(ctx.kettleFiles),
+      importModule: ctx.importModule,
+      runCommand: ctx.runCommand,
+      wireBrowserLaneHooks: ctx.wireBrowserLaneHooks,
+    },
+  );
+
+  expect(exitCode).toBe(0);
+
+  expect(ctx.runCommand.mock.calls[0]).toStrictEqual([
+    ['bash', '-c', 'bun build src/cli.ts --outfile dist/cli.js'],
+    { cwd: '/repo/packages/kettle', environment: { PATH: '/usr/bin' }, signal: ctx.signal },
+  ]);
+
+  expect(ctx.runCommand.mock.calls[1]?.[1]).toStrictEqual({
+    cwd: '/repo',
+    environment: {
+      PATH: '/usr/bin',
+      RIG_PROGRAM_KETTLE_CLI: '/repo/packages/kettle/dist/cli.js',
+    },
+    signal: ctx.signal,
+  });
+});
+
+test('it fails the lane with the program name when a build fails, and runs no test', async () => {
+  const ctx = setupTest();
+
+  ctx.runCommand.mockResolvedValueOnce(3);
+
+  const exitCode = await runLane(
+    ctx.e2eRequest,
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(true),
+      readTrackedFiles: () => Promise.resolve(ctx.kettleFiles),
+      importModule: ctx.importModule,
+      runCommand: ctx.runCommand,
+      wireBrowserLaneHooks: ctx.wireBrowserLaneHooks,
+    },
+  );
+
+  expect(exitCode).toBe(3);
+  expect(ctx.runCommand).toHaveBeenCalledTimes(1);
+
+  expect(ctx.output.err).toHaveBeenCalledExactlyOnceWith(
+    'rig: the build of program "kettle-cli" failed with exit code 3: bun build src/cli.ts --outfile dist/cli.js\n',
+  );
+});
+
+test('it exits 2 and runs nothing when an e2e folder sits in a package that no program names', async () => {
+  const ctx = setupTest();
+
+  const exitCode = await runLane(
+    ctx.e2eRequest,
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(true),
+      readTrackedFiles: () =>
+        Promise.resolve([
+          ...ctx.kettleFiles,
+          'packages/teapot/package.json',
+          'packages/teapot/e2e/cli-pour.test.ts',
+        ]),
+      importModule: ctx.importModule,
+      runCommand: ctx.runCommand,
+      wireBrowserLaneHooks: ctx.wireBrowserLaneHooks,
+    },
+  );
+
+  expect(exitCode).toBe(2);
+  expect(ctx.runCommand).not.toHaveBeenCalled();
+
+  expect(ctx.output.err).toHaveBeenCalledExactlyOnceWith(
+    'rig: packages/teapot/e2e has no program to run: declare the program in rig.config.ts programs, with the package it belongs to\n',
+  );
 });
