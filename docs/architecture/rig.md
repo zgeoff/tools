@@ -192,6 +192,10 @@ tarball lacks therefore fails the lane. The pack sits in a cache folder under ri
 repo root. The stop hook removes the run's pack, and the next run's start removes any pack whose run
 has exited.
 
+The `chex` program's build packs chex the same way and extracts the tarball under chex's own
+`node_modules`, so chex's e2e tests run the product a user installs. rig therefore needs no
+dependency on chex, which would close a cycle with chex's dependency on rig and stop release-please.
+
 A fresh CI runner's first Chrome start is the slow one, so after it unpacks the bin, the start hook
 starts Chrome once and the journeys that start Chrome never pay for that first start. The hook
 creates a git repo inside the run's pack folder that tracks one browser suite, because rig skips a
