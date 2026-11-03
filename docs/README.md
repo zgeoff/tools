@@ -45,6 +45,8 @@ The docs of tools: how its shared files and packages work, and the steps a contr
   `rig eval`.
 - [The test layout](./guides/test-layout.md): the faults `chex test-layout` reports and how to fix
   each.
+- [Testing a program with @zgeoff/testing](./guides/testing-package.md): drive a program in a
+  terminal, run it to its exit, or start it and wait until it is ready.
 - [Gating Codex edits](./guides/skill-gate-codex.md): register the skill gate as a Codex hook, and
   how the gate counts loads there.
 
