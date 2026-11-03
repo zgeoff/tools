@@ -2,8 +2,8 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
 import { $ } from 'bun';
-import { readGitEnv } from './read-git-env.ts';
 import { runHookedPush } from './run-hooked-push.ts';
 import { writeStubPrograms } from './write-stub-programs.ts';
 

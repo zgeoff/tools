@@ -2,10 +2,10 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
+import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { $ } from 'bun';
-import { readGitEnv } from './read-git-env.ts';
 import { runChexCLI } from './run-chex-cli.ts';
-import { writeTreeFiles } from './write-tree-files.ts';
 
 async function setupTest() {
   const repo = await mkdtemp(join(tmpdir(), 'run-chex-cli-'));
@@ -16,7 +16,7 @@ async function setupTest() {
 
   await $`git init --quiet --initial-branch=main ${repo}`.env({ ...env });
 
-  return { repo, env, chexBin: join(import.meta.dir, '../src/cli.ts') };
+  return { repo, env, chexBin: join(import.meta.dir, '../../src/cli.ts') };
 }
 
 test('it runs the chex bin with the arguments and returns its last line', async () => {

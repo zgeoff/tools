@@ -3,12 +3,12 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createGitCommit } from '@zgeoff/std/test-utils/create-git-commit';
+import { makeAnswerQueue } from '@zgeoff/std/test-utils/make-answer-queue';
 import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
 import { runGit } from '@zgeoff/std/test-utils/run-git';
 import { readBranchFiles } from './read-branch-files.ts';
 import type { ProgramResult, RunProgram } from './run-program.ts';
 import { runProgram } from './run-program.ts';
-import { makeAnswerQueue } from './test-utils/make-answer-queue.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'read-branch-files-'));

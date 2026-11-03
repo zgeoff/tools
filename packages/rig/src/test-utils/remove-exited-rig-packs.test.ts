@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { laneFiles } from '../src/browser/lane-files.ts';
+import { laneFiles } from '../browser/lane-files.ts';
 import { buildStubProcessProbe } from './build-stub-process-probe.ts';
 import { removeExitedRigPacks } from './remove-exited-rig-packs.ts';
 

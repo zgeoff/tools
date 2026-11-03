@@ -1,10 +1,10 @@
 import { mkdir, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
+import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { buildInitGuardHooks } from './build-init-guard-hooks.ts';
 import type { ChexE2EPack } from './get-chex-e2e-pack.ts';
 import { linkCommitlint } from './link-commitlint.ts';
 import { writeStubPrograms } from './write-stub-programs.ts';
-import { writeTreeFiles } from './write-tree-files.ts';
 
 export interface ChexBaselineInstall {
   // The tools checkout, whose commitlint the repo can link.

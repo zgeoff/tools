@@ -1,11 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
+import type { FileLocks } from '@zgeoff/rig/test-utils/file-locks';
 import type { Clock } from '@zgeoff/rig/test-utils/system-clock';
-import type { FileLocks } from './file-locks.ts';
+import type { TemplateFiles } from '@zgeoff/rig/test-utils/template-files';
+import { withFileLock } from '@zgeoff/rig/test-utils/with-file-lock';
 import { parseCacheEntry } from './parse-cache-entry.ts';
 import { pickStaleCacheEntries } from './pick-stale-cache-entries.ts';
-import type { TemplateFiles } from './template-files.ts';
-import { withFileLock } from './with-file-lock.ts';
 
 export interface PerRunTemplateOptions {
   readonly cacheDirectory: string;

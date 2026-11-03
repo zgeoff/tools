@@ -1,8 +1,11 @@
 import { join } from 'node:path';
+import {
+  chexE2EBinVariable,
+  chexE2EPackageVariable,
+} from '@zgeoff/chex/test-utils/get-chex-e2e-pack';
 import type { LaneContext, LaneStart } from '@zgeoff/rig';
 import { buildChexPackRun } from './build-chex-pack-run.ts';
 import type { E2EPackDependencies } from './e2e-pack-dependencies.ts';
-import { chexE2EBinVariable, chexE2EPackageVariable } from './get-chex-e2e-pack.ts';
 import { readPackedBin } from './read-packed-bin.ts';
 import { removeExitedRigPacks } from './remove-exited-rig-packs.ts';
 

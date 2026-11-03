@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { removePath } from '../src/browser/remove-path.ts';
+import { removePath } from '../browser/remove-path.ts';
 import { buildWarmUpSuite } from './build-warm-up-suite.ts';
 import { createTrackedRepo } from './create-tracked-repo.ts';
 

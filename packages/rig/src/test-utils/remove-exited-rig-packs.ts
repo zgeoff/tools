@@ -1,5 +1,5 @@
-import type { LaneFiles } from '../src/browser/lane-files.ts';
-import { removeExitedRunDirs } from '../src/browser/remove-exited-run-dirs.ts';
+import type { LaneFiles } from '../browser/lane-files.ts';
+import { removeExitedRunDirs } from '../browser/remove-exited-run-dirs.ts';
 
 export interface RigPackSweepOptions {
   readonly files: Pick<LaneFiles, 'readDirNames' | 'removePath'>;

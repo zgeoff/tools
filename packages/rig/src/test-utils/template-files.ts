@@ -1,7 +1,7 @@
 import { rename } from 'node:fs/promises';
-import { nodeFileSystem } from '../../../scripts/ci/node-file-system.ts';
-import { hasErrorCode } from '../src/browser/has-error-code.ts';
-import { readDirNames } from '../src/browser/read-dir-names.ts';
+import { nodeFileSystem } from '../../../../scripts/ci/node-file-system.ts';
+import { hasErrorCode } from '../browser/has-error-code.ts';
+import { readDirNames } from '../browser/read-dir-names.ts';
 
 export interface TemplateFiles {
   readonly readFile: (path: string) => Promise<Uint8Array>;

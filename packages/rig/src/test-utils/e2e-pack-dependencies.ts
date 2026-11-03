@@ -1,4 +1,4 @@
-import type { LaneFiles } from '../src/browser/lane-files.ts';
+import type { LaneFiles } from '../browser/lane-files.ts';
 import type { PackedBinFiles } from './read-packed-bin.ts';
 
 // The effects that the e2e lane's start and stop hooks reach, which the lane entrypoints pass in.

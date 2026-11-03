@@ -14,9 +14,9 @@ async function setupTest() {
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   const root = join(directory, 'repo');
-  const toolsRoot = join(import.meta.dir, '../../..');
+  const toolsRoot = join(import.meta.dir, '../../../..');
   const rigLog = join(directory, 'rig-calls');
-  const packageDir = join(import.meta.dir, '..');
+  const packageDir = join(import.meta.dir, '..', '..');
   const chex = { packageDir, binPath: join(packageDir, 'src/cli.ts') };
 
   return { root, toolsRoot, chex, rigLog, bin: join(root, 'node_modules/.bin') };

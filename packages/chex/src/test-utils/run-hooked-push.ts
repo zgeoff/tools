@@ -1,6 +1,6 @@
+import type { GitEnv } from '@zgeoff/std/test-utils/read-git-env';
 import { $ } from 'bun';
 import { collectFailedHookJobs } from './collect-failed-hook-jobs.ts';
-import type { GitEnv } from './read-git-env.ts';
 
 export interface HookedPush {
   readonly exitCode: number;

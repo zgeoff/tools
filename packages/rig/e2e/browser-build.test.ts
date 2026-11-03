@@ -4,10 +4,10 @@ import { hostname, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { buildBrowserRun } from '../src/browser/build-browser-run.ts';
 import { pickChromeDirs } from '../src/browser/pick-chrome-dirs.ts';
-import { createTrackedRepo } from '../test-utils/create-tracked-repo.ts';
-import { getRigE2EBin } from '../test-utils/get-rig-e2e-bin.ts';
-import { stopProcessGroups } from '../test-utils/stop-process-groups.ts';
-import { testProcesses } from '../test-utils/test-processes.ts';
+import { createTrackedRepo } from '../src/test-utils/create-tracked-repo.ts';
+import { getRigE2EBin } from '../src/test-utils/get-rig-e2e-bin.ts';
+import { stopProcessGroups } from '../src/test-utils/stop-process-groups.ts';
+import { testProcesses } from '../src/test-utils/test-processes.ts';
 
 async function setupTest() {
   const stack = new AsyncDisposableStack();

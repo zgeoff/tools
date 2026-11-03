@@ -3,15 +3,15 @@ import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { $ } from 'bun';
-import { commitAllFiles } from '../test-utils/commit-all-files.ts';
-import { createChexBaselineRepo } from '../test-utils/create-chex-baseline-repo.ts';
-import { getChexE2EPack } from '../test-utils/get-chex-e2e-pack.ts';
-import { readCallLog } from '../test-utils/read-call-log.ts';
-import { runChexCLI } from '../test-utils/run-chex-cli.ts';
-import { runHookedPush } from '../test-utils/run-hooked-push.ts';
-import { writeStubPrograms } from '../test-utils/write-stub-programs.ts';
-import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
+import { commitAllFiles } from '../src/test-utils/commit-all-files.ts';
+import { createChexBaselineRepo } from '../src/test-utils/create-chex-baseline-repo.ts';
+import { getChexE2EPack } from '../src/test-utils/get-chex-e2e-pack.ts';
+import { readCallLog } from '../src/test-utils/read-call-log.ts';
+import { runChexCLI } from '../src/test-utils/run-chex-cli.ts';
+import { runHookedPush } from '../src/test-utils/run-hooked-push.ts';
+import { writeStubPrograms } from '../src/test-utils/write-stub-programs.ts';
 
 // Every git call gets a clean environment, so a GIT_DIR this test inherits from a real hook cannot
 // reach the repo it runs in.

@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { readStreamUntil } from './read-stream-until.ts';
+import { readStreamUntil } from '@zgeoff/std/test-utils/read-stream-until';
 
 export interface LockHolder {
   // Kills the holder with SIGKILL and waits for its exit, which frees its lock.

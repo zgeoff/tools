@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import type { LaneContext, LaneStart } from '@zgeoff/rig';
-import { buildBrowserRun } from '../src/browser/build-browser-run.ts';
-import { pickChromeDirs } from '../src/browser/pick-chrome-dirs.ts';
+import { buildBrowserRun } from '../browser/build-browser-run.ts';
+import { pickChromeDirs } from '../browser/pick-chrome-dirs.ts';
 import { buildRigPackRun } from './build-rig-pack-run.ts';
 import { createRigTarball } from './create-rig-tarball.ts';
 import type { E2EPackDependencies } from './e2e-pack-dependencies.ts';

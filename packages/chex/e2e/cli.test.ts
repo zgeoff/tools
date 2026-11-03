@@ -2,13 +2,13 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
+import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { $ } from 'bun';
-import { buildInitGuardHooks } from '../test-utils/build-init-guard-hooks.ts';
-import { commitAllFiles } from '../test-utils/commit-all-files.ts';
-import { getChexE2EPack } from '../test-utils/get-chex-e2e-pack.ts';
-import { readGitEnv } from '../test-utils/read-git-env.ts';
-import { runChexCLI } from '../test-utils/run-chex-cli.ts';
-import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
+import { buildInitGuardHooks } from '../src/test-utils/build-init-guard-hooks.ts';
+import { commitAllFiles } from '../src/test-utils/commit-all-files.ts';
+import { getChexE2EPack } from '../src/test-utils/get-chex-e2e-pack.ts';
+import { runChexCLI } from '../src/test-utils/run-chex-cli.ts';
 
 // The repo has an origin and a feature branch, as a pushed branch does.
 async function setupTest() {
