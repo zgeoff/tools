@@ -290,3 +290,27 @@ test('it throws at the time limit when ready.check never settles', async () => {
 
   await expect(started).rejects.toThrow(/was not ready after 100 ms/u);
 });
+
+test('it throws when a slow ready.check answers true after the time limit', async () => {
+  const ctx = setupTest();
+
+  const started = start(ctx.command, {
+    args: ['mute'],
+    ready: {
+      check: async () => {
+        await Promise.resolve();
+
+        const blockedUntil = Date.now() + 150;
+
+        while (Date.now() < blockedUntil) {
+          // blocks the event loop past the deadline
+        }
+
+        return true;
+      },
+    },
+    readyTimeoutMs: 50,
+  });
+
+  await expect(started).rejects.toThrow(/was not ready after 50 ms/u);
+});

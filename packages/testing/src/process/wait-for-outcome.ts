@@ -37,7 +37,8 @@ export async function waitForOutcome<Value>(
 
     const value = await Promise.race([read(), waitPastDeadline(remainingMs)]);
 
-    if (value === pastDeadline) {
+    // A read that blocked the event loop can win the race and still finish past the deadline.
+    if (value === pastDeadline || Date.now() >= deadline) {
       return { kind: 'timeout' };
     }
 
