@@ -275,3 +275,36 @@ test('it passes a test helper that imports another helper of its own package', (
 
   expect(faults).toStrictEqual([]);
 });
+
+test('it reports a source that a package ships from its root when it imports a test helper', () => {
+  const faults = collectTestLayoutFaults(
+    [],
+    [
+      {
+        path: 'packages/kettle/index.js',
+        text: "import { buildWater } from '@acme/teapot/test-utils/build-water';\n",
+      },
+    ],
+  );
+
+  expect(faults).toStrictEqual([
+    'packages/kettle/index.js imports @acme/teapot/test-utils/build-water, a test helper, from production code; import test helpers only from tests and other test helpers',
+  ]);
+});
+
+test.each(['e2e/pour.ts', 'integration/pour.ts', 'evals/pour.ts', 'bench/pour.ts', 'pour.test.ts'])(
+  'it passes a package file at %s that imports a test helper by name',
+  (file) => {
+    const faults = collectTestLayoutFaults(
+      [],
+      [
+        {
+          path: `packages/kettle/${file}`,
+          text: "import { buildWater } from '@acme/teapot/test-utils/build-water';\n",
+        },
+      ],
+    );
+
+    expect(faults).toStrictEqual([]);
+  },
+);

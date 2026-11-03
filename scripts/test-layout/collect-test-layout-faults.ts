@@ -159,14 +159,16 @@ function getWorkspaceRoot(path: string): string {
     : (segments[0] ?? '');
 }
 
-// A package's production code is its src/, less its tests and its test helpers.
+const packageTestDirs = new Set(['e2e', 'integration', 'evals', 'bench', 'test-utils']);
+
 function isProductionCode(path: string): boolean {
   const root = getWorkspaceRoot(path);
 
-  return (
-    root.startsWith('packages/') &&
-    path.startsWith(`${root}/src/`) &&
-    !isHelperPath(path) &&
-    !/\.test\.[^/]+$/u.test(path)
-  );
+  if (!root.startsWith('packages/') || isHelperPath(path) || /\.test\.[^/]+$/u.test(path)) {
+    return false;
+  }
+
+  const [folder] = path.slice(root.length + 1).split('/');
+
+  return !packageTestDirs.has(folder ?? '');
 }
