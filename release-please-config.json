@@ -68,7 +68,7 @@
     },
     "packages/testing": {
       "component": "@zgeoff/testing",
-      "initial-version": "0.0.1"
+      "initial-version": "0.1.0"
     }
   }
 }
