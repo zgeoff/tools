@@ -2,11 +2,12 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { probeWorkspaceRepo } from './probe-workspace-repo.ts';
 
 async function setupTest(files: Readonly<Record<string, string>>) {
-  const repoRoot = await mkdtemp(join(tmpdir(), `rig-workspace-pid${process.pid}-`));
+  const repoRoot = await mkdtemp(join(tmpdir(), readRunFolderPrefix('rig-workspace-')));
 
   onTestFinished(() => rm(repoRoot, { recursive: true, force: true }));
 
