@@ -3,9 +3,9 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
-import { buildStubCommitlint } from '../test-utils/build-stub-commitlint.ts';
 import { runCommitsCheck } from './run-commits-check.ts';
 import { runProgram } from './run-program.ts';
+import { buildStubCommitlint } from './test-utils/build-stub-commitlint.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'run-commits-check-'));

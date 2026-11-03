@@ -19,7 +19,8 @@
   "files": [
     "src",
     "!src/**/*.test.ts",
-    "dist"
+    "dist",
+    "!src/test-utils"
   ],
   "type": "module",
   "exports": {
@@ -27,7 +28,8 @@
       "types": "./dist/index.d.ts",
       "bun": "./src/index.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./test-utils/*": "./src/test-utils/*.ts"
   },
   "publishConfig": {
     "access": "public"

@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runOxlint } from './test-utils/run-oxlint.ts';
+import { runOxlint } from './src/test-utils/run-oxlint.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'oxlintrc-test-'));

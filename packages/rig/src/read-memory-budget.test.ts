@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
-import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
+import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { readMemoryBudget } from './read-memory-budget.ts';
 
 async function setupTest() {
