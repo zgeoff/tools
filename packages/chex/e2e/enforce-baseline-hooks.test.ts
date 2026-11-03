@@ -8,8 +8,8 @@ import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { $ } from 'bun';
 import { commitAllFiles } from '../src/test-utils/commit-all-files.ts';
 import { createChexBaselineRepo } from '../src/test-utils/create-chex-baseline-repo.ts';
-import { getChexE2EPack } from '../src/test-utils/get-chex-e2e-pack.ts';
 import { readCallLog } from '../src/test-utils/read-call-log.ts';
+import { readChexInstall } from '../src/test-utils/read-chex-install.ts';
 import { runChexCLI } from '../src/test-utils/run-chex-cli.ts';
 import { runHookedPush } from '../src/test-utils/run-hooked-push.ts';
 import { writeStubPrograms } from '../src/test-utils/write-stub-programs.ts';
@@ -71,7 +71,7 @@ async function setupTest() {
     'pre-commit': `exec ${process.execPath} ${lefthook} run pre-commit "$@"`,
   });
 
-  const install = { toolsRoot: repoRoot, chex: getChexE2EPack(process.env), rigLog: rigCalls };
+  const install = { toolsRoot: repoRoot, chex: await readChexInstall(), rigLog: rigCalls };
   const readRigCalls = () => readCallLog(rigCalls);
 
   return {

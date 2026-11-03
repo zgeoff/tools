@@ -2,8 +2,8 @@ import { mkdir, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { buildInitGuardHooks } from './build-init-guard-hooks.ts';
-import type { ChexE2EPack } from './get-chex-e2e-pack.ts';
 import { linkCommitlint } from './link-commitlint.ts';
+import type { ChexInstall } from './read-chex-install.ts';
 import { writeStubPrograms } from './write-stub-programs.ts';
 
 export interface ChexBaselineInstall {
@@ -11,7 +11,7 @@ export interface ChexBaselineInstall {
   readonly toolsRoot: string;
 
   // The packed chex, which the repo links as its install.
-  readonly chex: ChexE2EPack;
+  readonly chex: ChexInstall;
 
   // The log the stub rig appends each call to.
   readonly rigLog: string;
