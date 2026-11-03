@@ -15,7 +15,7 @@ test('it sets up once, warms up 5 times, measures 20 times and returns the media
       return Promise.resolve('kettle');
     },
     run: (context) => {
-      calls.push(`run ${String(context)}`);
+      calls.push(`run ${context}`);
     },
   });
 

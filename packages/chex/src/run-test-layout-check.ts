@@ -99,7 +99,10 @@ export function runTestLayoutCommand(): Promise<number> {
     readRigConfig: async () => {
       const loaded: unknown = await import(join(cwd, 'rig.config.ts'));
 
-      return typeof loaded === 'object' && loaded !== null ? Reflect.get(loaded, 'default') : null;
+      const defaultExport: unknown =
+        typeof loaded === 'object' && loaded !== null ? Reflect.get(loaded, 'default') : null;
+
+      return defaultExport;
     },
     readParser: readOxcParser,
     writeOutput: (text) => {

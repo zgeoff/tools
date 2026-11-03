@@ -44,10 +44,10 @@ test('it runs the artifact even in CI', async () => {
   expect(launch.command).toStrictEqual(['bun', '/built/cli.js']);
 });
 
-test('it throws in CI when the program is not built', async () => {
+test('it throws in CI when the program is not built', () => {
   const ctx = setupTest({ CI: 'true' });
 
-  await expect(resolveProgramLaunch('kettle-cli', ctx.sources)).rejects.toThrow(
+  expect(resolveProgramLaunch('kettle-cli', ctx.sources)).rejects.toThrow(
     "program kettle-cli isn't built: run the e2e lane with rig e2e",
   );
 });
@@ -71,10 +71,10 @@ test('it runs the source when CI is empty', async () => {
   expect(launch.cwd).toBe('/repo');
 });
 
-test('it throws when the config declares no such program', async () => {
+test('it throws when the config declares no such program', () => {
   const ctx = setupTest({});
 
-  await expect(resolveProgramLaunch('teapot', ctx.sources)).rejects.toThrow(
+  expect(resolveProgramLaunch('teapot', ctx.sources)).rejects.toThrow(
     "program teapot isn't declared: add it to rig.config.ts programs",
   );
 });

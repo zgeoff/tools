@@ -62,12 +62,12 @@ test('it returns 128 plus the signal number when the signal kills the program', 
   expect(exitCode).toBe(137);
 });
 
-test('it throws with the output when the program exits before it is ready', async () => {
+test('it throws with the output when the program exits before it is ready', () => {
   setupTest();
 
   const started = startProgram('tiny', { args: ['nonsense'], ready: { url: '/health' } });
 
-  await expect(started).rejects.toThrow(
+  expect(started).rejects.toThrow(
     /program tiny exited before it was ready \(exit code 64\); its output:\nunknown mode nonsense/u,
   );
 });

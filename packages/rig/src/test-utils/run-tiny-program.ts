@@ -24,9 +24,7 @@ if (mode === 'echo') {
     },
   });
 
-  process.on('SIGTERM', async () => {
-    await server.stop(true);
-
+  process.on('SIGTERM', () => {
     process.exit(0);
   });
 
@@ -36,7 +34,9 @@ if (mode === 'echo') {
     process.exit(0);
   });
 
-  setInterval(() => null, 1000);
+  setInterval(() => {
+    // keeps the process alive until SIGTERM
+  }, 1000);
 } else {
   process.stderr.write(`unknown mode ${mode ?? ''}\n`);
 

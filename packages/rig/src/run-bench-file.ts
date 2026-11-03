@@ -7,7 +7,7 @@ const file = process.argv[2] ?? '';
 
 const loaded: unknown = await import(file);
 
-const defaultExport =
+const defaultExport: unknown =
   typeof loaded === 'object' && loaded !== null ? Reflect.get(loaded, 'default') : null;
 
 const parsed = parseBenchDefinition(defaultExport);
