@@ -1,14 +1,25 @@
 import { expect, test } from 'bun:test';
-import { readlinkSync } from 'node:fs';
 import { readRunFolderPrefix } from './read-run-folder-prefix.ts';
 
-test.if(process.platform === 'linux')(
-  "it ends the name with the test process's ID and PID namespace number",
-  () => {
-    const namespace = /\[(?<inode>\d+)\]/u.exec(readlinkSync('/proc/self/ns/pid'))?.groups?.[
-      'inode'
-    ];
+test("it ends the name with the test process's ID and PID namespace", () => {
+  expect(readRunFolderPrefix('kettle-', { platform: 'linux', readLink: () => 'pid:[7001]' })).toBe(
+    `kettle-pid${process.pid}-ns7001-`,
+  );
+});
 
-    expect(readRunFolderPrefix('kettle-')).toBe(`kettle-pid${process.pid}-ns${namespace}-`);
-  },
-);
+test('it names an unknown namespace when the namespace link cannot be read', () => {
+  const source = {
+    platform: 'linux' as const,
+    readLink: () => {
+      throw new Error('EACCES: permission denied');
+    },
+  };
+
+  expect(readRunFolderPrefix('kettle-', source)).toBe(`kettle-pid${process.pid}-nsunknown-`);
+});
+
+test('it names an unknown namespace for a namespace link of another shape', () => {
+  expect(readRunFolderPrefix('kettle-', { platform: 'linux', readLink: () => 'net:[7001]' })).toBe(
+    `kettle-pid${process.pid}-nsunknown-`,
+  );
+});
