@@ -2048,8 +2048,6 @@ function collectLaneSuffixes(oxlintConfigText, rigConfig) {
 
 // packages/chex/src/test-layout/collect-folder-faults.ts
 import { posix } from "path";
-var rootFolders = ["e2e", "evals", "bench"];
-var testFolderNames = new Set(["test", "tests", "__tests__"]);
 function collectFolderFaults(layout) {
   return [
     ...collectRootFolderFaults(layout),
@@ -2059,30 +2057,26 @@ function collectFolderFaults(layout) {
     ...collectSubfolderFaults(layout)
   ];
 }
+var rootFolders = ["e2e", "evals", "bench"];
 function collectRootFolderFaults(layout) {
   const example = pickExampleWorkspace(layout.workspaces);
   const faults = rootFolders.filter((folder) => layout.isWorkspaceRepo && hasFolder(layout.trackedPaths, folder)).map((folder) => `${folder}/ sits at the repo root; move each file into the workspace it tests, such as ${example}/${folder}/`);
   if (hasFolder(layout.trackedPaths, "test-utils")) {
-    faults.push(layout.isWorkspaceRepo ? `test-utils/ sits at the repo root; move each file into the workspace it tests, such as ${example}/src/test-utils/` : "test-utils/ sits at the repo root; move each file into src/test-utils/");
+    const target = layout.isWorkspaceRepo ? `the workspace it tests, such as ${example}/src/test-utils/` : "src/test-utils/";
+    faults.push(`test-utils/ sits at the repo root; move each file into ${target}`);
   }
   return faults;
-}
-function hasFolder(trackedPaths, folder) {
-  return trackedPaths.some((path) => path.startsWith(`${folder}/`));
 }
 function pickExampleWorkspace(workspaces) {
   const [first] = workspaces;
   const parent = first === undefined ? "." : posix.dirname(first);
   return parent === "." ? "packages/<name>" : `${parent}/<name>`;
 }
+function hasFolder(trackedPaths, folder) {
+  return trackedPaths.some((path) => path.startsWith(`${folder}/`));
+}
 function collectIntegrationFaults(trackedPaths) {
   return collectFolderPaths(trackedPaths).filter((folder) => posix.basename(folder) === "integration" && !folder.split("/").includes("src")).map((folder) => `${folder}/ holds tests; move each one beside the module it tests, in the package that wires together the packages it imports`);
-}
-function collectTestFolderFaults(trackedPaths) {
-  return collectFolderPaths(trackedPaths).filter((folder) => testFolderNames.has(posix.basename(folder))).map((folder) => `${folder}/ is a test folder; move its tests beside the modules they test, its end-to-end tests into the package's e2e/, and its helpers into src/test-utils/`);
-}
-function collectHelperFolderFaults(layout) {
-  return layout.workspaces.filter((root) => layout.trackedPaths.some((path) => path.startsWith(`${root}/test-utils/`))).map((root) => `${root}/test-utils/ holds test helpers outside src/; move each file into ${root}/src/test-utils/`);
 }
 function collectFolderPaths(trackedPaths) {
   const folders = new Set;
@@ -2093,6 +2087,13 @@ function collectFolderPaths(trackedPaths) {
     }
   }
   return [...folders].toSorted();
+}
+var testFolderNames = new Set(["test", "tests", "__tests__"]);
+function collectTestFolderFaults(trackedPaths) {
+  return collectFolderPaths(trackedPaths).filter((folder) => testFolderNames.has(posix.basename(folder))).map((folder) => `${folder}/ is a test folder; move its tests beside the modules they test, its end-to-end tests into the package's e2e/, and its helpers into src/test-utils/`);
+}
+function collectHelperFolderFaults(layout) {
+  return layout.workspaces.filter((root) => layout.trackedPaths.some((path) => path.startsWith(`${root}/test-utils/`))).map((root) => `${root}/test-utils/ holds test helpers outside src/; move each file into ${root}/src/test-utils/`);
 }
 function collectSubfolderFaults(layout) {
   const tracked = new Set(layout.trackedPaths);
@@ -2170,8 +2171,6 @@ function collectImportSpecifiers(oxc, program) {
 
 // packages/chex/src/test-layout/collect-import-faults.ts
 var sourcePattern = /\.(?:[cm]?[jt]s|[jt]sx)$/u;
-var packageHelperPattern = /^@[^/]+\/[^/]+\/test-utils(?:\/|$)/u;
-var packageTestFolders = new Set(["e2e", "evals", "bench", "test-utils"]);
 function collectImportFaults(oxc, layout, sources) {
   return sources.filter((source) => sourcePattern.test(source.path)).flatMap((source) => {
     const parsed = oxc.parseSync(source.path, source.text);
@@ -2184,6 +2183,7 @@ function collectImportFaults(oxc, layout, sources) {
     return collectImportSpecifiers(oxc, parsed.program).flatMap((specifier) => collectSpecifierFaults(layout, source.path, specifier));
   });
 }
+var packageHelperPattern = /^@[^/]+\/[^/]+\/test-utils(?:\/|$)/u;
 function collectSpecifierFaults(layout, importer, specifier) {
   const isRelative = specifier.startsWith("./") || specifier.startsWith("../");
   const target = isRelative ? normalize(join5(dirname2(importer), specifier)) : specifier;
@@ -2207,6 +2207,15 @@ function isHelperPath(layout, path) {
   const folder = getHelperFolder(layout, getWorkspaceRoot(layout, path));
   return path === folder || path.startsWith(`${folder}/`);
 }
+function getHelperFolder(layout, root) {
+  if (layout.workspaces.includes(root)) {
+    return `${root}/src/test-utils`;
+  }
+  if (root === "") {
+    return layout.isWorkspaceRepo ? "test-utils" : "src/test-utils";
+  }
+  return `${root}/test-utils`;
+}
 function getWorkspaceRoot(layout, path) {
   const workspace = layout.workspaces.find((root) => path.startsWith(`${root}/`));
   if (workspace !== undefined) {
@@ -2218,15 +2227,7 @@ function getWorkspaceRoot(layout, path) {
   }
   return segments[0] ?? "";
 }
-function getHelperFolder(layout, root) {
-  if (layout.workspaces.includes(root)) {
-    return `${root}/src/test-utils`;
-  }
-  if (root === "") {
-    return layout.isWorkspaceRepo ? "test-utils" : "src/test-utils";
-  }
-  return `${root}/test-utils`;
-}
+var packageTestFolders = new Set(["e2e", "evals", "bench", "test-utils"]);
 function isProductionCode(layout, path) {
   const root = getWorkspaceRoot(layout, path);
   if (root === "" && layout.isWorkspaceRepo || isHelperPath(layout, path)) {
@@ -2239,12 +2240,25 @@ function isProductionCode(layout, path) {
   if (!isPackage) {
     return true;
   }
-  const [folder] = path.slice(root === "" ? 0 : root.length + 1).split("/");
+  const relativePath = root === "" ? path : path.slice(root.length + 1);
+  const [folder] = relativePath.split("/");
   return !packageTestFolders.has(folder ?? "");
 }
 
 // packages/chex/src/test-layout/collect-name-faults.ts
 import { posix as posix2 } from "path";
+var testSuffix = ".test.ts";
+function collectNameFaults(layout) {
+  const namesByFolder = Map.groupBy(layout.trackedPaths, (path) => posix2.dirname(path));
+  const faults = [];
+  for (const path of layout.trackedPaths) {
+    if (path.endsWith(testSuffix)) {
+      const siblings = namesByFolder.get(posix2.dirname(path)) ?? [];
+      faults.push(...collectE2ENameFaults(path, layout), ...collectModuleTestFaults(path, layout, siblings));
+    }
+  }
+  return faults;
+}
 var e2ePrefixes = [
   "start-",
   "stop-",
@@ -2256,14 +2270,6 @@ var e2ePrefixes = [
   "compat-",
   "journey-"
 ];
-var testSuffix = ".test.ts";
-function collectNameFaults(layout) {
-  const namesByFolder = Map.groupBy(layout.trackedPaths, (path) => posix2.dirname(path));
-  return layout.trackedPaths.filter((path) => path.endsWith(testSuffix)).flatMap((path) => [
-    ...collectE2ENameFaults(path, layout),
-    ...collectModuleTestFaults(path, layout, namesByFolder.get(posix2.dirname(path)) ?? [])
-  ]);
-}
 function collectE2ENameFaults(path, layout) {
   const folder = posix2.dirname(path);
   const parent = posix2.dirname(folder);
@@ -2353,7 +2359,8 @@ async function runTestLayoutCheck(options) {
     const oxlintConfigText = tracked.has(".oxlintrc.json") ? await options.readText(".oxlintrc.json") : null;
     const rigConfig = tracked.has("rig.config.ts") ? await options.readRigConfig() : null;
     const sources = await Promise.all(trackedPaths.filter((path) => sourcePattern2.test(path)).map(async (path) => ({ path, text: await options.readText(path) })));
-    faults = collectTestLayoutFaults(await options.readParser(), {
+    const parser = await options.readParser();
+    faults = collectTestLayoutFaults(parser, {
       trackedPaths,
       workspaces: workspaces.kind === "single" ? [] : collectWorkspaceRoots(trackedPaths, workspaces.patterns),
       isWorkspaceRepo: workspaces.kind === "workspaces",
