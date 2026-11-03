@@ -80,3 +80,27 @@ test('it disposes of the setup result when a run throws', async () => {
 
   expect(disposals).toStrictEqual(['dispose']);
 });
+
+test('it disposes of a setup result that is a function with an async dispose', async () => {
+  const disposals: string[] = [];
+
+  const definition = defineBench({
+    name: 'boil',
+    budget: '50ms',
+    setup: () =>
+      Promise.resolve(
+        Object.assign(() => {}, {
+          [Symbol.asyncDispose]: () => {
+            disposals.push('dispose');
+
+            return Promise.resolve();
+          },
+        }),
+      ),
+    run: () => {},
+  });
+
+  await runBenchmark(definition, () => 0);
+
+  expect(disposals).toStrictEqual(['dispose']);
+});
