@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { isRecord } from '@zgeoff/std';
 
 export interface BaselineJobEntry {
@@ -13,11 +11,9 @@ export interface BaselineJobEntry {
 
 const hooks = ['pre-commit', 'pre-push'] as const;
 
-// Synchronous, because test.each needs the jobs before any test runs.
-export function readBaselineJobs(): BaselineJobEntry[] {
-  const config: unknown = Bun.YAML.parse(
-    readFileSync(join(import.meta.dir, '../../lefthook.yml'), 'utf8'),
-  );
+// The reader is synchronous, because test.each needs the jobs before any test runs.
+export function readBaselineJobs(readConfigText: () => string): BaselineJobEntry[] {
+  const config: unknown = Bun.YAML.parse(readConfigText());
 
   return hooks.flatMap((hook) => {
     const value = isRecord(config) ? config[hook] : undefined;

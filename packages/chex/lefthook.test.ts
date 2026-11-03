@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -194,7 +195,7 @@ test("it runs the related tests through rig without git's repository variables t
   expect(rigCall).toBe('related kettle.ts\n');
 });
 
-test.each(readBaselineJobs())(
+test.each(readBaselineJobs(() => readFileSync(`${import.meta.dir}/lefthook.yml`, 'utf8')))(
   "it runs the $hook job $name without git's repository variables that a hook in a worktree exports",
   async (job) => {
     const ctx = await setupTest();
@@ -228,7 +229,11 @@ test.each(readBaselineJobs())(
   },
 );
 
-test.each(readBaselineJobs().filter((job) => job.listsBranchFiles))(
+test.each(
+  readBaselineJobs(() => readFileSync(`${import.meta.dir}/lefthook.yml`, 'utf8')).filter(
+    (job) => job.listsBranchFiles,
+  ),
+)(
   "it lists the files of the $hook job $name without git's repository variables that a hook in a worktree exports",
   async (job) => {
     const ctx = await setupTest();
