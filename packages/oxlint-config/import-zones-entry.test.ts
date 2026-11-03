@@ -4,9 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ImportZonesOptions } from '@zgeoff/oxlint-config/import-zones';
 import { collectRefusingEdges, importZonesSchema } from '@zgeoff/oxlint-config/import-zones';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), `import-zones-entry-test-pid${process.pid}-`));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('import-zones-entry-test-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
