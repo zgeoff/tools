@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.12](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.11...@zgeoff/chex@0.0.12) (2026-11-03)
+
+### Bug Fixes
+
+- **chex:** make the pack build-folder test independent of test order
+  ([#476](https://github.com/zgeoff/tools/issues/476))
+  ([79082f9](https://github.com/zgeoff/tools/commit/79082f9c6cd66def609e7884c004ce9175b8993c))
+
 ## [0.0.11](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.10...@zgeoff/chex@0.0.11) (2026-11-03)
 
 ### Features
