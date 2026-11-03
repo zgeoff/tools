@@ -7,7 +7,7 @@ export default defineRig({
     chex: {
       package: 'packages/chex',
       source: 'src/cli.ts',
-      build: 'bun src/test-utils/pack-chex-program.ts',
+      build: 'bun src/test-utils/pack-chex-program.ts "$PPID"',
       artifact: 'node_modules/.cache/chex-e2e/package/src/cli.ts',
     },
     rig: { package: 'packages/rig', source: 'src/cli.ts', build: 'true', artifact: 'src/cli.ts' },

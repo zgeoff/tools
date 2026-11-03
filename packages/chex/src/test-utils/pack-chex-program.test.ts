@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readlink, rm, utimes } from 'node:fs/promises';
+import { mkdtemp, readlink, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
@@ -17,39 +17,76 @@ async function setupTest() {
     'src/cli.ts': 'export {};\n',
   });
 
-  return { packageDir, builds: join(packageDir, chexPackDir, 'builds') };
+  const running = new Set<number>();
+
+  const pack = (buildID: string, ownerPID: number) =>
+    runChexPack({ packageDir, buildID, ownerPID, isRunning: (pid) => running.has(pid) });
+
+  return { packageDir, builds: join(packageDir, chexPackDir, 'builds'), running, pack };
 }
 
 test('it extracts the pack and points the package link at this build', async () => {
   const ctx = await setupTest();
-  const linkPath = await runChexPack({ packageDir: ctx.packageDir, buildID: 'b1', now: Date.now });
+  const linkPath = await ctx.pack('b1', 101);
   const target = await readlink(linkPath);
 
   expect(target).toBe(join('builds', 'b1', 'package'));
   expect(existsSync(join(linkPath, 'src/cli.ts'))).toBeTrue();
 });
 
-test("it keeps a recent build's files when a later build moves the link", async () => {
+test("it keeps a build's files while its rig process still runs", async () => {
   const ctx = await setupTest();
 
-  await runChexPack({ packageDir: ctx.packageDir, buildID: 'b1', now: Date.now });
+  ctx.running.add(101);
 
-  const linkPath = await runChexPack({ packageDir: ctx.packageDir, buildID: 'b2', now: Date.now });
+  await ctx.pack('b1', 101);
+
+  const linkPath = await ctx.pack('b2', 202);
   const target = await readlink(linkPath);
 
   expect(target).toBe(join('builds', 'b2', 'package'));
   expect(existsSync(join(ctx.builds, 'b1/package/src/cli.ts'))).toBeTrue();
 });
 
-test('it removes a build older than an hour', async () => {
+test('it removes a build whose rig process has stopped', async () => {
   const ctx = await setupTest();
 
-  await runChexPack({ packageDir: ctx.packageDir, buildID: 'b1', now: Date.now });
-
-  const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-
-  await utimes(join(ctx.builds, 'b1'), twoHoursAgo, twoHoursAgo);
-  await runChexPack({ packageDir: ctx.packageDir, buildID: 'b2', now: Date.now });
+  await ctx.pack('b1', 101);
+  await ctx.pack('b2', 202);
 
   expect(existsSync(join(ctx.builds, 'b1'))).toBeFalse();
+});
+
+test('it removes a build folder that names no owner', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.builds, { 'stray/owner': 'none' });
+
+  await ctx.pack('b1', 101);
+
+  expect(existsSync(join(ctx.builds, 'stray'))).toBeFalse();
+});
+
+test('it skips a build folder that another build removes first', async () => {
+  const ctx = await setupTest();
+
+  const strays = Array.from({ length: 50 }, (_, index) => `stray-${index}/owner`);
+
+  await writeTreeFiles(ctx.builds, Object.fromEntries(strays.map((path) => [path, '0'])));
+
+  const results = await Promise.allSettled([ctx.pack('b1', 101), ctx.pack('b2', 202)]);
+
+  expect(results.map((result) => result.status)).toStrictEqual(['fulfilled', 'fulfilled']);
+});
+
+test('it replaces a package folder that an older build extracted in place', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(join(ctx.packageDir, chexPackDir), { 'package/src/cli.ts': '' });
+  await writeFile(join(ctx.packageDir, chexPackDir, 'package/README.md'), '');
+
+  const linkPath = await ctx.pack('b1', 101);
+  const target = await readlink(linkPath);
+
+  expect(target).toBe(join('builds', 'b1', 'package'));
 });

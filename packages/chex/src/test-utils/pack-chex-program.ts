@@ -1,4 +1,4 @@
-import { lstat, mkdir, readdir, rename, rm, stat, symlink } from 'node:fs/promises';
+import { lstat, mkdir, readFile, readdir, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
 
@@ -9,14 +9,14 @@ export interface PackChexOptions {
   // A name no other build uses, for this build's own folder.
   readonly buildID: string;
 
-  readonly now: () => number;
+  // The rig process that runs the tests against this build.
+  readonly ownerPID: number;
+
+  readonly isRunning: (pid: number) => boolean;
 }
 
 // The folder that rig.config.ts names, under the package, where the packed chex extracts.
 export const chexPackDir = 'node_modules/.cache/chex-e2e';
-
-// A pack older than this belongs to no run that is still going.
-const staleAfterMs = 60 * 60 * 1000;
 
 // Each build extracts into its own folder and one rename moves the `package` link, so a build
 // never deletes the files of a run that is still going. The pack sits in chex's node_modules,
@@ -26,18 +26,21 @@ export async function runChexPack(options: PackChexOptions): Promise<string> {
   const buildDir = join(packRoot, 'builds', options.buildID);
 
   await mkdir(buildDir, { recursive: true });
+  await writeFile(join(buildDir, 'owner'), String(options.ownerPID));
 
-  await $`bun pm pack --filename ${join(buildDir, 'chex.tgz')} --quiet`.cwd(options.packageDir);
+  await $`bun pm pack --filename ${join(buildDir, 'chex.tgz')} --quiet`
+    .cwd(options.packageDir)
+    .quiet();
 
   await $`tar -xzf ${join(buildDir, 'chex.tgz')} -C ${buildDir}`;
 
-  const pendingLink = join(packRoot, `package.${options.buildID}`);
   const linkPath = join(packRoot, 'package');
+  const pendingLink = join(packRoot, `package.${options.buildID}`);
 
   await removeUnlinkedPackage(linkPath);
   await symlink(join('builds', options.buildID, 'package'), pendingLink);
   await rename(pendingLink, linkPath);
-  await removeStaleBuilds(join(packRoot, 'builds'), options);
+  await removeOrphanBuilds(join(packRoot, 'builds'), options);
 
   return linkPath;
 }
@@ -51,24 +54,43 @@ async function removeUnlinkedPackage(linkPath: string): Promise<void> {
   }
 }
 
-async function removeStaleBuilds(buildsDir: string, options: PackChexOptions): Promise<void> {
+// A build whose rig process has stopped serves no run, so its folder goes.
+async function removeOrphanBuilds(buildsDir: string, options: PackChexOptions): Promise<void> {
   const builds = await readdir(buildsDir);
 
   for (const build of builds) {
-    const path = join(buildsDir, build);
+    const ownerText = await readFile(join(buildsDir, build, 'owner'), 'utf8').catch(() => '');
 
-    const info = await stat(path);
+    const ownerPID = Number(ownerText);
+    const isOrphan = !Number.isInteger(ownerPID) || ownerPID <= 0 || !options.isRunning(ownerPID);
 
-    if (build !== options.buildID && options.now() - info.mtimeMs > staleAfterMs) {
-      await rm(path, { recursive: true, force: true });
+    if (build !== options.buildID && isOrphan) {
+      await rm(join(buildsDir, build), { recursive: true, force: true });
     }
   }
 }
 
+function isProcessRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+
+    return true;
+  } catch (error) {
+    return error instanceof Error && 'code' in error && error.code === 'EPERM';
+  }
+}
+
 if (import.meta.main) {
+  const ownerPID = Number(process.argv[2]);
+
+  if (!Number.isInteger(ownerPID) || ownerPID <= 0) {
+    throw new Error(`pack-chex-program: pass the rig process id, not "${process.argv[2]}"`);
+  }
+
   await runChexPack({
     packageDir: process.cwd(),
-    buildID: `${Date.now()}-${process.pid}`,
-    now: () => Date.now(),
+    buildID: `${ownerPID}-${Date.now()}`,
+    ownerPID,
+    isRunning: isProcessRunning,
   });
 }
