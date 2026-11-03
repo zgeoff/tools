@@ -1,8 +1,14 @@
 import { expect, test } from 'bun:test';
+import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { readPinnedSkillText } from '@zgeoff/std/test-utils/read-pinned-skill-text';
 import { nodeFileSystem } from '../../scripts/ci/node-file-system.ts';
-import { readPinnedSkillText } from '../../test-utils/read-pinned-skill-text.ts';
-import { runLintTree } from './test-utils/run-lint-tree.ts';
+import { buildRigConfigSource } from './src/test-utils/build-rig-config-source.ts';
+import { buildTimeoutSource } from './src/test-utils/build-timeout-source.ts';
+import { createLintTree } from './src/test-utils/create-lint-tree.ts';
+import { readRigLaneLimit } from './src/test-utils/read-rig-lane-limit.ts';
+import { runLintIn } from './src/test-utils/run-lint-in.ts';
+import { runLintTree } from './src/test-utils/run-lint-tree.ts';
 
 test.each([
   ['a trailing number', "test('it brews', () => {}, 20_000);\n"],
@@ -369,4 +375,37 @@ test('it holds the same lane limits as the Lanes table in the shared testing ski
   expect(rows.length).toBe(7);
   expect(atLimit.exitCode).toBe(0);
   expect(reported).toIncludeSameMembers(rows.map((row) => row.lane));
+});
+
+test('it holds the limit of a declared lane once, for rig and for the lint rule', async () => {
+  const tree = await createLintTree(
+    {
+      'rig.config.ts': buildRigConfigSource("{ lanes: { kiln: { limit: '15s' } } }"),
+      'oven.ts': 'export const heat = 1;\n',
+      'oven.kiln.test.ts': buildTimeoutSource(20_000),
+    },
+    { 'zgeoff/max-test-timeout': 'error' },
+  );
+
+  const rigLimitBefore = await readRigLaneLimit(tree, 'kiln');
+  const lintBefore = await runLintIn(tree, tree, 'oven.kiln.test.ts');
+
+  await writeFile(
+    join(tree, 'rig.config.ts'),
+    buildRigConfigSource("{ lanes: { kiln: { limit: '25s' } } }"),
+  );
+
+  const rigLimitAfter = await readRigLaneLimit(tree, 'kiln');
+  const lintAfter = await runLintIn(tree, tree, 'oven.kiln.test.ts');
+
+  expect(rigLimitBefore).toBe(15_000);
+  expect(lintBefore.exitCode).toBe(1);
+
+  expect(lintBefore.stdout).toInclude(
+    'This timeout of 20000 ms is above the 15000 ms limit of the kiln lane',
+  );
+
+  expect(rigLimitAfter).toBe(25_000);
+  expect(lintAfter.exitCode).toBe(0);
+  expect(lintAfter.stdout).not.toInclude('max-test-timeout');
 });

@@ -1,0 +1,36 @@
+import { expect, onTestFinished, test } from 'bun:test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
+import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
+import { buildRigConfigSource } from './build-rig-config-source.ts';
+import { readRigLaneLimit } from './read-rig-lane-limit.ts';
+
+async function setupTest() {
+  const repoRoot = await mkdtemp(join(tmpdir(), readRunFolderPrefix('rig-lane-limit-')));
+
+  onTestFinished(() => rm(repoRoot, { recursive: true, force: true }));
+
+  return { repoRoot };
+}
+
+test('it reads the limit of a lane that rig.config.ts declares', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.repoRoot, {
+    'rig.config.ts': buildRigConfigSource("{ lanes: { kiln: { limit: '15s' } } }"),
+  });
+
+  const limitMs = await readRigLaneLimit(ctx.repoRoot, 'kiln');
+
+  expect(limitMs).toBe(15_000);
+});
+
+test('it fails for a lane the config does not hold', async () => {
+  const ctx = await setupTest();
+  const failure = await readRigLaneLimit(ctx.repoRoot, 'kiln').catch((error: unknown) => error);
+
+  expect(failure).toBeInstanceOf(Error);
+  expect(failure).toHaveProperty('message', expect.stringContaining('has no lane kiln'));
+});

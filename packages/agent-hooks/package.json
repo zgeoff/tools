@@ -38,6 +38,7 @@
   "devDependencies": {
     "@types/bun": "catalog:",
     "@types/picomatch": "catalog:",
+    "@zgeoff/rig": "workspace:*",
     "@zgeoff/std": "workspace:*",
     "gunshi": "catalog:",
     "picomatch": "catalog:",

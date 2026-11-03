@@ -2,12 +2,13 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildProbeRun } from '../../../../test-utils/build-probe-run.ts';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
+import { buildProbeRun } from '../test-utils/build-probe-run.ts';
 import { laneFiles } from './lane-files.ts';
 import { removeExitedRunDirs } from './remove-exited-run-dirs.ts';
 
 async function setupTest() {
-  const parentDir = await mkdtemp(join(tmpdir(), 'rig-browser-runs-'));
+  const parentDir = await mkdtemp(join(tmpdir(), readRunFolderPrefix('rig-browser-runs-')));
 
   onTestFinished(() => rm(parentDir, { recursive: true, force: true }));
 

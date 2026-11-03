@@ -2,14 +2,15 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { makeRejectingStub } from '../../../../test-utils/make-rejecting-stub.ts';
-import { makeResolvingStub } from '../../../../test-utils/make-resolving-stub.ts';
-import { writeTreeFiles } from '../../../../test-utils/write-tree-files.ts';
+import { makeRejectingStub } from '@zgeoff/std/test-utils/make-rejecting-stub';
+import { makeResolvingStub } from '@zgeoff/std/test-utils/make-resolving-stub';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
+import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { bunFileSystem } from './bun-file-system.ts';
 import { runInit } from './run-init.ts';
 
 async function setupTest() {
-  const project = await mkdtemp(join(tmpdir(), 'agent-hooks-init-'));
+  const project = await mkdtemp(join(tmpdir(), readRunFolderPrefix('agent-hooks-init-')));
 
   onTestFinished(() => rm(project, { recursive: true, force: true }));
 

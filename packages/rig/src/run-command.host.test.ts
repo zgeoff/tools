@@ -2,16 +2,17 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
-import { probeProcess } from '../../../test-utils/probe-process.ts';
 import { runCommand } from './run-command.ts';
+import { probeProcess } from './test-utils/probe-process.ts';
 
 async function setupTest() {
   const stack = new AsyncDisposableStack();
 
   onTestFinished(() => stack.disposeAsync());
 
-  const directory = await mkdtemp(join(tmpdir(), 'rig-run-command-'));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('rig-run-command-')));
 
   stack.defer(() => rm(directory, { recursive: true, force: true }));
 

@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'bun:test';
-import { buildFakeProcessRuntime } from '../../../../test-utils/build-fake-process-runtime.ts';
-import { buildStuckProcessGroups } from '../../../../test-utils/build-stuck-process-groups.ts';
+import { buildFakeProcessRuntime } from '../test-utils/build-fake-process-runtime.ts';
+import { buildStuckProcessGroups } from '../test-utils/build-stuck-process-groups.ts';
 import { ProcessGroupStillRunningError } from './process-group-still-running-error.ts';
 import { ProcessGroupStopError } from './process-group-stop-error.ts';
 import type { ProcessGroups } from './process-groups.ts';

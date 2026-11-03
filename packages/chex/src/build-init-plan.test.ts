@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
-import { buildInitGuardHooks } from '../../../test-utils/build-init-guard-hooks.ts';
 import { buildInitPlan } from './build-init-plan.ts';
+import { buildInitGuardHooks } from './test-utils/build-init-guard-hooks.ts';
 
 test('it plans the extends line and the check:docs script for a repo that has neither', () => {
   const packageText = JSON.stringify({

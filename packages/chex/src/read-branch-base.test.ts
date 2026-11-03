@@ -2,15 +2,16 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
-import { makeAnswerQueue } from '../../../test-utils/make-answer-queue.ts';
-import { readGitEnv } from '../../../test-utils/read-git-env.ts';
 import { readBranchBase } from './read-branch-base.ts';
 import type { ProgramResult, RunProgram } from './run-program.ts';
 import { runProgram } from './run-program.ts';
+import { makeAnswerQueue } from './test-utils/make-answer-queue.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'read-branch-base-'));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('read-branch-base-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

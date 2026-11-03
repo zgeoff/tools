@@ -2,16 +2,21 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createGitCommit } from '@zgeoff/std/test-utils/create-git-commit';
+import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
-import { createGitCommit } from '../../../test-utils/create-git-commit.ts';
-import { createStubCommand } from '../../../test-utils/create-stub-command.ts';
-import { readGitEnv } from '../../../test-utils/read-git-env.ts';
 import { runProgram } from './run-program.ts';
 import { runWorkflowsCheck } from './run-workflows-check.ts';
+import { createStubCommand } from './test-utils/create-stub-command.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'run-workflows-check-'));
+  const bin = await mkdtemp(join(tmpdir(), readRunFolderPrefix('run-workflows-check-bin-')));
+
+  onTestFinished(() => rm(bin, { recursive: true, force: true }));
+
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('run-workflows-check-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
@@ -22,7 +27,7 @@ async function setupTest() {
   const commitFiles = (files: Readonly<Record<string, string>>): Promise<string> =>
     createGitCommit(directory, env, files);
 
-  return { directory, env, commitFiles };
+  return { bin, directory, env, commitFiles };
 }
 
 test('it passes workflows that follow every rule', async () => {
@@ -1117,12 +1122,9 @@ test.each([
   'it asks GitHub whether the repo is private when CHECKS_PROFILE is unset, and gh answers %s',
   async (isPrivate, stdout) => {
     const ctx = await setupTest();
-    const bin = await mkdtemp(join(tmpdir(), 'run-workflows-check-bin-'));
 
-    onTestFinished(() => rm(bin, { recursive: true, force: true }));
-
-    await writeFile(join(bin, 'calls.log'), '');
-    await createStubCommand(bin, 'gh', join(bin, 'calls.log'), `${isPrivate}\n`);
+    await writeFile(join(ctx.bin, 'calls.log'), '');
+    await createStubCommand(ctx.bin, 'gh', join(ctx.bin, 'calls.log'), `${isPrivate}\n`);
 
     await ctx.commitFiles({
       '.github/workflows/checks.yml': [
@@ -1142,11 +1144,11 @@ test.each([
 
     const result = await $`bun ${join(import.meta.dir, 'run-workflows-check.ts')}`
       .cwd(ctx.directory)
-      .env({ ...ctx.env, PATH: `${bin}:${ctx.env['PATH']}`, GITHUB_ACTIONS: '' })
+      .env({ ...ctx.env, PATH: `${ctx.bin}:${ctx.env['PATH']}`, GITHUB_ACTIONS: '' })
       .nothrow()
       .quiet();
 
-    const calls = await readFile(join(bin, 'calls.log'), 'utf8');
+    const calls = await readFile(join(ctx.bin, 'calls.log'), 'utf8');
 
     expect({
       exitCode: result.exitCode,
@@ -1160,15 +1162,12 @@ test.each([
 
 test('it applies every rule and says why when CHECKS_PROFILE is unset and gh is not on the PATH', async () => {
   const ctx = await setupTest();
-  const bin = await mkdtemp(join(tmpdir(), 'run-workflows-check-bin-'));
-
-  onTestFinished(() => rm(bin, { recursive: true, force: true }));
 
   const git = Bun.which('git');
 
   invariant(git !== null, 'git is on the PATH');
 
-  await symlink(git, join(bin, 'git'));
+  await symlink(git, join(ctx.bin, 'git'));
 
   await ctx.commitFiles({
     '.github/workflows/checks.yml': [
@@ -1188,7 +1187,7 @@ test('it applies every rule and says why when CHECKS_PROFILE is unset and gh is 
 
   const result = await $`${process.execPath} ${join(import.meta.dir, 'run-workflows-check.ts')}`
     .cwd(ctx.directory)
-    .env({ ...ctx.env, PATH: bin, GITHUB_ACTIONS: '' })
+    .env({ ...ctx.env, PATH: ctx.bin, GITHUB_ACTIONS: '' })
     .nothrow()
     .quiet();
 

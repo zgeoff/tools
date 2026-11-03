@@ -3,10 +3,19 @@ import { existsSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { writeTreeFiles } from '../../../test-utils/write-tree-files.ts';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
+import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { defineRig } from './define-rig.ts';
 import { readRigConfig } from './read-rig-config.ts';
 import type { RigConfigSources } from './read-rig-config.ts';
+
+async function setupTest() {
+  const repoRoot = await mkdtemp(join(tmpdir(), readRunFolderPrefix('rig-config-test-')));
+
+  onTestFinished(() => rm(repoRoot, { recursive: true, force: true }));
+
+  return { repoRoot };
+}
 
 test('it reads the built-in lanes from a repo with no rig.config.ts', async () => {
   const config = await readRigConfig('/bakery', {
@@ -67,17 +76,15 @@ test('it refuses a rig.config.ts with no default export', async () => {
 });
 
 test('it reads a rig.config.ts from disk through the real file probe and importer', async () => {
-  const repoRoot = await mkdtemp(join(tmpdir(), 'rig-config-test-'));
-
-  onTestFinished(() => rm(repoRoot, { recursive: true, force: true }));
+  const ctx = await setupTest();
 
   const indexPath = join(import.meta.dir, 'index.ts');
 
-  await writeTreeFiles(repoRoot, {
+  await writeTreeFiles(ctx.repoRoot, {
     'rig.config.ts': `import { defineRig } from ${JSON.stringify(indexPath)};\n\nexport default defineRig({ lanes: { kiln: { limit: '15s' } } });\n`,
   });
 
-  const config = await readRigConfig(repoRoot, {
+  const config = await readRigConfig(ctx.repoRoot, {
     probeFile: existsSync,
     importModule: (path) => import(path),
   });

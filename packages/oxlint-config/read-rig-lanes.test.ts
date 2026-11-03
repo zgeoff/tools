@@ -1,10 +1,10 @@
 import { expect, test } from 'bun:test';
 import { pathToFileURL } from 'node:url';
-import { defineRig, parseRigConfig } from '../rig/src/index.ts';
+import type { ParsedRigConfig, ResolvedLane } from '@zgeoff/rig';
 import readRigLanes from './read-rig-lanes.js';
-import { buildRigConfigSource } from './test-utils/build-rig-config-source.ts';
-import { buildTimeoutSource } from './test-utils/build-timeout-source.ts';
-import { runLintTree } from './test-utils/run-lint-tree.ts';
+import { buildRigConfigSource } from './src/test-utils/build-rig-config-source.ts';
+import { buildTimeoutSource } from './src/test-utils/build-timeout-source.ts';
+import { runLintTree } from './src/test-utils/run-lint-tree.ts';
 
 test('it reads the limit of a lane that rig.config.ts declares', async () => {
   const files = {
@@ -164,28 +164,33 @@ test('it reads no lanes from a repository without a rig.config.ts', async () => 
 });
 
 test('it keys each lane but unit by its suffix, and a directory lane by its name', async () => {
+  const lane = { parallel: 1, memory: null, start: null, stop: null } as const;
+
+  const lanes: readonly ResolvedLane[] = [
+    { ...lane, name: 'unit', suffix: null, limitMs: 5000 },
+    { ...lane, name: 'e2e', suffix: null, limitMs: 15_000 },
+    { ...lane, name: 'browser', suffix: '.browser', limitMs: 10_000 },
+    { ...lane, name: 'kiln', suffix: '.kiln', limitMs: 15_000 },
+  ];
+
+  const parseRigConfig = (): ParsedRigConfig => ({ kind: 'parsed', config: { lanes } });
+
   const modules: Readonly<Record<string, unknown>> = {
-    [pathToFileURL('/bakery/rig.config.ts').href]: {
-      default: defineRig({ lanes: { kiln: { limit: '15s' } } }),
-    },
+    [pathToFileURL('/bakery/rig.config.ts').href]: { default: { lanes: { kiln: {} } } },
     [pathToFileURL('/bakery/node_modules/@zgeoff/rig/src/index.ts').href]: { parseRigConfig },
   };
 
-  const lanes = await readRigLanes('/bakery/oven', {
+  const limits = await readRigLanes('/bakery/oven', {
     resolveRepoRoot: () => '/bakery',
     probeFile: () => true,
     importModule: (url) => Promise.resolve(modules[url]),
     resolveRepoRig: () => '/bakery/node_modules/@zgeoff/rig/src/index.ts',
   });
 
-  expect(lanes).toStrictEqual(
+  expect(limits).toStrictEqual(
     new Map([
       ['e2e', 15_000],
       ['browser', 10_000],
-      ['docker', 15_000],
-      ['host', 15_000],
-      ['agent-sdk', 5000],
-      ['model-api', 120_000],
       ['kiln', 15_000],
     ]),
   );
@@ -194,7 +199,9 @@ test('it keys each lane but unit by its suffix, and a directory lane by its name
 test("it refuses a rig.config.ts that rig's parser refuses, with the parser's reason", async () => {
   const modules: Readonly<Record<string, unknown>> = {
     [pathToFileURL('/bakery/rig.config.ts').href]: { default: { lanes: 3 } },
-    [pathToFileURL('/bakery/node_modules/@zgeoff/rig/src/index.ts').href]: { parseRigConfig },
+    [pathToFileURL('/bakery/node_modules/@zgeoff/rig/src/index.ts').href]: {
+      parseRigConfig: (): ParsedRigConfig => ({ kind: 'refused', reason: 'its lanes are no list' }),
+    },
   };
 
   const failure = await readRigLanes('/bakery/oven', {

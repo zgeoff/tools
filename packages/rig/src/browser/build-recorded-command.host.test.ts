@@ -2,7 +2,8 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readStreamUntil } from '../../../../test-utils/read-stream-until.ts';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
+import { readStreamUntil } from '@zgeoff/std/test-utils/read-stream-until';
 import { buildRecordedCommand } from './build-recorded-command.ts';
 import { processGroups } from './process-groups.ts';
 
@@ -11,7 +12,7 @@ async function setupTest() {
 
   onTestFinished(() => stack.disposeAsync());
 
-  const directory = await mkdtemp(join(tmpdir(), 'recorded-command-'));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('recorded-command-')));
 
   stack.defer(() => rm(directory, { recursive: true, force: true }));
 

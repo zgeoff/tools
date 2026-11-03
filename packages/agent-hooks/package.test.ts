@@ -2,13 +2,14 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { cp, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { probeProcess } from '@zgeoff/rig/test-utils/probe-process';
+import { systemClock } from '@zgeoff/rig/test-utils/system-clock';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
-import { fileLocks } from '../../test-utils/file-locks.ts';
-import { probeProcess } from '../../test-utils/probe-process.ts';
-import { systemClock } from '../../test-utils/system-clock.ts';
-import { templateFiles } from '../../test-utils/template-files.ts';
-import { withPerRunTemplate } from '../../test-utils/with-per-run-template.ts';
+import { fileLocks } from './src/test-utils/file-locks.ts';
+import { templateFiles } from './src/test-utils/template-files.ts';
+import { withPerRunTemplate } from './src/test-utils/with-per-run-template.ts';
 
 async function setupTest() {
   // The real HOME keeps bun install on the shared cache.
@@ -22,7 +23,7 @@ async function setupTest() {
     new Bun.Glob('packages/{agent-hooks,std}/src/**').scan({ cwd: repoRoot, absolute: true }),
   );
 
-  const directory = await mkdtemp(join(tmpdir(), 'agent-hooks-package-'));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('agent-hooks-package-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

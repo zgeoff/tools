@@ -2,13 +2,14 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
-import { readGitEnv } from '../../../test-utils/read-git-env.ts';
 import { readRangeCommits } from './read-range-commits.ts';
 import { runProgram } from './run-program.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'read-range-commits-'));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('read-range-commits-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

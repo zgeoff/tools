@@ -2,9 +2,9 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { readStreamUntil } from '@zgeoff/std/test-utils/read-stream-until';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
-import { readStreamUntil } from '../../test-utils/read-stream-until.ts';
 
 // Bun's skipIf takes a boolean at collection time, so the modes this host supports are probed once
 // here: a GitHub runner has the systemd-sudo mode, a root shell without systemd the cgroupfs one.

@@ -2,9 +2,10 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { chmod, mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildStubProcessProbe } from '../../../../test-utils/build-stub-process-probe.ts';
-import { makeListingQueueStub } from '../../../../test-utils/make-listing-queue-stub.ts';
-import { makeResolvingStub } from '../../../../test-utils/make-resolving-stub.ts';
+import { makeResolvingStub } from '@zgeoff/std/test-utils/make-resolving-stub';
+import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
+import { buildStubProcessProbe } from '../test-utils/build-stub-process-probe.ts';
+import { makeListingQueueStub } from '../test-utils/make-listing-queue-stub.ts';
 import { laneFiles } from './lane-files.ts';
 import { probeRun } from './probe-run.ts';
 import type { ProcessGroups } from './process-groups.ts';
@@ -17,7 +18,7 @@ async function setupTest() {
 
   onTestFinished(() => stack.disposeAsync());
 
-  const directory = await mkdtemp(join(tmpdir(), 'rig-probe-run-'));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('rig-probe-run-')));
 
   stack.defer(() => rm(directory, { recursive: true, force: true }));
 
