@@ -195,6 +195,8 @@ has exited.
 The `chex` program's build packs chex the same way and extracts the tarball under chex's own
 `node_modules`, so chex's e2e tests run the product a user installs. rig therefore needs no
 dependency on chex, which would close a cycle with chex's dependency on rig and stop release-please.
+Each build extracts into a folder of its own and then moves the `package` link to it, so a second
+`rig e2e` run in the same checkout leaves the first run's files in place.
 
 A fresh CI runner's first Chrome start is the slow one, so after it unpacks the bin, the start hook
 starts Chrome once and the journeys that start Chrome never pay for that first start. The hook
