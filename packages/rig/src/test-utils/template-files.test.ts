@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readDirNames } from '../src/browser/read-dir-names.ts';
+import { readDirNames } from '../browser/read-dir-names.ts';
 import { templateFiles } from './template-files.ts';
 
 async function setupTest() {

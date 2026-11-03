@@ -4,13 +4,13 @@ import { hostname, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { buildBrowserRun } from '../src/browser/build-browser-run.ts';
 import { pickChromeDirs } from '../src/browser/pick-chrome-dirs.ts';
-import type { StubBuildRepo } from '../test-utils/create-stub-build-repo.ts';
-import { createStubBuildRepo } from '../test-utils/create-stub-build-repo.ts';
-import { getRigE2EBin } from '../test-utils/get-rig-e2e-bin.ts';
-import { probeProcess } from '../test-utils/probe-process.ts';
-import { stopProcessGroups } from '../test-utils/stop-process-groups.ts';
-import { templateFiles } from '../test-utils/template-files.ts';
-import { testProcesses } from '../test-utils/test-processes.ts';
+import type { StubBuildRepo } from '../src/test-utils/create-stub-build-repo.ts';
+import { createStubBuildRepo } from '../src/test-utils/create-stub-build-repo.ts';
+import { getRigE2EBin } from '../src/test-utils/get-rig-e2e-bin.ts';
+import { probeProcess } from '../src/test-utils/probe-process.ts';
+import { stopProcessGroups } from '../src/test-utils/stop-process-groups.ts';
+import { templateFiles } from '../src/test-utils/template-files.ts';
+import { testProcesses } from '../src/test-utils/test-processes.ts';
 
 async function setupTest() {
   const rigBin = getRigE2EBin(process.env);

@@ -1,5 +1,5 @@
+import type { GitEnv } from '@zgeoff/std/test-utils/read-git-env';
 import { $ } from 'bun';
-import type { GitEnv } from './read-git-env.ts';
 
 export interface ChexCLIRun {
   readonly exitCode: number;

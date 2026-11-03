@@ -226,6 +226,7 @@
       },
       "devDependencies": {
         "@types/bun": "catalog:",
+        "@zgeoff/chex": "workspace:*",
         "@zgeoff/std": "workspace:*",
         "tiny-invariant": "catalog:",
         "tsrs": "catalog:",

@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readTrackedFiles } from '../src/read-tracked-files.ts';
+import { readTrackedFiles } from '../read-tracked-files.ts';
 import { createTrackedRepo } from './create-tracked-repo.ts';
 
 async function setupTest() {

@@ -2,9 +2,9 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { initFiles } from '../src/init-files.ts';
+import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
+import { initFiles } from '../init-files.ts';
 import { readPackedBin } from './read-packed-bin.ts';
-import { writeTreeFiles } from './write-tree-files.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'read-packed-bin-'));

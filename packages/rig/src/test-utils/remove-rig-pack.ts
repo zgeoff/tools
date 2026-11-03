@@ -1,6 +1,6 @@
 import { hostname } from 'node:os';
 import type { LaneContext } from '@zgeoff/rig';
-import { removePath } from '../src/browser/remove-path.ts';
+import { removePath } from '../browser/remove-path.ts';
 import { buildRigPackRun } from './build-rig-pack-run.ts';
 
 export default async function removeRigPack(context: LaneContext): Promise<void> {

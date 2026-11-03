@@ -1,5 +1,5 @@
-import type { GitEnv } from './read-git-env.ts';
-import { runGit } from './run-git.ts';
+import type { GitEnv } from '@zgeoff/std/test-utils/read-git-env';
+import { runGit } from '@zgeoff/std/test-utils/run-git';
 
 // Stages every change in the work tree and commits it with the message, which runs the repo's
 // commit hooks.

@@ -9,7 +9,7 @@ async function setupTest() {
 
   onTestFinished(() => rm(root, { recursive: true, force: true }));
 
-  return { root, toolsRoot: join(import.meta.dir, '../../..') };
+  return { root, toolsRoot: join(import.meta.dir, '../../../..') };
 }
 
 test('it links the commitlint CLI and its config from the tools checkout', async () => {

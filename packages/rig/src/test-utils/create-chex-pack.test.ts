@@ -3,11 +3,11 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { LaneContext } from '@zgeoff/rig';
-import { laneFiles } from '../src/browser/lane-files.ts';
-import { initFiles } from '../src/init-files.ts';
+import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
+import { laneFiles } from '../browser/lane-files.ts';
+import { initFiles } from '../init-files.ts';
 import { buildStubCommandRunner } from './build-stub-command-runner.ts';
 import { createChexPack } from './create-chex-pack.ts';
-import { writeTreeFiles } from './write-tree-files.ts';
 
 async function setupTest() {
   const repoRoot = await mkdtemp(join(tmpdir(), 'create-chex-pack-'));

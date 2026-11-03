@@ -2,11 +2,11 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createBlockingStubKit } from '@zgeoff/std/test-utils/create-blocking-stub-kit';
+import { makeResolvingStub } from '@zgeoff/std/test-utils/make-resolving-stub';
 import { buildSignallingClock } from './build-signalling-clock.ts';
-import { createBlockingStubKit } from './create-blocking-stub-kit.ts';
 import { createRigTarball } from './create-rig-tarball.ts';
 import { fileLocks } from './file-locks.ts';
-import { makeResolvingStub } from './make-resolving-stub.ts';
 import { systemClock } from './system-clock.ts';
 
 async function setupTest() {

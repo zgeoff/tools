@@ -1,5 +1,5 @@
-import type { ProcessGroups } from '../src/browser/process-groups.ts';
-import { processGroups } from '../src/browser/process-groups.ts';
+import type { ProcessGroups } from '../browser/process-groups.ts';
+import { processGroups } from '../browser/process-groups.ts';
 import type { Clock } from './system-clock.ts';
 import { systemClock } from './system-clock.ts';
 
