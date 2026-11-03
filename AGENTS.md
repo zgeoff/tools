@@ -68,9 +68,17 @@ says.
 
 Each test and each test helper lives in the workspace it tests. In a package:
 
-- Unit tests sit beside the code they test, in `src/`.
+- A test sits beside the module it tests, in `src/`, unless it belongs in one of the folders below.
+  A benchmark of one module sits beside it too, as `src/<module>.bench.ts`.
 - Each test helper, with its own test file, sits in `src/test-utils/`.
-- The `e2e/` and `integration/` suites sit at the package root.
+- A test that starts a program as a process sits in `e2e/`, an evaluation in `evals/<name>/`, and a
+  benchmark of a running program in `bench/`, each at the package root. No package has an
+  `integration/` folder.
+
+A test imports runtime code from another workspace package only when its own package lists that
+package under `dependencies`. A type import or a helper import is not runtime code. When a test
+needs two packages that don't depend on each other, it sits in the package that wires them together
+in production, beside the module that does the wiring.
 
 When several packages need one helper, it lives in the package that owns what it starts, builds or
 fakes. Each other package adds that package as a `workspace:*` dev dependency and imports the helper
@@ -122,10 +130,10 @@ a helper they share. The repo root holds no `e2e/`, `integration/` or `test-util
 - `bun run check:baseline-jobs` runs each job of `packages/chex/lefthook.yml` in a sandbox and fails
   a job that keeps git's repository variables or breaks the behaviour its case expects. CI runs it.
 - `bun run check:test-layout` checks the layout that [Tests](#tests) sets out. It fails on a root
-  `e2e/`, `integration/` or `test-utils/` folder, and on a package helper outside `src/test-utils/`.
-  It fails on a relative import of another workspace's helper, and on production code that imports
-  any helper. It also fails on a source file that does not parse, whose imports it cannot read. CI
-  runs it.
+  `e2e/` or `test-utils/` folder, on any `integration/` folder, and on a package helper outside
+  `src/test-utils/`. It fails on a relative import of another workspace's helper, and on production
+  code that imports any helper. It also fails on a source file that does not parse, whose imports it
+  cannot read. It does not check the `dependencies` rule. CI runs it.
 - `bun x chex workflows` runs the shared workflow lint over the workflows HEAD holds, so commit a
   workflow change before you run it. CI runs it. `bun run check:docs` runs the docs checks that this
   repo takes, which the pre-push hook and CI run too.
