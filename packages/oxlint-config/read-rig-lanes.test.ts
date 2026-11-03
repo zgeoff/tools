@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { pathToFileURL } from 'node:url';
-import { defineRig, parseRigConfig } from '../rig/src/index.ts';
+import { defineRig, parseRigConfig } from '@zgeoff/rig';
 import readRigLanes from './read-rig-lanes.js';
 import { buildRigConfigSource } from './src/test-utils/build-rig-config-source.ts';
 import { buildTimeoutSource } from './src/test-utils/build-timeout-source.ts';
