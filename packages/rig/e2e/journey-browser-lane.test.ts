@@ -5,17 +5,13 @@ import { join } from 'node:path';
 import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { buildBrowserRun } from '../src/browser/build-browser-run.ts';
 import { pickChromeDirs } from '../src/browser/pick-chrome-dirs.ts';
+import { runProgram } from '../src/e2e.ts';
 import { createTrackedRepo } from '../src/test-utils/create-tracked-repo.ts';
-import { getRigE2EBin } from '../src/test-utils/get-rig-e2e-bin.ts';
-import { stopProcessGroups } from '../src/test-utils/stop-process-groups.ts';
-import { testProcesses } from '../src/test-utils/test-processes.ts';
 
 async function setupTest() {
   const stack = new AsyncDisposableStack();
 
   onTestFinished(() => stack.disposeAsync());
-
-  const rigBin = getRigE2EBin(process.env);
 
   const repoRoot = await mkdtemp(join(tmpdir(), readRunFolderPrefix('rig-browser-build-')));
 
@@ -38,27 +34,8 @@ async function setupTest() {
 
   return {
     repoRoot,
-    startLane: () => {
-      const lane = Bun.spawn([rigBin, 'browser'], {
-        cwd: repoRoot,
-        env: { ...process.env, TMPDIR: laneTmpdir },
-        stdout: 'ignore',
-        stderr: 'ignore',
-        detached: true,
-      });
-
-      // rig starts its build and its tests in process groups of their own, so the cleanup stops
-      // those groups and rig's, and waits for them, before the folders go.
-      stack.defer(async () => {
-        if (lane.exitCode === null && lane.signalCode === null) {
-          await stopProcessGroups(lane.pid, testProcesses);
-        }
-
-        await lane.exited;
-      });
-
-      return lane;
-    },
+    runLane: () =>
+      runProgram('rig', { args: ['browser'], cwd: repoRoot, env: { TMPDIR: laneTmpdir } }),
   };
 }
 
@@ -87,11 +64,9 @@ test("it runs the repo's build:browser script once, and gives the tests the fold
     ].join('\n'),
   });
 
-  const lane = ctx.startLane();
-
-  const exitCode = await lane.exited;
+  const lane = await ctx.runLane();
   const invocations = await readFile(invocationsPath, 'utf8');
 
-  expect(exitCode).toBe(0);
+  expect(lane.exitCode).toBe(0);
   expect(invocations).toBe('built\n');
 });

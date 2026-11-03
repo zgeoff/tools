@@ -3,7 +3,7 @@ import { readLaunchSources, resolveProgramLaunch } from './resolve-program-launc
 export interface RunProgramOptions {
   readonly args?: readonly string[];
 
-  readonly env?: Readonly<Record<string, string>>;
+  readonly env?: Readonly<Record<string, string | undefined>>;
 
   readonly cwd?: string;
 }

@@ -10,7 +10,7 @@ export type ProgramReady = { readonly url: string } | { readonly stdout: string 
 export interface StartProgramOptions {
   readonly args?: readonly string[];
 
-  readonly env?: Readonly<Record<string, string>>;
+  readonly env?: Readonly<Record<string, string | undefined>>;
 
   readonly ready?: ProgramReady;
 }
