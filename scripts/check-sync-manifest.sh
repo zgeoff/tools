@@ -4,7 +4,8 @@
 # every source whose target is a workflow, a string `build` when present, a
 # `scripts` field that matches the package.json scripts the build writes, an
 # `except` that lists owner/repo names, no link to an excepted file outside a
-# block that needs it, a `repo` that names zgeoff/tools or zgeoff/skills,
+# block that needs it, a `repo` that names zgeoff/tools or zgeoff/skills, no
+# key the repo-sync scripts do not read,
 # every file under skills/<name>/ in zgeoff/skills listed by the entry that
 # ships that skill, except the tests, and every package a code source imports
 # listed in its entry's `packages`.
@@ -114,6 +115,11 @@ while IFS=$'\t' read -r name source repo; do
 done < <(jq -r '.[] | .name as $n | .files[] | select(has("repo"))
   | select(.repo != "zgeoff/tools" and .repo != "zgeoff/skills")
   | [$n, .source, (.repo | tojson)] | @tsv' "$manifest")
+
+# repo-sync leaves out an entry that holds a key its scripts do not read.
+while IFS=$'\t' read -r name key; do
+  report "entry '$name' holds $key, which the repo-sync scripts do not read"
+done < <(bun "$scripts_dir/repo-sync/collect-unread-manifest-keys.ts" "$manifest")
 
 if jq -e 'any(.[].files[]; .repo == "zgeoff/skills")' "$manifest" > /dev/null && [ ! -d "$skills_tree" ]; then
   report "an entry reads zgeoff/skills, but its tree '$skills_tree' is missing; run bun run skills:install"

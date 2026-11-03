@@ -2,6 +2,11 @@
 // scripts/repo-sync/write-sync-entries.ts
 import { join } from "path";
 
+// packages/std/src/is-record.ts
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 // scripts/ci/node-file-system.ts
 import { appendFile, mkdir as mkdir2, readFile, readdir, stat } from "fs/promises";
 
@@ -65,10 +70,30 @@ async function writeStepOutputs(fileSystem, outputPath, outputs) {
   await fileSystem.appendText(outputPath, lines.join(""));
 }
 
-// packages/std/src/is-record.ts
-function isRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+// scripts/repo-sync/collect-unread-manifest-keys.ts
+var entryKeys = new Set([
+  "name",
+  "description",
+  "files",
+  "build",
+  "optIn",
+  "scripts",
+  "packages"
+]);
+var fileKeys = new Set(["repo", "source", "target", "mode", "except"]);
+function collectUnreadManifestKeys(entry) {
+  if (!isRecord(entry)) {
+    return [];
+  }
+  const unread = Object.keys(entry).filter((key) => !entryKeys.has(key));
+  const files = entry["files"];
+  if (!Array.isArray(files)) {
+    return unread;
+  }
+  const unreadFileKeys = files.flatMap((file, index) => isRecord(file) ? Object.keys(file).filter((key) => !fileKeys.has(key)).map((key) => `files[${index}].${key}`) : []);
+  return [...unread, ...unreadFileKeys];
 }
+if (false) {}
 
 // scripts/repo-sync/parse-skills-pin.ts
 function parseSkillsPin(value) {
@@ -192,23 +217,37 @@ async function writeSyncEntries(options) {
 `);
     return 1;
   }
+  const unread = picked.entries.map((entry) => ({
+    name: entry.name,
+    keys: collectUnreadManifestKeys(findManifestEntry(manifestValue, entry.name))
+  })).filter((found) => found.keys.length > 0);
+  for (const found of unread) {
+    options.writeOutput(`::error::${found.name} holds ${found.keys.join(", ")}, which these repo-sync scripts do not read, so the sync leaves it out; a run on a newer repo-sync pin reads it.
+`);
+  }
+  const unreadNames = unread.map((found) => found.name);
+  const entries = picked.entries.filter((entry) => !unreadNames.includes(entry.name));
   const skillsPin = await readSkillsPin(options);
   if (skillsPin.kind === "refused") {
     options.writeOutput(`::error::${skillsPin.message}
 `);
     return 1;
   }
-  const needsSkills = picked.entries.some((entry) => entry.files.some((file) => file.repo === "zgeoff/skills"));
+  const needsSkills = entries.some((entry) => entry.files.some((file) => file.repo === "zgeoff/skills"));
   if (needsSkills && skillsPin.commit === "") {
     options.writeOutput(`::error::An entry takes its sources from zgeoff/skills, but the tools ref has no ${skillsPinPath}
 `);
     return 1;
   }
   await writeStepOutputs(options.fileSystem, options.outputPath, {
-    entries: JSON.stringify(picked.entries),
-    "skills-ref": skillsPin.commit
+    entries: JSON.stringify(entries),
+    "skills-ref": skillsPin.commit,
+    unread: unreadNames.join(",")
   });
   return 0;
+}
+function findManifestEntry(manifest, name) {
+  return Array.isArray(manifest) ? manifest.find((entry) => isRecord(entry) && entry["name"] === name) : undefined;
 }
 async function readSkillsPin(options) {
   const path = join(options.cwd, skillsPinPath);

@@ -81,7 +81,7 @@ test('it outputs the entries it keeps as compact JSON in the sync entry contract
   ];
 
   expect(exitCode).toBe(0);
-  expect(outputs).toBe(`entries=${JSON.stringify(entries)}\nskills-ref=\n`);
+  expect(outputs).toBe(`entries=${JSON.stringify(entries)}\nskills-ref=\nunread=\n`);
   expect(ctx.output).toStrictEqual([]);
 });
 
@@ -142,10 +142,52 @@ test('it outputs the pinned commit of zgeoff/skills beside the entries that read
   expect(exitCode).toBe(0);
 
   expect(outputs).toBe(
-    `entries=${JSON.stringify(entries)}\nskills-ref=0123456789abcdef0123456789abcdef01234567\n`,
+    `entries=${JSON.stringify(entries)}\nskills-ref=0123456789abcdef0123456789abcdef01234567\nunread=\n`,
   );
 
   expect(ctx.output).toStrictEqual([]);
+});
+
+test('it leaves out each entry that holds a key these scripts do not read, and outputs its name', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    ctx.manifestPath,
+    JSON.stringify([
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+      },
+      {
+        name: 'kettle',
+        description: 'The kettle script',
+        files: [{ source: 'sync/kettle.ts', target: 'scripts/kettle.ts', ref: 'v2' }],
+      },
+    ]),
+  );
+
+  await writeFile(ctx.outputPath, '');
+
+  const exitCode = await writeSyncEntries({
+    cwd: ctx.directory,
+    skip: '',
+    include: '',
+    outputPath: ctx.outputPath,
+    fileSystem: nodeFileSystem,
+    writeOutput: ctx.writeOutput,
+  });
+
+  const outputs = await readFile(ctx.outputPath, 'utf8');
+
+  const entries = [buildMockSyncEntry({ name: 'editorconfig' })];
+
+  expect(exitCode).toBe(0);
+  expect(outputs).toBe(`entries=${JSON.stringify(entries)}\nskills-ref=\nunread=kettle\n`);
+
+  expect(ctx.output).toStrictEqual([
+    '::error::kettle holds files[0].ref, which these repo-sync scripts do not read, so the sync leaves it out; a run on a newer repo-sync pin reads it.\n',
+  ]);
 });
 
 test('it fails with an error and writes no output when an entry reads zgeoff/skills and the ref has no pin', async () => {

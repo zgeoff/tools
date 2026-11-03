@@ -957,9 +957,11 @@ function parseSyncSettings(env) {
   if (entries === null) {
     return { kind: "refused", message: "ENTRIES holds no list of manifest entries" };
   }
+  const unreadText = env["UNREAD"] ?? "";
   return {
     kind: "parsed",
     entries,
+    unread: unreadText.split(",").filter((name) => name !== ""),
     branch: env["BRANCH"] ?? "",
     marker: env["MARKER"] ?? "",
     commit,
@@ -974,7 +976,7 @@ function isCommitID(ref) {
 }
 async function commitEntries(context) {
   const synced = [];
-  const failed = [];
+  const failed = [...context.unread];
   const taken = [];
   const copied = [];
   const scripts = {};

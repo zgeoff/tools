@@ -278,6 +278,34 @@ test('it fails when a file names a repo the sync does not check out', async () =
   });
 });
 
+test('it fails when an entry holds a key the repo-sync scripts do not read', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/editorconfig': 'root = true\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        files: [{ source: 'sync/editorconfig', target: '.editorconfig', ref: 'v2' }],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      "check-sync-manifest: entry 'editorconfig' holds files[0].ref, which the repo-sync scripts do not read\n",
+  });
+});
+
 test('it fails when a Markdown file links an excepted file outside a block', async () => {
   const ctx = await setupTest();
 
