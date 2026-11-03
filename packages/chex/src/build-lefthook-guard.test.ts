@@ -8,8 +8,6 @@ import invariant from 'tiny-invariant';
 import { buildLefthookGuard } from './build-lefthook-guard.ts';
 import { buildInitGuardHooks } from './test-utils/build-init-guard-hooks.ts';
 
-// A repo as chex init leaves it before its first install: lefthook.yml extends the baseline, and
-// node_modules does not exist.
 async function setupTest() {
   const repo = await mkdtemp(join(tmpdir(), 'build-lefthook-guard-'));
 
@@ -18,16 +16,6 @@ async function setupTest() {
   const env = readGitEnv(repo);
 
   await $`git init --quiet --initial-branch=main ${repo}`.env({ ...env });
-
-  const guarded = buildLefthookGuard('extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n');
-
-  invariant(
-    guarded.kind === 'changed',
-    'chex adds the guard to a config that extends the baseline',
-  );
-
-  await writeFile(join(repo, 'lefthook.yml'), guarded.text);
-  await writeFile(join(repo, 'package.json'), '{ "name": "kettle" }\n');
 
   return { repo, env, lefthook: join(import.meta.dir, '../../../node_modules/.bin/lefthook') };
 }
@@ -132,6 +120,18 @@ test.each([['pre-commit'], ['pre-push']])(
   'it fails the %s hook and names the missing baseline in a checkout with no node_modules, though the hook gets no file',
   async (hook) => {
     const ctx = await setupTest();
+
+    // A repo as chex init leaves it before its first install: lefthook.yml extends the baseline,
+    // and node_modules does not exist.
+    const guarded = buildLefthookGuard('extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n');
+
+    invariant(
+      guarded.kind === 'changed',
+      'chex adds the guard to a config that extends the baseline',
+    );
+
+    await writeFile(join(ctx.repo, 'lefthook.yml'), guarded.text);
+    await writeFile(join(ctx.repo, 'package.json'), '{ "name": "kettle" }\n');
 
     const result = await $`${process.execPath} ${ctx.lefthook} run ${hook}`
       .cwd(ctx.repo)
