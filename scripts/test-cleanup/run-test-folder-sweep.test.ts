@@ -8,11 +8,24 @@ import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { readPIDNamespace } from './read-pid-namespace.ts';
 import { runTestFolderSweep } from './run-test-folder-sweep.ts';
 
-function setupTest() {
+async function setupTest() {
+  const temp = await mkdtemp(join(tmpdir(), readRunFolderPrefix('test-folder-sweep-')));
+
+  // A test makes a folder in it unreadable or read-only, so the cleanup gives the owner its
+  // access back first.
+  onTestFinished(async () => {
+    await $`chmod -R u+rwx ${temp}`.nothrow().quiet();
+
+    await rm(temp, { recursive: true, force: true });
+  });
+
+  const namespace = readPIDNamespace({ platform: process.platform, readLink: readlinkSync });
   const removed: string[] = [];
   const failures: string[] = [];
 
   return {
+    temp,
+    namespace,
     removed,
     failures,
     removePath: (path: string) => {
@@ -27,7 +40,7 @@ function setupTest() {
 }
 
 test('it removes the temp folders of a stopped test process and returns them', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
   const swept = await runTestFolderSweep({
     readCandidatePaths: () =>
@@ -46,7 +59,7 @@ test('it removes the temp folders of a stopped test process and returns them', a
 });
 
 test('it never removes the files of a run that is still going', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
   await runTestFolderSweep({
     readCandidatePaths: () => Promise.resolve(['/scratch/kettle-pid4200-ns7001-Ef34Gh']),
@@ -60,7 +73,7 @@ test('it never removes the files of a run that is still going', async () => {
 });
 
 test('it reports a folder it cannot remove and goes on with the rest', async () => {
-  const ctx = setupTest();
+  const ctx = await setupTest();
 
   const swept = await runTestFolderSweep({
     readCandidatePaths: () =>
@@ -82,66 +95,51 @@ test('it reports a folder it cannot remove and goes on with the rest', async () 
 });
 
 test('it removes the temp folder of an exited process and keeps a live or foreign-namespace one when run as a script', async () => {
-  const temp = await mkdtemp(join(tmpdir(), readRunFolderPrefix('test-folder-sweep-')));
-
-  onTestFinished(() => rm(temp, { recursive: true, force: true }));
+  const ctx = await setupTest();
 
   const exited = Bun.spawn(['true']);
 
   await exited.exited;
-
-  const namespace = readPIDNamespace({ platform: process.platform, readLink: readlinkSync });
-
-  await mkdir(join(temp, `kettle-pid${exited.pid}-ns${namespace}-Ab12Cd`));
-  await mkdir(join(temp, `kettle-pid${process.pid}-ns${namespace}-Ef34Gh`));
-  await mkdir(join(temp, `kettle-pid${exited.pid}-ns1-Gh56Ij`));
+  await mkdir(join(ctx.temp, `kettle-pid${exited.pid}-ns${ctx.namespace}-Ab12Cd`));
+  await mkdir(join(ctx.temp, `kettle-pid${process.pid}-ns${ctx.namespace}-Ef34Gh`));
+  await mkdir(join(ctx.temp, `kettle-pid${exited.pid}-ns1-Gh56Ij`));
 
   const result = await $`${process.execPath} ${join(import.meta.dir, 'run-test-folder-sweep.ts')}`
-    .env({ ...process.env, TMPDIR: temp })
+    .env({ ...process.env, TMPDIR: ctx.temp })
     .nothrow()
     .quiet();
 
-  const names = await readdir(temp);
+  const names = await readdir(ctx.temp);
 
   expect(result.exitCode).toBe(0);
 
   expect(names).toIncludeSameMembers([
     `kettle-pid${exited.pid}-ns1-Gh56Ij`,
-    `kettle-pid${process.pid}-ns${namespace}-Ef34Gh`,
+    `kettle-pid${process.pid}-ns${ctx.namespace}-Ef34Gh`,
   ]);
 });
 
 test.if(process.getuid?.() !== 0)(
   'it keeps a folder it cannot remove, says so, and exits 0 when run as a script',
   async () => {
-    const temp = await mkdtemp(join(tmpdir(), readRunFolderPrefix('test-folder-sweep-')));
-
-    // The test makes a folder inside read-only, so the cleanup gives the owner its access back first.
-    onTestFinished(async () => {
-      await $`chmod -R u+rwx ${temp}`.nothrow().quiet();
-
-      await rm(temp, { recursive: true, force: true });
-    });
+    const ctx = await setupTest();
 
     const exited = Bun.spawn(['true']);
 
     await exited.exited;
 
-    const stuck = join(
-      temp,
-      `kettle-pid${exited.pid}-ns${readPIDNamespace({ platform: process.platform, readLink: readlinkSync })}-Op90Qr`,
-    );
+    const stuck = join(ctx.temp, `kettle-pid${exited.pid}-ns${ctx.namespace}-Op90Qr`);
 
     await mkdir(join(stuck, 'locked'), { recursive: true });
     await writeFile(join(stuck, 'locked', 'lid.txt'), 'lid');
     await chmod(join(stuck, 'locked'), 0o500);
 
     const result = await $`${process.execPath} ${join(import.meta.dir, 'run-test-folder-sweep.ts')}`
-      .env({ ...process.env, TMPDIR: temp })
+      .env({ ...process.env, TMPDIR: ctx.temp })
       .nothrow()
       .quiet();
 
-    const names = await readdir(temp);
+    const names = await readdir(ctx.temp);
 
     expect(result.exitCode).toBe(0);
     expect(result.stderr.toString()).toInclude(`test-folder-sweep: kept ${stuck}`);
@@ -152,32 +150,25 @@ test.if(process.getuid?.() !== 0)(
 test.if(process.getuid?.() !== 0)(
   'it says so when it cannot read the temp folder, and exits 0 when run as a script',
   async () => {
-    const temp = await mkdtemp(join(tmpdir(), readRunFolderPrefix('test-folder-sweep-')));
+    const ctx = await setupTest();
 
-    onTestFinished(async () => {
-      await chmod(temp, 0o700);
-      await rm(temp, { recursive: true, force: true });
-    });
-
-    await chmod(temp, 0o000);
+    await chmod(ctx.temp, 0o000);
 
     const result = await $`${process.execPath} ${join(import.meta.dir, 'run-test-folder-sweep.ts')}`
-      .env({ ...process.env, TMPDIR: temp })
+      .env({ ...process.env, TMPDIR: ctx.temp })
       .nothrow()
       .quiet();
 
     expect(result.exitCode).toBe(0);
-    expect(result.stderr.toString()).toInclude(`test-folder-sweep: skipped ${temp}`);
+    expect(result.stderr.toString()).toInclude(`test-folder-sweep: skipped ${ctx.temp}`);
   },
 );
 
 test("it removes an ignored repo folder of an exited process and keeps a live one's when run as a script", async () => {
-  const temp = await mkdtemp(join(tmpdir(), readRunFolderPrefix('test-folder-sweep-')));
+  const ctx = await setupTest();
 
-  onTestFinished(() => rm(temp, { recursive: true, force: true }));
-
-  const repo = join(temp, 'repo');
-  const emptyTemp = join(temp, 'empty-temp');
+  const repo = join(ctx.temp, 'repo');
+  const emptyTemp = join(ctx.temp, 'empty-temp');
 
   const gitFreeEnv = Object.fromEntries(
     Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_')),
@@ -193,11 +184,8 @@ test("it removes an ignored repo folder of an exited process and keeps a live on
   const exited = Bun.spawn(['true']);
 
   await exited.exited;
-
-  const namespace = readPIDNamespace({ platform: process.platform, readLink: readlinkSync });
-
-  await mkdir(join(repo, `.test-kettle-pid${exited.pid}-ns${namespace}-Ab12Cd`));
-  await mkdir(join(repo, `.test-kettle-pid${process.pid}-ns${namespace}-Ef34Gh`));
+  await mkdir(join(repo, `.test-kettle-pid${exited.pid}-ns${ctx.namespace}-Ab12Cd`));
+  await mkdir(join(repo, `.test-kettle-pid${process.pid}-ns${ctx.namespace}-Ef34Gh`));
 
   const result = await $`${process.execPath} ${join(import.meta.dir, 'run-test-folder-sweep.ts')}`
     .cwd(repo)
@@ -212,6 +200,6 @@ test("it removes an ignored repo folder of an exited process and keeps a live on
   expect(names).toIncludeSameMembers([
     '.git',
     '.gitignore',
-    `.test-kettle-pid${process.pid}-ns${namespace}-Ef34Gh`,
+    `.test-kettle-pid${process.pid}-ns${ctx.namespace}-Ef34Gh`,
   ]);
 });
