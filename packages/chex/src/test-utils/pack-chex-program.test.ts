@@ -82,6 +82,10 @@ test('it keeps a build that a running rig process has started but not yet packed
 test('it skips a build folder that another build removes first', async () => {
   const ctx = await setupTest();
 
+  // Both rig runs are alive, as they are when two builds overlap, so neither build removes the other.
+  ctx.running.add(101);
+  ctx.running.add(202);
+
   const strays = Array.from({ length: 50 }, (_, index) => `${9000 + index}-s/chex.tgz`);
 
   await writeTreeFiles(ctx.builds, Object.fromEntries(strays.map((path) => [path, ''])));
