@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { fileLocks } from './file-locks.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'file-locks-'));
+  const directory = await mkdtemp(join(tmpdir(), `file-locks-${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { runBrowserWarmUp } from './run-browser-warm-up.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'run-browser-warm-up-'));
+  const directory = await mkdtemp(join(tmpdir(), `run-browser-warm-up-${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

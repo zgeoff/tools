@@ -17,7 +17,7 @@ async function setupTest() {
 
   // The build's process ID file sits in the repo, so one cleanup stops the processes before it
   // removes the repo.
-  const repoParent = await mkdtemp(join(tmpdir(), 'rig-browser-repo-'));
+  const repoParent = await mkdtemp(join(tmpdir(), `rig-browser-repo-${process.pid}-`));
 
   const started: {
     repo: StubBuildRepo | null;
@@ -59,7 +59,7 @@ async function setupTest() {
   // The lane moves Chrome's temp folder to /tmp when TMPDIR is too long for Chrome's socket path,
   // so the lane gets a TMPDIR of its own that the test owns, and the test asks the lane's own rule
   // where the Chrome folder goes.
-  const laneTmpdir = await mkdtemp(join(tmpdir(), 'rb-'));
+  const laneTmpdir = await mkdtemp(join(tmpdir(), `rb-${process.pid}-`));
 
   started.laneTmpdir = laneTmpdir;
 

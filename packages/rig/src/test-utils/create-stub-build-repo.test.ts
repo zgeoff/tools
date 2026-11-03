@@ -9,7 +9,7 @@ import { templateFiles } from './template-files.ts';
 import type { TestProcesses } from './test-processes.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'stub-build-repo-'));
+  const directory = await mkdtemp(join(tmpdir(), `stub-build-repo-${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

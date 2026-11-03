@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { readCallLog } from './read-call-log.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'read-call-log-'));
+  const directory = await mkdtemp(join(tmpdir(), `read-call-log-${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

@@ -7,7 +7,7 @@ import { initFiles } from '../init-files.ts';
 import { readPackedBin } from './read-packed-bin.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'read-packed-bin-'));
+  const directory = await mkdtemp(join(tmpdir(), `read-packed-bin-${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

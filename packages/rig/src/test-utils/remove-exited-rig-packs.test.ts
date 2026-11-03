@@ -7,7 +7,7 @@ import { buildStubProcessProbe } from './build-stub-process-probe.ts';
 import { removeExitedRigPacks } from './remove-exited-rig-packs.ts';
 
 async function setupTest() {
-  const runsDir = await mkdtemp(join(tmpdir(), 'rig-e2e-runs-'));
+  const runsDir = await mkdtemp(join(tmpdir(), `rig-e2e-runs-${process.pid}-`));
 
   onTestFinished(() => rm(runsDir, { recursive: true, force: true }));
 

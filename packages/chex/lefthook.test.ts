@@ -14,7 +14,7 @@ import { writeStubPrograms } from './src/test-utils/write-stub-programs.ts';
 // The PATH holds only bun, env, date, git and the stubs a test writes, so a program the host has, such as
 // shfmt or actionlint, is missing unless the test stubs it.
 async function setupTest() {
-  const repo = await mkdtemp(join(tmpdir(), 'chex-lefthook-job-'));
+  const repo = await mkdtemp(join(tmpdir(), `chex-lefthook-job-${process.pid}-`));
 
   onTestFinished(() => rm(repo, { recursive: true, force: true }));
 

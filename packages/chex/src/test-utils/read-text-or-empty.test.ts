@@ -6,7 +6,7 @@ import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { readTextOrEmpty } from './read-text-or-empty.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'read-text-or-empty-'));
+  const directory = await mkdtemp(join(tmpdir(), `read-text-or-empty-${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

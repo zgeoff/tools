@@ -13,7 +13,7 @@ async function setupTest() {
 
   onTestFinished(() => stack.disposeAsync());
 
-  const directory = await mkdtemp(join(tmpdir(), 'stub-build-repo-'));
+  const directory = await mkdtemp(join(tmpdir(), `stub-build-repo-${process.pid}-`));
 
   stack.defer(() => rm(directory, { recursive: true, force: true }));
 

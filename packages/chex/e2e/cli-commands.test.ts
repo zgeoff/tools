@@ -12,7 +12,7 @@ import { runChexCLI } from '../src/test-utils/run-chex-cli.ts';
 
 // The repo has an origin and a feature branch, as a pushed branch does.
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'chex-cli-'));
+  const directory = await mkdtemp(join(tmpdir(), `chex-cli-${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
