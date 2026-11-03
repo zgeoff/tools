@@ -26,9 +26,22 @@ test('it types the run context from what setup returns', async () => {
     },
   });
 
-  const step = await definition.prepare();
+  const prepared = await definition.prepare();
 
-  await step();
+  await prepared.step();
 
   expect(seen).toStrictEqual([2]);
+});
+
+test('it disposes of nothing when the setup result has no async dispose', async () => {
+  const definition = defineBench({
+    name: 'pour',
+    budget: '1s',
+    setup: () => Promise.resolve({ kettle: { litres: 2 } }),
+    run: () => {},
+  });
+
+  const prepared = await definition.prepare();
+
+  await expect(prepared.dispose()).resolves.toBeUndefined();
 });

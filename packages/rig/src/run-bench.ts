@@ -1,32 +1,31 @@
 import { basename, join } from 'node:path';
 import { pickExitCodeAfterTests } from './browser/pick-exit-code-after-tests.ts';
 import { buildDietCommand } from './build-diet-command.ts';
+import { buildProgramLaneHooks } from './build-program-lane-hooks.ts';
 import { collectBenchFiles } from './collect-bench-files.ts';
 import type { LaneHooks } from './lane-hooks.ts';
 import { makeRepoLaneHooks } from './make-repo-lane-hooks.ts';
-import type { CommandOptions } from './run-command.ts';
 import { runLaneHooks } from './run-lane-hooks.ts';
-import type { RigConfig, RigOutput, RigRun } from './types.ts';
+import type { ProgramBuildDeps } from './run-program-builds.ts';
+import { runProgramBuilds } from './run-program-builds.ts';
+import type { RigConfig, RigRun } from './types.ts';
 
-export interface BenchDeps {
+export interface BenchDeps extends ProgramBuildDeps {
   readonly dietScript: string;
 
   // The script that runs one bench file.
   readonly benchScript: string;
-
-  readonly output: RigOutput;
 
   readonly probeWorkspaceRepo: (repoRoot: string) => Promise<boolean>;
 
   readonly readTrackedFiles: (repoRoot: string) => Promise<readonly string[]>;
 
   readonly importModule: (path: string) => Promise<unknown>;
-
-  readonly runCommand: (command: readonly string[], options: CommandOptions) => Promise<number>;
 }
 
-// Runs each bench file in a process of its own, between the start and stop hooks of the bench lane
-// when the config names one.
+// Builds each program once, as `rig e2e` does, then runs each bench file in a process of its own,
+// between the start and stop hooks of the bench lane when the config names one. The bench process
+// gets RIG_PROGRAM_<NAME> for each program, so startProgram runs the built artifact.
 export async function runBench(
   args: readonly string[],
   config: RigConfig,
@@ -52,7 +51,17 @@ export async function runBench(
     return reportNoBenchmark(name, benchFiles, deps);
   }
 
-  const hooks = makeBenchHooks(config, run, deps);
+  const buildExitCode = await runProgramBuilds(config.programs, run, deps);
+
+  if (buildExitCode !== 0) {
+    return buildExitCode;
+  }
+
+  const hooks = buildProgramLaneHooks(
+    makeBenchHooks(config, run, deps),
+    run.repoRoot,
+    config.programs,
+  );
 
   const exitCode = await runLaneHooks(files, hooks);
 

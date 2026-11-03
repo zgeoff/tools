@@ -25,6 +25,30 @@ prints the median and the budget, and fails when the median is over the budget. 
 runs the benchmark file with that name, such as `boil` for `bench/boil.bench.ts`. A benchmark that
 needs a running system sets `bench: { lane: 'kiln' }` in `rig.config.ts`: `rig bench` then runs that
 lane's `start` hook first, hands its environment to the benchmarks, and runs its `stop` hook after.
+
+Before the benchmarks run, `rig bench` builds each program in `programs` in `rig.config.ts` once, as
+`rig e2e` does, and sets `RIG_PROGRAM_<NAME>` to each artifact path. A failed build fails the run,
+with the program's name, and runs no benchmark. So a benchmark of a running program can start it
+with `startProgram` from `@zgeoff/rig/e2e`, and gets the built artifact in CI too.
+
+After the measured runs, `rig bench` disposes of the `setup` result: when the result has a
+`Symbol.asyncDispose` method, `rig bench` calls it, even when a run throws. A `setup` that returns
+the handle from `startProgram` stops the program this way:
+
+```ts
+import { defineBench } from '@zgeoff/rig/bench';
+import { startProgram } from '@zgeoff/rig/e2e';
+
+export default defineBench({
+  name: 'health check',
+  budget: '20ms',
+  setup: () => startProgram('kettle-server', { ready: { url: '/health' } }),
+  run: async (kettle) => {
+    await fetch(`${kettle.url}/health`);
+  },
+});
+```
+
 A `src/<module>.bench.ts` benchmark beside its module is a module benchmark, which `rig bench`
 leaves alone.
 

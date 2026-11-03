@@ -20,12 +20,42 @@ test.each([
   });
 });
 
-test('it fails to prepare when prepare yields no step', () => {
+test('it fails to prepare when prepare yields no step', async () => {
   const parsed = parseBenchDefinition({ name: 'boil', budgetMs: 5, prepare: () => 1 });
 
   expect(parsed.kind).toBe('parsed');
 
   const prepare = parsed.kind === 'parsed' ? parsed.definition.prepare() : Promise.resolve();
 
-  expect(prepare).rejects.toThrow('the benchmark "boil" prepared no step to measure');
+  await expect(prepare).rejects.toThrow('the benchmark "boil" prepared no step to measure');
+});
+
+test('it keeps the disposal of the setup result', async () => {
+  const disposals: string[] = [];
+
+  const parsed = parseBenchDefinition(
+    defineBench({
+      name: 'boil',
+      budget: '5ms',
+      setup: () =>
+        Promise.resolve({
+          [Symbol.asyncDispose]: () => {
+            disposals.push('dispose');
+
+            return Promise.resolve();
+          },
+        }),
+      run: () => {},
+    }),
+  );
+
+  if (parsed.kind !== 'parsed') {
+    throw new Error('expected a parsed definition');
+  }
+
+  const prepared = await parsed.definition.prepare();
+
+  await prepared.dispose();
+
+  expect(disposals).toStrictEqual(['dispose']);
 });

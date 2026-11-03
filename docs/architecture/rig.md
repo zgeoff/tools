@@ -150,10 +150,14 @@ bun from the repo root, which they find by walking up to `rig.config.ts`.
 `rig bench` runs each tracked `bench/*.bench.ts` file of a package in a process of its own, under
 `diet`, because a benchmark's heap must not leak into the next one. The process runs the file's
 `defineBench` result through `run-bench-file.ts`: `setup` once, 5 warm-up runs, 20 measured runs,
-and a median that is compared to the budget. When `bench.lane` names a lane, the lane's `start` hook
-runs before the first file and its environment reaches every file, and the `stop` hook runs after
-the last, whether the benchmarks pass or not. `rig eval` runs each tracked
-`evals/<name>/run-<name>-eval.ts` script with `bun` from the repo root, one after another.
+and a median that is compared to the budget. A `finally` then calls the `setup` result's
+`Symbol.asyncDispose` when it has one, so a program that `setup` started stops even when a run
+throws. Before the first file, `rig bench` builds each program and sets `RIG_PROGRAM_<NAME>` through
+the same code as `rig e2e`, so a benchmark that calls `startProgram` runs the artifact in CI. When
+`bench.lane` names a lane, the lane's `start` hook runs before the first file and its environment
+reaches every file, and the `stop` hook runs after the last, whether the benchmarks pass or not.
+`rig eval` runs each tracked `evals/<name>/run-<name>-eval.ts` script with `bun` from the repo root,
+one after another.
 
 ## One source for the limits
 

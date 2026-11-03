@@ -1,7 +1,7 @@
 import { match } from 'ts-pattern';
 import { pickExitCodeAfterTests } from './browser/pick-exit-code-after-tests.ts';
 import type { BrowserLaneWiring } from './browser/wire-browser-lane-hooks.ts';
-import { buildProgramEnvironment } from './build-program-environment.ts';
+import { buildProgramLaneHooks } from './build-program-lane-hooks.ts';
 import type { TestSelection } from './build-test-selection.ts';
 import { buildTestSelection } from './build-test-selection.ts';
 import { collectUnprogrammedE2EDirs } from './collect-unprogrammed-e2e-dirs.ts';
@@ -15,7 +15,7 @@ import { pickLaneSelection } from './pick-lane-selection.ts';
 import { runLaneHooks } from './run-lane-hooks.ts';
 import type { ProgramBuildDeps } from './run-program-builds.ts';
 import { runProgramBuilds } from './run-program-builds.ts';
-import type { ProgramDeclaration, ResolvedLane, RigConfig, RigRun } from './types.ts';
+import type { ResolvedLane, RigConfig, RigRun } from './types.ts';
 
 export interface LaneDeps extends ProgramBuildDeps {
   readonly dietScript: string;
@@ -87,7 +87,11 @@ export async function runLane(request: LaneRequest, run: RigRun, deps: LaneDeps)
   }
 
   const hooks = await wireLaneHooks(lane, run, deps);
-  const exitCode = await runLaneHooks(testArgs, withProgramEnvironment(hooks, run, programs));
+
+  const exitCode = await runLaneHooks(
+    testArgs,
+    buildProgramLaneHooks(hooks, run.repoRoot, programs),
+  );
 
   // A signal that arrives while the stop hook cleans up still fails the run.
   return pickExitCodeAfterTests(exitCode, run.signal.aborted);
@@ -160,25 +164,4 @@ function wireLaneHooks(lane: ResolvedLane, run: RigRun, deps: LaneDeps): Promise
       runCommand: deps.runCommand,
     }),
   );
-}
-
-// The programs' artifact paths reach the test process beside whatever the lane's own start hook
-// adds.
-function withProgramEnvironment(
-  hooks: LaneHooks,
-  run: RigRun,
-  programs: Readonly<Record<string, ProgramDeclaration>>,
-): LaneHooks {
-  const programEnvironment = buildProgramEnvironment(run.repoRoot, programs);
-
-  return {
-    ...hooks,
-    start: async () => {
-      const started = await hooks.start();
-
-      return started.kind === 'finish'
-        ? started
-        : { kind: 'proceed', environment: { ...started.environment, ...programEnvironment } };
-    },
-  };
 }

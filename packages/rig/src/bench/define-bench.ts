@@ -21,13 +21,21 @@ interface BenchPlainOptions extends BenchBaseOptions {
 
 export type BenchOptions<Context> = BenchSetupOptions<Context> | BenchPlainOptions;
 
+// What `prepare` hands the runner: the step it measures, and `dispose`, which it calls once after the
+// measured runs, even when a run throws.
+export interface PreparedBench {
+  readonly step: () => Promise<void> | void;
+
+  readonly dispose: () => Promise<void>;
+}
+
 export interface BenchDefinition {
   readonly name: string;
 
   readonly budgetMs: number;
 
-  // Runs `setup` and returns the step to measure, which holds the setup result.
-  readonly prepare: () => Promise<() => Promise<void> | void>;
+  // Runs `setup` and returns the step to measure, which holds the setup result, and its disposal.
+  readonly prepare: () => Promise<PreparedBench>;
 }
 
 // A bench file default-exports the result, which `rig bench` imports and measures.
@@ -45,12 +53,26 @@ export function defineBench<Context>(options: BenchOptions<Context>): BenchDefin
     budgetMs,
     prepare: async () => {
       if (options.setup === undefined) {
-        return () => options.run();
+        return { step: () => options.run(), dispose: () => Promise.resolve() };
       }
 
       const context = await options.setup();
 
-      return () => options.run(context);
+      return { step: () => options.run(context), dispose: () => runContextDispose(context) };
     },
   };
+}
+
+// A setup result that holds a resource, such as the handle startProgram returns, is disposed of
+// through its `Symbol.asyncDispose`, so the program it started stops.
+async function runContextDispose(context: unknown): Promise<void> {
+  if (typeof context !== 'object' || context === null) {
+    return;
+  }
+
+  const dispose: unknown = Reflect.get(context, Symbol.asyncDispose);
+
+  if (typeof dispose === 'function') {
+    await Reflect.apply(dispose, context, []);
+  }
 }

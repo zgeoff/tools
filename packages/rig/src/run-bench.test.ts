@@ -160,3 +160,56 @@ test('it exits 2 for more than one name', async () => {
 
   expect(exitCode).toBe(2);
 });
+
+test('it builds each program once in its package folder and hands its artifact path to the benchmarks', async () => {
+  const ctx = setupTest();
+
+  const config = defineRig({
+    programs: {
+      'kettle-cli': {
+        package: 'packages/kettle',
+        source: 'src/cli.ts',
+        build: 'bun build src/cli.ts --outfile dist/cli.js',
+        artifact: 'dist/cli.js',
+      },
+    },
+  });
+
+  const exitCode = await runBench([], config, ctx.run, ctx.deps);
+
+  expect(exitCode).toBe(0);
+
+  expect(ctx.runCommand.mock.calls[0]).toStrictEqual([
+    ['bash', '-c', 'bun build src/cli.ts --outfile dist/cli.js'],
+    { cwd: '/repo/packages/kettle', environment: { PATH: '/bin' }, signal: ctx.run.signal },
+  ]);
+
+  expect(ctx.runCommand.mock.calls.slice(1).map((call) => call[1].environment)).toStrictEqual([
+    { PATH: '/bin', RIG_PROGRAM_KETTLE_CLI: '/repo/packages/kettle/dist/cli.js' },
+    { PATH: '/bin', RIG_PROGRAM_KETTLE_CLI: '/repo/packages/kettle/dist/cli.js' },
+  ]);
+});
+
+test('it fails with the program name when a build fails, and runs no benchmark', async () => {
+  const ctx = setupTest([3]);
+
+  const config = defineRig({
+    programs: {
+      'kettle-cli': {
+        package: 'packages/kettle',
+        source: 'src/cli.ts',
+        build: 'bun build src/cli.ts --outfile dist/cli.js',
+        artifact: 'dist/cli.js',
+      },
+    },
+  });
+
+  const exitCode = await runBench([], config, ctx.run, ctx.deps);
+
+  expect(exitCode).toBe(3);
+  expect(ctx.runCommand).toHaveBeenCalledTimes(1);
+
+  expect(ctx.output.err).toHaveBeenCalledExactlyOnceWith(
+    'rig: the build of program "kettle-cli" failed with exit code 3: bun build src/cli.ts --outfile dist/cli.js\n',
+  );
+});

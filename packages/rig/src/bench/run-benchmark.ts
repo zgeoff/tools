@@ -9,26 +9,30 @@ export interface BenchmarkResult {
 }
 
 // `prepare` runs once, then `run` warms up before the measured runs, and the median of those is the
-// result.
+// result. The setup result is disposed of after the measured runs, even when a run throws.
 export async function runBenchmark(
   definition: BenchDefinition,
   now: () => number,
 ): Promise<BenchmarkResult> {
-  const step = await definition.prepare();
+  const prepared = await definition.prepare();
 
-  for (let index = 0; index < warmUpRuns; index += 1) {
-    await step();
+  try {
+    for (let index = 0; index < warmUpRuns; index += 1) {
+      await prepared.step();
+    }
+
+    const samples: number[] = [];
+
+    for (let index = 0; index < measuredRuns; index += 1) {
+      const start = now();
+
+      await prepared.step();
+
+      samples.push(now() - start);
+    }
+
+    return { medianMs: pickMedian(samples) };
+  } finally {
+    await prepared.dispose();
   }
-
-  const samples: number[] = [];
-
-  for (let index = 0; index < measuredRuns; index += 1) {
-    const start = now();
-
-    await step();
-
-    samples.push(now() - start);
-  }
-
-  return { medianMs: pickMedian(samples) };
 }

@@ -77,8 +77,8 @@ export default defineRig({
 Oxlint's plugin reads this file under Node 22.18 or later, or under Bun, because it imports the
 config to take the limits from it.
 
-A repo declares the programs its `e2e/` folders run in `programs`, and `rig bench` and `rig eval`
-run the repo's benchmarks and evaluation suites.
+A repo declares the programs its `e2e/` folders and benchmarks run in `programs`, which `rig e2e`
+and `rig bench` build first. `rig bench` and `rig eval` run the benchmarks and evaluation suites.
 [Programs in e2e tests](../../docs/guides/e2e-programs.md) and
 [benchmarks and evaluations](../../docs/guides/benchmarks-and-evals.md) describe each.
 

@@ -25,14 +25,27 @@ export function parseBenchDefinition(value: unknown): ParsedBenchDefinition {
       name,
       budgetMs,
       prepare: async () => {
-        const step: unknown = await prepare();
+        const prepared: unknown = await prepare();
 
-        if (!isFunction(step)) {
+        const step: unknown =
+          typeof prepared === 'object' && prepared !== null ? Reflect.get(prepared, 'step') : null;
+
+        const dispose: unknown =
+          typeof prepared === 'object' && prepared !== null
+            ? Reflect.get(prepared, 'dispose')
+            : null;
+
+        if (!isFunction(step) || !isFunction(dispose)) {
           throw new Error(`the benchmark "${name}" prepared no step to measure`);
         }
 
-        return async () => {
-          await step();
+        return {
+          step: async () => {
+            await step();
+          },
+          dispose: async () => {
+            await dispose();
+          },
         };
       },
     },
