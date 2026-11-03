@@ -67,7 +67,7 @@ test('it refuses a rig.config.ts with no default export', async () => {
 });
 
 test('it reads a rig.config.ts from disk through the real file probe and importer', async () => {
-  const repoRoot = await mkdtemp(join(tmpdir(), 'rig-config-test-'));
+  const repoRoot = await mkdtemp(join(tmpdir(), `rig-config-test-pid${process.pid}-`));
 
   onTestFinished(() => rm(repoRoot, { recursive: true, force: true }));
 

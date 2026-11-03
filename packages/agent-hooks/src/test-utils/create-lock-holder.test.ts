@@ -6,7 +6,7 @@ import { createLockHolder } from './create-lock-holder.ts';
 import { fileLocks } from './file-locks.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'lock-holder-'));
+  const directory = await mkdtemp(join(tmpdir(), `lock-holder-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

@@ -8,7 +8,7 @@ import { runProgram } from './run-program.ts';
 import { buildTextWithBlobPrefix } from './test-utils/build-text-with-blob-prefix.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'run-local-paths-check-'));
+  const directory = await mkdtemp(join(tmpdir(), `run-local-paths-check-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

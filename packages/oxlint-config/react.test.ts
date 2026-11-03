@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { runOxlint } from './src/test-utils/run-oxlint.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'react-overlay-test-'));
+  const directory = await mkdtemp(join(tmpdir(), `react-overlay-test-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

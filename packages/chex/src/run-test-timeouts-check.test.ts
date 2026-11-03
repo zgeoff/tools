@@ -9,7 +9,7 @@ import { runProgram } from './run-program.ts';
 import { runTestTimeoutsCheck } from './run-test-timeouts-check.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'run-test-timeouts-check-'));
+  const directory = await mkdtemp(join(tmpdir(), `run-test-timeouts-check-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

@@ -7,7 +7,7 @@ import { laneFiles } from './lane-files.ts';
 import { removeExitedRunDirs } from './remove-exited-run-dirs.ts';
 
 async function setupTest() {
-  const parentDir = await mkdtemp(join(tmpdir(), 'rig-browser-runs-'));
+  const parentDir = await mkdtemp(join(tmpdir(), `rig-browser-runs-pid${process.pid}-`));
 
   onTestFinished(() => rm(parentDir, { recursive: true, force: true }));
 

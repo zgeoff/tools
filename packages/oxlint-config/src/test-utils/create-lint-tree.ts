@@ -10,7 +10,7 @@ export type FileTree = Readonly<Record<string, string>>;
 const rigPackageDir = join(import.meta.dir, '..', '..', '..', 'rig');
 
 export async function createLintTree(files: FileTree, rules: RuleSettings): Promise<string> {
-  const parent = await mkdtemp(join(tmpdir(), 'oxlint-config-test-'));
+  const parent = await mkdtemp(join(tmpdir(), `oxlint-config-test-pid${process.pid}-`));
 
   onTestFinished(() => rm(parent, { recursive: true, force: true }));
 

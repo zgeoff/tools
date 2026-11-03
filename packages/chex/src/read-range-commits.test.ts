@@ -8,7 +8,7 @@ import { readRangeCommits } from './read-range-commits.ts';
 import { runProgram } from './run-program.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'read-range-commits-'));
+  const directory = await mkdtemp(join(tmpdir(), `read-range-commits-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

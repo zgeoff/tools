@@ -9,7 +9,7 @@ import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { readTrackedFiles } from './read-tracked-files.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'rig-tracked-files-'));
+  const directory = await mkdtemp(join(tmpdir(), `rig-tracked-files-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

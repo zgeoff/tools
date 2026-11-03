@@ -7,7 +7,7 @@ import { buildRigConfigSource } from './build-rig-config-source.ts';
 import { readRigLaneLimit } from './read-rig-lane-limit.ts';
 
 async function setupTest() {
-  const repoRoot = await mkdtemp(join(tmpdir(), 'rig-lane-limit-'));
+  const repoRoot = await mkdtemp(join(tmpdir(), `rig-lane-limit-pid${process.pid}-`));
 
   onTestFinished(() => rm(repoRoot, { recursive: true, force: true }));
 

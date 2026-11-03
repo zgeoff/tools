@@ -13,7 +13,7 @@ import { fileLocks } from './file-locks.ts';
 import { withFileLock } from './with-file-lock.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'file-lock-'));
+  const directory = await mkdtemp(join(tmpdir(), `file-lock-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

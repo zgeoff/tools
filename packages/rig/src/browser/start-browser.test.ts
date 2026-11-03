@@ -8,7 +8,7 @@ import { laneFiles } from './lane-files.ts';
 import { startBrowser } from './start-browser.ts';
 
 async function setupTest() {
-  const repoRoot = await mkdtemp(join(tmpdir(), 'browser-start-'));
+  const repoRoot = await mkdtemp(join(tmpdir(), `browser-start-pid${process.pid}-`));
 
   onTestFinished(() => rm(repoRoot, { recursive: true, force: true }));
 

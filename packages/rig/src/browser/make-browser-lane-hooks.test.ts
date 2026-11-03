@@ -19,7 +19,7 @@ import { ProcessGroupStopError } from './process-group-stop-error.ts';
 import type { ProcessGroups } from './process-groups.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'rig-browser-lane-'));
+  const directory = await mkdtemp(join(tmpdir(), `rig-browser-lane-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

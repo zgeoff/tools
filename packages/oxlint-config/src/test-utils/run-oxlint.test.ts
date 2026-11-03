@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { runOxlint } from './run-oxlint.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'run-oxlint-'));
+  const directory = await mkdtemp(join(tmpdir(), `run-oxlint-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

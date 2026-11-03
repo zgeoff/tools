@@ -7,7 +7,7 @@ import { $ } from 'bun';
 import { buildSkillPageLines } from '../test-utils/build-skill-page-lines.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'check-skill-'));
+  const directory = await mkdtemp(join(tmpdir(), `check-skill-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

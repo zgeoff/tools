@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { lockFileWrites } from './lock-file-writes.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'lock-file-writes-'));
+  const directory = await mkdtemp(join(tmpdir(), `lock-file-writes-pid${process.pid}-`));
 
   const unlocks: (() => Promise<void>)[] = [];
 

@@ -8,7 +8,7 @@ import { runProgram } from './run-program.ts';
 import { buildStubCommitlint } from './test-utils/build-stub-commitlint.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'run-commits-check-'));
+  const directory = await mkdtemp(join(tmpdir(), `run-commits-check-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

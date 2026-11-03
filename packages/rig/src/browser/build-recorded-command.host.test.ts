@@ -11,7 +11,7 @@ async function setupTest() {
 
   onTestFinished(() => stack.disposeAsync());
 
-  const directory = await mkdtemp(join(tmpdir(), 'recorded-command-'));
+  const directory = await mkdtemp(join(tmpdir(), `recorded-command-pid${process.pid}-`));
 
   stack.defer(() => rm(directory, { recursive: true, force: true }));
 

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { makeBlockingTestRun } from './make-blocking-test-run.ts';
 
 test('it replaces the folder with a file, so a removal inside it fails with ENOTDIR, and passes', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'blocking-test-run-'));
+  const directory = await mkdtemp(join(tmpdir(), `blocking-test-run-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

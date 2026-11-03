@@ -7,7 +7,7 @@ import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { readMemoryBudget } from './read-memory-budget.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'read-memory-budget-'));
+  const directory = await mkdtemp(join(tmpdir(), `read-memory-budget-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

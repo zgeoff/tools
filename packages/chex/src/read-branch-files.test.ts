@@ -11,7 +11,7 @@ import { runProgram } from './run-program.ts';
 import { makeAnswerQueue } from './test-utils/make-answer-queue.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'read-branch-files-'));
+  const directory = await mkdtemp(join(tmpdir(), `read-branch-files-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

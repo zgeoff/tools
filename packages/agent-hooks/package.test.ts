@@ -22,7 +22,7 @@ async function setupTest() {
     new Bun.Glob('packages/{agent-hooks,std}/src/**').scan({ cwd: repoRoot, absolute: true }),
   );
 
-  const directory = await mkdtemp(join(tmpdir(), 'agent-hooks-package-'));
+  const directory = await mkdtemp(join(tmpdir(), `agent-hooks-package-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { makeFileWritingStub } from './make-file-writing-stub.ts';
 
 test('it writes the file into the folder it gets, and records the call', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'file-writing-stub-'));
+  const directory = await mkdtemp(join(tmpdir(), `file-writing-stub-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

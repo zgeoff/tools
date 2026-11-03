@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { createListingStubKit } from './create-listing-stub-kit.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'listing-stub-'));
+  const directory = await mkdtemp(join(tmpdir(), `listing-stub-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

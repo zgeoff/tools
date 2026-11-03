@@ -6,7 +6,7 @@ import { readDirNames } from '../../../rig/src/browser/read-dir-names.ts';
 import { templateFiles } from './template-files.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'template-files-'));
+  const directory = await mkdtemp(join(tmpdir(), `template-files-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

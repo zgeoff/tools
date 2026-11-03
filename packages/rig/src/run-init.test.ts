@@ -9,7 +9,7 @@ import { runInit } from './run-init.ts';
 import { makeRecordingStub } from './test-utils/make-recording-stub.ts';
 
 async function setupTest() {
-  const repoRoot = await mkdtemp(join(tmpdir(), 'rig-init-'));
+  const repoRoot = await mkdtemp(join(tmpdir(), `rig-init-pid${process.pid}-`));
 
   onTestFinished(() => rm(repoRoot, { recursive: true, force: true }));
 

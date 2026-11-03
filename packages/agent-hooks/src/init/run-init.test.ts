@@ -9,7 +9,7 @@ import { bunFileSystem } from './bun-file-system.ts';
 import { runInit } from './run-init.ts';
 
 async function setupTest() {
-  const project = await mkdtemp(join(tmpdir(), 'agent-hooks-init-'));
+  const project = await mkdtemp(join(tmpdir(), `agent-hooks-init-pid${process.pid}-`));
 
   onTestFinished(() => rm(project, { recursive: true, force: true }));
 

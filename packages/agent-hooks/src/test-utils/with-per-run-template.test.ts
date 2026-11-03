@@ -13,7 +13,7 @@ import { templateFiles } from './template-files.ts';
 import { withPerRunTemplate } from './with-per-run-template.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'per-run-template-'));
+  const directory = await mkdtemp(join(tmpdir(), `per-run-template-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

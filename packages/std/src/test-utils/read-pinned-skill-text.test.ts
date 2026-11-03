@@ -6,7 +6,9 @@ import { readPinnedSkillText } from './read-pinned-skill-text.ts';
 import { writeTreeFiles } from './write-tree-files.ts';
 
 async function setupTest() {
-  const root = await mkdtemp(join(import.meta.dir, '.test-read-pinned-skill-text-'));
+  const root = await mkdtemp(
+    join(import.meta.dir, `.test-read-pinned-skill-text-pid${process.pid}-`),
+  );
 
   onTestFinished(() => rm(root, { recursive: true, force: true }));
 

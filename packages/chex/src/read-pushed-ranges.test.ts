@@ -8,7 +8,7 @@ import { readPushedRanges } from './read-pushed-ranges.ts';
 import { runProgram } from './run-program.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'read-pushed-ranges-'));
+  const directory = await mkdtemp(join(tmpdir(), `read-pushed-ranges-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

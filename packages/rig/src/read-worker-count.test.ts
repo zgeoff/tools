@@ -7,7 +7,7 @@ import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
 import { readWorkerCount } from './read-worker-count.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'read-worker-count-'));
+  const directory = await mkdtemp(join(tmpdir(), `read-worker-count-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

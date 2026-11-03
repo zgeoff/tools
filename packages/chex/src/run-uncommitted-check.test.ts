@@ -9,7 +9,7 @@ import { runProgram } from './run-program.ts';
 import { runUncommittedCheck } from './run-uncommitted-check.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'run-uncommitted-check-'));
+  const directory = await mkdtemp(join(tmpdir(), `run-uncommitted-check-pid${process.pid}-`));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

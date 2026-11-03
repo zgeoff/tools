@@ -11,7 +11,7 @@ import { makeFailOnCall } from './test-utils/make-fail-on-call.ts';
 import { writeTextFile } from './write-text-file.ts';
 
 async function setupTest() {
-  const repoRoot = await mkdtemp(join(tmpdir(), 'chex-init-'));
+  const repoRoot = await mkdtemp(join(tmpdir(), `chex-init-pid${process.pid}-`));
 
   const unlocks: (() => Promise<void>)[] = [];
 
