@@ -116,6 +116,13 @@ test.if(process.getuid?.() !== 0)(
   async () => {
     const temp = await mkdtemp(join(tmpdir(), readRunFolderPrefix('test-folder-sweep-')));
 
+    // The test makes a folder inside read-only, so the cleanup gives the owner its access back first.
+    onTestFinished(async () => {
+      await $`chmod -R u+rwx ${temp}`.nothrow().quiet();
+
+      await rm(temp, { recursive: true, force: true });
+    });
+
     const exited = Bun.spawn(['true']);
 
     await exited.exited;
@@ -128,11 +135,6 @@ test.if(process.getuid?.() !== 0)(
     await mkdir(join(stuck, 'locked'), { recursive: true });
     await writeFile(join(stuck, 'locked', 'lid.txt'), 'lid');
     await chmod(join(stuck, 'locked'), 0o500);
-
-    onTestFinished(async () => {
-      await chmod(join(stuck, 'locked'), 0o700);
-      await rm(temp, { recursive: true, force: true });
-    });
 
     const result = await $`${process.execPath} ${join(import.meta.dir, 'run-test-folder-sweep.ts')}`
       .env({ ...process.env, TMPDIR: temp })
