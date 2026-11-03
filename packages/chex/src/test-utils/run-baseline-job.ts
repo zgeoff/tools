@@ -15,6 +15,9 @@ export interface BaselineJob {
 
   // The files lefthook substitutes for {files} in the job's run script.
   readonly files: readonly string[];
+
+  // The job's run script by default, or the files command that lists the job's files.
+  readonly part?: 'run' | 'files';
 }
 
 export interface BaselineJobDeps {
@@ -49,11 +52,30 @@ function buildJobScript(configText: string, job: BaselineJob): string {
     (entry: unknown) => isRecord(entry) && entry['name'] === job.name,
   );
 
-  const run = isRecord(found) ? found['run'] : undefined;
+  invariant(isRecord(found), `lefthook.yml has no ${job.hook} job named ${job.name}`);
 
-  invariant(typeof run === 'string', `lefthook.yml has no ${job.hook} job named ${job.name}`);
+  const part = job.part ?? 'run';
+  const command = found[part];
+
+  invariant(
+    typeof command === 'string',
+    `lefthook.yml has no ${part} command in the ${job.hook} job named ${job.name}`,
+  );
+
+  if (part === 'files') {
+    return command;
+  }
+
+  // lefthook expands a template in a run script only.
+  const templates = isRecord(config) && isRecord(config['templates']) ? config['templates'] : {};
+
+  const script = Object.entries(templates).reduce(
+    (text, [name, value]) =>
+      typeof value === 'string' ? text.replaceAll(`{${name}}`, value) : text,
+    command,
+  );
 
   const files = job.files.map((file) => `'${file.replaceAll("'", String.raw`'\''`)}'`).join(' ');
 
-  return run.replaceAll('{files}', files);
+  return script.replaceAll('{files}', files);
 }

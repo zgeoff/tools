@@ -12,7 +12,7 @@ function setupTest() {
   const deps = {
     readConfigText: () =>
       Promise.resolve(
-        'pre-push:\n  jobs:\n    - name: lint\n      run: oxlint {files}\n    - name: test\n      run: rig related {files}\n',
+        "templates:\n  quiet: exec 2>/dev/null;\npre-push:\n  jobs:\n    - name: lint\n      run: oxlint {files}\n    - name: test\n      files: git diff --name-only\n      run: '{quiet} rig related {files}'\n",
       ),
     runScript: (
       script: string,
@@ -71,4 +71,45 @@ test('it throws for a job that lefthook.yml does not hold', () => {
   );
 
   expect(run).rejects.toThrow('lefthook.yml has no pre-commit job named spelling');
+});
+
+test("it expands the config's templates in the run script", async () => {
+  const ctx = setupTest();
+
+  await runBaselineJob(
+    ctx.deps,
+    '/srv/kettle',
+    { hook: 'pre-push', name: 'test', files: ['kettle.ts'] },
+    {},
+  );
+
+  expect(ctx.scripts.map((call) => call.script)).toStrictEqual([
+    "exec 2>/dev/null; rig related 'kettle.ts'",
+  ]);
+});
+
+test("it runs the job's files command when asked for that part", async () => {
+  const ctx = setupTest();
+
+  await runBaselineJob(
+    ctx.deps,
+    '/srv/kettle',
+    { hook: 'pre-push', name: 'test', files: [], part: 'files' },
+    {},
+  );
+
+  expect(ctx.scripts.map((call) => call.script)).toStrictEqual(['git diff --name-only']);
+});
+
+test('it throws for a part that the job does not hold', () => {
+  const ctx = setupTest();
+
+  const run = runBaselineJob(
+    ctx.deps,
+    '/srv/kettle',
+    { hook: 'pre-push', name: 'lint', files: [], part: 'files' },
+    {},
+  );
+
+  expect(run).rejects.toThrow('lefthook.yml has no files command in the pre-push job named lint');
 });
