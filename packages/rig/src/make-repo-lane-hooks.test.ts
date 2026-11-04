@@ -105,7 +105,7 @@ test('it refuses a start module that default-exports no function', async () => {
   );
 });
 
-test('it runs bun test under diet with the lane budget, one process per file, and the arguments it gets', async () => {
+test('it runs bun test under diet with the lane budget, in random order in one global, and the arguments it gets', async () => {
   const ctx = setupTest();
 
   const lane = defineRig({ lanes: { kiln: { limit: '15s', memory: '8G' } } }).lanes.find(
@@ -137,6 +137,8 @@ test('it runs bun test under diet with the lane budget, one process per file, an
       'bun',
       'test',
       '--parallel=1',
+      '--randomize',
+      '--no-isolate',
       '--timeout=15000',
       '.kiln.test.ts',
     ],

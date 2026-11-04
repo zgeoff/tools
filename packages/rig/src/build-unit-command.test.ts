@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { buildUnitCommand } from './build-unit-command.ts';
 import { defineRig } from './define-rig.ts';
 
-test('it runs the unit tests in random order with the worker count and leaves every lane out', () => {
+test('it runs the unit tests in random order in one global per worker, with the worker count, and leaves every lane out', () => {
   const command = buildUnitCommand(defineRig({}), ['e2e', 'apps/shop/e2e'], 3, []);
 
   expect(command).toStrictEqual([
@@ -52,12 +52,3 @@ test('it leaves out only the folders that the e2e lane selects', () => {
 
   expect(command.filter((argument) => argument.includes('e2e'))).toBeEmpty();
 });
-
-test.each(['--isolate', '--no-isolate'])(
-  'it adds no --no-isolate when the arguments hold %s',
-  (flag) => {
-    const command = buildUnitCommand(defineRig({}), [], 1, [flag]);
-
-    expect(command.filter((argument) => argument.endsWith('isolate'))).toStrictEqual([flag]);
-  },
-);

@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import type { LaneHooks, LaneStartOutcome } from '../lane-hooks.ts';
+import { testRunArgs } from '../test-run-args.ts';
 import type { BrowserRun } from './build-browser-run.ts';
 import type { LaneEnvironments } from './build-lane-environments.ts';
 import { buildLaneEnvironments } from './build-lane-environments.ts';
@@ -48,8 +49,6 @@ export interface BrowserLaneOptions {
   ) => Promise<number>;
 }
 
-// `bun test --parallel=1` isolates each file, so the preload runs again for each one, and the
-// build and the run ID come from here, once per run.
 export function makeBrowserLaneHooks(options: BrowserLaneOptions): LaneHooks {
   const state = { hasRunFolders: false, keepsFolders: false };
 
@@ -190,7 +189,7 @@ async function runBrowserTests(
   const testsRecord = await createPendingRecord(options.run.groupsDir, 'tests', options.files);
 
   const testsExitCode = await options.runTests(
-    ['--parallel=1', '--preload', options.preloadPath, ...testArgs],
+    ['--parallel=1', ...testRunArgs, '--preload', options.preloadPath, ...testArgs],
     environment,
     options.signal,
     testsRecord,

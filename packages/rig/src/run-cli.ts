@@ -61,6 +61,14 @@ export async function runCLI(argv: readonly string[], run: RigRun, deps: CLIDeps
     return 2;
   }
 
+  if (args.hasIsolateOption) {
+    deps.output.err(
+      `rig: rig ${command} refuses --isolate, because every lane runs its files in one global per process\n`,
+    );
+
+    return 2;
+  }
+
   return lane.name === 'unit'
     ? runUnit(config, args.extraArgs, run, deps)
     : runLane({ config, lane, extraArgs: args.extraArgs }, run, deps);

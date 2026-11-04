@@ -35,8 +35,7 @@ so a run that outgrows its memory budget fails alone when `diet` finds a
 
 ## Commands
 
-- `rig unit` runs the unit tests in random order with the host's worker count, with `--no-isolate`
-  so the files of a worker share one module graph. Pass `--isolate` to turn that off.
+- `rig unit` runs the unit tests in random order with the host's worker count.
 - `rig related <paths...>` runs the unit tests beside the changed files, for a pre-push hook.
 - `rig <lane>` runs one lane: `e2e`, `browser`, `docker`, `host`, `agent-sdk`, `model-api`, or a
   lane the repo declares.
@@ -46,9 +45,10 @@ so a run that outgrows its memory budget fails alone when `diet` finds a
   has files for, and a starter config.
 
 `rig unit` and the lane commands pass every argument after the command on to `bun test`, so
-`bun run test --seed=1` replays a run's order, and rig drops one `--` among them. The exception is
-`--timeout`: the lane's limit in `rig.config.ts` is its one per-test timeout, so rig exits 2 on a
-`--timeout` or `--timeout=<ms>` argument and runs nothing. `rig related` takes changed file paths
+`bun run test --seed=1` replays a run's order, and rig drops one `--` among them. The exceptions are
+`--timeout` and `--isolate`. The lane's limit in `rig.config.ts` is its one per-test timeout, and
+every lane runs its files in random order with `--no-isolate`, so rig exits 2 on a `--timeout`,
+`--timeout=<ms>` or `--isolate` argument and runs nothing. `rig related` takes changed file paths
 only, and exits 2 on an option.
 
 An `e2e/` folder is the e2e lane's in a folder that holds a `package.json`, and at the repo root

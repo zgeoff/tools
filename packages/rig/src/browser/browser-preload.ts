@@ -1,10 +1,26 @@
 // A cold Chrome start on a fresh CI runner can run past the test timeout, so the preload starts
-// Chrome before the file's first test. Bun spawns one Chrome per process, on the options of the
-// first view, and every later view in the file reuses it.
+// Chrome before the first test. Bun spawns one Chrome per process, on the options of the first
+// view, and every later view in the process, in every file, reuses it.
 
+import { afterAll } from 'bun:test';
 import { hostname } from 'node:os';
+import { systemClock } from '../system-clock.ts';
 import { laneFiles } from './lane-files.ts';
+import { readProcessTable } from './read-process-table.ts';
 import { startBrowser } from './start-browser.ts';
+import { stopDescendantProcesses } from './stop-descendant-processes.ts';
+
+// Chrome's helper processes outlive the `bun test` that starts them, and diet then keeps its cgroup
+// for them, so the preload stops them after the last file.
+afterAll(() =>
+  stopDescendantProcesses({
+    rootPID: process.pid,
+    timeoutMs: 5000,
+    clock: systemClock,
+    readProcessTable,
+    signalProcess: process.kill.bind(process),
+  }),
+);
 
 await startBrowser({
   // The lane starts each test process in the repo's root.
@@ -12,8 +28,6 @@ await startBrowser({
   hostName: hostname(),
   environment: process.env,
 
-  // `bun test --parallel=1` stops each file's Chrome and loads this module again for the next
-  // file. A new Chrome on the last one's profile can start before the last one lets go of it.
   profileName: crypto.randomUUID(),
   readDirNames: laneFiles.readDirNames,
   openView: openChromeView,

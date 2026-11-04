@@ -4,7 +4,7 @@ import type { ProcessEntry } from './read-process-table.ts';
 
 export interface ProcessProbeDependencies {
   // Throws as `process.kill` does: ESRCH for a missing process, EPERM for another user's.
-  readonly signalProcess: (pid: number, signal: number) => void;
+  readonly signalProcess: (pid: number, signal: number) => boolean;
 
   readonly readProcessTable: () => readonly ProcessEntry[] | null;
 }

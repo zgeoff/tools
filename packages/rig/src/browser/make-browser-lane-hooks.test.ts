@@ -38,7 +38,7 @@ async function setupTest() {
   };
 }
 
-test('it runs the tests one file at a time, with the browser preload, after the arguments it takes', async () => {
+test('it runs the tests one file at a time in random order in one global, with the browser preload, after the arguments it takes', async () => {
   const ctx = await setupTest();
 
   const runTests = makeResolvingStub(0);
@@ -66,6 +66,8 @@ test('it runs the tests one file at a time, with the browser preload, after the 
   expect(runTests).toHaveBeenCalledExactlyOnceWith(
     [
       '--parallel=1',
+      '--randomize',
+      '--no-isolate',
       '--preload',
       '/work/notes-app/scripts/browser-lane/browser-preload.ts',
       '--timeout=10000',

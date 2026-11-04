@@ -11,7 +11,7 @@ export interface StandardLane {
 }
 
 // The limits are the per-test timeouts of the Lanes table in the testing skill. Every lane but
-// unit runs one process per file, because it needs a real system that two files cannot share.
+// unit runs its files one at a time, because it needs a real system that two files cannot share.
 export const standardLanes: readonly StandardLane[] = [
   { name: 'unit', suffix: null, limitMs: 5000, parallel: 'workers' },
   { name: 'e2e', suffix: null, limitMs: 15_000, parallel: 1 },

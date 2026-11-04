@@ -4,6 +4,7 @@ import type { LaneHooks } from './lane-hooks.ts';
 import { parseLaneHook } from './parse-lane-hook.ts';
 import { parseLaneStart } from './parse-lane-start.ts';
 import type { CommandOptions } from './run-command.ts';
+import { testRunArgs } from './test-run-args.ts';
 import type { LaneContext } from './types.ts';
 
 export interface RepoLaneOptions {
@@ -47,6 +48,7 @@ export function makeRepoLaneHooks(options: RepoLaneOptions): LaneHooks {
           'bun',
           'test',
           `--parallel=${options.parallel}`,
+          ...testRunArgs,
           ...testArgs,
         ]),
         { cwd: options.context.repoRoot, environment, signal: options.signal },
