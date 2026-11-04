@@ -122,7 +122,7 @@ export interface SkillGateOutputContext {
 export interface ToolGateInput {
   readonly tools: readonly ToolGate[];
   readonly toolName: string;
-  readonly skillsDir: string;
+  readonly projectDir: string;
   readonly loads: SessionLoads;
   readonly availableSkills: readonly string[];
   readonly availableReferences: readonly string[];

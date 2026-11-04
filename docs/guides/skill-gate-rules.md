@@ -76,7 +76,7 @@ Each tool gate in the optional `tools` list holds:
   [`PreToolUse` hook](https://code.claude.com/docs/en/hooks), such as `mcp__tracker__update_ticket`;
 - `skills`: the skills that the session loads before the call;
 - `references`: the files that the session reads before the call, each a path relative to
-  `.claude/skills/`.
+  `.claude/skills/`. A read of the file under `.agents/skills/` counts too.
 
 A tool gate needs at least one skill or reference. Never name `Edit`, `Write`, `MultiEdit` or `Bash`
 in a tool gate, because the path gates check those tools. The hook reads a rules file that breaks

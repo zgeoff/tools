@@ -21,12 +21,19 @@ export function planToolGate(input: ToolGateInput): ToolGatePlan {
       (skill) => input.availableSkills.includes(skill) && !input.loads.skills.includes(skill),
     );
 
+  // A repo keeps its skills in .agents/skills, with .claude/skills a link to it, so a read of a
+  // reference at either path counts.
+  const skillRoots = [
+    path.join(input.projectDir, '.agents', 'skills'),
+    path.join(input.projectDir, '.claude', 'skills'),
+  ];
+
   const missingReferences = gates
     .flatMap((gate) => gate.references)
     .filter(
       (reference) =>
         input.availableReferences.includes(reference) &&
-        !readPaths.has(path.resolve(input.skillsDir, reference)),
+        !skillRoots.some((root) => readPaths.has(path.resolve(root, reference))),
     );
 
   return {

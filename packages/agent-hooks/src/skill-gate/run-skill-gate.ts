@@ -285,7 +285,7 @@ async function checkToolCall(check: ToolCallCheck): Promise<HookResult | null> {
   const plan = planToolGate({
     tools: parsedRules.tools,
     toolName: check.toolName,
-    skillsDir,
+    projectDir: check.projectDir,
     loads,
     availableSkills: await readAvailableSkills(skillsDir),
     availableReferences: await readAvailableReferences(
