@@ -95,3 +95,36 @@ outlives the test.
 
 When a signal killed the program, its exit code is 128 plus the signal number: 143 for SIGTERM and
 137 for SIGKILL.
+
+## Shared test helpers
+
+`@zgeoff/testing/helpers` holds the helpers that tests in any repo reuse, and each is one module:
+
+| Helper                                                            | Does                                                                        |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `makeResolvingStub`, `makeRejectingStub`, `createBlockingStubKit` | build a `mock` that resolves, rejects, or waits until the test lets it go   |
+| `makeAnswerQueue`                                                 | answers each call in order, and throws when a call comes after the last one |
+| `readStreamUntil`                                                 | reads a stream until a line matches                                         |
+| `readRunFolderPrefix`, `writeTreeFiles`                           | name a test's temporary folder and fill it with files                       |
+| `readGitEnv`, `runGit`, `readGitHead`, `createGitCommit`          | run git in a test repo with a fixed identity and no global config           |
+| `waitFor`                                                         | retries a check until it stops throwing, or throws when `timeoutMs` passes  |
+| `updateEnv`, `removeEnvOverrides`                                 | override an environment variable, and put every one back                    |
+
+`waitFor` calls the check at once and every `intervalMs` (20 ms by default) until `timeoutMs` (5 s)
+passes. The timeout error names the `label` and keeps the check's last error as its `cause`:
+
+```ts
+import { waitFor } from '@zgeoff/testing/helpers';
+
+const entries = await waitFor(() => readEntries(ledger), { label: 'the first entry' });
+```
+
+`updateEnv` records a variable's original value the first time a test overrides it. Add the restore
+to the test preload, so no override outlives its test:
+
+```ts
+import { afterEach } from 'bun:test';
+import { removeEnvOverrides } from '@zgeoff/testing/helpers';
+
+afterEach(removeEnvOverrides);
+```

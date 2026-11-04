@@ -56,6 +56,27 @@ await using ledger = await start(command, { ready: { url: '/health' } });
 await fetch(`${ledger.url}/entries`);
 ```
 
+Small helpers for any Bun test live in `@zgeoff/testing/helpers`. `waitFor` retries a check until it
+stops throwing, and `updateEnv` overrides an environment variable that a hook restores:
+
+```ts
+import { updateEnv, waitFor } from '@zgeoff/testing/helpers';
+
+updateEnv('LEDGER_REGION', 'north');
+
+await waitFor(() => expect(readEntries()).toHaveLength(2), { label: 'two entries' });
+```
+
+Call `removeEnvOverrides` in an `afterEach` hook of the test preload, so no override outlives its
+test:
+
+```ts
+import { afterEach } from 'bun:test';
+import { removeEnvOverrides } from '@zgeoff/testing/helpers';
+
+afterEach(removeEnvOverrides);
+```
+
 ## Features
 
 - `spawnCLI` runs a program in a pseudo-terminal, with `screen` queries, `user` keystrokes, `resize`
@@ -63,6 +84,8 @@ await fetch(`${ledger.url}/entries`);
 - `run` runs a program to its exit, with `input` on stdin and a time limit.
 - `start` picks a free port, waits until the program is ready, and stops the whole process group.
 - Each handle kills its program when the test ends.
+- `@zgeoff/testing/helpers` holds the stubs, git fixtures, run-folder names, `waitFor` and the env
+  helpers that tests in several repos share.
 - An exit code is 128 plus the signal number when a signal killed the program.
 
 ## Documentation
