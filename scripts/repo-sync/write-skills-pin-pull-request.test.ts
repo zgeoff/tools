@@ -764,6 +764,100 @@ test('it leaves the manifest alone when only a skill folder no entry ships gains
   expect(ctx.commands.calls.at(-1)).toStrictEqual(merge);
 });
 
+test('it fails and writes no branch when GitHub gives a truncated tree of the skills commit', async () => {
+  const ctx = await setupTest();
+
+  const pinned = '0123456789abcdef0123456789abcdef01234567';
+  const commit = '89abcdef0123456789abcdef0123456789abcdef';
+
+  await ctx.writePin(pinned);
+
+  const listOpen = [
+    'gh',
+    'pr',
+    'list',
+    '--repo',
+    'example/tools',
+    '--head',
+    'skills-pin',
+    '--state',
+    'open',
+    '--json',
+    'number,isCrossRepository',
+  ];
+
+  const compareToPin = [
+    'gh',
+    'api',
+    `repos/zgeoff/skills/compare/${pinned}...${commit}`,
+    '--jq',
+    '.status',
+  ];
+
+  const compareToMain = [
+    'gh',
+    'api',
+    `repos/zgeoff/skills/compare/${commit}...main`,
+    '--jq',
+    '.status',
+  ];
+
+  const readHead = ['git', 'rev-parse', 'HEAD'];
+  const readTree = ['gh', 'api', `repos/zgeoff/skills/git/trees/${commit}?recursive=1`];
+
+  const readManifest = [
+    'gh',
+    'api',
+    'repos/example/tools/contents/sync/manifest.json?ref=fedcba9876543210fedcba9876543210fedcba98',
+  ];
+
+  ctx.commands.answer(listOpen, { exitCode: 0, stdout: '[]', stderr: '' });
+  ctx.commands.answer(compareToPin, { exitCode: 0, stdout: 'ahead\n', stderr: '' });
+  ctx.commands.answer(compareToMain, { exitCode: 0, stdout: 'identical\n', stderr: '' });
+
+  ctx.commands.answer(readHead, {
+    exitCode: 0,
+    stdout: 'fedcba9876543210fedcba9876543210fedcba98\n',
+    stderr: '',
+  });
+
+  ctx.commands.answer(readTree, {
+    exitCode: 0,
+    stdout: JSON.stringify({
+      truncated: true,
+      tree: [{ path: 'skills/kettle/SKILL.md', mode: '100644', type: 'blob' }],
+    }),
+    stderr: '',
+  });
+
+  ctx.commands.answer(readManifest, {
+    exitCode: 0,
+    stdout: JSON.stringify({
+      sha: '0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
+      content: Buffer.from('[]\n').toString('base64'),
+      encoding: 'base64',
+    }),
+    stderr: '',
+  });
+
+  const exitCode = await ctx.pin(commit);
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.commands.calls).toStrictEqual([
+    listOpen,
+    compareToPin,
+    compareToMain,
+    readHead,
+    readTree,
+    readManifest,
+  ]);
+
+  expect(ctx.output).toStrictEqual([
+    `::error::GitHub gave a truncated tree of zgeoff/skills ${commit}, or no content of sync/manifest.json at fedcba9876543210fedcba9876543210fedcba98; the next dispatch moves the pin\n`,
+  ]);
+});
+
 test('it opens its own pull request when only a fork holds a pin branch pull request', async () => {
   const ctx = await setupTest();
 
