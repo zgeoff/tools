@@ -15,7 +15,7 @@ export interface DescendantStop {
   readonly readProcessTable: () => readonly ProcessEntry[] | null;
 
   // Throws as `process.kill` does: ESRCH for a process that has exited.
-  readonly signalProcess: (pid: number, signal: NodeJS.Signals) => void;
+  readonly signalProcess: (pid: number, signal: NodeJS.Signals) => boolean;
 }
 
 const pollIntervalMs = 50;

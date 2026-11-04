@@ -18,7 +18,7 @@ afterAll(() =>
     deadlineMs: 5000,
     clock: systemClock,
     readProcessTable,
-    signalProcess: process.kill,
+    signalProcess: process.kill.bind(process),
   }),
 );
 

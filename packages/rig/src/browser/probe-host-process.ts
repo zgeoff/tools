@@ -3,7 +3,7 @@ import { readProcessTable } from './read-process-table.ts';
 
 export function probeHostProcess(pid: number): boolean {
   return probeProcess(pid, {
-    signalProcess: process.kill,
+    signalProcess: process.kill.bind(process),
     readProcessTable,
   });
 }

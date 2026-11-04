@@ -6,7 +6,7 @@ import type { ProcessEntry } from './read-process-table.ts';
 function setupTest() {
   return {
     dependencies: {
-      signalProcess: mock<ProcessProbeDependencies['signalProcess']>(() => {}),
+      signalProcess: mock<ProcessProbeDependencies['signalProcess']>(() => true),
       readProcessTable: mock<() => readonly ProcessEntry[] | null>(() => null),
     },
   };

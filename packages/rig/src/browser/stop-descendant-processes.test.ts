@@ -7,7 +7,7 @@ import type { DescendantStop } from './stop-descendant-processes.ts';
 import { stopDescendantProcesses } from './stop-descendant-processes.ts';
 
 function setupTest() {
-  const signalProcess = mock<DescendantStop['signalProcess']>(() => {});
+  const signalProcess = mock<DescendantStop['signalProcess']>(() => true);
   const clock = buildSteppingClock();
 
   return {
