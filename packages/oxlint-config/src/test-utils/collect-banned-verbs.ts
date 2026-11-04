@@ -1,6 +1,4 @@
-// Collects each code-span verb of the code-style skill's banned-verb bullet, in either shape the
-// skills repo has written it. A bullet in neither shape throws here, where a quiet empty list would
-// let the ban test pass with nothing to check.
+// Throws rather than return an empty list, which would let the ban test pass with nothing to check.
 export function collectBannedVerbs(markdown: string): string[] {
   const list = findNestedList(markdown) ?? findInlineList(markdown);
 
@@ -24,8 +22,7 @@ export function collectBannedVerbs(markdown: string): string[] {
 const nestedBulletPattern =
   /\n- Never start a name with one of these verbs\.[^\n]*\n(?<items>(?: {2}[^\n]*(?:\n|$))+)/u;
 
-// Each item names its verbs before its first full stop or semicolon; the text after it, such as
-// `read` in the advice on a database read, is no banned verb.
+// The skill follows an item's verbs with advice that names other code spans, such as `read`.
 function findNestedList(markdown: string): string | undefined {
   const items = nestedBulletPattern.exec(markdown)?.groups?.['items'];
 
@@ -35,8 +32,7 @@ function findNestedList(markdown: string): string | undefined {
     .join('\n');
 }
 
-// The lead, then its list up to the sentence after it; Markdown may wrap that sentence at any
-// space.
+// Markdown may wrap the closing sentence at any space.
 const inlineBulletPattern =
   /\n- Never start a name with (?<list>`[\s\S]*?)These\s+verbs\s+say\s+nothing/u;
 
