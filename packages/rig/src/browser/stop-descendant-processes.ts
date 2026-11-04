@@ -3,6 +3,7 @@ import type { Clock } from '../system-clock.ts';
 import { collectDescendantPIDs } from './collect-descendant-pids.ts';
 import { hasErrorCode } from './has-error-code.ts';
 import { pickDescendantStopStep } from './pick-descendant-stop-step.ts';
+import { pickListingReadStep } from './pick-listing-read-step.ts';
 import type { ProcessEntry } from './read-process-table.ts';
 
 export interface DescendantStop {
@@ -59,18 +60,20 @@ async function readFirstListing(
   stop: DescendantStop,
   deadline: number,
 ): Promise<readonly ProcessEntry[]> {
-  let listing = stop.readProcessTable();
+  let listing: readonly ProcessEntry[] | null = null;
 
   while (listing === null) {
-    if (stop.clock.now() >= deadline) {
-      throw new Error(
-        `the process listing failed for ${stop.deadlineMs} ms, so no process stopped`,
-      );
-    }
+    const step = pickListingReadStep(stop.readProcessTable(), stop.clock.now() >= deadline);
 
-    await stop.clock.sleep(pollIntervalMs);
-
-    listing = stop.readProcessTable();
+    listing = await match(step)
+      .with({ kind: 'listed' }, (listed) => Promise.resolve(listed.listing))
+      .with({ kind: 'failed' }, () =>
+        Promise.reject(
+          new Error(`the process listing failed for ${stop.deadlineMs} ms, so no process stopped`),
+        ),
+      )
+      .with({ kind: 'retry' }, () => stop.clock.sleep(pollIntervalMs).then(() => null))
+      .exhaustive();
   }
 
   return listing;
