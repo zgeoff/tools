@@ -66,7 +66,9 @@ async function raceDeadline<T>(
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   const deadline = new Promise<Outcome<T>>((resolve) => {
-    timer = setTimeout(() => resolve({ kind: 'deadline' }), remainingMs);
+    timer = setTimeout(() => {
+      resolve({ kind: 'deadline' });
+    }, remainingMs);
   });
 
   const settled = (async (): Promise<Outcome<T>> => {

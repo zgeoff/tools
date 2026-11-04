@@ -26,7 +26,7 @@ test('it resolves after some failed attempts', async () => {
   expect(value).toBe(3);
 });
 
-test('it times out with the label and the last error as the cause', async () => {
+test('it times out with the label and the last error as the cause', () => {
   const lastError = new Error('kettle is cold');
 
   const failure = waitFor(
@@ -36,13 +36,13 @@ test('it times out with the label and the last error as the cause', async () => 
     { intervalMs: 5, timeoutMs: 40, label: 'the kettle' },
   );
 
-  await expect(failure).rejects.toMatchObject({
+  expect(failure).rejects.toMatchObject({
     message: 'timed out after 40 ms waiting for the kettle: kettle is cold',
     cause: lastError,
   });
 });
 
-test('it times out without a label', async () => {
+test('it times out without a label', () => {
   const lastError = new Error('kettle is cold');
 
   const failure = waitFor(
@@ -52,7 +52,7 @@ test('it times out without a label', async () => {
     { intervalMs: 5, timeoutMs: 40 },
   );
 
-  await expect(failure).rejects.toMatchObject({
+  expect(failure).rejects.toMatchObject({
     message: 'timed out after 40 ms: kettle is cold',
     cause: lastError,
   });
@@ -73,18 +73,18 @@ test('it retries a rejection like a throw', async () => {
   expect(value).toBe('steeped');
 });
 
-test('it times out on a rejection with the last error as the cause', async () => {
+test('it times out on a rejection with the last error as the cause', () => {
   const lastError = new Error('still cold');
 
   const failure = waitFor(() => Promise.reject(lastError), { intervalMs: 5, timeoutMs: 40 });
 
-  await expect(failure).rejects.toMatchObject({
+  expect(failure).rejects.toMatchObject({
     message: 'timed out after 40 ms: still cold',
     cause: lastError,
   });
 });
 
-test('it starts no retry after the deadline', async () => {
+test('it starts no retry after the deadline', () => {
   let calls = 0;
 
   const failure = waitFor(
@@ -100,13 +100,12 @@ test('it starts no retry after the deadline', async () => {
     { intervalMs: 80, timeoutMs: 10 },
   );
 
-  await expect(failure).rejects.toThrow('timed out after 10 ms: kettle is cold');
-
+  expect(failure).rejects.toThrow('timed out after 10 ms: kettle is cold');
   expect(calls).toBe(1);
 });
 
-test('it times out while an attempt is still pending', async () => {
+test('it times out while an attempt is still pending', () => {
   const failure = waitFor(() => new Promise<string>(() => {}), { intervalMs: 5, timeoutMs: 30 });
 
-  await expect(failure).rejects.toThrow('timed out after 30 ms: the attempt had not finished');
+  expect(failure).rejects.toThrow('timed out after 30 ms: the attempt had not finished');
 });
