@@ -496,6 +496,44 @@ test('it fails when the release PR has conflicts', async () => {
   expect(output).toBe('');
 });
 
+test('it exits cleanly when the release PR merges while its own merge call fails', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeResponses('prs', [[{ number: 145 }]]);
+
+  await ctx.writeResponses('heads', [
+    buildMockHeadResponse('abc123', [
+      { name: 'pr / checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ]),
+  ]);
+
+  await ctx.writeResponses('mergeable', [
+    { mergeable: 'MERGEABLE', state: 'OPEN' },
+    { mergeable: 'UNKNOWN', state: 'MERGED' },
+  ]);
+
+  await ctx.writeResponses('merges', ['error']);
+
+  const result = await ctx.runScript(['zgeoff/tools']);
+  const calls = await ctx.readCalls();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'release PR #145 is already merged; the run of its merge commit tags it\n',
+    stderr: 'HTTP 502\n',
+  });
+
+  expect(calls.filter((call) => call.startsWith('pr merge'))).toHaveLength(1);
+
+  const output = await ctx.readOutput();
+
+  expect(output).toBe('');
+});
+
 test('it exits cleanly when no release PR is open', async () => {
   const ctx = await setupTest();
   const result = await ctx.runScript(['zgeoff/tools']);

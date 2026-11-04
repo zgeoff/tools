@@ -147,9 +147,16 @@ done
 
 # Mergeability is recomputed asynchronously after a push, so poll until it
 # settles. A MERGEABLE read can be stale ("Base branch was modified" from the
-# merge mutation), so the merge itself retries inside the same loop.
+# merge mutation), so the merge itself retries inside the same loop. A merge
+# that fails with "Merge already in progress" can still land, and a person can
+# merge the PR during the wait; a merged PR reads UNKNOWN for good, and the
+# run of its merge commit tags it.
 for _ in $(seq 1 12); do
-  view=$(gh pr view "$pr" --repo "$repo" --json mergeable,isDraft,labels)
+  view=$(gh pr view "$pr" --repo "$repo" --json mergeable,state,isDraft,labels)
+  if [ "$(jq -r .state <<< "$view")" = MERGED ]; then
+    echo "release PR #$pr is already merged; the run of its merge commit tags it"
+    exit 0
+  fi
   hold=$(jq -r "$hold_filter" <<< "$view")
   if [ -n "$hold" ]; then
     echo "release PR #$pr is held ($hold); leaving it open"
