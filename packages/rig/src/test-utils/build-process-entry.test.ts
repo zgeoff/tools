@@ -11,5 +11,10 @@ test('it builds a sleeping process with its parent', () => {
 });
 
 test('it builds a process in the state it gets', () => {
-  expect(buildProcessEntry(4120, 4100, 'Z')).toMatchObject({ state: 'Z' });
+  expect(buildProcessEntry(4120, 4100, 'Z')).toStrictEqual({
+    pid: 4120,
+    parentID: 4100,
+    groupID: 4100,
+    state: 'Z',
+  });
 });

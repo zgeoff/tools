@@ -103,7 +103,7 @@ test('it resolves at the deadline when only zombies remain, which no process rea
   expect(ctx.clock.now()).toBe(5000);
 });
 
-test('it throws with the descendants that are no zombie and still run at the deadline', async () => {
+test('it throws with the descendants that are no zombie and still run at the deadline', () => {
   const ctx = setupTest();
 
   const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
@@ -125,20 +125,15 @@ test('it throws with the descendants that are no zombie and still run at the dea
     ],
   ]);
 
-  const failure = await stopDescendantProcesses({
-    rootPID: 4100,
-    deadlineMs: 5000,
-    clock: ctx.clock,
-    signalProcess: ctx.signalProcess,
-    readProcessTable,
-  }).then(
-    () => null,
-    (error: unknown) => error,
-  );
-
-  expect(failure).toMatchObject({
-    message: 'the processes 4120, 4130 still run 5000 ms after SIGKILL',
-  });
+  expect(
+    stopDescendantProcesses({
+      rootPID: 4100,
+      deadlineMs: 5000,
+      clock: ctx.clock,
+      signalProcess: ctx.signalProcess,
+      readProcessTable,
+    }),
+  ).rejects.toThrowWithMessage(Error, 'the processes 4120, 4130 still run 5000 ms after SIGKILL');
 
   expect(ctx.clock.now()).toBe(5000);
 });
@@ -172,7 +167,7 @@ test('it goes on past each descendant that exits before its signal', async () =>
   expect(ctx.signalProcess).toHaveBeenCalledTimes(2);
 });
 
-test('it throws a signal failure other than a process that has exited', async () => {
+test('it throws a signal failure other than a process that has exited', () => {
   const ctx = setupTest();
 
   const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
@@ -189,18 +184,15 @@ test('it throws a signal failure other than a process that has exited', async ()
     throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
   });
 
-  const failure = await stopDescendantProcesses({
-    rootPID: 4100,
-    deadlineMs: 5000,
-    clock: ctx.clock,
-    signalProcess: ctx.signalProcess,
-    readProcessTable,
-  }).then(
-    () => null,
-    (error: unknown) => error,
-  );
-
-  expect(failure).toMatchObject({ code: 'EPERM' });
+  expect(
+    stopDescendantProcesses({
+      rootPID: 4100,
+      deadlineMs: 5000,
+      clock: ctx.clock,
+      signalProcess: ctx.signalProcess,
+      readProcessTable,
+    }),
+  ).rejects.toMatchObject({ code: 'EPERM' });
 });
 
 test('it reads a failed first listing again, and kills the descendants that the next one shows', async () => {
@@ -232,30 +224,28 @@ test('it reads a failed first listing again, and kills the descendants that the 
   ]);
 });
 
-test('it throws and kills nothing when the listing fails until the deadline', async () => {
+test('it throws and kills nothing when the listing fails until the deadline', () => {
   const ctx = setupTest();
   const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([null]);
 
-  const failure = await stopDescendantProcesses({
-    rootPID: 4100,
-    deadlineMs: 5000,
-    clock: ctx.clock,
-    signalProcess: ctx.signalProcess,
-    readProcessTable,
-  }).then(
-    () => null,
-    (error: unknown) => error,
+  expect(
+    stopDescendantProcesses({
+      rootPID: 4100,
+      deadlineMs: 5000,
+      clock: ctx.clock,
+      signalProcess: ctx.signalProcess,
+      readProcessTable,
+    }),
+  ).rejects.toThrowWithMessage(
+    Error,
+    'the process listing failed for 5000 ms, so no process stopped',
   );
-
-  expect(failure).toMatchObject({
-    message: 'the process listing failed for 5000 ms, so no process stopped',
-  });
 
   expect(ctx.signalProcess).not.toHaveBeenCalled();
   expect(ctx.clock.now()).toBe(5000);
 });
 
-test('it counts every descendant as running while a later listing fails', async () => {
+test('it counts every descendant as running while a later listing fails', () => {
   const ctx = setupTest();
 
   const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
@@ -269,18 +259,13 @@ test('it counts every descendant as running while a later listing fails', async 
     null,
   ]);
 
-  const failure = await stopDescendantProcesses({
-    rootPID: 4100,
-    deadlineMs: 5000,
-    clock: ctx.clock,
-    signalProcess: ctx.signalProcess,
-    readProcessTable,
-  }).then(
-    () => null,
-    (error: unknown) => error,
-  );
-
-  expect(failure).toMatchObject({
-    message: 'the processes 4120, 4130 still run 5000 ms after SIGKILL',
-  });
+  expect(
+    stopDescendantProcesses({
+      rootPID: 4100,
+      deadlineMs: 5000,
+      clock: ctx.clock,
+      signalProcess: ctx.signalProcess,
+      readProcessTable,
+    }),
+  ).rejects.toThrowWithMessage(Error, 'the processes 4120, 4130 still run 5000 ms after SIGKILL');
 });
