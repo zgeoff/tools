@@ -1,10 +1,11 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import { $ } from 'bun';
+import invariant from 'tiny-invariant';
 import { buildSkillPageLines } from '../test-utils/build-skill-page-lines.ts';
 
 async function setupTest() {
@@ -39,7 +40,27 @@ async function setupTest() {
   const run = (...args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`.cwd(directory).env(env).nothrow().quiet();
 
-  return { outsideDirectory, writePage, run };
+  // A PATH that holds the commands the script calls, linked from this host's PATH, but no bun.
+  const noBunPath = join(outsideDirectory, 'bin');
+
+  await mkdir(noBunPath);
+
+  for (const command of ['bash', 'git', 'perl', 'sed', 'sort', 'dirname']) {
+    const commandPath = Bun.which(command);
+
+    invariant(commandPath !== null, `${command} is not on the PATH`);
+
+    await symlink(commandPath, join(noBunPath, command));
+  }
+
+  const runWithoutBun = () =>
+    $`${join(noBunPath, 'bash')} ${scriptPath}`
+      .cwd(directory)
+      .env({ ...env, PATH: noBunPath })
+      .nothrow()
+      .quiet();
+
+  return { outsideDirectory, writePage, run, runWithoutBun };
 }
 
 test('it passes a skill with a name, a description, and short files', async () => {
@@ -145,6 +166,121 @@ test.each([
       '.claude/skills/demo/SKILL.md: description holds a colon and a space, which YAML reads as a key in a plain scalar; reword it, or quote it or write it as a block scalar (>-)\n' +
       'check-skill: 1 skills, 1 errors, 0 warnings\n',
     stderr: '',
+  });
+});
+
+test.each([
+  [
+    'a double quote inside a double-quoted description',
+    [
+      'description:',
+      '  "Tidies release notes. It cuts filler ("very", "really") and keeps each',
+      '  entry to one line. Load it before a release."',
+    ],
+  ],
+  [
+    'an apostrophe inside a single-quoted description, before another key',
+    [
+      'description:',
+      "  'Runs the demo service. Load the repo's project skill beside it; where they",
+      "  disagree, the project skill wins.'",
+      'metadata:',
+      '  kind: rule-set',
+    ],
+  ],
+  [
+    'an apostrophe on the last line of a single-quoted description',
+    [
+      'description:',
+      "  'Seeds the demo database. Load it before you run the",
+      "  service's first test.'",
+    ],
+  ],
+])('it fails frontmatter that is not valid YAML: %s', async (_, description) => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', ['---', 'name: demo', ...description, '---']);
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      '.claude/skills/demo/SKILL.md: frontmatter is not valid YAML (YAML Parse error: Unexpected token), so a strict loader refuses the skill; escape each quote inside a quoted value, or write the value as a block scalar (>-)\n' +
+      'check-skill: 1 skills, 1 errors, 0 warnings\n',
+    stderr: '',
+  });
+});
+
+test.each([
+  [
+    'escaped double quotes inside a double-quoted description',
+    [
+      'description:',
+      String.raw`  "Tidies release notes. It cuts filler (\"very\", \"really\") and keeps each`,
+      '  entry to one line. Load it before a release."',
+    ],
+  ],
+  [
+    'a doubled apostrophe inside a single-quoted description, before another key',
+    [
+      'description:',
+      "  'Runs the demo service. Load the repo''s project skill beside it; where they",
+      "  disagree, the project skill wins.'",
+      'metadata:',
+      '  kind: rule-set',
+    ],
+  ],
+  [
+    'an apostrophe inside a double-quoted description',
+    [
+      'description:',
+      '  "Seeds the demo database. Load it before you run the',
+      '  service\'s first test."',
+    ],
+  ],
+])('it passes frontmatter that is valid YAML: %s', async (_, description) => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', ['---', 'name: demo', ...description, '---']);
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-skill: 1 skills, 0 errors, 0 warnings\n',
+    stderr: '',
+  });
+});
+
+test('it stops with exit 2 when bun is not on the PATH', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description: Commands for the demo service. Load it before a demo test.',
+    '---',
+  ]);
+
+  const result = await ctx.runWithoutBun();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr: 'check-skill: cannot run bun to parse the frontmatter: No such file or directory\n',
   });
 });
 
