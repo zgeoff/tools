@@ -14,8 +14,6 @@ const manifestContentsSchema = z.object({
   encoding: z.literal('base64'),
 });
 
-// Returns the file of a contents API response from GitHub, or null when the response holds no
-// base64 content.
 export function parseManifestContents(value: unknown): ManifestContents | null {
   const parsed = manifestContentsSchema.safeParse(value);
 
