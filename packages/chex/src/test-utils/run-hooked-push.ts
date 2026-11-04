@@ -1,4 +1,4 @@
-import type { GitEnv } from '@zgeoff/std/test-utils/read-git-env';
+import type { GitEnv } from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
 import { collectFailedHookJobs } from './collect-failed-hook-jobs.ts';
 

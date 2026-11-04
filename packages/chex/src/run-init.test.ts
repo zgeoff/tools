@@ -3,7 +3,7 @@ import { mkdtemp, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
-import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
+import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import type { InitDeps } from './run-init.ts';
 import { runInit } from './run-init.ts';
 import { buildInitGuardHooks } from './test-utils/build-init-guard-hooks.ts';

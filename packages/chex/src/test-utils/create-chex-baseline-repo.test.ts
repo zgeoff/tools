@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, readlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
+import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
 import { buildInitGuardHooks } from './build-init-guard-hooks.ts';
 import { createChexBaselineRepo } from './create-chex-baseline-repo.ts';
