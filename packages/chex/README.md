@@ -75,8 +75,8 @@ skipped file back:
   under `.agents/skills/`, `.claude/skills/`, `skills/` and `sync/skills/`, which hold the banned
   patterns as examples.
 - `links` skips `project-docs-writing` under `.agents/skills/` and `.claude/skills/`, and
-  `docs-writing` and `skill-writing` under `.claude/skills/` and `sync/skills/`, which link to
-  placeholder targets as examples.
+  `docs-writing` and `skill-writing` under `.agents/skills/`, `.claude/skills/` and `sync/skills/`,
+  which link to placeholder targets as examples.
 - `prose`, `links`, `readmes` and `skill` skip each file that `.gitattributes` marks
   `linguist-vendored`.
 
