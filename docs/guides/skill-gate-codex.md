@@ -14,8 +14,8 @@ Codex runs a repo's hooks only in a trusted project, and only after you trust ea
 Open `/hooks` in the Codex CLI and trust the four entries. A changed definition needs a new review.
 
 Codex finds a repo's skills in `.agents/skills`, while the rules and the gate's own skill checks use
-`.claude/skills`. A repo that serves both harnesses makes `.agents/skills` a symlink to
-`.claude/skills`, or the reverse.
+`.claude/skills`. Each repo keeps its skills in `.agents/skills` and links `.claude/skills` to it,
+as [Skills](../architecture/repo-sync.md#skills) describes, so both paths reach the same files.
 
 ## How Codex loads count
 

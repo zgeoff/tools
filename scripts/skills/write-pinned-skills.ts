@@ -20,7 +20,7 @@ export interface WritePinnedSkillsOptions {
   // The URL that, with a commit appended, serves the gzipped tarball of zgeoff/skills at it.
   readonly archiveBaseURL: string;
 
-  // The skills this repo takes, each linked into .claude/skills/.
+  // The skills this repo takes, each linked into .agents/skills/.
   readonly skills: readonly string[];
 
   readonly fileSystem: Pick<
@@ -103,7 +103,7 @@ async function writeLockedSkills(options: Readonly<WritePinnedSkillsOptions>): P
     }
   }
 
-  await options.fileSystem.createDirectory(join(options.cwd, '.claude', 'skills'));
+  await options.fileSystem.createDirectory(join(options.cwd, '.agents', 'skills'));
 
   for (const skill of options.skills) {
     await writeSkillLink(options, commit, skill);
@@ -169,7 +169,7 @@ async function probeSkillLink(
     return false;
   }
 
-  const link = join('.claude', 'skills', skill);
+  const link = join('.agents', 'skills', skill);
 
   const exists = await options.fileSystem.probePath(join(options.cwd, link));
 
@@ -195,7 +195,7 @@ async function writeSkillLink(
   commit: string,
   skill: string,
 ): Promise<void> {
-  const staged = join('.claude', 'skills', `.${skill}.${options.runID}`);
+  const staged = join('.agents', 'skills', `.${skill}.${options.runID}`);
 
   await runChecked(options, [
     'ln',
@@ -206,11 +206,12 @@ async function writeSkillLink(
 
   await options.renamePath(
     join(options.cwd, staged),
-    join(options.cwd, '.claude', 'skills', skill),
+    join(options.cwd, '.agents', 'skills', skill),
   );
 }
 
-// The skills that `bun run skills:install` links into this repo's .claude/skills/.
+// The skills that `bun run skills:install` links into this repo's .agents/skills/, which
+// .claude/skills links to.
 export const defaultPinnedSkills = [
   'code-style',
   'docs-writing',
