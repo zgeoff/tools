@@ -13,6 +13,6 @@
   "packages/diet": "0.2.0",
   "packages/agent-hooks": "0.2.0",
   "packages/rig": "0.1.0",
-  "packages/chex": "0.1.0",
+  "packages/chex": "0.1.1",
   "packages/testing": "0.2.0"
 }

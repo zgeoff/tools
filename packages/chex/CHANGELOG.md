@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.1.0...@zgeoff/chex@0.1.1) (2026-11-04)
+
+
+### Bug Fixes
+
+* **chex:** drop the crash lane, which no repo or lane config defines ([#500](https://github.com/zgeoff/tools/issues/500)) ([9ada3e3](https://github.com/zgeoff/tools/commit/9ada3e36981da01ef401b427cc9490b65d8648c4))
+
 ## [0.1.0](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.14...@zgeoff/chex@0.1.0) (2026-11-04)
 
 
