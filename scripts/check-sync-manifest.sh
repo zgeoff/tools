@@ -8,7 +8,8 @@
 # key the repo-sync scripts do not read,
 # every file under skills/<name>/ in zgeoff/skills listed by the entry that
 # ships that skill, except the tests, and every package a code source imports
-# listed in its entry's `packages`.
+# listed in its entry's `packages`, and this repo's own .claude/skill-gate.json
+# holding every ignore entry and gate of the source that targets that path.
 #
 # A source whose `repo` is zgeoff/skills resolves in the zgeoff/skills tree at
 # the commit sync/skills-pin.json pins, which bun run skills:install unpacks
@@ -211,6 +212,31 @@ while IFS=$'\t' read -r name repo; do
 done < <(jq -r '.[] | .name as $n
   | [.files[] | .except // [] | select(type == "array") | .[] | strings | ascii_downcase] | unique | .[]
   | [$n, .] | @tsv' "$manifest")
+
+# This repo keeps a .claude/skill-gate.json of its own, with gates on top of
+# the shared rules that repo-sync delivers to that path elsewhere, so the copy
+# must still hold every shared ignore entry and gate.
+own_rules=.claude/skill-gate.json
+
+while IFS=$'\t' read -r name repo source; do
+  path=$(source_path "$repo" "$source")
+  [ -f "$path" ] && [ -f "$own_rules" ] || continue
+
+  if ! missing=$(jq -rn --slurpfile shared "$path" --slurpfile own "$own_rules" '
+    $shared[0] as $s | $own[0] as $o
+    | (($s.ignore // [])[] | select(. as $i | ($o.ignore // []) | any(.[]; . == $i) | not)
+      | "ignore entry \(tojson)"),
+      (($s.gates // [])[] | select(. as $g | ($o.gates // []) | any(.[]; . == $g) | not)
+      | "gate \(tojson)")' 2>&1); then
+    report "entry '$name' delivers $source, but $own_rules or the source is not readable JSON: $missing"
+    continue
+  fi
+
+  while IFS= read -r item; do
+    [ -n "$item" ] && report "entry '$name' delivers $source, but this repo's $own_rules lacks its $item"
+  done <<< "$missing"
+done < <(jq -r --arg target "$own_rules" '.[] | .name as $n | .files[] | select(.target == $target)
+  | [$n, (.repo // "zgeoff/tools"), .source] | @tsv' "$manifest")
 
 # A skill links its references by relative path, so a file the entry omits
 # arrives downstream as a dead link. Each entry that ships a file from a skill
