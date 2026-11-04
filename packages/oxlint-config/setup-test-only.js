@@ -24,16 +24,33 @@ const setupTestOnly = {
       modifier:
         '`test.{{modifier}}` is banned: use `test.skipIf(<condition>)` for a skip. Committed `skip`, `todo`, `only` and `failing` tests are not allowed.',
       concurrent: '`test.concurrent` is banned: tests that use `onTestFinished` run in order.',
+      branch:
+        'Move the case this {{branch}} picks into the test that needs it: the testing skill gives `setupTest()` no `if` and no ternary, because a branch there picks a scenario, and the scenario belongs in the test. Keep `setupTest()` to the wiring that every test shares.',
     },
     schema: [],
   },
   create(context) {
+    if (!testFilePattern.test(basename(context.physicalFilename))) {
+      return {};
+    }
+
     return {
-      Program(program) {
-        if (!testFilePattern.test(basename(context.physicalFilename))) {
+      IfStatement(node) {
+        // an `else if` belongs to the chain that its first `if` reports
+        if (node.parent.type === 'IfStatement' && node.parent.alternate === node) {
           return;
         }
 
+        reportSetupTestBranch(context, node, '`if`');
+      },
+      ConditionalExpression(node) {
+        if (isOptionalSpread(node)) {
+          return;
+        }
+
+        reportSetupTestBranch(context, node, 'ternary');
+      },
+      Program(program) {
         const testNames = collectTestNames(context, program);
         const isBunTest = isBunTestFile(program);
         const constants = [];
@@ -89,6 +106,48 @@ const setupTestOnly = {
     };
   },
 };
+
+// a branch in a function nested in setupTest, such as a stub callback, runs only when the
+// unit calls it, so only setupTest's own body counts
+function reportSetupTestBranch(context, node, branch) {
+  let current = node.parent;
+
+  while (isOutsideFunction(current)) {
+    current = current.parent;
+  }
+
+  if (
+    current?.type === 'FunctionDeclaration' &&
+    current.id?.name === 'setupTest' &&
+    current.parent.type === 'Program'
+  ) {
+    context.report({ node, messageId: 'branch', data: { branch } });
+  }
+}
+
+const functionTypes = new Set([
+  'FunctionDeclaration',
+  'FunctionExpression',
+  'ArrowFunctionExpression',
+]);
+
+function isOutsideFunction(node) {
+  return node !== null && node !== undefined && !functionTypes.has(node.type);
+}
+
+// `...(cond ? {} : { lid })` adds an optional property under exactOptionalPropertyTypes, which
+// is wiring like `??`
+function isOptionalSpread(node) {
+  return (
+    node.parent.type === 'SpreadElement' &&
+    node.parent.parent.type === 'ObjectExpression' &&
+    (isEmptyObject(node.consequent) || isEmptyObject(node.alternate))
+  );
+}
+
+function isEmptyObject(node) {
+  return node.type === 'ObjectExpression' && node.properties.length === 0;
+}
 
 const testModules = new Set(['bun:test', 'claude-code/testing']);
 
@@ -259,12 +318,6 @@ function isSkipGate(context, declarator, gates, testNames) {
   );
 }
 
-const functionTypes = new Set([
-  'FunctionDeclaration',
-  'FunctionExpression',
-  'ArrowFunctionExpression',
-]);
-
 // bun test reads a `skipIf` gate as it collects tests, so a read inside a
 // function, which runs later, does not count
 function isInSkipIfArgument(identifier, testNames) {
@@ -305,10 +358,6 @@ function isInGateInit(identifier, gates) {
   }
 
   return false;
-}
-
-function isOutsideFunction(node) {
-  return node !== null && node !== undefined && !functionTypes.has(node.type);
 }
 
 export default setupTestOnly;

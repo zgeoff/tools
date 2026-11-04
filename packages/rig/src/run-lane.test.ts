@@ -1,4 +1,5 @@
 import { expect, mock, test } from 'bun:test';
+import invariant from 'tiny-invariant';
 import type { BrowserLaneWiring } from './browser/wire-browser-lane-hooks.ts';
 import { defineRig } from './define-rig.ts';
 import type { LaneHooks } from './lane-hooks.ts';
@@ -39,9 +40,7 @@ function setupTest() {
 
   const e2eLane = e2eConfig.lanes.find((candidate) => candidate.name === 'e2e');
 
-  if (e2eLane === undefined) {
-    throw new Error('the config holds no e2e lane');
-  }
+  invariant(e2eLane, 'the config holds no e2e lane');
 
   const kettleFiles = ['packages/kettle/package.json', 'packages/kettle/e2e/cli-boil.test.ts'];
 

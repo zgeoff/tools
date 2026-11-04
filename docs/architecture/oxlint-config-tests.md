@@ -71,6 +71,19 @@ never reach a `skipIf` and report. A `const` that nothing reads reports too, and
 declarator that binds nothing, such as `const {} = registerHooks()`. The rule does not check the
 comment that the skill asks a gate to carry.
 
+The rule also reports an `if` and a ternary in the body of the module-level `setupTest()`, because
+the testing skill gives `setupTest()` no `if`: a branch there picks a scenario, and the scenario
+belongs in the test. The message tells the agent to move the case into the test that needs it. An
+`if` with `else if` arms reports once, at its first `if`. A branch in a nested block or loop
+reports, and a branch in a function nested in `setupTest()`, such as a stub callback or a dispose
+method, does not, because it runs only when the unit calls it. `??`, `&&` and `||` pass, so
+`options.clock ?? buildStubClock()` stays as default wiring.
+
+An optional spread passes too: a ternary that is the whole argument of an object spread, with `{}`
+as one arm, such as `...(lid === undefined ? {} : { lid })`, which adds an optional property. An
+object spread ternary with two non-empty arms reports, and so does a ternary inside an arm of an
+optional spread.
+
 ## `zgeoff/no-file-snapshot`
 
 Snapshots are inline only, so the golden value sits in the test that pins it. The rule reports every

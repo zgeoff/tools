@@ -889,6 +889,139 @@ test.each([
   expect(result.stdout).toInclude('Move this statement into a test or `setupTest()`');
 });
 
+test.each([
+  ['an if', '  if (options.hot) {\n    return { kettle: options.kettle };\n  }\n', '`if`'],
+  [
+    'an if in a loop',
+    '  for (const cup of options.cups) {\n    if (cup.full) {\n      pour(cup);\n    }\n  }\n',
+    '`if`',
+  ],
+  [
+    'an if in a block',
+    '  {\n    if (options.hot) {\n      pour(options.kettle);\n    }\n  }\n',
+    '`if`',
+  ],
+  ['a ternary', '  const water = options.hot ? boil() : pour();\n', 'ternary'],
+  [
+    'a spread ternary with no empty arm',
+    '  const pot = { ...(options.hot ? { heat: 100 } : { heat: 20 }) };\n',
+    'ternary',
+  ],
+  [
+    'a ternary with an empty arm outside a spread',
+    '  const pot = options.lid === undefined ? {} : { lid: options.lid };\n',
+    'ternary',
+  ],
+  [
+    'an array spread ternary with an empty object arm',
+    '  const cups = [...(options.hot ? {} : options.cups)];\n',
+    'ternary',
+  ],
+  [
+    'a call spread ternary with an empty object arm',
+    '  pour(...(options.hot ? {} : options.cups));\n',
+    'ternary',
+  ],
+  [
+    'a ternary in an arm of an optional spread',
+    '  const pot = { ...(options.lid === undefined ? {} : { lid: options.hot ? 100 : 20 }) };\n',
+    'ternary',
+  ],
+])('it flags %s in the body of setupTest', async (_, branch, name) => {
+  const source = `import { test } from 'bun:test';\n\nfunction setupTest(options) {\n${branch}\n  return {};\n}\n\ntest('it pours', () => {});\n`;
+
+  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude(`Move the case this ${name} picks into the test that needs it`);
+  expect(result.stdout).toInclude('the testing skill gives `setupTest()` no `if` and no ternary');
+});
+
+test('it flags an if chain in setupTest once', async () => {
+  const source =
+    "import { test } from 'bun:test';\n\nfunction setupTest(size) {\n  if (size === 'small') {\n    return { cups: 1 };\n  } else if (size === 'large') {\n    return { cups: 8 };\n  }\n\n  return { cups: 4 };\n}\n\ntest('it pours', () => {});\n";
+
+  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
+
+  expect(result.stdout.split('Move the case this `if` picks')).toHaveLength(2);
+});
+
+test.each([
+  ['a ?? default', '  const clock = options.clock ?? buildClock();\n'],
+  ['an && guard', '  const lid = options.hot && buildLid();\n'],
+  ['an || fallback', '  const cups = options.cups || 4;\n'],
+  [
+    'an optional spread with the empty object first',
+    '  const pot = { ...(options.lid === undefined ? {} : { lid: options.lid }) };\n',
+  ],
+  [
+    'an optional spread with the empty object last',
+    '  const pot = buildPot({ ...(options.lid === undefined ? { lid: buildLid() } : {}) });\n',
+  ],
+  [
+    'an if in a stub callback',
+    '  const pour = (cup) => {\n    if (cup.full) {\n      return 0;\n    }\n\n    return 1;\n  };\n',
+  ],
+  [
+    'a ternary in a function expression',
+    '  const boil = function () {\n    return options.hot ? 100 : 20;\n  };\n',
+  ],
+  [
+    'a ternary in an object method',
+    '  const kettle = {\n    read() {\n      return options.hot ? 100 : 20;\n    },\n  };\n',
+  ],
+  [
+    'an if in an async dispose method',
+    '  const pot = {\n    async [Symbol.asyncDispose]() {\n      if (options.hot) {\n        await cool();\n      }\n    },\n  };\n',
+  ],
+])('it accepts %s in setupTest', async (_, wiring) => {
+  const source = `import { test } from 'bun:test';\n\nfunction setupTest(options) {\n${wiring}\n  return {};\n}\n\ntest('it pours', () => {});\n`;
+
+  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
+
+  expect(result.stdout).not.toInclude('setup-test-only');
+});
+
+test.each([
+  [
+    'a test body',
+    "function setupTest() {\n  return {};\n}\n\ntest('it pours', () => {\n  const cups = process.env['CUPS'] ? 2 : 1;\n\n  if (cups > 1) {\n    pour();\n  }\n});\n",
+  ],
+  [
+    'a module-level helper',
+    'function readPot(hot) {\n  if (hot) {\n    return 100;\n  }\n\n  return hot ? 1 : 0;\n}\n',
+  ],
+  [
+    'a function declared in setupTest',
+    'function setupTest() {\n  function pour(cup) {\n    if (cup.full) {\n      return 0;\n    }\n\n    return 1;\n  }\n\n  return { pour };\n}\n',
+  ],
+])('it leaves a branch in %s to other rules', async (_, code) => {
+  const source = `import { test } from 'bun:test';\n\n${code}\ntest('it boils', () => {});\n`;
+
+  const result = await runLintTree({ 'pot.test.ts': source }, 'pot.test.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
+
+  expect(result.stdout).not.toInclude('Move the case this');
+});
+
+test('it leaves a branch in setupTest of a file that is no test file', async () => {
+  const source =
+    'export function setupTest(hot) {\n  if (hot) {\n    return 100;\n  }\n\n  return hot ? 1 : 0;\n}\n';
+
+  const result = await runLintTree({ 'pot.ts': source }, 'pot.ts', {
+    'zgeoff/setup-test-only': 'error',
+  });
+
+  expect(result.stdout).not.toInclude('setup-test-only');
+});
+
 test('it accepts a skip gate that only skipIf arguments read', async () => {
   const source =
     "import { test } from 'bun:test';\nimport { probeKettle } from './probe-kettle';\n\n// skipIf takes a boolean and has no in-body skip\nconst hasKettle = await probeKettle();\n\ntest.skipIf(!hasKettle)('it boils', () => {});\n\ntest.skipIf(!hasKettle)('it whistles', () => {});\n";
