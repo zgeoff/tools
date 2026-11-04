@@ -1,9 +1,11 @@
-import type { FileSystem } from './file-system.ts';
+export interface StepOutputFile {
+  readonly appendText: (path: string, text: string) => Promise<void>;
+}
 
 // GitHub Actions reads each `name=value` line of the file that GITHUB_OUTPUT names as one step
 // output, so a value that holds a newline would end its output early.
 export async function writeStepOutputs(
-  fileSystem: Pick<FileSystem, 'appendText'>,
+  outputFile: StepOutputFile,
   outputPath: string,
   outputs: Readonly<Record<string, string>>,
 ): Promise<void> {
@@ -15,5 +17,5 @@ export async function writeStepOutputs(
     return `${name}=${value}\n`;
   });
 
-  await fileSystem.appendText(outputPath, lines.join(''));
+  await outputFile.appendText(outputPath, lines.join(''));
 }

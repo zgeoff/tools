@@ -1,8 +1,8 @@
+import { writeStepOutputs } from '../../packages/chex/src/write-step-outputs.ts';
 import type { FileSystem } from '../ci/file-system.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
-import { writeStepOutputs } from '../ci/write-step-outputs.ts';
 import { matchChangedFiles } from './match-changed-files.ts';
 
 export interface ChangedFilesStep {

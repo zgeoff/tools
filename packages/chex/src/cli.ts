@@ -2,6 +2,7 @@
 import { rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
+import { runCIPlanCommand } from './ci-plan/write-check-plan.ts';
 import { runDependencyGatesCommand } from './dependency-gates/run-dependency-gates-check.ts';
 import { makeCheckRunner } from './make-check-runner.ts';
 import { runChex } from './run-chex.ts';
@@ -42,6 +43,7 @@ process.exitCode = await runChex(process.argv.slice(2), {
         process.stderr.write(text);
       },
     }),
+  runCIPlan: runCIPlanCommand,
   writeOutput: (text) => {
     process.stdout.write(text);
   },

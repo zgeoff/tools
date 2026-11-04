@@ -1,6 +1,6 @@
+import { writeStepOutputs } from '../../packages/chex/src/write-step-outputs.ts';
 import type { FileSystem } from '../ci/file-system.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
-import { writeStepOutputs } from '../ci/write-step-outputs.ts';
 import { pickReleaseOutputs } from './pick-release-outputs.ts';
 
 export interface ReleaseOutputsStep {

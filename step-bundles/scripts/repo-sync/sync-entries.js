@@ -320,7 +320,6 @@ import { isBuiltin } from "module";
 import { dirname as dirname2, join, normalize } from "path";
 var stepScriptSets = {
   "bun-checks": [
-    "scripts/bun-checks/write-check-plan.ts",
     "scripts/bun-checks/run-shell-check.ts",
     "scripts/bun-checks/run-docs-check.ts",
     "scripts/bun-checks/run-actionlint-check.ts",

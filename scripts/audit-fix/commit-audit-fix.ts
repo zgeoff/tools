@@ -1,9 +1,9 @@
+import { writeStepOutputs } from '../../packages/chex/src/write-step-outputs.ts';
 import type { FileSystem } from '../ci/file-system.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
-import { writeStepOutputs } from '../ci/write-step-outputs.ts';
 import { buildAuditFixPaths } from './build-audit-fix-paths.ts';
 import { planAuditFixCommit } from './plan-audit-fix-commit.ts';
 import { planAuditFixPush } from './plan-audit-fix-push.ts';

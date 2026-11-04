@@ -83,7 +83,7 @@ skipped file back:
 `chex init` writes the `extends` line and a
 [`chex-baseline` job](../../docs/architecture/pre-push-baseline.md#a-checkout-without-the-baseline)
 into `lefthook.yml`, and adds a `check:docs` script of `chex prose length links skill` when the repo
-has none. A second run changes nothing.
+has none, and changes nothing on a second run. `chex ci-plan` plans a run of `bun-checks`.
 
 ## The pre-push baseline
 

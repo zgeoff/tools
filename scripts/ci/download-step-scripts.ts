@@ -9,7 +9,6 @@ import { parseArgs } from 'node:util';
 // TypeScript script, which a step runs.
 export const stepScriptSets = {
   'bun-checks': [
-    'scripts/bun-checks/write-check-plan.ts',
     'scripts/bun-checks/run-shell-check.ts',
     'scripts/bun-checks/run-docs-check.ts',
     'scripts/bun-checks/run-actionlint-check.ts',

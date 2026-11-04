@@ -1,8 +1,8 @@
+import { appendFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { match } from 'ts-pattern';
-import type { FileSystem } from '../ci/file-system.ts';
-import { nodeFileSystem } from '../ci/node-file-system.ts';
-import { writeStepOutputs } from '../ci/write-step-outputs.ts';
+import type { StepOutputFile } from '../write-step-outputs.ts';
+import { writeStepOutputs } from '../write-step-outputs.ts';
 import { parseDocsChecks } from './parse-docs-checks.ts';
 import type { CheckPart, CheckPlan } from './plan-check-scripts.ts';
 import { planCheckScripts } from './plan-check-scripts.ts';
@@ -18,7 +18,9 @@ export interface CheckPlanStep {
 
   readonly lane: string;
 
-  readonly fileSystem: Pick<FileSystem, 'appendText' | 'readText'>;
+  readonly readText: (path: string) => Promise<string>;
+
+  readonly outputFile: StepOutputFile;
 }
 
 const parts: readonly CheckPart[] = ['all', 'static', 'test', 'lane'];
@@ -31,7 +33,7 @@ export async function writeCheckPlan(step: Readonly<CheckPlanStep>): Promise<str
     return [`the plan step needs PART (one of ${parts.join(', ')}) and GITHUB_OUTPUT.`];
   }
 
-  const packageText = await step.fileSystem.readText(join(step.cwd, 'package.json'));
+  const packageText = await step.readText(join(step.cwd, 'package.json'));
 
   const packageJSON: unknown = JSON.parse(packageText);
   const scripts = findScripts(packageJSON);
@@ -80,7 +82,7 @@ const planOutcomeWriters: { readonly [Kind in CheckPlan['kind']]: PlanOutcomeWri
     ]),
   planned: async (plan, docs, step) => {
     // Spaces around each list let a later step match one whole name.
-    await writeStepOutputs(step.fileSystem, step.outputPath, {
+    await writeStepOutputs(step.outputFile, step.outputPath, {
       scripts: ` ${plan.scripts.join(' ')} `,
       static: ` ${plan.static.join(' ')} `,
       test: ` ${plan.test.join(' ')} `,
@@ -102,19 +104,20 @@ function writePlanOutcome<Kind extends CheckPlan['kind']>(
   return writeOutcome(plan, docs, step);
 }
 
-if (import.meta.main) {
+export async function runCIPlanCommand(): Promise<number> {
   const errors = await writeCheckPlan({
     cwd: process.cwd(),
     outputPath: process.env['GITHUB_OUTPUT'] ?? '',
     part: process.env['PART'] ?? '',
     scripts: process.env['SCRIPTS'] ?? '',
     lane: process.env['LANE'] ?? '',
-    fileSystem: nodeFileSystem,
+    readText: (path) => readFile(path, 'utf8'),
+    outputFile: { appendText: (path, text) => appendFile(path, text) },
   });
 
   for (const error of errors) {
     process.stdout.write(`::error::${error}\n`);
   }
 
-  process.exitCode = errors.length === 0 ? 0 : 1;
+  return errors.length === 0 ? 0 : 1;
 }

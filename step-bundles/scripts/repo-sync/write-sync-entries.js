@@ -2,6 +2,19 @@
 // scripts/repo-sync/write-sync-entries.ts
 import { join } from "path";
 
+// packages/chex/src/write-step-outputs.ts
+async function writeStepOutputs(outputFile, outputPath, outputs) {
+  const lines = Object.entries(outputs).map(([name, value]) => {
+    if (value.includes(`
+`)) {
+      throw new Error(`the step output ${name} holds a newline`);
+    }
+    return `${name}=${value}
+`;
+  });
+  await outputFile.appendText(outputPath, lines.join(""));
+}
+
 // packages/std/src/is-record.ts
 function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -56,19 +69,6 @@ var nodeFileSystem = {
     }
   }
 };
-
-// scripts/ci/write-step-outputs.ts
-async function writeStepOutputs(fileSystem, outputPath, outputs) {
-  const lines = Object.entries(outputs).map(([name, value]) => {
-    if (value.includes(`
-`)) {
-      throw new Error(`the step output ${name} holds a newline`);
-    }
-    return `${name}=${value}
-`;
-  });
-  await fileSystem.appendText(outputPath, lines.join(""));
-}
 
 // scripts/repo-sync/collect-unread-manifest-keys.ts
 var entryKeys = new Set([

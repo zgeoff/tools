@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolveProgram } from '@zgeoff/rig/e2e';
@@ -33,8 +33,8 @@ async function setupTest() {
   return {
     repo,
     env,
-    runChex: async (args: readonly string[]) => {
-      const result = await run(chex.command, { args, cwd: repo, env });
+    runChex: async (args: readonly string[], stepEnv: Readonly<Record<string, string>> = {}) => {
+      const result = await run(chex.command, { args, cwd: repo, env: { ...env, ...stepEnv } });
 
       return { ...result, lastLine: result.stdout.trimEnd().split('\n').at(-1) };
     },
@@ -95,5 +95,64 @@ ${buildInitGuardHooks()}`,
     name: 'kettle',
     devDependencies: { '@zgeoff/chex': '0.1.0', '@zgeoff/diet': '0.1.2', '@zgeoff/rig': '0.0.2' },
     scripts: { 'check:docs': 'chex prose length links skill' },
+  });
+});
+
+test('it writes the check plan of the repo to the step outputs for ci-plan', async () => {
+  const ctx = await setupTest();
+
+  const outputPath = join(ctx.repo, '..', 'output');
+
+  await writeTreeFiles(ctx.repo, {
+    'package.json': JSON.stringify({
+      scripts: { lint: 'true', test: 'true', 'check:docs': 'chex prose links' },
+    }),
+  });
+
+  const result = await ctx.runChex(['ci-plan'], {
+    GITHUB_OUTPUT: outputPath,
+    PART: 'static',
+    SCRIPTS: 'lint test',
+    LANE: '',
+  });
+
+  const output = await readFile(outputPath, 'utf8');
+
+  expect({ exitCode: result.exitCode, output }).toStrictEqual({
+    exitCode: 0,
+    output: [
+      'scripts= lint ',
+      'static= lint ',
+      'test= test ',
+      'lanes=[]',
+      'docs= prose links ',
+      '',
+    ].join('\n'),
+  });
+});
+
+test('it exits 1 with an error annotation and writes no outputs when ci-plan lists a missing script', async () => {
+  const ctx = await setupTest();
+
+  const outputPath = join(ctx.repo, '..', 'output');
+
+  await writeTreeFiles(ctx.repo, {
+    'package.json': JSON.stringify({ scripts: { lint: 'true' } }),
+  });
+
+  const result = await ctx.runChex(['ci-plan'], {
+    GITHUB_OUTPUT: outputPath,
+    PART: 'static',
+    SCRIPTS: 'missing',
+    LANE: '',
+  });
+
+  const wroteOutputs = await Bun.file(outputPath).exists();
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout, wroteOutputs }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      '::error::package.json defines no script named: missing. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list.\n',
+    wroteOutputs: false,
   });
 });
