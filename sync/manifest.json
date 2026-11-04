@@ -149,6 +149,11 @@
       },
       {
         "repo": "zgeoff/skills",
+        "source": "skills/testing/references/schemas-and-access.md",
+        "target": ".claude/skills/testing/references/schemas-and-access.md"
+      },
+      {
+        "repo": "zgeoff/skills",
         "source": "skills/testing/references/seeding.md",
         "target": ".claude/skills/testing/references/seeding.md"
       },
