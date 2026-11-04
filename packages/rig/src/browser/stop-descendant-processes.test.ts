@@ -1,4 +1,5 @@
 import { expect, mock, test } from 'bun:test';
+import { makeAnswerQueue } from '@zgeoff/std/test-utils/make-answer-queue';
 import { buildProcessEntry } from '../test-utils/build-process-entry.ts';
 import { buildSteppingClock } from '../test-utils/build-stepping-clock.ts';
 import type { ProcessEntry } from './read-process-table.ts';
@@ -6,12 +7,6 @@ import type { DescendantStop } from './stop-descendant-processes.ts';
 import { stopDescendantProcesses } from './stop-descendant-processes.ts';
 
 function setupTest() {
-  const listings: (readonly ProcessEntry[] | null)[] = [];
-
-  const readProcessTable = mock<DescendantStop['readProcessTable']>(() =>
-    listings.length > 1 ? (listings.shift() ?? null) : (listings[0] ?? null),
-  );
-
   const signalProcess = mock<DescendantStop['signalProcess']>(() => {});
   const clock = buildSteppingClock();
 
@@ -25,22 +20,19 @@ function setupTest() {
       buildProcessEntry(4130, 4120),
       buildProcessEntry(5200, 1),
     ],
-    queueListings: (queued: readonly (readonly ProcessEntry[] | null)[]) => {
-      listings.push(...queued);
-    },
-    stop: { rootPID: 4100, deadlineMs: 5000, clock, readProcessTable, signalProcess },
+    stop: { rootPID: 4100, deadlineMs: 5000, clock, signalProcess },
   };
 }
 
 test("it kills every descendant of the root, and none of the root's ancestors or other processes", async () => {
   const ctx = setupTest();
 
-  ctx.queueListings([
+  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
     ctx.startingTable,
     [buildProcessEntry(4000, 1), buildProcessEntry(4100, 4000)],
   ]);
 
-  await stopDescendantProcesses(ctx.stop);
+  await stopDescendantProcesses({ ...ctx.stop, readProcessTable });
 
   expect(ctx.signalProcess.mock.calls).toStrictEqual([
     [4120, 'SIGKILL'],
@@ -51,7 +43,7 @@ test("it kills every descendant of the root, and none of the root's ancestors or
 test('it waits until each descendant leaves the listing, zombies included', async () => {
   const ctx = setupTest();
 
-  ctx.queueListings([
+  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
     ctx.startingTable,
     ctx.startingTable,
     [buildProcessEntry(4100, 4000), buildProcessEntry(4130, 1)],
@@ -59,7 +51,7 @@ test('it waits until each descendant leaves the listing, zombies included', asyn
     [buildProcessEntry(4100, 4000)],
   ]);
 
-  await stopDescendantProcesses(ctx.stop);
+  await stopDescendantProcesses({ ...ctx.stop, readProcessTable });
 
   expect(ctx.clock.sleep).toHaveBeenCalledTimes(3);
 });
@@ -67,12 +59,12 @@ test('it waits until each descendant leaves the listing, zombies included', asyn
 test('it resolves at the deadline when only zombies remain, which no process reaps', async () => {
   const ctx = setupTest();
 
-  ctx.queueListings([
+  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
     ctx.startingTable,
     [buildProcessEntry(4100, 4000), buildProcessEntry(4130, 1, 'Z')],
   ]);
 
-  await stopDescendantProcesses(ctx.stop);
+  await stopDescendantProcesses({ ...ctx.stop, readProcessTable });
 
   expect(ctx.clock.now()).toBe(5000);
 });
@@ -80,12 +72,12 @@ test('it resolves at the deadline when only zombies remain, which no process rea
 test('it throws with the descendants that are no zombie and still run at the deadline', async () => {
   const ctx = setupTest();
 
-  ctx.queueListings([
+  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
     ctx.startingTable,
     [...ctx.startingTable, buildProcessEntry(4140, 4130, 'Z')],
   ]);
 
-  const failure = await stopDescendantProcesses(ctx.stop).then(
+  const failure = await stopDescendantProcesses({ ...ctx.stop, readProcessTable }).then(
     () => null,
     (error: unknown) => error,
   );
@@ -97,30 +89,32 @@ test('it throws with the descendants that are no zombie and still run at the dea
   expect(ctx.clock.now()).toBe(5000);
 });
 
-test('it goes on past a descendant that exits before its signal', async () => {
+test('it goes on past each descendant that exits before its signal', async () => {
   const ctx = setupTest();
 
-  ctx.queueListings([ctx.startingTable, [buildProcessEntry(4100, 4000)]]);
+  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
+    ctx.startingTable,
+    [buildProcessEntry(4100, 4000)],
+  ]);
 
-  ctx.signalProcess.mockImplementationOnce(() => {
+  ctx.signalProcess.mockImplementation(() => {
     throw Object.assign(new Error('no such process'), { code: 'ESRCH' });
   });
 
-  await stopDescendantProcesses(ctx.stop);
+  await stopDescendantProcesses({ ...ctx.stop, readProcessTable });
 
   expect(ctx.signalProcess).toHaveBeenCalledTimes(2);
 });
 
 test('it throws a signal failure other than a process that has exited', async () => {
   const ctx = setupTest();
-
-  ctx.queueListings([ctx.startingTable]);
+  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([ctx.startingTable]);
 
   ctx.signalProcess.mockImplementation(() => {
     throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
   });
 
-  const failure = await stopDescendantProcesses(ctx.stop).then(
+  const failure = await stopDescendantProcesses({ ...ctx.stop, readProcessTable }).then(
     () => null,
     (error: unknown) => error,
   );
@@ -130,10 +124,9 @@ test('it throws a signal failure other than a process that has exited', async ()
 
 test('it kills nothing when the first listing fails', async () => {
   const ctx = setupTest();
+  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([null]);
 
-  ctx.queueListings([null]);
-
-  await stopDescendantProcesses(ctx.stop);
+  await stopDescendantProcesses({ ...ctx.stop, readProcessTable });
 
   expect(ctx.signalProcess).not.toHaveBeenCalled();
 });
@@ -141,9 +134,12 @@ test('it kills nothing when the first listing fails', async () => {
 test('it counts every descendant as running while a later listing fails', async () => {
   const ctx = setupTest();
 
-  ctx.queueListings([ctx.startingTable, null]);
+  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
+    ctx.startingTable,
+    null,
+  ]);
 
-  const failure = await stopDescendantProcesses(ctx.stop).then(
+  const failure = await stopDescendantProcesses({ ...ctx.stop, readProcessTable }).then(
     () => null,
     (error: unknown) => error,
   );
