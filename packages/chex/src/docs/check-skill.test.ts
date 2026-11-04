@@ -40,28 +40,27 @@ async function setupTest() {
   const run = (...args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`.cwd(directory).env(env).nothrow().quiet();
 
-  // Runs the script with a PATH that holds only the named commands, linked from this host's PATH.
-  const runWithCommands = async (commands: readonly string[]) => {
-    const binDirectory = join(outsideDirectory, 'bin');
+  // A PATH that holds the commands the script calls, linked from this host's PATH, but no bun.
+  const noBunPath = join(outsideDirectory, 'bin');
 
-    await mkdir(binDirectory, { recursive: true });
+  await mkdir(noBunPath);
 
-    for (const command of commands) {
-      const commandPath = Bun.which(command);
+  for (const command of ['bash', 'git', 'perl', 'sed', 'sort', 'dirname']) {
+    const commandPath = Bun.which(command);
 
-      invariant(commandPath !== null, `${command} is not on the PATH`);
+    invariant(commandPath !== null, `${command} is not on the PATH`);
 
-      await symlink(commandPath, join(binDirectory, command));
-    }
+    await symlink(commandPath, join(noBunPath, command));
+  }
 
-    return $`${join(binDirectory, 'bash')} ${scriptPath}`
+  const runWithoutBun = () =>
+    $`${join(noBunPath, 'bash')} ${scriptPath}`
       .cwd(directory)
-      .env({ ...env, PATH: binDirectory })
+      .env({ ...env, PATH: noBunPath })
       .nothrow()
       .quiet();
-  };
 
-  return { outsideDirectory, writePage, run, runWithCommands };
+  return { outsideDirectory, writePage, run, runWithoutBun };
 }
 
 test('it passes a skill with a name, a description, and short files', async () => {
@@ -272,7 +271,7 @@ test('it stops with exit 2 when bun is not on the PATH', async () => {
     '---',
   ]);
 
-  const result = await ctx.runWithCommands(['bash', 'git', 'perl', 'sed', 'sort', 'dirname']);
+  const result = await ctx.runWithoutBun();
 
   expect({
     exitCode: result.exitCode,
