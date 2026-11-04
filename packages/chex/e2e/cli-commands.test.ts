@@ -130,3 +130,29 @@ test('it writes the check plan of the repo to the step outputs for ci-plan', asy
     ].join('\n'),
   });
 });
+
+test('it exits 1 with an error annotation and writes no outputs when ci-plan lists a missing script', async () => {
+  const ctx = await setupTest();
+
+  const outputPath = join(ctx.repo, '..', 'output');
+
+  await writeTreeFiles(ctx.repo, {
+    'package.json': JSON.stringify({ scripts: { lint: 'true' } }),
+  });
+
+  const result = await ctx.runChex(['ci-plan'], {
+    GITHUB_OUTPUT: outputPath,
+    PART: 'static',
+    SCRIPTS: 'missing',
+    LANE: '',
+  });
+
+  const wroteOutputs = await Bun.file(outputPath).exists();
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout, wroteOutputs }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      '::error::package.json defines no script named: missing. Pass the scripts input, or set the BUN_CHECK_SCRIPTS repo variable, to change the list.\n',
+    wroteOutputs: false,
+  });
+});
