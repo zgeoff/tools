@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'bun:test';
-import { makeAnswerQueue } from '@zgeoff/std/test-utils/make-answer-queue';
+import { makeRepeatingAnswerQueue } from '@zgeoff/testing/helpers';
 import { buildProcessEntry } from '../test-utils/build-process-entry.ts';
 import { buildSteppingClock } from '../test-utils/build-stepping-clock.ts';
 import type { ProcessEntry } from './read-process-table.ts';
@@ -19,7 +19,7 @@ function setupTest() {
 test("it kills every descendant of the root, and none of the root's ancestors or other processes", async () => {
   const ctx = setupTest();
 
-  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
+  const readProcessTable = makeRepeatingAnswerQueue<readonly ProcessEntry[] | null>([
     [
       buildProcessEntry(4000, 1),
       buildProcessEntry(4100, 4000),
@@ -47,7 +47,7 @@ test("it kills every descendant of the root, and none of the root's ancestors or
 test('it waits until each descendant leaves the listing, zombies included', async () => {
   const ctx = setupTest();
 
-  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
+  const readProcessTable = makeRepeatingAnswerQueue<readonly ProcessEntry[] | null>([
     [
       buildProcessEntry(4000, 1),
       buildProcessEntry(4100, 4000),
@@ -81,7 +81,7 @@ test('it waits until each descendant leaves the listing, zombies included', asyn
 test('it resolves at the deadline when only zombies remain, which no process reaps', async () => {
   const ctx = setupTest();
 
-  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
+  const readProcessTable = makeRepeatingAnswerQueue<readonly ProcessEntry[] | null>([
     [
       buildProcessEntry(4000, 1),
       buildProcessEntry(4100, 4000),
@@ -106,7 +106,7 @@ test('it resolves at the deadline when only zombies remain, which no process rea
 test('it throws with the descendants that are no zombie and still run at the deadline', () => {
   const ctx = setupTest();
 
-  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
+  const readProcessTable = makeRepeatingAnswerQueue<readonly ProcessEntry[] | null>([
     [
       buildProcessEntry(4000, 1),
       buildProcessEntry(4100, 4000),
@@ -141,7 +141,7 @@ test('it throws with the descendants that are no zombie and still run at the dea
 test('it reads a failed first listing again, and kills the descendants that the next one shows', async () => {
   const ctx = setupTest();
 
-  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
+  const readProcessTable = makeRepeatingAnswerQueue<readonly ProcessEntry[] | null>([
     null,
     [
       buildProcessEntry(4000, 1),
@@ -169,7 +169,7 @@ test('it reads a failed first listing again, and kills the descendants that the 
 
 test('it throws and kills nothing when the listing fails until the deadline', () => {
   const ctx = setupTest();
-  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([null]);
+  const readProcessTable = makeRepeatingAnswerQueue<readonly ProcessEntry[] | null>([null]);
 
   expect(
     stopDescendantProcesses({
@@ -191,7 +191,7 @@ test('it throws and kills nothing when the listing fails until the deadline', ()
 test('it counts every descendant as running while a later listing fails', () => {
   const ctx = setupTest();
 
-  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
+  const readProcessTable = makeRepeatingAnswerQueue<readonly ProcessEntry[] | null>([
     [
       buildProcessEntry(4000, 1),
       buildProcessEntry(4100, 4000),

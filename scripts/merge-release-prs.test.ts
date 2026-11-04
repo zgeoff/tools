@@ -2,10 +2,10 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { buildMockHeadResponse } from './test-utils/build-mock-head-response.ts';
 import { createStubClock } from './test-utils/create-stub-clock.ts';
 import { createStubGH } from './test-utils/create-stub-gh.ts';
-import { readRunFolderPrefix } from './test-utils/read-run-folder-prefix.ts';
 import { runBashScript } from './test-utils/run-bash-script.ts';
 
 async function setupTest() {

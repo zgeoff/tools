@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { readStreamUntil } from '@zgeoff/std/test-utils/read-stream-until';
+import { readStreamUntil } from '@zgeoff/testing/helpers';
 import { killProcessGroups } from './kill-process-groups.ts';
 import { probeProcess } from './probe-process.ts';
 import { stopProcessGroups } from './stop-process-groups.ts';

@@ -1,10 +1,10 @@
 import { expect, test } from 'bun:test';
 import { symlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { readPinnedSkillText } from '@zgeoff/std/test-utils/read-pinned-skill-text';
 import { nodeFileSystem } from '../../scripts/ci/node-file-system.ts';
 import { collectBannedVerbs } from './src/test-utils/collect-banned-verbs.ts';
 import { createLintTree } from './src/test-utils/create-lint-tree.ts';
+import { readPinnedSkillText } from './src/test-utils/read-pinned-skill-text.ts';
 import { runLintIn } from './src/test-utils/run-lint-in.ts';
 import { runLintTree } from './src/test-utils/run-lint-tree.ts';
 import { runLint } from './src/test-utils/run-lint.ts';

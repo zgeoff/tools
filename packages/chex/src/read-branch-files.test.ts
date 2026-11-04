@@ -2,11 +2,13 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createGitCommit } from '@zgeoff/std/test-utils/create-git-commit';
-import { makeAnswerQueue } from '@zgeoff/std/test-utils/make-answer-queue';
-import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
-import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
-import { runGit } from '@zgeoff/std/test-utils/run-git';
+import {
+  createGitCommit,
+  makeAnswerQueue,
+  readGitEnv,
+  readRunFolderPrefix,
+  runGit,
+} from '@zgeoff/testing/helpers';
 import { readBranchFiles } from './read-branch-files.ts';
 import type { ProgramResult, RunProgram } from './run-program.ts';
 import { runProgram } from './run-program.ts';

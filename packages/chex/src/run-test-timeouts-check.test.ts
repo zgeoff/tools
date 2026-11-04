@@ -2,12 +2,12 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { readPinnedSkillText } from '@zgeoff/std/test-utils/read-pinned-skill-text';
-import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
+import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
 import { nodeFileSystem } from '../../../scripts/ci/node-file-system.ts';
 import { runProgram } from './run-program.ts';
 import { runTestTimeoutsCheck } from './run-test-timeouts-check.ts';
+import { readPinnedSkillText } from './test-utils/read-pinned-skill-text.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('run-test-timeouts-check-')));

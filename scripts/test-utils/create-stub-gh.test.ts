@@ -1,8 +1,8 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { createStubGH } from './create-stub-gh.ts';
-import { readRunFolderPrefix } from './read-run-folder-prefix.ts';
 
 async function setupTest() {
   // Inside the checkout, not the system temp dir: the folder is git-ignored.

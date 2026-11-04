@@ -28,6 +28,11 @@
       "bun": "./src/cli/index.ts",
       "default": "./src/cli/index.ts"
     },
+    "./helpers": {
+      "types": "./dist/helpers/index.d.ts",
+      "bun": "./src/helpers/index.ts",
+      "default": "./src/helpers/index.ts"
+    },
     "./process": {
       "types": "./dist/process/index.d.ts",
       "bun": "./src/process/index.ts",
@@ -46,7 +51,6 @@
   },
   "devDependencies": {
     "@types/bun": "catalog:",
-    "@zgeoff/std": "workspace:*",
     "tsrs": "catalog:",
     "typescript": "catalog:"
   },

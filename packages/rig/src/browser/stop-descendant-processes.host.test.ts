@@ -1,5 +1,5 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
-import { makeAnswerQueue } from '@zgeoff/std/test-utils/make-answer-queue';
+import { makeRepeatingAnswerQueue } from '@zgeoff/testing/helpers';
 import { systemClock } from '../system-clock.ts';
 import { buildProcessEntry } from '../test-utils/build-process-entry.ts';
 import { stopProcessGroups } from '../test-utils/stop-process-groups.ts';
@@ -23,7 +23,7 @@ test('it goes on past a descendant that exits before its signal', async () => {
 
   await exited.exited;
 
-  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
+  const readProcessTable = makeRepeatingAnswerQueue<readonly ProcessEntry[] | null>([
     [buildProcessEntry(4100, 4000), buildProcessEntry(exited.pid, 4100)],
     [buildProcessEntry(4100, 4000)],
   ]);
@@ -44,7 +44,7 @@ test('it goes on past a descendant that exits before its signal', async () => {
 test.skipIf(isRoot)('it throws the EPERM of a descendant that another user runs', () => {
   const ctx = setupTest();
 
-  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
+  const readProcessTable = makeRepeatingAnswerQueue<readonly ProcessEntry[] | null>([
     [buildProcessEntry(4100, 4000), buildProcessEntry(1, 4100)],
   ]);
 

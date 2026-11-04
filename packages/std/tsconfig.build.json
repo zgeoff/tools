@@ -13,5 +13,5 @@
   "files": [],
   "include": ["src"],
   // co-located test files never ship; declaration emit skips them
-  "exclude": ["src/**/*.test.ts", "src/test-utils"]
+  "exclude": ["src/**/*.test.ts"]
 }

@@ -3,8 +3,8 @@ import { readlinkSync } from 'node:fs';
 import { chmod, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
-import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { readPIDNamespace } from './read-pid-namespace.ts';
 import { runTestFolderSweep } from './run-test-folder-sweep.ts';
 

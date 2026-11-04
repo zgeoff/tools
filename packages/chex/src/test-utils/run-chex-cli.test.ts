@@ -2,9 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
-import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
-import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
+import { readGitEnv, readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
 import { runChexCLI } from './run-chex-cli.ts';
 

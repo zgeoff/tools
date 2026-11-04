@@ -1,7 +1,7 @@
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
-import { readRunFolderPrefix } from './read-run-folder-prefix.ts';
 
 export interface ArchiveFile {
   readonly content: string;

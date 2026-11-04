@@ -6,10 +6,12 @@ import { fileLocks } from '@zgeoff/rig/test-utils/file-locks';
 import { probeProcess } from '@zgeoff/rig/test-utils/probe-process';
 import { systemClock } from '@zgeoff/rig/test-utils/system-clock';
 import { templateFiles } from '@zgeoff/rig/test-utils/template-files';
-import { createBlockingStubKit } from '@zgeoff/std/test-utils/create-blocking-stub-kit';
-import { makeRejectingStub } from '@zgeoff/std/test-utils/make-rejecting-stub';
-import { makeResolvingStub } from '@zgeoff/std/test-utils/make-resolving-stub';
-import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
+import {
+  createBlockingStubKit,
+  makeRejectingStub,
+  makeResolvingStub,
+  readRunFolderPrefix,
+} from '@zgeoff/testing/helpers';
 import { makeFileWritingStub } from './make-file-writing-stub.ts';
 import { withPerRunTemplate } from './with-per-run-template.ts';
 

@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
+import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { createListingStubKit } from './create-listing-stub-kit.ts';
 
 async function setupTest() {

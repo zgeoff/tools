@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
+import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { buildProbeRun } from '../test-utils/build-probe-run.ts';
 import { laneFiles } from './lane-files.ts';
 import { removeExitedRunDirs } from './remove-exited-run-dirs.ts';

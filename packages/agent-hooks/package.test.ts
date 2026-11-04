@@ -6,7 +6,7 @@ import { fileLocks } from '@zgeoff/rig/test-utils/file-locks';
 import { probeProcess } from '@zgeoff/rig/test-utils/probe-process';
 import { systemClock } from '@zgeoff/rig/test-utils/system-clock';
 import { templateFiles } from '@zgeoff/rig/test-utils/template-files';
-import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
+import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 import { withPerRunTemplate } from './src/test-utils/with-per-run-template.ts';

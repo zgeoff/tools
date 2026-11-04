@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { readStreamUntil } from '@zgeoff/std/test-utils/read-stream-until';
+import { readStreamUntil } from '@zgeoff/testing/helpers';
 import { probeHostProcess } from './probe-host-process.ts';
 
 test('it finds a process that runs', () => {

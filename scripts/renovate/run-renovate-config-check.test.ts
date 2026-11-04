@@ -1,11 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/helpers';
 import { firstPartyScopes } from '../../packages/chex/src/dependency-gates/first-party-scopes.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import type { CommandOptions, CommandResult } from '../ci/run-command.ts';
-import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
-import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { runRenovateConfigCheck } from './run-renovate-config-check.ts';
 
 async function setupTest() {

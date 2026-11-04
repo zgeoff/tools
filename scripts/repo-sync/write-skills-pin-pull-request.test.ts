@@ -1,9 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { buildCommandStub } from '../test-utils/build-command-stub.ts';
-import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { writeSkillsPinPullRequest } from './write-skills-pin-pull-request.ts';
 
 async function setupTest() {

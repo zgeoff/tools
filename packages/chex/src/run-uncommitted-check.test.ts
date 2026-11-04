@@ -2,10 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createGitCommit } from '@zgeoff/std/test-utils/create-git-commit';
-import { readGitEnv } from '@zgeoff/std/test-utils/read-git-env';
-import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
-import { runGit } from '@zgeoff/std/test-utils/run-git';
+import { createGitCommit, readGitEnv, readRunFolderPrefix, runGit } from '@zgeoff/testing/helpers';
 import { runProgram } from './run-program.ts';
 import { runUncommittedCheck } from './run-uncommitted-check.ts';
 

@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
+import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
 import { createStubCommand } from './create-stub-command.ts';
 

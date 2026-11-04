@@ -21,6 +21,7 @@
         "@zgeoff/oxlint-config": "workspace:*",
         "@zgeoff/rig": "workspace:*",
         "@zgeoff/skill-gate": "workspace:*",
+        "@zgeoff/testing": "workspace:*",
         "@zgeoff/tsconfig": "workspace:*",
         "lefthook": "catalog:",
         "msw": "catalog:",
@@ -45,6 +46,7 @@
         "@types/picomatch": "catalog:",
         "@zgeoff/rig": "workspace:*",
         "@zgeoff/std": "workspace:*",
+        "@zgeoff/testing": "workspace:*",
         "gunshi": "catalog:",
         "picomatch": "catalog:",
         "simple-git": "catalog:",
@@ -141,7 +143,7 @@
       },
       "devDependencies": {
         "@types/bun": "catalog:",
-        "@zgeoff/std": "workspace:*",
+        "@zgeoff/testing": "workspace:*",
         "tiny-invariant": "catalog:",
         "tsrs": "catalog:",
         "typescript": "catalog:",
@@ -197,7 +199,7 @@
       "devDependencies": {
         "@types/bun": "catalog:",
         "@zgeoff/rig": "workspace:*",
-        "@zgeoff/std": "workspace:*",
+        "@zgeoff/testing": "workspace:*",
         "tsrs": "catalog:",
         "typescript": "catalog:",
       },
@@ -268,7 +270,6 @@
       },
       "devDependencies": {
         "@types/bun": "catalog:",
-        "@zgeoff/std": "workspace:*",
         "tsrs": "catalog:",
         "typescript": "catalog:",
       },
