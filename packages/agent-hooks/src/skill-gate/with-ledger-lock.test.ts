@@ -1,4 +1,4 @@
-import { expect, onTestFinished, test } from 'bun:test';
+import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -46,4 +46,28 @@ test('it runs the jobs on one ledger one at a time', async () => {
   const count = await readFile(counterPath, 'utf8');
 
   expect(count).toBe('20');
+});
+
+test('it runs the job without the lock when the lock file cannot be made', async () => {
+  const ctx = await setupTest();
+
+  const blockerPath = join(ctx.directory, 'state');
+
+  await writeFile(blockerPath, '');
+
+  const value = await withLedgerLock(join(blockerPath, 'ledger.json'), () =>
+    Promise.resolve('recorded'),
+  );
+
+  expect(value).toBe('recorded');
+});
+
+test('it passes on the error of a job that throws under the lock', async () => {
+  const ctx = await setupTest();
+
+  const job = mock(() => Promise.reject(new Error('ledger write failed')));
+
+  await withLedgerLock(join(ctx.directory, 'ledger.json'), job).catch(() => null);
+
+  expect(job).toHaveBeenCalledOnce();
 });

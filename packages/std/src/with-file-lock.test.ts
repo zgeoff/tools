@@ -212,3 +212,19 @@ test('it clears its record when it lets go', async () => {
 
   expect(record).toBe('');
 });
+
+test('it keeps the holder record for each caller that finds the lock busy', async () => {
+  const ctx = await setupTest();
+  const holder = await createLockHolder(ctx.lockPath);
+
+  onTestFinished(holder.kill);
+
+  await withFileLock(ctx.lockPath, () => Promise.resolve('built'));
+
+  const second = await withFileLock(ctx.lockPath, () => Promise.resolve('built'));
+
+  expect(second).toStrictEqual({
+    kind: 'busy',
+    holder: expect.objectContaining({ pid: holder.pid }),
+  });
+});

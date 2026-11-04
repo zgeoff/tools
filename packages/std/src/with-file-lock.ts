@@ -33,21 +33,6 @@ export async function withFileLock<Value>(
   options: FileLockOptions = {},
 ): Promise<FileLockResult<Value>> {
   const descriptor = openSync(path, 'a');
-  const lock = { isOpen: true };
-
-  const release = (): void => {
-    if (!lock.isOpen) {
-      return;
-    }
-
-    lock.isOpen = false;
-
-    try {
-      ftruncateSync(descriptor, 0);
-    } finally {
-      closeSync(descriptor);
-    }
-  };
 
   try {
     const isLocked = await waitForLock(descriptor, path, options.waitMs ?? 0);
@@ -58,9 +43,13 @@ export async function withFileLock<Value>(
 
     writeOwner(descriptor);
 
-    return { kind: 'ran', value: await fn() };
+    try {
+      return { kind: 'ran', value: await fn() };
+    } finally {
+      ftruncateSync(descriptor, 0);
+    }
   } finally {
-    release();
+    closeSync(descriptor);
   }
 }
 
