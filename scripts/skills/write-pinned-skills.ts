@@ -1,5 +1,6 @@
 import { rename } from 'node:fs/promises';
 import { join } from 'node:path';
+import { withFileLock } from '../../packages/std/src/with-file-lock.ts';
 import { writeStdout } from '../../packages/std/src/write-stdout.ts';
 import type { FileSystem } from '../ci/file-system.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
@@ -8,9 +9,7 @@ import type { CommandResult, RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { parseSkillsPin } from '../repo-sync/parse-skills-pin.ts';
 import { skillsPinPath } from '../repo-sync/skills-pin-path.ts';
-import { flockLockFile } from './flock-lock-file.ts';
 import { pinnedSkillsFolder } from './pinned-skills-folder.ts';
-import { withInstallLock } from './with-install-lock.ts';
 
 export interface WritePinnedSkillsOptions {
   // The root of a tools checkout.
@@ -38,18 +37,40 @@ export interface WritePinnedSkillsOptions {
 
   // Runs the work while this run holds the lock on the path, so installs that share a checkout run
   // one at a time.
-  readonly withLock: <T>(lockPath: string, work: () => Promise<T>) => Promise<T>;
+  readonly withLock: typeof withFileLock;
 
   readonly runCommand: RunCommand;
   readonly writeOutput: (text: string) => void;
 }
 
+// An install unpacks one archive, so one that holds the lock this long has hung.
+const installWaitMs = 120_000;
+
 // Unpacks zgeoff/skills at the pinned commit once, links each skill this repo takes to its folder
 // in that tree, as repo-sync gives another repo its copy, and drops the trees of other commits.
-export function writePinnedSkills(options: Readonly<WritePinnedSkillsOptions>): Promise<number> {
+export async function writePinnedSkills(
+  options: Readonly<WritePinnedSkillsOptions>,
+): Promise<number> {
   const lockPath = join(options.cwd, `${pinnedSkillsFolder}.lock`);
+  const work = () => writeLockedSkills(options);
 
-  return options.withLock(lockPath, () => writeLockedSkills(options));
+  const first = await options.withLock(lockPath, work);
+
+  if (first.kind === 'ran') {
+    return first.value;
+  }
+
+  options.writeOutput(`skills: another install holds ${lockPath}, so this one waits for it\n`);
+
+  const waited = await options.withLock(lockPath, work, { waitMs: installWaitMs });
+
+  if (waited.kind === 'ran') {
+    return waited.value;
+  }
+
+  options.writeOutput(`skills: ${lockPath} is held by another install; try again once it ends\n`);
+
+  return 1;
 }
 
 // The pin is read under the lock, so a run that waited installs the pin as it is now.
@@ -207,11 +228,7 @@ if (import.meta.main) {
     fileSystem: nodeFileSystem,
     renamePath: rename,
     runID: String(process.pid),
-    withLock: (lockPath, work) =>
-      withInstallLock(
-        { lockPath, lockFile: flockLockFile, wait: () => Bun.sleep(250), attempts: 480 },
-        work,
-      ),
+    withLock: withFileLock,
     runCommand,
     writeOutput: writeStdout,
   });

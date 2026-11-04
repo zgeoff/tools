@@ -132,3 +132,37 @@ test('it frees the lock when the task fails', async () => {
   expect(outcome).toBe(failure);
   expect(fileLocks.tryLock(lockFile)).toBeTrue();
 });
+
+test('it fails at once, and runs nothing, when flock fails', async () => {
+  const ctx = await setupTest();
+
+  const task = makeResolvingStub(undefined);
+  const clock = buildSteppingClock();
+
+  // A closed file gives flock a real descriptor error.
+  const closedLocks = {
+    ...fileLocks,
+    openLockFile: async (path: string) => {
+      const lockFile = await fileLocks.openLockFile(path);
+
+      await fileLocks.closeLockFile(lockFile);
+
+      return lockFile;
+    },
+  };
+
+  const locked = withFileLock(
+    ctx.lockPath,
+    { locks: closedLocks, clock, retryMs: 5, waitDeadlineMs: 50 },
+    task,
+  );
+
+  const outcome = await locked.then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(outcome).toMatchObject({ message: 'flock on descriptor -1 failed with errno 9' });
+  expect(task).not.toHaveBeenCalled();
+  expect(clock.sleep).not.toHaveBeenCalled();
+});

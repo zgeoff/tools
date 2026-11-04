@@ -11,13 +11,12 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { join } from 'node:path';
-import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/helpers';
+import { readRunFolderPrefix, waitFor, writeTreeFiles } from '@zgeoff/testing/helpers';
+import invariant from 'tiny-invariant';
+import { withFileLock } from '../../packages/std/src/with-file-lock.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { writeSkillsArchive } from '../test-utils/write-skills-archive.ts';
-import { flockLockFile } from './flock-lock-file.ts';
-import type { InstallLockOptions } from './with-install-lock.ts';
-import { withInstallLock } from './with-install-lock.ts';
 import { defaultPinnedSkills, writePinnedSkills } from './write-pinned-skills.ts';
 
 async function setupTest() {
@@ -51,23 +50,10 @@ async function setupTest() {
 
   const lockPath = join(tools, '.zgeoff-skills.lock');
 
-  // Each wait lets the other runs move on.
-  const buildLockOptions = (
-    wait: () => Promise<void> = () =>
-      new Promise((resolve) => {
-        setImmediate(resolve);
-      }),
-  ): InstallLockOptions => ({
-    lockPath,
-    lockFile: flockLockFile,
-    wait,
-    attempts: 100_000,
-  });
-
   const install = (
     skills: readonly string[],
     runID = 'run',
-    lockOptions: InstallLockOptions = buildLockOptions(),
+    withLock: typeof withFileLock = withFileLock,
   ) =>
     writePinnedSkills({
       cwd: tools,
@@ -77,14 +63,16 @@ async function setupTest() {
       fileSystem: nodeFileSystem,
       renamePath: rename,
       runID,
-      withLock: (path, work) => withInstallLock({ ...lockOptions, lockPath: path }, work),
+      withLock,
       runCommand,
       writeOutput: (text) => {
         output.push(text);
       },
     });
 
-  return { tools, archives, output, writeArchive, writePin, install, buildLockOptions };
+  const holdLock = <T>(work: () => Promise<T>) => withFileLock(lockPath, work);
+
+  return { tools, archives, output, writeArchive, writePin, install, holdLock };
 }
 
 test('it links each skill to its folder in the tree of the pinned commit', async () => {
@@ -251,28 +239,22 @@ test('it waits for the install that holds the lock before it unpacks', async () 
   await ctx.writePin(commit);
   await ctx.writeArchive(commit, { 'skills/kettle/SKILL.md': '# Kettle\n' });
 
-  const waited = Promise.withResolvers<void>();
-
-  const waiting = ctx.buildLockOptions(() => {
-    waited.resolve();
-
-    return new Promise((resolve) => {
-      setImmediate(resolve);
-    });
-  });
-
   // The install comes back wrapped, as awaiting it while the lock is held would never end.
-  const run = await withInstallLock(ctx.buildLockOptions(), async () => {
-    const pending = ctx.install(['kettle'], 'waiting', waiting);
+  const run = await ctx.holdLock(async () => {
+    const pending = ctx.install(['kettle'], 'waiting');
 
-    await waited.promise;
+    await waitFor(() => {
+      invariant(ctx.output.some((line) => line.includes('so this one waits for it')));
+    });
 
     return { pending, hasTree: existsSync(join(ctx.tools, '.zgeoff-skills')) };
   });
 
-  const exitCode = await run.pending;
+  invariant(run.kind === 'ran');
 
-  expect(run.hasTree).toBeFalse();
+  const exitCode = await run.value.pending;
+
+  expect(run.value.hasTree).toBeFalse();
   expect(exitCode).toBe(0);
   expect(existsSync(join(ctx.tools, '.claude', 'skills', 'kettle', 'SKILL.md'))).toBeTrue();
 });
@@ -313,28 +295,22 @@ test('it installs the pin as it stands once the lock is free', async () => {
   await ctx.writeArchive(newer, { 'skills/kettle/SKILL.md': '# Kettle, rewritten\n' });
   await ctx.writePin(older);
 
-  const waited = Promise.withResolvers<void>();
-
-  const waiting = ctx.buildLockOptions(() => {
-    waited.resolve();
-
-    return new Promise((resolve) => {
-      setImmediate(resolve);
-    });
-  });
-
   // The pin moves while the install waits, as a checkout of another branch does.
-  const run = await withInstallLock(ctx.buildLockOptions(), async () => {
-    const pending = ctx.install(['kettle'], 'waiting', waiting);
+  const run = await ctx.holdLock(async () => {
+    const pending = ctx.install(['kettle'], 'waiting');
 
-    await waited.promise;
+    await waitFor(() => {
+      invariant(ctx.output.some((line) => line.includes('so this one waits for it')));
+    });
 
     await ctx.writePin(newer);
 
     return { pending };
   });
 
-  const exitCode = await run.pending;
+  invariant(run.kind === 'ran');
+
+  const exitCode = await run.value.pending;
   const text = await readFile(join(ctx.tools, '.claude', 'skills', 'kettle', 'SKILL.md'), 'utf8');
 
   expect(exitCode).toBe(0);
@@ -376,4 +352,18 @@ test('it links each default skill when the pinned tree holds all five', async ()
     `../../.zgeoff-skills/${commit}/skills/deslop`,
     `../../.zgeoff-skills/${commit}/skills/cold-read`,
   ]);
+});
+
+test('it gives up when another install keeps the lock past the wait', async () => {
+  const ctx = await setupTest();
+
+  const exitCode = await ctx.install(['kettle'], 'stuck', () =>
+    Promise.resolve({ kind: 'busy', holder: null }),
+  );
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.output.at(-1)).toBe(
+    `skills: ${join(ctx.tools, '.zgeoff-skills.lock')} is held by another install; try again once it ends\n`,
+  );
 });

@@ -1,8 +1,8 @@
 # @zgeoff/std
 
 Small, dependency-free TypeScript helpers that more than one zgeoff repo needs. Each helper is one
-file with its test beside it, exported from the package root, and named by the shared
-function-naming rules.
+file with its test beside it, exported from the package root unless it needs Bun, and named by the
+shared function-naming rules.
 
 ## Install
 
@@ -21,16 +21,11 @@ spread, `...(x === undefined ? {} : { x })`, that such code otherwise writes per
 ```ts
 import { toExactOptional } from '@zgeoff/std';
 
-interface Options {
-  label?: string;
-  retries: number;
-}
-
 const label: string | undefined = readLabel();
 
-// { label: string | undefined; retries: number } does not fit Options, but
+// { label: string | undefined; retries: number } does not fit the type, but
 // toExactOptional's { label?: string; retries: number } does.
-const options: Options = toExactOptional({ label, retries: 3 });
+const options: { label?: string; retries: number } = toExactOptional({ label, retries: 3 });
 ```
 
 Own enumerable keys are copied, symbols included, as an object spread would. `null` values stay,
@@ -86,6 +81,12 @@ import { writeStdout } from '@zgeoff/std';
 process.exitCode = runCheck({ cwd: process.cwd(), writeOutput: writeStdout });
 ```
 
+### `withFileLock`
+
+Runs a callback under an exclusive lock on a file that other processes share. It needs Bun, so
+import it from `@zgeoff/std/with-file-lock`; [its doc](../../docs/architecture/std-file-lock.md)
+covers the rest.
+
 ## Typed helpers
 
 Each typed helper holds the one type assertion that its job needs, because TypeScript cannot prove
@@ -93,8 +94,5 @@ the type it returns. `toExactOptional` holds one for the same reason. The assert
 approved disable comment, so code that calls the helper needs no assertion of its own.
 
 The typed helpers are `machineTypes`, `pick`, `mergeDeep`, `toTagged` and `toReadonlyDeep`.
-
-## Documentation
-
-[The std typed helpers doc](../../docs/architecture/std-typed-helpers.md) describes each typed
-helper, with an example.
+[The std typed helpers doc](../../docs/architecture/std-typed-helpers.md) describes each one, with
+an example.

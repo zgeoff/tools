@@ -26,6 +26,8 @@ The docs of tools: how its shared files and packages work, and the steps a contr
   [test-file rules](./architecture/oxlint-config-tests.md).
 - [std typed helpers](./architecture/std-typed-helpers.md): the helpers in `@zgeoff/std` that each
   hold the one type assertion their job needs.
+- [std file lock](./architecture/std-file-lock.md): `withFileLock`, the cross-process lock in
+  `@zgeoff/std`, and how a crashed holder frees it.
 - [format-codemod rules](./architecture/format-codemod-rules.md): the blank lines the codemod adds
   and removes between statements.
 - [format-codemod inputs](./architecture/format-codemod-inputs.md): how the CLI turns its arguments

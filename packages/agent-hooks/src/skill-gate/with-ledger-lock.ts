@@ -1,6 +1,12 @@
-import { mkdir, rmdir, stat } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import { withFileLock } from '@zgeoff/std/with-file-lock';
 
+// A holder runs for milliseconds, so a lock still held after this long belongs to a stuck hook.
+const waitMs = 5000;
+
+// The job runs without the lock when the lock stays busy or cannot be made, since a stuck hook
+// must not hang the session. The lock file's name differs from the older hooks' lock folder.
 export async function withLedgerLock<Result>(
   ledgerPath: string | null,
   job: () => Promise<Result>,
@@ -9,49 +15,25 @@ export async function withLedgerLock<Result>(
     return job();
   }
 
-  const lockPath = `${ledgerPath}.lock`;
+  const run = { isStarted: false };
 
-  const held = await acquireLock(lockPath);
+  const startJob = (): Promise<Result> => {
+    run.isStarted = true;
+
+    return job();
+  };
 
   try {
-    return await job();
-  } finally {
-    if (held) {
-      await rmdir(lockPath).catch(() => null);
+    await mkdir(path.dirname(ledgerPath), { recursive: true });
+
+    const result = await withFileLock(`${ledgerPath}.flock`, startJob, { waitMs });
+
+    return result.kind === 'ran' ? result.value : await startJob();
+  } catch (error) {
+    if (run.isStarted) {
+      throw error;
     }
+
+    return job();
   }
-}
-
-const RETRY_MS = 10;
-const GIVE_UP_MS = 5000;
-
-// A holder runs for milliseconds, so a lock this old belongs to a hook that died.
-const STALE_MS = 30_000;
-
-// mkdir fails when the folder exists, which makes the claim atomic across hook processes. A lock
-// that cannot be had in time is skipped, since a stuck hook must not hang the session.
-async function acquireLock(lockPath: string): Promise<boolean> {
-  try {
-    await mkdir(path.dirname(lockPath), { recursive: true });
-  } catch {
-    return false;
-  }
-
-  const deadline = Date.now() + GIVE_UP_MS;
-
-  while (Date.now() < deadline) {
-    try {
-      await mkdir(lockPath);
-
-      return true;
-    } catch {
-      const info = await stat(lockPath).catch(() => null);
-
-      const isStale = info !== null && Date.now() - info.mtimeMs > STALE_MS;
-
-      await (isStale ? rmdir(lockPath).catch(() => null) : Bun.sleep(RETRY_MS));
-    }
-  }
-
-  return false;
 }
