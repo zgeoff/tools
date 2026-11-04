@@ -1,29 +1,22 @@
-import { isRecord } from '../../packages/std/src/is-record.ts';
+import { z } from 'zod';
 import type { SkillsTreeFile } from './build-skill-files-manifest.ts';
 
+const treeItemSchema = z.object({ path: z.string(), mode: z.string(), type: z.string() });
+
+// GitHub cuts a large recursive tree short and marks it truncated, which would hide new files, so
+// only a whole tree parses.
+const skillsTreeSchema = z.object({ truncated: z.literal(false), tree: z.array(treeItemSchema) });
+
 // Returns the blobs of a git tree response from GitHub, or null when the response is not a whole
-// tree: GitHub cuts a large recursive tree short and marks it truncated, which would hide new files.
+// tree.
 export function parseSkillsTree(value: unknown): SkillsTreeFile[] | null {
-  if (!isRecord(value) || value['truncated'] !== false || !Array.isArray(value['tree'])) {
+  const parsed = skillsTreeSchema.safeParse(value);
+
+  if (!parsed.success) {
     return null;
   }
 
-  const files: SkillsTreeFile[] = [];
-
-  for (const item of value['tree']) {
-    if (
-      !isRecord(item) ||
-      typeof item['path'] !== 'string' ||
-      typeof item['mode'] !== 'string' ||
-      typeof item['type'] !== 'string'
-    ) {
-      return null;
-    }
-
-    if (item['type'] === 'blob') {
-      files.push({ path: item['path'], mode: item['mode'] });
-    }
-  }
-
-  return files;
+  return parsed.data.tree
+    .filter((item) => item.type === 'blob')
+    .map((item) => ({ path: item.path, mode: item.mode }));
 }
