@@ -26,3 +26,50 @@ test('it asks for no permission beyond contents read, so a read-only caller can 
       Object.entries(grant).every(([scope, level]) => scope === 'contents' && level === 'read'),
   );
 });
+
+test.each(['static', 'checks'])(
+  'it runs each chex check of the %s job from the npm release that CHEX pins',
+  async (jobName) => {
+    const workflowText = await Bun.file(
+      new URL('../.github/workflows/bun-checks.yml', import.meta.url),
+    ).text();
+
+    const stepSchema = z.object({ name: z.string().optional(), run: z.string().optional() });
+    const jobSchema = z.object({ steps: z.array(stepSchema) });
+
+    const workflow = z
+      .object({
+        env: z.object({ CHEX: z.string() }),
+        jobs: z.record(z.string(), jobSchema),
+      })
+      .parse(Bun.YAML.parse(workflowText));
+
+    const steps = workflow.jobs[jobName]?.steps ?? [];
+
+    const isChexStep = (step: z.infer<typeof stepSchema>) =>
+      step.name !== 'Plan the check scripts' &&
+      (step.run?.includes('$CHEX') === true || step.run?.includes('chex/src/cli') === true);
+
+    const chexSteps = Object.fromEntries(
+      steps
+        .filter((step) => isChexStep(step))
+        .map((step): [string, string] => [step.name ?? '', step.run ?? '']),
+    );
+
+    expect(workflow.env.CHEX).toMatch(/^@zgeoff\/chex@\d+\.\d+\.\d+$/u);
+
+    expect(chexSteps).toStrictEqual({
+      'Check prose': 'bun x "$CHEX" prose',
+      'Check length': 'bun x "$CHEX" length',
+      'Check links': 'bun x "$CHEX" links',
+      'Check readmes': 'bun x "$CHEX" readmes',
+      'Check vision': 'bun x "$CHEX" vision',
+      'Check skill': 'bun x "$CHEX" skill',
+      'Lint workflows': 'bun x "$CHEX" workflows',
+      'Check commits': 'bun x "$CHEX" commits',
+      'Check local paths': 'bun x "$CHEX" local-paths',
+      'Check test timeouts': 'bun x "$CHEX" test-timeouts',
+      'Check dependency gates': 'bun x "$CHEX" dependency-gates',
+    });
+  },
+);
