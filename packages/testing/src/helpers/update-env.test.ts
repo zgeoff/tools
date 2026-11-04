@@ -2,8 +2,23 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { removeEnvOverrides } from './remove-env-overrides.ts';
 import { updateEnv } from './update-env.ts';
 
+// Each test starts from the real environment and puts back whatever it set directly, so the
+// fixture values never reach a later test.
 function setupTest(): void {
-  onTestFinished(removeEnvOverrides);
+  const names = ['KETTLE_MODE', 'KETTLE_LID'];
+  const saved = names.map((name) => [name, process.env[name]] as const);
+
+  onTestFinished(() => {
+    removeEnvOverrides();
+
+    for (const [name, value] of saved) {
+      if (value === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = value;
+      }
+    }
+  });
 }
 
 test('it sets a variable, and removeEnvOverrides restores the original', () => {

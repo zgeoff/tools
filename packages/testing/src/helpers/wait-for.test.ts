@@ -83,3 +83,30 @@ test('it times out on a rejection with the last error as the cause', async () =>
     cause: lastError,
   });
 });
+
+test('it starts no retry after the deadline', async () => {
+  let calls = 0;
+
+  const failure = waitFor(
+    () => {
+      calls += 1;
+
+      if (calls === 1) {
+        throw new Error('kettle is cold');
+      }
+
+      return 'late success';
+    },
+    { intervalMs: 80, timeoutMs: 10 },
+  );
+
+  await expect(failure).rejects.toThrow('timed out after 10 ms: kettle is cold');
+
+  expect(calls).toBe(1);
+});
+
+test('it times out while an attempt is still pending', async () => {
+  const failure = waitFor(() => new Promise<string>(() => {}), { intervalMs: 5, timeoutMs: 30 });
+
+  await expect(failure).rejects.toThrow('timed out after 30 ms: the attempt had not finished');
+});
