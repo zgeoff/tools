@@ -95,6 +95,7 @@
     "@zgeoff/oxlint-config": "workspace:*",
     "@zgeoff/rig": "workspace:*",
     "@zgeoff/skill-gate": "workspace:*",
+    "@zgeoff/testing": "workspace:*",
     "@zgeoff/tsconfig": "workspace:*",
     "lefthook": "catalog:",
     "msw": "catalog:",

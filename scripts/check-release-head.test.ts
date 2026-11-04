@@ -2,8 +2,8 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { createStubGH } from './test-utils/create-stub-gh.ts';
-import { readRunFolderPrefix } from './test-utils/read-run-folder-prefix.ts';
 import { runBashScript } from './test-utils/run-bash-script.ts';
 
 async function setupTest() {

@@ -2,11 +2,10 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
 import { runCommand } from '../ci/run-command.ts';
-import { readRunFolderPrefix } from './read-run-folder-prefix.ts';
 import { writeSkillsArchive } from './write-skills-archive.ts';
-import { writeTreeFiles } from './write-tree-files.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('write-skills-archive-')));

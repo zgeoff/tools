@@ -3,9 +3,8 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
-import { readRunFolderPrefix } from './test-utils/read-run-folder-prefix.ts';
-import { writeTreeFiles } from './test-utils/write-tree-files.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-sync-manifest-')));

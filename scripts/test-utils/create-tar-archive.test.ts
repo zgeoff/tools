@@ -1,9 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
 import { createTarArchive } from './create-tar-archive.ts';
-import { readRunFolderPrefix } from './read-run-folder-prefix.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(

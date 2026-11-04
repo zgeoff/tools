@@ -11,11 +11,10 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { join } from 'node:path';
+import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/helpers';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
-import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { writeSkillsArchive } from '../test-utils/write-skills-archive.ts';
-import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import { flockLockFile } from './flock-lock-file.ts';
 import type { InstallLockOptions } from './with-install-lock.ts';
 import { withInstallLock } from './with-install-lock.ts';

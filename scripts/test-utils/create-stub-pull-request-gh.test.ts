@@ -1,9 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
 import { createStubPullRequestGH } from './create-stub-pull-request-gh.ts';
-import { readRunFolderPrefix } from './read-run-folder-prefix.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(
