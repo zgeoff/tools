@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.0](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.14...@zgeoff/chex@0.1.0) (2026-11-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **testing:** @zgeoff/std no longer exports ./test-utils/*; import the test helpers from @zgeoff/testing/helpers.
+
+### Features
+
+* **testing:** add the helpers subpath and move shared test helpers ([#490](https://github.com/zgeoff/tools/issues/490)) ([28ca2f3](https://github.com/zgeoff/tools/commit/28ca2f382ca48cefb3f393255c8d51a77606d44c))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zgeoff/std bumped to 0.4.0
+  * devDependencies
+    * @zgeoff/rig bumped to 0.1.0
+    * @zgeoff/std bumped to 0.4.0
+    * @zgeoff/testing bumped to 0.2.0
+
 ## [0.0.14](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.13...@zgeoff/chex@0.0.14) (2026-11-04)
 
 ### Features
