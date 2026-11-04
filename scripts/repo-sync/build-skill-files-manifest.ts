@@ -7,14 +7,21 @@ export interface SkillFilesManifest {
   readonly added: readonly string[];
 }
 
+export interface SkillsTreeFile {
+  readonly path: string;
+
+  // The git mode of the blob, such as `100644`, `100755` for an executable, or `120000` for a link.
+  readonly mode: string;
+}
+
 const skillsRepo = 'zgeoff/skills';
 
-// Adds each file of the zgeoff/skills tree that sits in a skill folder an entry already ships, and
-// that the entry lacks, to that entry. A skill folder no entry ships stays out, as syncing a new
-// skill is a choice made by hand. The tests stay out as well, as the sync check leaves them out.
+// Adds to each entry the files of the zgeoff/skills tree that sit in a skill folder it ships and
+// that it lacks. A folder no entry ships stays out, as syncing a new skill is a choice made by hand,
+// and tests and links stay out, as the sync check skips them.
 export function buildSkillFilesManifest(
   manifest: unknown,
-  treePaths: readonly string[],
+  treeFiles: readonly SkillsTreeFile[],
 ): SkillFilesManifest {
   if (!Array.isArray(manifest)) {
     return { manifest, added: [] };
@@ -27,11 +34,17 @@ export function buildSkillFilesManifest(
       return entry;
     }
 
-    const files: unknown[] = [...entry['files']];
+    const files = entry['files'].map((file: unknown): unknown => file);
 
     for (const folder of collectSkillFolders(files)) {
-      for (const path of treePaths) {
-        if (!path.startsWith(folder.source) || path.endsWith('.test.ts')) {
+      for (const treeFile of treeFiles) {
+        const path = treeFile.path;
+
+        if (
+          !path.startsWith(folder.source) ||
+          path.endsWith('.test.ts') ||
+          treeFile.mode === '120000'
+        ) {
           continue;
         }
 
@@ -40,11 +53,13 @@ export function buildSkillFilesManifest(
         }
 
         const target = `${folder.target}${path.slice(folder.source.length)}`;
+        const mode = treeFile.mode === '100755' ? { mode: '0755' } : {};
 
         files.splice(getInsertIndex(files, folder.source, path), 0, {
           repo: skillsRepo,
           source: path,
           target,
+          ...mode,
         });
 
         if (!added.includes(path)) {

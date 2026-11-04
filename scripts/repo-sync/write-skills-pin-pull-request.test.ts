@@ -98,9 +98,9 @@ test.each([
       'api',
       `repos/zgeoff/skills/git/trees/${commit}?recursive=1`,
       '--jq',
-      'if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | .path end',
+      String.raw`if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | "\(.mode) \(.path)" end`,
     ],
-    { exitCode: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' },
+    { exitCode: 0, stdout: '100644 skills/kettle/SKILL.md\n', stderr: '' },
   );
 
   ctx.commands.answer(
@@ -312,6 +312,12 @@ test('it adds a new file of a skill folder the manifest ships, and the manifest 
         "repo": "zgeoff/skills",
         "source": "skills/kettle/references/limescale.md",
         "target": ".claude/skills/kettle/references/limescale.md"
+      },
+      {
+        "repo": "zgeoff/skills",
+        "source": "skills/kettle/scripts/boil.sh",
+        "target": ".claude/skills/kettle/scripts/boil.sh",
+        "mode": "0755"
       }
     ]
   }
@@ -359,12 +365,12 @@ test('it adds a new file of a skill folder the manifest ships, and the manifest 
       'api',
       `repos/zgeoff/skills/git/trees/${commit}?recursive=1`,
       '--jq',
-      'if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | .path end',
+      String.raw`if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | "\(.mode) \(.path)" end`,
     ],
     {
       exitCode: 0,
       stdout:
-        'skills/kettle/SKILL.md\nskills/kettle/references/descaling.md\nskills/kettle/references/limescale.md\n',
+        '100644 skills/kettle/SKILL.md\n100644 skills/kettle/references/descaling.md\n100644 skills/kettle/references/limescale.md\n100755 skills/kettle/scripts/boil.sh\n',
       stderr: '',
     },
   );
@@ -498,7 +504,7 @@ test('it adds a new file of a skill folder the manifest ships, and the manifest 
     '--title',
     'chore(skills): pin zgeoff/skills at 89abcdef0123',
     '--body',
-    `Moves \`sync/skills-pin.json\` to zgeoff/skills ${commit}, which zgeoff/skills sent from its green main. Once this merges and main is green, the sync dispatch sends the new skill text to every repo that takes it.\n\nAdds the new files of the skill folders it syncs to \`sync/manifest.json\`:\n\n- \`skills/kettle/references/descaling.md\`\n\nChanges: https://github.com/zgeoff/skills/compare/${pinned}...${commit}`,
+    `Moves \`sync/skills-pin.json\` to zgeoff/skills ${commit}, which zgeoff/skills sent from its green main. Once this merges and main is green, the sync dispatch sends the new skill text to every repo that takes it.\n\nAdds the new files of the skill folders it syncs to \`sync/manifest.json\`:\n\n- \`skills/kettle/references/descaling.md\`\n- \`skills/kettle/scripts/boil.sh\`\n\nChanges: https://github.com/zgeoff/skills/compare/${pinned}...${commit}`,
   ];
 
   ctx.commands.answer(createPull, {
@@ -529,6 +535,7 @@ test('it adds a new file of a skill folder the manifest ships, and the manifest 
     'tree/skills/kettle/SKILL.md': '# Kettle\n',
     'tree/skills/kettle/references/descaling.md': '# Descaling\n',
     'tree/skills/kettle/references/limescale.md': '# Limescale\n',
+    'tree/skills/kettle/scripts/boil.sh': 'echo boiling\n',
   });
 
   const checked = await $`bash ${ctx.checkScriptPath} sync/manifest.json tree`
@@ -607,12 +614,12 @@ test('it leaves the manifest alone when only a skill folder no entry ships gains
       'api',
       `repos/zgeoff/skills/git/trees/${commit}?recursive=1`,
       '--jq',
-      'if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | .path end',
+      String.raw`if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | "\(.mode) \(.path)" end`,
     ],
     {
       exitCode: 0,
       stdout:
-        'skills/kettle/SKILL.md\nskills/teapot/SKILL.md\nskills/teapot/references/brewing.md\n',
+        '100644 skills/kettle/SKILL.md\n100644 skills/teapot/SKILL.md\n100644 skills/teapot/references/brewing.md\n',
       stderr: '',
     },
   );
@@ -801,9 +808,9 @@ test('it opens its own pull request when only a fork holds a pin branch pull req
       'api',
       `repos/zgeoff/skills/git/trees/${commit}?recursive=1`,
       '--jq',
-      'if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | .path end',
+      String.raw`if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | "\(.mode) \(.path)" end`,
     ],
-    { exitCode: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' },
+    { exitCode: 0, stdout: '100644 skills/kettle/SKILL.md\n', stderr: '' },
   );
 
   ctx.commands.answer(
@@ -1003,9 +1010,9 @@ test('it moves the branch of the open pin pull request to a newer commit', async
       'api',
       `repos/zgeoff/skills/git/trees/${commit}?recursive=1`,
       '--jq',
-      'if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | .path end',
+      String.raw`if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | "\(.mode) \(.path)" end`,
     ],
-    { exitCode: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' },
+    { exitCode: 0, stdout: '100644 skills/kettle/SKILL.md\n', stderr: '' },
   );
 
   ctx.commands.answer(
@@ -1287,9 +1294,9 @@ test.each([
       'api',
       `repos/zgeoff/skills/git/trees/${commit}?recursive=1`,
       '--jq',
-      'if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | .path end',
+      String.raw`if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | "\(.mode) \(.path)" end`,
     ],
-    { exitCode: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' },
+    { exitCode: 0, stdout: '100644 skills/kettle/SKILL.md\n', stderr: '' },
   );
 
   ctx.commands.answer(
@@ -1836,11 +1843,11 @@ test.each([
         'api',
         `repos/zgeoff/skills/git/trees/${proposed}?recursive=1`,
         '--jq',
-        'if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | .path end',
+        String.raw`if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | "\(.mode) \(.path)" end`,
       ],
       {
         exitCode: 0,
-        stdout: 'skills/kettle/SKILL.md\nskills/kettle/references/descaling.md\n',
+        stdout: '100644 skills/kettle/SKILL.md\n100644 skills/kettle/references/descaling.md\n',
         stderr: '',
       },
     );

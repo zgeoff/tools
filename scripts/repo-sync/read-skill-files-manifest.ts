@@ -1,5 +1,6 @@
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { RunCommand } from '../ci/run-command.ts';
+import type { SkillsTreeFile } from './build-skill-files-manifest.ts';
 import { buildSkillFilesManifest } from './build-skill-files-manifest.ts';
 import { renderManifestText } from './render-manifest-text.ts';
 import { syncManifestPath } from './sync-manifest-path.ts';
@@ -38,7 +39,7 @@ export async function readSkillFilesManifest(
       'api',
       `repos/zgeoff/skills/git/trees/${skillsCommit}?recursive=1`,
       '--jq',
-      'if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | .path end',
+      String.raw`if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | "\(.mode) \(.path)" end`,
     ],
     { cwd: options.cwd, env: options.env },
   );
@@ -57,8 +58,20 @@ export async function readSkillFilesManifest(
 
   const [sha = '', ...content] = shown.stdout.split('\n');
   const manifestValue: unknown = JSON.parse(Buffer.from(content.join(''), 'base64').toString());
-  const paths = tree.stdout.split('\n').filter((path) => path !== '');
-  const built = buildSkillFilesManifest(manifestValue, paths);
+
+  const files = tree.stdout
+    .split('\n')
+    .filter((line) => line !== '')
+    .map((line) => toSkillsTreeFile(line));
+
+  const built = buildSkillFilesManifest(manifestValue, files);
 
   return { sha, text: renderManifestText(built.manifest), added: built.added };
+}
+
+// A line holds the blob's git mode, a space, then its path, which may hold spaces itself.
+function toSkillsTreeFile(line: string): SkillsTreeFile {
+  const space = line.indexOf(' ');
+
+  return { mode: line.slice(0, space), path: line.slice(space + 1) };
 }
