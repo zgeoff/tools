@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/zgeoff/tools/compare/@zgeoff/std@0.4.0...@zgeoff/std@0.4.1) (2026-11-04)
+
+
+### Features
+
+* **std:** add a cross-process lock on a file ([#509](https://github.com/zgeoff/tools/issues/509)) ([a361b80](https://github.com/zgeoff/tools/commit/a361b8090febe62aded980f7774c78539d3bc490))
+
 ## [0.4.0](https://github.com/zgeoff/tools/compare/@zgeoff/std@0.3.2...@zgeoff/std@0.4.0) (2026-11-04)
 
 
