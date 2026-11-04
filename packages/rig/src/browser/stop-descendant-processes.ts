@@ -1,3 +1,4 @@
+import { match } from 'ts-pattern';
 import type { Clock } from '../system-clock.ts';
 import { collectDescendantPIDs } from './collect-descendant-pids.ts';
 import { hasErrorCode } from './has-error-code.ts';
@@ -33,25 +34,26 @@ export async function stopDescendantProcesses(stop: DescendantStop): Promise<voi
   }
 
   const deadline = stop.clock.now() + stop.deadlineMs;
+  let isStopped = false;
 
-  for (;;) {
+  while (!isStopped) {
     const step = pickDescendantStopStep({
       descendants,
       listing: stop.readProcessTable(),
       isPastDeadline: stop.clock.now() >= deadline,
     });
 
-    if (step.kind === 'stopped') {
-      return;
-    }
-
-    if (step.kind === 'failed') {
-      throw new Error(
-        `the processes ${step.running.join(', ')} still run ${stop.deadlineMs} ms after SIGKILL`,
-      );
-    }
-
-    await stop.clock.sleep(pollIntervalMs);
+    isStopped = await match(step)
+      .with({ kind: 'stopped' }, () => Promise.resolve(true))
+      .with({ kind: 'failed' }, (failed) =>
+        Promise.reject(
+          new Error(
+            `the processes ${failed.running.join(', ')} still run ${stop.deadlineMs} ms after SIGKILL`,
+          ),
+        ),
+      )
+      .with({ kind: 'wait' }, () => stop.clock.sleep(pollIntervalMs).then(() => false))
+      .exhaustive();
   }
 }
 
