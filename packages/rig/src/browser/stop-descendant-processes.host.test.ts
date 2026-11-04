@@ -1,7 +1,9 @@
-import { expect, mock, test } from 'bun:test';
+import { expect, mock, onTestFinished, test } from 'bun:test';
 import { makeAnswerQueue } from '@zgeoff/std/test-utils/make-answer-queue';
 import { systemClock } from '../system-clock.ts';
 import { buildProcessEntry } from '../test-utils/build-process-entry.ts';
+import { stopProcessGroups } from '../test-utils/stop-process-groups.ts';
+import { testProcesses } from '../test-utils/test-processes.ts';
 import type { ProcessEntry } from './read-process-table.ts';
 import { stopDescendantProcesses } from './stop-descendant-processes.ts';
 
@@ -15,7 +17,9 @@ function setupTest() {
 
 test('it goes on past a descendant that exits before its signal', async () => {
   const ctx = setupTest();
-  const exited = Bun.spawn(['true']);
+  const exited = Bun.spawn(['true'], { detached: true });
+
+  onTestFinished(() => stopProcessGroups(exited.pid, testProcesses));
 
   await exited.exited;
 
