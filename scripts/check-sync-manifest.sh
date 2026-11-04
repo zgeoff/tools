@@ -220,7 +220,9 @@ own_rules=.claude/skill-gate.json
 
 while IFS=$'\t' read -r name repo source; do
   path=$(source_path "$repo" "$source")
-  [ -f "$path" ] && [ -f "$own_rules" ] || continue
+  if [ ! -f "$path" ] || [ ! -f "$own_rules" ]; then
+    continue
+  fi
 
   if ! missing=$(jq -rn --slurpfile shared "$path" --slurpfile own "$own_rules" '
     $shared[0] as $s | $own[0] as $o
@@ -233,7 +235,9 @@ while IFS=$'\t' read -r name repo source; do
   fi
 
   while IFS= read -r item; do
-    [ -n "$item" ] && report "entry '$name' delivers $source, but this repo's $own_rules lacks its $item"
+    if [ -n "$item" ]; then
+      report "entry '$name' delivers $source, but this repo's $own_rules lacks its $item"
+    fi
   done <<< "$missing"
 done < <(jq -r --arg target "$own_rules" '.[] | .name as $n | .files[] | select(.target == $target)
   | [$n, (.repo // "zgeoff/tools"), .source] | @tsv' "$manifest")
