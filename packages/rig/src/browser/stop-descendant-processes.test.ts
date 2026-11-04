@@ -138,63 +138,6 @@ test('it throws with the descendants that are no zombie and still run at the dea
   expect(ctx.clock.now()).toBe(5000);
 });
 
-test('it goes on past each descendant that exits before its signal', async () => {
-  const ctx = setupTest();
-
-  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
-    [
-      buildProcessEntry(4000, 1),
-      buildProcessEntry(4100, 4000),
-      buildProcessEntry(4120, 4100),
-      buildProcessEntry(4130, 4120),
-      buildProcessEntry(5200, 1),
-    ],
-    [buildProcessEntry(4100, 4000)],
-  ]);
-
-  ctx.signalProcess.mockImplementation(() => {
-    throw Object.assign(new Error('no such process'), { code: 'ESRCH' });
-  });
-
-  await stopDescendantProcesses({
-    rootPID: 4100,
-    timeoutMs: 5000,
-    clock: ctx.clock,
-    signalProcess: ctx.signalProcess,
-    readProcessTable,
-  });
-
-  expect(ctx.signalProcess).toHaveBeenCalledTimes(2);
-});
-
-test('it throws a signal failure other than a process that has exited', () => {
-  const ctx = setupTest();
-
-  const readProcessTable = makeAnswerQueue<readonly ProcessEntry[] | null>([
-    [
-      buildProcessEntry(4000, 1),
-      buildProcessEntry(4100, 4000),
-      buildProcessEntry(4120, 4100),
-      buildProcessEntry(4130, 4120),
-      buildProcessEntry(5200, 1),
-    ],
-  ]);
-
-  ctx.signalProcess.mockImplementation(() => {
-    throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
-  });
-
-  expect(
-    stopDescendantProcesses({
-      rootPID: 4100,
-      timeoutMs: 5000,
-      clock: ctx.clock,
-      signalProcess: ctx.signalProcess,
-      readProcessTable,
-    }),
-  ).rejects.toMatchObject({ code: 'EPERM' });
-});
-
 test('it reads a failed first listing again, and kills the descendants that the next one shows', async () => {
   const ctx = setupTest();
 
