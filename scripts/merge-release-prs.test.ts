@@ -517,9 +517,14 @@ test('it exits cleanly when the release PR merges while its own merge call fails
   const result = await ctx.runScript(['zgeoff/tools']);
   const calls = await ctx.readCalls();
 
-  expect({ exitCode: result.exitCode, stdout: result.stdout }).toStrictEqual({
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  }).toStrictEqual({
     exitCode: 0,
     stdout: 'release PR #145 is already merged; the run of its merge commit tags it\n',
+    stderr: 'HTTP 502\n',
   });
 
   expect(calls.filter((call) => call.startsWith('pr merge'))).toHaveLength(1);
