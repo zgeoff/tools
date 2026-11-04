@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { collectBannedVerbs } from './collect-banned-verbs.ts';
 
-test('it collects each code-span verb from the lead to the sentence after the list', () => {
+test('it collects each code-span verb of an inline list, from the lead to the sentence after it', () => {
   const markdown = [
     '## Function names',
     '',
@@ -28,16 +28,45 @@ test('it collects each code-span verb from the lead to the sentence after the li
   ]);
 });
 
+test('it collects the verbs of each nested item, and none from the advice after an item', () => {
+  const markdown = [
+    '## Function names',
+    '',
+    '- Never start a name with one of these verbs. They say nothing about I/O or a miss:',
+    '  - `process`, `manage`, `do`, `perform`, `execute` or `compute`;',
+    '  - `fetch`, `save`, `store`, `delete`, `search` or `lookup`. For a database read that can miss, use',
+    '    `read` and return `null`;',
+    '  - `handle`, outside a callback.',
+    '- You may start a name with `resolve`.',
+  ].join('\n');
+
+  expect(collectBannedVerbs(markdown)).toStrictEqual([
+    'process',
+    'manage',
+    'do',
+    'perform',
+    'execute',
+    'compute',
+    'fetch',
+    'save',
+    'store',
+    'delete',
+    'search',
+    'lookup',
+    'handle',
+  ]);
+});
+
 test('it throws for a skill with no banned-verb bullet', () => {
   expect(() => collectBannedVerbs('## Function names\n\n- `make` takes a suffix.\n')).toThrow(
-    "the code-style skill has no bullet from '- Never start a name with' to 'These verbs say nothing'",
+    "the code-style skill has no banned-verb bullet: neither '- Never start a name with one of these verbs.' with a nested list, nor '- Never start a name with' a list up to 'These verbs say nothing'",
   );
 });
 
 test('it throws for a banned-verb bullet that lists no verb', () => {
   expect(() =>
     collectBannedVerbs(
-      '## Function names\n\n- Never start a name with a vague verb. These verbs say nothing.\n',
+      '## Function names\n\n- Never start a name with one of these verbs. They say nothing:\n  - a vague one.\n',
     ),
   ).toThrow('the code-style skill bans no verb in its banned-verb bullet');
 });

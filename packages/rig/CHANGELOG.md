@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.1.0...@zgeoff/rig@0.1.1) (2026-11-04)
+
+
+### Bug Fixes
+
+* **rig:** test the process listing parse without a live process table ([#501](https://github.com/zgeoff/tools/issues/501)) ([6a7b5f2](https://github.com/zgeoff/tools/commit/6a7b5f2e6d8b872d4f7709e9489cee2bd2a28acf))
+
 ## [0.1.0](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.0.6...@zgeoff/rig@0.1.0) (2026-11-04)
 
 
