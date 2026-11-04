@@ -254,6 +254,11 @@
         "target": ".claude/skills/skill-writing/references/skill-kinds.md"
       },
       {
+        "repo": "zgeoff/skills",
+        "source": "skills/skill-writing/references/writing-references.md",
+        "target": ".claude/skills/skill-writing/references/writing-references.md"
+      },
+      {
         "source": "packages/chex/src/docs/check-skill.sh",
         "target": ".claude/skills/skill-writing/scripts/check-skill.sh",
         "mode": "0755"
