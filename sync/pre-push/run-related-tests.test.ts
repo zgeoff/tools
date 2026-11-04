@@ -127,6 +127,35 @@ test('#runRelatedTests runs only the related test through the test script and ex
   expect(run.stderr.toString()).toInclude('0 fail');
 });
 
+test('#runRelatedTests runs the related test files in one global, as a test script with no isolation flag does', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { test: 'bun test' } }),
+  );
+
+  await Promise.all(
+    ['src/a.test.ts', 'src/b.test.ts'].map((path) =>
+      writeFile(
+        join(ctx.directory, path),
+        "import { test } from 'bun:test';\n\ntest('it counts the files that share its global', () => {\n  const count = Number(Reflect.get(globalThis, 'filesSeen') ?? 0) + 1;\n\n  Reflect.set(globalThis, 'filesSeen', count);\n  console.log('files seen:', count);\n});\n",
+      ),
+    ),
+  );
+
+  const result = await $`bun ${join(import.meta.dir, 'run-related-tests.ts')} src/a.ts src/b.ts`
+    .cwd(ctx.directory)
+    .env({ PATH: process.env['PATH'] ?? '', TEST_WORKERS: '1' })
+    .nothrow()
+    .quiet();
+
+  expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+    exitCode: 0,
+    stdout: expect.toInclude('files seen: 2'),
+  });
+});
+
 test('#runRelatedTests exits with the failing code when the related test fails', async () => {
   const ctx = await setupTest();
 
@@ -235,7 +264,7 @@ test('#resolveRelatedTests selects a test whose suffix no lane declares', () => 
   ]);
 });
 
-test('#runRelatedTests passes --parallel=1 and the slow-host timeout to the test script when the host gets 1 worker', async () => {
+test('#runRelatedTests passes --parallel=1, --no-isolate and the slow-host timeout to the test script when the host gets 1 worker', async () => {
   const ctx = await setupTest();
 
   await writeFile(
@@ -253,11 +282,11 @@ test('#runRelatedTests passes --parallel=1 and the slow-host timeout to the test
 
   expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
     exitCode: 0,
-    stdout: 'test-args --parallel=1 --timeout=15000 ./src/a.test.ts\n',
+    stdout: 'test-args --parallel=1 --no-isolate --timeout=15000 ./src/a.test.ts\n',
   });
 });
 
-test('#runRelatedTests passes the worker count and no timeout to the test script when the host gets more than 1 worker', async () => {
+test('#runRelatedTests passes the worker count, --no-isolate and no timeout to the test script when the host gets more than 1 worker', async () => {
   const ctx = await setupTest();
 
   await writeFile(
@@ -275,7 +304,7 @@ test('#runRelatedTests passes the worker count and no timeout to the test script
 
   expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
     exitCode: 0,
-    stdout: 'test-args --parallel=3 ./src/a.test.ts\n',
+    stdout: 'test-args --parallel=3 --no-isolate ./src/a.test.ts\n',
   });
 });
 
@@ -299,7 +328,7 @@ test('#runRelatedTests runs 50 related test files, the default cap', async () =>
 
   expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
     exitCode: 0,
-    stdout: `test-args --parallel=2 ${tests.map((path) => `./${path}`).join(' ')}\n`,
+    stdout: `test-args --parallel=2 --no-isolate ${tests.map((path) => `./${path}`).join(' ')}\n`,
   });
 });
 
