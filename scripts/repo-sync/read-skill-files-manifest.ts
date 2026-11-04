@@ -1,7 +1,8 @@
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { RunCommand } from '../ci/run-command.ts';
-import type { SkillsTreeFile } from './build-skill-files-manifest.ts';
 import { buildSkillFilesManifest } from './build-skill-files-manifest.ts';
+import { parseManifestContents } from './parse-manifest-contents.ts';
+import { parseSkillsTree } from './parse-skills-tree.ts';
 import { renderManifestText } from './render-manifest-text.ts';
 import { syncManifestPath } from './sync-manifest-path.ts';
 
@@ -25,53 +26,36 @@ export interface SkillFilesManifestText {
   readonly added: readonly string[];
 }
 
-// The manifest at the commit of this repo, with the new files of the zgeoff/skills commit added.
+// The manifest at the commit of this repo, with the new files of the zgeoff/skills commit added;
+// null when GitHub gives a truncated tree or a manifest with no content.
 export async function readSkillFilesManifest(
   options: Readonly<ReadSkillFilesManifestOptions>,
   ref: string,
   skillsCommit: string,
-): Promise<SkillFilesManifestText> {
-  // A truncated tree would hide new files, so the read fails rather than miss them.
+): Promise<SkillFilesManifestText | null> {
   const tree = await runCheckedCommand(
     options.runCommand,
-    [
-      'gh',
-      'api',
-      `repos/zgeoff/skills/git/trees/${skillsCommit}?recursive=1`,
-      '--jq',
-      String.raw`if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | "\(.mode) \(.path)" end`,
-    ],
+    ['gh', 'api', `repos/zgeoff/skills/git/trees/${skillsCommit}?recursive=1`],
     { cwd: options.cwd, env: options.env },
   );
 
   const shown = await runCheckedCommand(
     options.runCommand,
-    [
-      'gh',
-      'api',
-      `repos/${options.repo}/contents/${syncManifestPath}?ref=${ref}`,
-      '--jq',
-      '.sha, .content',
-    ],
+    ['gh', 'api', `repos/${options.repo}/contents/${syncManifestPath}?ref=${ref}`],
     { cwd: options.cwd, env: options.env },
   );
 
-  const [sha = '', ...content] = shown.stdout.split('\n');
-  const manifestValue: unknown = JSON.parse(Buffer.from(content.join(''), 'base64').toString());
+  const treeValue: unknown = JSON.parse(tree.stdout);
+  const shownValue: unknown = JSON.parse(shown.stdout);
+  const files = parseSkillsTree(treeValue);
+  const contents = parseManifestContents(shownValue);
 
-  const files = tree.stdout
-    .split('\n')
-    .filter((line) => line !== '')
-    .map((line) => toSkillsTreeFile(line));
+  if (files === null || contents === null) {
+    return null;
+  }
 
+  const manifestValue: unknown = JSON.parse(contents.text);
   const built = buildSkillFilesManifest(manifestValue, files);
 
-  return { sha, text: renderManifestText(built.manifest), added: built.added };
-}
-
-// A line holds the blob's git mode, a space, then its path, which may hold spaces itself.
-function toSkillsTreeFile(line: string): SkillsTreeFile {
-  const space = line.indexOf(' ');
-
-  return { mode: line.slice(0, space), path: line.slice(space + 1) };
+  return { sha: contents.sha, text: renderManifestText(built.manifest), added: built.added };
 }

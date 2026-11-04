@@ -30,5 +30,5 @@ export async function probePinManifestChange(
     { cwd: options.cwd, env: options.env },
   );
 
-  return update.added.length > 0 && shown.stdout === update.text;
+  return update !== null && update.added.length > 0 && shown.stdout === update.text;
 }

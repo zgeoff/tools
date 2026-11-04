@@ -9,10 +9,10 @@ import { runCommand } from '../ci/run-command.ts';
 import { parseSkillsPin } from './parse-skills-pin.ts';
 import { pickSkillsPinMove } from './pick-skills-pin-move.ts';
 import { probePinManifestChange } from './probe-pin-manifest-change.ts';
-import type { SkillFilesManifestText } from './read-skill-files-manifest.ts';
 import { readSkillFilesManifest } from './read-skill-files-manifest.ts';
 import { skillsPinPath } from './skills-pin-path.ts';
 import { syncManifestPath } from './sync-manifest-path.ts';
+import { writeStagedManifest } from './write-staged-manifest.ts';
 
 export interface WriteSkillsPinPullRequestOptions {
   // A checkout of main of zgeoff/tools.
@@ -117,6 +117,10 @@ export async function writeSkillsPinPullRequest(
   });
 
   const branch = await writePinBranch(options, checkedOut.stdout.trim());
+
+  if (branch === null) {
+    return 1;
+  }
 
   if (openNumber === '') {
     const number = await writePinPullRequest(options, { pinned, number: '', added: branch.added });
@@ -313,8 +317,16 @@ interface PinBranch {
 async function writePinBranch(
   options: Readonly<WriteSkillsPinPullRequestOptions>,
   base: string,
-): Promise<PinBranch> {
+): Promise<PinBranch | null> {
   const update = await readSkillFilesManifest(options, base, options.commit);
+
+  if (update === null) {
+    options.writeOutput(
+      `::error::GitHub gave a truncated tree of zgeoff/skills ${options.commit}, or no content of ${syncManifestPath} at ${base}; the next dispatch moves the pin\n`,
+    );
+
+    return null;
+  }
 
   await writeBranchRef(options, stagingBranch, base);
 
@@ -345,7 +357,9 @@ async function writePinBranch(
   ]);
 
   const head =
-    update.added.length === 0 ? written.stdout.trim() : await writeManifestCommit(options, update);
+    update.added.length === 0
+      ? written.stdout.trim()
+      : await writeStagedManifest(options, update, stagingBranch);
 
   await writeBranchRef(options, pinBranch, head);
 
@@ -393,31 +407,6 @@ async function writeBranchRef(
 
 function renderPinTitle(commit: string): string {
   return `chore(skills): pin zgeoff/skills at ${commit.slice(0, 12)}`;
-}
-
-// Returns the commit it wrote on the staging branch.
-async function writeManifestCommit(
-  options: Readonly<WriteSkillsPinPullRequestOptions>,
-  update: Readonly<SkillFilesManifestText>,
-): Promise<string> {
-  const written = await runCheckedGH(options, [
-    'api',
-    '-X',
-    'PUT',
-    `repos/${options.repo}/contents/${syncManifestPath}`,
-    '-f',
-    'message=chore(skills): list the new skill files in the sync manifest',
-    '-f',
-    `content=${Buffer.from(update.text).toString('base64')}`,
-    '-f',
-    `sha=${update.sha}`,
-    '-f',
-    `branch=${stagingBranch}`,
-    '--jq',
-    '.commit.sha',
-  ]);
-
-  return written.stdout.trim();
 }
 
 interface PinPullRequest {
@@ -587,6 +576,10 @@ async function writeReusedPinPullRequest(
   );
 
   const branch = await writePinBranch(options, mainCommit);
+
+  if (branch === null) {
+    return 1;
+  }
 
   const number = await writePinPullRequest(options, {
     pinned: mainPin,

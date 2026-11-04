@@ -92,28 +92,28 @@ test.each([
     stderr: '',
   });
 
-  ctx.commands.answer(
-    [
-      'gh',
-      'api',
-      `repos/zgeoff/skills/git/trees/${commit}?recursive=1`,
-      '--jq',
-      String.raw`if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | "\(.mode) \(.path)" end`,
-    ],
-    { exitCode: 0, stdout: '100644 skills/kettle/SKILL.md\n', stderr: '' },
-  );
+  ctx.commands.answer(['gh', 'api', `repos/zgeoff/skills/git/trees/${commit}?recursive=1`], {
+    exitCode: 0,
+    stdout: JSON.stringify({
+      truncated: false,
+      tree: [{ path: 'skills/kettle/SKILL.md', mode: '100644', type: 'blob' }],
+    }),
+    stderr: '',
+  });
 
   ctx.commands.answer(
     [
       'gh',
       'api',
       'repos/example/tools/contents/sync/manifest.json?ref=fedcba9876543210fedcba9876543210fedcba98',
-      '--jq',
-      '.sha, .content',
     ],
     {
       exitCode: 0,
-      stdout: `0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33\n${Buffer.from('[]\n').toString('base64')}\n`,
+      stdout: JSON.stringify({
+        sha: '0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
+        content: Buffer.from('[]\n').toString('base64'),
+        encoding: 'base64',
+      }),
       stderr: '',
     },
   );
@@ -293,6 +293,8 @@ test('it adds a new file of a skill folder the manifest ships, and the manifest 
     },
   ];
 
+  const manifestText = JSON.stringify(manifest);
+
   const expectedManifest = `[
   {
     "name": "skill-kettle",
@@ -359,33 +361,33 @@ test('it adds a new file of a skill folder the manifest ships, and the manifest 
     stderr: '',
   });
 
-  ctx.commands.answer(
-    [
-      'gh',
-      'api',
-      `repos/zgeoff/skills/git/trees/${commit}?recursive=1`,
-      '--jq',
-      String.raw`if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | "\(.mode) \(.path)" end`,
-    ],
-    {
-      exitCode: 0,
-      stdout:
-        '100644 skills/kettle/SKILL.md\n100644 skills/kettle/references/descaling.md\n100644 skills/kettle/references/limescale.md\n100755 skills/kettle/scripts/boil.sh\n',
-      stderr: '',
-    },
-  );
+  ctx.commands.answer(['gh', 'api', `repos/zgeoff/skills/git/trees/${commit}?recursive=1`], {
+    exitCode: 0,
+    stdout: JSON.stringify({
+      truncated: false,
+      tree: [
+        { path: 'skills/kettle/SKILL.md', mode: '100644', type: 'blob' },
+        { path: 'skills/kettle/references/descaling.md', mode: '100644', type: 'blob' },
+        { path: 'skills/kettle/references/limescale.md', mode: '100644', type: 'blob' },
+        { path: 'skills/kettle/scripts/boil.sh', mode: '100755', type: 'blob' },
+      ],
+    }),
+    stderr: '',
+  });
 
   ctx.commands.answer(
     [
       'gh',
       'api',
       'repos/example/tools/contents/sync/manifest.json?ref=fedcba9876543210fedcba9876543210fedcba98',
-      '--jq',
-      '.sha, .content',
     ],
     {
       exitCode: 0,
-      stdout: `0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33\n${Buffer.from(JSON.stringify(manifest)).toString('base64')}\n`,
+      stdout: JSON.stringify({
+        sha: '0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
+        content: Buffer.from(manifestText).toString('base64'),
+        encoding: 'base64',
+      }),
       stderr: '',
     },
   );
@@ -573,6 +575,8 @@ test('it leaves the manifest alone when only a skill folder no entry ships gains
     },
   ];
 
+  const manifestText = JSON.stringify(manifest);
+
   await ctx.writePin(pinned);
 
   ctx.commands.answer(
@@ -608,33 +612,32 @@ test('it leaves the manifest alone when only a skill folder no entry ships gains
     stderr: '',
   });
 
-  ctx.commands.answer(
-    [
-      'gh',
-      'api',
-      `repos/zgeoff/skills/git/trees/${commit}?recursive=1`,
-      '--jq',
-      String.raw`if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | "\(.mode) \(.path)" end`,
-    ],
-    {
-      exitCode: 0,
-      stdout:
-        '100644 skills/kettle/SKILL.md\n100644 skills/teapot/SKILL.md\n100644 skills/teapot/references/brewing.md\n',
-      stderr: '',
-    },
-  );
+  ctx.commands.answer(['gh', 'api', `repos/zgeoff/skills/git/trees/${commit}?recursive=1`], {
+    exitCode: 0,
+    stdout: JSON.stringify({
+      truncated: false,
+      tree: [
+        { path: 'skills/kettle/SKILL.md', mode: '100644', type: 'blob' },
+        { path: 'skills/teapot/SKILL.md', mode: '100644', type: 'blob' },
+        { path: 'skills/teapot/references/brewing.md', mode: '100644', type: 'blob' },
+      ],
+    }),
+    stderr: '',
+  });
 
   ctx.commands.answer(
     [
       'gh',
       'api',
       'repos/example/tools/contents/sync/manifest.json?ref=fedcba9876543210fedcba9876543210fedcba98',
-      '--jq',
-      '.sha, .content',
     ],
     {
       exitCode: 0,
-      stdout: `0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33\n${Buffer.from(JSON.stringify(manifest)).toString('base64')}\n`,
+      stdout: JSON.stringify({
+        sha: '0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
+        content: Buffer.from(manifestText).toString('base64'),
+        encoding: 'base64',
+      }),
       stderr: '',
     },
   );
@@ -802,28 +805,28 @@ test('it opens its own pull request when only a fork holds a pin branch pull req
     stderr: '',
   });
 
-  ctx.commands.answer(
-    [
-      'gh',
-      'api',
-      `repos/zgeoff/skills/git/trees/${commit}?recursive=1`,
-      '--jq',
-      String.raw`if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | "\(.mode) \(.path)" end`,
-    ],
-    { exitCode: 0, stdout: '100644 skills/kettle/SKILL.md\n', stderr: '' },
-  );
+  ctx.commands.answer(['gh', 'api', `repos/zgeoff/skills/git/trees/${commit}?recursive=1`], {
+    exitCode: 0,
+    stdout: JSON.stringify({
+      truncated: false,
+      tree: [{ path: 'skills/kettle/SKILL.md', mode: '100644', type: 'blob' }],
+    }),
+    stderr: '',
+  });
 
   ctx.commands.answer(
     [
       'gh',
       'api',
       'repos/example/tools/contents/sync/manifest.json?ref=fedcba9876543210fedcba9876543210fedcba98',
-      '--jq',
-      '.sha, .content',
     ],
     {
       exitCode: 0,
-      stdout: `0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33\n${Buffer.from('[]\n').toString('base64')}\n`,
+      stdout: JSON.stringify({
+        sha: '0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
+        content: Buffer.from('[]\n').toString('base64'),
+        encoding: 'base64',
+      }),
       stderr: '',
     },
   );
@@ -1004,28 +1007,28 @@ test('it moves the branch of the open pin pull request to a newer commit', async
     stderr: '',
   });
 
-  ctx.commands.answer(
-    [
-      'gh',
-      'api',
-      `repos/zgeoff/skills/git/trees/${commit}?recursive=1`,
-      '--jq',
-      String.raw`if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | "\(.mode) \(.path)" end`,
-    ],
-    { exitCode: 0, stdout: '100644 skills/kettle/SKILL.md\n', stderr: '' },
-  );
+  ctx.commands.answer(['gh', 'api', `repos/zgeoff/skills/git/trees/${commit}?recursive=1`], {
+    exitCode: 0,
+    stdout: JSON.stringify({
+      truncated: false,
+      tree: [{ path: 'skills/kettle/SKILL.md', mode: '100644', type: 'blob' }],
+    }),
+    stderr: '',
+  });
 
   ctx.commands.answer(
     [
       'gh',
       'api',
       'repos/example/tools/contents/sync/manifest.json?ref=fedcba9876543210fedcba9876543210fedcba98',
-      '--jq',
-      '.sha, .content',
     ],
     {
       exitCode: 0,
-      stdout: `0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33\n${Buffer.from('[]\n').toString('base64')}\n`,
+      stdout: JSON.stringify({
+        sha: '0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
+        content: Buffer.from('[]\n').toString('base64'),
+        encoding: 'base64',
+      }),
       stderr: '',
     },
   );
@@ -1288,28 +1291,28 @@ test.each([
     stderr: '',
   });
 
-  ctx.commands.answer(
-    [
-      'gh',
-      'api',
-      `repos/zgeoff/skills/git/trees/${commit}?recursive=1`,
-      '--jq',
-      String.raw`if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | "\(.mode) \(.path)" end`,
-    ],
-    { exitCode: 0, stdout: '100644 skills/kettle/SKILL.md\n', stderr: '' },
-  );
+  ctx.commands.answer(['gh', 'api', `repos/zgeoff/skills/git/trees/${commit}?recursive=1`], {
+    exitCode: 0,
+    stdout: JSON.stringify({
+      truncated: false,
+      tree: [{ path: 'skills/kettle/SKILL.md', mode: '100644', type: 'blob' }],
+    }),
+    stderr: '',
+  });
 
   ctx.commands.answer(
     [
       'gh',
       'api',
       'repos/example/tools/contents/sync/manifest.json?ref=fedcba9876543210fedcba9876543210fedcba98',
-      '--jq',
-      '.sha, .content',
     ],
     {
       exitCode: 0,
-      stdout: `0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33\n${Buffer.from('[]\n').toString('base64')}\n`,
+      stdout: JSON.stringify({
+        sha: '0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
+        content: Buffer.from('[]\n').toString('base64'),
+        encoding: 'base64',
+      }),
       stderr: '',
     },
   );
@@ -1435,12 +1438,14 @@ test.each([
       'gh',
       'api',
       'repos/example/tools/contents/sync/manifest.json?ref=abad1dea0123456789abcdef0123456789abcdef',
-      '--jq',
-      '.sha, .content',
     ],
     {
       exitCode: 0,
-      stdout: `0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33\n${Buffer.from('[]\n').toString('base64')}\n`,
+      stdout: JSON.stringify({
+        sha: '0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
+        content: Buffer.from('[]\n').toString('base64'),
+        encoding: 'base64',
+      }),
       stderr: '',
     },
   );
@@ -1744,6 +1749,8 @@ test.each([
       },
     ];
 
+    const manifestText = JSON.stringify(manifest);
+
     const headManifest = `[
   {
     "name": "skill-kettle",
@@ -1837,32 +1844,27 @@ test.each([
       { exitCode: 0, stdout: `${base}\n`, stderr: '' },
     );
 
-    ctx.commands.answer(
-      [
-        'gh',
-        'api',
-        `repos/zgeoff/skills/git/trees/${proposed}?recursive=1`,
-        '--jq',
-        String.raw`if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | "\(.mode) \(.path)" end`,
-      ],
-      {
-        exitCode: 0,
-        stdout: '100644 skills/kettle/SKILL.md\n100644 skills/kettle/references/descaling.md\n',
-        stderr: '',
-      },
-    );
+    ctx.commands.answer(['gh', 'api', `repos/zgeoff/skills/git/trees/${proposed}?recursive=1`], {
+      exitCode: 0,
+      stdout: JSON.stringify({
+        truncated: false,
+        tree: [
+          { path: 'skills/kettle/SKILL.md', mode: '100644', type: 'blob' },
+          { path: 'skills/kettle/references/descaling.md', mode: '100644', type: 'blob' },
+        ],
+      }),
+      stderr: '',
+    });
 
     ctx.commands.answer(
-      [
-        'gh',
-        'api',
-        `repos/example/tools/contents/sync/manifest.json?ref=${base}`,
-        '--jq',
-        '.sha, .content',
-      ],
+      ['gh', 'api', `repos/example/tools/contents/sync/manifest.json?ref=${base}`],
       {
         exitCode: 0,
-        stdout: `0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33\n${Buffer.from(JSON.stringify(manifest)).toString('base64')}\n`,
+        stdout: JSON.stringify({
+          sha: '0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
+          content: Buffer.from(manifestText).toString('base64'),
+          encoding: 'base64',
+        }),
         stderr: '',
       },
     );
