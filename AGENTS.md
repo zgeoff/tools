@@ -51,9 +51,9 @@ sync/               the sources that repo-sync delivers, listed in sync/manifest
   skill-gate/       the skill gate's rules, which repo-sync writes to .claude/skill-gate.json in
                     each repo its except list leaves out, and which this repo links there
 scripts/            the step scripts that this repo's workflows run, one folder per area, and the
-                    shell scripts that repo-sync and the release job run; tests sit beside them
-step-bundles/       the bundle of each step script that a reusable workflow downloads, which
-                    `bun run build:step-bundles` writes; edit the script, never its bundle
+                    shell scripts that repo-sync and the release job run; tests sit beside them; a
+                    reusable workflow downloads each step script as it is, so a step script imports
+                    no package, and a step that needs one runs a chex subcommand from npm
 .github/workflows/  this repo's CI, release and sync dispatch, and the reusable workflows that other repos call:
                     bun-checks, repo-sync and its guard, audit-fix, release-please and the
                     paths-changed gate
@@ -93,10 +93,6 @@ says.
 - `bun run check:release-workflow` checks the tag step of the shared release job in
   `.github/workflows/release-please.yml`, and fails on a dependency cycle between the workspace
   packages, in any dependency field, which stops release-please. CI and the pre-push hook run it.
-- `bun run build:step-bundles` rebuilds `step-bundles/` from the step scripts. Run it, and commit
-  the bundles, after you change a step script, a file one imports, or a package it uses.
-  `bun run check:step-bundles` fails on a stale bundle and on a set of bundles that a runner could
-  not download or compile, and CI and the pre-push hook run it.
 - `bun run check:chex-pin` fails when no custom manager in `renovate.json` captures the chex release
   that `.github/workflows/bun-checks.yml` pins, which Renovate then never bumps. CI runs it.
 - `bun run check:repo-sync-workflows` checks the stub `sync/repo-sync.yml` against

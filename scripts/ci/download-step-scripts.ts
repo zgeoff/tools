@@ -5,8 +5,7 @@ import { isBuiltin } from 'node:module';
 import { dirname, join, normalize } from 'node:path';
 import { parseArgs } from 'node:util';
 
-// The scripts each reusable workflow's steps run. The download fetches the bundle of each
-// TypeScript script, which a step runs.
+// The scripts each reusable workflow's steps run.
 export const stepScriptSets = {
   'bun-checks': [
     'scripts/bun-checks/run-shell-check.ts',
@@ -15,7 +14,6 @@ export const stepScriptSets = {
     'scripts/ci/run-pinned-tool-step.ts',
     'scripts/ci/run-package-scripts.ts',
     'scripts/ci/collect-failed-jobs.ts',
-    'packages/chex/src/cli.ts',
   ],
   'paths-changed': ['scripts/paths-changed/run-changed-files-step.ts'],
   'repo-sync': [
@@ -39,20 +37,6 @@ export const stepScriptSets = {
 } as const satisfies Record<string, readonly string[]>;
 
 export type StepScriptSet = keyof typeof stepScriptSets;
-
-// The folder that holds one bundle of each TypeScript step script. Bun bundles each script with
-// every file and package it imports, so a caller's runner runs it with no install.
-export const stepBundlesFolder = 'step-bundles';
-
-// A step runs a TypeScript script from its bundle, at the script's repo path with a .js extension,
-// so a path the script builds from its own folder still finds the files downloaded beside it.
-export function toStepRunPath(entry: string): string {
-  return entry.endsWith('.ts') ? `${entry.slice(0, -'.ts'.length)}.js` : entry;
-}
-
-export function toStepToolsPath(runPath: string): string {
-  return runPath.endsWith('.js') ? `${stepBundlesFolder}/${runPath}` : runPath;
-}
 
 export type ReadToolsFile = (path: string) => Promise<string>;
 
@@ -114,7 +98,6 @@ function collectImportedPaths(path: string, text: string): string[] {
   const source = text.replace(/^#!.*/u, '');
 
   return transpiler.scanImports(source).flatMap((imported) => {
-    // Bun writes a bundle's built-in imports without the node: prefix.
     if (isBuiltin(imported.path)) {
       return [];
     }
@@ -270,9 +253,9 @@ export async function runDownloadStep(step: Readonly<DownloadStep>): Promise<num
   });
 
   const written = await downloadStepScripts({
-    entries: stepScriptSets[parsed.set].map((entry) => toStepRunPath(entry)),
+    entries: stepScriptSets[parsed.set],
     destination: join(runnerTemp, 'tools'),
-    readToolsFile: (path) => readToolsFile(toStepToolsPath(path)),
+    readToolsFile,
     writeFile: step.writeFile,
   });
 

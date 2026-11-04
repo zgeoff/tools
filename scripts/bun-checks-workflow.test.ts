@@ -47,8 +47,7 @@ test.each(['static', 'checks'])(
     const steps = workflow.jobs[jobName]?.steps ?? [];
 
     const isChexStep = (step: z.infer<typeof stepSchema>) =>
-      step.name !== 'Plan the check scripts' &&
-      (step.run?.includes('$CHEX') === true || step.run?.includes('chex/src/cli') === true);
+      step.run?.includes('$CHEX') === true || step.run?.includes('chex/src/cli') === true;
 
     const chexSteps = Object.fromEntries(
       steps
@@ -59,6 +58,7 @@ test.each(['static', 'checks'])(
     expect(workflow.env.CHEX).toMatch(/^@zgeoff\/chex@\d+\.\d+\.\d+$/u);
 
     expect(chexSteps).toStrictEqual({
+      'Plan the check scripts': 'bun x "$CHEX" ci-plan',
       'Check prose': 'bun x "$CHEX" prose',
       'Check length': 'bun x "$CHEX" length',
       'Check links': 'bun x "$CHEX" links',

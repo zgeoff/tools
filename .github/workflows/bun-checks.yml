@@ -160,34 +160,12 @@ jobs:
         with: &bun-version
           bun-version-file: .bun-version
 
-      # actionlint does not know job.workflow_repository or job.workflow_sha,
-      # so the step reads them through toJSON. The first download is the one
-      # script that downloads the bundles of the others.
-      - &download-downloader
-        name: Download the step script downloader
-        env: &tools-url
-          TOOLS_URL:
-            https://raw.githubusercontent.com/${{ fromJSON(toJSON(job)).workflow_repository }}/${{
-            fromJSON(toJSON(job)).workflow_sha }}
-        run:
-          &download-downloader-body curl -fsSL --retry 3 --retry-all-errors --create-dirs -o
-          "$RUNNER_TEMP/tools/.bun-version" "$TOOLS_URL/.bun-version" -o
-          "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts"
-          "$TOOLS_URL/scripts/ci/download-step-scripts.ts"
-
-      - &download-scripts
-        name: Download the check scripts
-        env: *tools-url
-        run:
-          &download-scripts-body bun "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts"
-          bun-checks
-
       - &plan
         name: Plan the check scripts
         id: plan
         env: &plan-env
           SCRIPTS: ${{ inputs.scripts }}
-        run: &plan-body bun "$RUNNER_TEMP/tools/packages/chex/src/cli.js" ci-plan
+        run: &plan-body bun x "$CHEX" ci-plan
 
   static:
     if:
@@ -221,8 +199,28 @@ jobs:
         name: Install
         run: &install-body bun install --frozen-lockfile
 
-      - *download-downloader
-      - *download-scripts
+      # actionlint does not know job.workflow_repository or job.workflow_sha,
+      # so the step reads them through toJSON. The first download is the one
+      # script that downloads the others.
+      - &download-downloader
+        name: Download the step script downloader
+        env: &tools-url
+          TOOLS_URL:
+            https://raw.githubusercontent.com/${{ fromJSON(toJSON(job)).workflow_repository }}/${{
+            fromJSON(toJSON(job)).workflow_sha }}
+        run:
+          &download-downloader-body curl -fsSL --retry 3 --retry-all-errors --create-dirs -o
+          "$RUNNER_TEMP/tools/.bun-version" "$TOOLS_URL/.bun-version" -o
+          "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/ci/download-step-scripts.ts"
+
+      - &download-scripts
+        name: Download the check scripts
+        env: *tools-url
+        run:
+          &download-scripts-body bun "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts"
+          bun-checks
+
       - *plan
 
       # The shell check runs shfmt and the workflows check runs actionlint,
@@ -234,21 +232,21 @@ jobs:
         name: Setup shfmt
         env: &shfmt-env
           SETUP_TOOL: ${{ inputs.setup-shfmt }}
-        run: &shfmt-body bun "$RUNNER_TEMP/tools/scripts/ci/run-pinned-tool-step.js" shfmt
+        run: &shfmt-body bun "$RUNNER_TEMP/tools/scripts/ci/run-pinned-tool-step.ts" shfmt
 
       - &setup-actionlint
         name: Setup actionlint
         id: setup-actionlint
         env: &actionlint-env
           SETUP_TOOL: ${{ inputs.setup-actionlint }}
-        run: &actionlint-body bun "$RUNNER_TEMP/tools/scripts/ci/run-pinned-tool-step.js" actionlint
+        run: &actionlint-body bun "$RUNNER_TEMP/tools/scripts/ci/run-pinned-tool-step.ts" actionlint
 
       # Each check and script step after the setup runs even when an earlier
       # one fails, so the run shows every check that fails, each by name.
       - &check-shell
         name: Check shell
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/run-shell-check.js"
+        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/run-shell-check.ts"
 
       # A repo whose check:docs script names its docs checks runs each one as
       # its own step. A repo with no check:docs script runs this step, which
@@ -258,7 +256,7 @@ jobs:
         if:
           ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' && steps.plan.outputs.docs
           == '' }}
-        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/run-docs-check.js"
+        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/run-docs-check.ts"
 
       - &check-prose
         name: Check prose
@@ -305,7 +303,7 @@ jobs:
       - &check-workflows
         name: Check workflows
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
-        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/run-actionlint-check.js"
+        run: bun "$RUNNER_TEMP/tools/scripts/bun-checks/run-actionlint-check.ts"
 
       # The workflow lint reads the profile, because one of its rules covers a
       # private repo alone.
@@ -343,7 +341,7 @@ jobs:
         if: ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' }}
         env:
           SCRIPTS: ${{ steps.plan.outputs.scripts }}
-        run: &run-body bun "$RUNNER_TEMP/tools/scripts/ci/run-package-scripts.js"
+        run: &run-body bun "$RUNNER_TEMP/tools/scripts/ci/run-package-scripts.ts"
 
   test:
     if:
@@ -371,7 +369,7 @@ jobs:
         name: Setup gitleaks
         env: &gitleaks-env
           SETUP_TOOL: ${{ inputs.setup-gitleaks }}
-        run: &gitleaks-body bun "$RUNNER_TEMP/tools/scripts/ci/run-pinned-tool-step.js" gitleaks
+        run: &gitleaks-body bun "$RUNNER_TEMP/tools/scripts/ci/run-pinned-tool-step.ts" gitleaks
       - *run-scripts
 
   test-lane:
@@ -580,4 +578,4 @@ jobs:
         if: ${{ always() && env.PROFILE == 'public' }}
         env:
           NEEDS: ${{ toJSON(needs) }}
-        run: bun "$RUNNER_TEMP/tools/scripts/ci/collect-failed-jobs.js"
+        run: bun "$RUNNER_TEMP/tools/scripts/ci/collect-failed-jobs.ts"
