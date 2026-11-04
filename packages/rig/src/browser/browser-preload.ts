@@ -15,7 +15,7 @@ import { stopDescendantProcesses } from './stop-descendant-processes.ts';
 afterAll(() =>
   stopDescendantProcesses({
     rootPID: process.pid,
-    deadlineMs: 5000,
+    timeoutMs: 5000,
     clock: systemClock,
     readProcessTable,
     signalProcess: process.kill.bind(process),

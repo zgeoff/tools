@@ -9,7 +9,7 @@ import type { ProcessEntry } from './read-process-table.ts';
 export interface DescendantStop {
   readonly rootPID: number;
 
-  readonly deadlineMs: number;
+  readonly timeoutMs: number;
 
   readonly clock: Clock;
 
@@ -22,9 +22,9 @@ export interface DescendantStop {
 const pollIntervalMs = 50;
 
 export async function stopDescendantProcesses(stop: DescendantStop): Promise<void> {
-  const deadline = stop.clock.now() + stop.deadlineMs;
+  const deadlineMs = stop.clock.now() + stop.timeoutMs;
 
-  const table = await readFirstListing(stop, deadline);
+  const table = await readFirstListing(stop, deadlineMs);
 
   const descendants = collectDescendantPIDs(table, stop.rootPID);
 
@@ -38,7 +38,7 @@ export async function stopDescendantProcesses(stop: DescendantStop): Promise<voi
     const step = pickDescendantStopStep({
       descendants,
       listing: stop.readProcessTable(),
-      isPastDeadline: stop.clock.now() >= deadline,
+      isPastDeadline: stop.clock.now() >= deadlineMs,
     });
 
     isStopped = await match(step)
@@ -46,7 +46,7 @@ export async function stopDescendantProcesses(stop: DescendantStop): Promise<voi
       .with({ kind: 'failed' }, (failed) =>
         Promise.reject(
           new Error(
-            `the processes ${failed.running.join(', ')} still run ${stop.deadlineMs} ms after SIGKILL`,
+            `the processes ${failed.running.join(', ')} still run ${stop.timeoutMs} ms after SIGKILL`,
           ),
         ),
       )
@@ -58,18 +58,18 @@ export async function stopDescendantProcesses(stop: DescendantStop): Promise<voi
 // Only a listing names the processes to stop, so a failed one is read again until the deadline.
 async function readFirstListing(
   stop: DescendantStop,
-  deadline: number,
+  deadlineMs: number,
 ): Promise<readonly ProcessEntry[]> {
   let listing: readonly ProcessEntry[] | null = null;
 
   while (listing === null) {
-    const step = pickListingReadStep(stop.readProcessTable(), stop.clock.now() >= deadline);
+    const step = pickListingReadStep(stop.readProcessTable(), stop.clock.now() >= deadlineMs);
 
     listing = await match(step)
       .with({ kind: 'listed' }, (listed) => Promise.resolve(listed.listing))
       .with({ kind: 'failed' }, () =>
         Promise.reject(
-          new Error(`the process listing failed for ${stop.deadlineMs} ms, so no process stopped`),
+          new Error(`the process listing failed for ${stop.timeoutMs} ms, so no process stopped`),
         ),
       )
       .with({ kind: 'retry' }, () => stop.clock.sleep(pollIntervalMs).then(() => null))

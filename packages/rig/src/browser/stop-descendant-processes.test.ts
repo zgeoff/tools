@@ -32,7 +32,7 @@ test("it kills every descendant of the root, and none of the root's ancestors or
 
   await stopDescendantProcesses({
     rootPID: 4100,
-    deadlineMs: 5000,
+    timeoutMs: 5000,
     clock: ctx.clock,
     signalProcess: ctx.signalProcess,
     readProcessTable,
@@ -69,7 +69,7 @@ test('it waits until each descendant leaves the listing, zombies included', asyn
 
   await stopDescendantProcesses({
     rootPID: 4100,
-    deadlineMs: 5000,
+    timeoutMs: 5000,
     clock: ctx.clock,
     signalProcess: ctx.signalProcess,
     readProcessTable,
@@ -94,7 +94,7 @@ test('it resolves at the deadline when only zombies remain, which no process rea
 
   await stopDescendantProcesses({
     rootPID: 4100,
-    deadlineMs: 5000,
+    timeoutMs: 5000,
     clock: ctx.clock,
     signalProcess: ctx.signalProcess,
     readProcessTable,
@@ -128,7 +128,7 @@ test('it throws with the descendants that are no zombie and still run at the dea
   expect(
     stopDescendantProcesses({
       rootPID: 4100,
-      deadlineMs: 5000,
+      timeoutMs: 5000,
       clock: ctx.clock,
       signalProcess: ctx.signalProcess,
       readProcessTable,
@@ -158,7 +158,7 @@ test('it goes on past each descendant that exits before its signal', async () =>
 
   await stopDescendantProcesses({
     rootPID: 4100,
-    deadlineMs: 5000,
+    timeoutMs: 5000,
     clock: ctx.clock,
     signalProcess: ctx.signalProcess,
     readProcessTable,
@@ -187,7 +187,7 @@ test('it throws a signal failure other than a process that has exited', () => {
   expect(
     stopDescendantProcesses({
       rootPID: 4100,
-      deadlineMs: 5000,
+      timeoutMs: 5000,
       clock: ctx.clock,
       signalProcess: ctx.signalProcess,
       readProcessTable,
@@ -212,7 +212,7 @@ test('it reads a failed first listing again, and kills the descendants that the 
 
   await stopDescendantProcesses({
     rootPID: 4100,
-    deadlineMs: 5000,
+    timeoutMs: 5000,
     clock: ctx.clock,
     signalProcess: ctx.signalProcess,
     readProcessTable,
@@ -231,7 +231,7 @@ test('it throws and kills nothing when the listing fails until the deadline', ()
   expect(
     stopDescendantProcesses({
       rootPID: 4100,
-      deadlineMs: 5000,
+      timeoutMs: 5000,
       clock: ctx.clock,
       signalProcess: ctx.signalProcess,
       readProcessTable,
@@ -262,7 +262,7 @@ test('it counts every descendant as running while a later listing fails', () => 
   expect(
     stopDescendantProcesses({
       rootPID: 4100,
-      deadlineMs: 5000,
+      timeoutMs: 5000,
       clock: ctx.clock,
       signalProcess: ctx.signalProcess,
       readProcessTable,
