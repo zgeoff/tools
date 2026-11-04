@@ -44,6 +44,10 @@ const setupTestOnly = {
         reportSetupTestBranch(context, node, '`if`');
       },
       ConditionalExpression(node) {
+        if (isOptionalSpread(node)) {
+          return;
+        }
+
         reportSetupTestBranch(context, node, 'ternary');
       },
       Program(program) {
@@ -129,6 +133,20 @@ const functionTypes = new Set([
 
 function isOutsideFunction(node) {
   return node !== null && node !== undefined && !functionTypes.has(node.type);
+}
+
+// `...(cond ? {} : { lid })` adds an optional property under exactOptionalPropertyTypes, which
+// is wiring like `??`
+function isOptionalSpread(node) {
+  return (
+    node.parent.type === 'SpreadElement' &&
+    node.parent.parent.type === 'ObjectExpression' &&
+    (isEmptyObject(node.consequent) || isEmptyObject(node.alternate))
+  );
+}
+
+function isEmptyObject(node) {
+  return node.type === 'ObjectExpression' && node.properties.length === 0;
 }
 
 const testModules = new Set(['bun:test', 'claude-code/testing']);

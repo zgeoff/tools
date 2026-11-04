@@ -79,6 +79,11 @@ reports, and a branch in a function nested in `setupTest()`, such as a stub call
 method, does not, because it runs only when the unit calls it. `??`, `&&` and `||` pass, so
 `options.clock ?? buildStubClock()` stays as default wiring.
 
+An optional spread passes too: a ternary that is the whole argument of an object spread, with `{}`
+as one arm, such as `...(lid === undefined ? {} : { lid })`, which adds an optional property. An
+object spread ternary with two non-empty arms reports, and so does a ternary inside an arm of an
+optional spread.
+
 ## `zgeoff/no-file-snapshot`
 
 Snapshots are inline only, so the golden value sits in the test that pins it. The rule reports every

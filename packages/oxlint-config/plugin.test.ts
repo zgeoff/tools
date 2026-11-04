@@ -903,8 +903,28 @@ test.each([
   ],
   ['a ternary', '  const water = options.hot ? boil() : pour();\n', 'ternary'],
   [
-    'a ternary in a spread',
-    '  const pot = { ...(options.lid === undefined ? {} : { lid: options.lid }) };\n',
+    'a spread ternary with no empty arm',
+    '  const pot = { ...(options.hot ? { heat: 100 } : { heat: 20 }) };\n',
+    'ternary',
+  ],
+  [
+    'a ternary with an empty arm outside a spread',
+    '  const pot = options.lid === undefined ? {} : { lid: options.lid };\n',
+    'ternary',
+  ],
+  [
+    'an array spread ternary with an empty object arm',
+    '  const cups = [...(options.hot ? {} : options.cups)];\n',
+    'ternary',
+  ],
+  [
+    'a call spread ternary with an empty object arm',
+    '  pour(...(options.hot ? {} : options.cups));\n',
+    'ternary',
+  ],
+  [
+    'a ternary in an arm of an optional spread',
+    '  const pot = { ...(options.lid === undefined ? {} : { lid: options.hot ? 100 : 20 }) };\n',
     'ternary',
   ],
 ])('it flags %s in the body of setupTest', async (_, branch, name) => {
@@ -934,6 +954,14 @@ test.each([
   ['a ?? default', '  const clock = options.clock ?? buildClock();\n'],
   ['an && guard', '  const lid = options.hot && buildLid();\n'],
   ['an || fallback', '  const cups = options.cups || 4;\n'],
+  [
+    'an optional spread with the empty object first',
+    '  const pot = { ...(options.lid === undefined ? {} : { lid: options.lid }) };\n',
+  ],
+  [
+    'an optional spread with the empty object last',
+    '  const pot = buildPot({ ...(options.lid === undefined ? { lid: buildLid() } : {}) });\n',
+  ],
   [
     'an if in a stub callback',
     '  const pour = (cup) => {\n    if (cup.full) {\n      return 0;\n    }\n\n    return 1;\n  };\n',
