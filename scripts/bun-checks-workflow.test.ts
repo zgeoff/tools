@@ -1,6 +1,7 @@
 // oxlint-disable zgeoff/test-beside-module -- a repo fact test of .github/workflows/bun-checks.yml, which bun test never reads in its hidden folder
 import { expect, test } from 'bun:test';
 import { z } from 'zod';
+import { laneNames } from '../packages/chex/src/ci-plan/plan-check-scripts.ts';
 
 test('it asks for no permission beyond contents read, so a read-only caller can run it', async () => {
   const workflowText = await Bun.file(
@@ -73,3 +74,22 @@ test.each(['static', 'checks'])(
     });
   },
 );
+
+test('it gives the private checks job one Lane step for each lane that chex ci-plan plans', async () => {
+  const workflowText = await Bun.file(
+    new URL('../.github/workflows/bun-checks.yml', import.meta.url),
+  ).text();
+
+  const stepSchema = z.object({ name: z.string().optional() });
+  const checksSchema = z.object({ steps: z.array(stepSchema) });
+
+  const workflow = z
+    .object({ jobs: z.object({ checks: checksSchema }) })
+    .parse(Bun.YAML.parse(workflowText));
+
+  const laneSteps = workflow.jobs.checks.steps
+    .map((step) => step.name ?? '')
+    .filter((name) => name.startsWith('Lane '));
+
+  expect(laneSteps).toStrictEqual(laneNames.map((lane) => `Lane ${lane}`));
+});

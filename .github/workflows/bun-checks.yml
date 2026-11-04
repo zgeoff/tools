@@ -24,7 +24,7 @@
 # `scripts` is a space-separated list of package.json script names. Empty
 # means the standard list: audit deadcode format:check lint typecheck test,
 # then each lane script the repo defines. A lane script is test:e2e,
-# test:browser, test:docker, test:host, test:agent-sdk or test:crash; test and
+# test:browser, test:docker, test:host or test:agent-sdk; test and
 # any other test:<name> run with the tests, and every other script runs with
 # the static checks, each group in the list's order. Any name the repo's
 # package.json does not define fails the run before any script runs, so a
@@ -562,14 +562,6 @@ jobs:
           contains(steps.plan.outputs.lanes, '"agent-sdk"') }}
         env:
           SCRIPTS: test:agent-sdk
-        run: *run-body
-
-      - name: Lane crash
-        if:
-          ${{ !cancelled() && steps.setup-actionlint.outcome == 'success' &&
-          contains(steps.plan.outputs.lanes, '"crash"') }}
-        env:
-          SCRIPTS: test:crash
         run: *run-body
 
       # Every check step skips in a public repo, and this one runs even after a

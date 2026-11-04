@@ -53,7 +53,7 @@ test('it adds each lane script the repo defines to the standard list', () => {
   });
 });
 
-test('it plans test:agent-sdk and test:crash as lanes, so the test job runs test alone', () => {
+test('it plans test:agent-sdk as a lane, so the test job runs test alone', () => {
   const plan = planCheckScripts({
     scripts: '',
     defined: [
@@ -63,7 +63,6 @@ test('it plans test:agent-sdk and test:crash as lanes, so the test job runs test
       'lint',
       'test',
       'test:agent-sdk',
-      'test:crash',
       'test:e2e',
       'typecheck',
     ],
@@ -82,11 +81,27 @@ test('it plans test:agent-sdk and test:crash as lanes, so the test job runs test
       'test',
       'test:e2e',
       'test:agent-sdk',
-      'test:crash',
     ],
     static: ['audit', 'deadcode', 'format:check', 'lint', 'typecheck'],
     test: ['test'],
-    lanes: ['e2e', 'agent-sdk', 'crash'],
+    lanes: ['e2e', 'agent-sdk'],
+  });
+});
+
+test('it runs a listed test:crash in the test job, as crash names no lane', () => {
+  const plan = planCheckScripts({
+    scripts: 'test test:crash',
+    defined: ['test', 'test:crash'],
+    part: 'all',
+    lane: '',
+  });
+
+  expect(plan).toStrictEqual({
+    kind: 'planned',
+    scripts: ['test', 'test:crash'],
+    static: [],
+    test: ['test', 'test:crash'],
+    lanes: [],
   });
 });
 
@@ -123,11 +138,10 @@ test.each([
   ['test', '', ['test', 'test:slow']],
   ['lane', 'e2e', ['test:e2e']],
   ['lane', 'agent-sdk', ['test:agent-sdk']],
-  ['lane', 'crash', ['test:crash']],
 ] as const)('it gives a public %s job only its own scripts', (part, lane, expected) => {
   const plan = planCheckScripts({
-    scripts: 'lint test:e2e test test:agent-sdk test:slow test:crash check',
-    defined: ['check', 'lint', 'test', 'test:agent-sdk', 'test:crash', 'test:e2e', 'test:slow'],
+    scripts: 'lint test:e2e test test:agent-sdk test:slow check',
+    defined: ['check', 'lint', 'test', 'test:agent-sdk', 'test:e2e', 'test:slow'],
     part,
     lane,
   });
@@ -137,6 +151,6 @@ test.each([
     scripts: expected,
     static: ['lint', 'check'],
     test: ['test', 'test:slow'],
-    lanes: ['e2e', 'agent-sdk', 'crash'],
+    lanes: ['e2e', 'agent-sdk'],
   });
 });
