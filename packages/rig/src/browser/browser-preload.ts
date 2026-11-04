@@ -7,7 +7,6 @@ import { hostname } from 'node:os';
 import { systemClock } from '../system-clock.ts';
 import { laneFiles } from './lane-files.ts';
 import { readProcessTable } from './read-process-table.ts';
-import { signalHostProcess } from './signal-host-process.ts';
 import { startBrowser } from './start-browser.ts';
 import { stopDescendantProcesses } from './stop-descendant-processes.ts';
 
@@ -19,7 +18,7 @@ afterAll(() =>
     deadlineMs: 5000,
     clock: systemClock,
     readProcessTable,
-    signalProcess: signalHostProcess,
+    signalProcess: process.kill,
   }),
 );
 
