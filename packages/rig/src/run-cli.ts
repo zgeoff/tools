@@ -1,5 +1,4 @@
 import { match } from 'ts-pattern';
-import { findIsolateArgument } from './find-isolate-argument.ts';
 import { findTimeoutArg } from './find-timeout-arg.ts';
 import { commandNames, isCommandName } from './is-command-name.ts';
 import { readCLIArgs } from './read-cli-args.ts';
@@ -62,11 +61,9 @@ export async function runCLI(argv: readonly string[], run: RigRun, deps: CLIDeps
     return 2;
   }
 
-  const isolateArgument = findIsolateArgument(args.extraArgs);
-
-  if (isolateArgument !== undefined) {
+  if (args.hasIsolateOption) {
     deps.output.err(
-      `rig: rig ${command} refuses ${isolateArgument}, because every lane runs its files in one global per process\n`,
+      `rig: rig ${command} refuses --isolate, because every lane runs its files in one global per process\n`,
     );
 
     return 2;

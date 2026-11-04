@@ -7,6 +7,8 @@ export interface CLIArgs {
   // Every argument after the command, flags and paths alike, which the command passes on to
   // `bun test`.
   readonly extraArgs: readonly string[];
+
+  readonly hasIsolateOption: boolean;
 }
 
 const argSchema = { command: { type: 'positional' } } as const;
@@ -27,6 +29,7 @@ export async function readCLIArgs(argv: readonly string[]): Promise<CLIArgs | st
       parsed = {
         command: ctx.values.command,
         extraArgs: dropFirstSeparator(argv.slice(1)),
+        hasIsolateOption: false,
       };
     },
   });
@@ -37,7 +40,13 @@ export async function readCLIArgs(argv: readonly string[]): Promise<CLIArgs | st
     return formatParseError(error);
   }
 
-  return parsed ?? 'the command line could not be parsed';
+  if (parsed === null) {
+    return 'the command line could not be parsed';
+  }
+
+  const commandArgs: CLIArgs = parsed;
+
+  return { ...commandArgs, hasIsolateOption: await probeIsolateOption(commandArgs.extraArgs) };
 }
 
 function dropFirstSeparator(args: readonly string[]): readonly string[] {
@@ -54,4 +63,24 @@ function formatParseError(error: unknown): string {
   }
 
   return error instanceof Error ? error.message : String(error);
+}
+
+const forwardedArgSchema = { isolate: { type: 'boolean' } } as const;
+
+// The forwarded arguments hold `bun test` options that rig never declares, so this parse is not
+// strict, and it reads only whether an isolate option, in any of its forms, is among them.
+async function probeIsolateOption(args: readonly string[]): Promise<boolean> {
+  let isExplicit = false;
+
+  const forwarded = define({
+    name: 'rig',
+    args: forwardedArgSchema,
+    run: (ctx) => {
+      isExplicit = ctx.explicit.isolate;
+    },
+  });
+
+  await cli([...args], forwarded, { strict: false });
+
+  return isExplicit;
 }

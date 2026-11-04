@@ -101,12 +101,12 @@ test.each([
 );
 
 test.each([
-  ['unit', '--isolate', ['--isolate']],
-  ['kiln', '--isolate=true', ['--bail', '--isolate=true']],
-  ['browser', '--isolate', ['--isolate']],
+  ['unit', ['--isolate']],
+  ['kiln', ['--bail', '--isolate=true']],
+  ['browser', ['--isolate']],
 ])(
-  'it exits 2 and runs nothing for rig %s given %s, because every lane shares one global per process',
-  async (command, isolateArgument, extraArgs) => {
+  'it exits 2 and runs nothing for rig %s given %p, because every lane shares one global per process',
+  async (command, extraArgs) => {
     const ctx = setupTest();
 
     const exitCode = await runCLI([command, ...extraArgs], ctx.run, {
@@ -121,7 +121,7 @@ test.each([
     expect(exitCode).toBe(2);
 
     expect(ctx.output.err).toHaveBeenCalledExactlyOnceWith(
-      `rig: rig ${command} refuses ${isolateArgument}, because every lane runs its files in one global per process\n`,
+      `rig: rig ${command} refuses --isolate, because every lane runs its files in one global per process\n`,
     );
 
     expect(ctx.runCommand).not.toHaveBeenCalled();
