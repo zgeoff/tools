@@ -12,6 +12,17 @@ test('it refuses init with an argument', () => {
   });
 });
 
+test('it reads ci-plan alone as the CI plan request', () => {
+  expect(parseChexArgs(['ci-plan'])).toStrictEqual({ kind: 'ci-plan' });
+});
+
+test('it refuses ci-plan with an argument', () => {
+  expect(parseChexArgs(['ci-plan', 'static'])).toStrictEqual({
+    kind: 'refused',
+    message: 'ci-plan takes no arguments',
+  });
+});
+
 test('it refuses no words at all', () => {
   expect(parseChexArgs([])).toStrictEqual({ kind: 'refused', message: 'name a check to run' });
 });

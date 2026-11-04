@@ -1,7 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { appendFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { writeCheckPlan } from './write-check-plan.ts';
 
 async function setupTest() {
@@ -12,7 +11,12 @@ async function setupTest() {
   const outputPath = join(directory, 'output');
   const readOutput = () => readFile(outputPath, 'utf8');
 
-  return { directory, outputPath, readOutput };
+  const files = {
+    readText: (path: string) => readFile(path, 'utf8'),
+    outputFile: { appendText: (path: string, text: string) => appendFile(path, text) },
+  };
+
+  return { directory, outputPath, readOutput, files };
 }
 
 test('it writes the plan for the script names package.json defines to the step outputs', async () => {
@@ -29,7 +33,7 @@ test('it writes the plan for the script names package.json defines to the step o
     part: 'all',
     scripts: 'lint test test:e2e',
     lane: '',
-    fileSystem: nodeFileSystem,
+    ...ctx.files,
   });
 
   const output = await ctx.readOutput();
@@ -72,7 +76,7 @@ test('it plans the standard static checks for the static job of a caller that li
     part: 'static',
     scripts: '',
     lane: '',
-    fileSystem: nodeFileSystem,
+    ...ctx.files,
   });
 
   const output = await ctx.readOutput();
@@ -94,7 +98,7 @@ test('it plans no lanes for a repo without lane scripts, so no public lane job s
     part: 'all',
     scripts: 'lint test',
     lane: '',
-    fileSystem: nodeFileSystem,
+    ...ctx.files,
   });
 
   const output = await ctx.readOutput();
@@ -120,7 +124,7 @@ test('it plans one lane per lane script, and a lane job runs only its own lane s
     part: 'lane',
     scripts: 'lint test test:e2e test:host',
     lane: 'host',
-    fileSystem: nodeFileSystem,
+    ...ctx.files,
   });
 
   const output = await ctx.readOutput();
@@ -162,7 +166,7 @@ test('it plans the static checks, the tests and each lane once for the private c
     part: 'all',
     scripts: 'lint test test:e2e test:browser test:docker test:host test:agent-sdk test:crash',
     lane: '',
-    fileSystem: nodeFileSystem,
+    ...ctx.files,
   });
 
   const output = await ctx.readOutput();
@@ -193,7 +197,7 @@ test('it fails with an error and writes no outputs when a listed script is missi
     part: 'all',
     scripts: 'lint check',
     lane: '',
-    fileSystem: nodeFileSystem,
+    ...ctx.files,
   });
 
   const wroteOutput = await Bun.file(ctx.outputPath).exists();
@@ -219,7 +223,7 @@ test('it fails with an error on a part it does not know', async () => {
     part: 'everything',
     scripts: 'lint',
     lane: '',
-    fileSystem: nodeFileSystem,
+    ...ctx.files,
   });
 
   expect(errors).toStrictEqual([
@@ -241,7 +245,7 @@ test('it plans each docs check that the check:docs script names', async () => {
     part: 'static',
     scripts: 'lint',
     lane: '',
-    fileSystem: nodeFileSystem,
+    ...ctx.files,
   });
 
   const output = await ctx.readOutput();
@@ -264,7 +268,7 @@ test('it fails with an error and writes no outputs when check:docs runs more tha
     part: 'static',
     scripts: 'lint',
     lane: '',
-    fileSystem: nodeFileSystem,
+    ...ctx.files,
   });
 
   expect(errors).toStrictEqual([

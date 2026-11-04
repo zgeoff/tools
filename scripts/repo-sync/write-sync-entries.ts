@@ -1,8 +1,8 @@
 import { join } from 'node:path';
+import { writeStepOutputs } from '../../packages/chex/src/write-step-outputs.ts';
 import { isRecord } from '../../packages/std/src/is-record.ts';
 import type { FileSystem } from '../ci/file-system.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
-import { writeStepOutputs } from '../ci/write-step-outputs.ts';
 import { collectUnreadManifestKeys } from './collect-unread-manifest-keys.ts';
 import { parseSkillsPin } from './parse-skills-pin.ts';
 import { parseSyncEntries } from './parse-sync-entries.ts';

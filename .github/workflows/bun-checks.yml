@@ -122,7 +122,10 @@ jobs:
           GITLEAKS_VERSION: 8.30.1
 
   # Lists the lanes for the test-<lane> jobs, so a repo without lanes starts
-  # none. It checks out package.json and .bun-version alone.
+  # none. It checks out package.json and .bun-version alone. The plan step,
+  # chex ci-plan, reads PART, SCRIPTS and LANE, and writes the scripts, static,
+  # test, lanes and docs outputs; it fails on a listed script that package.json
+  # lacks, and on a check:docs script that runs more than chex docs checks.
   plan:
     if:
       ${{ !((github.event.repository && github.event.repository.private) ||
@@ -179,7 +182,7 @@ jobs:
         id: plan
         env: &plan-env
           SCRIPTS: ${{ inputs.scripts }}
-        run: &plan-body bun "$RUNNER_TEMP/tools/scripts/bun-checks/write-check-plan.js"
+        run: &plan-body bun "$RUNNER_TEMP/tools/packages/chex/src/cli.js" ci-plan
 
   static:
     if:

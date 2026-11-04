@@ -5,6 +5,7 @@ import { chexUsage, parseChexArgs } from './parse-chex-args.ts';
 export interface ChexDeps {
   readonly runCheck: (name: CheckName, args: readonly string[]) => Promise<number>;
   readonly runInit: () => Promise<number>;
+  readonly runCIPlan: () => Promise<number>;
   readonly writeOutput: (text: string) => void;
   readonly writeError: (text: string) => void;
 }
@@ -19,6 +20,7 @@ export function runChex(argv: readonly string[], deps: ChexDeps): Promise<number
       return Promise.resolve(2);
     })
     .with({ kind: 'init' }, () => deps.runInit())
+    .with({ kind: 'ci-plan' }, () => deps.runCIPlan())
     .with({ kind: 'checks' }, (request) => runChecks(request.names, request.args, deps))
     .exhaustive();
 }

@@ -5,6 +5,7 @@ import { buildStubCheckRunner } from './test-utils/build-stub-check-runner.ts';
 function setupTest() {
   const lines: string[] = [];
   const runInit = mock(() => Promise.resolve(0));
+  const runCIPlan = mock(() => Promise.resolve(1));
 
   const writeOutput = (text: string) => {
     lines.push(`out ${text}`);
@@ -14,7 +15,7 @@ function setupTest() {
     lines.push(`err ${text}`);
   };
 
-  return { lines, runInit, writeOutput, writeError };
+  return { lines, runInit, runCIPlan, writeOutput, writeError };
 }
 
 test('it prints cleared with the name of each check that passes', async () => {
@@ -115,6 +116,17 @@ test('it runs init for the init command and prints no check line', async () => {
   expect(ctx.runInit).toHaveBeenCalledTimes(1);
 });
 
+test('it exits with the exit code of the CI plan for the ci-plan command, and prints no check line', async () => {
+  const ctx = setupTest();
+  const stub = buildStubCheckRunner({});
+
+  const exitCode = await runChex(['ci-plan'], { ...ctx, runCheck: stub.runCheck });
+
+  expect({ exitCode, lines: ctx.lines }).toStrictEqual({ exitCode: 1, lines: [] });
+  expect(stub.calls).toStrictEqual([]);
+  expect(ctx.runInit).not.toHaveBeenCalled();
+});
+
 test('it exits 2 with the usage and runs nothing for an unknown check', async () => {
   const ctx = setupTest();
   const stub = buildStubCheckRunner({});
@@ -125,7 +137,7 @@ test('it exits 2 with the usage and runs nothing for an unknown check', async ()
     exitCode: 2,
     lines: [
       'err chex: unknown check "spelling"\n' +
-        'usage: chex <check>... | chex <check> [args...] | chex init\n' +
+        'usage: chex <check>... | chex <check> [args...] | chex init | chex ci-plan\n' +
         'checks: prose, length, links, readmes, vision, skill, commits, local-paths, test-timeouts, test-layout, workflows, dependency-gates, uncommitted\n',
     ],
   });

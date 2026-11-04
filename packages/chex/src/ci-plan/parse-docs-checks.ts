@@ -1,7 +1,7 @@
 import { match } from 'ts-pattern';
-import { docsCheckNames } from '../../packages/chex/src/check-names.ts';
-import type { ChexRequest } from '../../packages/chex/src/parse-chex-args.ts';
-import { parseChexArgs } from '../../packages/chex/src/parse-chex-args.ts';
+import { docsCheckNames } from '../check-names.ts';
+import type { ChexRequest } from '../parse-chex-args.ts';
+import { parseChexArgs } from '../parse-chex-args.ts';
 
 export type DocsChecks =
   | { readonly kind: 'none' }
@@ -31,6 +31,7 @@ export function parseDocsChecks(script: string | undefined): DocsChecks {
         : refusal,
     )
     .with({ kind: 'init' }, () => refusal)
+    .with({ kind: 'ci-plan' }, () => refusal)
     .with({ kind: 'refused' }, () => refusal)
     .exhaustive();
 }

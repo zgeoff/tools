@@ -1,4 +1,17 @@
 // @bun
+// packages/chex/src/write-step-outputs.ts
+async function writeStepOutputs(outputFile, outputPath, outputs) {
+  const lines = Object.entries(outputs).map(([name, value]) => {
+    if (value.includes(`
+`)) {
+      throw new Error(`the step output ${name} holds a newline`);
+    }
+    return `${name}=${value}
+`;
+  });
+  await outputFile.appendText(outputPath, lines.join(""));
+}
+
 // scripts/ci/node-file-system.ts
 import { appendFile, mkdir as mkdir2, readFile, readdir, stat } from "fs/promises";
 
@@ -65,19 +78,6 @@ async function runCommand(argv, options) {
     child.exited
   ]);
   return { exitCode, stdout, stderr };
-}
-
-// scripts/ci/write-step-outputs.ts
-async function writeStepOutputs(fileSystem, outputPath, outputs) {
-  const lines = Object.entries(outputs).map(([name, value]) => {
-    if (value.includes(`
-`)) {
-      throw new Error(`the step output ${name} holds a newline`);
-    }
-    return `${name}=${value}
-`;
-  });
-  await fileSystem.appendText(outputPath, lines.join(""));
 }
 
 // scripts/repo-sync/write-sync-ref.ts

@@ -1,7 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { appendFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { nodeFileSystem } from './node-file-system.ts';
 import { writeStepOutputs } from './write-step-outputs.ts';
 
 async function setupTest() {
@@ -10,15 +9,16 @@ async function setupTest() {
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   const outputPath = join(directory, 'output');
+  const outputFile = { appendText: (path: string, text: string) => appendFile(path, text) };
 
-  return { outputPath };
+  return { outputPath, outputFile };
 }
 
 test('it appends one name=value line for each output after the lines already in the file', async () => {
   const ctx = await setupTest();
 
   await writeFile(ctx.outputPath, 'planned=true\n');
-  await writeStepOutputs(nodeFileSystem, ctx.outputPath, { lanes: '["e2e"]', changed: 'false' });
+  await writeStepOutputs(ctx.outputFile, ctx.outputPath, { lanes: '["e2e"]', changed: 'false' });
 
   const text = await readFile(ctx.outputPath, 'utf8');
 
@@ -30,7 +30,7 @@ test('it refuses a value that holds a newline and writes no output', async () =>
 
   await writeFile(ctx.outputPath, '');
 
-  const writing = writeStepOutputs(nodeFileSystem, ctx.outputPath, {
+  const writing = writeStepOutputs(ctx.outputFile, ctx.outputPath, {
     changed: 'true',
     body: 'one\ntwo',
   });

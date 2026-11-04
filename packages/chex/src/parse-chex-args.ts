@@ -4,6 +4,7 @@ import { checkNames, isCheckName } from './check-names.ts';
 
 export type ChexRequest =
   | { readonly kind: 'init' }
+  | { readonly kind: 'ci-plan' }
   | {
       readonly kind: 'checks';
       readonly names: readonly CheckName[];
@@ -20,7 +21,7 @@ const checksWithArgs: ReadonlySet<CheckName> = new Set([
   'workflows',
 ]);
 
-export const chexUsage = `usage: chex <check>... | chex <check> [args...] | chex init
+export const chexUsage = `usage: chex <check>... | chex <check> [args...] | chex init | chex ci-plan
 checks: ${checkNames.join(', ')}`;
 
 export function parseChexArgs(argv: readonly string[]): ChexRequest {
@@ -34,6 +35,12 @@ export function parseChexArgs(argv: readonly string[]): ChexRequest {
     return rest.length === 0
       ? { kind: 'init' }
       : { kind: 'refused', message: 'init takes no arguments' };
+  }
+
+  if (first === 'ci-plan') {
+    return rest.length === 0
+      ? { kind: 'ci-plan' }
+      : { kind: 'refused', message: 'ci-plan takes no arguments' };
   }
 
   // Each check parses its own options, so the tokens only mark where the check names end.
