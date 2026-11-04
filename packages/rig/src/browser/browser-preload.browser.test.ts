@@ -4,17 +4,21 @@ import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import invariant from 'tiny-invariant';
+import { stopProcessGroups } from '../test-utils/stop-process-groups.ts';
+import { testProcesses } from '../test-utils/test-processes.ts';
 import { findBrowserRun } from './find-browser-run.ts';
 import { readProcessTable } from './read-process-table.ts';
 
 async function setupTest() {
+  const stack = new AsyncDisposableStack();
+
+  onTestFinished(() => stack.disposeAsync());
+
   const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('browser-preload-')));
 
-  onTestFinished(async () => {
-    await rm(directory, { recursive: true, force: true });
-  });
+  stack.defer(() => rm(directory, { recursive: true, force: true }));
 
-  return { directory };
+  return { directory, stack };
 }
 
 test("it starts Chrome on a profile folder inside the run's folder", async () => {
@@ -83,8 +87,13 @@ test('it opens a view', async () => {
       join(import.meta.dir, 'browser-preload.ts'),
       ...files,
     ],
-    { cwd: process.cwd(), env: process.env, stdout: 'pipe', stderr: 'pipe' },
+    { cwd: process.cwd(), env: process.env, stdout: 'pipe', stderr: 'pipe', detached: true },
   );
+
+  ctx.stack.defer(async () => {
+    await stopProcessGroups(tests.pid, testProcesses);
+    await tests.exited;
+  });
 
   const exitCode = await tests.exited;
 
