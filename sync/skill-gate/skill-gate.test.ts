@@ -170,6 +170,7 @@ test.each([
 test.each([
   'zgeoff/atc',
   'zgeoff/auto-mode',
+  'zgeoff/boxxy',
   'zgeoff/cloud',
   'zgeoff/hq',
   'zgeoff/impz',
