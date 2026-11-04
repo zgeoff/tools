@@ -8,7 +8,11 @@ import type { CommandResult, RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { parseSkillsPin } from './parse-skills-pin.ts';
 import { pickSkillsPinMove } from './pick-skills-pin-move.ts';
+import { probePinManifestChange } from './probe-pin-manifest-change.ts';
+import type { SkillFilesManifestText } from './read-skill-files-manifest.ts';
+import { readSkillFilesManifest } from './read-skill-files-manifest.ts';
 import { skillsPinPath } from './skills-pin-path.ts';
+import { syncManifestPath } from './sync-manifest-path.ts';
 
 export interface WriteSkillsPinPullRequestOptions {
   // A checkout of main of zgeoff/tools.
@@ -35,8 +39,9 @@ const pinBranch = 'skills-pin';
 // Holds the next pin commit until the pin branch moves to it.
 const stagingBranch = 'skills-pin-next';
 
-// Opens, or moves, one pull request on the skills-pin branch that changes only the pin, with
-// auto-merge on, so the pin reaches main once the checks pass and the sync dispatch sends it on.
+// Opens, or moves, one pull request on the skills-pin branch that changes the pin, and adds to the
+// sync manifest each new file of a skill folder it ships, with auto-merge on, so the pin reaches
+// main once the checks pass and the sync dispatch sends it on.
 export async function writeSkillsPinPullRequest(
   options: Readonly<WriteSkillsPinPullRequestOptions>,
 ): Promise<number> {
@@ -111,17 +116,17 @@ export async function writeSkillsPinPullRequest(
     env: options.env,
   });
 
-  const head = await writePinBranch(options, checkedOut.stdout.trim());
+  const branch = await writePinBranch(options, checkedOut.stdout.trim());
 
   if (openNumber === '') {
-    const number = await writePinPullRequest(options, pinned, '');
+    const number = await writePinPullRequest(options, { pinned, number: '', added: branch.added });
 
-    await writePinAutoMerge(options, number, head);
+    await writePinAutoMerge(options, number, branch.head);
 
     return 0;
   }
 
-  return writeReusedPinPullRequest(options, { pinned, number: openNumber, proposed, head });
+  return writeReusedPinPullRequest(options, { pinned, number: openNumber, proposed, branch });
 }
 
 // Returns the number of the open pin pull request from this repo's own branch, or empty for none.
@@ -211,8 +216,9 @@ function runGH(
   return options.runCommand(['gh', ...args], { cwd: options.cwd, env: options.env });
 }
 
-// The branch head is bound only after it shows the pin pull request's own change: the pin file
-// alone, at the pin the run compared. Anything else waits for a person.
+// The branch head is bound only after it shows the pin pull request's own change: the pin file at
+// the pin the run compared, and the manifest as the run writes it for that pin, when it changes.
+// Anything else waits for a person.
 async function writeCoveredAutoMerge(
   options: Readonly<WriteSkillsPinPullRequestOptions>,
   number: string,
@@ -241,11 +247,21 @@ async function writeCoveredAutoMerge(
   ]);
 
   const headValue: unknown = JSON.parse(shown.stdout);
-  const isPinOnly = paths.length === 1 && paths[0] === skillsPinPath;
+  const headPin = parseSkillsPin(headValue);
+  const hasManifest = paths.includes(syncManifestPath);
 
-  if (!isPinOnly || parseSkillsPin(headValue) !== proposed) {
+  const isPinChange =
+    headPin !== null &&
+    headPin === proposed &&
+    paths.includes(skillsPinPath) &&
+    paths.length === (hasManifest ? 2 : 1);
+
+  const isManifestMatched =
+    isPinChange && hasManifest ? await probePinManifestChange(options, head, headPin) : true;
+
+  if (!isPinChange || !isManifestMatched) {
     options.writeOutput(
-      `::error::the open pin pull request #${number} changes more than ${skillsPinPath}, or moved since this run read it; check it by hand\n`,
+      `::error::the open pin pull request #${number} changes more than ${skillsPinPath} and the skill files of ${syncManifestPath}, or moved since this run read it; check it by hand\n`,
     );
 
     return 1;
@@ -283,13 +299,23 @@ async function writePinAutoMerge(
   }
 }
 
-// Returns the commit it wrote, which the contents API writes as the App on a staging branch, so
-// GitHub signs it. The pin branch moves to it in one step, as a pin branch reset to main would leave
-// the open pull request with no commits, and GitHub closes such a pull request.
+interface PinBranch {
+  // The last commit the run wrote.
+  readonly head: string;
+
+  // The zgeoff/skills sources the run added to the manifest.
+  readonly added: readonly string[];
+}
+
+// The contents API writes each commit as the App on a staging branch, so GitHub signs it. The pin
+// branch moves to the last in one step, as a pin branch reset to main would leave the open pull
+// request with no commits, and GitHub closes such a pull request.
 async function writePinBranch(
   options: Readonly<WriteSkillsPinPullRequestOptions>,
   base: string,
-): Promise<string> {
+): Promise<PinBranch> {
+  const update = await readSkillFilesManifest(options, base, options.commit);
+
   await writeBranchRef(options, stagingBranch, base);
 
   const file = await runCheckedGH(options, [
@@ -318,7 +344,8 @@ async function writePinBranch(
     '.commit.sha',
   ]);
 
-  const head = written.stdout.trim();
+  const head =
+    update.added.length === 0 ? written.stdout.trim() : await writeManifestCommit(options, update);
 
   await writeBranchRef(options, pinBranch, head);
 
@@ -330,7 +357,7 @@ async function writePinBranch(
     `repos/${options.repo}/git/refs/heads/${stagingBranch}`,
   ]);
 
-  return head;
+  return { head, added: update.added };
 }
 
 // Points the branch at the commit, and creates the branch when it does not exist.
@@ -368,19 +395,54 @@ function renderPinTitle(commit: string): string {
   return `chore(skills): pin zgeoff/skills at ${commit.slice(0, 12)}`;
 }
 
+// Returns the commit it wrote on the staging branch.
+async function writeManifestCommit(
+  options: Readonly<WriteSkillsPinPullRequestOptions>,
+  update: Readonly<SkillFilesManifestText>,
+): Promise<string> {
+  const written = await runCheckedGH(options, [
+    'api',
+    '-X',
+    'PUT',
+    `repos/${options.repo}/contents/${syncManifestPath}`,
+    '-f',
+    'message=chore(skills): list the new skill files in the sync manifest',
+    '-f',
+    `content=${Buffer.from(update.text).toString('base64')}`,
+    '-f',
+    `sha=${update.sha}`,
+    '-f',
+    `branch=${stagingBranch}`,
+    '--jq',
+    '.commit.sha',
+  ]);
+
+  return written.stdout.trim();
+}
+
+interface PinPullRequest {
+  // The pin on main that the pull request moves from.
+  readonly pinned: string;
+
+  // The pull request to edit, or empty to open one.
+  readonly number: string;
+
+  // The zgeoff/skills sources the branch adds to the manifest.
+  readonly added: readonly string[];
+}
+
 async function writePinPullRequest(
   options: Readonly<WriteSkillsPinPullRequestOptions>,
-  pinned: string,
-  number: string,
+  pull: Readonly<PinPullRequest>,
 ): Promise<string> {
   const title = renderPinTitle(options.commit);
-  const body = `Moves \`${skillsPinPath}\` to zgeoff/skills ${options.commit}, which zgeoff/skills sent from its green main. Once this merges and main is green, the sync dispatch sends the new skill text to every repo that takes it.\n\nChanges: https://github.com/zgeoff/skills/compare/${pinned}...${options.commit}`;
+  const body = `Moves \`${skillsPinPath}\` to zgeoff/skills ${options.commit}, which zgeoff/skills sent from its green main. Once this merges and main is green, the sync dispatch sends the new skill text to every repo that takes it.${renderAddedFiles(pull.added)}\n\nChanges: https://github.com/zgeoff/skills/compare/${pull.pinned}...${options.commit}`;
 
-  if (number !== '') {
+  if (pull.number !== '') {
     await runCheckedGH(options, [
       'pr',
       'edit',
-      number,
+      pull.number,
       '--repo',
       options.repo,
       '--title',
@@ -389,9 +451,9 @@ async function writePinPullRequest(
       body,
     ]);
 
-    options.writeOutput(`Updated pull request #${number} for ${pinBranch}.\n`);
+    options.writeOutput(`Updated pull request #${pull.number} for ${pinBranch}.\n`);
 
-    return number;
+    return pull.number;
   }
 
   const created = await runCheckedGH(options, [
@@ -417,6 +479,16 @@ async function writePinPullRequest(
   return url.slice(url.lastIndexOf('/') + 1);
 }
 
+function renderAddedFiles(added: readonly string[]): string {
+  if (added.length === 0) {
+    return '';
+  }
+
+  const lines = added.map((source) => `- \`${source}\``);
+
+  return `\n\nAdds the new files of the skill folders it syncs to \`${syncManifestPath}\`:\n\n${lines.join('\n')}`;
+}
+
 interface ReusedPinPullRequest {
   // The pin on main of the checkout, and the one the open pull request held when the run read it.
   readonly pinned: string;
@@ -424,8 +496,8 @@ interface ReusedPinPullRequest {
 
   readonly number: string;
 
-  // The commit the run wrote to the pin branch.
-  readonly head: string;
+  // What the run wrote to the pin branch.
+  readonly branch: Readonly<PinBranch>;
 }
 
 // The open pull request can merge, or close, at any time before this run moves its branch. A pull
@@ -450,9 +522,13 @@ async function writeReusedPinPullRequest(
   const state = viewed.stdout.trim();
 
   if (state === 'OPEN') {
-    const number = await writePinPullRequest(options, reused.pinned, reused.number);
+    const number = await writePinPullRequest(options, {
+      pinned: reused.pinned,
+      number: reused.number,
+      added: reused.branch.added,
+    });
 
-    await writePinAutoMerge(options, number, reused.head);
+    await writePinAutoMerge(options, number, reused.branch.head);
 
     return 0;
   }
@@ -462,9 +538,13 @@ async function writeReusedPinPullRequest(
       `Pull request #${reused.number} is ${state}, so the run opens a new one.\n`,
     );
 
-    const number = await writePinPullRequest(options, reused.pinned, '');
+    const number = await writePinPullRequest(options, {
+      pinned: reused.pinned,
+      number: '',
+      added: reused.branch.added,
+    });
 
-    await writePinAutoMerge(options, number, reused.head);
+    await writePinAutoMerge(options, number, reused.branch.head);
 
     return 0;
   }
@@ -506,10 +586,15 @@ async function writeReusedPinPullRequest(
     `Pull request #${reused.number} merged, so the run opens a new one from main at ${mainCommit}.\n`,
   );
 
-  const head = await writePinBranch(options, mainCommit);
-  const number = await writePinPullRequest(options, mainPin, '');
+  const branch = await writePinBranch(options, mainCommit);
 
-  await writePinAutoMerge(options, number, head);
+  const number = await writePinPullRequest(options, {
+    pinned: mainPin,
+    number: '',
+    added: branch.added,
+  });
+
+  await writePinAutoMerge(options, number, branch.head);
 
   return 0;
 }

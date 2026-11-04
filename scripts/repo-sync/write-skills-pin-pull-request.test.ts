@@ -1,7 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
+import { fileURLToPath } from 'node:url';
+import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/helpers';
+import { $ } from 'bun';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { buildCommandStub } from '../test-utils/build-command-stub.ts';
 import { writeSkillsPinPullRequest } from './write-skills-pin-pull-request.ts';
@@ -34,7 +36,9 @@ async function setupTest() {
       },
     });
 
-  return { commands, output, writePin, pin };
+  const checkScriptPath = fileURLToPath(new URL('../check-sync-manifest.sh', import.meta.url));
+
+  return { directory, checkScriptPath, commands, output, writePin, pin };
 }
 
 // A refused auto-merge leaves the pull request open for a hand merge, so the run still passes.
@@ -87,6 +91,32 @@ test.each([
     stdout: 'fedcba9876543210fedcba9876543210fedcba98\n',
     stderr: '',
   });
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      `repos/zgeoff/skills/git/trees/${commit}?recursive=1`,
+      '--jq',
+      'if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | .path end',
+    ],
+    { exitCode: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      'repos/example/tools/contents/sync/manifest.json?ref=fedcba9876543210fedcba9876543210fedcba98',
+      '--jq',
+      '.sha, .content',
+    ],
+    {
+      exitCode: 0,
+      stdout: `0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33\n${Buffer.from('[]\n').toString('base64')}\n`,
+      stderr: '',
+    },
+  );
 
   ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin'], {
     exitCode: 1,
@@ -238,6 +268,492 @@ test.each([
   expect(ctx.output).toStrictEqual(['https://github.com/example/tools/pull/41\n', ...warnings]);
 });
 
+test('it adds a new file of a skill folder the manifest ships, and the manifest passes the sync check', async () => {
+  const ctx = await setupTest();
+
+  const pinned = '0123456789abcdef0123456789abcdef01234567';
+  const commit = '89abcdef0123456789abcdef0123456789abcdef';
+
+  const manifest = [
+    {
+      name: 'skill-kettle',
+      description: 'The kettle skill',
+      files: [
+        {
+          repo: 'zgeoff/skills',
+          source: 'skills/kettle/SKILL.md',
+          target: '.claude/skills/kettle/SKILL.md',
+        },
+        {
+          repo: 'zgeoff/skills',
+          source: 'skills/kettle/references/limescale.md',
+          target: '.claude/skills/kettle/references/limescale.md',
+        },
+      ],
+    },
+  ];
+
+  const expectedManifest = `[
+  {
+    "name": "skill-kettle",
+    "description": "The kettle skill",
+    "files": [
+      {
+        "repo": "zgeoff/skills",
+        "source": "skills/kettle/SKILL.md",
+        "target": ".claude/skills/kettle/SKILL.md"
+      },
+      {
+        "repo": "zgeoff/skills",
+        "source": "skills/kettle/references/descaling.md",
+        "target": ".claude/skills/kettle/references/descaling.md"
+      },
+      {
+        "repo": "zgeoff/skills",
+        "source": "skills/kettle/references/limescale.md",
+        "target": ".claude/skills/kettle/references/limescale.md"
+      }
+    ]
+  }
+]
+`;
+
+  await ctx.writePin(pinned);
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'pr',
+      'list',
+      '--repo',
+      'example/tools',
+      '--head',
+      'skills-pin',
+      '--state',
+      'open',
+      '--json',
+      'number,isCrossRepository',
+    ],
+    { exitCode: 0, stdout: '[]', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', `repos/zgeoff/skills/compare/${pinned}...${commit}`, '--jq', '.status'],
+    { exitCode: 0, stdout: 'ahead\n', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', `repos/zgeoff/skills/compare/${commit}...main`, '--jq', '.status'],
+    { exitCode: 0, stdout: 'identical\n', stderr: '' },
+  );
+
+  ctx.commands.answer(['git', 'rev-parse', 'HEAD'], {
+    exitCode: 0,
+    stdout: 'fedcba9876543210fedcba9876543210fedcba98\n',
+    stderr: '',
+  });
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      `repos/zgeoff/skills/git/trees/${commit}?recursive=1`,
+      '--jq',
+      'if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | .path end',
+    ],
+    {
+      exitCode: 0,
+      stdout:
+        'skills/kettle/SKILL.md\nskills/kettle/references/descaling.md\nskills/kettle/references/limescale.md\n',
+      stderr: '',
+    },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      'repos/example/tools/contents/sync/manifest.json?ref=fedcba9876543210fedcba9876543210fedcba98',
+      '--jq',
+      '.sha, .content',
+    ],
+    {
+      exitCode: 0,
+      stdout: `0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33\n${Buffer.from(JSON.stringify(manifest)).toString('base64')}\n`,
+      stderr: '',
+    },
+  );
+
+  ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin-next'], {
+    exitCode: 1,
+    stdout: '',
+    stderr: 'gh: Not Found (HTTP 404)',
+  });
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      '--silent',
+      'repos/example/tools/git/refs',
+      '-f',
+      'ref=refs/heads/skills-pin-next',
+      '-f',
+      'sha=fedcba9876543210fedcba9876543210fedcba98',
+    ],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      'repos/example/tools/contents/sync/skills-pin.json?ref=skills-pin-next',
+      '--jq',
+      '.sha',
+    ],
+    { exitCode: 0, stdout: '5d41402abc4b2a76b9719d911017c592ae0f2f0a\n', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      '-X',
+      'PUT',
+      'repos/example/tools/contents/sync/skills-pin.json',
+      '-f',
+      'message=chore(skills): pin zgeoff/skills at 89abcdef0123',
+      '-f',
+      `content=${Buffer.from(`{\n  "commit": "${commit}"\n}\n`).toString('base64')}`,
+      '-f',
+      'sha=5d41402abc4b2a76b9719d911017c592ae0f2f0a',
+      '-f',
+      'branch=skills-pin-next',
+      '--jq',
+      '.commit.sha',
+    ],
+    { exitCode: 0, stdout: 'c0ffee0123456789abcdef0123456789abcdef01\n', stderr: '' },
+  );
+
+  const writeManifest = [
+    'gh',
+    'api',
+    '-X',
+    'PUT',
+    'repos/example/tools/contents/sync/manifest.json',
+    '-f',
+    'message=chore(skills): list the new skill files in the sync manifest',
+    '-f',
+    `content=${Buffer.from(expectedManifest).toString('base64')}`,
+    '-f',
+    'sha=0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
+    '-f',
+    'branch=skills-pin-next',
+    '--jq',
+    '.commit.sha',
+  ];
+
+  ctx.commands.answer(writeManifest, {
+    exitCode: 0,
+    stdout: 'beefcafe0123456789abcdef0123456789abcdef\n',
+    stderr: '',
+  });
+
+  ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin'], {
+    exitCode: 1,
+    stdout: '',
+    stderr: 'gh: Not Found (HTTP 404)',
+  });
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      '--silent',
+      'repos/example/tools/git/refs',
+      '-f',
+      'ref=refs/heads/skills-pin',
+      '-f',
+      'sha=beefcafe0123456789abcdef0123456789abcdef',
+    ],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', '--silent', '-X', 'DELETE', 'repos/example/tools/git/refs/heads/skills-pin-next'],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  const createPull = [
+    'gh',
+    'pr',
+    'create',
+    '--repo',
+    'example/tools',
+    '--base',
+    'main',
+    '--head',
+    'skills-pin',
+    '--title',
+    'chore(skills): pin zgeoff/skills at 89abcdef0123',
+    '--body',
+    `Moves \`sync/skills-pin.json\` to zgeoff/skills ${commit}, which zgeoff/skills sent from its green main. Once this merges and main is green, the sync dispatch sends the new skill text to every repo that takes it.\n\nAdds the new files of the skill folders it syncs to \`sync/manifest.json\`:\n\n- \`skills/kettle/references/descaling.md\`\n\nChanges: https://github.com/zgeoff/skills/compare/${pinned}...${commit}`,
+  ];
+
+  ctx.commands.answer(createPull, {
+    exitCode: 0,
+    stdout: 'https://github.com/example/tools/pull/41\n',
+    stderr: '',
+  });
+
+  const merge = [
+    'gh',
+    'pr',
+    'merge',
+    '41',
+    '--repo',
+    'example/tools',
+    '--auto',
+    '--squash',
+    '--match-head-commit',
+    'beefcafe0123456789abcdef0123456789abcdef',
+  ];
+
+  ctx.commands.answer(merge, { exitCode: 0, stdout: '', stderr: '' });
+
+  const exitCode = await ctx.pin(commit);
+
+  await writeTreeFiles(join(ctx.directory, 'check'), {
+    'sync/manifest.json': expectedManifest,
+    'tree/skills/kettle/SKILL.md': '# Kettle\n',
+    'tree/skills/kettle/references/descaling.md': '# Descaling\n',
+    'tree/skills/kettle/references/limescale.md': '# Limescale\n',
+  });
+
+  const checked = await $`bash ${ctx.checkScriptPath} sync/manifest.json tree`
+    .cwd(join(ctx.directory, 'check'))
+    .nothrow()
+    .quiet();
+
+  expect(exitCode).toBe(0);
+  expect(ctx.commands.calls).toIncludeAllMembers([writeManifest, createPull]);
+  expect(ctx.commands.calls.at(-1)).toStrictEqual(merge);
+
+  expect({ exitCode: checked.exitCode, stderr: checked.stderr.toString() }).toStrictEqual({
+    exitCode: 0,
+    stderr: '',
+  });
+});
+
+test('it leaves the manifest alone when only a skill folder no entry ships gains a file', async () => {
+  const ctx = await setupTest();
+
+  const pinned = '0123456789abcdef0123456789abcdef01234567';
+  const commit = '89abcdef0123456789abcdef0123456789abcdef';
+
+  const manifest = [
+    {
+      name: 'skill-kettle',
+      description: 'The kettle skill',
+      files: [
+        {
+          repo: 'zgeoff/skills',
+          source: 'skills/kettle/SKILL.md',
+          target: '.claude/skills/kettle/SKILL.md',
+        },
+      ],
+    },
+  ];
+
+  await ctx.writePin(pinned);
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'pr',
+      'list',
+      '--repo',
+      'example/tools',
+      '--head',
+      'skills-pin',
+      '--state',
+      'open',
+      '--json',
+      'number,isCrossRepository',
+    ],
+    { exitCode: 0, stdout: '[]', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', `repos/zgeoff/skills/compare/${pinned}...${commit}`, '--jq', '.status'],
+    { exitCode: 0, stdout: 'ahead\n', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', `repos/zgeoff/skills/compare/${commit}...main`, '--jq', '.status'],
+    { exitCode: 0, stdout: 'identical\n', stderr: '' },
+  );
+
+  ctx.commands.answer(['git', 'rev-parse', 'HEAD'], {
+    exitCode: 0,
+    stdout: 'fedcba9876543210fedcba9876543210fedcba98\n',
+    stderr: '',
+  });
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      `repos/zgeoff/skills/git/trees/${commit}?recursive=1`,
+      '--jq',
+      'if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | .path end',
+    ],
+    {
+      exitCode: 0,
+      stdout:
+        'skills/kettle/SKILL.md\nskills/teapot/SKILL.md\nskills/teapot/references/brewing.md\n',
+      stderr: '',
+    },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      'repos/example/tools/contents/sync/manifest.json?ref=fedcba9876543210fedcba9876543210fedcba98',
+      '--jq',
+      '.sha, .content',
+    ],
+    {
+      exitCode: 0,
+      stdout: `0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33\n${Buffer.from(JSON.stringify(manifest)).toString('base64')}\n`,
+      stderr: '',
+    },
+  );
+
+  ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin-next'], {
+    exitCode: 1,
+    stdout: '',
+    stderr: 'gh: Not Found (HTTP 404)',
+  });
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      '--silent',
+      'repos/example/tools/git/refs',
+      '-f',
+      'ref=refs/heads/skills-pin-next',
+      '-f',
+      'sha=fedcba9876543210fedcba9876543210fedcba98',
+    ],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      'repos/example/tools/contents/sync/skills-pin.json?ref=skills-pin-next',
+      '--jq',
+      '.sha',
+    ],
+    { exitCode: 0, stdout: '5d41402abc4b2a76b9719d911017c592ae0f2f0a\n', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      '-X',
+      'PUT',
+      'repos/example/tools/contents/sync/skills-pin.json',
+      '-f',
+      'message=chore(skills): pin zgeoff/skills at 89abcdef0123',
+      '-f',
+      `content=${Buffer.from(`{\n  "commit": "${commit}"\n}\n`).toString('base64')}`,
+      '-f',
+      'sha=5d41402abc4b2a76b9719d911017c592ae0f2f0a',
+      '-f',
+      'branch=skills-pin-next',
+      '--jq',
+      '.commit.sha',
+    ],
+    { exitCode: 0, stdout: 'c0ffee0123456789abcdef0123456789abcdef01\n', stderr: '' },
+  );
+
+  ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin'], {
+    exitCode: 1,
+    stdout: '',
+    stderr: 'gh: Not Found (HTTP 404)',
+  });
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      '--silent',
+      'repos/example/tools/git/refs',
+      '-f',
+      'ref=refs/heads/skills-pin',
+      '-f',
+      'sha=c0ffee0123456789abcdef0123456789abcdef01',
+    ],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', '--silent', '-X', 'DELETE', 'repos/example/tools/git/refs/heads/skills-pin-next'],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'pr',
+      'create',
+      '--repo',
+      'example/tools',
+      '--base',
+      'main',
+      '--head',
+      'skills-pin',
+      '--title',
+      'chore(skills): pin zgeoff/skills at 89abcdef0123',
+      '--body',
+      `Moves \`sync/skills-pin.json\` to zgeoff/skills ${commit}, which zgeoff/skills sent from its green main. Once this merges and main is green, the sync dispatch sends the new skill text to every repo that takes it.\n\nChanges: https://github.com/zgeoff/skills/compare/${pinned}...${commit}`,
+    ],
+    { exitCode: 0, stdout: 'https://github.com/example/tools/pull/41\n', stderr: '' },
+  );
+
+  const merge = [
+    'gh',
+    'pr',
+    'merge',
+    '41',
+    '--repo',
+    'example/tools',
+    '--auto',
+    '--squash',
+    '--match-head-commit',
+    'c0ffee0123456789abcdef0123456789abcdef01',
+  ];
+
+  ctx.commands.answer(merge, { exitCode: 0, stdout: '', stderr: '' });
+
+  const exitCode = await ctx.pin(commit);
+
+  const manifestWrites = ctx.commands.calls.filter((argv) =>
+    argv.includes('repos/example/tools/contents/sync/manifest.json'),
+  );
+
+  expect(exitCode).toBe(0);
+  expect(manifestWrites).toStrictEqual([]);
+  expect(ctx.commands.calls.at(-1)).toStrictEqual(merge);
+});
+
 test('it opens its own pull request when only a fork holds a pin branch pull request', async () => {
   const ctx = await setupTest();
 
@@ -278,6 +794,32 @@ test('it opens its own pull request when only a fork holds a pin branch pull req
     stdout: 'fedcba9876543210fedcba9876543210fedcba98\n',
     stderr: '',
   });
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      `repos/zgeoff/skills/git/trees/${commit}?recursive=1`,
+      '--jq',
+      'if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | .path end',
+    ],
+    { exitCode: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      'repos/example/tools/contents/sync/manifest.json?ref=fedcba9876543210fedcba9876543210fedcba98',
+      '--jq',
+      '.sha, .content',
+    ],
+    {
+      exitCode: 0,
+      stdout: `0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33\n${Buffer.from('[]\n').toString('base64')}\n`,
+      stderr: '',
+    },
+  );
 
   ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin'], {
     exitCode: 1,
@@ -454,6 +996,32 @@ test('it moves the branch of the open pin pull request to a newer commit', async
     stdout: 'fedcba9876543210fedcba9876543210fedcba98\n',
     stderr: '',
   });
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      `repos/zgeoff/skills/git/trees/${commit}?recursive=1`,
+      '--jq',
+      'if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | .path end',
+    ],
+    { exitCode: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      'repos/example/tools/contents/sync/manifest.json?ref=fedcba9876543210fedcba9876543210fedcba98',
+      '--jq',
+      '.sha, .content',
+    ],
+    {
+      exitCode: 0,
+      stdout: `0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33\n${Buffer.from('[]\n').toString('base64')}\n`,
+      stderr: '',
+    },
+  );
 
   ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin'], {
     exitCode: 0,
@@ -713,6 +1281,32 @@ test.each([
     stderr: '',
   });
 
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      `repos/zgeoff/skills/git/trees/${commit}?recursive=1`,
+      '--jq',
+      'if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | .path end',
+    ],
+    { exitCode: 0, stdout: 'skills/kettle/SKILL.md\n', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      'repos/example/tools/contents/sync/manifest.json?ref=fedcba9876543210fedcba9876543210fedcba98',
+      '--jq',
+      '.sha, .content',
+    ],
+    {
+      exitCode: 0,
+      stdout: `0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33\n${Buffer.from('[]\n').toString('base64')}\n`,
+      stderr: '',
+    },
+  );
+
   ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin'], {
     exitCode: 0,
     stdout: '{"object":{"sha":"aaaa"}}',
@@ -827,6 +1421,21 @@ test.each([
       'Accept: application/vnd.github.raw',
     ],
     { exitCode: 0, stdout: JSON.stringify({ commit: mainPins[row.mainPinKind] }), stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      'repos/example/tools/contents/sync/manifest.json?ref=abad1dea0123456789abcdef0123456789abcdef',
+      '--jq',
+      '.sha, .content',
+    ],
+    {
+      exitCode: 0,
+      stdout: `0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33\n${Buffer.from('[]\n').toString('base64')}\n`,
+      stderr: '',
+    },
   );
 
   ctx.commands.answer(
@@ -1097,6 +1706,193 @@ test.each([
     expect(ctx.output[0]).toBe(
       `Nothing to pin: the open pin pull request already pins ${commit} or a newer commit.\n`,
     );
+  },
+);
+
+test.each([
+  ['the manifest the run writes for the pin', 'skills/kettle/references/descaling.md', 0],
+  ['a manifest that lists another file', 'skills/kettle/references/whistle.md', 1],
+])(
+  'it binds auto-merge to an open pin branch that also changes the manifest only for %s',
+  async (_label, headSource, expectedExitCode) => {
+    const ctx = await setupTest();
+
+    const pinned = '0123456789abcdef0123456789abcdef01234567';
+    const commit = '456789abcdef0123456789abcdef0123456789ab';
+    const proposed = '89abcdef0123456789abcdef0123456789abcdef';
+    const head = 'beefcafe0123456789abcdef0123456789abcdef';
+    const base = 'fedcba9876543210fedcba9876543210fedcba98';
+
+    const manifest = [
+      {
+        name: 'skill-kettle',
+        description: 'The kettle skill',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+        ],
+      },
+    ];
+
+    const headManifest = `[
+  {
+    "name": "skill-kettle",
+    "description": "The kettle skill",
+    "files": [
+      {
+        "repo": "zgeoff/skills",
+        "source": "skills/kettle/SKILL.md",
+        "target": ".claude/skills/kettle/SKILL.md"
+      },
+      {
+        "repo": "zgeoff/skills",
+        "source": "${headSource}",
+        "target": ".claude/skills/kettle/${headSource.slice('skills/kettle/'.length)}"
+      }
+    ]
+  }
+]
+`;
+
+    await ctx.writePin(pinned);
+
+    ctx.commands.answer(
+      [
+        'gh',
+        'pr',
+        'list',
+        '--repo',
+        'example/tools',
+        '--head',
+        'skills-pin',
+        '--state',
+        'open',
+        '--json',
+        'number,isCrossRepository',
+      ],
+      { exitCode: 0, stdout: '[{"number":41,"isCrossRepository":false}]', stderr: '' },
+    );
+
+    ctx.commands.answer(
+      [
+        'gh',
+        'api',
+        'repos/example/tools/contents/sync/skills-pin.json?ref=skills-pin',
+        '-H',
+        'Accept: application/vnd.github.raw',
+      ],
+      { exitCode: 0, stdout: JSON.stringify({ commit: proposed }), stderr: '' },
+    );
+
+    ctx.commands.answer(
+      ['gh', 'api', `repos/zgeoff/skills/compare/${pinned}...${commit}`, '--jq', '.status'],
+      { exitCode: 0, stdout: 'ahead\n', stderr: '' },
+    );
+
+    ctx.commands.answer(
+      ['gh', 'api', `repos/zgeoff/skills/compare/${proposed}...${commit}`, '--jq', '.status'],
+      { exitCode: 0, stdout: 'behind\n', stderr: '' },
+    );
+
+    ctx.commands.answer(
+      ['gh', 'api', `repos/zgeoff/skills/compare/${commit}...main`, '--jq', '.status'],
+      { exitCode: 0, stdout: 'ahead\n', stderr: '' },
+    );
+
+    ctx.commands.answer(
+      ['gh', 'pr', 'view', '41', '--repo', 'example/tools', '--json', 'headRefOid,files'],
+      {
+        exitCode: 0,
+        stdout: JSON.stringify({
+          headRefOid: head,
+          files: [{ path: 'sync/manifest.json' }, { path: 'sync/skills-pin.json' }],
+        }),
+        stderr: '',
+      },
+    );
+
+    ctx.commands.answer(
+      [
+        'gh',
+        'api',
+        `repos/example/tools/contents/sync/skills-pin.json?ref=${head}`,
+        '-H',
+        'Accept: application/vnd.github.raw',
+      ],
+      { exitCode: 0, stdout: JSON.stringify({ commit: proposed }), stderr: '' },
+    );
+
+    ctx.commands.answer(
+      ['gh', 'api', `repos/example/tools/compare/main...${head}`, '--jq', '.merge_base_commit.sha'],
+      { exitCode: 0, stdout: `${base}\n`, stderr: '' },
+    );
+
+    ctx.commands.answer(
+      [
+        'gh',
+        'api',
+        `repos/zgeoff/skills/git/trees/${proposed}?recursive=1`,
+        '--jq',
+        'if .truncated then error("the tree is truncated") else .tree[] | select(.type == "blob") | .path end',
+      ],
+      {
+        exitCode: 0,
+        stdout: 'skills/kettle/SKILL.md\nskills/kettle/references/descaling.md\n',
+        stderr: '',
+      },
+    );
+
+    ctx.commands.answer(
+      [
+        'gh',
+        'api',
+        `repos/example/tools/contents/sync/manifest.json?ref=${base}`,
+        '--jq',
+        '.sha, .content',
+      ],
+      {
+        exitCode: 0,
+        stdout: `0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33\n${Buffer.from(JSON.stringify(manifest)).toString('base64')}\n`,
+        stderr: '',
+      },
+    );
+
+    ctx.commands.answer(
+      [
+        'gh',
+        'api',
+        `repos/example/tools/contents/sync/manifest.json?ref=${head}`,
+        '-H',
+        'Accept: application/vnd.github.raw',
+      ],
+      { exitCode: 0, stdout: headManifest, stderr: '' },
+    );
+
+    const merge = [
+      'gh',
+      'pr',
+      'merge',
+      '41',
+      '--repo',
+      'example/tools',
+      '--auto',
+      '--squash',
+      '--match-head-commit',
+      head,
+    ];
+
+    ctx.commands.answer(merge, { exitCode: 0, stdout: '', stderr: '' });
+
+    const exitCode = await ctx.pin(commit);
+
+    const merges = ctx.commands.calls.filter((argv) => argv[1] === 'pr' && argv[2] === 'merge');
+    const expectedMerges = expectedExitCode === 0 ? [merge] : [];
+
+    expect(exitCode).toBe(expectedExitCode);
+    expect(merges).toStrictEqual(expectedMerges);
   },
 );
 
