@@ -1595,6 +1595,28 @@ test('it turns auto-merge on when the repo links .claude/skills to .agents/skill
   expect(pulls).toStrictEqual([expect.objectContaining({ autoMerge: { method: 'squash', head } })]);
 });
 
+test('it writes a skill through a .claude/skills link whose .agents/skills folder git left out', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeMainLink('.claude/skills', '../.agents/skills');
+  await ctx.writeManifestCommit([]);
+  await ctx.writeSource('sync/skills/kettle/SKILL.md', '# Kettle\n');
+
+  const exitCode = await ctx.runSync([
+    {
+      name: 'skill-kettle',
+      description: 'The kettle skill',
+      files: [{ source: 'sync/skills/kettle/SKILL.md', target: '.claude/skills/kettle/SKILL.md' }],
+    },
+  ]);
+
+  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
+
+  expect(exitCode).toBe(0);
+  expect(files).toStrictEqual(['.agents/skills/kettle/SKILL.md', '.claude/skills', 'README.md']);
+});
+
 test('it turns auto-merge on when it deletes a retired copy through a .claude/skills link', async () => {
   const ctx = await setupTest();
 
