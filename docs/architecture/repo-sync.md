@@ -220,9 +220,10 @@ finds the move in this repo's history, so a repo that missed syncs since the mov
 too.
 
 A retired file also stays while its entry is still in the manifest and the run did not sync that
-entry, because the entry's current files can still need it. That covers an entry the repo skips or
-leaves out of `include`, and an entry that failed. A retired file of an entry that the manifest no
-longer holds stays when the repo lists that entry in `skip`.
+entry, because the entry's current files can still need it. A retired path that reaches the file of
+a current target through a symlink stays too, because it is that target's fresh copy. That covers an
+entry the repo skips or leaves out of `include`, and an entry that failed. A retired file of an
+entry that the manifest no longer holds stays when the repo lists that entry in `skip`.
 [`scripts/remove-retired-sync-files.sh`](../../scripts/remove-retired-sync-files.sh) reads the
 earlier manifests from this repo's history, and the versions of a zgeoff/skills source from that
 repo's history, so the workflow checks out the full history of both.
@@ -234,11 +235,14 @@ so the pull request merges once the repo's required checks pass. Its files are t
 already reviewed, so it needs no review in the repo. The workflow turns auto-merge on only when the
 pull request merges into the branch the run synced from, and the branch changes nothing but the
 targets the run copied, the retired copies it removed, and `package.json` changed only by the
-scripts that an entry's `scripts` field declares. On any other change it warns and leaves auto-merge
-off, and the pull request waits for review. Auto-merge binds to the head commit that the run
-checked. A repo whose settings disallow auto-merge gets a warning, and its sync pull requests wait
-for review. GitHub refuses auto-merge for a pull request that can merge at once, such as one in a
-repo whose rules require no check, so that pull request waits for review too.
+scripts that an entry's `scripts` field declares. It compares each path after it resolves the
+symlinks in its folders, because git records a copy written through a linked folder at the real
+path: with `.claude/skills` linked to `.agents/skills`, a skill target lands at its `.agents/skills`
+path. On any other change it warns and leaves auto-merge off, and the pull request waits for review.
+Auto-merge binds to the head commit that the run checked. A repo whose settings disallow auto-merge
+gets a warning, and its sync pull requests wait for review. GitHub refuses auto-merge for a pull
+request that can merge at once, such as one in a repo whose rules require no check, so that pull
+request waits for review too.
 
 GitHub keeps auto-merge on through a later push by anyone with write access, the workflow's own
 force push included, so two steps keep an unchecked commit from merging on its own. The workflow

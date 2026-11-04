@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -82,6 +82,46 @@ test('it deletes a file an earlier manifest delivered and the current manifest d
 
   expect(existsSync(join(ctx.caller, '.claude/skills/demo/scripts/check.sh'))).toBeFalse();
   expect(existsSync(join(ctx.caller, '.claude/skills/demo/SKILL.md'))).toBeTrue();
+});
+
+test('it keeps a retired copy that reaches the file of a current target through a folder link', async () => {
+  const ctx = await setupTest();
+
+  await createGitCommit(ctx.tools, ctx.env, {
+    'sync/demo/SKILL.md': '# Demo\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-demo',
+        files: [{ source: 'sync/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' }],
+      },
+    ]),
+  });
+
+  await createGitCommit(ctx.tools, ctx.env, {
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-demo',
+        files: [{ source: 'sync/demo/SKILL.md', target: '.agents/skills/demo/SKILL.md' }],
+      },
+    ]),
+  });
+
+  await writeTreeFiles(ctx.caller, { '.agents/skills/demo/SKILL.md': '# Demo\n' });
+  await mkdir(join(ctx.caller, '.claude'));
+  await symlink('../.agents/skills', join(ctx.caller, '.claude/skills'));
+
+  const result = await $`bash ${ctx.scriptPath} ${ctx.tools} skill-demo`
+    .cwd(ctx.caller)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+
+  expect(existsSync(join(ctx.caller, '.agents/skills/demo/SKILL.md'))).toBeTrue();
 });
 
 test('it deletes a retired file that matches an older version of its source', async () => {

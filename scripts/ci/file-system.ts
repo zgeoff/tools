@@ -16,4 +16,7 @@ export interface FileSystem {
   // Removes a file or a folder with all it holds; a missing path is no error.
   readonly removePath: (path: string) => Promise<void>;
   readonly probePath: (path: string) => Promise<boolean>;
+
+  // Returns the absolute path with every symlink in it resolved; throws for a missing path.
+  readonly resolveRealPath: (path: string) => Promise<string>;
 }

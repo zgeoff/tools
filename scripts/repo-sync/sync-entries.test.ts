@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { createGitCommit, readGitHead, readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
@@ -210,6 +210,17 @@ async function setupTest() {
       .quiet();
   };
 
+  const writeMainLink = async (path: string, target: string) => {
+    await $`git -C ${seed} checkout -q -B main origin/main`.env(env).quiet();
+
+    await mkdir(dirname(join(seed, path)), { recursive: true });
+    await symlink(target, join(seed, path));
+
+    await $`git -C ${seed} add -A && git -C ${seed} commit -q -m ${'link'} && git -C ${seed} push -q origin HEAD:main`
+      .env(env)
+      .quiet();
+  };
+
   return {
     origin,
     state,
@@ -235,6 +246,7 @@ async function setupTest() {
     readCommitBodies,
     readPullRequests,
     writeBranch,
+    writeMainLink,
   };
 }
 
@@ -1553,6 +1565,98 @@ test('it turns auto-merge on when a build changes package.json only by the scrip
 
   expect(exitCode).toBe(0);
   expect(pulls).toStrictEqual([expect.objectContaining({ autoMerge: { method: 'squash', head } })]);
+});
+
+test('it turns auto-merge on when the repo links .claude/skills to .agents/skills', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeBranch('main', '.agents/skills/kettle/SKILL.md', '# Kettle\n');
+  await ctx.writeMainLink('.claude/skills', '../.agents/skills');
+  await ctx.writeManifestCommit([]);
+  await ctx.writeSource('sync/skills/kettle/SKILL.md', '# Kettle\n\nDescale it monthly.\n');
+
+  const exitCode = await ctx.runSync([
+    {
+      name: 'skill-kettle',
+      description: 'The kettle skill',
+      files: [{ source: 'sync/skills/kettle/SKILL.md', target: '.claude/skills/kettle/SKILL.md' }],
+    },
+  ]);
+
+  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
+  const content = await ctx.readBranch('repo-sync/zgeoff-tools', '.agents/skills/kettle/SKILL.md');
+  const pulls = await ctx.readPullRequests();
+  const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
+
+  expect(exitCode).toBe(0);
+  expect(files).toStrictEqual(['.agents/skills/kettle/SKILL.md', '.claude/skills', 'README.md']);
+  expect(content).toBe('# Kettle\n\nDescale it monthly.\n');
+  expect(pulls).toStrictEqual([expect.objectContaining({ autoMerge: { method: 'squash', head } })]);
+});
+
+test('it turns auto-merge on when it deletes a retired copy through a .claude/skills link', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  const skill = { source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' };
+
+  const check = {
+    source: 'sync/skills/demo/scripts/check.sh',
+    target: '.claude/skills/demo/scripts/check.sh',
+  };
+
+  await ctx.writeSource(skill.source, '# Demo\n');
+  await ctx.writeSource(check.source, 'echo check\n');
+  await ctx.writeManifestCommit([{ name: 'skill-demo', files: [skill, check] }]);
+  await ctx.writeManifestCommit([{ name: 'skill-demo', files: [skill] }]);
+  await ctx.writeBranch('main', '.agents/skills/demo/scripts/check.sh', 'echo check\n');
+  await ctx.writeMainLink('.claude/skills', '../.agents/skills');
+
+  const exitCode = await ctx.runSync([
+    { name: 'skill-demo', description: 'The demo skill', files: [skill] },
+  ]);
+
+  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
+  const pulls = await ctx.readPullRequests();
+  const head = await ctx.readBranchHead('repo-sync/zgeoff-tools');
+
+  expect(exitCode).toBe(0);
+  expect(files).toStrictEqual(['.agents/skills/demo/SKILL.md', '.claude/skills', 'README.md']);
+  expect(pulls).toStrictEqual([expect.objectContaining({ autoMerge: { method: 'squash', head } })]);
+});
+
+test('it keeps a file it wrote when a retired target reaches the same file through a link', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeBranch('main', '.agents/skills/demo/SKILL.md', '# Demo\n');
+  await ctx.writeMainLink('.claude/skills', '../.agents/skills');
+  await ctx.writeSource('sync/skills/demo/SKILL.md', '# Demo\n');
+
+  await ctx.writeManifestCommit([
+    {
+      name: 'skill-demo',
+      files: [{ source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' }],
+    },
+  ]);
+
+  const entry = {
+    name: 'skill-demo',
+    description: 'The demo skill',
+    files: [{ source: 'sync/skills/demo/SKILL.md', target: '.agents/skills/demo/SKILL.md' }],
+  };
+
+  await ctx.writeManifestCommit([entry]);
+  await ctx.writeSource('sync/skills/demo/SKILL.md', '# Demo\n\nRun it daily.\n');
+
+  const exitCode = await ctx.runSync([entry]);
+  const content = await ctx.readBranch('repo-sync/zgeoff-tools', '.agents/skills/demo/SKILL.md');
+
+  expect(exitCode).toBe(0);
+  expect(content).toBe('# Demo\n\nRun it daily.\n');
 });
 
 test('it warns and passes when the repo refuses auto-merge', async () => {
