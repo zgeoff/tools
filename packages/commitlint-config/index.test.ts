@@ -21,7 +21,10 @@ async function setupTest() {
 
   const parserOpts = config.parserPreset?.parserOpts;
 
-  invariant(parserOpts, 'the config sets no parserPreset.parserOpts');
+  invariant(
+    parserOpts !== undefined && parserOpts !== null,
+    'the config sets no parserPreset.parserOpts',
+  );
 
   return {
     commitlint: join(import.meta.dir, 'node_modules/.bin/commitlint'),

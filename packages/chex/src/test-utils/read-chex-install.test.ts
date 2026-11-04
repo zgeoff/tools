@@ -30,11 +30,11 @@ test('it reads the chex source when no artifact is named', async () => {
   expect(install.packageDir).toBe(join(import.meta.dir, '../..'));
 });
 
-test('it throws when the artifact is no src/cli.ts', async () => {
+test('it throws when the artifact is no src/cli.ts', () => {
   setupTest();
   updateEnv('RIG_PROGRAM_CHEX', '/srv/pack/chex');
 
-  await expect(readChexInstall()).rejects.toThrow(
+  expect(readChexInstall()).rejects.toThrow(
     'the chex program runs /srv/pack/chex, which ends with no src/cli.ts',
   );
 });
