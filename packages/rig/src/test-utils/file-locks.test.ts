@@ -34,3 +34,15 @@ test('it gives the lock to one open file at a time, and frees it when that file 
   expect(isSecondLockedWhileHeld).toBeFalse();
   expect(fileLocks.tryLock(second)).toBeTrue();
 });
+
+test('it throws, rather than report a held lock, when flock fails', async () => {
+  const ctx = await setupTest();
+  const lockFile = await fileLocks.openLockFile(ctx.lockPath);
+
+  await fileLocks.closeLockFile(lockFile);
+
+  expect(() => fileLocks.tryLock(lockFile)).toThrowWithMessage(
+    Error,
+    'flock on descriptor -1 failed with errno 9',
+  );
+});
