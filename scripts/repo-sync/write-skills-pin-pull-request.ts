@@ -6,9 +6,10 @@ import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { CommandResult, RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
+import { isCoveredPinHead } from './is-covered-pin-head.ts';
 import { parseSkillsPin } from './parse-skills-pin.ts';
 import { pickSkillsPinMove } from './pick-skills-pin-move.ts';
-import { probePinManifestChange } from './probe-pin-manifest-change.ts';
+import { readPinManifestFacts } from './read-pin-manifest-facts.ts';
 import { readSkillFilesManifest } from './read-skill-files-manifest.ts';
 import { skillsPinPath } from './skills-pin-path.ts';
 import { syncManifestPath } from './sync-manifest-path.ts';
@@ -220,9 +221,8 @@ function runGH(
   return options.runCommand(['gh', ...args], { cwd: options.cwd, env: options.env });
 }
 
-// The branch head is bound only after it shows the pin pull request's own change: the pin file at
-// the pin the run compared, and the manifest as the run writes it for that pin, when it changes.
-// Anything else waits for a person.
+// The branch head is bound only after it shows the pin pull request's own change. Anything else
+// waits for a person.
 async function writeCoveredAutoMerge(
   options: Readonly<WriteSkillsPinPullRequestOptions>,
   number: string,
@@ -252,18 +252,13 @@ async function writeCoveredAutoMerge(
 
   const headValue: unknown = JSON.parse(shown.stdout);
   const headPin = parseSkillsPin(headValue);
-  const hasManifest = paths.includes(syncManifestPath);
 
-  const isPinChange =
-    headPin !== null &&
-    headPin === proposed &&
-    paths.includes(skillsPinPath) &&
-    paths.length === (hasManifest ? 2 : 1);
+  const manifest =
+    paths.includes(syncManifestPath) && headPin !== null
+      ? await readPinManifestFacts(options, head, headPin)
+      : null;
 
-  const isManifestMatched =
-    isPinChange && hasManifest ? await probePinManifestChange(options, head, headPin) : true;
-
-  if (!isPinChange || !isManifestMatched) {
+  if (!isCoveredPinHead({ paths, headPin, proposed, manifest })) {
     options.writeOutput(
       `::error::the open pin pull request #${number} changes more than ${skillsPinPath} and the skill files of ${syncManifestPath}, or moved since this run read it; check it by hand\n`,
     );
