@@ -26,8 +26,6 @@ export interface SkillFilesManifestText {
   readonly added: readonly string[];
 }
 
-// The manifest at the commit of this repo, with the new files of the zgeoff/skills commit added;
-// null when GitHub gives a truncated tree or a manifest with no content.
 export async function readSkillFilesManifest(
   options: Readonly<ReadSkillFilesManifestOptions>,
   ref: string,

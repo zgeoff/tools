@@ -14,8 +14,6 @@ export interface CoveredPinHead {
   readonly manifest: PinManifestFacts | null;
 }
 
-// Whether the head shows only the pin pull request's own change: the pin file at the pin the run
-// compared, and the manifest as the pin step writes it for that pin, when it changes.
 export function isCoveredPinHead(head: Readonly<CoveredPinHead>): boolean {
   if (head.headPin === null || head.headPin !== head.proposed) {
     return false;
