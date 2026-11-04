@@ -52,15 +52,18 @@ test('it stops the processes of the shared Chrome after the last file, before th
     files.map((file) =>
       writeFile(
         file,
-        `import { test } from 'bun:test';
+        `import { onTestFinished, test } from 'bun:test';
 import { collectDescendantPIDs } from ${JSON.stringify(join(import.meta.dir, 'collect-descendant-pids.ts'))};
 import { readProcessTable } from ${JSON.stringify(join(import.meta.dir, 'read-process-table.ts'))};
 
 test('it opens a view', async () => {
   const view = new Bun.WebView({ backend: 'chrome' });
 
+  onTestFinished(() => {
+    view.close();
+  });
+
   await view.navigate('about:blank');
-  view.close();
 
   await Bun.write(${JSON.stringify(`${file}.pids.json`)}, JSON.stringify(collectDescendantPIDs(readProcessTable() ?? [], process.pid)));
 });
