@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import lint from '@commitlint/lint';
 import load from '@commitlint/load';
+import invariant from 'tiny-invariant';
 
 // The project sits inside this repo so `extends` resolves @zgeoff/commitlint-config through the
 // workspace link in the root node_modules, the way a consumer's install resolves it.
@@ -18,14 +19,15 @@ async function setupTest() {
   // process, with the config that the CLI would load.
   const config = await load({}, { cwd: directory });
 
-  const parserOpts = config.parserPreset?.parserOpts ?? null;
-  const lintOptions: Parameters<typeof lint>[2] = parserOpts === null ? {} : { parserOpts };
+  const parserOpts = config.parserPreset?.parserOpts;
+
+  invariant(parserOpts, 'the config sets no parserPreset.parserOpts');
 
   return {
     commitlint: join(import.meta.dir, 'node_modules/.bin/commitlint'),
     directory,
     lintMessage: async (message: string) => {
-      const result = await lint(message, config.rules, lintOptions);
+      const result = await lint(message, config.rules, { parserOpts });
 
       return { valid: result.valid, ruleNames: result.errors.map((error) => error.name) };
     },

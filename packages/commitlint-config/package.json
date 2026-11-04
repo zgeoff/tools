@@ -26,6 +26,7 @@
     "@commitlint/lint": "catalog:",
     "@commitlint/load": "catalog:",
     "@types/bun": "catalog:",
+    "tiny-invariant": "catalog:",
     "tsrs": "catalog:",
     "typescript": "catalog:"
   },
