@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.14](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.13...@zgeoff/chex@0.0.14) (2026-11-04)
+
+### Features
+
+- **chex:** add the ci-plan command that plans a bun-checks run
+  ([#482](https://github.com/zgeoff/tools/issues/482))
+  ([3645438](https://github.com/zgeoff/tools/commit/36454384d251a17e30991fa4baa677957794c8e3))
+
 ## [0.0.13](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.12...@zgeoff/chex@0.0.13) (2026-11-04)
 
 ### Features
