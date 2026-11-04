@@ -21,11 +21,9 @@ export interface DescendantStop {
 const pollIntervalMs = 50;
 
 export async function stopDescendantProcesses(stop: DescendantStop): Promise<void> {
-  const table = stop.readProcessTable();
+  const deadline = stop.clock.now() + stop.deadlineMs;
 
-  if (table === null) {
-    return;
-  }
+  const table = await readFirstListing(stop, deadline);
 
   const descendants = collectDescendantPIDs(table, stop.rootPID);
 
@@ -33,7 +31,6 @@ export async function stopDescendantProcesses(stop: DescendantStop): Promise<voi
     killProcess(pid, stop);
   }
 
-  const deadline = stop.clock.now() + stop.deadlineMs;
   let isStopped = false;
 
   while (!isStopped) {
@@ -55,6 +52,28 @@ export async function stopDescendantProcesses(stop: DescendantStop): Promise<voi
       .with({ kind: 'wait' }, () => stop.clock.sleep(pollIntervalMs).then(() => false))
       .exhaustive();
   }
+}
+
+// Only a listing names the processes to stop, so a failed one is read again until the deadline.
+async function readFirstListing(
+  stop: DescendantStop,
+  deadline: number,
+): Promise<readonly ProcessEntry[]> {
+  let listing = stop.readProcessTable();
+
+  while (listing === null) {
+    if (stop.clock.now() >= deadline) {
+      throw new Error(
+        `the process listing failed for ${stop.deadlineMs} ms, so no process stopped`,
+      );
+    }
+
+    await stop.clock.sleep(pollIntervalMs);
+
+    listing = stop.readProcessTable();
+  }
+
+  return listing;
 }
 
 function killProcess(pid: number, stop: DescendantStop): void {
