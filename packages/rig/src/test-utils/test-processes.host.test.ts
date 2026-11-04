@@ -8,8 +8,10 @@ test('it lists the children of a process, and reads the group each one runs in',
     stdout: 'pipe',
   });
 
-  onTestFinished(() => {
+  onTestFinished(async () => {
     testProcesses.signalGroup(parent.pid, 'SIGKILL');
+
+    await parent.exited;
   });
 
   await readStreamUntil(parent.stdout, 'started');
