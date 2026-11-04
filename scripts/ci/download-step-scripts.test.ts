@@ -14,8 +14,6 @@ import {
   parseDownloadArgs,
   readURL,
   runDownloadStep,
-  toStepRunPath,
-  toStepToolsPath,
 } from './download-step-scripts.ts';
 import type { URLOutcome } from './download-step-scripts.ts';
 import { nodeFileSystem } from './node-file-system.ts';
@@ -278,14 +276,6 @@ test.each([
   expect(isToolsURL(url)).toBe(expected);
 });
 
-test.each([
-  ['scripts/kettle/boil.ts', 'scripts/kettle/boil.js', 'step-bundles/scripts/kettle/boil.js'],
-  ['scripts/kettle/whistle.sh', 'scripts/kettle/whistle.sh', 'scripts/kettle/whistle.sh'],
-])('it runs %s from %s, downloaded from %s', (entry, runPath, toolsPath) => {
-  expect(toStepRunPath(entry)).toBe(runPath);
-  expect(toStepToolsPath(runPath)).toBe(toolsPath);
-});
-
 test('it fails the step and downloads nothing when TOOLS_URL names no commit', async () => {
   const urls: string[] = [];
   const written: string[] = [];
@@ -404,11 +394,17 @@ test('it downloads the set from the tools commit into the runner folder', async 
   );
 
   const repoContents = await Promise.all(
-    downloaded.map((path) => readFile(join(root, toStepToolsPath(path)), 'utf8')),
+    downloaded.map((path) => readFile(join(root, path), 'utf8')),
   );
 
   expect(exitCode).toBe(0);
-  expect(downloaded).toStrictEqual(['scripts/paths-changed/run-changed-files-step.js']);
+
+  expect(downloaded).toIncludeAllMembers([
+    'scripts/paths-changed/run-changed-files-step.ts',
+    'scripts/paths-changed/match-changed-files.ts',
+    'packages/chex/src/write-step-outputs.ts',
+  ]);
+
   expect(contents).toStrictEqual(repoContents);
   expect(output).toStrictEqual([`downloaded ${downloaded.length} files from ${toolsURL}\n`]);
 });

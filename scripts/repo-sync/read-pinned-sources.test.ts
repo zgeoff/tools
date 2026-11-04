@@ -1,11 +1,13 @@
 import { expect, test } from 'bun:test';
 import { readPinnedSources } from './read-pinned-sources.ts';
 
-test('it reads each reusable workflow, the downloaded files and the bundle of every step script', async () => {
+test('it reads each reusable workflow, the downloaded files and every step script with the files it imports', async () => {
   const files: Record<string, string> = {
     '.github/workflows/bake.yml': 'on:\n  workflow_call:\njobs: {}\n',
     '.github/workflows/nightly.yml': 'on:\n  schedule: []\njobs: {}\n',
-    'step-bundles/scripts/repo-sync/sync-entries.js': "import { join } from 'path';\n\njoin();\n",
+    'scripts/repo-sync/sync-entries.ts':
+      "import { loaves } from './count-loaves.ts';\n\nloaves();\n",
+    'scripts/repo-sync/count-loaves.ts': 'export const loaves = () => 1;\n',
   };
 
   const sources = await readPinnedSources({
@@ -17,11 +19,11 @@ test('it reads each reusable workflow, the downloaded files and the bundle of ev
     '.github/workflows/bake.yml',
     '.bun-version',
     'scripts/ci/download-step-scripts.ts',
-    'step-bundles/scripts/repo-sync/sync-entries.js',
+    'scripts/repo-sync/sync-entries.ts',
+    'scripts/repo-sync/count-loaves.ts',
   ]);
 
   expect(sources).not.toContain('.github/workflows/nightly.yml');
-  expect(sources).not.toContain('scripts/repo-sync/sync-entries.ts');
 });
 
 test.each([

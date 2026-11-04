@@ -8,7 +8,6 @@
     "**/dist/**",
     ".worktrees/**",
     "**/*.json",
-    ".zgeoff-skills/**",
-    "step-bundles/**"
+    ".zgeoff-skills/**"
   ]
 }

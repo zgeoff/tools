@@ -30,20 +30,20 @@ async function setupTest() {
   return { tools, env, writeToolsCommit, read };
 }
 
-test('it reads the reusable workflows and the step bundles the commit holds', async () => {
+test('it reads the reusable workflows and the step scripts the commit holds', async () => {
   const ctx = await setupTest();
 
   const commit = await ctx.writeToolsCommit({
     '.github/workflows/bake.yml': 'on:\n  workflow_call:\njobs: {}\n',
     '.github/workflows/nightly.yml': 'on:\n  schedule: []\njobs: {}\n',
-    'step-bundles/scripts/repo-sync/sync-entries.js': "import { join } from 'path';\n\njoin();\n",
+    'scripts/repo-sync/sync-entries.ts': "import { join } from 'node:path';\n\njoin();\n",
   });
 
   const sources = await ctx.read(commit);
 
   expect(sources).toIncludeAllMembers([
     '.github/workflows/bake.yml',
-    'step-bundles/scripts/repo-sync/sync-entries.js',
+    'scripts/repo-sync/sync-entries.ts',
   ]);
 
   expect(sources).not.toContain('.github/workflows/nightly.yml');
