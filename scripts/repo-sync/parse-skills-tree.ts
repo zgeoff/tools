@@ -7,8 +7,6 @@ const treeItemSchema = z.object({ path: z.string(), mode: z.string(), type: z.st
 // only a whole tree parses.
 const skillsTreeSchema = z.object({ truncated: z.literal(false), tree: z.array(treeItemSchema) });
 
-// Returns the blobs of a git tree response from GitHub, or null when the response is not a whole
-// tree.
 export function parseSkillsTree(value: unknown): SkillsTreeFile[] | null {
   const parsed = skillsTreeSchema.safeParse(value);
 
