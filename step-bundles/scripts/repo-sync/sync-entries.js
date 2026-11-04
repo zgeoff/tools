@@ -326,13 +326,7 @@ var stepScriptSets = {
     "scripts/ci/run-pinned-tool-step.ts",
     "scripts/ci/run-package-scripts.ts",
     "scripts/ci/collect-failed-jobs.ts",
-    "packages/chex/src/cli.ts",
-    "packages/chex/src/docs/check-prose.sh",
-    "packages/chex/src/docs/check-length.sh",
-    "packages/chex/src/docs/check-links.sh",
-    "packages/chex/src/docs/check-readmes.sh",
-    "packages/chex/src/docs/check-vision.sh",
-    "packages/chex/src/docs/check-skill.sh"
+    "packages/chex/src/cli.ts"
   ],
   "paths-changed": ["scripts/paths-changed/run-changed-files-step.ts"],
   "repo-sync": [

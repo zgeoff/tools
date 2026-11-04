@@ -119,6 +119,15 @@ To add a package, from the first version that ships its `init`:
    `no RENOVATE_ALLOWED_COMMANDS pattern in .github/workflows/renovate.yml allows '<command>'` when
    a preset command has no pattern that allows it.
 
+## The chex release that bun-checks runs
+
+[`bun-checks.yml`](../../.github/workflows/bun-checks.yml) runs each chex subcommand from npm, at
+the release that its `CHEX` variable pins. A custom manager in this repo's
+[`renovate.json`](../../renovate.json) finds the pin, so a new chex release reaches it as an
+`@zgeoff/*` bump: with no release-age wait, merged on green checks. The merge moves `main`, and each
+repo's next sync pull request moves its workflow pins to that commit, as [repo-sync](./repo-sync.md)
+describes. `bun run check:chex-pin` fails when no custom manager captures the pin, and CI runs it.
+
 ## Running Renovate
 
 This repo's [`renovate.yml`](../../.github/workflows/renovate.yml) runs self-hosted Renovate every

@@ -97,6 +97,8 @@ says.
   the bundles, after you change a step script, a file one imports, or a package it uses.
   `bun run check:step-bundles` fails on a stale bundle and on a set of bundles that a runner could
   not download or compile, and CI and the pre-push hook run it.
+- `bun run check:chex-pin` fails when no custom manager in `renovate.json` captures the chex release
+  that `.github/workflows/bun-checks.yml` pins, which Renovate then never bumps. CI runs it.
 - `bun run check:repo-sync-workflows` checks the stub `sync/repo-sync.yml` against
   `.github/workflows/repo-sync.yml`: two dispatches of different tools commits get two concurrency
   groups, the sync job queues every waiting run, the stub grants every permission a job asks for,
