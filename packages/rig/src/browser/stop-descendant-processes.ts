@@ -1,9 +1,8 @@
 import { match } from 'ts-pattern';
 import type { Clock } from '../system-clock.ts';
-import { collectDescendantPIDs } from './collect-descendant-pids.ts';
 import { hasErrorCode } from './has-error-code.ts';
 import { pickDescendantStopStep } from './pick-descendant-stop-step.ts';
-import { pickListingReadStep } from './pick-listing-read-step.ts';
+import { pickFreezeStep } from './pick-freeze-step.ts';
 import type { ProcessEntry } from './read-process-table.ts';
 
 export interface DescendantStop {
@@ -24,12 +23,10 @@ const pollIntervalMs = 50;
 export async function stopDescendantProcesses(stop: DescendantStop): Promise<void> {
   const deadline = stop.clock.now() + stop.deadlineMs;
 
-  const table = await readFirstListing(stop, deadline);
-
-  const descendants = collectDescendantPIDs(table, stop.rootPID);
+  const descendants = await freezeDescendants(stop, deadline);
 
   for (const pid of descendants) {
-    killProcess(pid, stop);
+    signalLiveProcess(pid, 'SIGKILL', stop);
   }
 
   let isStopped = false;
@@ -55,33 +52,49 @@ export async function stopDescendantProcesses(stop: DescendantStop): Promise<voi
   }
 }
 
-// Only a listing names the processes to stop, so a failed one is read again until the deadline.
-async function readFirstListing(
+// A descendant can fork between a listing and its SIGKILL, and the child would escape the stop, so
+// the stop halts each descendant with SIGSTOP and lists again until a listing shows no new one.
+async function freezeDescendants(
   stop: DescendantStop,
   deadline: number,
-): Promise<readonly ProcessEntry[]> {
-  let listing: readonly ProcessEntry[] | null = null;
+): Promise<readonly number[]> {
+  const frozen: number[] = [];
+  let isFrozen = false;
 
-  while (listing === null) {
-    const step = pickListingReadStep(stop.readProcessTable(), stop.clock.now() >= deadline);
+  while (!isFrozen) {
+    const step = pickFreezeStep({
+      rootPID: stop.rootPID,
+      listing: stop.readProcessTable(),
+      frozen,
+      isPastDeadline: stop.clock.now() >= deadline,
+    });
 
-    listing = await match(step)
-      .with({ kind: 'listed' }, (listed) => Promise.resolve(listed.listing))
+    isFrozen = await match(step)
+      .with({ kind: 'freeze' }, (next) => {
+        for (const pid of next.pids) {
+          signalLiveProcess(pid, 'SIGSTOP', stop);
+        }
+
+        frozen.push(...next.pids);
+
+        return Promise.resolve(false);
+      })
+      .with({ kind: 'frozen' }, () => Promise.resolve(true))
+      .with({ kind: 'retry' }, () => stop.clock.sleep(pollIntervalMs).then(() => false))
       .with({ kind: 'failed' }, () =>
         Promise.reject(
           new Error(`the process listing failed for ${stop.deadlineMs} ms, so no process stopped`),
         ),
       )
-      .with({ kind: 'retry' }, () => stop.clock.sleep(pollIntervalMs).then(() => null))
       .exhaustive();
   }
 
-  return listing;
+  return frozen;
 }
 
-function killProcess(pid: number, stop: DescendantStop): void {
+function signalLiveProcess(pid: number, signal: NodeJS.Signals, stop: DescendantStop): void {
   try {
-    stop.signalProcess(pid, 'SIGKILL');
+    stop.signalProcess(pid, signal);
   } catch (error) {
     if (!hasErrorCode(error, 'ESRCH')) {
       throw error;

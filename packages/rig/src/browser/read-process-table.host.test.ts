@@ -13,3 +13,9 @@ test('it lists the process that reads it, with its parent, its group and its sta
 
   expect(table).toSatisfyAll((entry: ProcessEntry) => entry.state !== '');
 });
+
+test('it leaves out the ps process that makes the listing', () => {
+  const table = readProcessTable();
+
+  expect(table?.filter((entry) => entry.parentID === process.pid)).toStrictEqual([]);
+});
