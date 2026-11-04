@@ -1,3 +1,5 @@
+import { parseProcessListing } from './parse-process-listing.ts';
+
 export interface ProcessEntry {
   readonly pid: number;
 
@@ -9,8 +11,7 @@ export interface ProcessEntry {
 }
 
 // Null when `ps` fails to start or exits nonzero. `ps -A` lists every process, so a nonzero exit
-// is a failed listing, never a sign that a process has exited. It lists itself too, as a child of
-// the reader that has exited by then, so the listing leaves it out.
+// is a failed listing, never a sign that a process has exited.
 export function readProcessTable(): readonly ProcessEntry[] | null {
   const listing = runListing();
 
@@ -18,16 +19,7 @@ export function readProcessTable(): readonly ProcessEntry[] | null {
     return null;
   }
 
-  return listing.stdout
-    .toString()
-    .split('\n')
-    .map((line) => line.trim().split(/\s+/u))
-    .flatMap(([pid, parentID, groupID, state]) =>
-      pid === undefined || parentID === undefined || groupID === undefined || state === undefined
-        ? []
-        : [{ pid: Number(pid), parentID: Number(parentID), groupID: Number(groupID), state }],
-    )
-    .filter((entry) => entry.pid !== listing.pid);
+  return parseProcessListing(listing.stdout.toString(), listing.pid);
 }
 
 function runListing() {
