@@ -3,8 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
-import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
-import { writeTreeFiles } from '@zgeoff/std/test-utils/write-tree-files';
+import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/helpers';
 import { readMemoryBudget } from './read-memory-budget.ts';
 
 async function setupTest() {

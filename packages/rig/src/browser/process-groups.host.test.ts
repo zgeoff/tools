@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { readStreamUntil } from '@zgeoff/std/test-utils/read-stream-until';
+import { readStreamUntil } from '@zgeoff/testing/helpers';
 import { processGroups } from './process-groups.ts';
 
 test('it finds a group that runs, and finds none once the group is stopped', async () => {

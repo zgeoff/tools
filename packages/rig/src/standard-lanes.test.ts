@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test';
 import { join } from 'node:path';
-import { readPinnedSkillText } from '@zgeoff/std/test-utils/read-pinned-skill-text';
 import { nodeFileSystem } from '../../../scripts/ci/node-file-system.ts';
 import { standardLanes } from './standard-lanes.ts';
+import { readPinnedSkillText } from './test-utils/read-pinned-skill-text.ts';
 
 test('it holds the lanes and limits of the Lanes table in the shared testing skill', async () => {
   const markdown = await readPinnedSkillText(

@@ -1,6 +1,5 @@
 import { expect, test } from 'bun:test';
-import { makeRejectingStub } from '@zgeoff/std/test-utils/make-rejecting-stub';
-import { makeResolvingStub } from '@zgeoff/std/test-utils/make-resolving-stub';
+import { makeRejectingStub, makeResolvingStub } from '@zgeoff/testing/helpers';
 import type { LaneStartOutcome } from './lane-hooks.ts';
 import { runLaneHooks } from './run-lane-hooks.ts';
 

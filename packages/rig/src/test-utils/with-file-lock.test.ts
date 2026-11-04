@@ -2,10 +2,12 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createBlockingStubKit } from '@zgeoff/std/test-utils/create-blocking-stub-kit';
-import { makeRejectingStub } from '@zgeoff/std/test-utils/make-rejecting-stub';
-import { makeResolvingStub } from '@zgeoff/std/test-utils/make-resolving-stub';
-import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
+import {
+  createBlockingStubKit,
+  makeRejectingStub,
+  makeResolvingStub,
+  readRunFolderPrefix,
+} from '@zgeoff/testing/helpers';
 import { buildSignallingClock } from './build-signalling-clock.ts';
 import { buildSteppingClock } from './build-stepping-clock.ts';
 import { createLockHolder } from './create-lock-holder.ts';

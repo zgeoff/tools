@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'bun:test';
-import { makeAnswerQueue } from '@zgeoff/std/test-utils/make-answer-queue';
+import { makeAnswerQueue } from '@zgeoff/testing/helpers';
 import { buildSteppingClock } from './build-stepping-clock.ts';
 import { buildStuckProcessGroups } from './build-stuck-process-groups.ts';
 import { killProcessGroups } from './kill-process-groups.ts';
@@ -7,7 +7,7 @@ import type { TestProcesses } from './test-processes.ts';
 
 test('it sends SIGKILL to each group, and waits until none of them runs', async () => {
   const clock = buildSteppingClock();
-  const isRunning = makeAnswerQueue([true, false, false]);
+  const isRunning = makeAnswerQueue([true, false, false, false]);
 
   const processes = {
     signalGroup: mock<TestProcesses['signalGroup']>(() => {}),

@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'bun:test';
-import { makeResolvingStub } from '@zgeoff/std/test-utils/make-resolving-stub';
+import { makeResolvingStub } from '@zgeoff/testing/helpers';
 import invariant from 'tiny-invariant';
 import { defineRig } from './define-rig.ts';
 import { makeRepoLaneHooks } from './make-repo-lane-hooks.ts';

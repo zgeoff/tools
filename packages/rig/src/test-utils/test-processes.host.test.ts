@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { readStreamUntil } from '@zgeoff/std/test-utils/read-stream-until';
+import { readStreamUntil } from '@zgeoff/testing/helpers';
 import { testProcesses } from './test-processes.ts';
 
 test('it lists the children of a process, and reads the group each one runs in', async () => {
