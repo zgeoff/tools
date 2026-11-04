@@ -1,6 +1,5 @@
 import type { Pointer } from 'bun:ffi';
 import { FFIType, dlopen, read } from 'bun:ffi';
-import { existsSync } from 'node:fs';
 import type { FileHandle } from 'node:fs/promises';
 import { open } from 'node:fs/promises';
 
@@ -74,10 +73,13 @@ function loadLibc(): Libc {
     };
   }
 
-  const library = dlopen(resolveLinuxLibc(), {
+  const symbols = {
     flock: { args: [FFIType.i32, FFIType.i32], returns: FFIType.i32 },
     __errno_location: { args: [], returns: FFIType.ptr },
-  });
+  } as const;
+
+  // A glibc host can also carry musl's loader, so the libc that loads decides, not the files.
+  const library = openLinuxLibc(symbols);
 
   return {
     flock: library.symbols.flock,
@@ -101,12 +103,16 @@ const muslArchitectures: Partial<Record<NodeJS.Architecture, string>> = {
   x64: 'x86_64',
 };
 
-function resolveLinuxLibc(): string {
-  const muslArchitecture = muslArchitectures[process.arch];
+function openLinuxLibc<Symbols extends Parameters<typeof dlopen>[1]>(symbols: Symbols) {
+  try {
+    return dlopen('libc.so.6', symbols);
+  } catch (error) {
+    const muslArchitecture = muslArchitectures[process.arch];
 
-  if (muslArchitecture !== undefined && existsSync(`/lib/ld-musl-${muslArchitecture}.so.1`)) {
-    return `libc.musl-${muslArchitecture}.so.1`;
+    if (muslArchitecture === undefined) {
+      throw error;
+    }
+
+    return dlopen(`libc.musl-${muslArchitecture}.so.1`, symbols);
   }
-
-  return 'libc.so.6';
 }
