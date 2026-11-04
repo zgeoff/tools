@@ -49,7 +49,9 @@ sync/               the sources that repo-sync delivers, listed in sync/manifest
                     repo-sync guard
   hooks/            the agent hooks' start-up stub and the skill gate's older entry point
   skill-gate/       the skill gate's rules, which repo-sync writes to .claude/skill-gate.json in
-                    each repo its except list leaves out, and which this repo links there
+                    each repo its except list leaves out; this repo keeps its own copy there,
+                    with a gate of its own on TypeScript, and check:sync fails when the copy lacks
+                    a shared gate
 scripts/            the step scripts that this repo's workflows run, one folder per area, and the
                     shell scripts that repo-sync and the release job run; tests sit beside them; a
                     reusable workflow downloads each step script as it is, so a step script imports

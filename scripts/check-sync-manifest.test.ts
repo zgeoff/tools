@@ -1106,3 +1106,112 @@ test('it fails when the packages field is not a list of strings', async () => {
       "check-sync-manifest: entry 'brew' has a packages field that is not a list of strings\n",
   });
 });
+
+test("it fails when this repo's own skill-gate rules lack a gate of the shared rules", async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/rules.json': JSON.stringify({
+      ignore: ['vendor/'],
+      gates: [
+        { match: 'recipes/**', skills: ['baking'] },
+        { match: 'menus/**', skills: ['plating'] },
+      ],
+    }),
+    '.claude/skill-gate.json': JSON.stringify({
+      ignore: ['vendor/'],
+      gates: [
+        { match: 'recipes/**', skills: ['baking'] },
+        { match: '**/*.ts', skills: ['code-style'] },
+      ],
+    }),
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'kitchen-rules',
+        description: 'The kitchen gate rules',
+        files: [{ source: 'sync/rules.json', target: '.claude/skill-gate.json' }],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      'check-sync-manifest: entry \'kitchen-rules\' delivers sync/rules.json, but this repo\'s .claude/skill-gate.json lacks its gate {"match":"menus/**","skills":["plating"]}\n',
+  });
+});
+
+test("it fails when this repo's own skill-gate rules lack an ignore entry of the shared rules", async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/rules.json': JSON.stringify({
+      ignore: ['vendor/'],
+      gates: [{ match: 'recipes/**', skills: ['baking'] }],
+    }),
+    '.claude/skill-gate.json': JSON.stringify({
+      ignore: [],
+      gates: [{ match: 'recipes/**', skills: ['baking'] }],
+    }),
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'kitchen-rules',
+        description: 'The kitchen gate rules',
+        files: [{ source: 'sync/rules.json', target: '.claude/skill-gate.json' }],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      "check-sync-manifest: entry 'kitchen-rules' delivers sync/rules.json, but this repo's .claude/skill-gate.json lacks its ignore entry \"vendor/\"\n",
+  });
+});
+
+test("it passes when this repo's own skill-gate rules hold every shared ignore entry and gate, with gates of its own", async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/rules.json': JSON.stringify({
+      ignore: ['vendor/'],
+      gates: [{ match: 'recipes/**', skills: ['baking'] }],
+    }),
+    '.claude/skill-gate.json': JSON.stringify({
+      ignore: ['vendor/'],
+      gates: [
+        { match: 'recipes/**', skills: ['baking'] },
+        { match: '**/*.ts', skills: ['code-style'] },
+      ],
+    }),
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'kitchen-rules',
+        description: 'The kitchen gate rules',
+        files: [{ source: 'sync/rules.json', target: '.claude/skill-gate.json' }],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+});
