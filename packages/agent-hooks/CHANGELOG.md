@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.0](https://github.com/zgeoff/tools/compare/@zgeoff/agent-hooks@0.1.5...@zgeoff/agent-hooks@0.2.0) (2026-11-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **testing:** @zgeoff/std no longer exports ./test-utils/*; import the test helpers from @zgeoff/testing/helpers.
+
+### Features
+
+* **testing:** add the helpers subpath and move shared test helpers ([#490](https://github.com/zgeoff/tools/issues/490)) ([28ca2f3](https://github.com/zgeoff/tools/commit/28ca2f382ca48cefb3f393255c8d51a77606d44c))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/rig bumped to 0.1.0
+    * @zgeoff/std bumped to 0.4.0
+    * @zgeoff/testing bumped to 0.2.0
+
 ## [0.1.5](https://github.com/zgeoff/tools/compare/@zgeoff/agent-hooks@0.1.4...@zgeoff/agent-hooks@0.1.5) (2026-11-03)
 
 ### Dependencies

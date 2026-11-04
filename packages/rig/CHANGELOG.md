@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.1.0](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.0.6...@zgeoff/rig@0.1.0) (2026-11-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **testing:** @zgeoff/std no longer exports ./test-utils/*; import the test helpers from @zgeoff/testing/helpers.
+* **rig:** rig exits 2 on an --isolate argument and runs nothing, where rig unit used to drop its --no-isolate for it.
+
+### Features
+
+* **rig:** run every lane in one global per process, in random order ([#479](https://github.com/zgeoff/tools/issues/479)) ([251cc1a](https://github.com/zgeoff/tools/commit/251cc1a3ee30b7e70a9619f57e1a74d5463b4572))
+* **testing:** add the helpers subpath and move shared test helpers ([#490](https://github.com/zgeoff/tools/issues/490)) ([28ca2f3](https://github.com/zgeoff/tools/commit/28ca2f382ca48cefb3f393255c8d51a77606d44c))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zgeoff/diet bumped to 0.2.0
+    * @zgeoff/std bumped to 0.4.0
+  * devDependencies
+    * @zgeoff/std bumped to 0.4.0
+    * @zgeoff/testing bumped to 0.2.0
+
 ## [0.0.6](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.0.5...@zgeoff/rig@0.0.6) (2026-11-03)
 
 ### Features

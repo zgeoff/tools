@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/zgeoff/tools/compare/@zgeoff/testing@0.1.0...@zgeoff/testing@0.2.0) (2026-11-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **testing:** @zgeoff/std no longer exports ./test-utils/*; import the test helpers from @zgeoff/testing/helpers.
+
+### Features
+
+* **testing:** add the helpers subpath and move shared test helpers ([#490](https://github.com/zgeoff/tools/issues/490)) ([28ca2f3](https://github.com/zgeoff/tools/commit/28ca2f382ca48cefb3f393255c8d51a77606d44c))
+
 ## 0.1.0 (2026-11-03)
 
 ### Features
