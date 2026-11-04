@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { readStreamUntil } from '@zgeoff/std/test-utils/read-stream-until';
+import { readStreamUntil } from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 
