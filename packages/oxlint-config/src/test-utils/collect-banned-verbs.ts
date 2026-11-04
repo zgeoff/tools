@@ -21,8 +21,6 @@ export function collectBannedVerbs(markdown: string): string[] {
   return verbs;
 }
 
-// The lead, then one indented item per line or wrapped line, up to the next line that is not
-// indented.
 const nestedBulletPattern =
   /\n- Never start a name with one of these verbs\.[^\n]*\n(?<items>(?: {2}[^\n]*(?:\n|$))+)/u;
 
