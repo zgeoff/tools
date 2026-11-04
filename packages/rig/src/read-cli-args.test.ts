@@ -61,7 +61,7 @@ test.each([
 ])('it finds no isolate option in %s', async (_, extraArgs) => {
   const args = await readCLIArgs(['unit', ...extraArgs]);
 
-  expect(args).toMatchObject({ hasIsolateOption: false });
+  expect(args).toStrictEqual({ command: 'unit', extraArgs, hasIsolateOption: false });
 });
 
 test('it refuses a command line with no command', async () => {
