@@ -84,14 +84,10 @@ test('it opens a view', async () => {
   await writeFile(
     recorder,
     `import { afterAll } from 'bun:test';
-import { collectDescendantPIDs } from ${collectorPath};
 import { readProcessTable } from ${tablePath};
 
 afterAll(async () => {
-  const table = readProcessTable() ?? [];
-  const descendants = collectDescendantPIDs(table, process.pid);
-
-  await Bun.write(${JSON.stringify(afterStopPath)}, JSON.stringify(table.filter((entry) => descendants.includes(entry.pid))));
+  await Bun.write(${JSON.stringify(afterStopPath)}, JSON.stringify(readProcessTable() ?? []));
 });
 `,
   );
