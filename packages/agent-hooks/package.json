@@ -40,6 +40,7 @@
     "@types/picomatch": "catalog:",
     "@zgeoff/rig": "workspace:*",
     "@zgeoff/std": "workspace:*",
+    "@zgeoff/testing": "workspace:*",
     "gunshi": "catalog:",
     "picomatch": "catalog:",
     "simple-git": "catalog:",
