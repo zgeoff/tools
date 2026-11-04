@@ -256,6 +256,7 @@
       "version": "0.4.0",
       "devDependencies": {
         "@types/bun": "catalog:",
+        "@zgeoff/testing": "workspace:*",
         "tsrs": "catalog:",
         "type-fest": "catalog:",
         "typescript": "catalog:",
