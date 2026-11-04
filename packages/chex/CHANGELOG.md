@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.13](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.12...@zgeoff/chex@0.0.13) (2026-11-04)
+
+
+### Features
+
+* **chex:** fail a skill whose frontmatter a strict parser refuses ([#480](https://github.com/zgeoff/tools/issues/480)) ([e0acbfb](https://github.com/zgeoff/tools/commit/e0acbfbb461b9b5d60e53e1c91ff8a46753e07fe))
+
 ## [0.0.12](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.0.11...@zgeoff/chex@0.0.12) (2026-11-03)
 
 ### Bug Fixes
