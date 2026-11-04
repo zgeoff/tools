@@ -4,10 +4,11 @@ import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readRunFolderPrefix } from '@zgeoff/std/test-utils/read-run-folder-prefix';
 import invariant from 'tiny-invariant';
+import { z } from 'zod';
 import { stopProcessGroups } from '../test-utils/stop-process-groups.ts';
 import { testProcesses } from '../test-utils/test-processes.ts';
 import { findBrowserRun } from './find-browser-run.ts';
-import { readProcessTable } from './read-process-table.ts';
+import { isZombieState } from './is-zombie-state.ts';
 
 async function setupTest() {
   const stack = new AsyncDisposableStack();
@@ -50,15 +51,19 @@ test('it runs the file under the TMPDIR the lane picks for Chrome', () => {
 test('it stops the processes of the shared Chrome after the last file, before the test process exits', async () => {
   const ctx = await setupTest();
 
+  const collectorPath = JSON.stringify(join(import.meta.dir, 'collect-descendant-pids.ts'));
+  const tablePath = JSON.stringify(join(import.meta.dir, 'read-process-table.ts'));
   const files = ['first', 'second'].map((name) => join(ctx.directory, `${name}.test.ts`));
+  const recorder = join(ctx.directory, 'record-after-stop.ts');
+  const afterStopPath = join(ctx.directory, 'after-stop.json');
 
   await Promise.all(
     files.map((file) =>
       writeFile(
         file,
         `import { onTestFinished, test } from 'bun:test';
-import { collectDescendantPIDs } from ${JSON.stringify(join(import.meta.dir, 'collect-descendant-pids.ts'))};
-import { readProcessTable } from ${JSON.stringify(join(import.meta.dir, 'read-process-table.ts'))};
+import { collectDescendantPIDs } from ${collectorPath};
+import { readProcessTable } from ${tablePath};
 
 test('it opens a view', async () => {
   const view = new Bun.WebView({ backend: 'chrome' });
@@ -76,6 +81,22 @@ test('it opens a view', async () => {
     ),
   );
 
+  await writeFile(
+    recorder,
+    `import { afterAll } from 'bun:test';
+import { collectDescendantPIDs } from ${collectorPath};
+import { readProcessTable } from ${tablePath};
+
+afterAll(async () => {
+  const table = readProcessTable() ?? [];
+  const descendants = collectDescendantPIDs(table, process.pid);
+
+  await Bun.write(${JSON.stringify(afterStopPath)}, JSON.stringify(table.filter((entry) => descendants.includes(entry.pid))));
+});
+`,
+  );
+
+  // The recorder loads after the browser preload, so its afterAll runs after the preload's.
   const tests = Bun.spawn(
     [
       process.execPath,
@@ -85,6 +106,8 @@ test('it opens a view', async () => {
       '--no-isolate',
       '--preload',
       join(import.meta.dir, 'browser-preload.ts'),
+      '--preload',
+      recorder,
       ...files,
     ],
     { cwd: process.cwd(), env: process.env, stdout: 'pipe', stderr: 'pipe', detached: true },
@@ -97,15 +120,21 @@ test('it opens a view', async () => {
 
   const exitCode = await tests.exited;
 
-  const listing = readProcessTable();
-
   const recorded = await Promise.all(
     files.map((file): Promise<unknown> => Bun.file(`${file}.pids.json`).json()),
   );
 
-  const chromePIDs = recorded.flat();
+  const afterStopJSON: unknown = await Bun.file(afterStopPath).json();
+
+  const afterStop = z.array(z.object({ pid: z.number(), state: z.string() })).parse(afterStopJSON);
 
   expect(exitCode).toBe(0);
+
+  const chromePIDs = recorded.flat();
+
   expect(chromePIDs).not.toBeEmpty();
-  expect(listing?.filter((entry) => chromePIDs.includes(entry.pid))).toStrictEqual([]);
+
+  expect(
+    afterStop.filter((entry) => chromePIDs.includes(entry.pid) && !isZombieState(entry.state)),
+  ).toStrictEqual([]);
 });
