@@ -19,8 +19,8 @@ jobs:
     with:
       scripts:
         check:sync check:release-workflow check:repo-sync-workflows check:step-bundles
-        check:lefthook-guard check:baseline-jobs check:test-layout format:check lint:full typecheck
-        test test:browser test:e2e test:host
+        check:chex-pin check:lefthook-guard check:baseline-jobs check:test-layout format:check
+        lint:full typecheck test test:browser test:e2e test:host
       # oxlint runs its JS plugin under Node, which reads rig.config.ts and
       # strips its types from Node 22.18.
       node-version: 26
@@ -48,5 +48,5 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: .bun-version
-      - name: Validate default.json
+      - name: Validate default.json and renovate.json
         run: bun run --silent check:renovate-config

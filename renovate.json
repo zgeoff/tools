@@ -1,6 +1,16 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>zgeoff/tools"],
+  "customManagers": [
+    {
+      "description": "The chex release whose subcommands the bun-checks workflow runs from npm. The preset's chex rule runs chex init on each bump, which finds this repo already set up.",
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/bun-checks\\.yml$/"],
+      "matchStrings": ["CHEX: '(?<depName>@zgeoff/chex)@(?<currentValue>[^']+)'"],
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "npm"
+    }
+  ],
   "packageRules": [
     {
       "description": "Hold msw below 3. msw 3 intercepts fetch at node:net, which Bun's native fetch never uses, so the test mock server catches nothing under Bun and its tests reach the real network. Remove this rule once msw's fetch interception works under Bun.",

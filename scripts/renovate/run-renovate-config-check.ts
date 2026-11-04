@@ -65,6 +65,7 @@ export async function runRenovateConfigCheck(
       '--strict',
       '--no-global',
       'default.json',
+      'renovate.json',
     ],
     { cwd: check.cwd, env: check.env },
   );

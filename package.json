@@ -70,6 +70,7 @@
     "check:step-bundles": "bun scripts/ci/write-step-bundles.ts --check",
     "check:lefthook-guard": "bun scripts/lefthook/run-lefthook-guard-check.ts",
     "check:baseline-jobs": "bun scripts/lefthook/run-baseline-jobs-check.ts",
+    "check:chex-pin": "bun scripts/renovate/run-chex-pin-check.ts",
     "check:renovate-config": "bun scripts/renovate/run-renovate-config-check.ts",
     "check:test-layout": "chex test-layout",
     "ci:install-tool": "bun scripts/ci/run-pinned-tool-step.ts",

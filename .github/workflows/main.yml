@@ -55,6 +55,7 @@ jobs:
       - run: bun run check:release-workflow
       - run: bun run check:repo-sync-workflows
       - run: bun run check:step-bundles
+      - run: bun run check:chex-pin
       - run: bun run check:lefthook-guard
       - run: bun run check:baseline-jobs
       - run: bun run check:test-layout

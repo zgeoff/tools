@@ -37,7 +37,7 @@ async function setupTest() {
   return { directory, calls, errors, runCheck };
 }
 
-test('it validates default.json strictly at the pinned version and returns the validator exit code', async () => {
+test('it validates default.json and renovate.json strictly at the pinned version and returns the validator exit code', async () => {
   const ctx = await setupTest();
 
   await writeTreeFiles(ctx.directory, {
@@ -76,6 +76,7 @@ test('it validates default.json strictly at the pinned version and returns the v
         '--strict',
         '--no-global',
         'default.json',
+        'renovate.json',
       ],
       cwd: ctx.directory,
     },
