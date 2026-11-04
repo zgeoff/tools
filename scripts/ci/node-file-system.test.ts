@@ -63,7 +63,7 @@ test('it reads the path of every file below a folder, and none for a missing fol
   expect(missing).toStrictEqual([]);
 });
 
-test('it resolves each symlink in a path to the folder it links to', async () => {
+test('it resolves a path through a folder link to the absolute path of the real folder', async () => {
   const ctx = await setupTest();
 
   await mkdir(join(ctx.directory, 'shelf/kettle'), { recursive: true });
@@ -73,4 +73,10 @@ test('it resolves each symlink in a path to the folder it links to', async () =>
   const directory = await realpath(ctx.directory);
 
   expect(resolved).toBe(join(directory, 'shelf/kettle'));
+});
+
+test('it rejects a path that does not exist', async () => {
+  const ctx = await setupTest();
+
+  expect(nodeFileSystem.resolveRealPath(join(ctx.directory, 'teapot'))).rejects.toThrow();
 });
