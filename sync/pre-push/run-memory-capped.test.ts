@@ -50,6 +50,29 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
 );
 
 test.skipIf(!modesOutput.includes('systemd-sudo'))(
+  'it runs the command with the caller environment under sudo systemd-run when the caller exports a read-only shell variable',
+  async () => {
+    const ctx = setupTest();
+
+    const result =
+      await $`bash ${ctx.scriptPath} 128 ${ctx.bun} -e ${'console.log(process.env.KILN_GLAZE)'}`
+        .env({
+          ...ctx.env,
+          MEMORY_CAP_MODE: 'systemd-sudo',
+          SHELLOPTS: 'braceexpand:hashall:interactive-comments',
+          KILN_GLAZE: 'celadon',
+        })
+        .nothrow()
+        .quiet();
+
+    expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+      exitCode: 0,
+      stdout: 'celadon\n',
+    });
+  },
+);
+
+test.skipIf(!modesOutput.includes('systemd-sudo'))(
   'it deletes the environment file when sudo fails before the scope starts',
   async () => {
     const ctx = setupTest();

@@ -159,13 +159,19 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
 );
 
 test.skipIf(!modesOutput.includes('systemd-sudo'))(
-  'it runs the command as the caller with the caller environment under sudo systemd-run, whatever user it exports',
+  'it runs the command as the caller with the caller environment under sudo systemd-run, whatever user or read-only shell variable it exports',
   async () => {
     const ctx = setupTest();
 
     const result =
       await $`bash ${ctx.scriptPath} --budget 128M -- ${ctx.bun} -e ${'console.log(require("node:os").userInfo().username, process.env.KILN_GLAZE)'}`
-        .env({ ...ctx.env, DIET_MODE: 'systemd-sudo', user: 'root', KILN_GLAZE: 'celadon' })
+        .env({
+          ...ctx.env,
+          DIET_MODE: 'systemd-sudo',
+          user: 'root',
+          SHELLOPTS: 'braceexpand:hashall:interactive-comments',
+          KILN_GLAZE: 'celadon',
+        })
         .nothrow()
         .quiet();
 

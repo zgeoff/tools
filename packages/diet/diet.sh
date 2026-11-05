@@ -229,10 +229,14 @@ fi
 # The second half of a systemd mode, which systemd-run starts inside the scope.
 if [ "${1:-}" = --inside ]; then
   # The caller's environment comes back first, so a variable it exports, such
-  # as user, never replaces an argument. A name bash keeps read-only, such as
-  # SHELLOPTS, refuses the export.
+  # as user, never replaces an argument. Bash ends the script on an export of a
+  # name it keeps read-only, such as SHELLOPTS, whatever follows the export.
   if [ -n "$3" ]; then
     while IFS= read -r -d '' pair; do
+      name=${pair%%=*}
+      if [[ -v $name && ${!name@a} == *r* ]]; then
+        continue
+      fi
       export "${pair?}" 2> /dev/null || true
     done < "$3"
     rm -f "$3"
