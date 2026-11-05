@@ -152,7 +152,7 @@ repo's settings lets GitHub merge it sooner, except a bump that
 
 The `workflow-audit-fix` caller runs the reusable
 [`audit-fix.yml`](../../.github/workflows/audit-fix.yml) every day, by hand, and after a run fails
-in the workflow that holds a repo's `bun audit`: `PR`, `pr`, `CI`, `Dependency Health` or
+in the workflow that holds a repo's `bun audit`: `PR`, `pr`, `CI`, `Main`, `Dependency Health` or
 `Dep Health`. Only a failed run on `main` starts it, because the job audits the default branch, and
 a failure on a pull-request branch leaves that audit unchanged. That failed run must come from a
 push, the schedule or a dispatch in the repo itself, because a fork's pull request can come from a
