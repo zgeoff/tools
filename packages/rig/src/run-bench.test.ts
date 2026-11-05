@@ -28,8 +28,8 @@ function setupTest() {
   const commandOutputs = new Map([
     ['git rev-parse --show-prefix', { exitCode: 0, stdout: '\n' }],
     [
-      'git worktree list --porcelain',
-      { exitCode: 0, stdout: 'worktree /repo\nHEAD 1a2b3c\nbranch refs/heads/main\n\n' },
+      'git worktree list --porcelain -z',
+      { exitCode: 0, stdout: 'worktree /repo\0HEAD 1a2b3c\0branch refs/heads/main\0\0' },
     ],
   ]);
 
@@ -81,8 +81,8 @@ function setupTest() {
     leftListing: {
       exitCode: 0,
       stdout:
-        'worktree /repo\nHEAD 1a2b3c\nbranch refs/heads/main\n\n' +
-        'worktree /repo/.git/rig-bench/run-1/base\nHEAD 4d5e6f\ndetached\n\n',
+        'worktree /repo\0HEAD 1a2b3c\0branch refs/heads/main\0\0' +
+        'worktree /repo/.git/rig-bench/run-1/base\0HEAD 4d5e6f\0detached\0\0',
     },
   };
 }
@@ -858,7 +858,7 @@ test('it exits 1, says how to remove the checkout and keeps the work folder when
   const ctx = setupTest();
 
   ctx.exitCodes.push(0, 1, 1);
-  ctx.commandOutputs.set('git worktree list --porcelain', ctx.leftListing);
+  ctx.commandOutputs.set('git worktree list --porcelain -z', ctx.leftListing);
 
   const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, ctx.deps);
 
@@ -882,7 +882,7 @@ test('it fails a comparison whose benches pass when git still lists the checkout
   const ctx = setupTest();
 
   ctx.exitCodes.push(0, 0, 0, 0, 1);
-  ctx.commandOutputs.set('git worktree list --porcelain', ctx.leftListing);
+  ctx.commandOutputs.set('git worktree list --porcelain -z', ctx.leftListing);
 
   const exitCode = await runBench(['--base', 'main', 'boil'], defineRig({}), ctx.run, ctx.deps);
 
@@ -893,7 +893,7 @@ test('it keeps the work folder and says how to remove the checkout when git stil
   const ctx = setupTest();
 
   ctx.exitCodes.push(128, 1);
-  ctx.commandOutputs.set('git worktree list --porcelain', ctx.leftListing);
+  ctx.commandOutputs.set('git worktree list --porcelain -z', ctx.leftListing);
 
   const exitCode = await runBench(['--base', 'kettle-v0'], defineRig({}), ctx.run, ctx.deps);
 
@@ -905,7 +905,7 @@ test('it keeps the work folder and says how to remove the checkout when git stil
   }).toStrictEqual({
     exitCode: 1,
     listed: [
-      ['git', 'worktree', 'list', '--porcelain'],
+      ['git', 'worktree', 'list', '--porcelain', '-z'],
       { cwd: '/repo', environment: { PATH: '/bin' } },
     ],
     err: [

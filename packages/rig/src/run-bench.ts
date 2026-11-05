@@ -389,7 +389,7 @@ async function removeBaseCheckout(
     return 'removed';
   }
 
-  const listing = await deps.readCommandOutput(['git', 'worktree', 'list', '--porcelain'], {
+  const listing = await deps.readCommandOutput(['git', 'worktree', 'list', '--porcelain', '-z'], {
     cwd: run.repoRoot,
     environment: run.environment,
   });
