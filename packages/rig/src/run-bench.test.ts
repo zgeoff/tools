@@ -524,6 +524,66 @@ test('it builds and runs the base side with the config of the base checkout', as
   ]);
 });
 
+test('it runs the lane hooks of each side from its own root and hands each side its own environment', async () => {
+  const ctx = setupTest();
+  const imported: string[] = [];
+
+  const hooks = new Map<string, () => Promise<unknown>>([
+    [
+      '/repo/hooks/start-kiln.ts',
+      () => Promise.resolve({ environment: { KILN_URL: 'http://localhost:7001' } }),
+    ],
+    ['/repo/hooks/stop-kiln.ts', () => Promise.resolve()],
+    [
+      '/repo/.git/rig-bench/run-1/base/hooks/start-oven.ts',
+      () => Promise.resolve({ environment: { OVEN_URL: 'http://localhost:7002' } }),
+    ],
+    ['/repo/.git/rig-bench/run-1/base/hooks/stop-oven.ts', () => Promise.resolve()],
+  ]);
+
+  const headConfig = defineRig({
+    lanes: { kiln: { limit: '15s', start: 'hooks/start-kiln.ts', stop: 'hooks/stop-kiln.ts' } },
+    bench: { lane: 'kiln' },
+  });
+
+  const baseConfig = defineRig({
+    lanes: { oven: { limit: '15s', start: 'hooks/start-oven.ts', stop: 'hooks/stop-oven.ts' } },
+    bench: { lane: 'oven' },
+  });
+
+  await runBench(['--base', 'main', 'boil'], headConfig, ctx.run, {
+    ...ctx.deps,
+    readConfig: () => Promise.resolve(baseConfig),
+    importModule: (path: string) => {
+      imported.push(path);
+
+      return Promise.resolve({ default: hooks.get(path) });
+    },
+  });
+
+  expect({
+    imported,
+    benches: ctx.runCommand.mock.calls
+      .slice(2, 4)
+      .map((call) => [call[1].cwd, call[1].environment]),
+    lastCommand: ctx.runCommand.mock.calls.at(-1)?.[0],
+    removed: ctx.removeFolder.mock.calls,
+  }).toStrictEqual({
+    imported: [
+      '/repo/.git/rig-bench/run-1/base/hooks/start-oven.ts',
+      '/repo/.git/rig-bench/run-1/base/hooks/stop-oven.ts',
+      '/repo/hooks/start-kiln.ts',
+      '/repo/hooks/stop-kiln.ts',
+    ],
+    benches: [
+      ['/repo/.git/rig-bench/run-1/base', { PATH: '/bin', OVEN_URL: 'http://localhost:7002' }],
+      ['/repo', { PATH: '/bin', KILN_URL: 'http://localhost:7001' }],
+    ],
+    lastCommand: ['git', 'worktree', 'remove', '--force', '/repo/.git/rig-bench/run-1/base'],
+    removed: [['/repo/.git/rig-bench/run-1']],
+  });
+});
+
 test('it exits 1 with its message and runs no bench when the base cannot be checked out', async () => {
   const ctx = setupTest();
 
