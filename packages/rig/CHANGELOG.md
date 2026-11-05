@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.1.4...@zgeoff/rig@0.1.5) (2026-11-05)
+
+
+### Features
+
+* **rig:** compare benches with a base ref and run them concurrently ([#521](https://github.com/zgeoff/tools/issues/521)) ([26d9fe5](https://github.com/zgeoff/tools/commit/26d9fe5ce09aae5989a67325b32f21581b44da4e))
+
 ## [0.1.4](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.1.3...@zgeoff/rig@0.1.4) (2026-11-05)
 
 

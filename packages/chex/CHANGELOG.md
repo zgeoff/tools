@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.7](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.1.6...@zgeoff/chex@0.1.7) (2026-11-05)
+
+
+### Bug Fixes
+
+* **chex:** name the line where skill frontmatter stops parsing ([#527](https://github.com/zgeoff/tools/issues/527)) ([446022c](https://github.com/zgeoff/tools/commit/446022c7aab057ff2dddf84ef8114942860e4d19))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/rig bumped to 0.1.5
+
 ## [0.1.6](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.1.5...@zgeoff/chex@0.1.6) (2026-11-05)
 
 
