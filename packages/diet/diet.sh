@@ -1,6 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# The last step of a systemd-sudo run. It starts with an empty environment and
+# gives the command the caller's, from a file only the caller can read, so no
+# value goes on a command line. The loop keeps its state in the arguments, so
+# no name the caller exports clashes with one of its own. Bash ends the script
+# on an export of a name it keeps read-only.
+if [ "${1:-}" = --launch ]; then
+  mapfile -d '' -t caller_environment < "$2"
+  rm -f "$2"
+  shift 2
+  set -- "${#caller_environment[@]}" "${caller_environment[@]}" "$@"
+  unset caller_environment
+  while [ "$1" -gt 0 ]; do
+    if [[ ${2%%=*} =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+      case ${2%%=*} in
+        BASHOPTS | BASH_VERSINFO | EUID | PPID | SHELLOPTS | UID) ;;
+        *) export "${2?}" ;;
+      esac
+    fi
+    set -- "$(($1 - 1))" "${@:3}"
+  done
+  shift
+  exec "$@"
+fi
+
 modes=(systemd-sudo systemd-user cgroupfs)
 
 usage() {
@@ -228,19 +252,14 @@ fi
 
 # The second half of a systemd mode, which systemd-run starts inside the scope.
 if [ "${1:-}" = --inside ]; then
-  # The command gets the caller's environment as it stood, which sudo leaves
-  # behind, and this shell keeps its own, so no name the caller exports can
-  # clash with one this script sets or one bash keeps read-only.
+  # sudo leaves the caller's environment behind, and the launch step gives it
+  # back to the command alone.
   launcher=()
   if [ -n "$3" ]; then
-    mapfile -d '' -t caller_environment < "$3"
-    rm -f "$3"
-    for entry in "${caller_environment[@]}"; do
-      if [ "$entry" = GITHUB_ACTIONS=true ]; then
-        GITHUB_ACTIONS=true
-      fi
-    done
-    launcher=(env -i "${caller_environment[@]}")
+    if grep -qzx GITHUB_ACTIONS=true "$3"; then
+      GITHUB_ACTIONS=true
+    fi
+    launcher=(env -i bash "$0" --launch "$3")
   fi
   user=$2
   shift 3
