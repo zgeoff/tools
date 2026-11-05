@@ -668,6 +668,69 @@ test('it exits 1 with its message and removes the checkout when bun install fail
   });
 });
 
+test('it removes the checkout with an unaborted signal and then the work folder when the run aborts after the checkout', async () => {
+  const ctx = setupTest();
+  const events: unknown[] = [];
+
+  ctx.runCommand.mockImplementationOnce(() => Promise.resolve(0));
+
+  ctx.runCommand.mockImplementationOnce(() => {
+    ctx.abortRun();
+
+    return Promise.resolve(1);
+  });
+
+  ctx.runCommand.mockImplementationOnce((command, options) => {
+    events.push({ command, isAborted: options.signal.aborted });
+
+    return Promise.resolve(0);
+  });
+
+  ctx.removeFolder.mockImplementation((path) => {
+    events.push({ removed: path });
+
+    return Promise.resolve();
+  });
+
+  const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, ctx.deps);
+
+  expect({ exitCode, events }).toStrictEqual({
+    exitCode: 1,
+    events: [
+      {
+        command: ['git', 'worktree', 'remove', '--force', '/repo/.git/rig-bench/run-1/base'],
+        isAborted: false,
+      },
+      { removed: '/repo/.git/rig-bench/run-1' },
+    ],
+  });
+});
+
+test('it removes the checkout and the work folder and hands the error on when a comparison throws', async () => {
+  const ctx = setupTest();
+
+  const config = defineRig({
+    lanes: { kiln: { limit: '15s', start: 'test-utils/start-kiln.ts' } },
+    bench: { lane: 'kiln' },
+  });
+
+  ctx.startKiln.mockImplementation(() => Promise.reject(new Error('the kiln cracked')));
+
+  const running = runBench(['--base', 'main', 'boil'], config, ctx.run, ctx.deps);
+
+  expect(running).rejects.toThrow('the kiln cracked');
+
+  await Promise.allSettled([running]);
+
+  expect({
+    lastCommand: ctx.runCommand.mock.calls.at(-1)?.[0],
+    removed: ctx.removeFolder.mock.calls,
+  }).toStrictEqual({
+    lastCommand: ['git', 'worktree', 'remove', '--force', '/repo/.git/rig-bench/run-1/base'],
+    removed: [['/repo/.git/rig-bench/run-1']],
+  });
+});
+
 test('it exits 1, says how to remove the checkout and keeps the work folder when the checkout removal fails', async () => {
   const ctx = setupTest();
 
