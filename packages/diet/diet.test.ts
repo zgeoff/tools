@@ -1,8 +1,14 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
-import { readStreamUntil } from '@zgeoff/testing/helpers';
+import {
+  createStubSudo,
+  readRunFolderPrefix,
+  readStreamUntil,
+  waitFor,
+} from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 
@@ -111,6 +117,65 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
         .quiet();
 
     expect(result.stdout.toString()).toBe('/var/tmp/diet-kiln\n');
+  },
+);
+
+test.skipIf(!modesOutput.includes('systemd-sudo'))(
+  'it deletes the environment file when sudo fails before the scope starts',
+  async () => {
+    const ctx = setupTest();
+
+    const bin = await mkdtemp(join(tmpdir(), readRunFolderPrefix('diet-sudo-')));
+
+    onTestFinished(() => rm(bin, { recursive: true, force: true }));
+
+    const record = join(bin, 'calls');
+
+    await createStubSudo(bin, record);
+
+    const result = await $`bash ${ctx.scriptPath} --budget 128M -- true`
+      .env({ ...ctx.env, DIET_MODE: 'systemd-sudo', PATH: `${bin}:${process.env['PATH'] ?? ''}` })
+      .nothrow()
+      .quiet();
+
+    const recorded = await readFile(record, 'utf8');
+
+    const lines = recorded.split('\n');
+    const environmentLine = lines[lines.indexOf('text --inside') + 2] ?? '';
+
+    expect(environmentLine).toMatch(/^file \/tmp\/diet-environment\.\w+$/u);
+
+    const environmentFile = environmentLine.slice('file '.length);
+
+    await waitFor(
+      () => {
+        invariant(!existsSync(environmentFile), `${environmentFile} is still there`);
+      },
+      { label: 'the environment file to go' },
+    );
+
+    expect(result.exitCode).toBe(1);
+  },
+);
+
+test.skipIf(!modesOutput.includes('systemd-sudo'))(
+  'it runs the command as the caller with the caller environment under sudo systemd-run unchanged, whatever names it exports',
+  async () => {
+    const ctx = setupTest();
+
+    const result =
+      await $`bash ${ctx.scriptPath} --budget 128M -- ${ctx.bun} -e ${'console.log(require("node:os").userInfo().username, process.env.KILN_GLAZE, process.env.user)'}`
+        .env({
+          ...ctx.env,
+          DIET_MODE: 'systemd-sudo',
+          user: 'root',
+          SHELLOPTS: 'braceexpand:hashall:interactive-comments',
+          KILN_GLAZE: 'celadon',
+        })
+        .nothrow()
+        .quiet();
+
+    expect(result.stdout.toString()).toBe(`${userInfo().username} celadon root\n`);
   },
 );
 

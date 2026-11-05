@@ -175,11 +175,24 @@ while IFS=$'\t' read -r name repo source target; do
 
   while IFS= read -r specifier; do
     [ -n "$specifier" ] || continue
-    wanted_source=$(realpath -m --relative-to=. "$(dirname "$source")/$specifier")
-    wanted_target=$(realpath -m --relative-to=. "$(dirname "$target")/$specifier")
 
-    if ! jq -e --arg name "$name" --arg source "$wanted_source" --arg target "$wanted_target" \
-      'any(.[] | select(.name == $name) | .files[]; .source == $source and .target == $target)' \
+    # Bun picks among several files for an import without an extension, and the
+    # file it picks behind a symlink can't be read back, so the check takes
+    # only an import that names its file.
+    if [ ! -f "$(dirname "$source")/$specifier" ]; then
+      report "entry '$name' delivers $source, which imports $specifier, a path that names no file; write the import as the file's path with its extension"
+      continue
+    fi
+
+    # An entry may name a symlinked file by its own path or by the file behind it.
+    wanted_source=$(realpath -m -s --relative-to=. "$(dirname "$source")/$specifier")
+    linked_source=$(realpath -m --relative-to=. "$(dirname "$source")/$specifier")
+    wanted_target=$(realpath -m -s --relative-to=. "$(dirname "$target")/$specifier")
+
+    if ! jq -e --arg name "$name" --arg source "$wanted_source" --arg linked "$linked_source" \
+      --arg target "$wanted_target" \
+      'any(.[] | select(.name == $name) | .files[];
+        (.source == $source or .source == $linked) and .target == $target)' \
       "$manifest" > /dev/null; then
       report "entry '$name' delivers $source to $target, which imports $specifier, but the entry does not deliver $wanted_source to $wanted_target"
     fi

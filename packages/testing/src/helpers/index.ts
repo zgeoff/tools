@@ -1,5 +1,6 @@
 export { createBlockingStubKit } from './create-blocking-stub-kit.ts';
 export { createGitCommit } from './create-git-commit.ts';
+export { createStubSudo } from './create-stub-sudo.ts';
 export { makeAnswerQueue } from './make-answer-queue.ts';
 export { makeRepeatingAnswerQueue } from './make-repeating-answer-queue.ts';
 export { makeRejectingStub } from './make-rejecting-stub.ts';

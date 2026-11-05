@@ -1,9 +1,13 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createStubSudo, waitFor } from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 
 // Bun's skipIf takes a boolean at collection time, so the modes this host supports are probed once
 // here: a GitHub runner has the systemd-sudo mode, a root shell without systemd the cgroupfs one.
@@ -42,6 +46,72 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
         /^run-memory-capped: systemd-sudo, memory.max 128 MiB, memory.swap.max (?:0 MiB|absent)\nrun-memory-capped: peak anon memory \d+ MiB, sampled every 200 ms; memory.peak (?:\d+ MiB|absent)\nrun-memory-capped: OOM kills 0\n$/u,
       ),
     });
+  },
+);
+
+test.skipIf(!modesOutput.includes('systemd-sudo'))(
+  'it runs the command with the caller environment under sudo systemd-run unchanged, whatever names it exports',
+  async () => {
+    const ctx = setupTest();
+
+    const result =
+      await $`bash ${ctx.scriptPath} 128 ${ctx.bun} -e ${'console.log(process.env.KILN_GLAZE, process.env.user)'}`
+        .env({
+          ...ctx.env,
+          MEMORY_CAP_MODE: 'systemd-sudo',
+          user: 'root',
+          SHELLOPTS: 'braceexpand:hashall:interactive-comments',
+          KILN_GLAZE: 'celadon',
+        })
+        .nothrow()
+        .quiet();
+
+    expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
+      exitCode: 0,
+      stdout: 'celadon root\n',
+    });
+  },
+);
+
+test.skipIf(!modesOutput.includes('systemd-sudo'))(
+  'it deletes the environment file when sudo fails before the scope starts',
+  async () => {
+    const ctx = setupTest();
+
+    const bin = await mkdtemp(join(tmpdir(), readRunFolderPrefix('run-memory-capped-sudo-')));
+
+    onTestFinished(() => rm(bin, { recursive: true, force: true }));
+
+    const record = join(bin, 'calls');
+
+    await createStubSudo(bin, record);
+
+    const result = await $`bash ${ctx.scriptPath} 128 true`
+      .env({
+        ...ctx.env,
+        MEMORY_CAP_MODE: 'systemd-sudo',
+        PATH: `${bin}:${process.env['PATH'] ?? ''}`,
+      })
+      .nothrow()
+      .quiet();
+
+    const recorded = await readFile(record, 'utf8');
+
+    const lines = recorded.split('\n');
+    const environmentLine = lines[lines.indexOf('text --inside') + 2] ?? '';
+
+    expect(environmentLine).toMatch(/^file \/tmp\/run-memory-capped-environment\.\w+$/u);
+
+    const environmentFile = environmentLine.slice('file '.length);
+
+    await waitFor(
+      () => {
+        invariant(!existsSync(environmentFile), `${environmentFile} is still there`);
+      },
+      { label: 'the environment file to go' },
+    );
+
+    expect(result.exitCode).toBe(1);
   },
 );
 

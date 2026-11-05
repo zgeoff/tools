@@ -1,6 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# The last step of a systemd-sudo run. It starts with an empty environment and
+# gives the command the caller's, from a file only the caller can read, so no
+# value goes on a command line. The loop keeps its state in the arguments, so
+# no name the caller exports clashes with one of its own. Bash ends the script
+# on an export of a name it keeps read-only.
+if [ "${1:-}" = --launch ]; then
+  mapfile -d '' -t caller_environment < "$2"
+  rm -f "$2"
+  shift 2
+  set -- "${#caller_environment[@]}" "${caller_environment[@]}" "$@"
+  unset caller_environment
+  while [ "$1" -gt 0 ]; do
+    if [[ ${2%%=*} =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+      case ${2%%=*} in
+        BASHOPTS | BASH_VERSINFO | EUID | PPID | SHELLOPTS | UID) ;;
+        *) export "${2?}" ;;
+      esac
+    fi
+    set -- "$(($1 - 1))" "${@:3}"
+  done
+  shift
+  exec "$@"
+fi
+
 modes=(systemd-sudo systemd-user cgroupfs)
 
 usage() {
@@ -228,9 +252,18 @@ fi
 
 # The second half of a systemd mode, which systemd-run starts inside the scope.
 if [ "${1:-}" = --inside ]; then
+  # sudo leaves the caller's environment behind, and the launch step gives it
+  # back to the command alone.
+  launcher=()
+  if [ -n "$3" ]; then
+    if grep -qzx GITHUB_ACTIONS=true "$3"; then
+      GITHUB_ACTIONS=true
+    fi
+    launcher=(env -i bash "$0" --launch "$3")
+  fi
   user=$2
-  shift 2
-  run_and_report "/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup)" "$user" "$@"
+  shift 3
+  run_and_report "/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup)" "$user" "${launcher[@]}" "$@"
   exit "$status"
 fi
 
@@ -274,21 +307,28 @@ fi
 
 self=$(readlink -f "$0")
 case "$mode" in
-  # sudo keeps the environment, and PATH, which its secure_path resets, and
-  # TMPDIR, which glibc drops from the environment of a setuid program like
-  # sudo; OOMPolicy=continue keeps the scope, and its report, alive when the
-  # kernel kills the command.
+  # The environment goes through a file only the user can read: the sudo of
+  # ubuntu-26.04 ignores a bare --preserve-env, secure_path resets PATH, glibc
+  # drops TMPDIR from a setuid program, and sudo logs its arguments, so a
+  # secret never goes on the command line; OOMPolicy=continue keeps the scope,
+  # and its report, alive when the kernel kills the command.
   systemd-sudo)
-    exec sudo --preserve-env env "PATH=$PATH" ${TMPDIR+"TMPDIR=$TMPDIR"} systemd-run --scope --quiet --collect \
+    # The caller's TMPDIR may name no folder yet, and the command gets it as is.
+    environment_file=$(umask 077 && mktemp --tmpdir=/tmp diet-environment.XXXXXX)
+    env -0 > "$environment_file"
+    # exec keeps this process ID, so the file goes once the run ends, even when
+    # sudo or systemd-run fails before the inside step deletes it.
+    (tail --pid=$$ -f /dev/null && rm -f "$environment_file") < /dev/null > /dev/null 2>&1 &
+    exec sudo systemd-run --scope --quiet --collect \
       --unit="diet-$$" \
       -p MemoryMax="$budget" -p MemorySwapMax=0 -p OOMPolicy=continue \
-      -- bash "$self" --inside "$(id -un)" "$@"
+      -- bash "$self" --inside "$(id -un)" "$environment_file" "$@"
     ;;
   systemd-user)
     exec systemd-run --user --scope --quiet --collect \
       --unit="diet-$$" \
       -p MemoryMax="$budget" -p MemorySwapMax=0 -p OOMPolicy=continue \
-      -- bash "$self" --inside '' "$@"
+      -- bash "$self" --inside '' '' "$@"
     ;;
   cgroupfs)
     own="/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup)"
