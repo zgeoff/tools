@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.1.4...@zgeoff/chex@0.1.5) (2026-11-05)
+
+
+### Features
+
+* **chex:** accept dispatch groups and release queues in workflow lint ([#516](https://github.com/zgeoff/tools/issues/516)) ([e38c3a8](https://github.com/zgeoff/tools/commit/e38c3a83284350933ab5b8a9b3314f684c88db1b))
+
 ## [0.1.4](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.1.3...@zgeoff/chex@0.1.4) (2026-11-04)
 
 
