@@ -7,8 +7,9 @@
 # block that needs it, a `repo` that names zgeoff/tools or zgeoff/skills, no
 # key the repo-sync scripts do not read,
 # every file under skills/<name>/ in zgeoff/skills listed by the entry that
-# ships that skill, except the tests, and every package a code source imports
-# listed in its entry's `packages`, and this repo's own .claude/skill-gate.json
+# ships that skill, except the tests, every package a code source imports
+# listed in its entry's `packages`, every relative import of a code source
+# delivered by the same entry, and this repo's own .claude/skill-gate.json
 # holding every ignore entry and gate of the source that targets that path.
 #
 # A source whose `repo` is zgeoff/skills resolves in the zgeoff/skills tree at
@@ -161,6 +162,31 @@ done < <(jq -r '.[] | .name as $n
   | (.packages // [] | if type == "array" then tojson else "[]" end) as $p
   | .files[] | select(.source | test("\\.[cm]?[jt]sx?$"))
   | [$n, (.repo // "zgeoff/tools"), .source, $p] | @tsv' "$manifest")
+
+# A delivered code file that imports a relative path fails at load in a repo
+# that lacks the imported file, so the same entry delivers that file at the
+# target the import names.
+while IFS=$'\t' read -r name repo source target; do
+  path=$(source_path "$repo" "$source")
+  [ -f "$path" ] || continue
+
+  # The package check above reports a source that does not parse.
+  imported=$(bun "$scripts_dir/collect-relative-imports.ts" "$path" 2> /dev/null) || continue
+
+  while IFS= read -r specifier; do
+    [ -n "$specifier" ] || continue
+    wanted_source=$(realpath -m --relative-to=. "$(dirname "$source")/$specifier")
+    wanted_target=$(realpath -m --relative-to=. "$(dirname "$target")/$specifier")
+
+    if ! jq -e --arg name "$name" --arg source "$wanted_source" --arg target "$wanted_target" \
+      'any(.[] | select(.name == $name) | .files[]; .source == $source and .target == $target)' \
+      "$manifest" > /dev/null; then
+      report "entry '$name' delivers $source to $target, which imports $specifier, but the entry does not deliver $wanted_source to $wanted_target"
+    fi
+  done <<< "$imported"
+done < <(jq -r '.[] | .name as $n | .files[] | select(.source | test("\\.[cm]?[jt]sx?$"))
+  | select((.repo // "zgeoff/tools") == "zgeoff/tools")
+  | [$n, "zgeoff/tools", .source, .target] | @tsv' "$manifest")
 
 while IFS=$'\t' read -r name source; do
   report "entry '$name' gives $source an except that is not a list of owner/repo names"
