@@ -82,11 +82,12 @@ pour one cup  4            30.40ms      2.10ms       33.20ms      2.40ms       +
 ```
 
 `rig bench` checks `<ref>` out in a git worktree under the repo's git folder, runs
-`bun install --frozen-lockfile` there, and then builds the programs and runs the bench lane hooks of
-that checkout with its own `rig.config.ts`. So a lane that starts a server starts one from each
-side. The worktree is removed when the run ends. The budget holds on the head only, and a benchmark
-that exists on one side only shows `-` on the other. `rig bench --base <ref> <name>` compares one
-benchmark file.
+`bun install --frozen-lockfile` there. From the checkout's copy of the folder you run `rig` in, it
+then builds the programs and runs the bench lane hooks with that copy's `rig.config.ts`. So a lane
+that starts a server starts one from each side. The worktree is removed when the run ends. When git
+can't remove it, `rig bench` keeps it, prints the `git worktree remove --force` command to run, and
+exits 1. The budget holds on the head only, and a benchmark that exists on one side only shows `-`
+on the other. `rig bench --base <ref> <name>` compares one benchmark file.
 
 A `src/<module>.bench.ts` benchmark beside its module is a module benchmark, which `rig bench`
 leaves alone.

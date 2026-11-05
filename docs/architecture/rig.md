@@ -166,10 +166,13 @@ whether the numbers belong to the head or to a base.
 
 With `--base <ref>`, `rig bench` adds a detached worktree of the ref in a run folder under
 `git rev-parse --git-common-dir`, which git never lists as untracked, runs
-`bun install --frozen-lockfile` there, and runs that side with the worktree's own config, programs
-and lane, through the head's `run-bench-file.ts`. A bench file from an older rig has no
-`concurrency`, so the runner reads it as level 1. The `finally` of the run removes the worktree and
-the run folder.
+`bun install --frozen-lockfile` there. It runs that side from the worktree's copy of the folder that
+`rig` started in, found with `git rev-parse --show-prefix`, so both sides read the same package's
+config, programs and lane. The base runs through the head's `run-bench-file.ts`. A bench file from
+an older rig has no `concurrency`, so the runner reads it as level 1. Every path out of the
+comparison removes the worktree with a signal of its own, so an aborted run still cleans up. When
+the removal fails and `git worktree list` still names the worktree, the run folder stays, because
+deleting it would leave git a registration with no folder.
 
 Before the first file of each side, `rig bench` builds each program and sets `RIG_PROGRAM_<NAME>`
 through the same code as `rig e2e`, so a benchmark that starts a program from `resolveProgram` runs
