@@ -565,6 +565,65 @@ test.each([
 
 test.each([
   [
+    `\${{ github.event_name == 'push' }}`,
+    [
+      {
+        path: '.github/workflows/main.yml',
+        line: 7,
+        message:
+          'job checks runs in a checks workflow beside a release or deploy job, so it sets a job-level concurrency group with cancel-in-progress: true',
+      },
+    ],
+  ],
+  [`\${{ github.event_name == 'push' || github.event_name == 'pull_request' }}`, []],
+  [`\${{ github.event_name != 'workflow_dispatch' }}`, []],
+])(
+  'it checks that cancel-in-progress %p holds for push and pull_request beside a dispatch group',
+  async (cancel, expected) => {
+    const ctx = await setupTest();
+
+    await ctx.commitFiles({
+      '.github/workflows/main.yml': [
+        'on:',
+        '  push:',
+        '    branches: [main]',
+        '  pull_request:',
+        '  workflow_dispatch:',
+        'jobs:',
+        '  checks:',
+        '    runs-on: ubuntu-latest',
+        '    timeout-minutes: 5',
+        '    concurrency:',
+        `      group: checks-\${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}`,
+        `      cancel-in-progress: ${cancel}`,
+        '    steps:',
+        '      - run: bun run lint',
+        '  release:',
+        '    runs-on: ubuntu-latest',
+        '    timeout-minutes: 5',
+        '    concurrency:',
+        '      group: release',
+        '      cancel-in-progress: false',
+        '    steps:',
+        '      - run: bun run release',
+        '',
+      ].join('\n'),
+    });
+
+    const findings = runWorkflowsCheck({
+      cwd: ctx.directory,
+      env: ctx.env,
+      paths: [],
+      profile: undefined,
+      runProgram,
+    });
+
+    expect(findings).toStrictEqual(expected);
+  },
+);
+
+test.each([
+  [
     'two dispatches at one ref share a group',
     `checks-\${{ github.event_name == 'workflow_dispatch' && github.ref_name || github.ref }}`,
     `\${{ github.event_name == 'push' }}`,
