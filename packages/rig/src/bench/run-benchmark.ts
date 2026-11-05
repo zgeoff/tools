@@ -73,7 +73,8 @@ async function runRound(
       const startMs = now();
       const result = prepared.step();
 
-      if (result instanceof Promise) {
+      // A promise from another realm fails `instanceof Promise`, so only `undefined` skips the await.
+      if (result !== undefined) {
         await result;
       }
 

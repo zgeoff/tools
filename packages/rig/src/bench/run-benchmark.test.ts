@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import { setImmediate } from 'node:timers/promises';
 import { makeAnswerQueue } from '@zgeoff/testing/helpers';
 import { buildSteppingClock } from '../test-utils/build-stepping-clock.ts';
+import { createOtherRealmTimeout } from '../test-utils/create-other-realm-timeout.ts';
 import { defineBench } from './define-bench.ts';
 import { runBenchmark } from './run-benchmark.ts';
 
@@ -96,6 +97,37 @@ test('it times each synchronous call of a round apart from the calls after it', 
   });
 
   expect(result).toStrictEqual([{ concurrency: 4, medianMs: 1, spreadMs: 0 }]);
+});
+
+test('it times a call and disposes of the setup result after a run whose promise comes from another realm settles', async () => {
+  const clock = buildSteppingClock();
+  const events: string[] = [];
+
+  const definition = defineBench({
+    name: 'steep',
+    budget: '50ms',
+    setup: () =>
+      Promise.resolve({
+        [Symbol.asyncDispose]: () => {
+          events.push('dispose');
+
+          return Promise.resolve();
+        },
+      }),
+    run: () =>
+      createOtherRealmTimeout(1, () => {
+        events.push('steeped');
+
+        return clock.sleep(2);
+      }),
+  });
+
+  const result = await runBenchmark(definition, clock.now);
+
+  expect({ result, lastEvents: events.slice(-2) }).toStrictEqual({
+    result: [{ concurrency: 1, medianMs: 2, spreadMs: 0 }],
+    lastEvents: ['steeped', 'dispose'],
+  });
 });
 
 test('it disposes of the setup result once, after the measured runs', async () => {

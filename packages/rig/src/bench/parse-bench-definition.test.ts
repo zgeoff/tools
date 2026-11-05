@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import invariant from 'tiny-invariant';
+import { createOtherRealmTimeout } from '../test-utils/create-other-realm-timeout.ts';
 import { defineBench } from './define-bench.ts';
 import { parseBenchDefinition } from './parse-bench-definition.ts';
 
@@ -81,6 +82,31 @@ test('it returns a promise from the step of an async run that settles after the 
   await prepared.step();
 
   expect(calls).toStrictEqual(['steeped']);
+});
+
+test('it returns a step that settles after a run whose promise comes from another realm', async () => {
+  const events: string[] = [];
+
+  const parsed = parseBenchDefinition(
+    defineBench({
+      name: 'steep',
+      budget: '5ms',
+      run: () =>
+        createOtherRealmTimeout(1, () => {
+          events.push('steeped');
+        }),
+    }),
+  );
+
+  invariant(parsed.kind === 'parsed');
+
+  const prepared = await parsed.definition.prepare();
+
+  await prepared.step();
+
+  events.push('stepped');
+
+  expect(events).toStrictEqual(['steeped', 'stepped']);
 });
 
 test('it keeps the disposal of the setup result', async () => {

@@ -53,7 +53,7 @@ export function parseBenchDefinition(value: unknown): ParsedBenchDefinition {
           step: () => {
             const result: unknown = step();
 
-            return result instanceof Promise ? settleStep(result) : undefined;
+            return result === undefined ? undefined : settleStep(result);
           },
           dispose: async () => {
             await dispose();
@@ -68,6 +68,8 @@ function isFunction(value: unknown): value is (...args: unknown[]) => unknown {
   return typeof value === 'function';
 }
 
-async function settleStep(result: Promise<unknown>): Promise<void> {
+// `instanceof Promise` misses a thenable and a promise from another realm, such as a `node:vm`
+// context, so any value but `undefined` goes through `await`, which adopts both.
+async function settleStep(result: unknown): Promise<void> {
   await result;
 }
