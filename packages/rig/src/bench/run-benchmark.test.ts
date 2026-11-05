@@ -1,14 +1,15 @@
 import { expect, test } from 'bun:test';
 import { setImmediate } from 'node:timers/promises';
 import { makeAnswerQueue } from '@zgeoff/testing/helpers';
+import { buildInFlightRun } from '../test-utils/build-in-flight-run.ts';
 import { buildSteppingClock } from '../test-utils/build-stepping-clock.ts';
+import { buildTickingClock } from '../test-utils/build-ticking-clock.ts';
 import { createOtherRealmTimeout } from '../test-utils/create-other-realm-timeout.ts';
 import { defineBench } from './define-bench.ts';
 import { runBenchmark } from './run-benchmark.ts';
 
 test('it sets up once, warms up 5 times, measures 20 times and returns the median', async () => {
   const calls: string[] = [];
-  let tick = 0;
 
   const definition = defineBench({
     name: 'boil',
@@ -23,11 +24,7 @@ test('it sets up once, warms up 5 times, measures 20 times and returns the media
     },
   });
 
-  const result = await runBenchmark(definition, () => {
-    tick += 3;
-
-    return tick;
-  });
+  const result = await runBenchmark(definition, buildTickingClock(3));
 
   expect(calls.filter((call) => call === 'setup')).toHaveLength(1);
   expect(calls.filter((call) => call === 'run kettle')).toHaveLength(25);
@@ -36,29 +33,20 @@ test('it sets up once, warms up 5 times, measures 20 times and returns the media
 });
 
 test('it keeps as many calls in flight at once as the level names', async () => {
-  const inFlightAtStart: number[] = [];
-  let inFlight = 0;
+  const inFlightRun = buildInFlightRun();
 
   const definition = defineBench({
     name: 'pour',
     budget: '50ms',
     concurrency: [4],
-    run: async () => {
-      inFlight += 1;
-
-      inFlightAtStart.push(inFlight);
-
-      await Promise.resolve();
-
-      inFlight -= 1;
-    },
+    run: inFlightRun.run,
   });
 
   await runBenchmark(definition, () => 0);
 
   expect({
-    calls: inFlightAtStart.length,
-    mostInFlight: Math.max(...inFlightAtStart),
+    calls: inFlightRun.inFlightAtStart.length,
+    mostInFlight: Math.max(...inFlightRun.inFlightAtStart),
   }).toStrictEqual({ calls: 100, mostInFlight: 4 });
 });
 
@@ -81,8 +69,6 @@ test('it times each call of a round on its own and gives the median and spread p
 });
 
 test('it times each synchronous call of a round apart from the calls after it', async () => {
-  let tick = 0;
-
   const definition = defineBench({
     name: 'stir',
     budget: '50ms',
@@ -90,11 +76,7 @@ test('it times each synchronous call of a round apart from the calls after it', 
     run: () => {},
   });
 
-  const result = await runBenchmark(definition, () => {
-    tick += 1;
-
-    return tick;
-  });
+  const result = await runBenchmark(definition, buildTickingClock(1));
 
   expect(result).toStrictEqual([{ concurrency: 4, medianMs: 1, spreadMs: 0 }]);
 });

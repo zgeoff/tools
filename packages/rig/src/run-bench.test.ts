@@ -1,55 +1,28 @@
 import { expect, mock, test } from 'bun:test';
 import { defineRig } from './define-rig.ts';
-import type { ReadCommandOutput } from './read-command-output.ts';
 import { runBench } from './run-bench.ts';
-import type { CommandOptions } from './run-command.ts';
+import type { BenchDeps } from './run-bench.ts';
+import { buildStubCommandAnswers } from './test-utils/build-stub-command-answers.ts';
+import { buildStubLookup } from './test-utils/build-stub-lookup.ts';
 import { makeRecordingStub } from './test-utils/make-recording-stub.ts';
 
 function setupTest() {
   const controller = new AbortController();
-
-  const exitCodes: number[] = [];
-
-  const reports = new Map<string, string>();
 
   const startKiln = mock<() => Promise<unknown>>(() =>
     Promise.resolve({ environment: { KILN_URL: 'http://localhost:7001' } }),
   );
 
   const stopKiln = mock<() => Promise<unknown>>(() => Promise.resolve());
-
-  const runCommand = mock<(command: readonly string[], options: CommandOptions) => Promise<number>>(
-    () => Promise.resolve(exitCodes.shift() ?? 0),
-  );
-
   const removeFolder = mock<(path: string) => Promise<void>>(() => Promise.resolve());
   const output = { out: makeRecordingStub(), err: makeRecordingStub() };
 
-  const commandOutputs = new Map([
-    ['git rev-parse --show-prefix', { exitCode: 0, stdout: '\n' }],
-    [
-      'git worktree list --porcelain -z',
-      { exitCode: 0, stdout: 'worktree /repo\0HEAD 1a2b3c\0branch refs/heads/main\0\0' },
-    ],
-  ]);
-
-  const readCommandOutput = mock<ReadCommandOutput>((command) =>
-    Promise.resolve(commandOutputs.get(command.join(' ')) ?? { exitCode: 127, stdout: '' }),
-  );
-
   return {
-    exitCodes,
-    reports,
-    runCommand,
+    controller,
     removeFolder,
-    commandOutputs,
-    readCommandOutput,
     output,
     startKiln,
     stopKiln,
-    abortRun: () => {
-      controller.abort();
-    },
     run: {
       repoRoot: '/repo',
       environment: { PATH: '/bin' },
@@ -60,7 +33,6 @@ function setupTest() {
       dietScript: '/diet.sh',
       benchScript: '/run-bench-file.ts',
       output,
-      runCommand,
       readConfig: () => Promise.resolve(defineRig({})),
       probeWorkspaceRepo: () => Promise.resolve(true),
       readTrackedFiles: () =>
@@ -69,32 +41,29 @@ function setupTest() {
           'packages/kettle/bench/boil.bench.ts',
           'packages/kettle/bench/steep.bench.ts',
         ]),
-      importModule: (path: string) =>
-        Promise.resolve({ default: path.endsWith('start-kiln.ts') ? startKiln : stopKiln }),
+      importModule: buildStubLookup<unknown>(
+        {
+          '/repo/test-utils/start-kiln.ts': { default: startKiln },
+          '/repo/test-utils/stop-kiln.ts': { default: stopKiln },
+        },
+        {},
+      ),
       createWorkFolder: () => Promise.resolve('/repo/.git/rig-bench/run-1'),
-      readText: (path: string) => Promise.resolve(reports.get(path) ?? null),
+      readText: () => Promise.resolve(null),
       removeFolder,
-      readCommandOutput,
-    },
-
-    // What git lists while the base checkout is still registered.
-    leftListing: {
-      exitCode: 0,
-      stdout:
-        'worktree /repo\0HEAD 1a2b3c\0branch refs/heads/main\0\0' +
-        'worktree /repo/.git/rig-bench/run-1/base\0HEAD 4d5e6f\0detached\0\0',
     },
   };
 }
 
 test('it runs each bench file in a process of its own under diet, with the head report', async () => {
   const ctx = setupTest();
+  const commands = buildStubCommandAnswers({ exitCodes: [], outputs: {} });
 
-  const exitCode = await runBench([], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runBench([], defineRig({}), ctx.run, { ...ctx.deps, ...commands });
 
   expect(exitCode).toBe(0);
 
-  expect(ctx.runCommand.mock.calls.map((call) => call[0])).toStrictEqual([
+  expect(commands.runCommand.mock.calls.map((call) => call[0])).toStrictEqual([
     [
       'bash',
       '/diet.sh',
@@ -120,49 +89,72 @@ test('it runs each bench file in a process of its own under diet, with the head 
 
 test('it runs every file and exits 1 when one bench file fails', async () => {
   const ctx = setupTest();
+  const commands = buildStubCommandAnswers({ exitCodes: [1, 0], outputs: {} });
 
-  ctx.exitCodes.push(1, 0);
-
-  const exitCode = await runBench([], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runBench([], defineRig({}), ctx.run, { ...ctx.deps, ...commands });
 
   expect(exitCode).toBe(1);
-  expect(ctx.runCommand).toHaveBeenCalledTimes(2);
+  expect(commands.runCommand).toHaveBeenCalledTimes(2);
 });
 
 test('it exits 1 when a head entry is over its budget and no base is given', async () => {
   const ctx = setupTest();
+  const commands = buildStubCommandAnswers({ exitCodes: [], outputs: {} });
 
-  ctx.reports.set(
-    '/repo/.git/rig-bench/run-1/head.jsonl',
-    '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":4,"spreadMs":0.5,"budgetMs":50}\n' +
-      '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":4,"medianMs":61,"spreadMs":3,"budgetMs":50}\n',
+  const readText = buildStubLookup<string | null>(
+    {
+      '/repo/.git/rig-bench/run-1/head.jsonl':
+        '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":4,"spreadMs":0.5,"budgetMs":50}\n' +
+        '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":4,"medianMs":61,"spreadMs":3,"budgetMs":50}\n',
+    },
+    null,
   );
 
-  const exitCode = await runBench([], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runBench([], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    ...commands,
+    readText,
+  });
 
   expect(exitCode).toBe(1);
 });
 
 test('it exits 0 when every entry is within budget', async () => {
   const ctx = setupTest();
+  const commands = buildStubCommandAnswers({ exitCodes: [], outputs: {} });
 
-  ctx.reports.set(
-    '/repo/.git/rig-bench/run-1/head.jsonl',
-    '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":4,"spreadMs":0.5,"budgetMs":50}\n' +
-      '{"file":"/repo/packages/kettle/bench/steep.bench.ts","name":"steep","concurrency":1,"medianMs":12,"spreadMs":1,"budgetMs":20}\n',
+  const readText = buildStubLookup<string | null>(
+    {
+      '/repo/.git/rig-bench/run-1/head.jsonl':
+        '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":4,"spreadMs":0.5,"budgetMs":50}\n' +
+        '{"file":"/repo/packages/kettle/bench/steep.bench.ts","name":"steep","concurrency":1,"medianMs":12,"spreadMs":1,"budgetMs":20}\n',
+    },
+    null,
   );
 
-  const exitCode = await runBench([], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runBench([], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    ...commands,
+    readText,
+  });
 
   expect(exitCode).toBe(0);
 });
 
 test('it exits 1 and names the line when the report holds a line that is no entry', async () => {
   const ctx = setupTest();
+  const commands = buildStubCommandAnswers({ exitCodes: [], outputs: {} });
 
-  ctx.reports.set('/repo/.git/rig-bench/run-1/head.jsonl', 'the kettle boiled\n');
+  const readText = buildStubLookup<string | null>(
+    { '/repo/.git/rig-bench/run-1/head.jsonl': 'the kettle boiled\n' },
+    null,
+  );
 
-  const exitCode = await runBench([], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runBench([], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    ...commands,
+    readText,
+  });
 
   expect({ exitCode, err: ctx.output.err.mock.calls }).toStrictEqual({
     exitCode: 1,
@@ -172,10 +164,11 @@ test('it exits 1 and names the line when the report holds a line that is no entr
 
 test('it runs only the benchmark that the name picks', async () => {
   const ctx = setupTest();
+  const commands = buildStubCommandAnswers({ exitCodes: [], outputs: {} });
 
-  await runBench(['steep'], defineRig({}), ctx.run, ctx.deps);
+  await runBench(['steep'], defineRig({}), ctx.run, { ...ctx.deps, ...commands });
 
-  expect(ctx.runCommand.mock.calls.map((call) => call[0])).toStrictEqual([
+  expect(commands.runCommand.mock.calls.map((call) => call[0])).toStrictEqual([
     [
       'bash',
       '/diet.sh',
@@ -191,8 +184,9 @@ test('it runs only the benchmark that the name picks', async () => {
 
 test('it exits 1 and names the benchmarks when the name matches none', async () => {
   const ctx = setupTest();
+  const commands = buildStubCommandAnswers({ exitCodes: [], outputs: {} });
 
-  const exitCode = await runBench(['brew'], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runBench(['brew'], defineRig({}), ctx.run, { ...ctx.deps, ...commands });
 
   expect(exitCode).toBe(1);
 
@@ -203,9 +197,11 @@ test('it exits 1 and names the benchmarks when the name matches none', async () 
 
 test('it says so and exits 0 when the repo has no benchmark', async () => {
   const ctx = setupTest();
+  const commands = buildStubCommandAnswers({ exitCodes: [], outputs: {} });
 
   const exitCode = await runBench([], defineRig({}), ctx.run, {
     ...ctx.deps,
+    ...commands,
     readTrackedFiles: () => Promise.resolve([]),
   });
 
@@ -215,6 +211,7 @@ test('it says so and exits 0 when the repo has no benchmark', async () => {
 
 test('it runs the start hook of the bench lane first, hands its environment on, and runs the stop hook after', async () => {
   const ctx = setupTest();
+  const commands = buildStubCommandAnswers({ exitCodes: [], outputs: {} });
 
   const config = defineRig({
     lanes: {
@@ -223,13 +220,13 @@ test('it runs the start hook of the bench lane first, hands its environment on, 
     bench: { lane: 'kiln' },
   });
 
-  const exitCode = await runBench([], config, ctx.run, ctx.deps);
+  const exitCode = await runBench([], config, ctx.run, { ...ctx.deps, ...commands });
 
   expect(exitCode).toBe(0);
   expect(ctx.startKiln).toHaveBeenCalledTimes(1);
   expect(ctx.stopKiln).toHaveBeenCalledTimes(1);
 
-  expect(ctx.runCommand.mock.calls[0]?.[1].environment).toStrictEqual({
+  expect(commands.runCommand.mock.calls[0]?.[1].environment).toStrictEqual({
     PATH: '/bin',
     KILN_URL: 'http://localhost:7001',
   });
@@ -237,15 +234,14 @@ test('it runs the start hook of the bench lane first, hands its environment on, 
 
 test('it runs the stop hook of the bench lane even when a benchmark fails', async () => {
   const ctx = setupTest();
-
-  ctx.exitCodes.push(1, 1);
+  const commands = buildStubCommandAnswers({ exitCodes: [1, 1], outputs: {} });
 
   const config = defineRig({
     lanes: { kiln: { limit: '15s', stop: 'test-utils/stop-kiln.ts' } },
     bench: { lane: 'kiln' },
   });
 
-  const exitCode = await runBench([], config, ctx.run, ctx.deps);
+  const exitCode = await runBench([], config, ctx.run, { ...ctx.deps, ...commands });
 
   expect(exitCode).toBe(1);
   expect(ctx.stopKiln).toHaveBeenCalledTimes(1);
@@ -253,8 +249,12 @@ test('it runs the stop hook of the bench lane even when a benchmark fails', asyn
 
 test('it exits 2 and says why for more than one name', async () => {
   const ctx = setupTest();
+  const commands = buildStubCommandAnswers({ exitCodes: [], outputs: {} });
 
-  const exitCode = await runBench(['boil', 'steep'], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runBench(['boil', 'steep'], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    ...commands,
+  });
 
   expect({ exitCode, err: ctx.output.err.mock.calls }).toStrictEqual({
     exitCode: 2,
@@ -264,6 +264,7 @@ test('it exits 2 and says why for more than one name', async () => {
 
 test('it builds each program once in its package folder and hands its artifact path to the benchmarks', async () => {
   const ctx = setupTest();
+  const commands = buildStubCommandAnswers({ exitCodes: [], outputs: {} });
 
   const config = defineRig({
     programs: {
@@ -276,16 +277,16 @@ test('it builds each program once in its package folder and hands its artifact p
     },
   });
 
-  const exitCode = await runBench([], config, ctx.run, ctx.deps);
+  const exitCode = await runBench([], config, ctx.run, { ...ctx.deps, ...commands });
 
   expect(exitCode).toBe(0);
 
-  expect(ctx.runCommand.mock.calls[0]).toStrictEqual([
+  expect(commands.runCommand.mock.calls[0]).toStrictEqual([
     ['bash', '-c', 'bun build src/cli.ts --outfile dist/cli.js'],
     { cwd: '/repo/packages/kettle', environment: { PATH: '/bin' }, signal: ctx.run.signal },
   ]);
 
-  expect(ctx.runCommand.mock.calls.slice(1).map((call) => call[1].environment)).toStrictEqual([
+  expect(commands.runCommand.mock.calls.slice(1).map((call) => call[1].environment)).toStrictEqual([
     { PATH: '/bin', RIG_PROGRAM_KETTLE_CLI: '/repo/packages/kettle/dist/cli.js' },
     { PATH: '/bin', RIG_PROGRAM_KETTLE_CLI: '/repo/packages/kettle/dist/cli.js' },
   ]);
@@ -293,8 +294,7 @@ test('it builds each program once in its package folder and hands its artifact p
 
 test('it fails with the program name when a build fails, and runs no benchmark', async () => {
   const ctx = setupTest();
-
-  ctx.exitCodes.push(3);
+  const commands = buildStubCommandAnswers({ exitCodes: [3], outputs: {} });
 
   const config = defineRig({
     programs: {
@@ -307,10 +307,10 @@ test('it fails with the program name when a build fails, and runs no benchmark',
     },
   });
 
-  const exitCode = await runBench([], config, ctx.run, ctx.deps);
+  const exitCode = await runBench([], config, ctx.run, { ...ctx.deps, ...commands });
 
   expect(exitCode).toBe(3);
-  expect(ctx.runCommand).toHaveBeenCalledTimes(1);
+  expect(commands.runCommand).toHaveBeenCalledTimes(1);
 
   expect(ctx.output.err).toHaveBeenCalledExactlyOnceWith(
     'rig: the build of program "kettle-cli" failed with exit code 3: bun build src/cli.ts --outfile dist/cli.js\n',
@@ -320,9 +320,14 @@ test('it fails with the program name when a build fails, and runs no benchmark',
 test('it checks the base out, runs the base side and then the head side, and removes the checkout', async () => {
   const ctx = setupTest();
 
-  await runBench(['--base', 'main', 'boil'], defineRig({}), ctx.run, ctx.deps);
+  const commands = buildStubCommandAnswers({
+    exitCodes: [],
+    outputs: { 'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' } },
+  });
 
-  expect(ctx.runCommand.mock.calls.map((call) => [call[0], call[1].cwd])).toStrictEqual([
+  await runBench(['--base', 'main', 'boil'], defineRig({}), ctx.run, { ...ctx.deps, ...commands });
+
+  expect(commands.runCommand.mock.calls.map((call) => [call[0], call[1].cwd])).toStrictEqual([
     [['git', 'worktree', 'add', '--detach', '/repo/.git/rig-bench/run-1/base', 'main'], '/repo'],
     [['bun', 'install', '--frozen-lockfile'], '/repo/.git/rig-bench/run-1/base'],
     [
@@ -358,19 +363,28 @@ test('it checks the base out, runs the base side and then the head side, and rem
 test('it prints the base, the head and the change of each bench and level', async () => {
   const ctx = setupTest();
 
-  ctx.reports.set(
-    '/repo/.git/rig-bench/run-1/base.jsonl',
-    '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/pour.bench.ts","name":"pour one cup","concurrency":1,"medianMs":12.1,"spreadMs":0.8,"budgetMs":80}\n' +
-      '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/pour.bench.ts","name":"pour one cup","concurrency":4,"medianMs":30.4,"spreadMs":2.1,"budgetMs":80}\n',
+  const commands = buildStubCommandAnswers({
+    exitCodes: [],
+    outputs: { 'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' } },
+  });
+
+  const readText = buildStubLookup<string | null>(
+    {
+      '/repo/.git/rig-bench/run-1/base.jsonl':
+        '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/pour.bench.ts","name":"pour one cup","concurrency":1,"medianMs":12.1,"spreadMs":0.8,"budgetMs":80}\n' +
+        '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/pour.bench.ts","name":"pour one cup","concurrency":4,"medianMs":30.4,"spreadMs":2.1,"budgetMs":80}\n',
+      '/repo/.git/rig-bench/run-1/head.jsonl':
+        '{"file":"/repo/packages/kettle/bench/pour.bench.ts","name":"pour one cup","concurrency":1,"medianMs":11.5,"spreadMs":0.7,"budgetMs":80}\n' +
+        '{"file":"/repo/packages/kettle/bench/pour.bench.ts","name":"pour one cup","concurrency":4,"medianMs":33.2,"spreadMs":2.4,"budgetMs":80}\n',
+    },
+    null,
   );
 
-  ctx.reports.set(
-    '/repo/.git/rig-bench/run-1/head.jsonl',
-    '{"file":"/repo/packages/kettle/bench/pour.bench.ts","name":"pour one cup","concurrency":1,"medianMs":11.5,"spreadMs":0.7,"budgetMs":80}\n' +
-      '{"file":"/repo/packages/kettle/bench/pour.bench.ts","name":"pour one cup","concurrency":4,"medianMs":33.2,"spreadMs":2.4,"budgetMs":80}\n',
-  );
-
-  const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    ...commands,
+    readText,
+  });
 
   expect({ exitCode, out: ctx.output.out.mock.calls }).toStrictEqual({
     exitCode: 0,
@@ -387,17 +401,26 @@ test('it prints the base, the head and the change of each bench and level', asyn
 test('it passes a comparison whose base entry is over its budget', async () => {
   const ctx = setupTest();
 
-  ctx.reports.set(
-    '/repo/.git/rig-bench/run-1/base.jsonl',
-    '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":70,"spreadMs":2,"budgetMs":50}\n',
+  const commands = buildStubCommandAnswers({
+    exitCodes: [],
+    outputs: { 'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' } },
+  });
+
+  const readText = buildStubLookup<string | null>(
+    {
+      '/repo/.git/rig-bench/run-1/base.jsonl':
+        '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":70,"spreadMs":2,"budgetMs":50}\n',
+      '/repo/.git/rig-bench/run-1/head.jsonl':
+        '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":40,"spreadMs":2,"budgetMs":50}\n',
+    },
+    null,
   );
 
-  ctx.reports.set(
-    '/repo/.git/rig-bench/run-1/head.jsonl',
-    '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":40,"spreadMs":2,"budgetMs":50}\n',
-  );
-
-  const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    ...commands,
+    readText,
+  });
 
   expect(exitCode).toBe(0);
 });
@@ -405,12 +428,24 @@ test('it passes a comparison whose base entry is over its budget', async () => {
 test('it fails a comparison whose head entry is over its budget', async () => {
   const ctx = setupTest();
 
-  ctx.reports.set(
-    '/repo/.git/rig-bench/run-1/head.jsonl',
-    '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":70,"spreadMs":2,"budgetMs":50}\n',
+  const commands = buildStubCommandAnswers({
+    exitCodes: [],
+    outputs: { 'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' } },
+  });
+
+  const readText = buildStubLookup<string | null>(
+    {
+      '/repo/.git/rig-bench/run-1/head.jsonl':
+        '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":70,"spreadMs":2,"budgetMs":50}\n',
+    },
+    null,
   );
 
-  const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    ...commands,
+    readText,
+  });
 
   expect(exitCode).toBe(1);
 });
@@ -418,9 +453,15 @@ test('it fails a comparison whose head entry is over its budget', async () => {
 test('it fails a comparison whose base side fails', async () => {
   const ctx = setupTest();
 
-  ctx.exitCodes.push(0, 0, 1);
+  const commands = buildStubCommandAnswers({
+    exitCodes: [0, 0, 1],
+    outputs: { 'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' } },
+  });
 
-  const exitCode = await runBench(['--base', 'main', 'boil'], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runBench(['--base', 'main', 'boil'], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    ...commands,
+  });
 
   expect(exitCode).toBe(1);
 });
@@ -428,22 +469,35 @@ test('it fails a comparison whose base side fails', async () => {
 test('it compares a named benchmark that only the base has, with a dash on the head', async () => {
   const ctx = setupTest();
 
-  const trackedFiles = new Map([
-    ['/repo', ['packages/kettle/package.json', 'packages/kettle/bench/boil.bench.ts']],
-    [
-      '/repo/.git/rig-bench/run-1/base',
-      ['packages/kettle/package.json', 'packages/kettle/bench/brew.bench.ts'],
-    ],
-  ]);
+  const commands = buildStubCommandAnswers({
+    exitCodes: [],
+    outputs: { 'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' } },
+  });
 
-  ctx.reports.set(
-    '/repo/.git/rig-bench/run-1/base.jsonl',
-    '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/brew.bench.ts","name":"brew","concurrency":1,"medianMs":12,"spreadMs":0.5,"budgetMs":80}\n',
+  const readTrackedFiles = buildStubLookup<readonly string[]>(
+    {
+      '/repo': ['packages/kettle/package.json', 'packages/kettle/bench/boil.bench.ts'],
+      '/repo/.git/rig-bench/run-1/base': [
+        'packages/kettle/package.json',
+        'packages/kettle/bench/brew.bench.ts',
+      ],
+    },
+    [],
+  );
+
+  const readText = buildStubLookup<string | null>(
+    {
+      '/repo/.git/rig-bench/run-1/base.jsonl':
+        '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/brew.bench.ts","name":"brew","concurrency":1,"medianMs":12,"spreadMs":0.5,"budgetMs":80}\n',
+    },
+    null,
   );
 
   const exitCode = await runBench(['--base', 'main', 'brew'], defineRig({}), ctx.run, {
     ...ctx.deps,
-    readTrackedFiles: (root: string) => Promise.resolve(trackedFiles.get(root) ?? []),
+    ...commands,
+    readTrackedFiles,
+    readText,
   });
 
   expect({ exitCode, out: ctx.output.out.mock.calls }).toStrictEqual({
@@ -460,34 +514,37 @@ test('it compares a named benchmark that only the base has, with a dash on the h
 test('it exits 1, names the benchmarks of both sides and cleans up when neither side has the name', async () => {
   const ctx = setupTest();
 
-  const trackedFiles = new Map([
-    [
-      '/repo',
-      [
+  const commands = buildStubCommandAnswers({
+    exitCodes: [],
+    outputs: { 'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' } },
+  });
+
+  const readTrackedFiles = buildStubLookup<readonly string[]>(
+    {
+      '/repo': [
         'packages/kettle/package.json',
         'packages/kettle/bench/boil.bench.ts',
         'packages/kettle/bench/steep.bench.ts',
       ],
-    ],
-    [
-      '/repo/.git/rig-bench/run-1/base',
-      [
+      '/repo/.git/rig-bench/run-1/base': [
         'packages/kettle/package.json',
         'packages/kettle/bench/steep.bench.ts',
         'packages/kettle/bench/pour.bench.ts',
       ],
-    ],
-  ]);
+    },
+    [],
+  );
 
   const exitCode = await runBench(['--base', 'main', 'brew'], defineRig({}), ctx.run, {
     ...ctx.deps,
-    readTrackedFiles: (root: string) => Promise.resolve(trackedFiles.get(root) ?? []),
+    ...commands,
+    readTrackedFiles,
   });
 
   expect({
     exitCode,
     err: ctx.output.err.mock.calls,
-    lastCommand: ctx.runCommand.mock.calls.at(-1)?.[0],
+    lastCommand: commands.runCommand.mock.calls.at(-1)?.[0],
     removed: ctx.removeFolder.mock.calls,
   }).toStrictEqual({
     exitCode: 1,
@@ -500,19 +557,28 @@ test('it exits 1, names the benchmarks of both sides and cleans up when neither 
 test('it compares two bench files that define a benchmark of the same name, each with its file', async () => {
   const ctx = setupTest();
 
-  ctx.reports.set(
-    '/repo/.git/rig-bench/run-1/base.jsonl',
-    '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/boil.bench.ts","name":"pour","concurrency":1,"medianMs":40,"spreadMs":2,"budgetMs":80}\n' +
-      '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/steep.bench.ts","name":"pour","concurrency":1,"medianMs":12,"spreadMs":0.5,"budgetMs":80}\n',
+  const commands = buildStubCommandAnswers({
+    exitCodes: [],
+    outputs: { 'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' } },
+  });
+
+  const readText = buildStubLookup<string | null>(
+    {
+      '/repo/.git/rig-bench/run-1/base.jsonl':
+        '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/boil.bench.ts","name":"pour","concurrency":1,"medianMs":40,"spreadMs":2,"budgetMs":80}\n' +
+        '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/steep.bench.ts","name":"pour","concurrency":1,"medianMs":12,"spreadMs":0.5,"budgetMs":80}\n',
+      '/repo/.git/rig-bench/run-1/head.jsonl':
+        '{"file":"/repo/packages/kettle/bench/steep.bench.ts","name":"pour","concurrency":1,"medianMs":12,"spreadMs":0.5,"budgetMs":80}\n' +
+        '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"pour","concurrency":1,"medianMs":44,"spreadMs":3,"budgetMs":80}\n',
+    },
+    null,
   );
 
-  ctx.reports.set(
-    '/repo/.git/rig-bench/run-1/head.jsonl',
-    '{"file":"/repo/packages/kettle/bench/steep.bench.ts","name":"pour","concurrency":1,"medianMs":12,"spreadMs":0.5,"budgetMs":80}\n' +
-      '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"pour","concurrency":1,"medianMs":44,"spreadMs":3,"budgetMs":80}\n',
-  );
-
-  await runBench(['--base', 'main'], defineRig({}), ctx.run, ctx.deps);
+  await runBench(['--base', 'main'], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    ...commands,
+    readText,
+  });
 
   expect(ctx.output.out.mock.calls).toStrictEqual([
     [
@@ -525,26 +591,30 @@ test('it compares two bench files that define a benchmark of the same name, each
 
 test('it runs the base side from the package folder of the checkout when rig starts in a package folder', async () => {
   const ctx = setupTest();
-  const configRoots: string[] = [];
 
-  const trackedFiles = new Map([
-    ['/repo/packages/kettle', ['package.json', 'bench/boil.bench.ts']],
-    ['/repo/.git/rig-bench/run-1/base/packages/kettle', ['package.json', 'bench/boil.bench.ts']],
-  ]);
-
-  ctx.commandOutputs.set('git rev-parse --show-prefix', {
-    exitCode: 0,
-    stdout: 'packages/kettle/\n',
+  const commands = buildStubCommandAnswers({
+    exitCodes: [],
+    outputs: { 'git rev-parse --show-prefix': { exitCode: 0, stdout: 'packages/kettle/\n' } },
   });
 
-  ctx.reports.set(
-    '/repo/.git/rig-bench/run-1/base.jsonl',
-    '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":40,"spreadMs":2,"budgetMs":80}\n',
+  const readConfig = mock<BenchDeps['readConfig']>(() => Promise.resolve(defineRig({})));
+
+  const readTrackedFiles = buildStubLookup<readonly string[]>(
+    {
+      '/repo/packages/kettle': ['package.json', 'bench/boil.bench.ts'],
+      '/repo/.git/rig-bench/run-1/base/packages/kettle': ['package.json', 'bench/boil.bench.ts'],
+    },
+    [],
   );
 
-  ctx.reports.set(
-    '/repo/.git/rig-bench/run-1/head.jsonl',
-    '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":44,"spreadMs":3,"budgetMs":80}\n',
+  const readText = buildStubLookup<string | null>(
+    {
+      '/repo/.git/rig-bench/run-1/base.jsonl':
+        '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":40,"spreadMs":2,"budgetMs":80}\n',
+      '/repo/.git/rig-bench/run-1/head.jsonl':
+        '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":44,"spreadMs":3,"budgetMs":80}\n',
+    },
+    null,
   );
 
   const exitCode = await runBench(
@@ -553,25 +623,23 @@ test('it runs the base side from the package folder of the checkout when rig sta
     { ...ctx.run, repoRoot: '/repo/packages/kettle' },
     {
       ...ctx.deps,
+      ...commands,
       probeWorkspaceRepo: () => Promise.resolve(false),
-      readConfig: (root: string) => {
-        configRoots.push(root);
-
-        return Promise.resolve(defineRig({}));
-      },
-      readTrackedFiles: (root: string) => Promise.resolve(trackedFiles.get(root) ?? []),
+      readConfig,
+      readTrackedFiles,
+      readText,
     },
   );
 
   expect({
     exitCode,
-    configRoots,
-    listed: ctx.readCommandOutput.mock.calls[0],
-    commands: ctx.runCommand.mock.calls.map((call) => [call[0], call[1].cwd]),
+    configRoots: readConfig.mock.calls,
+    listed: commands.readCommandOutput.mock.calls[0],
+    commands: commands.runCommand.mock.calls.map((call) => [call[0], call[1].cwd]),
     out: ctx.output.out.mock.calls,
   }).toStrictEqual({
     exitCode: 0,
-    configRoots: ['/repo/.git/rig-bench/run-1/base/packages/kettle'],
+    configRoots: [['/repo/.git/rig-bench/run-1/base/packages/kettle']],
     listed: [
       ['git', 'rev-parse', '--show-prefix'],
       { cwd: '/repo/packages/kettle', environment: { PATH: '/bin' } },
@@ -625,6 +693,11 @@ test('it runs the base side from the package folder of the checkout when rig sta
 test('it builds and runs the base side with the config of the base checkout', async () => {
   const ctx = setupTest();
 
+  const commands = buildStubCommandAnswers({
+    exitCodes: [],
+    outputs: { 'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' } },
+  });
+
   const baseConfig = defineRig({
     programs: {
       'kettle-cli': {
@@ -638,11 +711,12 @@ test('it builds and runs the base side with the config of the base checkout', as
 
   await runBench(['--base', 'main', 'boil'], defineRig({}), ctx.run, {
     ...ctx.deps,
+    ...commands,
     readConfig: () => Promise.resolve(baseConfig),
   });
 
   expect(
-    ctx.runCommand.mock.calls.slice(2, 4).map((call) => [call[1].cwd, call[1].environment]),
+    commands.runCommand.mock.calls.slice(2, 4).map((call) => [call[1].cwd, call[1].environment]),
   ).toStrictEqual([
     ['/repo/.git/rig-bench/run-1/base/packages/kettle', { PATH: '/bin' }],
     [
@@ -657,20 +731,25 @@ test('it builds and runs the base side with the config of the base checkout', as
 
 test('it runs the lane hooks of each side from its own root and hands each side its own environment', async () => {
   const ctx = setupTest();
-  const imported: string[] = [];
 
-  const hooks = new Map<string, () => Promise<unknown>>([
-    [
-      '/repo/hooks/start-kiln.ts',
-      () => Promise.resolve({ environment: { KILN_URL: 'http://localhost:7001' } }),
-    ],
-    ['/repo/hooks/stop-kiln.ts', () => Promise.resolve()],
-    [
-      '/repo/.git/rig-bench/run-1/base/hooks/start-oven.ts',
-      () => Promise.resolve({ environment: { OVEN_URL: 'http://localhost:7002' } }),
-    ],
-    ['/repo/.git/rig-bench/run-1/base/hooks/stop-oven.ts', () => Promise.resolve()],
-  ]);
+  const commands = buildStubCommandAnswers({
+    exitCodes: [],
+    outputs: { 'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' } },
+  });
+
+  const importModule = buildStubLookup<unknown>(
+    {
+      '/repo/hooks/start-kiln.ts': {
+        default: () => Promise.resolve({ environment: { KILN_URL: 'http://localhost:7001' } }),
+      },
+      '/repo/hooks/stop-kiln.ts': { default: () => Promise.resolve() },
+      '/repo/.git/rig-bench/run-1/base/hooks/start-oven.ts': {
+        default: () => Promise.resolve({ environment: { OVEN_URL: 'http://localhost:7002' } }),
+      },
+      '/repo/.git/rig-bench/run-1/base/hooks/stop-oven.ts': { default: () => Promise.resolve() },
+    },
+    {},
+  );
 
   const headConfig = defineRig({
     lanes: { kiln: { limit: '15s', start: 'hooks/start-kiln.ts', stop: 'hooks/stop-kiln.ts' } },
@@ -684,27 +763,24 @@ test('it runs the lane hooks of each side from its own root and hands each side 
 
   await runBench(['--base', 'main', 'boil'], headConfig, ctx.run, {
     ...ctx.deps,
+    ...commands,
     readConfig: () => Promise.resolve(baseConfig),
-    importModule: (path: string) => {
-      imported.push(path);
-
-      return Promise.resolve({ default: hooks.get(path) });
-    },
+    importModule,
   });
 
   expect({
-    imported,
-    benches: ctx.runCommand.mock.calls
+    imported: importModule.mock.calls,
+    benches: commands.runCommand.mock.calls
       .slice(2, 4)
       .map((call) => [call[1].cwd, call[1].environment]),
-    lastCommand: ctx.runCommand.mock.calls.at(-1)?.[0],
+    lastCommand: commands.runCommand.mock.calls.at(-1)?.[0],
     removed: ctx.removeFolder.mock.calls,
   }).toStrictEqual({
     imported: [
-      '/repo/.git/rig-bench/run-1/base/hooks/start-oven.ts',
-      '/repo/.git/rig-bench/run-1/base/hooks/stop-oven.ts',
-      '/repo/hooks/start-kiln.ts',
-      '/repo/hooks/stop-kiln.ts',
+      ['/repo/.git/rig-bench/run-1/base/hooks/start-oven.ts'],
+      ['/repo/.git/rig-bench/run-1/base/hooks/stop-oven.ts'],
+      ['/repo/hooks/start-kiln.ts'],
+      ['/repo/hooks/stop-kiln.ts'],
     ],
     benches: [
       ['/repo/.git/rig-bench/run-1/base', { PATH: '/bin', OVEN_URL: 'http://localhost:7002' }],
@@ -718,13 +794,19 @@ test('it runs the lane hooks of each side from its own root and hands each side 
 test('it exits 1 with its message and runs no bench when the base cannot be checked out', async () => {
   const ctx = setupTest();
 
-  ctx.exitCodes.push(128);
+  const commands = buildStubCommandAnswers({
+    exitCodes: [128],
+    outputs: { 'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' } },
+  });
 
-  const exitCode = await runBench(['--base', 'kettle-v0'], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runBench(['--base', 'kettle-v0'], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    ...commands,
+  });
 
   expect({
     exitCode,
-    commands: ctx.runCommand.mock.calls.map((call) => call[0].slice(0, 3)),
+    commands: commands.runCommand.mock.calls.map((call) => call[0].slice(0, 3)),
     err: ctx.output.err.mock.calls,
   }).toStrictEqual({
     exitCode: 1,
@@ -738,51 +820,61 @@ test('it exits 1 with its message and runs no bench when the base cannot be chec
 
 test('it removes the checkout with an unaborted signal and then the work folder when an abort fails the checkout', async () => {
   const ctx = setupTest();
-  const events: unknown[] = [];
 
-  ctx.runCommand.mockImplementationOnce(() => {
-    ctx.abortRun();
-
-    return Promise.resolve(1);
-  });
-
-  ctx.runCommand.mockImplementationOnce((command, options) => {
-    events.push({ command, isAborted: options.signal.aborted });
-
-    return Promise.resolve(128);
-  });
-
-  ctx.removeFolder.mockImplementation((path) => {
-    events.push({ removed: path });
-
-    return Promise.resolve();
-  });
-
-  const exitCode = await runBench(['--base', 'kettle-v0'], defineRig({}), ctx.run, ctx.deps);
-
-  expect({ exitCode, events, err: ctx.output.err.mock.calls }).toStrictEqual({
-    exitCode: 1,
-    events: [
-      {
-        command: ['git', 'worktree', 'remove', '--force', '/repo/.git/rig-bench/run-1/base'],
-        isAborted: false,
+  const commands = buildStubCommandAnswers({
+    exitCodes: [{ exitCode: 1, abort: ctx.controller }, 128],
+    outputs: {
+      'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' },
+      'git worktree list --porcelain -z': {
+        exitCode: 0,
+        stdout: 'worktree /repo\0HEAD 1a2b3c\0branch refs/heads/main\0\0',
       },
-      { removed: '/repo/.git/rig-bench/run-1' },
-    ],
+    },
+  });
+
+  const exitCode = await runBench(['--base', 'kettle-v0'], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    ...commands,
+  });
+
+  const removal = commands.runCommand.mock.calls.at(-1);
+
+  expect({
+    exitCode,
+    removal: { command: removal?.[0], isAborted: removal?.[1].signal.aborted },
+    removed: ctx.removeFolder.mock.calls,
+    err: ctx.output.err.mock.calls,
+  }).toStrictEqual({
+    exitCode: 1,
+    removal: {
+      command: ['git', 'worktree', 'remove', '--force', '/repo/.git/rig-bench/run-1/base'],
+      isAborted: false,
+    },
+    removed: [['/repo/.git/rig-bench/run-1']],
     err: [['rig bench: could not check out "kettle-v0"\n']],
   });
+
+  expect(ctx.removeFolder.mock.invocationCallOrder[0]).toBeGreaterThan(
+    commands.runCommand.mock.invocationCallOrder.at(-1) ?? Number.POSITIVE_INFINITY,
+  );
 });
 
 test('it exits 1 with its message and removes the checkout when bun install fails in it', async () => {
   const ctx = setupTest();
 
-  ctx.exitCodes.push(0, 1);
+  const commands = buildStubCommandAnswers({
+    exitCodes: [0, 1],
+    outputs: { 'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' } },
+  });
 
-  const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    ...commands,
+  });
 
   expect({
     exitCode,
-    commands: ctx.runCommand.mock.calls.map((call) => call[0][1]),
+    commands: commands.runCommand.mock.calls.map((call) => call[0][1]),
     err: ctx.output.err.mock.calls,
   }).toStrictEqual({
     exitCode: 1,
@@ -793,44 +885,44 @@ test('it exits 1 with its message and removes the checkout when bun install fail
 
 test('it removes the checkout with an unaborted signal and then the work folder when the run aborts after the checkout', async () => {
   const ctx = setupTest();
-  const events: unknown[] = [];
 
-  ctx.runCommand.mockImplementationOnce(() => Promise.resolve(0));
-
-  ctx.runCommand.mockImplementationOnce(() => {
-    ctx.abortRun();
-
-    return Promise.resolve(1);
+  const commands = buildStubCommandAnswers({
+    exitCodes: [0, { exitCode: 1, abort: ctx.controller }, 0],
+    outputs: { 'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' } },
   });
 
-  ctx.runCommand.mockImplementationOnce((command, options) => {
-    events.push({ command, isAborted: options.signal.aborted });
-
-    return Promise.resolve(0);
+  const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    ...commands,
   });
 
-  ctx.removeFolder.mockImplementation((path) => {
-    events.push({ removed: path });
+  const removal = commands.runCommand.mock.calls.at(-1);
 
-    return Promise.resolve();
-  });
-
-  const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, ctx.deps);
-
-  expect({ exitCode, events }).toStrictEqual({
+  expect({
+    exitCode,
+    removal: { command: removal?.[0], isAborted: removal?.[1].signal.aborted },
+    removed: ctx.removeFolder.mock.calls,
+  }).toStrictEqual({
     exitCode: 1,
-    events: [
-      {
-        command: ['git', 'worktree', 'remove', '--force', '/repo/.git/rig-bench/run-1/base'],
-        isAborted: false,
-      },
-      { removed: '/repo/.git/rig-bench/run-1' },
-    ],
+    removal: {
+      command: ['git', 'worktree', 'remove', '--force', '/repo/.git/rig-bench/run-1/base'],
+      isAborted: false,
+    },
+    removed: [['/repo/.git/rig-bench/run-1']],
   });
+
+  expect(ctx.removeFolder.mock.invocationCallOrder[0]).toBeGreaterThan(
+    commands.runCommand.mock.invocationCallOrder.at(-1) ?? Number.POSITIVE_INFINITY,
+  );
 });
 
 test('it removes the checkout and the work folder and hands the error on when a comparison throws', async () => {
   const ctx = setupTest();
+
+  const commands = buildStubCommandAnswers({
+    exitCodes: [],
+    outputs: { 'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' } },
+  });
 
   const config = defineRig({
     lanes: { kiln: { limit: '15s', start: 'test-utils/start-kiln.ts' } },
@@ -839,14 +931,17 @@ test('it removes the checkout and the work folder and hands the error on when a 
 
   ctx.startKiln.mockImplementation(() => Promise.reject(new Error('the kiln cracked')));
 
-  const running = runBench(['--base', 'main', 'boil'], config, ctx.run, ctx.deps);
+  const running = runBench(['--base', 'main', 'boil'], config, ctx.run, {
+    ...ctx.deps,
+    ...commands,
+  });
 
   expect(running).rejects.toThrow('the kiln cracked');
 
   await Promise.allSettled([running]);
 
   expect({
-    lastCommand: ctx.runCommand.mock.calls.at(-1)?.[0],
+    lastCommand: commands.runCommand.mock.calls.at(-1)?.[0],
     removed: ctx.removeFolder.mock.calls,
   }).toStrictEqual({
     lastCommand: ['git', 'worktree', 'remove', '--force', '/repo/.git/rig-bench/run-1/base'],
@@ -857,10 +952,23 @@ test('it removes the checkout and the work folder and hands the error on when a 
 test('it exits 1, says how to remove the checkout and keeps the work folder when git still lists the checkout it could not remove', async () => {
   const ctx = setupTest();
 
-  ctx.exitCodes.push(0, 1, 1);
-  ctx.commandOutputs.set('git worktree list --porcelain -z', ctx.leftListing);
+  const commands = buildStubCommandAnswers({
+    exitCodes: [0, 1, 1],
+    outputs: {
+      'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' },
+      'git worktree list --porcelain -z': {
+        exitCode: 0,
+        stdout:
+          'worktree /repo\0HEAD 1a2b3c\0branch refs/heads/main\0\0' +
+          'worktree /repo/.git/rig-bench/run-1/base\0HEAD 4d5e6f\0detached\0\0',
+      },
+    },
+  });
 
-  const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    ...commands,
+  });
 
   expect({
     exitCode,
@@ -881,10 +989,23 @@ test('it exits 1, says how to remove the checkout and keeps the work folder when
 test('it fails a comparison whose benches pass when git still lists the checkout it could not remove', async () => {
   const ctx = setupTest();
 
-  ctx.exitCodes.push(0, 0, 0, 0, 1);
-  ctx.commandOutputs.set('git worktree list --porcelain -z', ctx.leftListing);
+  const commands = buildStubCommandAnswers({
+    exitCodes: [0, 0, 0, 0, 1],
+    outputs: {
+      'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' },
+      'git worktree list --porcelain -z': {
+        exitCode: 0,
+        stdout:
+          'worktree /repo\0HEAD 1a2b3c\0branch refs/heads/main\0\0' +
+          'worktree /repo/.git/rig-bench/run-1/base\0HEAD 4d5e6f\0detached\0\0',
+      },
+    },
+  });
 
-  const exitCode = await runBench(['--base', 'main', 'boil'], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runBench(['--base', 'main', 'boil'], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    ...commands,
+  });
 
   expect(exitCode).toBe(1);
 });
@@ -892,14 +1013,27 @@ test('it fails a comparison whose benches pass when git still lists the checkout
 test('it keeps the work folder and says how to remove the checkout when git still lists the checkout of a failed add', async () => {
   const ctx = setupTest();
 
-  ctx.exitCodes.push(128, 1);
-  ctx.commandOutputs.set('git worktree list --porcelain -z', ctx.leftListing);
+  const commands = buildStubCommandAnswers({
+    exitCodes: [128, 1],
+    outputs: {
+      'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' },
+      'git worktree list --porcelain -z': {
+        exitCode: 0,
+        stdout:
+          'worktree /repo\0HEAD 1a2b3c\0branch refs/heads/main\0\0' +
+          'worktree /repo/.git/rig-bench/run-1/base\0HEAD 4d5e6f\0detached\0\0',
+      },
+    },
+  });
 
-  const exitCode = await runBench(['--base', 'kettle-v0'], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runBench(['--base', 'kettle-v0'], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    ...commands,
+  });
 
   expect({
     exitCode,
-    listed: ctx.readCommandOutput.mock.calls.at(-1),
+    listed: commands.readCommandOutput.mock.calls.at(-1),
     err: ctx.output.err.mock.calls,
     removed: ctx.removeFolder.mock.calls,
   }).toStrictEqual({
@@ -921,9 +1055,21 @@ test('it keeps the work folder and says how to remove the checkout when git stil
 test('it removes the work folder and prints only the checkout message when git lists no checkout of a failed add', async () => {
   const ctx = setupTest();
 
-  ctx.exitCodes.push(128, 1);
+  const commands = buildStubCommandAnswers({
+    exitCodes: [128, 1],
+    outputs: {
+      'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' },
+      'git worktree list --porcelain -z': {
+        exitCode: 0,
+        stdout: 'worktree /repo\0HEAD 1a2b3c\0branch refs/heads/main\0\0',
+      },
+    },
+  });
 
-  const exitCode = await runBench(['--base', 'kettle-v0'], defineRig({}), ctx.run, ctx.deps);
+  const exitCode = await runBench(['--base', 'kettle-v0'], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    ...commands,
+  });
 
   expect({
     exitCode,
@@ -938,8 +1084,9 @@ test('it removes the work folder and prints only the checkout message when git l
 
 test('it removes the work folder after a run', async () => {
   const ctx = setupTest();
+  const commands = buildStubCommandAnswers({ exitCodes: [], outputs: {} });
 
-  await runBench([], defineRig({}), ctx.run, ctx.deps);
+  await runBench([], defineRig({}), ctx.run, { ...ctx.deps, ...commands });
 
   expect(ctx.removeFolder).toHaveBeenCalledExactlyOnceWith('/repo/.git/rig-bench/run-1');
 });
@@ -947,12 +1094,15 @@ test('it removes the work folder after a run', async () => {
 test('it removes the work folder and the checkout when a bench fails', async () => {
   const ctx = setupTest();
 
-  ctx.exitCodes.push(0, 0, 1, 1);
+  const commands = buildStubCommandAnswers({
+    exitCodes: [0, 0, 1, 1],
+    outputs: { 'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' } },
+  });
 
-  await runBench(['--base', 'main', 'boil'], defineRig({}), ctx.run, ctx.deps);
+  await runBench(['--base', 'main', 'boil'], defineRig({}), ctx.run, { ...ctx.deps, ...commands });
 
   expect({
-    lastCommand: ctx.runCommand.mock.calls.at(-1)?.[0],
+    lastCommand: commands.runCommand.mock.calls.at(-1)?.[0],
     removed: ctx.removeFolder.mock.calls,
   }).toStrictEqual({
     lastCommand: ['git', 'worktree', 'remove', '--force', '/repo/.git/rig-bench/run-1/base'],
@@ -962,6 +1112,7 @@ test('it removes the work folder and the checkout when a bench fails', async () 
 
 test('it removes the work folder when a lane hook throws', async () => {
   const ctx = setupTest();
+  const commands = buildStubCommandAnswers({ exitCodes: [], outputs: {} });
 
   const config = defineRig({
     lanes: { kiln: { limit: '15s', start: 'test-utils/start-kiln.ts' } },
@@ -970,7 +1121,7 @@ test('it removes the work folder when a lane hook throws', async () => {
 
   ctx.startKiln.mockImplementation(() => Promise.reject(new Error('the kiln cracked')));
 
-  const running = runBench([], config, ctx.run, ctx.deps);
+  const running = runBench([], config, ctx.run, { ...ctx.deps, ...commands });
 
   expect(running).rejects.toThrow('the kiln cracked');
 
