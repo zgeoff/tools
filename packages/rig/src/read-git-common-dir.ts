@@ -5,8 +5,8 @@ export interface GitCommonDirDeps {
   readonly readCommandOutput: ReadCommandOutput;
 }
 
-// Returns git's own answer, which is relative to the repo root in the main checkout and absolute in
-// a linked worktree.
+// Returns git's own answer: in the main checkout it is relative to the folder git runs in, such as
+// ../../.git from a package folder, and in a linked worktree it is absolute.
 export async function readGitCommonDir(
   repoRoot: string,
   environment: SpawnOptions['environment'],
