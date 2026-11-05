@@ -2,8 +2,8 @@
 #
 # Runs the shared audit-fix step, which turns a red `bun audit` on the default
 # branch into a fix pull request, or into a pull request that records an ignore
-# with a reason and an expiry. It runs daily, by hand, and after a PR or
-# dependency-health run on main fails. A failed run on any other branch starts
+# with a reason and an expiry. It runs daily, by hand, and after a PR, CI, Main
+# or dependency-health run on main fails. A failed run on any other branch starts
 # nothing, because the job audits only the default branch. A failed run of a
 # pull request, or from another repository, starts nothing either, because a
 # fork's branch can be named main. It needs Bun 1.4.0 or newer in .bun-version
@@ -12,7 +12,7 @@ name: Audit fix
 
 on:
   workflow_run:
-    workflows: [PR, pr, CI, Dependency Health, Dep Health]
+    workflows: [PR, pr, CI, Main, Dependency Health, Dep Health]
     types: [completed]
     branches: [main]
   schedule:
