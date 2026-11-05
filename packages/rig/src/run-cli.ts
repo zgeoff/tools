@@ -17,9 +17,7 @@ import type { UnitDeps } from './run-unit.ts';
 import type { RigConfig, RigRun } from './types.ts';
 
 export interface CLIDeps
-  extends LaneDeps, UnitDeps, RelatedTestDeps, InitDeps, BenchDeps, EvalDeps {
-  readonly readConfig: (repoRoot: string) => Promise<RigConfig>;
-}
+  extends LaneDeps, UnitDeps, RelatedTestDeps, InitDeps, BenchDeps, EvalDeps {}
 
 export async function runCLI(argv: readonly string[], run: RigRun, deps: CLIDeps): Promise<number> {
   const args = await readCLIArgs(argv);

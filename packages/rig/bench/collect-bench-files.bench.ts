@@ -4,6 +4,7 @@ import { collectBenchFiles } from '../src/collect-bench-files.ts';
 export default defineBench({
   name: 'collect bench files',
   budget: '20ms',
+  concurrency: [1, 4],
   setup: () =>
     Promise.resolve(Array.from({ length: 500 }, (_, index) => buildTrackedFiles(index)).flat()),
   run: (trackedFiles) => {

@@ -14,6 +14,37 @@ test('it refuses a budget that is no duration', () => {
   );
 });
 
+test('it measures at concurrency 1 alone when the options name no concurrency', () => {
+  const definition = defineBench({ name: 'boil', budget: '2s', run: () => {} });
+
+  expect(definition.concurrency).toStrictEqual([1]);
+});
+
+test('it keeps the concurrency levels in the order the options give', () => {
+  const definition = defineBench({
+    name: 'boil',
+    budget: '2s',
+    concurrency: [4, 1],
+    run: () => {},
+  });
+
+  expect(definition.concurrency).toStrictEqual([4, 1]);
+});
+
+test.each([
+  ['an empty list', [], ''],
+  ['a zero', [1, 0], '1, 0'],
+  ['a fraction', [1.5], '1.5'],
+  ['a repeated level', [4, 4], '4, 4'],
+])('it refuses a concurrency with %s', (_title, concurrency, listText) => {
+  expect(() =>
+    defineBench({ name: 'boil', budget: '2s', concurrency, run: () => {} }),
+  ).toThrowWithMessage(
+    Error,
+    `defineBench: the benchmark "boil" has the concurrency [${listText}], which is no list of distinct positive whole numbers`,
+  );
+});
+
 test('it types the run context from what setup returns', async () => {
   const seen: number[] = [];
 

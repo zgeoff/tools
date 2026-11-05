@@ -1,9 +1,11 @@
 #!/usr/bin/env bun
 import { existsSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
 import { availableParallelism, totalmem } from 'node:os';
 import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
 import { wireBrowserLaneHooks } from './browser/wire-browser-lane-hooks.ts';
+import { createBenchWorkFolder } from './create-bench-work-folder.ts';
 import { initFiles } from './init-files.ts';
 import { probeWorkspaceRepo } from './probe-workspace-repo.ts';
 import { readRigConfig } from './read-rig-config.ts';
@@ -66,6 +68,13 @@ try {
           readText: readOptionalText,
         }),
       importModule: (path) => import(path),
+      createWorkFolder: createBenchWorkFolder,
+      readText: async (path) => {
+        const text = await readOptionalText(path);
+
+        return text ?? null;
+      },
+      removeFolder: (path) => rm(path, { recursive: true, force: true }),
       runCommand,
       wireBrowserLaneHooks,
     },

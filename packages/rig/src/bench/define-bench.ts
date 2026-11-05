@@ -1,10 +1,14 @@
 import { parseDuration } from '../parse-duration.ts';
+import { isConcurrencyList } from './is-concurrency-list.ts';
 
 interface BenchBaseOptions {
   readonly name: string;
 
   // A duration such as `'50ms'` or `'2s'` that the median of a measured run must not pass.
   readonly budget: string;
+
+  // The numbers of `run` calls to keep in flight at once, each measured in turn.
+  readonly concurrency?: readonly number[];
 }
 
 interface BenchSetupOptions<Context> extends BenchBaseOptions {
@@ -34,6 +38,8 @@ export interface BenchDefinition {
 
   readonly budgetMs: number;
 
+  readonly concurrency: readonly number[];
+
   // Runs `setup` and returns the step to measure, which holds the setup result, and its disposal.
   readonly prepare: () => Promise<PreparedBench>;
 }
@@ -48,9 +54,18 @@ export function defineBench<Context>(options: BenchOptions<Context>): BenchDefin
     );
   }
 
+  const concurrency = options.concurrency ?? [1];
+
+  if (!isConcurrencyList(concurrency)) {
+    throw new Error(
+      `defineBench: the benchmark "${options.name}" has the concurrency [${(options.concurrency ?? []).join(', ')}], which is no list of distinct positive whole numbers`,
+    );
+  }
+
   return {
     name: options.name,
     budgetMs,
+    concurrency,
     prepare: async () => {
       if (options.setup === undefined) {
         return { step: () => options.run(), dispose: () => Promise.resolve() };

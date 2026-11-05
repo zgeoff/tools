@@ -1,18 +1,37 @@
 import { expect, test } from 'bun:test';
+import invariant from 'tiny-invariant';
 import { defineBench } from './define-bench.ts';
 import { parseBenchDefinition } from './parse-bench-definition.ts';
 
 test('it accepts what defineBench returns', () => {
-  const parsed = parseBenchDefinition(defineBench({ name: 'boil', budget: '5ms', run: () => {} }));
+  const parsed = parseBenchDefinition(
+    defineBench({ name: 'boil', budget: '5ms', concurrency: [1, 4], run: () => {} }),
+  );
 
-  expect(parsed.kind).toBe('parsed');
+  expect(parsed).toStrictEqual({
+    kind: 'parsed',
+    definition: { name: 'boil', budgetMs: 5, concurrency: [1, 4], prepare: expect.any(Function) },
+  });
 });
 
-test.each([
+test('it measures at concurrency 1 alone when the definition has no concurrency', () => {
+  const parsed = parseBenchDefinition({ name: 'boil', budgetMs: 5, prepare: () => 1 });
+
+  expect(parsed).toStrictEqual({
+    kind: 'parsed',
+    definition: { name: 'boil', budgetMs: 5, concurrency: [1], prepare: expect.any(Function) },
+  });
+});
+
+test.each<readonly [string, unknown]>([
   ['null', null],
   ['a string', 'boil'],
   ['an object with no prepare', { name: 'boil', budgetMs: 5 }],
   ['an object whose budget is text', { name: 'boil', budgetMs: '5ms', prepare: () => 1 }],
+  [
+    'an object whose concurrency repeats a level',
+    { name: 'boil', budgetMs: 5, concurrency: [2, 2], prepare: () => 1 },
+  ],
 ])('it refuses %s', (_title, value) => {
   expect(parseBenchDefinition(value)).toStrictEqual({
     kind: 'refused',
@@ -23,11 +42,11 @@ test.each([
 test('it fails to prepare when prepare yields no step', () => {
   const parsed = parseBenchDefinition({ name: 'boil', budgetMs: 5, prepare: () => 1 });
 
-  expect(parsed.kind).toBe('parsed');
+  invariant(parsed.kind === 'parsed');
 
-  const prepare = parsed.kind === 'parsed' ? parsed.definition.prepare() : Promise.resolve();
-
-  expect(prepare).rejects.toThrow('the benchmark "boil" prepared no step to measure');
+  expect(parsed.definition.prepare()).rejects.toThrow(
+    'the benchmark "boil" prepared no step to measure',
+  );
 });
 
 test('it keeps the disposal of the setup result', async () => {
@@ -49,9 +68,7 @@ test('it keeps the disposal of the setup result', async () => {
     }),
   );
 
-  if (parsed.kind !== 'parsed') {
-    throw new Error('expected a parsed definition');
-  }
+  invariant(parsed.kind === 'parsed');
 
   const prepared = await parsed.definition.prepare();
 
