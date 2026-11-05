@@ -50,15 +50,16 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
 );
 
 test.skipIf(!modesOutput.includes('systemd-sudo'))(
-  'it runs the command with the caller environment under sudo systemd-run when the caller exports a read-only shell variable',
+  'it runs the command with the caller environment under sudo systemd-run unchanged, whatever names it exports',
   async () => {
     const ctx = setupTest();
 
     const result =
-      await $`bash ${ctx.scriptPath} 128 ${ctx.bun} -e ${'console.log(process.env.KILN_GLAZE)'}`
+      await $`bash ${ctx.scriptPath} 128 ${ctx.bun} -e ${'console.log(process.env.KILN_GLAZE, process.env.user)'}`
         .env({
           ...ctx.env,
           MEMORY_CAP_MODE: 'systemd-sudo',
+          user: 'root',
           SHELLOPTS: 'braceexpand:hashall:interactive-comments',
           KILN_GLAZE: 'celadon',
         })
@@ -67,7 +68,7 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
 
     expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
       exitCode: 0,
-      stdout: 'celadon\n',
+      stdout: 'celadon root\n',
     });
   },
 );

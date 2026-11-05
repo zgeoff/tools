@@ -193,23 +193,24 @@ fi
 
 # The second half of a systemd mode, which systemd-run starts inside the scope.
 if [ "${1:-}" = --inside ]; then
-  # The caller's environment comes back first, so a variable it exports, such
-  # as user, never replaces an argument. Bash ends the script on an export of a
-  # name it keeps read-only, such as SHELLOPTS, whatever follows the export.
+  # The command gets the caller's environment as it stood, which sudo leaves
+  # behind, and this shell keeps its own, so no name the caller exports can
+  # clash with one this script sets or one bash keeps read-only.
+  launcher=()
   if [ -n "$3" ]; then
-    while IFS= read -r -d '' pair; do
-      name=${pair%%=*}
-      if [[ -v $name && ${!name@a} == *r* ]]; then
-        continue
-      fi
-      export "${pair?}" 2> /dev/null || true
-    done < "$3"
+    mapfile -d '' -t caller_environment < "$3"
     rm -f "$3"
+    for entry in "${caller_environment[@]}"; do
+      if [ "$entry" = GITHUB_ACTIONS=true ]; then
+        GITHUB_ACTIONS=true
+      fi
+    done
+    launcher=(env -i "${caller_environment[@]}")
   fi
   user=$2
   mode=$4
   shift 4
-  run_and_report "/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup)" "$user" "$mode" "$@"
+  run_and_report "/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup)" "$user" "$mode" "${launcher[@]}" "$@"
   exit "$status"
 fi
 
