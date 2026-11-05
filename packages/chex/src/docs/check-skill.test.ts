@@ -177,6 +177,12 @@ test.each([
       '  "Tidies release notes. It cuts filler ("very", "really") and keeps each',
       '  entry to one line. Load it before a release."',
     ],
+    4,
+  ],
+  [
+    'an apostrophe inside a one-line single-quoted description',
+    ["description: 'Formats the reader's release notes. Load it before a release.'"],
+    3,
   ],
   [
     'an apostrophe inside a single-quoted description, before another key',
@@ -187,6 +193,7 @@ test.each([
       'metadata:',
       '  kind: rule-set',
     ],
+    4,
   ],
   [
     'an apostrophe on the last line of a single-quoted description',
@@ -195,26 +202,45 @@ test.each([
       "  'Seeds the demo database. Load it before you run the",
       "  service's first test.'",
     ],
+    5,
   ],
-])('it fails frontmatter that is not valid YAML: %s', async (_, description) => {
-  const ctx = await setupTest();
+  [
+    'an apostrophe in a single-quoted value after a valid two-line description',
+    [
+      'description:',
+      "  'Seeds the demo database. Load it before you run the service''s",
+      "  first test.'",
+      "compatibility: 'Needs the service's database.'",
+    ],
+    6,
+  ],
+])(
+  'it fails frontmatter that is not valid YAML at the line it breaks on: %s',
+  async (_, description, line) => {
+    const ctx = await setupTest();
 
-  await ctx.writePage('.claude/skills/demo/SKILL.md', ['---', 'name: demo', ...description, '---']);
+    await ctx.writePage('.claude/skills/demo/SKILL.md', [
+      '---',
+      'name: demo',
+      ...description,
+      '---',
+    ]);
 
-  const result = await ctx.run();
+    const result = await ctx.run();
 
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  }).toStrictEqual({
-    exitCode: 1,
-    stdout:
-      '.claude/skills/demo/SKILL.md: frontmatter is not valid YAML (YAML Parse error: Unexpected token), so a strict loader refuses the skill; escape each quote inside a quoted value, or write the value as a block scalar (>-)\n' +
-      'check-skill: 1 skills, 1 errors, 0 warnings\n',
-    stderr: '',
-  });
-});
+    expect({
+      exitCode: result.exitCode,
+      stdout: result.stdout.toString(),
+      stderr: result.stderr.toString(),
+    }).toStrictEqual({
+      exitCode: 1,
+      stdout:
+        `.claude/skills/demo/SKILL.md:${line}: frontmatter is not valid YAML (YAML Parse error: Unexpected token), so a strict loader refuses the skill; escape each quote inside a quoted value, or write the value as a block scalar (>-)\n` +
+        'check-skill: 1 skills, 1 errors, 0 warnings\n',
+      stderr: '',
+    });
+  },
+);
 
 test.each([
   [
