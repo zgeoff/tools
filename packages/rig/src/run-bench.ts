@@ -7,8 +7,7 @@ import { parseBenchReport } from './bench/parse-bench-report.ts';
 import type { ParsedBenchReport } from './bench/parse-bench-report.ts';
 import { pickBenchPlan } from './bench/pick-bench-plan.ts';
 import { pickCheckoutCleanup } from './bench/pick-checkout-cleanup.ts';
-import type { CheckoutCleanup } from './bench/pick-checkout-cleanup.ts';
-import { pickComparisonResult } from './bench/pick-comparison-result.ts';
+import { pickCleanedUpResult } from './bench/pick-cleaned-up-result.ts';
 import { pickComparisonVerdict } from './bench/pick-comparison-verdict.ts';
 import { pickHeadVerdict } from './bench/pick-head-verdict.ts';
 import { pickNamedBenchFiles } from './bench/pick-named-bench-files.ts';
@@ -135,16 +134,23 @@ async function runHeadBench(
     reportPath: join(workFolder, 'head.jsonl'),
   };
 
-  try {
-    const exitCode = await runBenchSide(head, run, deps);
-    const report = await readBenchReport(head, deps);
+  const [ran] = await Promise.allSettled([runHeadSide(head, run, deps)]);
+  const [cleaned] = await Promise.allSettled([deps.removeFolder(workFolder)]);
 
-    const verdictExitCode = writeBenchVerdict(pickHeadVerdict(report, exitCode), deps);
+  const result = pickCleanedUpResult(ran, cleaned);
 
-    return pickExitCodeAfterTests(verdictExitCode, run.signal.aborted);
-  } finally {
-    await deps.removeFolder(workFolder);
+  if (result.kind === 'throw') {
+    throw result.error;
   }
+
+  return pickExitCodeAfterTests(result.value, run.signal.aborted);
+}
+
+async function runHeadSide(head: BenchSide, run: RigRun, deps: BenchDeps): Promise<number> {
+  const exitCode = await runBenchSide(head, run, deps);
+  const report = await readBenchReport(head, deps);
+
+  return writeBenchVerdict(pickHeadVerdict(report, exitCode), deps);
 }
 
 // Runs one side's bench files against that side's root, so a base checkout builds its own programs
@@ -280,15 +286,15 @@ async function runBenchComparison(
   // An abort makes the add report failure even when git finished the checkout, so every path,
   // a failed add included, runs the same removal.
   const [compared] = await Promise.allSettled([runCheckoutComparison(comparison, base, run, deps)]);
-  const [cleaned] = await Promise.allSettled([removeComparisonCheckout(base, compared, run, deps)]);
+  const [cleaned] = await Promise.allSettled([removeComparisonCheckout(base, run, deps)]);
 
-  const result = pickComparisonResult(compared, cleaned);
+  const result = pickCleanedUpResult(compared, cleaned);
 
   if (result.kind === 'throw') {
     throw result.error;
   }
 
-  return pickExitCodeAfterTests(result.exitCode, run.signal.aborted);
+  return pickExitCodeAfterTests(Math.max(result.value, result.cleanup), run.signal.aborted);
 }
 
 async function runCheckoutComparison(
@@ -372,13 +378,12 @@ async function runCheckedOutComparison(
 
 async function removeComparisonCheckout(
   base: BaseCheckout,
-  compared: PromiseSettledResult<number>,
   run: RigRun,
   deps: BenchDeps,
-): Promise<CheckoutCleanup['result']> {
+): Promise<number> {
   const checkout = await removeBaseCheckout(base.checkoutRoot, run, deps);
 
-  const cleanup = pickCheckoutCleanup(base.checkoutRoot, checkout, compared);
+  const cleanup = pickCheckoutCleanup(base.checkoutRoot, checkout);
 
   writeBenchOutput(cleanup.output, deps);
 
@@ -386,7 +391,7 @@ async function removeComparisonCheckout(
     await deps.removeFolder(base.workFolder);
   }
 
-  return cleanup.result;
+  return cleanup.exitCode;
 }
 
 // An aborted run still removes the checkout, so the removal gets a signal of its own.

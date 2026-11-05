@@ -980,7 +980,7 @@ test('it throws the comparison error and the cleanup error together when a compa
   expect(failure).toStrictEqual(
     expect.objectContaining({
       constructor: AggregateError,
-      message: 'the comparison failed, and its cleanup failed too',
+      message: 'the run failed, and its cleanup failed too',
       errors: [kilnError, shelfError],
     }),
   );
@@ -1165,4 +1165,36 @@ test('it removes the work folder when a lane hook throws', async () => {
   await Promise.allSettled([running]);
 
   expect(ctx.removeFolder).toHaveBeenCalledExactlyOnceWith('/repo/.git/rig-bench/run-1');
+});
+
+test('it throws the head error and the cleanup error together when a lane hook throws and the work folder removal fails', async () => {
+  const ctx = setupTest();
+  const commands = buildStubCommandAnswers({ exitCodes: [], outputs: {} });
+
+  const config = defineRig({
+    lanes: { kiln: { limit: '15s', start: 'test-utils/start-kiln.ts' } },
+    bench: { lane: 'kiln' },
+  });
+
+  const kilnError = new Error('the kiln cracked');
+  const shelfError = new Error('the shelf collapsed');
+
+  ctx.startKiln.mockImplementation(() => Promise.reject(kilnError));
+
+  const failure = await runBench([], config, ctx.run, {
+    ...ctx.deps,
+    ...commands,
+    removeFolder: makeRejectingStub(shelfError),
+  }).then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(failure).toStrictEqual(
+    expect.objectContaining({
+      constructor: AggregateError,
+      message: 'the run failed, and its cleanup failed too',
+      errors: [kilnError, shelfError],
+    }),
+  );
 });

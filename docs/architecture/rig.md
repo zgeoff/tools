@@ -158,11 +158,12 @@ otherwise gives a command that runs the source with bun. It finds the repo root 
 `rig bench` runs each tracked `bench/*.bench.ts` file of a package in a process of its own, under
 `diet`, because a benchmark's heap must not leak into the next one. The process runs the file's
 `defineBench` result through `run-bench-file.ts`: `setup` once, then for each concurrency level 5
-warm-up rounds and 20 measured rounds of that many calls at once. A `finally` then calls the `setup`
-result's `Symbol.asyncDispose` when it has one, so a program that `setup` started stops even when a
-run throws. The process appends one JSON line per level to a report file and exits 0 whatever the
-median, and `rig bench` reads the report and judges the budget, because only the parent knows
-whether the numbers belong to the head or to a base.
+warm-up rounds and 20 measured rounds of that many calls at once. After the rounds settle, it calls
+the `setup` result's `Symbol.asyncDispose` when it has one, so a program that `setup` started stops
+even when a run throws. When the run and the dispose both throw, the process throws an
+`AggregateError` that holds both, the run's error first. The process appends one JSON line per level
+to a report file and exits 0 whatever the median, and `rig bench` reads the report and judges the
+budget, because only the parent knows whether the numbers belong to the head or to a base.
 
 With `--base <ref>`, `rig bench` adds a detached worktree of the ref in a run folder under
 `git rev-parse --git-common-dir`, which git never lists as untracked, runs

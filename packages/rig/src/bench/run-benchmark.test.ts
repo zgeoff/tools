@@ -194,6 +194,33 @@ test('it disposes of the setup result when a run throws', async () => {
   expect(disposals).toStrictEqual(['dispose']);
 });
 
+test('it throws the run error and the dispose error together when a run throws and the dispose rejects', async () => {
+  const kettleError = new Error('the kettle cracked');
+  const lidError = new Error('the lid stuck');
+
+  const definition = defineBench({
+    name: 'boil',
+    budget: '50ms',
+    setup: () => Promise.resolve({ [Symbol.asyncDispose]: () => Promise.reject(lidError) }),
+    run: () => {
+      throw kettleError;
+    },
+  });
+
+  const failure = await runBenchmark(definition, () => 0).then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(failure).toStrictEqual(
+    expect.objectContaining({
+      constructor: AggregateError,
+      message: 'the run failed, and its cleanup failed too',
+      errors: [kettleError, lidError],
+    }),
+  );
+});
+
 test('it waits for every call of the round before it disposes of the setup result when a call rejects', async () => {
   const events: string[] = [];
   const slowCall = Promise.withResolvers<void>();

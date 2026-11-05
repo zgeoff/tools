@@ -1,4 +1,5 @@
 import type { BenchDefinition, PreparedBench } from './define-bench.ts';
+import { pickCleanedUpResult } from './pick-cleaned-up-result.ts';
 import { pickQuantile } from './pick-quantile.ts';
 
 export interface BenchmarkResult {
@@ -17,20 +18,32 @@ export async function runBenchmark(
   now: () => number,
 ): Promise<readonly BenchmarkResult[]> {
   const prepared = await definition.prepare();
+  const [ran] = await Promise.allSettled([runLevels(definition, prepared, now)]);
+  const [cleaned] = await Promise.allSettled([prepared.dispose()]);
 
-  try {
-    const results: BenchmarkResult[] = [];
+  const result = pickCleanedUpResult(ran, cleaned);
 
-    for (const concurrency of definition.concurrency) {
-      const result = await runLevel(prepared, concurrency, now);
-
-      results.push(result);
-    }
-
-    return results;
-  } finally {
-    await prepared.dispose();
+  if (result.kind === 'throw') {
+    throw result.error;
   }
+
+  return result.value;
+}
+
+async function runLevels(
+  definition: BenchDefinition,
+  prepared: PreparedBench,
+  now: () => number,
+): Promise<readonly BenchmarkResult[]> {
+  const results: BenchmarkResult[] = [];
+
+  for (const concurrency of definition.concurrency) {
+    const result = await runLevel(prepared, concurrency, now);
+
+    results.push(result);
+  }
+
+  return results;
 }
 
 const warmUpRounds = 5;

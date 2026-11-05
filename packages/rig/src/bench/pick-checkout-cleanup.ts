@@ -7,32 +7,23 @@ export interface CheckoutCleanup {
   // still points at a folder.
   readonly isWorkFolderKept: boolean;
 
-  readonly result:
-    | { readonly kind: 'exit'; readonly exitCode: number }
-    | { readonly kind: 'throw'; readonly error: unknown };
+  // A checkout that git still registers fails a comparison that passed.
+  readonly exitCode: number;
 }
 
-export function pickCheckoutCleanup(
-  baseRoot: string,
-  checkout: CheckoutState,
-  compared: PromiseSettledResult<number>,
-): CheckoutCleanup {
-  const isWorkFolderKept = checkout === 'left';
-
-  const output: readonly BenchOutput[] = isWorkFolderKept
-    ? [
-        {
-          stream: 'err',
-          text: `rig bench: could not remove the checkout at ${baseRoot}; remove it with git worktree remove --force ${baseRoot}\n`,
-        },
-      ]
-    : [];
-
-  if (compared.status === 'rejected') {
-    return { output, isWorkFolderKept, result: { kind: 'throw', error: compared.reason } };
+export function pickCheckoutCleanup(baseRoot: string, checkout: CheckoutState): CheckoutCleanup {
+  if (checkout !== 'left') {
+    return { output: [], isWorkFolderKept: false, exitCode: 0 };
   }
 
-  const exitCode = isWorkFolderKept && compared.value === 0 ? 1 : compared.value;
-
-  return { output, isWorkFolderKept, result: { kind: 'exit', exitCode } };
+  return {
+    output: [
+      {
+        stream: 'err',
+        text: `rig bench: could not remove the checkout at ${baseRoot}; remove it with git worktree remove --force ${baseRoot}\n`,
+      },
+    ],
+    isWorkFolderKept: true,
+    exitCode: 1,
+  };
 }
