@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.6](https://github.com/zgeoff/tools/compare/@zgeoff/agent-hooks@0.2.5...@zgeoff/agent-hooks@0.2.6) (2026-11-05)
+
+
+### Bug Fixes
+
+* read each repo's skills through a .claude/skills folder link ([#513](https://github.com/zgeoff/tools/issues/513)) ([654f469](https://github.com/zgeoff/tools/commit/654f4696b168d72c156b7785028b5d2af6b4ee76))
+
 ## [0.2.5](https://github.com/zgeoff/tools/compare/@zgeoff/agent-hooks@0.2.4...@zgeoff/agent-hooks@0.2.5) (2026-11-05)
 
 

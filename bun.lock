@@ -37,7 +37,7 @@
     },
     "packages/agent-hooks": {
       "name": "@zgeoff/agent-hooks",
-      "version": "0.2.5",
+      "version": "0.2.6",
       "bin": {
         "agent-hooks": "./dist/cli.js",
       },
@@ -101,7 +101,7 @@
     },
     "packages/chex": {
       "name": "@zgeoff/chex",
-      "version": "0.1.7",
+      "version": "0.1.8",
       "bin": {
         "chex": "./src/cli.ts",
       },
@@ -242,7 +242,7 @@
     },
     "packages/skill-gate": {
       "name": "@zgeoff/skill-gate",
-      "version": "0.2.21",
+      "version": "0.2.22",
       "dependencies": {
         "@zgeoff/agent-hooks": "workspace:*",
       },
