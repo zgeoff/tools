@@ -1,3 +1,16 @@
+export interface BenchOutput {
+  readonly stream: 'out' | 'err';
+
+  readonly text: string;
+}
+
+// What `rig bench` prints, in order, and the exit code it returns after.
+export interface BenchVerdict {
+  readonly output: readonly BenchOutput[];
+
+  readonly exitCode: number;
+}
+
 export interface BenchSideTimes {
   readonly medianMs: number;
 
