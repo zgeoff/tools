@@ -515,12 +515,13 @@ test('it reports a release or deploy job that a newer run can cancel', async () 
 });
 
 test.each([
-  ['true'],
-  [`\${{ github.event_name == 'push' }}`],
-  [`\${{ github.event_name != 'workflow_dispatch' }}`],
+  ['github.run_id', 'true'],
+  ['github.run_id', `\${{ github.event_name == 'push' }}`],
+  ['github.run_id', `\${{ github.event_name != 'workflow_dispatch' }}`],
+  ['github.run_number', `\${{ github.event_name == 'push' }}`],
 ])(
-  'it passes checks beside a release job that give each dispatched run a group of its own, with cancel-in-progress %p',
-  async (cancel) => {
+  'it passes checks beside a release job that group each dispatched run by %p, with cancel-in-progress %p',
+  async (value, cancel) => {
     const ctx = await setupTest();
 
     await ctx.commitFiles({
@@ -534,7 +535,7 @@ test.each([
         '    runs-on: ubuntu-latest',
         '    timeout-minutes: 5',
         '    concurrency:',
-        `      group: checks-\${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}`,
+        `      group: checks-\${{ github.event_name == 'workflow_dispatch' && ${value} || github.ref }}`,
         `      cancel-in-progress: ${cancel}`,
         '    steps:',
         '      - run: bun run lint',
@@ -585,6 +586,12 @@ test.each([
     `checks-\${{ github.event_name == 'workflow_dispatch' && github.run_attempt || github.ref }}`,
     'true',
     ['the concurrency group holds github.run_attempt, so no newer run cancels this one'],
+  ],
+  [
+    'the dispatch branch returns a shared value after the run ID',
+    `checks-\${{ github.event_name == 'workflow_dispatch' && github.run_id && github.ref || github.ref }}`,
+    'true',
+    ['the concurrency group holds github.run_id, so no newer run cancels this one'],
   ],
   [
     'a push run never cancels',

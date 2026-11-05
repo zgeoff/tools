@@ -157,44 +157,34 @@ function isMainGate(context: WorkflowContext): boolean {
   );
 }
 
-// Two dispatches at one commit share github.sha, and github.run_attempt starts at 1 in each run.
-const dispatchRunValues = new Set(['github.run_id', 'github.run_number']);
-
-// A dispatched run whose group holds a run-unique value shares the group with no other run, so no
-// run cancels it, and every other run still cancels.
+// A dispatched run whose group is a run-unique value shares the group with no other run, so no run
+// cancels it, and every other run still cancels.
 function isDispatchGroup(context: WorkflowContext, concurrency: unknown): boolean {
   const group = findMember(concurrency, 'group');
 
   return (
     typeof group === 'string' &&
-    parseGroupReferences(group).dispatch.some((value) => dispatchRunValues.has(value)) &&
+    findNonDispatchGroup(group) !== undefined &&
     isCancellingOutsideDispatch(context, findMember(concurrency, 'cancel-in-progress'))
   );
 }
 
-interface GroupReferences {
-  // The context references only a dispatched run's group reads.
-  readonly dispatch: readonly string[];
-
-  readonly other: readonly string[];
-}
-
 // GitHub reads `a && b || c` as `(a && b) || c`, so a dispatched run takes its group from b and
-// every other run from c. A `||` inside b ends b early, which moves its references to the rest.
+// every other run from c. A `||` inside b ends b early, so b no longer reads as one value.
 const dispatchGroupPattern =
   /^(?<prefix>[^$]*)\$\{\{\s*github\.event_name\s*==\s*'workflow_dispatch'\s*&&(?<dispatch>.+?)\|\|(?<other>.+)\}\}(?<suffix>[^$]*)$/su;
 
-function parseGroupReferences(group: string): GroupReferences {
+// Two dispatches at one commit share github.sha, and github.run_attempt starts at 1 in each run.
+const dispatchRunValues = new Set(['github.run_id', 'github.run_number']);
+
+// Returns the group a run other than a dispatched one reads, when a dispatched run's group is a
+// lone run-unique value.
+function findNonDispatchGroup(group: string): string | undefined {
   const split = dispatchGroupPattern.exec(group)?.groups;
 
-  return split === undefined
-    ? { dispatch: [], other: collectExpressionReferences(group) }
-    : {
-        dispatch: collectExpressionReferences(`\${{ ${split['dispatch'] ?? ''} }}`),
-        other: collectExpressionReferences(
-          `${split['prefix'] ?? ''}\${{ ${split['other'] ?? ''} }}${split['suffix'] ?? ''}`,
-        ),
-      };
+  return split !== undefined && dispatchRunValues.has((split['dispatch'] ?? '').trim())
+    ? `${split['prefix'] ?? ''}\${{ ${split['other'] ?? ''} }}${split['suffix'] ?? ''}`
+    : undefined;
 }
 
 function isCancellingOutsideDispatch(context: WorkflowContext, cancel: unknown): boolean {
@@ -237,17 +227,10 @@ function collectPerRunGroupFindings(
   line: number,
 ): WorkflowFinding[] {
   const group = findMember(concurrency, 'group');
-
-  const groupReferences =
-    typeof group === 'string' ? parseGroupReferences(group) : { dispatch: [], other: [] };
-
-  const references = new Set([
-    ...groupReferences.other,
-    ...groupReferences.dispatch.filter((value) => !dispatchRunValues.has(value)),
-  ]);
-
+  const checked = typeof group === 'string' ? (findNonDispatchGroup(group) ?? group) : '';
+  const references = collectExpressionReferences(checked);
   const allowed = isGateGroup(context, concurrency) ? 'github.sha' : undefined;
-  const perRun = perRunValues.find((value) => value !== allowed && references.has(value));
+  const perRun = perRunValues.find((value) => value !== allowed && references.includes(value));
 
   return perRun === undefined
     ? []
