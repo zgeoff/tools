@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/zgeoff/tools/compare/@zgeoff/testing@0.2.0...@zgeoff/testing@0.2.1) (2026-11-05)
+
+
+### Bug Fixes
+
+* **sync:** ask a delivered import to name its file ([#518](https://github.com/zgeoff/tools/issues/518)) ([a0db58c](https://github.com/zgeoff/tools/commit/a0db58cc79f5778e12332e925ef17b215d6ca2e2))
+
 ## [0.2.0](https://github.com/zgeoff/tools/compare/@zgeoff/testing@0.1.0...@zgeoff/testing@0.2.0) (2026-11-04)
 
 

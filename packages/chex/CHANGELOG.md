@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.6](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.1.5...@zgeoff/chex@0.1.6) (2026-11-05)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zgeoff/std bumped to 0.4.2
+  * devDependencies
+    * @zgeoff/rig bumped to 0.1.4
+    * @zgeoff/std bumped to 0.4.2
+    * @zgeoff/testing bumped to 0.2.1
+
 ## [0.1.5](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.1.4...@zgeoff/chex@0.1.5) (2026-11-05)
 
 
