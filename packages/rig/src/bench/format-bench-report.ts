@@ -1,6 +1,6 @@
+import type { BenchReportEntry } from './bench-report-entry-schema.ts';
 import type { BenchDefinition } from './define-bench.ts';
 import type { BenchmarkResult } from './run-benchmark.ts';
-import type { BenchReportEntry } from './types.ts';
 
 export function formatBenchReport(
   file: string,

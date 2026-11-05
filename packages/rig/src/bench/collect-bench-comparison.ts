@@ -1,4 +1,5 @@
-import type { BenchComparisonRow, BenchReportEntry, BenchSideTimes } from './types.ts';
+import type { BenchReportEntry } from './bench-report-entry-schema.ts';
+import type { BenchComparisonRow, BenchSideTimes } from './types.ts';
 
 // Each side's entries name their bench file relative to that side's root, so the same file matches
 // on both sides.

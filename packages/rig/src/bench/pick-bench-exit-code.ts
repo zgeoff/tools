@@ -1,4 +1,4 @@
-import type { BenchReportEntry } from './types.ts';
+import type { BenchReportEntry } from './bench-report-entry-schema.ts';
 
 // The budget holds on the head only, so a base slower than its budget still lets the head pass.
 export function pickBenchExitCode(

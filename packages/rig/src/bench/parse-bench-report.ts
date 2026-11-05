@@ -1,4 +1,5 @@
-import type { BenchReportEntry } from './types.ts';
+import type { BenchReportEntry } from './bench-report-entry-schema.ts';
+import { benchReportEntrySchema } from './bench-report-entry-schema.ts';
 
 export type ParsedBenchReport =
   | { readonly kind: 'parsed'; readonly entries: readonly BenchReportEntry[] }
@@ -35,27 +36,7 @@ function parseEntry(line: string): BenchReportEntry | null {
     return null;
   }
 
-  if (typeof value !== 'object' || value === null) {
-    return null;
-  }
+  const parsed = benchReportEntrySchema.safeParse(value);
 
-  const file: unknown = Reflect.get(value, 'file');
-  const name: unknown = Reflect.get(value, 'name');
-  const concurrency: unknown = Reflect.get(value, 'concurrency');
-  const medianMs: unknown = Reflect.get(value, 'medianMs');
-  const spreadMs: unknown = Reflect.get(value, 'spreadMs');
-  const budgetMs: unknown = Reflect.get(value, 'budgetMs');
-
-  if (
-    typeof file !== 'string' ||
-    typeof name !== 'string' ||
-    typeof concurrency !== 'number' ||
-    typeof medianMs !== 'number' ||
-    typeof spreadMs !== 'number' ||
-    typeof budgetMs !== 'number'
-  ) {
-    return null;
-  }
-
-  return { file, name, concurrency, medianMs, spreadMs, budgetMs };
+  return parsed.success ? parsed.data : null;
 }

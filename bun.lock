@@ -229,6 +229,7 @@
         "@zgeoff/std": "workspace:*",
         "gunshi": "catalog:",
         "ts-pattern": "catalog:",
+        "zod": "catalog:",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
@@ -237,7 +238,6 @@
         "tiny-invariant": "catalog:",
         "tsrs": "catalog:",
         "typescript": "catalog:",
-        "zod": "catalog:",
       },
     },
     "packages/skill-gate": {

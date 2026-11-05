@@ -1,20 +1,3 @@
-// One line of the report that a bench file process appends for `rig bench` to read: one benchmark
-// at one concurrency level.
-export interface BenchReportEntry {
-  // Two bench files can define benchmarks of the same name, so the file tells them apart.
-  readonly file: string;
-
-  readonly name: string;
-
-  readonly concurrency: number;
-
-  readonly medianMs: number;
-
-  readonly spreadMs: number;
-
-  readonly budgetMs: number;
-}
-
 export interface BenchSideTimes {
   readonly medianMs: number;
 
