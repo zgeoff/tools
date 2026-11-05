@@ -1069,7 +1069,7 @@ test.each([
   ['../leaves', 'sync/leaves/index.ts', 'scripts/leaves/index.ts'],
   ['../steep.js', 'sync/steep.ts', 'scripts/steep.ts'],
 ])(
-  'it resolves the relative import %p to the file Bun loads, and passes when the entry delivers it',
+  'it asks for the file path of the import %p, even when the entry delivers the file Bun would load',
   async (specifier, importedSource, importedTarget) => {
     const ctx = await setupTest();
 
@@ -1094,79 +1094,16 @@ test.each([
       exitCode: result.exitCode,
       stdout: result.stdout.toString(),
       stderr: result.stderr.toString(),
-    }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
-  },
-);
-
-test('it fails when the entry leaves out the file an import without an extension resolves to', async () => {
-  const ctx = await setupTest();
-
-  await writeTreeFiles(ctx.directory, {
-    'sync/kettle/brew.ts': "import { steep } from '../steep';\n\nconsole.log(steep);\n",
-    'sync/steep.ts': 'export const steep = 3;\n',
-    'sync/manifest.json': JSON.stringify([
-      {
-        name: 'brew',
-        description: 'The brew script',
-        files: [{ source: 'sync/kettle/brew.ts', target: 'scripts/kettle/brew.ts' }],
-      },
-    ]),
-  });
-
-  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
-
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  }).toStrictEqual({
-    exitCode: 1,
-    stdout: '',
-    stderr:
-      "check-sync-manifest: entry 'brew' delivers sync/kettle/brew.ts to scripts/kettle/brew.ts, which imports ../steep, but the entry does not deliver sync/steep.ts to scripts/steep.ts\n",
-  });
-});
-
-test.each([['alias.ts'], ['steep.backup']])(
-  'it names the file that answers an import, not the symlink %p to the same file',
-  async (decoy) => {
-    const ctx = await setupTest();
-
-    await writeTreeFiles(ctx.directory, {
-      'sync/kettle/brew.ts': "import { steep } from './steep';\n\nconsole.log(steep);\n",
-      'sync/kettle/steep.ts': 'export const steep = 3;\n',
-      'sync/manifest.json': JSON.stringify([
-        {
-          name: 'brew',
-          description: 'The brew script',
-          files: [
-            { source: 'sync/kettle/brew.ts', target: 'scripts/brew.ts' },
-            { source: `sync/kettle/${decoy}`, target: `scripts/${decoy}` },
-          ],
-        },
-      ]),
-    });
-
-    await symlink('steep.ts', join(ctx.directory, 'sync/kettle', decoy));
-
-    const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
-
-    expect({
-      exitCode: result.exitCode,
-      stdout: result.stdout.toString(),
-      stderr: result.stderr.toString(),
     }).toStrictEqual({
       exitCode: 1,
       stdout: '',
-      stderr:
-        "check-sync-manifest: entry 'brew' delivers sync/kettle/brew.ts to scripts/brew.ts, which imports ./steep, but the entry does not deliver sync/kettle/steep.ts to scripts/steep.ts\n",
+      stderr: `check-sync-manifest: entry 'brew' delivers sync/kettle/brew.ts, which imports ${specifier}, a path that names no file; write the import as the file's path with its extension\n`,
     });
   },
 );
 
 test.each([
-  ['./steep', 'steep.ts', 'sync/kettle/steep.ts'],
-  ['./alias', 'alias.ts', 'sync/kettle/alias.ts'],
+  ['./steep.ts', 'steep.ts', 'sync/kettle/steep.ts'],
   ['./alias.ts', 'alias.ts', 'sync/kettle/alias.ts'],
   ['./alias.ts', 'alias.ts', 'packages/tea/steep.ts'],
 ])(
@@ -1198,45 +1135,6 @@ test.each([
       stdout: result.stdout.toString(),
       stderr: result.stderr.toString(),
     }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
-  },
-);
-
-test.each([
-  [
-    'sync/steep.ts',
-    'scripts/steep.ts',
-    1,
-    "check-sync-manifest: entry 'brew' delivers sync/kettle/brew.ts to scripts/kettle/brew.ts, which imports ../steep, but the entry does not deliver sync/steep.tsx to scripts/steep.tsx\n",
-  ],
-  ['sync/steep.tsx', 'scripts/steep.tsx', 0, ''],
-])(
-  'it follows the file Bun loads when two files answer an import without an extension, with %p delivered',
-  async (delivered, deliveredTarget, exitCode, stderr) => {
-    const ctx = await setupTest();
-
-    await writeTreeFiles(ctx.directory, {
-      'sync/kettle/brew.ts': "import { steep } from '../steep';\n\nconsole.log(steep);\n",
-      'sync/steep.ts': 'export const steep = 3;\n',
-      'sync/steep.tsx': 'export const steep = 4;\n',
-      'sync/manifest.json': JSON.stringify([
-        {
-          name: 'brew',
-          description: 'The brew script',
-          files: [
-            { source: 'sync/kettle/brew.ts', target: 'scripts/kettle/brew.ts' },
-            { source: delivered, target: deliveredTarget },
-          ],
-        },
-      ]),
-    });
-
-    const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
-
-    expect({
-      exitCode: result.exitCode,
-      stdout: result.stdout.toString(),
-      stderr: result.stderr.toString(),
-    }).toStrictEqual({ exitCode, stdout: '', stderr });
   },
 );
 
@@ -1272,7 +1170,7 @@ test('it reports each import of a file when one import runs through another file
     exitCode: 1,
     stdout: '',
     stderr: [
-      "check-sync-manifest: entry 'brew' delivers sync/kettle/brew.ts to scripts/brew.ts, which imports ./helper.ts/missing, but the entry does not deliver sync/kettle/helper.ts/missing to scripts/helper.ts/missing",
+      "check-sync-manifest: entry 'brew' delivers sync/kettle/brew.ts, which imports ./helper.ts/missing, a path that names no file; write the import as the file's path with its extension",
       "check-sync-manifest: entry 'brew' delivers sync/kettle/brew.ts to scripts/brew.ts, which imports ./steep.ts, but the entry does not deliver sync/kettle/steep.ts to scripts/steep.ts",
       '',
     ].join('\n'),

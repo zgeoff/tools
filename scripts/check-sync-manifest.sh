@@ -173,14 +173,21 @@ while IFS=$'\t' read -r name repo source target; do
   # The package check above reports a source that does not parse.
   imported=$(bun "$scripts_dir/collect-relative-imports.ts" "$path" 2> /dev/null) || continue
 
-  # Each line holds the import and the path, as written beside the import, of
-  # the file Bun loads for it.
-  while IFS=$'\t' read -r specifier loaded; do
+  while IFS= read -r specifier; do
     [ -n "$specifier" ] || continue
+
+    # Bun picks among several files for an import without an extension, and the
+    # file it picks behind a symlink can't be read back, so the check takes
+    # only an import that names its file.
+    if [ ! -f "$(dirname "$source")/$specifier" ]; then
+      report "entry '$name' delivers $source, which imports $specifier, a path that names no file; write the import as the file's path with its extension"
+      continue
+    fi
+
     # An entry may name a symlinked file by its own path or by the file behind it.
-    wanted_source=$(realpath -m -s --relative-to=. "$(dirname "$source")/$loaded")
-    linked_source=$(realpath -m --relative-to=. "$(dirname "$source")/$loaded")
-    wanted_target=$(realpath -m -s --relative-to=. "$(dirname "$target")/$loaded")
+    wanted_source=$(realpath -m -s --relative-to=. "$(dirname "$source")/$specifier")
+    linked_source=$(realpath -m --relative-to=. "$(dirname "$source")/$specifier")
+    wanted_target=$(realpath -m -s --relative-to=. "$(dirname "$target")/$specifier")
 
     if ! jq -e --arg name "$name" --arg source "$wanted_source" --arg linked "$linked_source" \
       --arg target "$wanted_target" \
