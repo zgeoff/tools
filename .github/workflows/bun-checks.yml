@@ -92,7 +92,7 @@ on:
 
 # The chex release that every chex step runs from npm. Renovate bumps it.
 env:
-  CHEX: '@zgeoff/chex@0.1.6'
+  CHEX: '@zgeoff/chex@0.1.7'
 
 jobs:
   # Public profile.
