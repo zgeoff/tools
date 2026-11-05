@@ -29,8 +29,8 @@ function collectDeployFindings(
   job: Job,
   workflowConcurrency: unknown,
 ): WorkflowFinding[] {
-  const isQueued =
-    isQueueGroup(findMember(job.definition, 'concurrency')) || isQueueGroup(workflowConcurrency);
+  const concurrency = findMember(job.definition, 'concurrency');
+  const isQueued = isQueueGroup(concurrency ?? workflowConcurrency);
 
   return [
     ...(isQueued
@@ -157,18 +157,17 @@ function isMainGate(context: WorkflowContext): boolean {
   );
 }
 
-// A value that differs between two runs on the same branch gives each run its own group, which no
-// later run cancels.
-const perRunValues = ['github.sha', 'github.run_id', 'github.run_number', 'github.run_attempt'];
+// Two dispatches at one commit share github.sha, and github.run_attempt starts at 1 in each run.
+const dispatchRunValues = new Set(['github.run_id', 'github.run_number']);
 
-// A dispatched run whose group holds a per-run value shares the group with no other run, so no run
-// cancels it, and every other run still cancels.
+// A dispatched run whose group holds a run-unique value shares the group with no other run, so no
+// run cancels it, and every other run still cancels.
 function isDispatchGroup(context: WorkflowContext, concurrency: unknown): boolean {
   const group = findMember(concurrency, 'group');
 
   return (
     typeof group === 'string' &&
-    perRunValues.some((value) => parseGroupReferences(group).dispatch.includes(value)) &&
+    parseGroupReferences(group).dispatch.some((value) => dispatchRunValues.has(value)) &&
     isCancellingOutsideDispatch(context, findMember(concurrency, 'cancel-in-progress'))
   );
 }
@@ -228,15 +227,27 @@ function isEventExpressionTrue(text: string, event: string): boolean {
   );
 }
 
+// A value that differs between two runs on the same branch gives each run its own group, which no
+// later run cancels.
+const perRunValues = ['github.sha', 'github.run_id', 'github.run_number', 'github.run_attempt'];
+
 function collectPerRunGroupFindings(
   context: WorkflowContext,
   concurrency: unknown,
   line: number,
 ): WorkflowFinding[] {
   const group = findMember(concurrency, 'group');
-  const references = typeof group === 'string' ? parseGroupReferences(group).other : [];
+
+  const groupReferences =
+    typeof group === 'string' ? parseGroupReferences(group) : { dispatch: [], other: [] };
+
+  const references = new Set([
+    ...groupReferences.other,
+    ...groupReferences.dispatch.filter((value) => !dispatchRunValues.has(value)),
+  ]);
+
   const allowed = isGateGroup(context, concurrency) ? 'github.sha' : undefined;
-  const perRun = perRunValues.find((value) => value !== allowed && references.includes(value));
+  const perRun = perRunValues.find((value) => value !== allowed && references.has(value));
 
   return perRun === undefined
     ? []

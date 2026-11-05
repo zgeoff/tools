@@ -567,27 +567,48 @@ test.each([
     'two dispatches at one ref share a group',
     `checks-\${{ github.event_name == 'workflow_dispatch' && github.ref_name || github.ref }}`,
     `\${{ github.event_name == 'push' }}`,
-    'job checks runs in a checks workflow beside a release or deploy job, so it sets a job-level concurrency group with cancel-in-progress: true',
+    [
+      'job checks runs in a checks workflow beside a release or deploy job, so it sets a job-level concurrency group with cancel-in-progress: true',
+    ],
+  ],
+  [
+    'two dispatches at one commit share a group',
+    `checks-\${{ github.event_name == 'workflow_dispatch' && github.sha || github.ref }}`,
+    `\${{ github.event_name == 'push' }}`,
+    [
+      'job checks runs in a checks workflow beside a release or deploy job, so it sets a job-level concurrency group with cancel-in-progress: true',
+      'the concurrency group holds github.sha, so no newer run cancels this one',
+    ],
+  ],
+  [
+    'a dispatched run groups by its attempt number',
+    `checks-\${{ github.event_name == 'workflow_dispatch' && github.run_attempt || github.ref }}`,
+    'true',
+    ['the concurrency group holds github.run_attempt, so no newer run cancels this one'],
   ],
   [
     'a push run never cancels',
     `checks-\${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}`,
     `\${{ github.event_name == 'workflow_dispatch' }}`,
-    'job checks runs in a checks workflow beside a release or deploy job, so it sets a job-level concurrency group with cancel-in-progress: true',
+    [
+      'job checks runs in a checks workflow beside a release or deploy job, so it sets a job-level concurrency group with cancel-in-progress: true',
+    ],
   ],
   [
     'the cancel expression tests more than the event',
     `checks-\${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}`,
     `\${{ github.event_name == 'push' && vars.CANCEL == 'yes' }}`,
-    'job checks runs in a checks workflow beside a release or deploy job, so it sets a job-level concurrency group with cancel-in-progress: true',
+    [
+      'job checks runs in a checks workflow beside a release or deploy job, so it sets a job-level concurrency group with cancel-in-progress: true',
+    ],
   ],
   [
     'a push run takes a per-run group',
     `checks-\${{ github.event_name == 'workflow_dispatch' && github.run_id || github.run_number }}`,
     'true',
-    'the concurrency group holds github.run_number, so no newer run cancels this one',
+    ['the concurrency group holds github.run_number, so no newer run cancels this one'],
   ],
-])('it reports checks beside a release job when %s', async (_case, group, cancel, message) => {
+])('it reports checks beside a release job when %s', async (_case, group, cancel, messages) => {
   const ctx = await setupTest();
 
   await ctx.commitFiles({
@@ -625,7 +646,9 @@ test.each([
     runProgram,
   });
 
-  expect(findings).toStrictEqual([{ path: '.github/workflows/main.yml', line: 6, message }]);
+  expect(findings).toStrictEqual(
+    messages.map((message) => ({ path: '.github/workflows/main.yml', line: 6, message })),
+  );
 });
 
 test('it passes a release job that a workflow-level queue covers, whose group keeps each push run apart', async () => {
@@ -669,6 +692,48 @@ test('it passes a release job that a workflow-level queue covers, whose group ke
   });
 
   expect(findings).toStrictEqual([]);
+});
+
+test('it reports a release job whose own group cancels, though a workflow-level queue covers the run', async () => {
+  const ctx = await setupTest();
+
+  await ctx.commitFiles({
+    '.github/workflows/main.yml': [
+      'on:',
+      '  push:',
+      '    branches: [main]',
+      'concurrency:',
+      `  group: main-\${{ github.run_id }}`,
+      '  cancel-in-progress: false',
+      'jobs:',
+      '  release:',
+      '    runs-on: ubuntu-latest',
+      '    timeout-minutes: 5',
+      '    concurrency:',
+      '      group: release',
+      '      cancel-in-progress: true',
+      '    steps:',
+      '      - run: bun run release',
+      '',
+    ].join('\n'),
+  });
+
+  const findings = runWorkflowsCheck({
+    cwd: ctx.directory,
+    env: ctx.env,
+    paths: [],
+    profile: undefined,
+    runProgram,
+  });
+
+  expect(findings).toStrictEqual([
+    {
+      path: '.github/workflows/main.yml',
+      line: 8,
+      message:
+        'job release releases or deploys, so it or its workflow sets a concurrency group with cancel-in-progress: false',
+    },
+  ]);
 });
 
 test('it reports a per-run group that never cancels in a checks workflow with no release job', async () => {
