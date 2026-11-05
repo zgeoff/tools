@@ -13,8 +13,8 @@ sync/test-utils/.test-*
 # skills to.
 /.zgeoff-skills/
 /.zgeoff-skills.lock
-/.claude/skills/code-style
-/.claude/skills/docs-writing
-/.claude/skills/skill-writing
-/.claude/skills/deslop
-/.claude/skills/cold-read
+/.agents/skills/code-style
+/.agents/skills/docs-writing
+/.agents/skills/skill-writing
+/.agents/skills/deslop
+/.agents/skills/cold-read

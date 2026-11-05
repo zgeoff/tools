@@ -14,6 +14,9 @@
 # list of targets the run copied names the new targets it wrote; a target that
 # `except` kept from the repo is not in it, so its old copy stays.
 #
+# A retired file whose path reaches the file of a current target through a
+# symlink stays, because it is that target's copy.
+#
 # A retired file stays while an entry that delivered it is still in the
 # manifest and is not in the comma-separated list of entries this run synced,
 # because the entry's current files can still need it. A retired file of an
@@ -107,9 +110,10 @@ to_delivered_form() {
   fi
 }
 
-declare -A current=() listed=() entries=() sources=() taken=() skipped=() moved=() renamed=() copied=()
+declare -A current=() current_files=() listed=() entries=() sources=() taken=() skipped=() moved=() renamed=() copied=()
 while IFS= read -r target; do
   current["$target"]=1
+  current_files["$(realpath -m -- "$target")"]=1
 done < <(jq -r '.[].files[].target' "$tools/sync/manifest.json")
 
 while IFS= read -r name; do
@@ -170,6 +174,11 @@ done <<< "$rows"
 
 while IFS= read -r target; do
   if [ -z "$target" ] || [ ! -f "$target" ] || [ -L "$target" ]; then
+    continue
+  fi
+  # Through a symlinked folder, such as .claude/skills linked to .agents/skills, a retired target
+  # can name the file of a current target, which the run has just written.
+  if [ -n "${current_files[$(realpath -m -- "$target")]:-}" ]; then
     continue
   fi
   kept=0

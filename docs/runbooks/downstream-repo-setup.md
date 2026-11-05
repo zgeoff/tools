@@ -35,7 +35,17 @@ baseline need changes in the repo beyond the `include` line, which repo-sync nev
 
    Expect: `true`.
 
-4. Dispatch it once: `gh workflow run repo-sync.yml -R zgeoff/<repo>`. Expect one pull request that
+4. Keep the repo's skills in `.agents/skills/`, and link `.claude/skills` to it, as
+   [Skills](../architecture/repo-sync.md#skills) describes. Run this at the repo root, and commit
+   the link:
+
+   ```sh
+   mkdir -p .agents/skills .claude && ln -s ../.agents/skills .claude/skills && git add .claude/skills
+   ```
+
+   Expect: `git ls-files -s .claude/skills` prints mode `120000`.
+
+5. Dispatch it once: `gh workflow run repo-sync.yml -R zgeoff/<repo>`. Expect one pull request that
    carries every entry the repo is behind on. From then on, each merge to `main` of tools that
    changes a synced file opens or updates that pull request.
 
@@ -53,8 +63,7 @@ A repo opts in to the `hook-start` entry in five steps, plus a sixth for a repo 
    [The shared rules](../guides/skill-gate-rules.md#the-shared-rules).
 5. Run `bunx agent-hooks init` at the repo root. Expect
    `agent-hooks init wrote .claude/settings.json and .codex/hooks.json`.
-6. For a repo that also uses Codex, trust the hook definitions in the Codex CLI with `/hooks`. Codex
-   reads skills from `.agents/skills`, so link it to `.claude/skills`.
+6. For a repo that also uses Codex, trust the hook definitions in the Codex CLI with `/hooks`.
 
 ## Opting in to the pre-push baseline
 

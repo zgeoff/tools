@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { removePath } from '../../packages/rig/src/browser/remove-path.ts';
 import { nodeFileSystem } from './node-file-system.ts';
@@ -61,4 +61,22 @@ test('it reads the path of every file below a folder, and none for a missing fol
 
   expect(paths).toStrictEqual(['lid.txt', 'spout/water.txt']);
   expect(missing).toStrictEqual([]);
+});
+
+test('it resolves a path through a folder link to the absolute path of the real folder', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, 'shelf/kettle'), { recursive: true });
+  await symlink('shelf', join(ctx.directory, 'counter'));
+
+  const resolved = await nodeFileSystem.resolveRealPath(join(ctx.directory, 'counter/kettle'));
+  const directory = await realpath(ctx.directory);
+
+  expect(resolved).toBe(join(directory, 'shelf/kettle'));
+});
+
+test('it rejects a path that does not exist', async () => {
+  const ctx = await setupTest();
+
+  expect(nodeFileSystem.resolveRealPath(join(ctx.directory, 'teapot'))).rejects.toThrow();
 });

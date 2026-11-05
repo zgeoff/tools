@@ -146,11 +146,16 @@ pull-request checks.
 
 ## Skills
 
-The text of each shared Claude skill lives in [zgeoff/skills](https://github.com/zgeoff/skills),
-under `skills/<name>/`, and its `skill-<name>` entry delivers it to `.claude/skills/<name>/`. The
-run checks out zgeoff/skills at the commit that `sync/skills-pin.json` holds in the tools commit it
-syncs, so a repo's sync pull request names both commits. A skill entry is opt-in, so a repo takes
-only the skills for the work it holds. These skill entries are not opt-in, and reach every repo:
+The text of each shared skill lives in [zgeoff/skills](https://github.com/zgeoff/skills), under
+`skills/<name>/`, and its `skill-<name>` entry delivers it to `.claude/skills/<name>/`. Each repo
+keeps its skills in `.agents/skills/`, where Codex reads them, and links `.claude/skills`, where
+Claude Code reads them, to `../.agents/skills`, so the copy lands in `.agents/skills/<name>/`. The
+targets stay under `.claude/skills/`: in a repo whose `.claude/skills` is a folder, a target under
+`.agents/skills/` lands where Claude Code never reads, and the retired-file step deletes the copy it
+does read. The run checks out zgeoff/skills at the commit that `sync/skills-pin.json` holds in the
+tools commit it syncs, so a repo's sync pull request names both commits. A skill entry is opt-in, so
+a repo takes only the skills for the work it holds. These skill entries are not opt-in, and reach
+every repo:
 
 - `skill-pr-evidence`, because every agent that opens a pull request needs it.
 - `skill-deslop`, because the skill gate makes an agent load it before a skill edit.
@@ -168,9 +173,9 @@ This repo takes skills from the same pin. `bun run skills:install`, which `bun i
 unpacks zgeoff/skills at the pinned commit into the git-ignored `.zgeoff-skills/<commit>/`, and
 links each skill that `defaultPinnedSkills` in
 [`write-pinned-skills.ts`](../../scripts/skills/write-pinned-skills.ts) lists from
-`.claude/skills/`. Two installs in one checkout run one at a time, through the lock file
-`.zgeoff-skills.lock`. The verb-contract test reads code-style's role table from that tree, and the
-function-verb test reads its banned verbs.
+`.agents/skills/`, which the tracked link `.claude/skills` points to. Two installs in one checkout
+run one at a time, through the lock file `.zgeoff-skills.lock`. The verb-contract test reads
+code-style's role table from that tree, and the function-verb test reads its banned verbs.
 
 A reference that fits only some repos, such as one for a language a repo never uses, names the other
 repos in its `except`, so they never load it. Every link to it in the entry's Markdown files sits in
@@ -220,9 +225,10 @@ finds the move in this repo's history, so a repo that missed syncs since the mov
 too.
 
 A retired file also stays while its entry is still in the manifest and the run did not sync that
-entry, because the entry's current files can still need it. That covers an entry the repo skips or
-leaves out of `include`, and an entry that failed. A retired file of an entry that the manifest no
-longer holds stays when the repo lists that entry in `skip`.
+entry, because the entry's current files can still need it. A retired path that reaches the file of
+a current target through a symlink stays too, because it is that target's fresh copy. That covers an
+entry the repo skips or leaves out of `include`, and an entry that failed. A retired file of an
+entry that the manifest no longer holds stays when the repo lists that entry in `skip`.
 [`scripts/remove-retired-sync-files.sh`](../../scripts/remove-retired-sync-files.sh) reads the
 earlier manifests from this repo's history, and the versions of a zgeoff/skills source from that
 repo's history, so the workflow checks out the full history of both.
@@ -234,11 +240,12 @@ so the pull request merges once the repo's required checks pass. Its files are t
 already reviewed, so it needs no review in the repo. The workflow turns auto-merge on only when the
 pull request merges into the branch the run synced from, and the branch changes nothing but the
 targets the run copied, the retired copies it removed, and `package.json` changed only by the
-scripts that an entry's `scripts` field declares. On any other change it warns and leaves auto-merge
-off, and the pull request waits for review. Auto-merge binds to the head commit that the run
-checked. A repo whose settings disallow auto-merge gets a warning, and its sync pull requests wait
-for review. GitHub refuses auto-merge for a pull request that can merge at once, such as one in a
-repo whose rules require no check, so that pull request waits for review too.
+scripts that an entry's `scripts` field declares, each path read with its folders' symlinks
+resolved, as git records it. On any other change it warns and leaves auto-merge off, and the pull
+request waits for review. Auto-merge binds to the head commit that the run checked. A repo whose
+settings disallow auto-merge gets a warning, and its sync pull requests wait for review. GitHub
+refuses auto-merge for a pull request that can merge at once, such as one in a repo whose rules
+require no check, so that pull request waits for review too.
 
 GitHub keeps auto-merge on through a later push by anyone with write access, the workflow's own
 force push included, so two steps keep an unchecked commit from merging on its own. The workflow

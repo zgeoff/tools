@@ -14,7 +14,7 @@ test('it lists the skills and references the gates on a tool need that the sessi
         { tool: 'mcp__tracker__close_ticket', skills: ['closing'], references: [] },
       ],
       toolName: 'mcp__tracker__update_ticket',
-      skillsDir: '/repo/.claude/skills',
+      projectDir: '/repo',
       loads: { skills: ['ticket-review'], readPaths: [], compacted: false },
       availableSkills: ['ticket-review', 'tracker', 'closing'],
       availableReferences: ['ticket-review/references/reasons.md'],
@@ -37,10 +37,33 @@ test('it counts a reference once the session reads its file under the skills fol
         },
       ],
       toolName: 'mcp__tracker__update_ticket',
-      skillsDir: '/repo/.claude/skills',
+      projectDir: '/repo',
       loads: {
         skills: [],
         readPaths: ['/repo/.claude/skills/ticket-review/./references/reasons.md'],
+        compacted: false,
+      },
+      availableSkills: [],
+      availableReferences: ['ticket-review/references/reasons.md'],
+    }),
+  ).toStrictEqual({ missingSkills: [], missingReferences: [], unknown: [] });
+});
+
+test('it counts a reference once the session reads its file under .agents/skills', () => {
+  expect(
+    planToolGate({
+      tools: [
+        {
+          tool: 'mcp__tracker__update_ticket',
+          skills: [],
+          references: ['ticket-review/references/reasons.md'],
+        },
+      ],
+      toolName: 'mcp__tracker__update_ticket',
+      projectDir: '/repo',
+      loads: {
+        skills: [],
+        readPaths: ['/repo/.agents/skills/ticket-review/references/reasons.md'],
         compacted: false,
       },
       availableSkills: [],
@@ -60,7 +83,7 @@ test('it never counts a read of a file with the same name in another folder', ()
         },
       ],
       toolName: 'mcp__tracker__update_ticket',
-      skillsDir: '/repo/.claude/skills',
+      projectDir: '/repo',
       loads: {
         skills: [],
         readPaths: ['/elsewhere/ticket-review/references/reasons.md'],
@@ -87,7 +110,7 @@ test('it reports a skill or reference the repo lacks and never requires it', () 
         },
       ],
       toolName: 'mcp__tracker__update_ticket',
-      skillsDir: '/repo/.claude/skills',
+      projectDir: '/repo',
       loads: { skills: [], readPaths: [], compacted: false },
       availableSkills: ['ticket-review'],
       availableReferences: [],

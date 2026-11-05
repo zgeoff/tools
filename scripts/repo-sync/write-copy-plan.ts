@@ -18,7 +18,11 @@ export async function writeCopyPlan(context: CopyPlanContext, plan: CopyPlan): P
     const path = join(context.cwd, copy.target);
     const existing = copy.isPinned ? await readExistingText(context, path) : null;
 
-    await context.fileSystem.createDirectory(join(context.cwd, dirname(copy.target)));
+    // mkdir fails on a path through a link to a folder that does not exist yet, such as a
+    // .claude/skills link to an .agents/skills that git checked out empty, so it gets the real path.
+    const folder = await runChecked(context, ['realpath', '-m', '--', dirname(copy.target)]);
+
+    await context.fileSystem.createDirectory(folder.stdout.trimEnd());
 
     await runChecked(context, ['install', '-m', copy.mode, copy.source, copy.target]);
 

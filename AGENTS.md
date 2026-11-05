@@ -20,8 +20,9 @@ The rules a task needs are not repeated here. Load the skill for the work before
 Each source is a folder of zgeoff/skills, at the commit that `sync/skills-pin.json` pins.
 `bun run skills:install`, which `bun install` runs, unpacks that commit into
 `.zgeoff-skills/<commit>/` and links the skills that `defaultPinnedSkills` in
-[`write-pinned-skills.ts`](scripts/skills/write-pinned-skills.ts) lists into `.claude/skills/`. For
-a skill that list leaves out, read its `SKILL.md` under `.zgeoff-skills/<commit>/skills/<name>/`.
+[`write-pinned-skills.ts`](scripts/skills/write-pinned-skills.ts) lists into `.agents/skills/`.
+`.claude/skills` is a link to `.agents/skills`, so Claude Code and Codex read the same skills. For a
+skill that list leaves out, read its `SKILL.md` under `.zgeoff-skills/<commit>/skills/<name>/`.
 
 ## Skill changes
 

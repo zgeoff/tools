@@ -20,6 +20,7 @@ import { readSyncCommitFacts } from './read-sync-commit-facts.ts';
 import { renderSyncCommitSubject } from './render-sync-commit-subject.ts';
 import { renderSyncPullRequestBody } from './render-sync-pull-request-body.ts';
 import { renderSyncPullRequestTitle } from './render-sync-pull-request-title.ts';
+import { resolveRepoPaths } from './resolve-repo-paths.ts';
 import { selectSyncFiles } from './select-sync-files.ts';
 import { syncSourceCheckouts } from './sync-source-checkouts.ts';
 import { toolsPinsEntry } from './tools-pins-entry.ts';
@@ -35,7 +36,7 @@ export interface SyncEntriesOptions {
 
   readonly fileSystem: Pick<
     FileSystem,
-    'appendText' | 'createDirectory' | 'probePath' | 'readText' | 'writeText'
+    'appendText' | 'createDirectory' | 'probePath' | 'readText' | 'resolveRealPath' | 'writeText'
   >;
 
   readonly runCommand: RunCommand;
@@ -66,17 +67,7 @@ interface SyncSettings {
   readonly base: string;
 }
 
-interface SyncContext extends SyncSettings {
-  readonly cwd: string;
-  readonly env: Readonly<Record<string, string | undefined>>;
-  readonly fileSystem: Pick<
-    FileSystem,
-    'appendText' | 'createDirectory' | 'probePath' | 'readText' | 'writeText'
-  >;
-  readonly runCommand: RunCommand;
-  readonly runLoggedCommand: RunCommand;
-  readonly writeOutput: (text: string) => void;
-}
+interface SyncContext extends SyncSettings, SyncEntriesOptions {}
 
 export async function syncEntries(options: Readonly<SyncEntriesOptions>): Promise<number> {
   const settings = parseSyncSettings(options.env);
@@ -122,8 +113,9 @@ export async function syncEntries(options: Readonly<SyncEntriesOptions>): Promis
 
   if (pushed) {
     const number = await writePullRequest(context, committed.synced);
+    const delivered = await resolveRepoPaths(context.fileSystem, context.cwd, committed.delivered);
 
-    await writeSyncAutoMerge(context, { ...committed, number, base: context.base });
+    await writeSyncAutoMerge(context, { ...committed, delivered, number, base: context.base });
   }
 
   await removeEntryBranches(context, pushed, committed.failed);
