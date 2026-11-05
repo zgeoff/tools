@@ -1,9 +1,13 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { waitFor } from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
+import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 
 // Bun's skipIf takes a boolean at collection time, so the modes this host supports are probed once
 // here: a GitHub runner has the systemd-sudo mode, a root shell without systemd the cgroupfs one.
@@ -42,6 +46,50 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
         /^run-memory-capped: systemd-sudo, memory.max 128 MiB, memory.swap.max (?:0 MiB|absent)\nrun-memory-capped: peak anon memory \d+ MiB, sampled every 200 ms; memory.peak (?:\d+ MiB|absent)\nrun-memory-capped: OOM kills 0\n$/u,
       ),
     });
+  },
+);
+
+test.skipIf(!modesOutput.includes('systemd-sudo'))(
+  'it deletes the environment file when sudo fails before the scope starts',
+  async () => {
+    const ctx = setupTest();
+
+    const bin = await mkdtemp(join(tmpdir(), readRunFolderPrefix('run-memory-capped-sudo-')));
+
+    onTestFinished(() => rm(bin, { recursive: true, force: true }));
+
+    const record = join(bin, 'arguments');
+
+    await writeFile(
+      join(bin, 'sudo'),
+      `#!/bin/bash\n[ "$*" = '-n true' ] && exit 0\nprintf '%s\\n' "$@" > '${record}'\nexit 1\n`,
+      { mode: 0o755 },
+    );
+
+    const result = await $`bash ${ctx.scriptPath} 128 true`
+      .env({
+        ...ctx.env,
+        MEMORY_CAP_MODE: 'systemd-sudo',
+        PATH: `${bin}:${process.env['PATH'] ?? ''}`,
+      })
+      .nothrow()
+      .quiet();
+
+    const recorded = await readFile(record, 'utf8');
+
+    const sudoArguments = recorded.split('\n');
+    const environmentFile = sudoArguments[sudoArguments.indexOf('--inside') + 2];
+
+    invariant(environmentFile !== undefined, 'sudo got no environment file');
+
+    await waitFor(
+      () => {
+        invariant(!existsSync(environmentFile), `${environmentFile} is still there`);
+      },
+      { label: 'the environment file to go' },
+    );
+
+    expect(result.exitCode).toBe(1);
   },
 );
 
