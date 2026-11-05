@@ -7,12 +7,12 @@ import { $ } from 'bun';
 import { createStubSudo } from './create-stub-sudo.ts';
 import { readRunFolderPrefix } from './read-run-folder-prefix.ts';
 
-async function setupTest() {
+async function setupTest(recordName = 'calls') {
   const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('create-stub-sudo-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const record = join(directory, 'calls');
+  const record = join(directory, recordName);
 
   await createStubSudo(directory, record);
 
@@ -43,4 +43,14 @@ test('#createStubSudo records each argument of another call, marks the ones that
     exitCode: 1,
     recorded: `text systemd-run\ntext --inside\nfile ${kiln}\ntext glaze\n`,
   });
+});
+
+test('#createStubSudo records to a path that holds a quote or a dollar sign', async () => {
+  const ctx = await setupTest(`potter's $kiln`);
+
+  await $`${ctx.sudo} glaze`.nothrow().quiet();
+
+  const recorded = await readFile(ctx.record, 'utf8');
+
+  expect(recorded).toBe('text glaze\n');
 });

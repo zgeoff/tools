@@ -14,7 +14,7 @@ export async function createStubSudo(directory: string, record: string): Promise
       `[ "$*" = '-n true' ] && exit 0`,
       'for argument in "$@"; do',
       '  if [ -f "$argument" ]; then kind=file; else kind=text; fi',
-      `  printf '%s %s\\n' "$kind" "$argument" >> '${record}'`,
+      `  printf '%s %s\\n' "$kind" "$argument" >> '${record.replaceAll("'", String.raw`'\''`)}'`,
       'done',
       'exit 1',
       '',
