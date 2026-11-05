@@ -1,9 +1,14 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
-import { readRunFolderPrefix, readStreamUntil, waitFor } from '@zgeoff/testing/helpers';
+import {
+  createStubSudo,
+  readRunFolderPrefix,
+  readStreamUntil,
+  waitFor,
+} from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 
@@ -124,35 +129,23 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
 
     onTestFinished(() => rm(bin, { recursive: true, force: true }));
 
-    const record = join(bin, 'environment-file');
+    const record = join(bin, 'calls');
 
-    // The stub records the environment file it gets only when that file exists, then fails as a
-    // scope that never starts does.
-    await writeFile(
-      join(bin, 'sudo'),
-      [
-        '#!/bin/bash',
-        `[ "$*" = '-n true' ] && exit 0`,
-        'arguments=("$@")',
-        `for index in "\${!arguments[@]}"; do`,
-        `  if [ "\${arguments[index]}" = --inside ] && [ -f "\${arguments[index + 2]}" ]; then`,
-        `    printf '%s' "\${arguments[index + 2]}" > '${record}'`,
-        '  fi',
-        'done',
-        'exit 1',
-        '',
-      ].join('\n'),
-      { mode: 0o755 },
-    );
+    await createStubSudo(bin, record);
 
     const result = await $`bash ${ctx.scriptPath} --budget 128M -- true`
       .env({ ...ctx.env, DIET_MODE: 'systemd-sudo', PATH: `${bin}:${process.env['PATH'] ?? ''}` })
       .nothrow()
       .quiet();
 
-    const environmentFile = await readFile(record, 'utf8');
+    const recorded = await readFile(record, 'utf8');
 
-    expect(environmentFile).toMatch(/^\/tmp\/diet-environment\.\w+$/u);
+    const lines = recorded.split('\n');
+    const environmentLine = lines[lines.indexOf('text --inside') + 2] ?? '';
+
+    expect(environmentLine).toMatch(/^file \/tmp\/diet-environment\.\w+$/u);
+
+    const environmentFile = environmentLine.slice('file '.length);
 
     await waitFor(
       () => {
