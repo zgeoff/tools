@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -1125,6 +1125,74 @@ test('it fails when the entry leaves out the file an import without an extension
       "check-sync-manifest: entry 'brew' delivers sync/kettle/brew.ts to scripts/kettle/brew.ts, which imports ../steep, but the entry does not deliver sync/steep.ts to scripts/steep.ts\n",
   });
 });
+
+test('it passes an imported file that is a symlink, delivered at the path the import names', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/kettle/brew.ts': "import { steep } from './steep';\n\nconsole.log(steep);\n",
+    'packages/tea/steep.ts': 'export const steep = 3;\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'brew',
+        description: 'The brew script',
+        files: [
+          { source: 'sync/kettle/brew.ts', target: 'scripts/brew.ts' },
+          { source: 'sync/kettle/steep.ts', target: 'scripts/steep.ts' },
+        ],
+      },
+    ]),
+  });
+
+  await symlink('../../packages/tea/steep.ts', join(ctx.directory, 'sync/kettle/steep.ts'));
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+});
+
+test.each([
+  [
+    'sync/steep.ts',
+    'scripts/steep.ts',
+    1,
+    "check-sync-manifest: entry 'brew' delivers sync/kettle/brew.ts to scripts/kettle/brew.ts, which imports ../steep, but the entry does not deliver sync/steep.tsx to scripts/steep.tsx\n",
+  ],
+  ['sync/steep.tsx', 'scripts/steep.tsx', 0, ''],
+])(
+  'it follows the file Bun loads when two files answer an import without an extension, with %p delivered',
+  async (delivered, deliveredTarget, exitCode, stderr) => {
+    const ctx = await setupTest();
+
+    await writeTreeFiles(ctx.directory, {
+      'sync/kettle/brew.ts': "import { steep } from '../steep';\n\nconsole.log(steep);\n",
+      'sync/steep.ts': 'export const steep = 3;\n',
+      'sync/steep.tsx': 'export const steep = 4;\n',
+      'sync/manifest.json': JSON.stringify([
+        {
+          name: 'brew',
+          description: 'The brew script',
+          files: [
+            { source: 'sync/kettle/brew.ts', target: 'scripts/kettle/brew.ts' },
+            { source: delivered, target: deliveredTarget },
+          ],
+        },
+      ]),
+    });
+
+    const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+    expect({
+      exitCode: result.exitCode,
+      stdout: result.stdout.toString(),
+      stderr: result.stderr.toString(),
+    }).toStrictEqual({ exitCode, stdout: '', stderr });
+  },
+);
 
 test('it fails when a code source does not parse', async () => {
   const ctx = await setupTest();

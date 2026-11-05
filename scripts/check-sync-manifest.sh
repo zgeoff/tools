@@ -173,24 +173,19 @@ while IFS=$'\t' read -r name repo source target; do
   # The package check above reports a source that does not parse.
   imported=$(bun "$scripts_dir/collect-relative-imports.ts" "$path" 2> /dev/null) || continue
 
-  while IFS= read -r specifier; do
+  # Each line holds the import and the path, as written beside the import, of
+  # the file Bun loads for it.
+  while IFS=$'\t' read -r specifier loaded; do
     [ -n "$specifier" ] || continue
+    # An entry may name a symlinked file by its own path or by the file behind it.
+    wanted_source=$(realpath -m -s --relative-to=. "$(dirname "$source")/$loaded")
+    linked_source=$(realpath -m --relative-to=. "$(dirname "$source")/$loaded")
+    wanted_target=$(realpath -m -s --relative-to=. "$(dirname "$target")/$loaded")
 
-    # Bun resolves an import without an extension, or of a folder, to the
-    # first file that exists with one of these endings.
-    ending=''
-    for candidate in '' .ts .tsx .mts .cts .js .jsx .mjs .cjs /index.ts /index.tsx /index.js /index.mjs; do
-      if [ -f "$(dirname "$source")/$specifier$candidate" ]; then
-        ending=$candidate
-        break
-      fi
-    done
-
-    wanted_source=$(realpath -m --relative-to=. "$(dirname "$source")/$specifier$ending")
-    wanted_target=$(realpath -m --relative-to=. "$(dirname "$target")/$specifier$ending")
-
-    if ! jq -e --arg name "$name" --arg source "$wanted_source" --arg target "$wanted_target" \
-      'any(.[] | select(.name == $name) | .files[]; .source == $source and .target == $target)' \
+    if ! jq -e --arg name "$name" --arg source "$wanted_source" --arg linked "$linked_source" \
+      --arg target "$wanted_target" \
+      'any(.[] | select(.name == $name) | .files[];
+        (.source == $source or .source == $linked) and .target == $target)' \
       "$manifest" > /dev/null; then
       report "entry '$name' delivers $source to $target, which imports $specifier, but the entry does not deliver $wanted_source to $wanted_target"
     fi
