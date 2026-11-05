@@ -262,6 +262,10 @@ async function runBenchComparison(
     const addFailure = findBaseSetupVerdict('checkout', comparison.baseRef, addExitCode);
 
     if (addFailure !== null) {
+      // An abort makes the add report failure even when git finished the checkout, so the removal
+      // runs anyway, and its exit code is moot: it fails when git registered nothing.
+      await removeBaseCheckout(baseRoot, run, deps);
+
       return writeBenchVerdict(addFailure, deps);
     }
 
@@ -269,11 +273,7 @@ async function runBenchComparison(
       runCheckedOutComparison(comparison, workFolder, run, deps),
     ]);
 
-    // An aborted run still removes the checkout, so the removal gets a signal of its own.
-    const removeExitCode = await deps.runCommand(
-      ['git', 'worktree', 'remove', '--force', baseRoot],
-      { cwd: run.repoRoot, environment: run.environment, signal: new AbortController().signal },
-    );
+    const removeExitCode = await removeBaseCheckout(baseRoot, run, deps);
 
     const removal = pickCheckoutRemoval(baseRoot, removeExitCode, compared);
 
@@ -291,6 +291,15 @@ async function runBenchComparison(
       await deps.removeFolder(workFolder);
     }
   }
+}
+
+// An aborted run still removes the checkout, so the removal gets a signal of its own.
+function removeBaseCheckout(baseRoot: string, run: RigRun, deps: BenchDeps): Promise<number> {
+  return deps.runCommand(['git', 'worktree', 'remove', '--force', baseRoot], {
+    cwd: run.repoRoot,
+    environment: run.environment,
+    signal: new AbortController().signal,
+  });
 }
 
 async function runCheckedOutComparison(

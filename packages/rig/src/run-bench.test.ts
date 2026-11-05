@@ -5,7 +5,7 @@ import type { CommandOptions } from './run-command.ts';
 import { makeRecordingStub } from './test-utils/make-recording-stub.ts';
 
 function setupTest() {
-  const signal = new AbortController().signal;
+  const controller = new AbortController();
 
   const exitCodes: number[] = [];
 
@@ -32,7 +32,15 @@ function setupTest() {
     output,
     startKiln,
     stopKiln,
-    run: { repoRoot: '/repo', environment: { PATH: '/bin' }, signal, runID: '1' },
+    abortRun: () => {
+      controller.abort();
+    },
+    run: {
+      repoRoot: '/repo',
+      environment: { PATH: '/bin' },
+      signal: controller.signal,
+      runID: '1',
+    },
     deps: {
       dietScript: '/diet.sh',
       benchScript: '/run-bench-file.ts',
@@ -593,11 +601,51 @@ test('it exits 1 with its message and runs no bench when the base cannot be chec
 
   expect({
     exitCode,
-    commands: ctx.runCommand.mock.calls.length,
+    commands: ctx.runCommand.mock.calls.map((call) => call[0].slice(0, 3)),
     err: ctx.output.err.mock.calls,
   }).toStrictEqual({
     exitCode: 1,
-    commands: 1,
+    commands: [
+      ['git', 'worktree', 'add'],
+      ['git', 'worktree', 'remove'],
+    ],
+    err: [['rig bench: could not check out "kettle-v0"\n']],
+  });
+});
+
+test('it removes the checkout with an unaborted signal and then the work folder when an abort fails the checkout', async () => {
+  const ctx = setupTest();
+  const events: unknown[] = [];
+
+  ctx.runCommand.mockImplementationOnce(() => {
+    ctx.abortRun();
+
+    return Promise.resolve(1);
+  });
+
+  ctx.runCommand.mockImplementationOnce((command, options) => {
+    events.push({ command, isAborted: options.signal.aborted });
+
+    return Promise.resolve(128);
+  });
+
+  ctx.removeFolder.mockImplementation((path) => {
+    events.push({ removed: path });
+
+    return Promise.resolve();
+  });
+
+  const exitCode = await runBench(['--base', 'kettle-v0'], defineRig({}), ctx.run, ctx.deps);
+
+  expect({ exitCode, events, err: ctx.output.err.mock.calls }).toStrictEqual({
+    exitCode: 1,
+    events: [
+      {
+        command: ['git', 'worktree', 'remove', '--force', '/repo/.git/rig-bench/run-1/base'],
+        isAborted: false,
+      },
+      { removed: '/repo/.git/rig-bench/run-1' },
+    ],
     err: [['rig bench: could not check out "kettle-v0"\n']],
   });
 });
