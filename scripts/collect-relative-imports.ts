@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { basename, dirname, resolve } from 'node:path';
+import { readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { writeStdout } from '../packages/std/src/write-stdout.ts';
 import { collectImportSpecifiers } from './collect-import-specifiers.ts';
@@ -12,28 +12,39 @@ export function collectRelativeImports(source: string, filename: string): string
     : [...new Set(specifiers.filter((specifier) => /^\.\.?\//u.test(specifier)))].toSorted();
 }
 
-// Bun picks among files that differ only in their extension in its own order, such as .tsx before
-// .ts, so the file it loads comes from Bun itself. Bun returns the path behind a symlink, so only
-// the file name it picked is kept. An import no file answers stays as written.
+// Bun picks steep.tsx before steep.ts and loads steep.ts for steep.js, so Bun names the file. It
+// returns the path behind a symlink, so the result is the file beside the import, or in the folder
+// it names, that leads there.
 function resolveImportPath(specifier: string, directory: string): string {
-  const name = basename(specifier);
-  const loaded = findLoadedName(specifier, directory);
+  const named = join(directory, specifier);
+  const loaded = probeFile(named) ? undefined : resolveLoadedPath(specifier, directory);
 
-  if (loaded === undefined || loaded === name) {
-    return specifier;
-  }
+  const match =
+    loaded === undefined
+      ? undefined
+      : [dirname(named), named]
+          .flatMap((folder) => readFolderEntries(folder).map((entry) => join(folder, entry)))
+          .find((path) => probeFile(path) && realpathSync(path) === loaded);
 
-  return loaded.startsWith(`${name}.`)
-    ? `${specifier}${loaded.slice(name.length)}`
-    : `${specifier}/${loaded}`;
+  return match === undefined ? specifier : relative(directory, match);
 }
 
-function findLoadedName(specifier: string, directory: string): string | undefined {
+function probeFile(path: string): boolean {
+  return statSync(path, { throwIfNoEntry: false })?.isFile() ?? false;
+}
+
+function resolveLoadedPath(specifier: string, directory: string): string | undefined {
   try {
-    return basename(Bun.resolveSync(specifier, resolve(directory)));
+    return Bun.resolveSync(specifier, resolve(directory));
   } catch {
     return undefined;
   }
+}
+
+function readFolderEntries(folder: string): string[] {
+  return statSync(folder, { throwIfNoEntry: false })?.isDirectory() === true
+    ? readdirSync(folder).toSorted()
+    : [];
 }
 
 // Prints each relative import, a tab, and the import completed to the file Bun loads for it.

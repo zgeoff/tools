@@ -1067,6 +1067,7 @@ test.each([
 test.each([
   ['../steep', 'sync/steep.ts', 'scripts/steep.ts'],
   ['../leaves', 'sync/leaves/index.ts', 'scripts/leaves/index.ts'],
+  ['../steep.js', 'sync/steep.ts', 'scripts/steep.ts'],
 ])(
   'it resolves the relative import %p to the file Bun loads, and passes when the entry delivers it',
   async (specifier, importedSource, importedTarget) => {
@@ -1126,34 +1127,42 @@ test('it fails when the entry leaves out the file an import without an extension
   });
 });
 
-test('it passes an imported file that is a symlink, delivered at the path the import names', async () => {
-  const ctx = await setupTest();
+test.each([
+  ['./steep', 'steep.ts', 'sync/kettle/steep.ts'],
+  ['./alias', 'alias.ts', 'sync/kettle/alias.ts'],
+  ['./alias.ts', 'alias.ts', 'sync/kettle/alias.ts'],
+  ['./alias.ts', 'alias.ts', 'packages/tea/steep.ts'],
+])(
+  'it passes the import %p of the symlink %p when the entry names it as %p',
+  async (specifier, link, deliveredSource) => {
+    const ctx = await setupTest();
 
-  await writeTreeFiles(ctx.directory, {
-    'sync/kettle/brew.ts': "import { steep } from './steep';\n\nconsole.log(steep);\n",
-    'packages/tea/steep.ts': 'export const steep = 3;\n',
-    'sync/manifest.json': JSON.stringify([
-      {
-        name: 'brew',
-        description: 'The brew script',
-        files: [
-          { source: 'sync/kettle/brew.ts', target: 'scripts/brew.ts' },
-          { source: 'sync/kettle/steep.ts', target: 'scripts/steep.ts' },
-        ],
-      },
-    ]),
-  });
+    await writeTreeFiles(ctx.directory, {
+      'sync/kettle/brew.ts': `import { steep } from '${specifier}';\n\nconsole.log(steep);\n`,
+      'packages/tea/steep.ts': 'export const steep = 3;\n',
+      'sync/manifest.json': JSON.stringify([
+        {
+          name: 'brew',
+          description: 'The brew script',
+          files: [
+            { source: 'sync/kettle/brew.ts', target: 'scripts/brew.ts' },
+            { source: deliveredSource, target: `scripts/${link}` },
+          ],
+        },
+      ]),
+    });
 
-  await symlink('../../packages/tea/steep.ts', join(ctx.directory, 'sync/kettle/steep.ts'));
+    await symlink('../../packages/tea/steep.ts', join(ctx.directory, 'sync/kettle', link));
 
-  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+    const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
 
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
-});
+    expect({
+      exitCode: result.exitCode,
+      stdout: result.stdout.toString(),
+      stderr: result.stderr.toString(),
+    }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+  },
+);
 
 test.each([
   [
