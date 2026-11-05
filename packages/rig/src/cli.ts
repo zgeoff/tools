@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 import { existsSync } from 'node:fs';
-import { rm } from 'node:fs/promises';
 import { availableParallelism, totalmem } from 'node:os';
 import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
+import { removePath } from './browser/remove-path.ts';
 import { wireBrowserLaneHooks } from './browser/wire-browser-lane-hooks.ts';
 import { createBenchWorkFolder } from './create-bench-work-folder.ts';
 import { initFiles } from './init-files.ts';
@@ -74,7 +74,7 @@ try {
 
         return text ?? null;
       },
-      removeFolder: (path) => rm(path, { recursive: true, force: true }),
+      removeFolder: removePath,
       runCommand,
       wireBrowserLaneHooks,
     },
