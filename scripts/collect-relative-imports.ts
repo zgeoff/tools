@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { writeStdout } from '../packages/std/src/write-stdout.ts';
 import { collectImportSpecifiers } from './collect-import-specifiers.ts';
@@ -13,8 +13,8 @@ export function collectRelativeImports(source: string, filename: string): string
 }
 
 // Bun picks steep.tsx before steep.ts and loads steep.ts for steep.js, so Bun names the file. It
-// returns the path behind a symlink, so the result is the file beside the import, or in the folder
-// it names, that leads there.
+// returns the path behind a symlink, so the result is the file that answers the import and leads
+// there.
 function resolveImportPath(specifier: string, directory: string): string {
   const named = join(directory, specifier);
   const loaded = probeFile(named) ? undefined : resolveLoadedPath(specifier, directory);
@@ -22,11 +22,27 @@ function resolveImportPath(specifier: string, directory: string): string {
   const match =
     loaded === undefined
       ? undefined
-      : [dirname(named), named]
-          .flatMap((folder) => readFolderEntries(folder).map((entry) => join(folder, entry)))
-          .find((path) => probeFile(path) && realpathSync(path) === loaded);
+      : readCandidatePaths(named).find((path) => probeFile(path) && realpathSync(path) === loaded);
 
   return match === undefined ? specifier : relative(directory, match);
+}
+
+// The import steep is answered by steep.<ext>, the import steep.js also by steep.<ext>, and the
+// import of a folder by its index.<ext>.
+function readCandidatePaths(named: string): string[] {
+  const name = basename(named);
+  const stem = name.replace(/\.[^.]+$/u, '');
+
+  const siblings = readFolderEntries(dirname(named)).filter(
+    (entry) => entry.startsWith(`${name}.`) || (stem !== name && entry.startsWith(`${stem}.`)),
+  );
+
+  return [
+    ...siblings.map((entry) => join(dirname(named), entry)),
+    ...readFolderEntries(named)
+      .filter((entry) => entry.startsWith('index.'))
+      .map((entry) => join(named, entry)),
+  ];
 }
 
 function probeFile(path: string): boolean {

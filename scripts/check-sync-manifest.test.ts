@@ -1127,6 +1127,40 @@ test('it fails when the entry leaves out the file an import without an extension
   });
 });
 
+test('it names the file that answers an import, not another symlink to the same file', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/kettle/brew.ts': "import { steep } from './steep';\n\nconsole.log(steep);\n",
+    'sync/kettle/steep.ts': 'export const steep = 3;\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'brew',
+        description: 'The brew script',
+        files: [
+          { source: 'sync/kettle/brew.ts', target: 'scripts/brew.ts' },
+          { source: 'sync/kettle/alias.ts', target: 'scripts/alias.ts' },
+        ],
+      },
+    ]),
+  });
+
+  await symlink('steep.ts', join(ctx.directory, 'sync/kettle/alias.ts'));
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      "check-sync-manifest: entry 'brew' delivers sync/kettle/brew.ts to scripts/brew.ts, which imports ./steep, but the entry does not deliver sync/kettle/steep.ts to scripts/steep.ts\n",
+  });
+});
+
 test.each([
   ['./steep', 'steep.ts', 'sync/kettle/steep.ts'],
   ['./alias', 'alias.ts', 'sync/kettle/alias.ts'],
