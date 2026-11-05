@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.8.5](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.8.4...@zgeoff/oxlint-config@0.8.5) (2026-11-05)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/rig bumped to 0.1.5
+
 ## [0.8.4](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.8.3...@zgeoff/oxlint-config@0.8.4) (2026-11-05)
 
 
