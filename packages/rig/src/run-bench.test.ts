@@ -620,6 +620,39 @@ test('it exits 1 with its message and removes the checkout when bun install fail
   });
 });
 
+test('it exits 1, says how to remove the checkout and keeps the work folder when the checkout removal fails', async () => {
+  const ctx = setupTest();
+
+  ctx.exitCodes.push(0, 1, 1);
+
+  const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, ctx.deps);
+
+  expect({
+    exitCode,
+    err: ctx.output.err.mock.calls,
+    removed: ctx.removeFolder.mock.calls,
+  }).toStrictEqual({
+    exitCode: 1,
+    err: [
+      ['rig bench: bun install failed in the checkout of "main"\n'],
+      [
+        'rig bench: could not remove the checkout at /repo/.git/rig-bench/run-1/base; remove it with git worktree remove --force /repo/.git/rig-bench/run-1/base\n',
+      ],
+    ],
+    removed: [],
+  });
+});
+
+test('it fails a comparison whose benches pass when the checkout removal fails', async () => {
+  const ctx = setupTest();
+
+  ctx.exitCodes.push(0, 0, 0, 0, 1);
+
+  const exitCode = await runBench(['--base', 'main', 'boil'], defineRig({}), ctx.run, ctx.deps);
+
+  expect(exitCode).toBe(1);
+});
+
 test('it removes the work folder after a run', async () => {
   const ctx = setupTest();
 

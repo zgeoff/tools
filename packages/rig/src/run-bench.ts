@@ -83,20 +83,23 @@ export async function runBench(
     reportPath: join(workFolder, 'head.jsonl'),
   };
 
-  try {
-    const exitCode =
-      parsed.baseRef === null
-        ? await runHeadBench(head, run, deps)
-        : await runBenchComparison(
-            { baseRef: parsed.baseRef, name: parsed.name, workFolder, head, headBenchFiles },
-            run,
-            deps,
-          );
+  if (parsed.baseRef === null) {
+    try {
+      const exitCode = await runHeadBench(head, run, deps);
 
-    return pickExitCodeAfterTests(exitCode, run.signal.aborted);
-  } finally {
-    await deps.removeFolder(workFolder);
+      return pickExitCodeAfterTests(exitCode, run.signal.aborted);
+    } finally {
+      await deps.removeFolder(workFolder);
+    }
   }
+
+  const exitCode = await runBenchComparison(
+    { baseRef: parsed.baseRef, name: parsed.name, workFolder, head, headBenchFiles },
+    run,
+    deps,
+  );
+
+  return pickExitCodeAfterTests(exitCode, run.signal.aborted);
 }
 
 async function readBenchFiles(root: string, deps: BenchDeps): Promise<readonly string[]> {
@@ -249,33 +252,59 @@ interface BenchComparison {
   readonly headBenchFiles: readonly string[];
 }
 
+// A checkout that git could not remove keeps its work folder, so git's record of the checkout
+// still points at a folder.
 async function runBenchComparison(
   comparison: BenchComparison,
   run: RigRun,
   deps: BenchDeps,
 ): Promise<number> {
   const baseRoot = join(comparison.workFolder, 'base');
-
-  const addExitCode = await deps.runCommand(
-    ['git', 'worktree', 'add', '--detach', baseRoot, comparison.baseRef],
-    { cwd: run.repoRoot, environment: run.environment, signal: run.signal },
-  );
-
-  if (addExitCode !== 0) {
-    deps.output.err(`rig bench: could not check out "${comparison.baseRef}"\n`);
-
-    return 1;
-  }
+  let isCheckoutLeft = false;
 
   try {
-    return await runCheckedOutComparison(comparison, baseRoot, run, deps);
-  } finally {
+    const addExitCode = await deps.runCommand(
+      ['git', 'worktree', 'add', '--detach', baseRoot, comparison.baseRef],
+      { cwd: run.repoRoot, environment: run.environment, signal: run.signal },
+    );
+
+    if (addExitCode !== 0) {
+      deps.output.err(`rig bench: could not check out "${comparison.baseRef}"\n`);
+
+      return 1;
+    }
+
+    const [compared] = await Promise.allSettled([
+      runCheckedOutComparison(comparison, baseRoot, run, deps),
+    ]);
+
     // An aborted run still removes the checkout, so the removal gets a signal of its own.
-    await deps.runCommand(['git', 'worktree', 'remove', '--force', baseRoot], {
-      cwd: run.repoRoot,
-      environment: run.environment,
-      signal: new AbortController().signal,
-    });
+    const removeExitCode = await deps.runCommand(
+      ['git', 'worktree', 'remove', '--force', baseRoot],
+      {
+        cwd: run.repoRoot,
+        environment: run.environment,
+        signal: new AbortController().signal,
+      },
+    );
+
+    isCheckoutLeft = removeExitCode !== 0;
+
+    if (isCheckoutLeft) {
+      deps.output.err(
+        `rig bench: could not remove the checkout at ${baseRoot}; remove it with git worktree remove --force ${baseRoot}\n`,
+      );
+    }
+
+    if (compared.status === 'rejected') {
+      throw compared.reason;
+    }
+
+    return isCheckoutLeft && compared.value === 0 ? 1 : compared.value;
+  } finally {
+    if (!isCheckoutLeft) {
+      await deps.removeFolder(comparison.workFolder);
+    }
   }
 }
 
