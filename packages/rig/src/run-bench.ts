@@ -18,6 +18,7 @@ import { pickExitCodeAfterTests } from './browser/pick-exit-code-after-tests.ts'
 import { buildDietCommand } from './build-diet-command.ts';
 import { buildProgramLaneHooks } from './build-program-lane-hooks.ts';
 import { collectBenchFiles } from './collect-bench-files.ts';
+import { defineRig } from './define-rig.ts';
 import type { LaneHooks } from './lane-hooks.ts';
 import { makeRepoLaneHooks } from './make-repo-lane-hooks.ts';
 import type { ReadCommandOutput } from './read-command-output.ts';
@@ -45,6 +46,8 @@ export interface BenchDeps extends ProgramBuildDeps {
   readonly createWorkFolder: (repoRoot: string) => Promise<string>;
 
   readonly readText: (path: string) => Promise<string | null>;
+
+  readonly probeFolder: (path: string) => Promise<boolean>;
 
   readonly removeFolder: (path: string) => Promise<void>;
 
@@ -335,13 +338,12 @@ async function runCheckedOutComparison(
     return writeBenchVerdict(installFailure, deps);
   }
 
-  const baseConfig = await deps.readConfig(checkout.sideRoot);
-  const baseBenchFiles = await readBenchFiles(checkout.sideRoot, deps);
+  const baseSide = await readBaseSide(checkout.sideRoot, deps);
 
   const missing = findMissingBenchVerdict(
     comparison.name,
     comparison.headBenchFiles,
-    baseBenchFiles,
+    baseSide.benchFiles,
   );
 
   if (missing !== null) {
@@ -350,8 +352,8 @@ async function runCheckedOutComparison(
 
   const base: BenchSide = {
     root: checkout.sideRoot,
-    config: baseConfig,
-    files: pickNamedBenchFiles(baseBenchFiles, comparison.name),
+    config: baseSide.config,
+    files: pickNamedBenchFiles(baseSide.benchFiles, comparison.name),
     reportPath: join(checkout.workFolder, 'base.jsonl'),
   };
 
@@ -374,6 +376,27 @@ async function runCheckedOutComparison(
     ),
     deps,
   );
+}
+
+interface BaseSide {
+  readonly config: RigConfig;
+
+  readonly benchFiles: readonly string[];
+}
+
+// A package that only the head has gives an empty base side, which runs nothing, so the table
+// shows `-` for the base.
+async function readBaseSide(root: string, deps: BenchDeps): Promise<BaseSide> {
+  const isPresent = await deps.probeFolder(root);
+
+  if (!isPresent) {
+    return { config: defineRig({}), benchFiles: [] };
+  }
+
+  const config = await deps.readConfig(root);
+  const benchFiles = await readBenchFiles(root, deps);
+
+  return { config, benchFiles };
 }
 
 async function removeComparisonCheckout(

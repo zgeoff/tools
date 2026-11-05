@@ -94,6 +94,7 @@ try {
 
         return text ?? null;
       },
+      probeFolder: (path) => Promise.resolve(existsSync(path)),
       removeFolder: removePath,
       readCommandOutput: readOutput,
       runCommand,

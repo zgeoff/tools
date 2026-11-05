@@ -51,6 +51,7 @@ function setupTest() {
       ),
       createWorkFolder: () => Promise.resolve('/repo/.git/rig-bench/run-1'),
       readText: () => Promise.resolve(null),
+      probeFolder: () => Promise.resolve(true),
       removeFolder,
     },
   };
@@ -688,6 +689,85 @@ test('it runs the base side from the package folder of the checkout when rig sta
           'boil   1            40.00ms      2.00ms       44.00ms      3.00ms       +10.0%\n',
       ],
     ],
+  });
+});
+
+test('it compares against an empty base, runs the head and removes the checkout when the package folder is new on the head', async () => {
+  const ctx = setupTest();
+
+  const commands = buildStubCommandAnswers({
+    exitCodes: [],
+    outputs: { 'git rev-parse --show-prefix': { exitCode: 0, stdout: 'packages/kettle/\n' } },
+  });
+
+  const readConfig = mock<BenchDeps['readConfig']>(() => Promise.resolve(defineRig({})));
+
+  const readTrackedFiles = buildStubLookup<readonly string[]>(
+    { '/repo/packages/kettle': ['package.json', 'bench/boil.bench.ts'] },
+    [],
+  );
+
+  const probeFolder = buildStubLookup<boolean>(
+    { '/repo/.git/rig-bench/run-1/base/packages/kettle': false },
+    true,
+  );
+
+  const readText = buildStubLookup<string | null>(
+    {
+      '/repo/.git/rig-bench/run-1/head.jsonl':
+        '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":44,"spreadMs":3,"budgetMs":80}\n',
+    },
+    null,
+  );
+
+  const exitCode = await runBench(
+    ['--base', 'main'],
+    defineRig({}),
+    { ...ctx.run, repoRoot: '/repo/packages/kettle' },
+    {
+      ...ctx.deps,
+      ...commands,
+      probeWorkspaceRepo: () => Promise.resolve(false),
+      readConfig,
+      readTrackedFiles,
+      probeFolder,
+      readText,
+    },
+  );
+
+  expect({
+    exitCode,
+    configRoots: readConfig.mock.calls,
+    trackedRoots: readTrackedFiles.mock.calls,
+    commands: commands.runCommand.mock.calls.map((call) => call[0]),
+    out: ctx.output.out.mock.calls,
+    removed: ctx.removeFolder.mock.calls,
+  }).toStrictEqual({
+    exitCode: 0,
+    configRoots: [],
+    trackedRoots: [['/repo/packages/kettle']],
+    commands: [
+      ['git', 'worktree', 'add', '--detach', '/repo/.git/rig-bench/run-1/base', 'main'],
+      ['bun', 'install', '--frozen-lockfile'],
+      [
+        'bash',
+        '/diet.sh',
+        '--',
+        'bun',
+        '/run-bench-file.ts',
+        '/repo/packages/kettle/bench/boil.bench.ts',
+        '--report',
+        '/repo/.git/rig-bench/run-1/head.jsonl',
+      ],
+      ['git', 'worktree', 'remove', '--force', '/repo/.git/rig-bench/run-1/base'],
+    ],
+    out: [
+      [
+        'bench  concurrency  base median  base spread  head median  head spread  change\n' +
+          'boil   1            -            -            44.00ms      3.00ms       -\n',
+      ],
+    ],
+    removed: [['/repo/.git/rig-bench/run-1']],
   });
 });
 

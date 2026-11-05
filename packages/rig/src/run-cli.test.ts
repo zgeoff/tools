@@ -33,6 +33,7 @@ function setupTest() {
       importModule: () => Promise.resolve({}),
       createWorkFolder: () => Promise.reject(new Error('no bench here')),
       readText: () => Promise.reject(new Error('no bench here')),
+      probeFolder: () => Promise.reject(new Error('no bench here')),
       removeFolder: () => Promise.reject(new Error('no bench here')),
       readCommandOutput: () => Promise.reject(new Error('no bench here')),
       runCommand,
