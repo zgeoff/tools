@@ -175,8 +175,19 @@ while IFS=$'\t' read -r name repo source target; do
 
   while IFS= read -r specifier; do
     [ -n "$specifier" ] || continue
-    wanted_source=$(realpath -m --relative-to=. "$(dirname "$source")/$specifier")
-    wanted_target=$(realpath -m --relative-to=. "$(dirname "$target")/$specifier")
+
+    # Bun resolves an import without an extension, or of a folder, to the
+    # first file that exists with one of these endings.
+    ending=''
+    for candidate in '' .ts .tsx .mts .cts .js .jsx .mjs .cjs /index.ts /index.tsx /index.js /index.mjs; do
+      if [ -f "$(dirname "$source")/$specifier$candidate" ]; then
+        ending=$candidate
+        break
+      fi
+    done
+
+    wanted_source=$(realpath -m --relative-to=. "$(dirname "$source")/$specifier$ending")
+    wanted_target=$(realpath -m --relative-to=. "$(dirname "$target")/$specifier$ending")
 
     if ! jq -e --arg name "$name" --arg source "$wanted_source" --arg target "$wanted_target" \
       'any(.[] | select(.name == $name) | .files[]; .source == $source and .target == $target)' \

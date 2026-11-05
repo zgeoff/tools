@@ -1064,6 +1064,39 @@ test.each([
   }).toStrictEqual({ exitCode, stdout: '', stderr });
 });
 
+test.each([
+  ['../steep', 'sync/steep.ts', 'scripts/steep.ts'],
+  ['../leaves', 'sync/leaves/index.ts', 'scripts/leaves/index.ts'],
+])(
+  'it resolves the relative import %p to the file Bun loads, and passes when the entry delivers it',
+  async (specifier, importedSource, importedTarget) => {
+    const ctx = await setupTest();
+
+    await writeTreeFiles(ctx.directory, {
+      'sync/kettle/brew.ts': `import { steep } from '${specifier}';\n\nconsole.log(steep);\n`,
+      [importedSource]: 'export const steep = 3;\n',
+      'sync/manifest.json': JSON.stringify([
+        {
+          name: 'brew',
+          description: 'The brew script',
+          files: [
+            { source: 'sync/kettle/brew.ts', target: 'scripts/kettle/brew.ts' },
+            { source: importedSource, target: importedTarget },
+          ],
+        },
+      ]),
+    });
+
+    const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+    expect({
+      exitCode: result.exitCode,
+      stdout: result.stdout.toString(),
+      stderr: result.stderr.toString(),
+    }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+  },
+);
+
 test('it fails when a code source does not parse', async () => {
   const ctx = await setupTest();
 
