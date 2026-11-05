@@ -1138,6 +1138,35 @@ test.each([
   },
 );
 
+test('it asks for the file path of an import without an extension when the entry leaves out the file too', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/kettle/brew.ts': "import { steep } from '../steep';\n\nconsole.log(steep);\n",
+    'sync/steep.ts': 'export const steep = 3;\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'brew',
+        description: 'The brew script',
+        files: [{ source: 'sync/kettle/brew.ts', target: 'scripts/kettle/brew.ts' }],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      "check-sync-manifest: entry 'brew' delivers sync/kettle/brew.ts, which imports ../steep, a path that names no file; write the import as the file's path with its extension\n",
+  });
+});
+
 test('it reports each import of a file when one import runs through another file', async () => {
   const ctx = await setupTest();
 
