@@ -124,11 +124,24 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
 
     onTestFinished(() => rm(bin, { recursive: true, force: true }));
 
-    const record = join(bin, 'arguments');
+    const record = join(bin, 'environment-file');
 
+    // The stub records the environment file it gets only when that file exists, then fails as a
+    // scope that never starts does.
     await writeFile(
       join(bin, 'sudo'),
-      `#!/bin/bash\n[ "$*" = '-n true' ] && exit 0\nprintf '%s\\n' "$@" > '${record}'\nexit 1\n`,
+      [
+        '#!/bin/bash',
+        `[ "$*" = '-n true' ] && exit 0`,
+        'arguments=("$@")',
+        `for index in "\${!arguments[@]}"; do`,
+        `  if [ "\${arguments[index]}" = --inside ] && [ -f "\${arguments[index + 2]}" ]; then`,
+        `    printf '%s' "\${arguments[index + 2]}" > '${record}'`,
+        '  fi',
+        'done',
+        'exit 1',
+        '',
+      ].join('\n'),
       { mode: 0o755 },
     );
 
@@ -137,12 +150,9 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
       .nothrow()
       .quiet();
 
-    const recorded = await readFile(record, 'utf8');
+    const environmentFile = await readFile(record, 'utf8');
 
-    const sudoArguments = recorded.split('\n');
-    const environmentFile = sudoArguments[sudoArguments.indexOf('--inside') + 2];
-
-    invariant(environmentFile !== undefined, 'sudo got no environment file');
+    expect(environmentFile).toMatch(/^\/tmp\/diet-environment\.\w+$/u);
 
     await waitFor(
       () => {
