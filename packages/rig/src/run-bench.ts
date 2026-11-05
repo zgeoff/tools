@@ -1,5 +1,6 @@
 import { join, relative } from 'node:path';
 import { match } from 'ts-pattern';
+import { buildBaseSideRoot } from './bench/build-base-side-root.ts';
 import { findBaseSetupVerdict } from './bench/find-base-setup-verdict.ts';
 import { findMissingBenchVerdict } from './bench/find-missing-bench-verdict.ts';
 import { parseBenchReport } from './bench/parse-bench-report.ts';
@@ -19,6 +20,7 @@ import { collectBenchFiles } from './collect-bench-files.ts';
 import type { LaneHooks } from './lane-hooks.ts';
 import { makeRepoLaneHooks } from './make-repo-lane-hooks.ts';
 import type { ReadCommandOutput } from './read-command-output.ts';
+import { readGitPrefix } from './read-git-prefix.ts';
 import { runLaneHooks } from './run-lane-hooks.ts';
 import type { ProgramBuildDeps } from './run-program-builds.ts';
 import { runProgramBuilds } from './run-program-builds.ts';
@@ -50,7 +52,7 @@ export interface BenchDeps extends ProgramBuildDeps {
 
 // Builds each program once, as `rig e2e` does, then runs each bench file in a process of its own,
 // between the start and stop hooks of the bench lane when the config names one. A base ref runs
-// the same way from a checkout of that ref, with that checkout's config.
+// the same way from the same folder of a checkout of that ref, with that folder's config.
 export async function runBench(
   args: readonly string[],
   config: RigConfig,
@@ -247,24 +249,38 @@ interface BenchComparison {
   readonly headBenchFiles: readonly string[];
 }
 
+interface BaseCheckout {
+  readonly workFolder: string;
+
+  // The top folder of the checkout, which git adds and removes.
+  readonly checkoutRoot: string;
+
+  // The folder inside the checkout that matches the folder rig started in.
+  readonly sideRoot: string;
+}
+
 async function runBenchComparison(
   comparison: BenchComparison,
   run: RigRun,
   deps: BenchDeps,
 ): Promise<number> {
+  const gitPrefix = await readGitPrefix(run.repoRoot, run.environment, deps);
   const workFolder = await deps.createWorkFolder(run.repoRoot);
 
-  const baseRoot = join(workFolder, 'base');
+  const checkoutRoot = join(workFolder, 'base');
+
+  const base: BaseCheckout = {
+    workFolder,
+    checkoutRoot,
+    sideRoot: buildBaseSideRoot(checkoutRoot, gitPrefix),
+  };
 
   // An abort makes the add report failure even when git finished the checkout, so every path,
   // a failed add included, runs the same removal.
-  const [compared] = await Promise.allSettled([
-    runCheckoutComparison(comparison, workFolder, run, deps),
-  ]);
+  const [compared] = await Promise.allSettled([runCheckoutComparison(comparison, base, run, deps)]);
+  const checkout = await removeBaseCheckout(checkoutRoot, run, deps);
 
-  const checkout = await removeBaseCheckout(baseRoot, run, deps);
-
-  const cleanup = pickCheckoutCleanup(baseRoot, checkout, compared);
+  const cleanup = pickCheckoutCleanup(checkoutRoot, checkout, compared);
 
   writeBenchOutput(cleanup.output, deps);
 
@@ -281,12 +297,12 @@ async function runBenchComparison(
 
 async function runCheckoutComparison(
   comparison: BenchComparison,
-  workFolder: string,
+  checkout: BaseCheckout,
   run: RigRun,
   deps: BenchDeps,
 ): Promise<number> {
   const addExitCode = await deps.runCommand(
-    ['git', 'worktree', 'add', '--detach', join(workFolder, 'base'), comparison.baseRef],
+    ['git', 'worktree', 'add', '--detach', checkout.checkoutRoot, comparison.baseRef],
     { cwd: run.repoRoot, environment: run.environment, signal: run.signal },
   );
 
@@ -296,19 +312,17 @@ async function runCheckoutComparison(
     return writeBenchVerdict(addFailure, deps);
   }
 
-  return runCheckedOutComparison(comparison, workFolder, run, deps);
+  return runCheckedOutComparison(comparison, checkout, run, deps);
 }
 
 async function runCheckedOutComparison(
   comparison: BenchComparison,
-  workFolder: string,
+  checkout: BaseCheckout,
   run: RigRun,
   deps: BenchDeps,
 ): Promise<number> {
-  const baseRoot = join(workFolder, 'base');
-
   const installExitCode = await deps.runCommand(['bun', 'install', '--frozen-lockfile'], {
-    cwd: baseRoot,
+    cwd: checkout.checkoutRoot,
     environment: run.environment,
     signal: run.signal,
   });
@@ -319,8 +333,8 @@ async function runCheckedOutComparison(
     return writeBenchVerdict(installFailure, deps);
   }
 
-  const baseConfig = await deps.readConfig(baseRoot);
-  const baseBenchFiles = await readBenchFiles(baseRoot, deps);
+  const baseConfig = await deps.readConfig(checkout.sideRoot);
+  const baseBenchFiles = await readBenchFiles(checkout.sideRoot, deps);
 
   const missing = findMissingBenchVerdict(
     comparison.name,
@@ -333,17 +347,17 @@ async function runCheckedOutComparison(
   }
 
   const base: BenchSide = {
-    root: baseRoot,
+    root: checkout.sideRoot,
     config: baseConfig,
     files: pickNamedBenchFiles(baseBenchFiles, comparison.name),
-    reportPath: join(workFolder, 'base.jsonl'),
+    reportPath: join(checkout.workFolder, 'base.jsonl'),
   };
 
   const head: BenchSide = {
     root: run.repoRoot,
     config: comparison.headConfig,
     files: comparison.headFiles,
-    reportPath: join(workFolder, 'head.jsonl'),
+    reportPath: join(checkout.workFolder, 'head.jsonl'),
   };
 
   const baseExitCode = await runBenchSide(base, run, deps);
@@ -362,15 +376,14 @@ async function runCheckedOutComparison(
 
 // An aborted run still removes the checkout, so the removal gets a signal of its own.
 async function removeBaseCheckout(
-  baseRoot: string,
+  checkoutRoot: string,
   run: RigRun,
   deps: BenchDeps,
 ): Promise<CheckoutState> {
-  const removeExitCode = await deps.runCommand(['git', 'worktree', 'remove', '--force', baseRoot], {
-    cwd: run.repoRoot,
-    environment: run.environment,
-    signal: new AbortController().signal,
-  });
+  const removeExitCode = await deps.runCommand(
+    ['git', 'worktree', 'remove', '--force', checkoutRoot],
+    { cwd: run.repoRoot, environment: run.environment, signal: new AbortController().signal },
+  );
 
   if (removeExitCode === 0) {
     return 'removed';
@@ -381,5 +394,5 @@ async function removeBaseCheckout(
     environment: run.environment,
   });
 
-  return pickUnremovedCheckoutState(listing, baseRoot);
+  return pickUnremovedCheckoutState(listing, checkoutRoot);
 }

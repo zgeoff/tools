@@ -25,11 +25,16 @@ function setupTest() {
   const removeFolder = mock<(path: string) => Promise<void>>(() => Promise.resolve());
   const output = { out: makeRecordingStub(), err: makeRecordingStub() };
 
-  const readCommandOutput = mock<ReadCommandOutput>(() =>
-    Promise.resolve({
-      exitCode: 0,
-      stdout: 'worktree /repo\nHEAD 1a2b3c\nbranch refs/heads/main\n\n',
-    }),
+  const commandOutputs = new Map([
+    ['git rev-parse --show-prefix', { exitCode: 0, stdout: '\n' }],
+    [
+      'git worktree list --porcelain',
+      { exitCode: 0, stdout: 'worktree /repo\nHEAD 1a2b3c\nbranch refs/heads/main\n\n' },
+    ],
+  ]);
+
+  const readCommandOutput = mock<ReadCommandOutput>((command) =>
+    Promise.resolve(commandOutputs.get(command.join(' ')) ?? { exitCode: 127, stdout: '' }),
   );
 
   return {
@@ -37,6 +42,7 @@ function setupTest() {
     reports,
     runCommand,
     removeFolder,
+    commandOutputs,
     readCommandOutput,
     output,
     startKiln,
@@ -517,6 +523,105 @@ test('it compares two bench files that define a benchmark of the same name, each
   ]);
 });
 
+test('it runs the base side from the package folder of the checkout when rig starts in a package folder', async () => {
+  const ctx = setupTest();
+  const configRoots: string[] = [];
+
+  const trackedFiles = new Map([
+    ['/repo/packages/kettle', ['package.json', 'bench/boil.bench.ts']],
+    ['/repo/.git/rig-bench/run-1/base/packages/kettle', ['package.json', 'bench/boil.bench.ts']],
+  ]);
+
+  ctx.commandOutputs.set('git rev-parse --show-prefix', {
+    exitCode: 0,
+    stdout: 'packages/kettle/\n',
+  });
+
+  ctx.reports.set(
+    '/repo/.git/rig-bench/run-1/base.jsonl',
+    '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":40,"spreadMs":2,"budgetMs":80}\n',
+  );
+
+  ctx.reports.set(
+    '/repo/.git/rig-bench/run-1/head.jsonl',
+    '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":44,"spreadMs":3,"budgetMs":80}\n',
+  );
+
+  const exitCode = await runBench(
+    ['--base', 'main'],
+    defineRig({}),
+    { ...ctx.run, repoRoot: '/repo/packages/kettle' },
+    {
+      ...ctx.deps,
+      probeWorkspaceRepo: () => Promise.resolve(false),
+      readConfig: (root: string) => {
+        configRoots.push(root);
+
+        return Promise.resolve(defineRig({}));
+      },
+      readTrackedFiles: (root: string) => Promise.resolve(trackedFiles.get(root) ?? []),
+    },
+  );
+
+  expect({
+    exitCode,
+    configRoots,
+    listed: ctx.readCommandOutput.mock.calls[0],
+    commands: ctx.runCommand.mock.calls.map((call) => [call[0], call[1].cwd]),
+    out: ctx.output.out.mock.calls,
+  }).toStrictEqual({
+    exitCode: 0,
+    configRoots: ['/repo/.git/rig-bench/run-1/base/packages/kettle'],
+    listed: [
+      ['git', 'rev-parse', '--show-prefix'],
+      { cwd: '/repo/packages/kettle', environment: { PATH: '/bin' } },
+    ],
+    commands: [
+      [
+        ['git', 'worktree', 'add', '--detach', '/repo/.git/rig-bench/run-1/base', 'main'],
+        '/repo/packages/kettle',
+      ],
+      [['bun', 'install', '--frozen-lockfile'], '/repo/.git/rig-bench/run-1/base'],
+      [
+        [
+          'bash',
+          '/diet.sh',
+          '--',
+          'bun',
+          '/run-bench-file.ts',
+          '/repo/.git/rig-bench/run-1/base/packages/kettle/bench/boil.bench.ts',
+          '--report',
+          '/repo/.git/rig-bench/run-1/base.jsonl',
+        ],
+        '/repo/.git/rig-bench/run-1/base/packages/kettle',
+      ],
+      [
+        [
+          'bash',
+          '/diet.sh',
+          '--',
+          'bun',
+          '/run-bench-file.ts',
+          '/repo/packages/kettle/bench/boil.bench.ts',
+          '--report',
+          '/repo/.git/rig-bench/run-1/head.jsonl',
+        ],
+        '/repo/packages/kettle',
+      ],
+      [
+        ['git', 'worktree', 'remove', '--force', '/repo/.git/rig-bench/run-1/base'],
+        '/repo/packages/kettle',
+      ],
+    ],
+    out: [
+      [
+        'bench  concurrency  base median  base spread  head median  head spread  change\n' +
+          'boil   1            40.00ms      2.00ms       44.00ms      3.00ms       +10.0%\n',
+      ],
+    ],
+  });
+});
+
 test('it builds and runs the base side with the config of the base checkout', async () => {
   const ctx = setupTest();
 
@@ -753,7 +858,7 @@ test('it exits 1, says how to remove the checkout and keeps the work folder when
   const ctx = setupTest();
 
   ctx.exitCodes.push(0, 1, 1);
-  ctx.readCommandOutput.mockImplementation(() => Promise.resolve(ctx.leftListing));
+  ctx.commandOutputs.set('git worktree list --porcelain', ctx.leftListing);
 
   const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, ctx.deps);
 
@@ -777,7 +882,7 @@ test('it fails a comparison whose benches pass when git still lists the checkout
   const ctx = setupTest();
 
   ctx.exitCodes.push(0, 0, 0, 0, 1);
-  ctx.readCommandOutput.mockImplementation(() => Promise.resolve(ctx.leftListing));
+  ctx.commandOutputs.set('git worktree list --porcelain', ctx.leftListing);
 
   const exitCode = await runBench(['--base', 'main', 'boil'], defineRig({}), ctx.run, ctx.deps);
 
@@ -788,19 +893,20 @@ test('it keeps the work folder and says how to remove the checkout when git stil
   const ctx = setupTest();
 
   ctx.exitCodes.push(128, 1);
-  ctx.readCommandOutput.mockImplementation(() => Promise.resolve(ctx.leftListing));
+  ctx.commandOutputs.set('git worktree list --porcelain', ctx.leftListing);
 
   const exitCode = await runBench(['--base', 'kettle-v0'], defineRig({}), ctx.run, ctx.deps);
 
   expect({
     exitCode,
-    listed: ctx.readCommandOutput.mock.calls,
+    listed: ctx.readCommandOutput.mock.calls.at(-1),
     err: ctx.output.err.mock.calls,
     removed: ctx.removeFolder.mock.calls,
   }).toStrictEqual({
     exitCode: 1,
     listed: [
-      [['git', 'worktree', 'list', '--porcelain'], { cwd: '/repo', environment: { PATH: '/bin' } }],
+      ['git', 'worktree', 'list', '--porcelain'],
+      { cwd: '/repo', environment: { PATH: '/bin' } },
     ],
     err: [
       ['rig bench: could not check out "kettle-v0"\n'],
