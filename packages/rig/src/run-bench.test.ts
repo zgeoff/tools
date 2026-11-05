@@ -1010,7 +1010,7 @@ test('it removes the checkout and the work folder and hands the error on when a 
     bench: { lane: 'kiln' },
   });
 
-  ctx.startKiln.mockImplementation(() => Promise.reject(new Error('the kiln cracked')));
+  ctx.startKiln.mockImplementation(makeRejectingStub(new Error('the kiln cracked')));
 
   const running = runBench(['--base', 'main', 'boil'], config, ctx.run, {
     ...ctx.deps,
@@ -1046,7 +1046,7 @@ test('it throws the comparison error and the cleanup error together when a compa
   const kilnError = new Error('the kiln cracked');
   const shelfError = new Error('the shelf collapsed');
 
-  ctx.startKiln.mockImplementation(() => Promise.reject(kilnError));
+  ctx.startKiln.mockImplementation(makeRejectingStub(kilnError));
 
   const failure = await runBench(['--base', 'main', 'boil'], config, ctx.run, {
     ...ctx.deps,
@@ -1236,7 +1236,7 @@ test('it removes the work folder when a lane hook throws', async () => {
     bench: { lane: 'kiln' },
   });
 
-  ctx.startKiln.mockImplementation(() => Promise.reject(new Error('the kiln cracked')));
+  ctx.startKiln.mockImplementation(makeRejectingStub(new Error('the kiln cracked')));
 
   const running = runBench([], config, ctx.run, { ...ctx.deps, ...commands });
 
@@ -1259,7 +1259,7 @@ test('it throws the head error and the cleanup error together when a lane hook t
   const kilnError = new Error('the kiln cracked');
   const shelfError = new Error('the shelf collapsed');
 
-  ctx.startKiln.mockImplementation(() => Promise.reject(kilnError));
+  ctx.startKiln.mockImplementation(makeRejectingStub(kilnError));
 
   const failure = await runBench([], config, ctx.run, {
     ...ctx.deps,
