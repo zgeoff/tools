@@ -1240,6 +1240,45 @@ test.each([
   },
 );
 
+test('it reports each import of a file when one import runs through another file', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/kettle/brew.ts': [
+      "import { pour } from './helper.ts/missing';",
+      "import { steep } from './steep.ts';",
+      '',
+      'console.log(pour, steep);',
+      '',
+    ].join('\n'),
+    'sync/kettle/helper.ts': 'export const helper = 1;\n',
+    'sync/kettle/steep.ts': 'export const steep = 3;\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'brew',
+        description: 'The brew script',
+        files: [{ source: 'sync/kettle/brew.ts', target: 'scripts/brew.ts' }],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr: [
+      "check-sync-manifest: entry 'brew' delivers sync/kettle/brew.ts to scripts/brew.ts, which imports ./helper.ts/missing, but the entry does not deliver sync/kettle/helper.ts/missing to scripts/helper.ts/missing",
+      "check-sync-manifest: entry 'brew' delivers sync/kettle/brew.ts to scripts/brew.ts, which imports ./steep.ts, but the entry does not deliver sync/kettle/steep.ts to scripts/steep.ts",
+      '',
+    ].join('\n'),
+  });
+});
+
 test('it fails when a code source does not parse', async () => {
   const ctx = await setupTest();
 

@@ -1,3 +1,4 @@
+import type { Stats } from 'node:fs';
 import { readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -55,7 +56,17 @@ function isLoadableAs(entry: string, bases: ReadonlySet<string>): boolean {
 }
 
 function probeFile(path: string): boolean {
-  return statSync(path, { throwIfNoEntry: false })?.isFile() ?? false;
+  return readStats(path)?.isFile() ?? false;
+}
+
+// A path that runs through a file, such as helper.ts/missing, throws ENOTDIR even when a missing
+// entry returns undefined.
+function readStats(path: string): Stats | undefined {
+  try {
+    return statSync(path, { throwIfNoEntry: false });
+  } catch {
+    return undefined;
+  }
 }
 
 function resolveLoadedPath(specifier: string, directory: string): string | undefined {
@@ -67,9 +78,7 @@ function resolveLoadedPath(specifier: string, directory: string): string | undef
 }
 
 function readFolderEntries(folder: string): string[] {
-  return statSync(folder, { throwIfNoEntry: false })?.isDirectory() === true
-    ? readdirSync(folder).toSorted()
-    : [];
+  return readStats(folder)?.isDirectory() === true ? readdirSync(folder).toSorted() : [];
 }
 
 // Prints each relative import, a tab, and the import completed to the file Bun loads for it.
