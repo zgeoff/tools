@@ -1,4 +1,6 @@
 import { expect, test } from 'bun:test';
+import { join } from 'node:path';
+import { $ } from 'bun';
 import { collectPackageImports } from './collect-package-imports.ts';
 
 test.each([
@@ -70,4 +72,20 @@ test('#collectPackageImports reads JSX in a .tsx file', () => {
 
 test('#collectPackageImports returns null for a source that does not parse', () => {
   expect(collectPackageImports('const = ;\n', 'brew.ts')).toBeNull();
+});
+
+test('it prints its usage and exits 2 without a file argument', async () => {
+  const result = await $`bun ${join(import.meta.dir, 'collect-package-imports.ts')}`
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr: 'usage: collect-package-imports.ts <file>\n',
+  });
 });
