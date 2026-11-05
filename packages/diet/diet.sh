@@ -292,6 +292,9 @@ case "$mode" in
     # The caller's TMPDIR may name no folder yet, and the command gets it as is.
     environment_file=$(umask 077 && mktemp --tmpdir=/tmp diet-environment.XXXXXX)
     env -0 > "$environment_file"
+    # exec keeps this process ID, so the file goes once the run ends, even when
+    # sudo or systemd-run fails before the inside step deletes it.
+    (tail --pid=$$ -f /dev/null && rm -f "$environment_file") < /dev/null > /dev/null 2>&1 &
     exec sudo systemd-run --scope --quiet --collect \
       --unit="diet-$$" \
       -p MemoryMax="$budget" -p MemorySwapMax=0 -p OOMPolicy=continue \
