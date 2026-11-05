@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
-import { basename, dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { writeStdout } from '../packages/std/src/write-stdout.ts';
 import { collectImportSpecifiers } from './collect-import-specifiers.ts';
@@ -27,22 +27,31 @@ function resolveImportPath(specifier: string, directory: string): string {
   return match === undefined ? specifier : relative(directory, match);
 }
 
+const loadableExtensions = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs']);
+
 // The import steep is answered by steep.<ext>, the import steep.js also by steep.<ext>, and the
-// import of a folder by its index.<ext>.
+// import of a folder by its index.<ext>, each with an extension Bun loads.
 function readCandidatePaths(named: string): string[] {
   const name = basename(named);
-  const stem = name.replace(/\.[^.]+$/u, '');
 
-  const siblings = readFolderEntries(dirname(named)).filter(
-    (entry) => entry.startsWith(`${name}.`) || (stem !== name && entry.startsWith(`${stem}.`)),
-  );
+  const bases = new Set([name, name.slice(0, name.length - extname(name).length)]);
 
   return [
-    ...siblings.map((entry) => join(dirname(named), entry)),
+    ...readFolderEntries(dirname(named))
+      .filter((entry) => isLoadableAs(entry, bases))
+      .map((entry) => join(dirname(named), entry)),
     ...readFolderEntries(named)
-      .filter((entry) => entry.startsWith('index.'))
+      .filter((entry) => isLoadableAs(entry, new Set(['index'])))
       .map((entry) => join(named, entry)),
   ];
+}
+
+function isLoadableAs(entry: string, bases: ReadonlySet<string>): boolean {
+  const extension = extname(entry);
+
+  return (
+    loadableExtensions.has(extension) && bases.has(entry.slice(0, entry.length - extension.length))
+  );
 }
 
 function probeFile(path: string): boolean {
