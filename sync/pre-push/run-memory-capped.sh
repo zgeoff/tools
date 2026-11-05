@@ -194,8 +194,16 @@ fi
 # The second half of a systemd mode, which systemd-run starts inside the scope.
 if [ "${1:-}" = --inside ]; then
   user=$2
-  mode=$3
-  shift 3
+  environment_file=$3
+  mode=$4
+  shift 4
+  if [ -n "$environment_file" ]; then
+    # A name bash keeps read-only, such as SHELLOPTS, refuses the export.
+    while IFS= read -r -d '' pair; do
+      export "${pair?}" 2> /dev/null || true
+    done < "$environment_file"
+    rm -f "$environment_file"
+  fi
   run_and_report "/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup)" "$user" "$mode" "$@"
   exit "$status"
 fi
@@ -222,21 +230,24 @@ fi
 
 self=$(readlink -f "$0")
 case "$mode" in
-  # The environment goes to env as arguments: the sudo of ubuntu-26.04 ignores
-  # a bare --preserve-env, and sudo's secure_path resets PATH; OOMPolicy=continue
-  # keeps the scope, and its report, alive when the kernel kills the command.
+  # The environment goes through a file only the user can read: the sudo of
+  # ubuntu-26.04 ignores a bare --preserve-env, secure_path resets PATH, and
+  # sudo logs its arguments, so a secret never goes on the command line;
+  # OOMPolicy=continue keeps the scope, and its report, alive when the kernel
+  # kills the command.
   systemd-sudo)
-    mapfile -d '' environment < <(env -0)
-    exec sudo env "${environment[@]}" systemd-run --scope --quiet --collect \
+    environment_file=$(umask 077 && mktemp)
+    env -0 > "$environment_file"
+    exec sudo systemd-run --scope --quiet --collect \
       --unit="run-memory-capped-$$" \
       -p MemoryMax="${mib}M" -p MemorySwapMax=0 -p OOMPolicy=continue \
-      -- bash "$self" --inside "$(id -un)" "$mode" "$@"
+      -- bash "$self" --inside "$(id -un)" "$environment_file" "$mode" "$@"
     ;;
   systemd-user)
     exec systemd-run --user --scope --quiet --collect \
       --unit="run-memory-capped-$$" \
       -p MemoryMax="${mib}M" -p MemorySwapMax=0 -p OOMPolicy=continue \
-      -- bash "$self" --inside '' "$mode" "$@"
+      -- bash "$self" --inside '' '' "$mode" "$@"
     ;;
   cgroupfs)
     own="/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup)"

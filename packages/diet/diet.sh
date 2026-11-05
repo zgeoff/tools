@@ -229,7 +229,15 @@ fi
 # The second half of a systemd mode, which systemd-run starts inside the scope.
 if [ "${1:-}" = --inside ]; then
   user=$2
-  shift 2
+  environment_file=$3
+  shift 3
+  if [ -n "$environment_file" ]; then
+    # A name bash keeps read-only, such as SHELLOPTS, refuses the export.
+    while IFS= read -r -d '' pair; do
+      export "${pair?}" 2> /dev/null || true
+    done < "$environment_file"
+    rm -f "$environment_file"
+  fi
   run_and_report "/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup)" "$user" "$@"
   exit "$status"
 fi
@@ -274,22 +282,24 @@ fi
 
 self=$(readlink -f "$0")
 case "$mode" in
-  # The environment goes to env as arguments: the sudo of ubuntu-26.04 ignores
-  # a bare --preserve-env, sudo's secure_path resets PATH, and glibc drops
-  # TMPDIR from the environment of a setuid program like sudo; OOMPolicy=continue
-  # keeps the scope, and its report, alive when the kernel kills the command.
+  # The environment goes through a file only the user can read: the sudo of
+  # ubuntu-26.04 ignores a bare --preserve-env, secure_path resets PATH, glibc
+  # drops TMPDIR from a setuid program, and sudo logs its arguments, so a
+  # secret never goes on the command line; OOMPolicy=continue keeps the scope,
+  # and its report, alive when the kernel kills the command.
   systemd-sudo)
-    mapfile -d '' environment < <(env -0)
-    exec sudo env "${environment[@]}" systemd-run --scope --quiet --collect \
+    environment_file=$(umask 077 && mktemp)
+    env -0 > "$environment_file"
+    exec sudo systemd-run --scope --quiet --collect \
       --unit="diet-$$" \
       -p MemoryMax="$budget" -p MemorySwapMax=0 -p OOMPolicy=continue \
-      -- bash "$self" --inside "$(id -un)" "$@"
+      -- bash "$self" --inside "$(id -un)" "$environment_file" "$@"
     ;;
   systemd-user)
     exec systemd-run --user --scope --quiet --collect \
       --unit="diet-$$" \
       -p MemoryMax="$budget" -p MemorySwapMax=0 -p OOMPolicy=continue \
-      -- bash "$self" --inside '' "$@"
+      -- bash "$self" --inside '' '' "$@"
     ;;
   cgroupfs)
     own="/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup)"
