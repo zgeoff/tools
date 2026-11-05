@@ -236,7 +236,8 @@ case "$mode" in
   # OOMPolicy=continue keeps the scope, and its report, alive when the kernel
   # kills the command.
   systemd-sudo)
-    environment_file=$(umask 077 && mktemp)
+    # The caller's TMPDIR may name no folder yet, and the command gets it as is.
+    environment_file=$(umask 077 && mktemp --tmpdir=/tmp run-memory-capped-environment.XXXXXX)
     env -0 > "$environment_file"
     exec sudo systemd-run --scope --quiet --collect \
       --unit="run-memory-capped-$$" \
