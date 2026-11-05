@@ -79,6 +79,25 @@ test('it times each call of a round on its own and gives the median and spread p
   ]);
 });
 
+test('it times each synchronous call of a round apart from the calls after it', async () => {
+  let tick = 0;
+
+  const definition = defineBench({
+    name: 'stir',
+    budget: '50ms',
+    concurrency: [4],
+    run: () => {},
+  });
+
+  const result = await runBenchmark(definition, () => {
+    tick += 1;
+
+    return tick;
+  });
+
+  expect(result).toStrictEqual([{ concurrency: 4, medianMs: 1, spreadMs: 0 }]);
+});
+
 test('it disposes of the setup result once, after the measured runs', async () => {
   const calls: string[] = [];
 

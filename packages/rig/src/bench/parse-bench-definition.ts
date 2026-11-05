@@ -50,8 +50,10 @@ export function parseBenchDefinition(value: unknown): ParsedBenchDefinition {
         }
 
         return {
-          step: async () => {
-            await step();
+          step: () => {
+            const result: unknown = step();
+
+            return result instanceof Promise ? settleStep(result) : undefined;
           },
           dispose: async () => {
             await dispose();
@@ -64,4 +66,8 @@ export function parseBenchDefinition(value: unknown): ParsedBenchDefinition {
 
 function isFunction(value: unknown): value is (...args: unknown[]) => unknown {
   return typeof value === 'function';
+}
+
+async function settleStep(result: Promise<unknown>): Promise<void> {
+  await result;
 }

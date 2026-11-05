@@ -71,8 +71,11 @@ async function runRound(
   const settled = await Promise.allSettled(
     Array.from({ length: concurrency }, async () => {
       const startMs = now();
+      const result = prepared.step();
 
-      await prepared.step();
+      if (result instanceof Promise) {
+        await result;
+      }
 
       return now() - startMs;
     }),

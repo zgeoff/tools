@@ -49,6 +49,40 @@ test('it fails to prepare when prepare yields no step', () => {
   );
 });
 
+test('it returns no promise from the step of a synchronous run', async () => {
+  const parsed = parseBenchDefinition(defineBench({ name: 'stir', budget: '5ms', run: () => {} }));
+
+  invariant(parsed.kind === 'parsed');
+
+  const prepared = await parsed.definition.prepare();
+
+  expect(prepared.step()).toBeUndefined();
+});
+
+test('it returns a promise from the step of an async run that settles after the run', async () => {
+  const calls: string[] = [];
+
+  const parsed = parseBenchDefinition(
+    defineBench({
+      name: 'steep',
+      budget: '5ms',
+      run: async () => {
+        await Promise.resolve();
+
+        calls.push('steeped');
+      },
+    }),
+  );
+
+  invariant(parsed.kind === 'parsed');
+
+  const prepared = await parsed.definition.prepare();
+
+  await prepared.step();
+
+  expect(calls).toStrictEqual(['steeped']);
+});
+
 test('it keeps the disposal of the setup result', async () => {
   const disposals: string[] = [];
 
