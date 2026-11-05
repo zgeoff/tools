@@ -1138,6 +1138,48 @@ test.each([
   },
 );
 
+test.each([
+  ['leaves the symlink out', []],
+  [
+    'names the file behind it at another target',
+    [{ source: 'packages/tea/steep.ts', target: 'scripts/steep.ts' }],
+  ],
+  [
+    'delivers another file at its target',
+    [{ source: 'packages/tea/pour.ts', target: 'scripts/alias.ts' }],
+  ],
+])('it fails the import of a symlink when the entry %s', async (_case, linkedFiles) => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/kettle/brew.ts': "import { steep } from './alias.ts';\n\nconsole.log(steep);\n",
+    'packages/tea/steep.ts': 'export const steep = 3;\n',
+    'packages/tea/pour.ts': 'export const pour = 2;\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'brew',
+        description: 'The brew script',
+        files: [{ source: 'sync/kettle/brew.ts', target: 'scripts/brew.ts' }, ...linkedFiles],
+      },
+    ]),
+  });
+
+  await symlink('../../packages/tea/steep.ts', join(ctx.directory, 'sync/kettle/alias.ts'));
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      "check-sync-manifest: entry 'brew' delivers sync/kettle/brew.ts to scripts/brew.ts, which imports ./alias.ts, but the entry does not deliver sync/kettle/alias.ts to scripts/alias.ts\n",
+  });
+});
+
 test('it asks for the file path of an import without an extension when the entry leaves out the file too', async () => {
   const ctx = await setupTest();
 
