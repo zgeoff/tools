@@ -274,12 +274,13 @@ fi
 
 self=$(readlink -f "$0")
 case "$mode" in
-  # sudo keeps the environment, and PATH, which its secure_path resets, and
-  # TMPDIR, which glibc drops from the environment of a setuid program like
-  # sudo; OOMPolicy=continue keeps the scope, and its report, alive when the
-  # kernel kills the command.
+  # The environment goes to env as arguments: the sudo of ubuntu-26.04 ignores
+  # a bare --preserve-env, sudo's secure_path resets PATH, and glibc drops
+  # TMPDIR from the environment of a setuid program like sudo; OOMPolicy=continue
+  # keeps the scope, and its report, alive when the kernel kills the command.
   systemd-sudo)
-    exec sudo --preserve-env env "PATH=$PATH" ${TMPDIR+"TMPDIR=$TMPDIR"} systemd-run --scope --quiet --collect \
+    mapfile -d '' environment < <(env -0)
+    exec sudo env "${environment[@]}" systemd-run --scope --quiet --collect \
       --unit="diet-$$" \
       -p MemoryMax="$budget" -p MemorySwapMax=0 -p OOMPolicy=continue \
       -- bash "$self" --inside "$(id -un)" "$@"
