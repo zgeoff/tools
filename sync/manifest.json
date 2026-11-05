@@ -472,6 +472,26 @@
         "target": "scripts/run-workflows-check.ts"
       },
       {
+        "source": "packages/chex/src/collect-concurrency-findings.ts",
+        "target": "scripts/collect-concurrency-findings.ts"
+      },
+      {
+        "source": "packages/chex/src/find-member.ts",
+        "target": "scripts/find-member.ts"
+      },
+      {
+        "source": "packages/chex/src/get-top-level-line.ts",
+        "target": "scripts/get-top-level-line.ts"
+      },
+      {
+        "source": "packages/chex/src/pull-request-triggers.ts",
+        "target": "scripts/pull-request-triggers.ts"
+      },
+      {
+        "source": "packages/chex/src/workflow-context.ts",
+        "target": "scripts/workflow-context.ts"
+      },
+      {
         "source": "packages/chex/src/read-checks-profile.ts",
         "target": "scripts/read-checks-profile.ts"
       },

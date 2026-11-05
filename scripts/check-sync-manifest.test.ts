@@ -946,12 +946,16 @@ test('it passes a code source that imports only built-in modules, relative paths
       "import { warmCup } from 'cup-warmer/sync';",
       '',
     ].join('\n'),
+    'sync/steep.ts': 'export const steep = 3;\n',
     'sync/manifest.json': JSON.stringify([
       {
         name: 'brew',
         description: 'The brew script',
         packages: ['@acme/teapot', 'cup-warmer'],
-        files: [{ source: 'sync/brew.ts', target: 'scripts/brew.ts' }],
+        files: [
+          { source: 'sync/brew.ts', target: 'scripts/brew.ts' },
+          { source: 'sync/steep.ts', target: 'scripts/steep.ts' },
+        ],
       },
     ]),
   });
@@ -1015,6 +1019,49 @@ test('it passes a code source that names a package only in comments and strings'
     stdout: result.stdout.toString(),
     stderr: result.stderr.toString(),
   }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+});
+
+test.each([
+  [
+    'leaves out the file a relative import names',
+    [{ source: 'sync/kettle/brew.ts', target: 'scripts/brew.ts' }],
+    1,
+    "check-sync-manifest: entry 'brew' delivers sync/kettle/brew.ts to scripts/brew.ts, which imports ../steep.ts, but the entry does not deliver sync/steep.ts to steep.ts\n",
+  ],
+  [
+    'delivers the imported file beside another target',
+    [
+      { source: 'sync/kettle/brew.ts', target: 'scripts/kettle/brew.ts' },
+      { source: 'sync/steep.ts', target: 'scripts/steep/steep.ts' },
+    ],
+    1,
+    "check-sync-manifest: entry 'brew' delivers sync/kettle/brew.ts to scripts/kettle/brew.ts, which imports ../steep.ts, but the entry does not deliver sync/steep.ts to scripts/steep.ts\n",
+  ],
+  [
+    'delivers the imported file where the import names it',
+    [
+      { source: 'sync/kettle/brew.ts', target: 'scripts/kettle/brew.ts' },
+      { source: 'sync/steep.ts', target: 'scripts/steep.ts' },
+    ],
+    0,
+    '',
+  ],
+])('it checks a relative import when the entry %s', async (_case, files, exitCode, stderr) => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/kettle/brew.ts': "import { steep } from '../steep.ts';\n\nconsole.log(steep);\n",
+    'sync/steep.ts': 'export const steep = 3;\n',
+    'sync/manifest.json': JSON.stringify([{ name: 'brew', description: 'The brew script', files }]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({ exitCode, stdout: '', stderr });
 });
 
 test('it fails when a code source does not parse', async () => {
