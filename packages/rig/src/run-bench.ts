@@ -1,4 +1,4 @@
-import { basename, join } from 'node:path';
+import { basename, join, relative } from 'node:path';
 import { collectBenchComparison } from './bench/collect-bench-comparison.ts';
 import { formatBenchComparison } from './bench/format-bench-comparison.ts';
 import { parseBenchReport } from './bench/parse-bench-report.ts';
@@ -65,12 +65,13 @@ export async function runBench(
     return 2;
   }
 
-  const benchFiles = await readBenchFiles(run.repoRoot, deps);
+  const headBenchFiles = await readBenchFiles(run.repoRoot, deps);
 
-  const files = pickNamedFiles(benchFiles, parsed.name);
+  const files = pickNamedFiles(headBenchFiles, parsed.name);
 
-  if (files.length === 0) {
-    return reportNoBenchmark(parsed.name, benchFiles, deps);
+  // A benchmark that only the base has still compares, so with a base the check waits for its files.
+  if (parsed.baseRef === null && files.length === 0) {
+    return reportNoBenchmark(parsed.name, headBenchFiles, deps);
   }
 
   const workFolder = await deps.createWorkFolder(run.repoRoot);
@@ -87,7 +88,7 @@ export async function runBench(
       parsed.baseRef === null
         ? await runHeadBench(head, run, deps)
         : await runBenchComparison(
-            { baseRef: parsed.baseRef, name: parsed.name, workFolder, head },
+            { baseRef: parsed.baseRef, name: parsed.name, workFolder, head, headBenchFiles },
             run,
             deps,
           );
@@ -124,7 +125,7 @@ function reportNoBenchmark(
     return 0;
   }
 
-  const names = benchFiles.map((file) => toBenchName(file)).join(', ');
+  const names = [...new Set(benchFiles.map((file) => toBenchName(file)))].join(', ');
 
   deps.output.err(`rig bench: no benchmark named "${name}"; the benchmarks are ${names}\n`);
 
@@ -133,7 +134,7 @@ function reportNoBenchmark(
 
 async function runHeadBench(head: BenchSide, run: RigRun, deps: BenchDeps): Promise<number> {
   const exitCode = await runBenchSide(head, run, deps);
-  const report = await readBenchReport(head.reportPath, deps);
+  const report = await readBenchReport(head, deps);
 
   if (report.kind === 'refused') {
     deps.output.err(`rig bench: ${report.reason}\n`);
@@ -211,11 +212,28 @@ function makeBenchHooks(side: BenchSide, run: RigRun, deps: BenchDeps): LaneHook
   };
 }
 
-// A bench file that failed before it measured anything appends no report.
-async function readBenchReport(path: string, deps: BenchDeps): Promise<ParsedBenchReport> {
-  const text = await deps.readText(path);
+// A bench file that failed before it measured anything appends no report. Each entry's file
+// becomes relative to the side's root, so the same file matches on the base and on the head.
+async function readBenchReport(side: BenchSide, deps: BenchDeps): Promise<ParsedBenchReport> {
+  const text = await deps.readText(side.reportPath);
 
-  return parseBenchReport(text ?? '');
+  const report = parseBenchReport(text ?? '');
+
+  if (report.kind === 'refused') {
+    return report;
+  }
+
+  return {
+    kind: 'parsed',
+    entries: report.entries.map((entry) => ({
+      file: relative(side.root, entry.file),
+      name: entry.name,
+      concurrency: entry.concurrency,
+      medianMs: entry.medianMs,
+      spreadMs: entry.spreadMs,
+      budgetMs: entry.budgetMs,
+    })),
+  };
 }
 
 interface BenchComparison {
@@ -226,6 +244,9 @@ interface BenchComparison {
   readonly workFolder: string;
 
   readonly head: BenchSide;
+
+  // Every bench file of the head, for the names a missing benchmark lists.
+  readonly headBenchFiles: readonly string[];
 }
 
 async function runBenchComparison(
@@ -286,10 +307,18 @@ async function runCheckedOutComparison(
     reportPath: join(comparison.workFolder, 'base.jsonl'),
   };
 
+  if (base.files.length === 0 && comparison.head.files.length === 0) {
+    return reportNoBenchmark(
+      comparison.name,
+      [...comparison.headBenchFiles, ...baseBenchFiles],
+      deps,
+    );
+  }
+
   const baseExitCode = await runBenchSide(base, run, deps);
   const headExitCode = await runBenchSide(comparison.head, run, deps);
-  const baseReport = await readBenchReport(base.reportPath, deps);
-  const headReport = await readBenchReport(comparison.head.reportPath, deps);
+  const baseReport = await readBenchReport(base, deps);
+  const headReport = await readBenchReport(comparison.head, deps);
 
   if (baseReport.kind === 'refused') {
     deps.output.err(`rig bench: ${baseReport.reason}\n`);

@@ -11,7 +11,10 @@ const header = [
 ] as const;
 
 export function formatBenchComparison(rows: readonly BenchComparisonRow[]): string {
-  const cells: readonly (readonly string[])[] = [header, ...rows.map((row) => formatCells(row))];
+  const cells: readonly (readonly string[])[] = [
+    header,
+    ...rows.map((row) => formatCells(row, rows)),
+  ];
 
   const widths = header.map((_, column) =>
     Math.max(...cells.map((line) => line[column]?.length ?? 0)),
@@ -29,9 +32,12 @@ export function formatBenchComparison(rows: readonly BenchComparisonRow[]): stri
     .join('');
 }
 
-function formatCells(row: BenchComparisonRow): readonly string[] {
+function formatCells(
+  row: BenchComparisonRow,
+  rows: readonly BenchComparisonRow[],
+): readonly string[] {
   return [
-    row.name,
+    formatLabel(row, rows),
     String(row.concurrency),
     formatTime(row.base?.medianMs),
     formatTime(row.base?.spreadMs),
@@ -39,6 +45,15 @@ function formatCells(row: BenchComparisonRow): readonly string[] {
     formatTime(row.head?.spreadMs),
     formatChange(row.base, row.head),
   ];
+}
+
+// The name alone reads best, so the file shows only where two rows would look the same.
+function formatLabel(row: BenchComparisonRow, rows: readonly BenchComparisonRow[]): string {
+  const isShared = rows.some(
+    (other) => other !== row && other.name === row.name && other.concurrency === row.concurrency,
+  );
+
+  return isShared ? `${row.name} (${row.file})` : row.name;
 }
 
 function formatTime(timeMs: number | undefined): string {

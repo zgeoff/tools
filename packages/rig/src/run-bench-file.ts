@@ -30,6 +30,6 @@ if (args.kind === 'refused') {
 
     process.stdout.write(formatBenchmarkResult(parsed.definition, results));
 
-    await appendFile(args.reportPath, formatBenchReport(parsed.definition, results));
+    await appendFile(args.reportPath, formatBenchReport(args.file, parsed.definition, results));
   }
 }

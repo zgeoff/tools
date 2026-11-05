@@ -1,4 +1,6 @@
 import { expect, test } from 'bun:test';
+import { setImmediate } from 'node:timers/promises';
+import { makeAnswerQueue } from '@zgeoff/testing/helpers';
 import { buildSteppingClock } from '../test-utils/build-stepping-clock.ts';
 import { defineBench } from './define-bench.ts';
 import { runBenchmark } from './run-benchmark.ts';
@@ -157,6 +159,48 @@ test('it disposes of the setup result when a run throws', async () => {
   await Promise.allSettled([running]);
 
   expect(disposals).toStrictEqual(['dispose']);
+});
+
+test('it waits for every call of the round before it disposes of the setup result when a call rejects', async () => {
+  const events: string[] = [];
+  const slowCall = Promise.withResolvers<void>();
+
+  const steps = makeAnswerQueue([
+    () => Promise.reject(new Error('the kettle cracked')),
+    async () => {
+      await slowCall.promise;
+
+      events.push('poured');
+    },
+  ]);
+
+  const definition = defineBench({
+    name: 'pour',
+    budget: '50ms',
+    concurrency: [2],
+    setup: () =>
+      Promise.resolve({
+        [Symbol.asyncDispose]: () => {
+          events.push('dispose');
+
+          return Promise.resolve();
+        },
+      }),
+    run: () => steps()(),
+  });
+
+  const running = runBenchmark(definition, () => 0);
+
+  // A turn of the event loop lets a rejection that does not wait for the round reach the dispose.
+  await setImmediate();
+
+  slowCall.resolve();
+
+  expect(running).rejects.toThrow('the kettle cracked');
+
+  await Promise.allSettled([running]);
+
+  expect(events).toStrictEqual(['poured', 'dispose']);
 });
 
 test('it disposes of a setup result that is a function with an async dispose', async () => {

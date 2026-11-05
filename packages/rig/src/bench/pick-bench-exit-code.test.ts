@@ -8,7 +8,14 @@ test.each([
 ])('it exits %s', (_title, sideExitCodes, medianMs, expected) => {
   expect(
     pickBenchExitCode(sideExitCodes, [
-      { name: 'boil', concurrency: 1, medianMs, spreadMs: 0.5, budgetMs: 50 },
+      {
+        file: 'bench/boil.bench.ts',
+        name: 'boil',
+        concurrency: 1,
+        medianMs,
+        spreadMs: 0.5,
+        budgetMs: 50,
+      },
     ]),
   ).toBe(expected);
 });

@@ -102,8 +102,8 @@ test('it exits 1 when a head entry is over its budget and no base is given', asy
 
   ctx.reports.set(
     '/repo/.git/rig-bench/run-1/head.jsonl',
-    '{"name":"boil","concurrency":1,"medianMs":4,"spreadMs":0.5,"budgetMs":50}\n' +
-      '{"name":"boil","concurrency":4,"medianMs":61,"spreadMs":3,"budgetMs":50}\n',
+    '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":4,"spreadMs":0.5,"budgetMs":50}\n' +
+      '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":4,"medianMs":61,"spreadMs":3,"budgetMs":50}\n',
   );
 
   const exitCode = await runBench([], defineRig({}), ctx.run, ctx.deps);
@@ -116,8 +116,8 @@ test('it exits 0 when every entry is within budget', async () => {
 
   ctx.reports.set(
     '/repo/.git/rig-bench/run-1/head.jsonl',
-    '{"name":"boil","concurrency":1,"medianMs":4,"spreadMs":0.5,"budgetMs":50}\n' +
-      '{"name":"steep","concurrency":1,"medianMs":12,"spreadMs":1,"budgetMs":20}\n',
+    '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":4,"spreadMs":0.5,"budgetMs":50}\n' +
+      '{"file":"/repo/packages/kettle/bench/steep.bench.ts","name":"steep","concurrency":1,"medianMs":12,"spreadMs":1,"budgetMs":20}\n',
   );
 
   const exitCode = await runBench([], defineRig({}), ctx.run, ctx.deps);
@@ -328,14 +328,14 @@ test('it prints the base, the head and the change of each bench and level', asyn
 
   ctx.reports.set(
     '/repo/.git/rig-bench/run-1/base.jsonl',
-    '{"name":"pour one cup","concurrency":1,"medianMs":12.1,"spreadMs":0.8,"budgetMs":80}\n' +
-      '{"name":"pour one cup","concurrency":4,"medianMs":30.4,"spreadMs":2.1,"budgetMs":80}\n',
+    '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/pour.bench.ts","name":"pour one cup","concurrency":1,"medianMs":12.1,"spreadMs":0.8,"budgetMs":80}\n' +
+      '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/pour.bench.ts","name":"pour one cup","concurrency":4,"medianMs":30.4,"spreadMs":2.1,"budgetMs":80}\n',
   );
 
   ctx.reports.set(
     '/repo/.git/rig-bench/run-1/head.jsonl',
-    '{"name":"pour one cup","concurrency":1,"medianMs":11.5,"spreadMs":0.7,"budgetMs":80}\n' +
-      '{"name":"pour one cup","concurrency":4,"medianMs":33.2,"spreadMs":2.4,"budgetMs":80}\n',
+    '{"file":"/repo/packages/kettle/bench/pour.bench.ts","name":"pour one cup","concurrency":1,"medianMs":11.5,"spreadMs":0.7,"budgetMs":80}\n' +
+      '{"file":"/repo/packages/kettle/bench/pour.bench.ts","name":"pour one cup","concurrency":4,"medianMs":33.2,"spreadMs":2.4,"budgetMs":80}\n',
   );
 
   const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, ctx.deps);
@@ -357,12 +357,12 @@ test('it passes a comparison whose base entry is over its budget', async () => {
 
   ctx.reports.set(
     '/repo/.git/rig-bench/run-1/base.jsonl',
-    '{"name":"boil","concurrency":1,"medianMs":70,"spreadMs":2,"budgetMs":50}\n',
+    '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":70,"spreadMs":2,"budgetMs":50}\n',
   );
 
   ctx.reports.set(
     '/repo/.git/rig-bench/run-1/head.jsonl',
-    '{"name":"boil","concurrency":1,"medianMs":40,"spreadMs":2,"budgetMs":50}\n',
+    '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":40,"spreadMs":2,"budgetMs":50}\n',
   );
 
   const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, ctx.deps);
@@ -375,7 +375,7 @@ test('it fails a comparison whose head entry is over its budget', async () => {
 
   ctx.reports.set(
     '/repo/.git/rig-bench/run-1/head.jsonl',
-    '{"name":"boil","concurrency":1,"medianMs":70,"spreadMs":2,"budgetMs":50}\n',
+    '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"boil","concurrency":1,"medianMs":70,"spreadMs":2,"budgetMs":50}\n',
   );
 
   const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, ctx.deps);
@@ -391,6 +391,104 @@ test('it fails a comparison whose base side fails', async () => {
   const exitCode = await runBench(['--base', 'main', 'boil'], defineRig({}), ctx.run, ctx.deps);
 
   expect(exitCode).toBe(1);
+});
+
+test('it compares a named benchmark that only the base has, with a dash on the head', async () => {
+  const ctx = setupTest();
+
+  const trackedFiles = new Map([
+    ['/repo', ['packages/kettle/package.json', 'packages/kettle/bench/boil.bench.ts']],
+    [
+      '/repo/.git/rig-bench/run-1/base',
+      ['packages/kettle/package.json', 'packages/kettle/bench/brew.bench.ts'],
+    ],
+  ]);
+
+  ctx.reports.set(
+    '/repo/.git/rig-bench/run-1/base.jsonl',
+    '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/brew.bench.ts","name":"brew","concurrency":1,"medianMs":12,"spreadMs":0.5,"budgetMs":80}\n',
+  );
+
+  const exitCode = await runBench(['--base', 'main', 'brew'], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    readTrackedFiles: (root: string) => Promise.resolve(trackedFiles.get(root) ?? []),
+  });
+
+  expect({ exitCode, out: ctx.output.out.mock.calls }).toStrictEqual({
+    exitCode: 0,
+    out: [
+      [
+        'bench  concurrency  base median  base spread  head median  head spread  change\n' +
+          'brew   1            12.00ms      0.50ms       -            -            -\n',
+      ],
+    ],
+  });
+});
+
+test('it exits 1, names the benchmarks of both sides and cleans up when neither side has the name', async () => {
+  const ctx = setupTest();
+
+  const trackedFiles = new Map([
+    [
+      '/repo',
+      [
+        'packages/kettle/package.json',
+        'packages/kettle/bench/boil.bench.ts',
+        'packages/kettle/bench/steep.bench.ts',
+      ],
+    ],
+    [
+      '/repo/.git/rig-bench/run-1/base',
+      [
+        'packages/kettle/package.json',
+        'packages/kettle/bench/steep.bench.ts',
+        'packages/kettle/bench/pour.bench.ts',
+      ],
+    ],
+  ]);
+
+  const exitCode = await runBench(['--base', 'main', 'brew'], defineRig({}), ctx.run, {
+    ...ctx.deps,
+    readTrackedFiles: (root: string) => Promise.resolve(trackedFiles.get(root) ?? []),
+  });
+
+  expect({
+    exitCode,
+    err: ctx.output.err.mock.calls,
+    lastCommand: ctx.runCommand.mock.calls.at(-1)?.[0],
+    removed: ctx.removeFolder.mock.calls,
+  }).toStrictEqual({
+    exitCode: 1,
+    err: [['rig bench: no benchmark named "brew"; the benchmarks are boil, steep, pour\n']],
+    lastCommand: ['git', 'worktree', 'remove', '--force', '/repo/.git/rig-bench/run-1/base'],
+    removed: [['/repo/.git/rig-bench/run-1']],
+  });
+});
+
+test('it compares two bench files that define a benchmark of the same name, each with its file', async () => {
+  const ctx = setupTest();
+
+  ctx.reports.set(
+    '/repo/.git/rig-bench/run-1/base.jsonl',
+    '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/boil.bench.ts","name":"pour","concurrency":1,"medianMs":40,"spreadMs":2,"budgetMs":80}\n' +
+      '{"file":"/repo/.git/rig-bench/run-1/base/packages/kettle/bench/steep.bench.ts","name":"pour","concurrency":1,"medianMs":12,"spreadMs":0.5,"budgetMs":80}\n',
+  );
+
+  ctx.reports.set(
+    '/repo/.git/rig-bench/run-1/head.jsonl',
+    '{"file":"/repo/packages/kettle/bench/steep.bench.ts","name":"pour","concurrency":1,"medianMs":12,"spreadMs":0.5,"budgetMs":80}\n' +
+      '{"file":"/repo/packages/kettle/bench/boil.bench.ts","name":"pour","concurrency":1,"medianMs":44,"spreadMs":3,"budgetMs":80}\n',
+  );
+
+  await runBench(['--base', 'main'], defineRig({}), ctx.run, ctx.deps);
+
+  expect(ctx.output.out.mock.calls).toStrictEqual([
+    [
+      'bench                                        concurrency  base median  base spread  head median  head spread  change\n' +
+        'pour (packages/kettle/bench/steep.bench.ts)  1            12.00ms      0.50ms       12.00ms      0.50ms       +0.0%\n' +
+        'pour (packages/kettle/bench/boil.bench.ts)   1            40.00ms      2.00ms       44.00ms      3.00ms       +10.0%\n',
+    ],
+  ]);
 });
 
 test('it builds and runs the base side with the config of the base checkout', async () => {

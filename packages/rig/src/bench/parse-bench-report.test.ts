@@ -6,7 +6,7 @@ import { parseBenchReport } from './parse-bench-report.ts';
 test('it reads back every entry that the report format writes', () => {
   const definition = defineBench({ name: 'steep', budget: '40ms', run: () => {} });
 
-  const text = formatBenchReport(definition, [
+  const text = formatBenchReport('/teapot/bench/steep.bench.ts', definition, [
     { concurrency: 1, medianMs: 11.5, spreadMs: 0.7 },
     { concurrency: 4, medianMs: 33.2, spreadMs: 2.4 },
   ]);
@@ -14,8 +14,22 @@ test('it reads back every entry that the report format writes', () => {
   expect(parseBenchReport(text)).toStrictEqual({
     kind: 'parsed',
     entries: [
-      { name: 'steep', concurrency: 1, medianMs: 11.5, spreadMs: 0.7, budgetMs: 40 },
-      { name: 'steep', concurrency: 4, medianMs: 33.2, spreadMs: 2.4, budgetMs: 40 },
+      {
+        file: '/teapot/bench/steep.bench.ts',
+        name: 'steep',
+        concurrency: 1,
+        medianMs: 11.5,
+        spreadMs: 0.7,
+        budgetMs: 40,
+      },
+      {
+        file: '/teapot/bench/steep.bench.ts',
+        name: 'steep',
+        concurrency: 4,
+        medianMs: 33.2,
+        spreadMs: 2.4,
+        budgetMs: 40,
+      },
     ],
   });
 });
@@ -26,7 +40,14 @@ test('it reads no entries from an empty report', () => {
 
 test.each([
   ['text that is no JSON', 'the kettle boiled'],
-  ['an entry with no median', '{"name":"steep","concurrency":1,"spreadMs":0.7,"budgetMs":40}'],
+  [
+    'an entry with no median',
+    '{"file":"/teapot/bench/steep.bench.ts","name":"steep","concurrency":1,"spreadMs":0.7,"budgetMs":40}',
+  ],
+  [
+    'an entry with no bench file',
+    '{"name":"steep","concurrency":1,"medianMs":11.5,"spreadMs":0.7,"budgetMs":40}',
+  ],
 ])('it refuses a report with a line of %s', (_title, line) => {
   expect(parseBenchReport(`${line}\n`)).toStrictEqual({
     kind: 'refused',

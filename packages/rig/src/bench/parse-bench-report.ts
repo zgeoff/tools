@@ -39,6 +39,7 @@ function parseEntry(line: string): BenchReportEntry | null {
     return null;
   }
 
+  const file: unknown = Reflect.get(value, 'file');
   const name: unknown = Reflect.get(value, 'name');
   const concurrency: unknown = Reflect.get(value, 'concurrency');
   const medianMs: unknown = Reflect.get(value, 'medianMs');
@@ -46,6 +47,7 @@ function parseEntry(line: string): BenchReportEntry | null {
   const budgetMs: unknown = Reflect.get(value, 'budgetMs');
 
   if (
+    typeof file !== 'string' ||
     typeof name !== 'string' ||
     typeof concurrency !== 'number' ||
     typeof medianMs !== 'number' ||
@@ -55,5 +57,5 @@ function parseEntry(line: string): BenchReportEntry | null {
     return null;
   }
 
-  return { name, concurrency, medianMs, spreadMs, budgetMs };
+  return { file, name, concurrency, medianMs, spreadMs, budgetMs };
 }

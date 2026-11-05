@@ -61,13 +61,14 @@ async function runLevel(
 }
 
 // Each call is timed on its own, so the times show how long one call waits under the load of the
-// others, not how long the round took.
-function runRound(
+// others, not how long the round took. A rejected call still waits for the rest of its round, so
+// the setup result is never disposed of under a call that runs.
+async function runRound(
   prepared: PreparedBench,
   concurrency: number,
   now: () => number,
 ): Promise<number[]> {
-  return Promise.all(
+  const settled = await Promise.allSettled(
     Array.from({ length: concurrency }, async () => {
       const startMs = now();
 
@@ -76,4 +77,12 @@ function runRound(
       return now() - startMs;
     }),
   );
+
+  const rejected = settled.find((outcome) => outcome.status === 'rejected');
+
+  if (rejected !== undefined) {
+    throw rejected.reason;
+  }
+
+  return settled.flatMap((outcome) => (outcome.status === 'fulfilled' ? [outcome.value] : []));
 }
