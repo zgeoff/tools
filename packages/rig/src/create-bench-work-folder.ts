@@ -1,29 +1,26 @@
-import { mkdir, mkdtemp } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { buildBenchFolderPath } from './build-bench-folder-path.ts';
 
-// The folder sits in the git folder, which git never lists as untracked, and in the common one, so
-// a run from a linked worktree shares one place with the main checkout.
-export async function createBenchWorkFolder(repoRoot: string): Promise<string> {
-  const listing = Bun.spawn(['git', 'rev-parse', '--git-common-dir'], {
-    cwd: repoRoot,
-    stdout: 'pipe',
-    stderr: 'inherit',
-  });
+export interface BenchWorkFolderDeps {
+  // Returns what `git rev-parse --git-common-dir` prints in the repo root.
+  readonly readGitCommonDir: (repoRoot: string) => Promise<string>;
 
-  const [exitCode, output] = await Promise.all([
-    listing.exited,
-    new Response(listing.stdout).text(),
-  ]);
+  // Makes the folder and its parents, and keeps a folder that exists.
+  readonly createFolder: (path: string) => Promise<void>;
 
-  if (exitCode !== 0) {
-    throw new Error(
-      `git rev-parse --git-common-dir failed in ${repoRoot} with exit code ${exitCode}`,
-    );
-  }
+  // Makes a new folder whose path starts with the prefix, and returns its path.
+  readonly createTempFolder: (prefix: string) => Promise<string>;
+}
 
-  const benchFolder = join(resolve(repoRoot, output.trim()), 'rig-bench');
+export async function createBenchWorkFolder(
+  repoRoot: string,
+  deps: BenchWorkFolderDeps,
+): Promise<string> {
+  const gitCommonDir = await deps.readGitCommonDir(repoRoot);
 
-  await mkdir(benchFolder, { recursive: true });
+  const benchFolder = buildBenchFolderPath(repoRoot, gitCommonDir);
 
-  return mkdtemp(join(benchFolder, 'run-'));
+  await deps.createFolder(benchFolder);
+
+  return deps.createTempFolder(join(benchFolder, 'run-'));
 }

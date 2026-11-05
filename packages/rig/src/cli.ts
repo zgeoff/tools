@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { existsSync } from 'node:fs';
+import { mkdir, mkdtemp } from 'node:fs/promises';
 import { availableParallelism, totalmem } from 'node:os';
 import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
@@ -8,6 +9,7 @@ import { wireBrowserLaneHooks } from './browser/wire-browser-lane-hooks.ts';
 import { createBenchWorkFolder } from './create-bench-work-folder.ts';
 import { initFiles } from './init-files.ts';
 import { probeWorkspaceRepo } from './probe-workspace-repo.ts';
+import { readGitCommonDir } from './read-git-common-dir.ts';
 import { readRigConfig } from './read-rig-config.ts';
 import { readTrackedFiles } from './read-tracked-files.ts';
 import { readWorkerCount } from './read-worker-count.ts';
@@ -68,7 +70,14 @@ try {
           readText: readOptionalText,
         }),
       importModule: (path) => import(path),
-      createWorkFolder: createBenchWorkFolder,
+      createWorkFolder: (root) =>
+        createBenchWorkFolder(root, {
+          readGitCommonDir,
+          createFolder: async (path) => {
+            await mkdir(path, { recursive: true });
+          },
+          createTempFolder: (prefix) => mkdtemp(prefix),
+        }),
       readText: async (path) => {
         const text = await readOptionalText(path);
 
