@@ -55,6 +55,7 @@
     "test:browser": "bun scripts/test-cleanup/run-test-folder-sweep.ts && rig browser",
     "test:e2e": "bun scripts/test-cleanup/run-test-folder-sweep.ts && rig e2e",
     "test:host": "bun scripts/test-cleanup/run-test-folder-sweep.ts && rig host",
+    "bench": "rig bench",
     "build": "bun run --filter '*' build",
     "skills:install": "bun scripts/skills/write-pinned-skills.ts",
     "lint": "oxlint",

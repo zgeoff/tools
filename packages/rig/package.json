@@ -50,7 +50,8 @@
     "@zgeoff/diet": "workspace:*",
     "@zgeoff/std": "workspace:*",
     "gunshi": "catalog:",
-    "ts-pattern": "catalog:"
+    "ts-pattern": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/bun": "catalog:",
@@ -58,8 +59,7 @@
     "@zgeoff/testing": "workspace:*",
     "tiny-invariant": "catalog:",
     "tsrs": "catalog:",
-    "typescript": "catalog:",
-    "zod": "catalog:"
+    "typescript": "catalog:"
   },
   "engines": {
     "bun": ">=1.3"

@@ -1,5 +1,6 @@
 import { cli } from 'gunshi/bone';
 import { define } from 'gunshi/definition';
+import { formatParseError } from './format-parse-error.ts';
 
 export interface CLIArgs {
   readonly command: string;
@@ -53,16 +54,6 @@ function dropFirstSeparator(args: readonly string[]): readonly string[] {
   const separator = args.indexOf('--');
 
   return separator === -1 ? args : args.toSpliced(separator, 1);
-}
-
-// The parser throws one error that holds every reason the command line is refused, so each reason
-// prints on a line of its own.
-function formatParseError(error: unknown): string {
-  if (error instanceof AggregateError) {
-    return error.errors.map((reason) => formatParseError(reason)).join('\n');
-  }
-
-  return error instanceof Error ? error.message : String(error);
 }
 
 const forwardedArgSchema = { isolate: { type: 'boolean' } } as const;

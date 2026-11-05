@@ -1,11 +1,18 @@
 #!/usr/bin/env bun
 import { existsSync } from 'node:fs';
+import { mkdir, mkdtemp } from 'node:fs/promises';
 import { availableParallelism, totalmem } from 'node:os';
 import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
+import { processRuntime } from './browser/process-runtime.ts';
+import { removePath } from './browser/remove-path.ts';
 import { wireBrowserLaneHooks } from './browser/wire-browser-lane-hooks.ts';
+import { createBenchWorkFolder } from './create-bench-work-folder.ts';
 import { initFiles } from './init-files.ts';
 import { probeWorkspaceRepo } from './probe-workspace-repo.ts';
+import { readCommandOutput } from './read-command-output.ts';
+import type { CommandOutput, ReadCommandOptions } from './read-command-output.ts';
+import { readGitCommonDir } from './read-git-common-dir.ts';
 import { readRigConfig } from './read-rig-config.ts';
 import { readTrackedFiles } from './read-tracked-files.ts';
 import { readWorkerCount } from './read-worker-count.ts';
@@ -37,6 +44,13 @@ const output = {
 // `bun run` starts a package script in the folder of the package that defines it.
 const repoRoot = process.cwd();
 
+function readOutput(
+  command: readonly string[],
+  options: ReadCommandOptions,
+): Promise<CommandOutput> {
+  return readCommandOutput(command, options, processRuntime);
+}
+
 try {
   process.exitCode = await runCLI(
     process.argv.slice(2),
@@ -66,6 +80,23 @@ try {
           readText: readOptionalText,
         }),
       importModule: (path) => import(path),
+      createWorkFolder: (root) =>
+        createBenchWorkFolder(root, {
+          readGitCommonDir: (gitRoot) =>
+            readGitCommonDir(gitRoot, process.env, { readCommandOutput: readOutput }),
+          createFolder: async (path) => {
+            await mkdir(path, { recursive: true });
+          },
+          createTempFolder: (prefix) => mkdtemp(prefix),
+        }),
+      readText: async (path) => {
+        const text = await readOptionalText(path);
+
+        return text ?? null;
+      },
+      probeFolder: (path) => Promise.resolve(existsSync(path)),
+      removeFolder: removePath,
+      readCommandOutput: readOutput,
       runCommand,
       wireBrowserLaneHooks,
     },

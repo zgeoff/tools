@@ -157,13 +157,28 @@ otherwise gives a command that runs the source with bun. It finds the repo root 
 
 `rig bench` runs each tracked `bench/*.bench.ts` file of a package in a process of its own, under
 `diet`, because a benchmark's heap must not leak into the next one. The process runs the file's
-`defineBench` result through `run-bench-file.ts`: `setup` once, 5 warm-up runs, 20 measured runs,
-and a median that is compared to the budget. A `finally` then calls the `setup` result's
-`Symbol.asyncDispose` when it has one, so a program that `setup` started stops even when a run
-throws. Before the first file, `rig bench` builds each program and sets `RIG_PROGRAM_<NAME>` through
-the same code as `rig e2e`, so a benchmark that starts a program from `resolveProgram` runs the
-artifact in CI. When `bench.lane` names a lane, the lane's `start` hook runs before the first file
-and its environment reaches every file, and the `stop` hook runs after the last, whether the
+`defineBench` result through `run-bench-file.ts`: `setup` once, then for each concurrency level 5
+warm-up rounds and 20 measured rounds of that many calls at once. After the rounds settle, it calls
+the `setup` result's `Symbol.asyncDispose` when it has one, so a program that `setup` started stops
+even when a run throws. When the run and the dispose both throw, the process throws an
+`AggregateError` that holds both, the run's error first. The process appends one JSON line per level
+to a report file and exits 0 whatever the median, and `rig bench` reads the report and judges the
+budget, because only the parent knows whether the numbers belong to the head or to a base.
+
+With `--base <ref>`, `rig bench` adds a detached worktree of the ref in a run folder under
+`git rev-parse --git-common-dir`, which git never lists as untracked, runs
+`bun install --frozen-lockfile` there. It runs that side from the worktree's copy of the folder that
+`rig` started in, found with `git rev-parse --show-prefix`, so both sides read the same package's
+config, programs and lane. The base runs through the head's `run-bench-file.ts`. A bench file from
+an older rig has no `concurrency`, so the runner reads it as level 1. Every path out of the
+comparison removes the worktree with a signal of its own, so an aborted run still cleans up. When
+the removal fails and `git worktree list` still names the worktree, the run folder stays, because
+deleting it would leave git a registration with no folder.
+
+Before the first file of each side, `rig bench` builds each program and sets `RIG_PROGRAM_<NAME>`
+through the same code as `rig e2e`, so a benchmark that starts a program from `resolveProgram` runs
+the artifact in CI. When `bench.lane` names a lane, the lane's `start` hook runs before the first
+file and its environment reaches every file, and the `stop` hook runs after the last, whether the
 benchmarks pass or not. `rig eval` runs each tracked `evals/<name>/run-<name>-eval.ts` script with
 `bun` from the repo root, one after another.
 

@@ -1,4 +1,5 @@
 import type { BenchDefinition } from './define-bench.ts';
+import { isConcurrencyList } from './is-concurrency-list.ts';
 
 export type ParsedBenchDefinition =
   | { readonly kind: 'parsed'; readonly definition: BenchDefinition }
@@ -15,7 +16,15 @@ export function parseBenchDefinition(value: unknown): ParsedBenchDefinition {
   const budgetMs: unknown = Reflect.get(value, 'budgetMs');
   const prepare: unknown = Reflect.get(value, 'prepare');
 
-  if (typeof name !== 'string' || typeof budgetMs !== 'number' || !isFunction(prepare)) {
+  // A bench file on a base ref can import an older rig, whose result has no concurrency.
+  const concurrency: unknown = Reflect.get(value, 'concurrency') ?? [1];
+
+  if (
+    typeof name !== 'string' ||
+    typeof budgetMs !== 'number' ||
+    !isFunction(prepare) ||
+    !isConcurrencyList(concurrency)
+  ) {
     return { kind: 'refused', reason: 'the default export is no defineBench result' };
   }
 
@@ -24,6 +33,7 @@ export function parseBenchDefinition(value: unknown): ParsedBenchDefinition {
     definition: {
       name,
       budgetMs,
+      concurrency,
       prepare: async () => {
         const prepared: unknown = await prepare();
 
@@ -40,8 +50,10 @@ export function parseBenchDefinition(value: unknown): ParsedBenchDefinition {
         }
 
         return {
-          step: async () => {
-            await step();
+          step: () => {
+            const result: unknown = step();
+
+            return result === undefined ? undefined : settleStep(result);
           },
           dispose: async () => {
             await dispose();
@@ -54,4 +66,10 @@ export function parseBenchDefinition(value: unknown): ParsedBenchDefinition {
 
 function isFunction(value: unknown): value is (...args: unknown[]) => unknown {
   return typeof value === 'function';
+}
+
+// `instanceof Promise` misses a thenable and a promise from another realm, such as a `node:vm`
+// context, so any value but `undefined` goes through `await`, which adopts both.
+async function settleStep(result: unknown): Promise<void> {
+  await result;
 }

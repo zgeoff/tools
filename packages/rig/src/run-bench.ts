@@ -1,10 +1,28 @@
-import { basename, join } from 'node:path';
+import { join, relative } from 'node:path';
+import { match } from 'ts-pattern';
+import { buildBaseSideRoot } from './bench/build-base-side-root.ts';
+import { findBaseSetupVerdict } from './bench/find-base-setup-verdict.ts';
+import { findMissingBenchVerdict } from './bench/find-missing-bench-verdict.ts';
+import { parseBenchReport } from './bench/parse-bench-report.ts';
+import type { ParsedBenchReport } from './bench/parse-bench-report.ts';
+import { pickBenchPlan } from './bench/pick-bench-plan.ts';
+import { pickCheckoutCleanup } from './bench/pick-checkout-cleanup.ts';
+import { pickCleanedUpResult } from './bench/pick-cleaned-up-result.ts';
+import { pickComparisonVerdict } from './bench/pick-comparison-verdict.ts';
+import { pickHeadVerdict } from './bench/pick-head-verdict.ts';
+import { pickNamedBenchFiles } from './bench/pick-named-bench-files.ts';
+import { pickUnremovedCheckoutState } from './bench/pick-unremoved-checkout-state.ts';
+import { readBenchArgs } from './bench/read-bench-args.ts';
+import type { BenchOutput, BenchVerdict, CheckoutState } from './bench/types.ts';
 import { pickExitCodeAfterTests } from './browser/pick-exit-code-after-tests.ts';
 import { buildDietCommand } from './build-diet-command.ts';
 import { buildProgramLaneHooks } from './build-program-lane-hooks.ts';
 import { collectBenchFiles } from './collect-bench-files.ts';
+import { defineRig } from './define-rig.ts';
 import type { LaneHooks } from './lane-hooks.ts';
 import { makeRepoLaneHooks } from './make-repo-lane-hooks.ts';
+import type { ReadCommandOutput } from './read-command-output.ts';
+import { readGitPrefix } from './read-git-prefix.ts';
 import { runLaneHooks } from './run-lane-hooks.ts';
 import type { ProgramBuildDeps } from './run-program-builds.ts';
 import { runProgramBuilds } from './run-program-builds.ts';
@@ -16,82 +34,154 @@ export interface BenchDeps extends ProgramBuildDeps {
   // The script that runs one bench file.
   readonly benchScript: string;
 
+  readonly readConfig: (repoRoot: string) => Promise<RigConfig>;
+
   readonly probeWorkspaceRepo: (repoRoot: string) => Promise<boolean>;
 
   readonly readTrackedFiles: (repoRoot: string) => Promise<readonly string[]>;
 
   readonly importModule: (path: string) => Promise<unknown>;
+
+  // Makes a new folder for one run's reports and base checkout.
+  readonly createWorkFolder: (repoRoot: string) => Promise<string>;
+
+  readonly readText: (path: string) => Promise<string | null>;
+
+  readonly probeFolder: (path: string) => Promise<boolean>;
+
+  readonly removeFolder: (path: string) => Promise<void>;
+
+  readonly readCommandOutput: ReadCommandOutput;
 }
 
 // Builds each program once, as `rig e2e` does, then runs each bench file in a process of its own,
-// between the start and stop hooks of the bench lane when the config names one. The bench process
-// gets RIG_PROGRAM_<NAME> for each program, so resolveProgram gives the built artifact.
+// between the start and stop hooks of the bench lane when the config names one. A base ref runs
+// the same way from the same folder of a checkout of that ref, with that folder's config.
 export async function runBench(
   args: readonly string[],
   config: RigConfig,
   run: RigRun,
   deps: BenchDeps,
 ): Promise<number> {
-  if (args.length > 1) {
-    deps.output.err('rig bench: takes at most one benchmark name\n');
+  const parsed = await readBenchArgs(args);
 
-    return 2;
+  if (parsed.kind === 'refused') {
+    return writeBenchVerdict(
+      { output: [{ stream: 'err', text: `rig bench: ${parsed.reason}\n` }], exitCode: 2 },
+      deps,
+    );
   }
 
-  const isWorkspaceRepo = await deps.probeWorkspaceRepo(run.repoRoot);
-  const trackedFiles = await deps.readTrackedFiles(run.repoRoot);
+  const headBenchFiles = await readBenchFiles(run.repoRoot, deps);
 
-  const benchFiles = collectBenchFiles(trackedFiles, isWorkspaceRepo);
-  const [name] = args;
+  return match(pickBenchPlan(parsed.name, parsed.baseRef, headBenchFiles))
+    .with({ kind: 'finished' }, (plan) => writeBenchVerdict(plan.verdict, deps))
+    .with({ kind: 'head' }, (plan) => runHeadBench(plan.files, config, run, deps))
+    .with({ kind: 'comparison' }, (plan) =>
+      runBenchComparison(
+        {
+          baseRef: plan.baseRef,
+          name: parsed.name,
+          headConfig: config,
+          headFiles: plan.files,
+          headBenchFiles,
+        },
+        run,
+        deps,
+      ),
+    )
+    .exhaustive();
+}
 
-  const files =
-    name === undefined ? benchFiles : benchFiles.filter((file) => toBenchName(file) === name);
+function writeBenchVerdict(verdict: BenchVerdict, deps: BenchDeps): number {
+  writeBenchOutput(verdict.output, deps);
 
-  if (files.length === 0) {
-    return reportNoBenchmark(name, benchFiles, deps);
+  return verdict.exitCode;
+}
+
+function writeBenchOutput(output: readonly BenchOutput[], deps: BenchDeps): void {
+  for (const entry of output) {
+    deps.output[entry.stream](entry.text);
+  }
+}
+
+async function readBenchFiles(root: string, deps: BenchDeps): Promise<readonly string[]> {
+  const isWorkspaceRepo = await deps.probeWorkspaceRepo(root);
+  const trackedFiles = await deps.readTrackedFiles(root);
+
+  return collectBenchFiles(trackedFiles, isWorkspaceRepo);
+}
+
+interface BenchSide {
+  readonly root: string;
+
+  readonly config: RigConfig;
+
+  readonly files: readonly string[];
+
+  readonly reportPath: string;
+}
+
+async function runHeadBench(
+  files: readonly string[],
+  config: RigConfig,
+  run: RigRun,
+  deps: BenchDeps,
+): Promise<number> {
+  const workFolder = await deps.createWorkFolder(run.repoRoot);
+
+  const head: BenchSide = {
+    root: run.repoRoot,
+    config,
+    files,
+    reportPath: join(workFolder, 'head.jsonl'),
+  };
+
+  const [ran] = await Promise.allSettled([runHeadSide(head, run, deps)]);
+  const [cleaned] = await Promise.allSettled([deps.removeFolder(workFolder)]);
+
+  const result = pickCleanedUpResult(ran, cleaned);
+
+  if (result.kind === 'throw') {
+    throw result.error;
   }
 
-  const buildExitCode = await runProgramBuilds(config.programs, run, deps);
+  return pickExitCodeAfterTests(result.value, run.signal.aborted);
+}
+
+async function runHeadSide(head: BenchSide, run: RigRun, deps: BenchDeps): Promise<number> {
+  const exitCode = await runBenchSide(head, run, deps);
+  const report = await readBenchReport(head, deps);
+
+  return writeBenchVerdict(pickHeadVerdict(report, exitCode), deps);
+}
+
+// Runs one side's bench files against that side's root, so a base checkout builds its own programs
+// and starts its own lane.
+async function runBenchSide(side: BenchSide, run: RigRun, deps: BenchDeps): Promise<number> {
+  if (side.files.length === 0) {
+    return 0;
+  }
+
+  const sideRun: RigRun = { ...run, repoRoot: side.root };
+
+  const buildExitCode = await runProgramBuilds(side.config.programs, sideRun, deps);
 
   if (buildExitCode !== 0) {
     return buildExitCode;
   }
 
   const hooks = buildProgramLaneHooks(
-    makeBenchHooks(config, run, deps),
-    run.repoRoot,
-    config.programs,
+    makeBenchHooks(side, sideRun, deps),
+    side.root,
+    side.config.programs,
   );
 
-  const exitCode = await runLaneHooks(files, hooks);
-
-  return pickExitCodeAfterTests(exitCode, run.signal.aborted);
+  return runLaneHooks(side.files, hooks);
 }
 
-function toBenchName(file: string): string {
-  return basename(file, '.bench.ts');
-}
-
-function reportNoBenchmark(
-  name: string | undefined,
-  benchFiles: readonly string[],
-  deps: BenchDeps,
-): number {
-  if (name === undefined) {
-    deps.output.out('rig: the repo has no benchmarks\n');
-
-    return 0;
-  }
-
-  const names = benchFiles.map((file) => toBenchName(file)).join(', ');
-
-  deps.output.err(`rig bench: no benchmark named "${name}"; the benchmarks are ${names}\n`);
-
-  return 1;
-}
-
-function makeBenchHooks(config: RigConfig, run: RigRun, deps: BenchDeps): LaneHooks {
-  const lane = config.lanes.find((candidate) => candidate.name === config.benchLane);
+function makeBenchHooks(side: BenchSide, run: RigRun, deps: BenchDeps): LaneHooks {
+  const lane = side.config.lanes.find((candidate) => candidate.name === side.config.benchLane);
 
   const laneHooks: Pick<LaneHooks, 'start' | 'stop'> =
     lane === undefined
@@ -119,6 +209,8 @@ function makeBenchHooks(config: RigConfig, run: RigRun, deps: BenchDeps): LaneHo
             'bun',
             deps.benchScript,
             join(run.repoRoot, file),
+            '--report',
+            side.reportPath,
           ]),
           { cwd: run.repoRoot, environment, signal: run.signal },
         );
@@ -129,4 +221,221 @@ function makeBenchHooks(config: RigConfig, run: RigRun, deps: BenchDeps): LaneHo
       return exitCode;
     },
   };
+}
+
+// A bench file that failed before it measured anything appends no report. Each entry's file
+// becomes relative to the side's root, so the same file matches on the base and on the head.
+async function readBenchReport(side: BenchSide, deps: BenchDeps): Promise<ParsedBenchReport> {
+  const text = await deps.readText(side.reportPath);
+
+  const report = parseBenchReport(text ?? '');
+
+  if (report.kind === 'refused') {
+    return report;
+  }
+
+  return {
+    kind: 'parsed',
+    entries: report.entries.map((entry) => ({
+      file: relative(side.root, entry.file),
+      name: entry.name,
+      concurrency: entry.concurrency,
+      medianMs: entry.medianMs,
+      spreadMs: entry.spreadMs,
+      budgetMs: entry.budgetMs,
+    })),
+  };
+}
+
+interface BenchComparison {
+  readonly baseRef: string;
+
+  readonly name: string | null;
+
+  readonly headConfig: RigConfig;
+
+  readonly headFiles: readonly string[];
+
+  // Every bench file of the head, for the names a missing benchmark lists.
+  readonly headBenchFiles: readonly string[];
+}
+
+interface BaseCheckout {
+  readonly workFolder: string;
+
+  // The top folder of the checkout, which git adds and removes.
+  readonly checkoutRoot: string;
+
+  // The folder inside the checkout that matches the folder rig started in.
+  readonly sideRoot: string;
+}
+
+async function runBenchComparison(
+  comparison: BenchComparison,
+  run: RigRun,
+  deps: BenchDeps,
+): Promise<number> {
+  const gitPrefix = await readGitPrefix(run.repoRoot, run.environment, deps);
+  const workFolder = await deps.createWorkFolder(run.repoRoot);
+
+  const checkoutRoot = join(workFolder, 'base');
+
+  const base: BaseCheckout = {
+    workFolder,
+    checkoutRoot,
+    sideRoot: buildBaseSideRoot(checkoutRoot, gitPrefix),
+  };
+
+  // An abort makes the add report failure even when git finished the checkout, so every path,
+  // a failed add included, runs the same removal.
+  const [compared] = await Promise.allSettled([runCheckoutComparison(comparison, base, run, deps)]);
+  const [cleaned] = await Promise.allSettled([removeComparisonCheckout(base, run, deps)]);
+
+  const result = pickCleanedUpResult(compared, cleaned);
+
+  if (result.kind === 'throw') {
+    throw result.error;
+  }
+
+  return pickExitCodeAfterTests(Math.max(result.value, result.cleanup), run.signal.aborted);
+}
+
+async function runCheckoutComparison(
+  comparison: BenchComparison,
+  checkout: BaseCheckout,
+  run: RigRun,
+  deps: BenchDeps,
+): Promise<number> {
+  const addExitCode = await deps.runCommand(
+    ['git', 'worktree', 'add', '--detach', checkout.checkoutRoot, comparison.baseRef],
+    { cwd: run.repoRoot, environment: run.environment, signal: run.signal },
+  );
+
+  const addFailure = findBaseSetupVerdict('checkout', comparison.baseRef, addExitCode);
+
+  if (addFailure !== null) {
+    return writeBenchVerdict(addFailure, deps);
+  }
+
+  return runCheckedOutComparison(comparison, checkout, run, deps);
+}
+
+async function runCheckedOutComparison(
+  comparison: BenchComparison,
+  checkout: BaseCheckout,
+  run: RigRun,
+  deps: BenchDeps,
+): Promise<number> {
+  const installExitCode = await deps.runCommand(['bun', 'install', '--frozen-lockfile'], {
+    cwd: checkout.checkoutRoot,
+    environment: run.environment,
+    signal: run.signal,
+  });
+
+  const installFailure = findBaseSetupVerdict('install', comparison.baseRef, installExitCode);
+
+  if (installFailure !== null) {
+    return writeBenchVerdict(installFailure, deps);
+  }
+
+  const baseSide = await readBaseSide(checkout.sideRoot, deps);
+
+  const missing = findMissingBenchVerdict(
+    comparison.name,
+    comparison.headBenchFiles,
+    baseSide.benchFiles,
+  );
+
+  if (missing !== null) {
+    return writeBenchVerdict(missing, deps);
+  }
+
+  const base: BenchSide = {
+    root: checkout.sideRoot,
+    config: baseSide.config,
+    files: pickNamedBenchFiles(baseSide.benchFiles, comparison.name),
+    reportPath: join(checkout.workFolder, 'base.jsonl'),
+  };
+
+  const head: BenchSide = {
+    root: run.repoRoot,
+    config: comparison.headConfig,
+    files: comparison.headFiles,
+    reportPath: join(checkout.workFolder, 'head.jsonl'),
+  };
+
+  const baseExitCode = await runBenchSide(base, run, deps);
+  const headExitCode = await runBenchSide(head, run, deps);
+  const baseReport = await readBenchReport(base, deps);
+  const headReport = await readBenchReport(head, deps);
+
+  return writeBenchVerdict(
+    pickComparisonVerdict(
+      { exitCode: baseExitCode, report: baseReport },
+      { exitCode: headExitCode, report: headReport },
+    ),
+    deps,
+  );
+}
+
+interface BaseSide {
+  readonly config: RigConfig;
+
+  readonly benchFiles: readonly string[];
+}
+
+// A package that only the head has gives an empty base side, which runs nothing, so the table
+// shows `-` for the base.
+async function readBaseSide(root: string, deps: BenchDeps): Promise<BaseSide> {
+  const isPresent = await deps.probeFolder(root);
+
+  if (!isPresent) {
+    return { config: defineRig({}), benchFiles: [] };
+  }
+
+  const config = await deps.readConfig(root);
+  const benchFiles = await readBenchFiles(root, deps);
+
+  return { config, benchFiles };
+}
+
+async function removeComparisonCheckout(
+  base: BaseCheckout,
+  run: RigRun,
+  deps: BenchDeps,
+): Promise<number> {
+  const checkout = await removeBaseCheckout(base.checkoutRoot, run, deps);
+
+  const cleanup = pickCheckoutCleanup(base.checkoutRoot, checkout);
+
+  writeBenchOutput(cleanup.output, deps);
+
+  if (!cleanup.isWorkFolderKept) {
+    await deps.removeFolder(base.workFolder);
+  }
+
+  return cleanup.exitCode;
+}
+
+// An aborted run still removes the checkout, so the removal gets a signal of its own.
+async function removeBaseCheckout(
+  checkoutRoot: string,
+  run: RigRun,
+  deps: BenchDeps,
+): Promise<CheckoutState> {
+  const removeExitCode = await deps.runCommand(
+    ['git', 'worktree', 'remove', '--force', checkoutRoot],
+    { cwd: run.repoRoot, environment: run.environment, signal: new AbortController().signal },
+  );
+
+  if (removeExitCode === 0) {
+    return 'removed';
+  }
+
+  const listing = await deps.readCommandOutput(['git', 'worktree', 'list', '--porcelain', '-z'], {
+    cwd: run.repoRoot,
+    environment: run.environment,
+  });
+
+  return pickUnremovedCheckoutState(listing, checkoutRoot);
 }
