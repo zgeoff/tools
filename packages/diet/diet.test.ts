@@ -1,6 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { userInfo } from 'node:os';
 import { join } from 'node:path';
 import { readStreamUntil } from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
@@ -111,6 +112,21 @@ test.skipIf(!modesOutput.includes('systemd-sudo'))(
         .quiet();
 
     expect(result.stdout.toString()).toBe('/var/tmp/diet-kiln\n');
+  },
+);
+
+test.skipIf(!modesOutput.includes('systemd-sudo'))(
+  'it runs the command as the caller with the caller environment under sudo systemd-run, whatever user it exports',
+  async () => {
+    const ctx = setupTest();
+
+    const result =
+      await $`bash ${ctx.scriptPath} --budget 128M -- ${ctx.bun} -e ${'console.log(require("node:os").userInfo().username, process.env.KILN_GLAZE)'}`
+        .env({ ...ctx.env, DIET_MODE: 'systemd-sudo', user: 'root', KILN_GLAZE: 'celadon' })
+        .nothrow()
+        .quiet();
+
+    expect(result.stdout.toString()).toBe(`${userInfo().username} celadon\n`);
   },
 );
 

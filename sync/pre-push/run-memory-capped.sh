@@ -193,17 +193,18 @@ fi
 
 # The second half of a systemd mode, which systemd-run starts inside the scope.
 if [ "${1:-}" = --inside ]; then
-  user=$2
-  environment_file=$3
-  mode=$4
-  shift 4
-  if [ -n "$environment_file" ]; then
-    # A name bash keeps read-only, such as SHELLOPTS, refuses the export.
+  # The caller's environment comes back first, so a variable it exports, such
+  # as user, never replaces an argument. A name bash keeps read-only, such as
+  # SHELLOPTS, refuses the export.
+  if [ -n "$3" ]; then
     while IFS= read -r -d '' pair; do
       export "${pair?}" 2> /dev/null || true
-    done < "$environment_file"
-    rm -f "$environment_file"
+    done < "$3"
+    rm -f "$3"
   fi
+  user=$2
+  mode=$4
+  shift 4
   run_and_report "/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup)" "$user" "$mode" "$@"
   exit "$status"
 fi
