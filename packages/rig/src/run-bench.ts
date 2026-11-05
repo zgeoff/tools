@@ -7,6 +7,8 @@ import { parseBenchReport } from './bench/parse-bench-report.ts';
 import type { ParsedBenchReport } from './bench/parse-bench-report.ts';
 import { pickBenchPlan } from './bench/pick-bench-plan.ts';
 import { pickCheckoutCleanup } from './bench/pick-checkout-cleanup.ts';
+import type { CheckoutCleanup } from './bench/pick-checkout-cleanup.ts';
+import { pickComparisonResult } from './bench/pick-comparison-result.ts';
 import { pickComparisonVerdict } from './bench/pick-comparison-verdict.ts';
 import { pickHeadVerdict } from './bench/pick-head-verdict.ts';
 import { pickNamedBenchFiles } from './bench/pick-named-bench-files.ts';
@@ -278,21 +280,15 @@ async function runBenchComparison(
   // An abort makes the add report failure even when git finished the checkout, so every path,
   // a failed add included, runs the same removal.
   const [compared] = await Promise.allSettled([runCheckoutComparison(comparison, base, run, deps)]);
-  const checkout = await removeBaseCheckout(checkoutRoot, run, deps);
+  const [cleaned] = await Promise.allSettled([removeComparisonCheckout(base, compared, run, deps)]);
 
-  const cleanup = pickCheckoutCleanup(checkoutRoot, checkout, compared);
+  const result = pickComparisonResult(compared, cleaned);
 
-  writeBenchOutput(cleanup.output, deps);
-
-  if (!cleanup.isWorkFolderKept) {
-    await deps.removeFolder(workFolder);
+  if (result.kind === 'throw') {
+    throw result.error;
   }
 
-  if (cleanup.result.kind === 'throw') {
-    throw cleanup.result.error;
-  }
-
-  return pickExitCodeAfterTests(cleanup.result.exitCode, run.signal.aborted);
+  return pickExitCodeAfterTests(result.exitCode, run.signal.aborted);
 }
 
 async function runCheckoutComparison(
@@ -372,6 +368,25 @@ async function runCheckedOutComparison(
     ),
     deps,
   );
+}
+
+async function removeComparisonCheckout(
+  base: BaseCheckout,
+  compared: PromiseSettledResult<number>,
+  run: RigRun,
+  deps: BenchDeps,
+): Promise<CheckoutCleanup['result']> {
+  const checkout = await removeBaseCheckout(base.checkoutRoot, run, deps);
+
+  const cleanup = pickCheckoutCleanup(base.checkoutRoot, checkout, compared);
+
+  writeBenchOutput(cleanup.output, deps);
+
+  if (!cleanup.isWorkFolderKept) {
+    await deps.removeFolder(base.workFolder);
+  }
+
+  return cleanup.result;
 }
 
 // An aborted run still removes the checkout, so the removal gets a signal of its own.

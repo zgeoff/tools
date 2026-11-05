@@ -1,4 +1,5 @@
 import { expect, mock, test } from 'bun:test';
+import { makeRejectingStub } from '@zgeoff/testing/helpers';
 import { defineRig } from './define-rig.ts';
 import { runBench } from './run-bench.ts';
 import type { BenchDeps } from './run-bench.ts';
@@ -947,6 +948,42 @@ test('it removes the checkout and the work folder and hands the error on when a 
     lastCommand: ['git', 'worktree', 'remove', '--force', '/repo/.git/rig-bench/run-1/base'],
     removed: [['/repo/.git/rig-bench/run-1']],
   });
+});
+
+test('it throws the comparison error and the cleanup error together when a comparison throws and the work folder removal fails', async () => {
+  const ctx = setupTest();
+
+  const commands = buildStubCommandAnswers({
+    exitCodes: [],
+    outputs: { 'git rev-parse --show-prefix': { exitCode: 0, stdout: '\n' } },
+  });
+
+  const config = defineRig({
+    lanes: { kiln: { limit: '15s', start: 'test-utils/start-kiln.ts' } },
+    bench: { lane: 'kiln' },
+  });
+
+  const kilnError = new Error('the kiln cracked');
+  const shelfError = new Error('the shelf collapsed');
+
+  ctx.startKiln.mockImplementation(() => Promise.reject(kilnError));
+
+  const failure = await runBench(['--base', 'main', 'boil'], config, ctx.run, {
+    ...ctx.deps,
+    ...commands,
+    removeFolder: makeRejectingStub(shelfError),
+  }).then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(failure).toStrictEqual(
+    expect.objectContaining({
+      constructor: AggregateError,
+      message: 'the comparison failed, and its cleanup failed too',
+      errors: [kilnError, shelfError],
+    }),
+  );
 });
 
 test('it exits 1, says how to remove the checkout and keeps the work folder when git still lists the checkout it could not remove', async () => {
