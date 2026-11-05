@@ -1,5 +1,6 @@
 import { expect, mock, test } from 'bun:test';
 import { defineRig } from './define-rig.ts';
+import type { ReadCommandOutput } from './read-command-output.ts';
 import { runBench } from './run-bench.ts';
 import type { CommandOptions } from './run-command.ts';
 import { makeRecordingStub } from './test-utils/make-recording-stub.ts';
@@ -24,11 +25,19 @@ function setupTest() {
   const removeFolder = mock<(path: string) => Promise<void>>(() => Promise.resolve());
   const output = { out: makeRecordingStub(), err: makeRecordingStub() };
 
+  const readCommandOutput = mock<ReadCommandOutput>(() =>
+    Promise.resolve({
+      exitCode: 0,
+      stdout: 'worktree /repo\nHEAD 1a2b3c\nbranch refs/heads/main\n\n',
+    }),
+  );
+
   return {
     exitCodes,
     reports,
     runCommand,
     removeFolder,
+    readCommandOutput,
     output,
     startKiln,
     stopKiln,
@@ -59,6 +68,15 @@ function setupTest() {
       createWorkFolder: () => Promise.resolve('/repo/.git/rig-bench/run-1'),
       readText: (path: string) => Promise.resolve(reports.get(path) ?? null),
       removeFolder,
+      readCommandOutput,
+    },
+
+    // What git lists while the base checkout is still registered.
+    leftListing: {
+      exitCode: 0,
+      stdout:
+        'worktree /repo\nHEAD 1a2b3c\nbranch refs/heads/main\n\n' +
+        'worktree /repo/.git/rig-bench/run-1/base\nHEAD 4d5e6f\ndetached\n\n',
     },
   };
 }
@@ -731,10 +749,11 @@ test('it removes the checkout and the work folder and hands the error on when a 
   });
 });
 
-test('it exits 1, says how to remove the checkout and keeps the work folder when the checkout removal fails', async () => {
+test('it exits 1, says how to remove the checkout and keeps the work folder when git still lists the checkout it could not remove', async () => {
   const ctx = setupTest();
 
   ctx.exitCodes.push(0, 1, 1);
+  ctx.readCommandOutput.mockImplementation(() => Promise.resolve(ctx.leftListing));
 
   const exitCode = await runBench(['--base', 'main'], defineRig({}), ctx.run, ctx.deps);
 
@@ -754,14 +773,61 @@ test('it exits 1, says how to remove the checkout and keeps the work folder when
   });
 });
 
-test('it fails a comparison whose benches pass when the checkout removal fails', async () => {
+test('it fails a comparison whose benches pass when git still lists the checkout it could not remove', async () => {
   const ctx = setupTest();
 
   ctx.exitCodes.push(0, 0, 0, 0, 1);
+  ctx.readCommandOutput.mockImplementation(() => Promise.resolve(ctx.leftListing));
 
   const exitCode = await runBench(['--base', 'main', 'boil'], defineRig({}), ctx.run, ctx.deps);
 
   expect(exitCode).toBe(1);
+});
+
+test('it keeps the work folder and says how to remove the checkout when git still lists the checkout of a failed add', async () => {
+  const ctx = setupTest();
+
+  ctx.exitCodes.push(128, 1);
+  ctx.readCommandOutput.mockImplementation(() => Promise.resolve(ctx.leftListing));
+
+  const exitCode = await runBench(['--base', 'kettle-v0'], defineRig({}), ctx.run, ctx.deps);
+
+  expect({
+    exitCode,
+    listed: ctx.readCommandOutput.mock.calls,
+    err: ctx.output.err.mock.calls,
+    removed: ctx.removeFolder.mock.calls,
+  }).toStrictEqual({
+    exitCode: 1,
+    listed: [
+      [['git', 'worktree', 'list', '--porcelain'], { cwd: '/repo', environment: { PATH: '/bin' } }],
+    ],
+    err: [
+      ['rig bench: could not check out "kettle-v0"\n'],
+      [
+        'rig bench: could not remove the checkout at /repo/.git/rig-bench/run-1/base; remove it with git worktree remove --force /repo/.git/rig-bench/run-1/base\n',
+      ],
+    ],
+    removed: [],
+  });
+});
+
+test('it removes the work folder and prints only the checkout message when git lists no checkout of a failed add', async () => {
+  const ctx = setupTest();
+
+  ctx.exitCodes.push(128, 1);
+
+  const exitCode = await runBench(['--base', 'kettle-v0'], defineRig({}), ctx.run, ctx.deps);
+
+  expect({
+    exitCode,
+    err: ctx.output.err.mock.calls,
+    removed: ctx.removeFolder.mock.calls,
+  }).toStrictEqual({
+    exitCode: 1,
+    err: [['rig bench: could not check out "kettle-v0"\n']],
+    removed: [['/repo/.git/rig-bench/run-1']],
+  });
 });
 
 test('it removes the work folder after a run', async () => {

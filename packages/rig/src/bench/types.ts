@@ -11,6 +11,10 @@ export interface BenchVerdict {
   readonly exitCode: number;
 }
 
+// What became of the base checkout after its removal: `absent` when the removal failed and git
+// registers no such worktree, `left` when git still registers it or its list failed.
+export type CheckoutState = 'removed' | 'absent' | 'left';
+
 export interface BenchSideTimes {
   readonly medianMs: number;
 

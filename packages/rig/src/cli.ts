@@ -11,6 +11,7 @@ import { createBenchWorkFolder } from './create-bench-work-folder.ts';
 import { initFiles } from './init-files.ts';
 import { probeWorkspaceRepo } from './probe-workspace-repo.ts';
 import { readCommandOutput } from './read-command-output.ts';
+import type { CommandOutput, ReadCommandOptions } from './read-command-output.ts';
 import { readGitCommonDir } from './read-git-common-dir.ts';
 import { readRigConfig } from './read-rig-config.ts';
 import { readTrackedFiles } from './read-tracked-files.ts';
@@ -42,6 +43,13 @@ const output = {
 
 // `bun run` starts a package script in the folder of the package that defines it.
 const repoRoot = process.cwd();
+
+function readOutput(
+  command: readonly string[],
+  options: ReadCommandOptions,
+): Promise<CommandOutput> {
+  return readCommandOutput(command, options, processRuntime);
+}
 
 try {
   process.exitCode = await runCLI(
@@ -75,10 +83,7 @@ try {
       createWorkFolder: (root) =>
         createBenchWorkFolder(root, {
           readGitCommonDir: (gitRoot) =>
-            readGitCommonDir(gitRoot, process.env, {
-              readCommandOutput: (command, options) =>
-                readCommandOutput(command, options, processRuntime),
-            }),
+            readGitCommonDir(gitRoot, process.env, { readCommandOutput: readOutput }),
           createFolder: async (path) => {
             await mkdir(path, { recursive: true });
           },
@@ -90,6 +95,7 @@ try {
         return text ?? null;
       },
       removeFolder: removePath,
+      readCommandOutput: readOutput,
       runCommand,
       wireBrowserLaneHooks,
     },

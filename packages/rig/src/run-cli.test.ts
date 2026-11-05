@@ -34,6 +34,7 @@ function setupTest() {
       createWorkFolder: () => Promise.reject(new Error('no bench here')),
       readText: () => Promise.reject(new Error('no bench here')),
       removeFolder: () => Promise.reject(new Error('no bench here')),
+      readCommandOutput: () => Promise.reject(new Error('no bench here')),
       runCommand,
       wireBrowserLaneHooks: () => Promise.reject(new Error('no browser lane here')),
     },

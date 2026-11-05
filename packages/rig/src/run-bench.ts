@@ -5,18 +5,20 @@ import { findMissingBenchVerdict } from './bench/find-missing-bench-verdict.ts';
 import { parseBenchReport } from './bench/parse-bench-report.ts';
 import type { ParsedBenchReport } from './bench/parse-bench-report.ts';
 import { pickBenchPlan } from './bench/pick-bench-plan.ts';
-import { pickCheckoutRemoval } from './bench/pick-checkout-removal.ts';
+import { pickCheckoutCleanup } from './bench/pick-checkout-cleanup.ts';
 import { pickComparisonVerdict } from './bench/pick-comparison-verdict.ts';
 import { pickHeadVerdict } from './bench/pick-head-verdict.ts';
 import { pickNamedBenchFiles } from './bench/pick-named-bench-files.ts';
+import { pickUnremovedCheckoutState } from './bench/pick-unremoved-checkout-state.ts';
 import { readBenchArgs } from './bench/read-bench-args.ts';
-import type { BenchOutput, BenchVerdict } from './bench/types.ts';
+import type { BenchOutput, BenchVerdict, CheckoutState } from './bench/types.ts';
 import { pickExitCodeAfterTests } from './browser/pick-exit-code-after-tests.ts';
 import { buildDietCommand } from './build-diet-command.ts';
 import { buildProgramLaneHooks } from './build-program-lane-hooks.ts';
 import { collectBenchFiles } from './collect-bench-files.ts';
 import type { LaneHooks } from './lane-hooks.ts';
 import { makeRepoLaneHooks } from './make-repo-lane-hooks.ts';
+import type { ReadCommandOutput } from './read-command-output.ts';
 import { runLaneHooks } from './run-lane-hooks.ts';
 import type { ProgramBuildDeps } from './run-program-builds.ts';
 import { runProgramBuilds } from './run-program-builds.ts';
@@ -42,6 +44,8 @@ export interface BenchDeps extends ProgramBuildDeps {
   readonly readText: (path: string) => Promise<string | null>;
 
   readonly removeFolder: (path: string) => Promise<void>;
+
+  readonly readCommandOutput: ReadCommandOutput;
 }
 
 // Builds each program once, as `rig e2e` does, then runs each bench file in a process of its own,
@@ -251,55 +255,48 @@ async function runBenchComparison(
   const workFolder = await deps.createWorkFolder(run.repoRoot);
 
   const baseRoot = join(workFolder, 'base');
-  let isCheckoutLeft = false;
 
-  try {
-    const addExitCode = await deps.runCommand(
-      ['git', 'worktree', 'add', '--detach', baseRoot, comparison.baseRef],
-      { cwd: run.repoRoot, environment: run.environment, signal: run.signal },
-    );
+  // An abort makes the add report failure even when git finished the checkout, so every path,
+  // a failed add included, runs the same removal.
+  const [compared] = await Promise.allSettled([
+    runCheckoutComparison(comparison, workFolder, run, deps),
+  ]);
 
-    const addFailure = findBaseSetupVerdict('checkout', comparison.baseRef, addExitCode);
+  const checkout = await removeBaseCheckout(baseRoot, run, deps);
 
-    if (addFailure !== null) {
-      // An abort makes the add report failure even when git finished the checkout, so the removal
-      // runs anyway, and its exit code is moot: it fails when git registered nothing.
-      await removeBaseCheckout(baseRoot, run, deps);
+  const cleanup = pickCheckoutCleanup(baseRoot, checkout, compared);
 
-      return writeBenchVerdict(addFailure, deps);
-    }
+  writeBenchOutput(cleanup.output, deps);
 
-    const [compared] = await Promise.allSettled([
-      runCheckedOutComparison(comparison, workFolder, run, deps),
-    ]);
-
-    const removeExitCode = await removeBaseCheckout(baseRoot, run, deps);
-
-    const removal = pickCheckoutRemoval(baseRoot, removeExitCode, compared);
-
-    isCheckoutLeft = removal.isCheckoutLeft;
-
-    writeBenchOutput(removal.output, deps);
-
-    if (removal.result.kind === 'throw') {
-      throw removal.result.error;
-    }
-
-    return pickExitCodeAfterTests(removal.result.exitCode, run.signal.aborted);
-  } finally {
-    if (!isCheckoutLeft) {
-      await deps.removeFolder(workFolder);
-    }
+  if (!cleanup.isWorkFolderKept) {
+    await deps.removeFolder(workFolder);
   }
+
+  if (cleanup.result.kind === 'throw') {
+    throw cleanup.result.error;
+  }
+
+  return pickExitCodeAfterTests(cleanup.result.exitCode, run.signal.aborted);
 }
 
-// An aborted run still removes the checkout, so the removal gets a signal of its own.
-function removeBaseCheckout(baseRoot: string, run: RigRun, deps: BenchDeps): Promise<number> {
-  return deps.runCommand(['git', 'worktree', 'remove', '--force', baseRoot], {
-    cwd: run.repoRoot,
-    environment: run.environment,
-    signal: new AbortController().signal,
-  });
+async function runCheckoutComparison(
+  comparison: BenchComparison,
+  workFolder: string,
+  run: RigRun,
+  deps: BenchDeps,
+): Promise<number> {
+  const addExitCode = await deps.runCommand(
+    ['git', 'worktree', 'add', '--detach', join(workFolder, 'base'), comparison.baseRef],
+    { cwd: run.repoRoot, environment: run.environment, signal: run.signal },
+  );
+
+  const addFailure = findBaseSetupVerdict('checkout', comparison.baseRef, addExitCode);
+
+  if (addFailure !== null) {
+    return writeBenchVerdict(addFailure, deps);
+  }
+
+  return runCheckedOutComparison(comparison, workFolder, run, deps);
 }
 
 async function runCheckedOutComparison(
@@ -361,4 +358,28 @@ async function runCheckedOutComparison(
     ),
     deps,
   );
+}
+
+// An aborted run still removes the checkout, so the removal gets a signal of its own.
+async function removeBaseCheckout(
+  baseRoot: string,
+  run: RigRun,
+  deps: BenchDeps,
+): Promise<CheckoutState> {
+  const removeExitCode = await deps.runCommand(['git', 'worktree', 'remove', '--force', baseRoot], {
+    cwd: run.repoRoot,
+    environment: run.environment,
+    signal: new AbortController().signal,
+  });
+
+  if (removeExitCode === 0) {
+    return 'removed';
+  }
+
+  const listing = await deps.readCommandOutput(['git', 'worktree', 'list', '--porcelain'], {
+    cwd: run.repoRoot,
+    environment: run.environment,
+  });
+
+  return pickUnremovedCheckoutState(listing, baseRoot);
 }
