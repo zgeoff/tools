@@ -4,6 +4,7 @@ import { mkdir, mkdtemp } from 'node:fs/promises';
 import { availableParallelism, totalmem } from 'node:os';
 import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
+import { processRuntime } from './browser/process-runtime.ts';
 import { removePath } from './browser/remove-path.ts';
 import { wireBrowserLaneHooks } from './browser/wire-browser-lane-hooks.ts';
 import { createBenchWorkFolder } from './create-bench-work-folder.ts';
@@ -73,7 +74,11 @@ try {
       importModule: (path) => import(path),
       createWorkFolder: (root) =>
         createBenchWorkFolder(root, {
-          readGitCommonDir: (gitRoot) => readGitCommonDir(gitRoot, { readCommandOutput }),
+          readGitCommonDir: (gitRoot) =>
+            readGitCommonDir(gitRoot, process.env, {
+              readCommandOutput: (command, options) =>
+                readCommandOutput(command, options, processRuntime),
+            }),
           createFolder: async (path) => {
             await mkdir(path, { recursive: true });
           },

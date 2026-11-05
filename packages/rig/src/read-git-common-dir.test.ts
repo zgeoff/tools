@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
+import { processRuntime } from './browser/process-runtime.ts';
 import { readCommandOutput } from './read-command-output.ts';
 import { readGitCommonDir } from './read-git-common-dir.ts';
 import { createTrackedRepo } from './test-utils/create-tracked-repo.ts';
@@ -22,12 +23,16 @@ test('it reads the git folder of a main checkout as git prints it', async () => 
 
   await createTrackedRepo(ctx.repoRoot, { 'package.json': '{"name":"kettle"}' });
 
-  expect(readGitCommonDir(ctx.repoRoot, { readCommandOutput })).resolves.toBe('.git');
+  expect(
+    readGitCommonDir(ctx.repoRoot, process.env, {
+      readCommandOutput: (command, options) => readCommandOutput(command, options, processRuntime),
+    }),
+  ).resolves.toBe('.git');
 });
 
 test('it throws when git exits non-zero', () => {
   expect(
-    readGitCommonDir('/srv/teapot', {
+    readGitCommonDir('/srv/teapot', process.env, {
       readCommandOutput: () => Promise.resolve({ exitCode: 128, stdout: '' }),
     }),
   ).rejects.toThrow('git rev-parse --git-common-dir failed in /srv/teapot with exit code 128');
