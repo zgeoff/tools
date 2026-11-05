@@ -9,6 +9,7 @@ import { wireBrowserLaneHooks } from './browser/wire-browser-lane-hooks.ts';
 import { createBenchWorkFolder } from './create-bench-work-folder.ts';
 import { initFiles } from './init-files.ts';
 import { probeWorkspaceRepo } from './probe-workspace-repo.ts';
+import { readCommandOutput } from './read-command-output.ts';
 import { readGitCommonDir } from './read-git-common-dir.ts';
 import { readRigConfig } from './read-rig-config.ts';
 import { readTrackedFiles } from './read-tracked-files.ts';
@@ -72,7 +73,7 @@ try {
       importModule: (path) => import(path),
       createWorkFolder: (root) =>
         createBenchWorkFolder(root, {
-          readGitCommonDir,
+          readGitCommonDir: (gitRoot) => readGitCommonDir(gitRoot, { readCommandOutput }),
           createFolder: async (path) => {
             await mkdir(path, { recursive: true });
           },

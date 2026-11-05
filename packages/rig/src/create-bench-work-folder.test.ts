@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { readGitEnv, readRunFolderPrefix, runGit } from '@zgeoff/testing/helpers';
 import { createBenchWorkFolder } from './create-bench-work-folder.ts';
+import { readCommandOutput } from './read-command-output.ts';
 import { readGitCommonDir } from './read-git-common-dir.ts';
 import { createTrackedRepo } from './test-utils/create-tracked-repo.ts';
 
@@ -18,7 +19,7 @@ async function setupTest() {
     repoRoot: join(directory, 'kettle'),
     createBenchWorkFolder: (repoRoot: string) =>
       createBenchWorkFolder(repoRoot, {
-        readGitCommonDir,
+        readGitCommonDir: (gitRoot) => readGitCommonDir(gitRoot, { readCommandOutput }),
         createFolder: async (path) => {
           await mkdir(path, { recursive: true });
         },
