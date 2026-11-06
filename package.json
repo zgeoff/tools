@@ -21,7 +21,7 @@
       "@types/react": "19.3.0",
       "@types/react-dom": "19.3.0",
       "ajv": "8.20.0",
-      "bun-pty": "0.5.2",
+      "bun-pty": "0.6.0",
       "gunshi": "1.0.0-rc.1",
       "happy-dom": "21.0.4",
       "jest-extended": "7.0.0",
