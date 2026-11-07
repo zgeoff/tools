@@ -332,6 +332,18 @@ test.each([
   ['a root over the cap', { 'packages/api/src/to-cents.ts': 'export {};\n' }],
   ['a synonym folder', { 'packages/api/src/lib/round.ts': 'export {};\n' }],
   [
+    'a declaration file in a synonym folder',
+    { 'packages/api/src/lib/globals.d.ts': 'export {};\n' },
+  ],
+  [
+    'a utils/ declaration file that imports a feature folder',
+    {
+      'packages/api/src/utils/shims.d.ts':
+        "import type { Charge } from '../payments/charge-card.ts';\n",
+      'packages/api/src/payments/charge-card.ts': 'export {};\n',
+    },
+  ],
+  [
     'a utils/ import of a feature folder',
     {
       'packages/api/src/utils/round.ts':

@@ -13,9 +13,10 @@ export default function readLooseModules(sourcePackage) {
     .toSorted();
 }
 
+const declarationPattern = /\.d\.[cm]?ts$/u;
 const testPattern = /\.(?:test|bench|spec)\.[cm]?[jt]sx?$/u;
 const exemptPattern = /^(?:index|types|constants)\.[cm]?[jt]sx?$/u;
 
 function isCountedModule(name) {
-  return !testPattern.test(name) && !exemptPattern.test(name);
+  return !declarationPattern.test(name) && !testPattern.test(name) && !exemptPattern.test(name);
 }
