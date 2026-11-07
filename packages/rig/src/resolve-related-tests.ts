@@ -8,8 +8,6 @@ export interface RelatedTestSources {
   readonly probeFile: (path: string) => boolean;
 }
 
-// The unit run covers a changed file through the test beside it, so each changed path maps to its
-// sibling test, and the files of a lane and the paths the config ignores drop out.
 export function resolveRelatedTests(
   paths: readonly string[],
   config: RigConfig,
