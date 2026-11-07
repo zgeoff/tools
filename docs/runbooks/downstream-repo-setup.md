@@ -7,7 +7,33 @@ never makes.
 
 ## Wiring up a downstream repo
 
-1. Install the repo-sync GitHub App on the repo, and set the `REPO_SYNC_APP_CLIENT_ID` and
+The merge of the repo-sync stub in step 5 starts the repo's first sync, so do the other steps first.
+
+1. Add the config of [noslop](https://github.com/zgeoff/noslop), the review bot, as `review.json` at
+   the repo root, and merge it in a pull request of its own:
+
+   ```json
+   { "extends": "github:zgeoff/noslop-config" }
+   ```
+
+   noslop reviews a pull request under the config on `main`, so the first sync pull request needs
+   this file on `main` first. noslop counts each file that the `synced` globs of the config match,
+   the shared config's globs included, as code the pull request did not write. So a finding in a
+   synced file takes a `deferred` reply that points at the issue for the fix in tools or
+   zgeoff/skills, as
+   [Answer a finding](https://github.com/zgeoff/noslop/blob/main/docs/guides/answer-a-finding.md)
+   describes. Without the file on `main`, such a finding takes only `accepted-risk`, which only an
+   admin of the repo can record. When the repo takes a synced file that the shared `synced` list
+   misses, add a `synced` list of path globs, such as `["scripts/shared/**"]`, to `review.json`.
+   noslop appends it to the shared list.
+
+   ```sh
+   gh api repos/zgeoff/<repo>/contents/review.json --jq .path
+   ```
+
+   Expect: `review.json`.
+
+2. Install the repo-sync GitHub App on the repo. Set the `REPO_SYNC_APP_CLIENT_ID` and
    `REPO_SYNC_APP_PRIVATE_KEY` repo secrets from the `repo-sync-github-app` item in the `zgeoff`
    1Password vault:
 
@@ -16,17 +42,7 @@ never makes.
    op read 'op://zgeoff/repo-sync-github-app/private-key' | gh secret set REPO_SYNC_APP_PRIVATE_KEY -R zgeoff/<repo>
    ```
 
-2. Copy [`repo-sync.yml`](../../sync/repo-sync.yml) to `.github/workflows/repo-sync.yml`, and pin
-   its `uses:` line to the newest commit on `main` of tools whose `Main` run passed. A commit whose
-   run failed or still runs is newer than every green one, so a repo pinned to it skips the sync
-   until a newer commit turns green. Print the newest green commit:
-
-   ```sh
-   gh api -X GET repos/zgeoff/tools/actions/workflows/main.yml/runs -f branch=main -f event=push -f status=success -f per_page=1 --jq '.workflow_runs[0].head_sha'
-   ```
-
-   Replace `@main` on the `uses:` line with `@<commit> # main`, where `<commit>` is the printed
-   commit.
+   Expect: `gh secret list -R zgeoff/<repo>` lists both names.
 
 3. Allow auto-merge in the repo, so a sync pull request merges on green checks:
 
@@ -37,8 +53,8 @@ never makes.
    Expect: `true`.
 
 4. Keep the repo's skills in `.agents/skills/`, and link `.claude/skills` to it, as
-   [Skills](../architecture/repo-sync.md#skills) describes. Run this at the repo root, and commit
-   the link:
+   [Skills](../architecture/repo-sync.md#skills) describes. Run this at the repo root, and merge the
+   link:
 
    ```sh
    mkdir -p .agents/skills .claude && ln -s ../.agents/skills .claude/skills && git add .claude/skills
@@ -46,21 +62,32 @@ never makes.
 
    Expect: `git ls-files -s .claude/skills` prints mode `120000`.
 
-5. Dispatch it once: `gh workflow run repo-sync.yml -R zgeoff/<repo>`. Expect one pull request that
-   carries every entry the repo is behind on. From then on, each merge to `main` of tools that
-   changes a synced file opens or updates that pull request.
+5. Copy [`repo-sync.yml`](../../sync/repo-sync.yml) to `.github/workflows/repo-sync.yml`. Pin its
+   `uses:` line to the newest commit on `main` of tools whose `Main` workflow run passed. A repo
+   pinned to a commit whose run failed or still runs skips the sync until a newer commit turns
+   green, and a sync pull request moves the pin to that commit. Print the newest green commit:
+
+   ```sh
+   gh api -X GET repos/zgeoff/tools/actions/workflows/main.yml/runs -f branch=main -f event=push -f status=success -f per_page=1 --jq '.workflow_runs[0].head_sha'
+   ```
+
+   Replace `@main` on the `uses:` line with `@<commit> # main`, where `<commit>` is the printed
+   commit. Merge the stub. Expect one sync pull request that carries every entry the repo is behind
+   on. If none opens, start the sync with `gh workflow run repo-sync.yml -R zgeoff/<repo>`. From
+   then on, each merge to `main` of tools that changes a synced file opens a sync pull request, or
+   updates the one that is open.
 
 ## Opting in to the agent hooks
 
 A repo opts in to the `hook-start` entry in five steps, plus a sixth for a repo that uses Codex.
-`agent-hooks init` refuses to run until the stub exists, so the stub arrives first:
+`agent-hooks init` refuses to run until `.claude/hooks/start.ts` exists, so that file arrives first:
 
 1. Add `hook-start` to `include` in `.github/workflows/repo-sync.yml`.
 2. Dispatch repo-sync with `gh workflow run repo-sync.yml -R zgeoff/<repo>`, and merge its pull
-   request. Expect the default branch to hold `.claude/hooks/start.ts`.
+   request. Expect `main` to hold `.claude/hooks/start.ts`.
 3. Run `bun add -d @zgeoff/agent-hooks` at the repo root. Expect `bun.lock` to list the package.
-4. Check that the default branch holds `.claude/skill-gate.json`, which a new repo takes from
-   repo-sync. For gates of the repo's own, follow
+4. Check that `main` holds `.claude/skill-gate.json`, which a new repo takes from repo-sync. For
+   gates of the repo's own, follow
    [The shared rules](../guides/skill-gate-rules.md#the-shared-rules).
 5. Run `bunx agent-hooks init` at the repo root. Expect
    `agent-hooks init wrote .claude/settings.json and .codex/hooks.json`.
@@ -125,7 +152,7 @@ one `extends` line in place of the repo-sync entry:
    `pre-commit` or `pre-push` hook whose jobs are not a block list; for these, write the jobs as a
    block list, then run `chex init` again.
 3. Edit `check:docs` to name the docs checks the repo takes, such as
-   `chex prose length links vision`. CI runs each check that it names as its own step.
+   `chex prose length links vision`. CI runs each check that `check:docs` names as its own step.
 4. In `lefthook.yml`, delete `parallel` and the baseline's jobs from `pre-push` and `pre-commit`, as
    step 2 of [Opting in to the pre-push baseline](#opting-in-to-the-pre-push-baseline) describes. To
    keep a job of the repo's own in place of a baseline job, such as a typecheck under a lower memory
