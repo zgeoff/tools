@@ -27,6 +27,25 @@ test('it returns the messages of the rule with their file and line, sorted by fi
   ]);
 });
 
+test('it rejects a run in which a plugin rule throws', async () => {
+  const directory = await createLintTree(
+    {
+      '.oxlintrc.json': JSON.stringify({
+        jsPlugins: ['./crash-plugin.mjs'],
+        rules: { 'crash/boom': 'error' },
+      }),
+      'crash-plugin.mjs':
+        "export default { meta: { name: 'crash' }, rules: { boom: { create() { return { Program() { throw new Error('boom inside the rule'); } }; } } } };\n",
+      'a.ts': 'export {};\n',
+    },
+    {},
+  );
+
+  expect(runLintMessages(directory, 'crash/boom', ['a.ts'])).rejects.toThrow(
+    /names no rule.*Error running JS plugin.*boom inside the rule/u,
+  );
+});
+
 test('it leaves out the messages of other rules', async () => {
   const directory = await createLintTree(
     { 'a.ts': "import { join } from 'node:path';\n" },

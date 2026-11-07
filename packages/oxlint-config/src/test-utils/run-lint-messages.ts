@@ -31,6 +31,15 @@ function parseLintMessages(stdout: string, rule: string): LintMessage[] {
     throw new TypeError(`oxlint printed no diagnostics list: ${stdout}`);
   }
 
+  // oxlint reports an exception inside a JS plugin as a diagnostic with no rule code
+  const crash: unknown = diagnostics.find(
+    (diagnostic: unknown) => !isRecord(diagnostic) || typeof diagnostic['code'] !== 'string',
+  );
+
+  if (crash !== undefined) {
+    throw new Error(`oxlint reported a diagnostic that names no rule: ${JSON.stringify(crash)}`);
+  }
+
   return diagnostics
     .filter((diagnostic: unknown) => isRecord(diagnostic) && diagnostic['code'] === code)
     .map((diagnostic: unknown) => toLintMessage(diagnostic))
