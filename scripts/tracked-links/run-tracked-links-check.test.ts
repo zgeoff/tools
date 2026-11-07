@@ -73,3 +73,25 @@ test('it exits 1 and names the link when its target folder holds only untracked 
     ],
   });
 });
+
+test('it exits 0 when the staged link points at a tracked folder and the unstaged link points at a missing one', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    '.claude/settings.json': '{}',
+    '.agents/skills/.gitkeep': '',
+  });
+
+  const linkPath = join(ctx.directory, '.claude', 'skills');
+
+  await symlink('../.agents/skills', linkPath);
+
+  await ctx.runGit(['add', '.claude', '.agents/skills/.gitkeep']);
+
+  await rm(linkPath);
+  await symlink('../.agents/missing', linkPath);
+
+  const exitCode = await ctx.runCheck();
+
+  expect({ exitCode, output: ctx.output }).toStrictEqual({ exitCode: 0, output: [] });
+});
