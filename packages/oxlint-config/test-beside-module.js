@@ -12,7 +12,7 @@ export default function buildTestBesideModule(rigLanes) {
       type: 'problem',
       messages: {
         missing:
-          'Move this test beside the module it tests: no `{{name}}.<ext>` sits in this directory. A flow across several packages belongs in `integration/`, and a test that drives the built product in `e2e/`, at the repo root or an app root.',
+          'Move this test beside the module it tests: no `{{name}}.<ext>` sits in this directory. A test that runs the built program belongs in `e2e/` of the package that builds it, and an evaluation in `evals/` of the package whose code it scores.',
         rigLanes:
           'Declare lanes in rig.config.ts only: this repo has one, and the `lanes` option here would give the lanes a second source.',
       },

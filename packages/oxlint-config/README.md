@@ -80,6 +80,9 @@ The plugin is addressable on its own at `@zgeoff/oxlint-config/plugin` for confi
   [require functions](../../docs/architecture/oxlint-config.md#require-functions).
 - Import boundaries: `zgeoff/import-zones` fails an import that crosses a declared zone boundary.
   See [import zones](../../docs/architecture/oxlint-config-import-zones.md).
+- Feature folders: `zgeoff/feature-folders` caps the loose modules at the root of a package's
+  `src/`, and keeps shared code in `src/utils/`. See
+  [feature folders](../../docs/architecture/oxlint-config-feature-folders.md).
 
 ## Configuration
 

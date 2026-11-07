@@ -6,6 +6,7 @@ import { collectBannedVerbs } from './src/test-utils/collect-banned-verbs.ts';
 import { createLintTree } from './src/test-utils/create-lint-tree.ts';
 import { readPinnedSkillText } from './src/test-utils/read-pinned-skill-text.ts';
 import { runLintIn } from './src/test-utils/run-lint-in.ts';
+import { runLintMessages } from './src/test-utils/run-lint-messages.ts';
 import { runLintTree } from './src/test-utils/run-lint-tree.ts';
 import { runLint } from './src/test-utils/run-lint.ts';
 import { runOxlint } from './src/test-utils/run-oxlint.ts';
@@ -349,6 +350,28 @@ test('it flags a test file with no module beside it', async () => {
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toInclude('test-beside-module');
   expect(result.stdout).toInclude('parse-entry.<ext>');
+});
+
+test('it sends a test with no module beside it to the e2e/ and evals/ of its package', async () => {
+  const directory = await createLintTree(
+    {
+      'src/parse-entry.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
+    { 'zgeoff/test-beside-module': 'error' },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/test-beside-module', [
+    'src/parse-entry.test.ts',
+  ]);
+
+  expect(messages).toStrictEqual([
+    {
+      filename: 'src/parse-entry.test.ts',
+      line: 1,
+      message:
+        'Move this test beside the module it tests: no `parse-entry.<ext>` sits in this directory. A test that runs the built program belongs in `e2e/` of the package that builds it, and an evaluation in `evals/` of the package whose code it scores.',
+    },
+  ]);
 });
 
 test('it flags a .test.tsx file with no module beside it', async () => {

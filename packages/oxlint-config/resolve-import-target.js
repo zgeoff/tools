@@ -1,13 +1,14 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { isBuiltin } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
+import readPackageManifest from './read-package-manifest.js';
 
 export default function resolveImportTarget(filename, specifier, settings) {
   if (isPathSpecifier(specifier)) {
     return toTarget(resolveImportedFile(filename, toFileSpecifier(specifier), settings.extensions));
   }
 
-  const manifest = readPackageManifest(dirname(filename), settings.root);
+  const manifest = resolveNearestManifest(dirname(filename), settings.root);
 
   return resolveManifestTarget(manifest, specifier, settings);
 }
@@ -54,7 +55,7 @@ function toFileSpecifier(specifier) {
 
 const manifests = new Map();
 
-function readPackageManifest(directory, root) {
+function resolveNearestManifest(directory, root) {
   if (manifests.has(directory)) {
     return manifests.get(directory);
   }
@@ -64,9 +65,9 @@ function readPackageManifest(directory, root) {
   let manifest = null;
 
   if (existsSync(path)) {
-    manifest = { directory, ...JSON.parse(readFileSync(path, 'utf8')) };
+    manifest = { directory, ...readPackageManifest(directory) };
   } else if (directory !== root && parent !== directory) {
-    manifest = readPackageManifest(parent, root);
+    manifest = resolveNearestManifest(parent, root);
   }
 
   manifests.set(directory, manifest);

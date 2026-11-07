@@ -59,6 +59,17 @@
     "get-zone-options.js",
     "make-glob-matcher.js",
     "resolve-import-target.js",
+    "feature-folders.js",
+    "pick-folder-kind.js",
+    "pick-loose-module-message.js",
+    "collect-entry-targets.js",
+    "read-loose-modules.js",
+    "resolve-source-package.js",
+    "find-feature-folder.js",
+    "build-import-settings.js",
+    "read-stale-pending.js",
+    "read-package-manifest.js",
+    "read-module-paths.js",
     "index.js"
   ],
   "type": "module",
@@ -84,6 +95,7 @@
   "devDependencies": {
     "@types/bun": "catalog:",
     "@zgeoff/rig": "workspace:*",
+    "@zgeoff/std": "workspace:*",
     "@zgeoff/testing": "workspace:*",
     "tsrs": "catalog:",
     "typescript": "catalog:"
