@@ -89,15 +89,22 @@ field. The `knip-runner` entry delivers `scripts/run-knip.sh`, which runs knip s
 repo's own `tsconfig.json`. The runner needs a `tsconfig.json` at the repo root, and it analyses the
 whole repo, so only the root `package.json` calls it. knip reads a relative path given to
 `--reporter`, `--cache-location` or `--directory` from the `scripts/` folder, so give each of these
-an absolute path. A repo opts in with three steps:
+an absolute path. A repo opts in with one pull request that makes three changes:
 
 1. Add `knip-runner` to `include` in `.github/workflows/repo-sync.yml`.
-2. Dispatch repo-sync with `gh workflow run repo-sync.yml -R zgeoff/<repo>`, and merge its pull
-   request. Expect the default branch to hold `scripts/run-knip.sh`.
+2. Copy [`run-knip.sh`](../../sync/deadcode/run-knip.sh) to `scripts/run-knip.sh` with its mode, as
+   in `install -m 0755 <tools>/sync/deadcode/run-knip.sh scripts/run-knip.sh`, where `<tools>` is a
+   checkout of tools at the newest commit on `main` whose `Main` run passed. Expect
+   `git ls-files -s scripts/run-knip.sh` to show `100755` once you stage it. If it shows `100644`,
+   run `git update-index --chmod=+x scripts/run-knip.sh`.
 3. In `package.json`, replace each `knip` command in the `deadcode` script with
    `bash scripts/run-knip.sh`, and keep its arguments, as in
    `bash scripts/run-knip.sh --production`. Expect `bun run deadcode` to pass in a worktree under
    `.worktrees/`.
+
+The merge changes the stub, so repo-sync runs on the newest green commit of tools. The copy matches
+that commit's file in content and mode, so the run commits nothing for the entry, as
+[Delivery](../architecture/repo-sync.md#delivery) describes.
 
 ## Taking the baseline from chex
 
