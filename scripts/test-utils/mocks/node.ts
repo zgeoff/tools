@@ -1,3 +1,4 @@
+// oxlint-disable zgeoff/file-named-for-export -- the testing skill names this file mocks/node.ts
 import { setupServer } from 'msw/node';
 
 // The one MSW server of a test process. No remote service has default handlers yet, so a test adds

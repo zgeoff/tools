@@ -28,10 +28,10 @@
     "no-jsdoc.js",
     "no-comment-rule-override.js",
     "no-hidden-cast.js",
-    "test-beside-module.js",
+    "build-test-beside-module.js",
     "no-file-snapshot.js",
     "setup-test-only.js",
-    "max-test-timeout.js",
+    "build-max-test-timeout.js",
     "test-timeout-exception-ticket.js",
     "build-lane-limits.js",
     "read-rig-lanes.js",
@@ -47,8 +47,8 @@
     "find-static-key.js",
     "import-zones.js",
     "import-zones-schema.js",
-    "import-zones-entry.js",
-    "import-zones-entry.d.ts",
+    "import-zones/index.js",
+    "import-zones/index.d.ts",
     "collect-refusing-edges.js",
     "is-edge-refusing.js",
     "is-entry-applying.js",
@@ -70,8 +70,9 @@
     "read-stale-pending.js",
     "read-package-manifest.js",
     "read-module-paths.js",
-    "seed-only.js",
+    "build-seed-only.js",
     "test-beside-seed.js",
+    "file-named-for-export.js",
     "read-folder-sources.js",
     "collect-written-tables.js",
     "collect-sql-writes.js",
@@ -87,8 +88,8 @@
     "./react.json": "./react.json",
     "./plugin": "./plugin.js",
     "./import-zones": {
-      "types": "./import-zones-entry.d.ts",
-      "default": "./import-zones-entry.js"
+      "types": "./import-zones/index.d.ts",
+      "default": "./import-zones/index.js"
     }
   },
   "publishConfig": {

@@ -6,7 +6,7 @@ import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { run } from '@zgeoff/testing/process';
 import { buildBrowserRun } from '../src/browser/build-browser-run.ts';
 import { pickChromeDirs } from '../src/browser/pick-chrome-dirs.ts';
-import { resolveProgram } from '../src/e2e.ts';
+import { resolveProgram } from '../src/programs/index.ts';
 import { createTrackedRepo } from '../src/test-utils/create-tracked-repo.ts';
 
 async function setupTest() {

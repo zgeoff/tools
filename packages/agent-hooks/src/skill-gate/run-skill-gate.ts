@@ -34,7 +34,8 @@ import { readFileHashes } from './read-file-hashes.ts';
 import { readRulesState } from './read-rules-state.ts';
 import { readSessionLoads } from './read-session-loads.ts';
 import { readWorkTree } from './read-work-tree.ts';
-import { recordCommandReads, recordLifecycle } from './record-codex-loads.ts';
+import { recordCommandReads } from './record-command-reads.ts';
+import { recordLifecycle } from './record-lifecycle.ts';
 import { resolveStateDir } from './resolve-state-dir.ts';
 import type {
   BashChangeHookOutput,

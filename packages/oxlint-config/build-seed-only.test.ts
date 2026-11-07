@@ -299,7 +299,7 @@ async function setupTest() {
 
   const plugin = [
     "import { appendFileSync } from 'node:fs';",
-    `import buildSeedOnly from ${JSON.stringify(join(import.meta.dir, 'seed-only.js'))};`,
+    `import buildSeedOnly from ${JSON.stringify(join(import.meta.dir, 'build-seed-only.js'))};`,
     `import readFolderSources from ${JSON.stringify(join(import.meta.dir, 'read-folder-sources.js'))};`,
     '',
     'const readLoggedSources = (folder) => {',

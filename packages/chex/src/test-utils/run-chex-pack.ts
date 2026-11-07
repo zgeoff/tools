@@ -87,7 +87,7 @@ if (import.meta.main) {
   const ownerPID = Number(process.argv[2]);
 
   if (!Number.isInteger(ownerPID) || ownerPID <= 0) {
-    throw new Error(`pack-chex-program: pass the rig process id, not "${process.argv[2]}"`);
+    throw new Error(`run-chex-pack: pass the rig process id, not "${process.argv[2]}"`);
   }
 
   await runChexPack({

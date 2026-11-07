@@ -45,6 +45,7 @@
     "zgeoff/feature-folders": "error",
     "zgeoff/seed-only": "error",
     "zgeoff/test-beside-seed": "error",
+    "zgeoff/file-named-for-export": "error",
 
     // name a value for what it holds, in full words: one letter only for a
     // coordinate, zod's `z`, Bun's shell `$` or an unread `_` placeholder, and
@@ -156,7 +157,7 @@
     "unicorn/no-useless-undefined": ["error", { "checkArguments": false }],
     "unicorn/no-null": "off",
     "unicorn/number-literal-case": "off",
-    "unicorn/filename-case": "off",
+    "unicorn/filename-case": ["error", { "case": "kebabCase" }],
 
     // one declaration per variable; a declaration list has no order to sort
     "one-var": ["error", "never"],

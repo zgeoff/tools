@@ -4,10 +4,10 @@ import { mkdtemp, readlink, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/helpers';
-import { chexPackDir, runChexPack } from './pack-chex-program.ts';
+import { chexPackDir, runChexPack } from './run-chex-pack.ts';
 
 async function setupTest() {
-  const packageDir = await mkdtemp(join(tmpdir(), readRunFolderPrefix('pack-chex-program-')));
+  const packageDir = await mkdtemp(join(tmpdir(), readRunFolderPrefix('run-chex-pack-')));
 
   onTestFinished(() => rm(packageDir, { recursive: true, force: true }));
 

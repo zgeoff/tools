@@ -1,10 +1,41 @@
 # oxlint-config code-style rules
 
-Five rules of the `zgeoff/*` plugin in `@zgeoff/oxlint-config` check the code-style skill's
+Six rules of the `zgeoff/*` plugin in `@zgeoff/oxlint-config` check the code-style skill's
 conventions for names and module layout. `zgeoff/function-verb` and `zgeoff/verb-contract` check
 function names against the skill's role table, `zgeoff/module-order` checks the order of a file's
-declarations, `zgeoff/no-abbreviated-names` checks value names, and `zgeoff/no-class` bans classes.
-The [config overview](./oxlint-config.md) covers the rest of the config.
+declarations, `zgeoff/file-named-for-export` checks that a file is named for its main export,
+`zgeoff/no-abbreviated-names` checks value names, and `zgeoff/no-class` bans classes. The
+[config overview](./oxlint-config.md) covers the rest of the config.
+
+## File names
+
+The config runs `unicorn/filename-case` with `kebabCase`, so every linted file name is kebab-case.
+
+`zgeoff/file-named-for-export` reports a file whose exports hold no name that matches the file's
+name. The rule drops the hyphens from the file name, drops the underscores from each export name,
+and compares the two without case. `parse-cli-args.ts` matches `parseCLIArgs`, `kettle-state.ts`
+matches the type `KettleState`, and `max-kettles.ts` matches `MAX_KETTLES`. A default export counts
+under the name it declares, or under the identifier it exports. The rule reports at the file's first
+export.
+
+The rule skips these files:
+
+- `index`, `types` and `constants` files, which have no main export;
+- a file with no exports;
+- a file with a role suffix between its name and its extension, such as `rig.config.ts`,
+  `boil.bench.ts` or `pour.test.ts`, because the tool that loads it sets its exports;
+- a file with an `export * from` or an `export { default } from`, which hides the name it exports.
+
+A file with only `export {}` has no exports. A default export wrapped in `satisfies` or `as` counts
+under the name it wraps, and a dotted namespace such as `PourKettle.Spout` counts under its first
+name.
+
+A file whose path a convention fixes keeps its name with a file-level disable comment that gives the
+reason:
+
+```ts
+// oxlint-disable zgeoff/file-named-for-export -- the testing skill names this file mocks/node.ts
+```
 
 ## `zgeoff/function-verb`
 

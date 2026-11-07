@@ -7,7 +7,7 @@ import { collectRefusingEdges, importZonesSchema } from '@zgeoff/oxlint-config/i
 import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('import-zones-entry-test-')));
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('import-zones-index-test-')));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
@@ -17,8 +17,8 @@ async function setupTest() {
 
   return {
     directory,
-    oxlintBin: join(import.meta.dir, '..', '..', 'node_modules', '.bin', 'oxlint'),
-    pluginPath: join(import.meta.dir, 'plugin.js'),
+    oxlintBin: join(import.meta.dir, '..', '..', '..', 'node_modules', '.bin', 'oxlint'),
+    pluginPath: join(import.meta.dir, '..', 'plugin.js'),
   };
 }
 
