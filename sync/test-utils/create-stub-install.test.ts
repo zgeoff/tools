@@ -64,6 +64,25 @@ test('it logs the call and fails with no node_modules', async () => {
   expect(calls).toBe(`bun install in ${ctx.project}\n`);
 });
 
+test('it logs the call and stops on SIGKILL', async () => {
+  const ctx = await setupTest();
+
+  const log = join(ctx.directory, 'install.log');
+
+  await createStubInstall(ctx.bin, { log, outcome: { kind: 'killed' } });
+
+  const install = Bun.spawnSync([join(ctx.bin, 'bun'), 'install'], { cwd: ctx.project });
+
+  expect({ success: install.success, signalCode: install.signalCode }).toStrictEqual({
+    success: false,
+    signalCode: 'SIGKILL',
+  });
+
+  const calls = await readFile(log, 'utf8');
+
+  expect(calls).toBe(`bun install in ${ctx.project}\n`);
+});
+
 test('it logs the call, removes the path and fails', async () => {
   const ctx = await setupTest();
 

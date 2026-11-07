@@ -4,6 +4,7 @@ import { match } from 'ts-pattern';
 
 export type StubInstallOutcome =
   | { readonly kind: 'fails' }
+  | { readonly kind: 'killed' }
   | { readonly kind: 'removes'; readonly path: string }
   | { readonly kind: 'links'; readonly packageName: string; readonly packageDir: string };
 
@@ -16,8 +17,8 @@ export interface StubInstallOptions {
 }
 
 // Writes a stand-in `bun` that appends `bun <arguments> in <folder>` to the log, prints
-// `stub install started` on stderr, then fails, removes a path and fails, or links the package into
-// node_modules.
+// `stub install started` on stderr, then fails, kills itself with SIGKILL, removes a path and fails,
+// or links the package into node_modules.
 export async function createStubInstall(
   directory: string,
   options: StubInstallOptions,
@@ -31,6 +32,7 @@ export async function createStubInstall(
 
   const outcomeSteps = match(options.outcome)
     .with({ kind: 'fails' }, () => ['exit 1'])
+    .with({ kind: 'killed' }, () => ['kill -KILL $$'])
     .with({ kind: 'removes' }, (outcome) => [`rm -f '${outcome.path}'`, 'exit 1'])
     .with({ kind: 'links' }, (outcome) => [
       `mkdir -p "node_modules/$(dirname '${outcome.packageName}')"`,
