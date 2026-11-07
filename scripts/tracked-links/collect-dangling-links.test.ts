@@ -64,6 +64,28 @@ test('it reports each link whose path steps out of a file with ..', () => {
   ]);
 });
 
+test('it passes a chain of 40 links that ends at a tracked file', () => {
+  const links = Array.from({ length: 40 }, (_, index) => ({
+    path: `hop-${index}`,
+    target: index === 39 ? 'end.txt' : `hop-${index + 1}`,
+  }));
+
+  expect(collectDanglingLinks(links, [...links.map((link) => link.path), 'end.txt'])).toStrictEqual(
+    [],
+  );
+});
+
+test('it reports the first link of a chain of 41 links, which Linux refuses as a loop', () => {
+  const links = Array.from({ length: 41 }, (_, index) => ({
+    path: `hop-${index}`,
+    target: index === 40 ? 'end.txt' : `hop-${index + 1}`,
+  }));
+
+  expect(collectDanglingLinks(links, [...links.map((link) => link.path), 'end.txt'])).toStrictEqual(
+    [{ path: 'hop-0', target: 'hop-1', resolved: 'hop-1' }],
+  );
+});
+
 test('it reports each link of a loop', () => {
   const links = [
     { path: 'ping', target: 'pong' },

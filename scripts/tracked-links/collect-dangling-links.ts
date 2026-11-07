@@ -78,7 +78,9 @@ function resolveLinkPath(link: TrackedLink, tree: LinkTree): string | null {
   const parent = posix.dirname(link.path);
   const pending = [...(parent === '.' ? [] : parent.split('/')), ...link.target.split('/')];
   const reached: string[] = [];
-  let hops = 0;
+
+  // The link itself is the first hop.
+  let hops = 1;
 
   while (pending.length > 0) {
     const part = pending.shift();
