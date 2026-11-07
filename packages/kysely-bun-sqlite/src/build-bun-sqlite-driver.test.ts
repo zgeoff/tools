@@ -4,8 +4,6 @@ import { setImmediate } from 'node:timers/promises';
 import { CompiledQuery } from 'kysely';
 import { buildBunSQLiteDriver } from './build-bun-sqlite-driver.ts';
 
-// oxlint-disable zgeoff/seed-only -- tests a database driver, whose product is storage
-
 function setupTest() {
   const sqlite = new Database(':memory:');
 

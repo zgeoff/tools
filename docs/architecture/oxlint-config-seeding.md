@@ -14,9 +14,22 @@ reference requires. The rule checks test code: each `<name>.test.ts` or `<name>.
 each file under a `test-utils` folder below the repo root. In test code it reports a database write:
 
 - a call of a method named `insertInto`, `updateTable` or `deleteFrom`, as Kysely names them;
-- a string or a template literal that holds an `INSERT … INTO`, a `REPLACE INTO`, an `UPDATE … SET`
-  or a `DELETE FROM` statement, in any letter case. The rule skips the title of a `test`, `it` or
-  `describe` call, so prose such as "it can insert into the queue" in a title never counts.
+- an `INSERT … INTO`, a `REPLACE INTO`, an `UPDATE … SET` or a `DELETE FROM` statement, in any
+  letter case, in a string or a template literal that a SQL call takes.
+
+The rule reads SQL only where it can run, so English prose such as "the store ran no delete from the
+events table" never counts. A SQL call takes the statement as one of these:
+
+| Form                                                                                      | Example                                 |
+| ----------------------------------------------------------------------------------------- | --------------------------------------- |
+| the first argument of a method named `run`, `exec`, `query`, `prepare`, `raw` or `unsafe` | `db.run('…')`, `CompiledQuery.raw('…')` |
+| the first argument of a call of `sql`                                                     | `sql('…')`                              |
+| the template of a tag named `sql`, alone or as a member                                   | `` sql`…` ``, `` ctx.sql`…` ``          |
+
+The rule follows a `const` to the string it holds, and joins strings added with `+`. It reads a part
+it cannot follow, such as a parameter, as an interpolation. The rule skips the `exec` of a regular
+expression: a literal, a `RegExp` call, or a `const` that holds one of these. It misses a statement
+held in a parameter or a `let`.
 
 A write passes in these places:
 
@@ -27,13 +40,23 @@ A write passes in these places:
   names without the schema, an alias, quotes or letter case;
 - in a migration test: a test file whose path below the repo root holds `migrate`, `migration` or
   `migrations` as a whole word between `/`, `-`, `_` or `.`, such as `run-migrations.test.ts`;
-- in a seed's own test: a `seed-<name>.test.ts` file under `test-utils`.
+- in a seed's own test: a `seed-<name>.test.ts` file under `test-utils`;
+- to a table the same file creates, anywhere in the file, with a `CREATE TABLE` statement in a SQL
+  call or with a Kysely `createTable` call.
 
-A test of code whose product is SQL or storage, such as a database dialect, takes a file-level
-disable comment, with the case as its reason:
+The last place covers the testing skill's "a test of code whose product is SQL or storage, such as a
+database dialect". Such a test makes the tables it needs to drive the code, as a test of a database
+opener, a transaction helper, a query-plan reader, a backup or a raw file reader does. The rule
+passes a write to a table the file creates even when a module writes a table of that name, because a
+reader of another build's file makes tables with the real names. The rule reads `CREATE TABLE`,
+`CREATE TEMP TABLE`, `CREATE TEMPORARY TABLE` and `CREATE VIRTUAL TABLE`, each with or without
+`IF NOT EXISTS`, and a `createTable` call whose first argument is a string literal.
+
+A test of storage code whose table the file does not create, such as one that opens a database file
+kept in the repo, takes a file-level disable comment with the case as its reason:
 
 ```ts
-// oxlint-disable zgeoff/seed-only -- tests the dialect, whose product is SQL
+// oxlint-disable zgeoff/seed-only -- tests the file reader, whose product is storage
 ```
 
 The rule finds a table's owner by the table's name, so outside a seed it reports a table name that

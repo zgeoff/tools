@@ -5,7 +5,7 @@ import { createLintTree } from './src/test-utils/create-lint-tree.ts';
 import { runLintIn } from './src/test-utils/run-lint-in.ts';
 import { runLintTree } from './src/test-utils/run-lint-tree.ts';
 
-// oxlint-disable zgeoff/seed-only, no-template-curly-in-string -- the SQL and the interpolations are fixtures of the rule under test, whose product is reports on SQL
+// oxlint-disable no-template-curly-in-string -- the interpolations are fixtures of the rule under test
 
 test.each([
   ['insertInto', "await db.insertInto('kettles').values({ id: 1 }).execute();"],
@@ -19,6 +19,25 @@ test.each([
   ['a lower-case raw DELETE in a sql tag', 'await sql`delete from kettles`.execute(db);'],
   ['a raw REPLACE', "db.run('REPLACE INTO kettles (id) VALUES (1)');"],
   ['a raw UPDATE of an aliased table', "db.run('UPDATE kettles AS k SET full = 1');"],
+  ['a mixed-case raw UPDATE', "db.exec('Update kettles Set full = 1');"],
+  ['a raw INSERT in a prepared statement', "db.prepare('INSERT INTO kettles (id) VALUES (?)');"],
+  ['a raw DELETE in a query', "db.query('delete from kettles').run();"],
+  [
+    'a raw INSERT in a sql.raw call',
+    "await sql.raw('INSERT INTO kettles (id) VALUES (1)').execute(db);",
+  ],
+  [
+    'a raw UPDATE in a CompiledQuery.raw call',
+    "await db.executeQuery(CompiledQuery.raw('UPDATE kettles SET full = 1'));",
+  ],
+  ['a raw DELETE in an unsafe call', 'await pg.unsafe(`DELETE FROM kettles`);'],
+  ['a raw INSERT in a sql call', "await sql('INSERT INTO kettles (id) VALUES (1)');"],
+  ['a raw INSERT in a member sql tag', 'await ctx.sql`INSERT INTO kettles (id) VALUES (1)`;'],
+  [
+    'a raw INSERT held in a const',
+    "const insert = 'INSERT INTO kettles (id) VALUES (1)';\n  db.run(insert);",
+  ],
+  ['a raw DELETE joined from strings', "db.run('DELETE FROM ' + 'kettles');"],
 ])('it reports %s in a test file', async (_, write) => {
   const source = `test('it pours a kettle', async () => {\n  ${write}\n});\n`;
 
@@ -44,6 +63,34 @@ test.each([
   [
     'an upsert clause',
     "test('it reads', () => {\n  db.run('SELECT 1 ON CONFLICT DO UPDATE SET full = 1');\n});\n",
+  ],
+  [
+    'prose with a delete from in an assertion message',
+    "test('it keeps the cups', () => {\n  expect(log, 'the kettle ran no delete from the cups table').toBeEmpty();\n});\n",
+  ],
+  [
+    'prose with an insert into in a constant',
+    "test('it pours', () => {\n  const note = 'the kettle may Insert Into a cup';\n\n  expect(note).toBeString();\n});\n",
+  ],
+  [
+    "prose with a delete from in a regular expression's exec",
+    "test('it finds no lid', () => {\n  expect(/lid/u.exec('the kettle ran no delete from cups')).toBeNull();\n});\n",
+  ],
+  [
+    'prose with a delete from in the exec of a regular expression held in a const',
+    "test('it finds no lid', () => {\n  const lid = /lid/u;\n\n  expect(lid.exec('the kettle ran no delete from cups')).toBeNull();\n});\n",
+  ],
+  [
+    'prose with a delete from in the exec of a new RegExp',
+    "test('it finds no lid', () => {\n  expect(new RegExp('lid', 'u').exec('the kettle ran no delete from cups')).toBeNull();\n});\n",
+  ],
+  [
+    'prose with a delete from in the exec of a RegExp call',
+    "test('it finds no lid', () => {\n  expect(RegExp('lid', 'u').exec('the kettle ran no delete from cups')).toBeNull();\n});\n",
+  ],
+  [
+    'SQL in a string that no SQL call takes',
+    "test('it logs', () => {\n  logger.info('INSERT INTO kettles (id) VALUES (1)');\n});\n",
   ],
 ])('it accepts %s in a test file', async (_, source) => {
   const result = await runLintTree({ 'src/pour.test.ts': source }, 'src/pour.test.ts', {
@@ -199,6 +246,71 @@ test.each([
   expect(result.exitCode).toBe(0);
 });
 
+test.each([
+  [
+    'a database dialect, whose product is SQL',
+    'src/build-dialect.test.ts',
+    "test('it compiles an insert', async () => {\n  ctx.sqlite.run('CREATE TABLE kettles (id INTEGER)');\n  await ctx.db.insertInto('kettles').values({ id: 1 }).execute();\n});\n",
+  ],
+  [
+    'a database dialect, with the table made through the schema builder',
+    'src/build-dialect.test.ts',
+    "test('it compiles an insert', async () => {\n  await ctx.db.schema.createTable('kettles').addColumn('id', 'integer').execute();\n  await ctx.db.insertInto('kettles').values({ id: 1 }).execute();\n});\n",
+  ],
+  [
+    'a database driver, whose product is storage',
+    'src/build-driver.test.ts',
+    "test('it runs a write', async () => {\n  ctx.sqlite.run('create table if not exists \"kettles\" (id INTEGER)');\n  await ctx.connection.executeQuery(CompiledQuery.raw('INSERT INTO kettles (id) VALUES (1)'));\n});\n",
+  ],
+  [
+    'a database opener',
+    'src/open-kettle-db.test.ts',
+    "test('it opens a database', async () => {\n  await sql`CREATE TABLE kettles (id INTEGER)`.execute(ctx.db);\n  ctx.other.query('DELETE FROM kettles').run();\n});\n",
+  ],
+  [
+    'a transaction helper',
+    'src/with-transaction.test.ts',
+    "test('it rolls back', async () => {\n  ctx.sqlite.run('CREATE TEMP TABLE kettles (id INTEGER)');\n  await sql`UPDATE kettles SET id = 2`.execute(ctx.db);\n});\n",
+  ],
+  [
+    'a raw file reader, with a table made later in the file',
+    'src/read-kettle-file.test.ts',
+    "test('it reads a file', () => {\n  ctx.db.run(\"INSERT INTO main.kettles VALUES (1)\");\n});\n\ntest('it reads an empty file', () => {\n  ctx.db.exec('CREATE TABLE main.kettles (id INTEGER)');\n});\n",
+  ],
+  [
+    'a query-plan reader',
+    'src/read-query-plan.test.ts',
+    "test('it never runs the planned write', () => {\n  ctx.db.run('CREATE VIRTUAL TABLE kettles USING fts5(name)');\n  readQueryPlan(ctx.path, CompiledQuery.raw(\"INSERT INTO kettles (name) VALUES ('tall')\", []));\n});\n",
+  ],
+  [
+    'a backup',
+    'src/write-backup.test.ts',
+    "test('it copies every row', () => {\n  ctx.db.run('CREATE TEMPORARY TABLE kettles (id INTEGER)');\n  ctx.db.run('WITH RECURSIVE n(i) AS (SELECT 1) INSERT INTO kettles SELECT i FROM n');\n});\n",
+  ],
+])('it accepts a write to a table the file creates, in a test of %s', async (_, path, source) => {
+  const result = await runLintTree({ [path]: source }, path, { 'zgeoff/seed-only': 'error' });
+
+  expect(result.exitCode).toBe(0);
+});
+
+test.each([
+  [
+    'another table',
+    "test('it pours', () => {\n  db.run('CREATE TABLE cups (id INTEGER)');\n  db.run('INSERT INTO kettles (id) VALUES (1)');\n});\n",
+  ],
+  [
+    'the table, but only in prose',
+    "test('it pours', () => {\n  const note = 'the setup may create table kettles first';\n\n  db.run('INSERT INTO kettles (id) VALUES (1)');\n});\n",
+  ],
+])('it reports a write in a test file that creates %s', async (_, source) => {
+  const result = await runLintTree({ 'src/pour.test.ts': source }, 'src/pour.test.ts', {
+    'zgeoff/seed-only': 'error',
+  });
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude("Seed 'kettles' through the module that writes it");
+});
+
 test('it reports a write in a test whose path only holds migration inside a word', async () => {
   const source =
     "test('it grants a visa', async () => {\n  await db.insertInto('visas').values({ id: 1 }).execute();\n});\n";
@@ -224,10 +336,22 @@ test('it honours a file-level disable comment in a test of code whose product is
   expect(result.exitCode).toBe(0);
 });
 
+test('it honours a next-line disable comment above a statement inside a multi-line call', async () => {
+  const source =
+    "test('it rewinds the ledger', () => {\n  db.run(\n    // oxlint-disable-next-line zgeoff/seed-only -- a migration test rewinds the ledger\n    \"DELETE FROM kettle_ledger WHERE name = '002_add_lid'\",\n  );\n});\n";
+
+  const result = await runLintTree({ 'src/pour.test.ts': source }, 'src/pour.test.ts', {
+    'zgeoff/seed-only': 'error',
+  });
+
+  expect(result.exitCode).toBe(0);
+});
+
 test.each([
   ['a Kysely table in a variable', 'await db.insertInto(table).values({ id: 1 }).execute();'],
   ['a Kysely table in a template literal', 'await db.deleteFrom(`kettles`).execute();'],
   ['a raw table in an interpolation', 'db.run(`UPDATE ${table} SET full = 1`);'],
+  ['a raw table joined from a variable', "db.run('UPDATE ' + table + ' SET full = 1');"],
 ])('it reports %s as a non-literal table name', async (_, write) => {
   const source = `test('it pours a kettle', async () => {\n  ${write}\n});\n`;
 

@@ -1,8 +1,8 @@
 import { basename, dirname } from 'node:path';
+import collectCreatedTables from './collect-created-tables.js';
 import collectSQLWrites from './collect-sql-writes.js';
 import collectWrittenTables from './collect-written-tables.js';
-import findBunTestName from './find-bun-test-name.js';
-import findChainRoot from './find-chain-root.js';
+import findConstInitializer from './find-const-initializer.js';
 import findFunctionName from './find-function-name.js';
 import isInTestUtils from './is-in-test-utils.js';
 import isVerbMatch from './is-verb-match.js';
@@ -49,44 +49,64 @@ export default function buildSeedOnly(readFolderSources) {
         return {};
       }
 
-      const checkWrite = (node, table) => {
-        if (kind.inTestUtils && isInSeedFunction(node)) {
+      // a table the file creates is the test's own, so a write to it counts only once the whole
+      // file is read
+      const writes = [];
+      const createdTables = new Set();
+
+      const collectText = (node) => {
+        const text = toSQLText(context, node, new Set());
+
+        if (text === null) {
           return;
         }
 
-        if (table === null) {
-          context.report({ node, messageId: 'nonLiteral' });
-        } else if (!kind.isTest || !readFolderTables(dirname(filename)).has(table)) {
-          context.report({ node, messageId: 'write', data: { table } });
+        for (const table of collectSQLWrites(text)) {
+          // the statement, not its call, so a disable comment above a statement inside a
+          // multi-line call covers it
+          writes.push({ node, table });
+        }
+
+        for (const table of collectCreatedTables(text)) {
+          createdTables.add(table);
         }
       };
 
-      const checkText = (node, text) => {
-        if (!isTestTitle(context, node)) {
-          for (const table of collectSQLWrites(text)) {
-            checkWrite(node, table);
-          }
+      const checkWrite = (write) => {
+        if ((kind.inTestUtils && isInSeedFunction(write.node)) || createdTables.has(write.table)) {
+          return;
+        }
+
+        if (write.table === null) {
+          context.report({ node: write.node, messageId: 'nonLiteral' });
+        } else if (!kind.isTest || !readFolderTables(dirname(filename)).has(write.table)) {
+          context.report({ node: write.node, messageId: 'write', data: { table: write.table } });
         }
       };
 
       return {
         CallExpression(node) {
           if (isKyselyWrite(node)) {
-            checkWrite(node, findLiteralTable(node.arguments[0]));
-          }
-        },
-        Literal(node) {
-          if (typeof node.value === 'string') {
-            checkText(node, node.value);
-          }
-        },
-        TemplateLiteral(node) {
-          const text = node.quasis
-            .map((quasi) => quasi.value.cooked ?? quasi.value.raw)
-            // oxlint-disable-next-line no-template-curly-in-string -- marks each interpolation as a module's text shows it
-            .join('${}');
+            writes.push({ node, table: findLiteralTable(node.arguments[0]) });
+          } else if (isKyselyCreateTable(node)) {
+            const table = findLiteralTable(node.arguments[0]);
 
-          checkText(node, text);
+            if (table !== null) {
+              createdTables.add(table);
+            }
+          } else if (isSQLCall(context, node.callee)) {
+            collectText(node.arguments[0]);
+          }
+        },
+        TaggedTemplateExpression(node) {
+          if (isSQLTag(node.tag)) {
+            collectText(node.quasi);
+          }
+        },
+        'Program:exit'() {
+          for (const write of writes) {
+            checkWrite(write);
+          }
         },
       };
     },
@@ -107,6 +127,40 @@ function pickFileKind(repoPath, name) {
   }
 
   return isTest || inTestUtils ? { inTestUtils, isTest } : null;
+}
+
+// oxlint-disable-next-line no-template-curly-in-string -- marks an interpolation as a module's text shows it
+const interpolation = '${}';
+
+function toSQLText(context, node, seen) {
+  if (node?.type === 'Literal' && typeof node.value === 'string') {
+    return node.value;
+  }
+
+  if (node?.type === 'TemplateLiteral') {
+    return node.quasis.map((quasi) => quasi.value.cooked ?? quasi.value.raw).join(interpolation);
+  }
+
+  // a part the rule cannot read stands for an interpolation, so its table name counts as not a
+  // string literal
+  if (node?.type === 'BinaryExpression' && node.operator === '+') {
+    const left = toSQLText(context, node.left, seen);
+    const right = toSQLText(context, node.right, seen);
+
+    return left === null && right === null
+      ? null
+      : `${left ?? interpolation}${right ?? interpolation}`;
+  }
+
+  if (node?.type !== 'Identifier' || seen.has(node.name)) {
+    return null;
+  }
+
+  const initializer = findConstInitializer(context, node);
+
+  return initializer === null
+    ? null
+    : toSQLText(context, initializer, new Set([...seen, node.name]));
 }
 
 const functionTypes = new Set([
@@ -134,20 +188,6 @@ function isInSeedFunction(node) {
   return name !== null && isVerbMatch(name.name, 'seed');
 }
 
-const testRunnerNames = new Set(['test', 'it', 'describe']);
-
-function isTestTitle(context, node) {
-  const call = node.parent;
-
-  if (call?.type !== 'CallExpression' || call.arguments[0] !== node) {
-    return false;
-  }
-
-  const root = findChainRoot(call.callee, true);
-
-  return root !== null && testRunnerNames.has(findBunTestName(context, root));
-}
-
 const kyselyWriteMethods = new Set(['insertInto', 'updateTable', 'deleteFrom']);
 
 function isKyselyWrite(node) {
@@ -165,4 +205,59 @@ function findLiteralTable(argument) {
   return argument?.type === 'Literal' && typeof argument.value === 'string'
     ? toTableName(argument.value)
     : null;
+}
+
+function isKyselyCreateTable(node) {
+  const callee = node.callee;
+
+  return (
+    callee.type === 'MemberExpression' &&
+    !callee.computed &&
+    callee.property.type === 'Identifier' &&
+    callee.property.name === 'createTable'
+  );
+}
+
+// bun:sqlite and better-sqlite3 run SQL through `run`, `exec`, `query` and `prepare`, Kysely
+// through `sql.raw` and `CompiledQuery.raw`, and postgres.js through `sql(…)` and `sql.unsafe`
+const sqlMethods = new Set(['run', 'exec', 'query', 'prepare', 'raw', 'unsafe']);
+
+function isSQLCall(context, callee) {
+  if (callee.type === 'Identifier') {
+    return callee.name === 'sql';
+  }
+
+  // a regular expression's `exec` takes prose
+  return (
+    callee.type === 'MemberExpression' &&
+    !callee.computed &&
+    callee.property.type === 'Identifier' &&
+    sqlMethods.has(callee.property.name) &&
+    !isRegularExpression(context, callee.object)
+  );
+}
+
+function isRegularExpression(context, node) {
+  if (node.type === 'Identifier') {
+    const initializer = findConstInitializer(context, node);
+
+    return (
+      initializer !== null &&
+      initializer.type !== 'Identifier' &&
+      isRegularExpression(context, initializer)
+    );
+  }
+
+  return (
+    node.regex !== undefined ||
+    ((node.type === 'NewExpression' || node.type === 'CallExpression') &&
+      node.callee.type === 'Identifier' &&
+      node.callee.name === 'RegExp')
+  );
+}
+
+function isSQLTag(tag) {
+  const name = tag.type === 'MemberExpression' && !tag.computed ? tag.property : tag;
+
+  return name.type === 'Identifier' && name.name === 'sql';
 }
