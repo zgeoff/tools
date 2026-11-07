@@ -38,6 +38,42 @@ test.each([['--watch'], ['--coverage']])(
   },
 );
 
+test.each([['--coverage'], ['--reporter-outfile=report.xml'], ['--preload=./test/setup.ts']])(
+  'it refuses %s when the one run starts from a package folder',
+  (flag) => {
+    const plan = pickUnitRunPlan(
+      defineRig({}),
+      { flags: [flag], tests: ['packages/oven/src/heat.test.ts'], isDiscovery: false },
+      ['packages/oven/package.json', 'packages/oven/bunfig.toml'],
+    );
+
+    expect(plan).toStrictEqual({
+      kind: 'refused',
+      message: `rig: ${flag} holds a path, and these tests run from packages/oven under its own bunfig.toml, so the path would resolve there; run bun test from that folder\n`,
+    });
+  },
+);
+
+test('it plans the one run from a package folder for --watch, which holds no path', () => {
+  const plan = pickUnitRunPlan(
+    defineRig({}),
+    { flags: ['--watch'], tests: ['packages/oven/src/heat.test.ts'], isDiscovery: false },
+    ['packages/oven/package.json', 'packages/oven/bunfig.toml'],
+  );
+
+  expect(plan).toStrictEqual({
+    kind: 'runs',
+    testRuns: [
+      {
+        folder: 'packages/oven',
+        bunfig: null,
+        files: ['packages/oven/src/heat.test.ts'],
+        ignore: [],
+      },
+    ],
+  });
+});
+
 test('it plans one run for each bunfig when no flag needs a single run', () => {
   const plan = pickUnitRunPlan(
     defineRig({}),

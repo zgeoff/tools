@@ -117,8 +117,8 @@ output shows every failure, and rig exits with the first failing run's exit code
 rig starts no further run. A `--watch` run never exits, each `--coverage` or `--reporter-outfile`
 run writes its file from its own folder or over the one before, and a relative `--preload` resolves
 against each run's folder. So rig refuses these flags with exit 2 when the tests need more than one
-run. The other lanes run from the repo root under its `bunfig.toml`, where their hooks and program
-builds run.
+run, and refuses all but `--watch` when the one run starts from a package folder. The other lanes
+run from the repo root under its `bunfig.toml`, where their hooks and program builds run.
 
 A repo whose React tests need a DOM preload names that bunfig and the tests it runs:
 

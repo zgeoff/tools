@@ -31,10 +31,23 @@ export function pickUnitRunPlan(
 
   const singleRunFlag = findSingleRunFlag(request.flags);
 
-  if (singleRunFlag !== undefined && testRuns.length > 1) {
+  if (singleRunFlag === undefined) {
+    return { kind: 'runs', testRuns };
+  }
+
+  if (testRuns.length > 1) {
     return {
       kind: 'refused',
-      message: `rig: ${singleRunFlag} needs the tests in one bun test run, and these tests need ${testRuns.length}, one for each bunfig; name the tests of one bunfig\n`,
+      message: `rig: ${singleRunFlag.flag} needs the tests in one bun test run, and these tests need ${testRuns.length}, one for each bunfig; name the tests of one bunfig\n`,
+    };
+  }
+
+  const packageFolder = testRuns.find((testRun) => testRun.folder !== '')?.folder;
+
+  if (singleRunFlag.holdsPath && packageFolder !== undefined) {
+    return {
+      kind: 'refused',
+      message: `rig: ${singleRunFlag.flag} holds a path, and these tests run from ${packageFolder} under its own bunfig.toml, so the path would resolve there; run bun test from that folder\n`,
     };
   }
 

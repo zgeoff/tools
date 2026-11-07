@@ -2,14 +2,14 @@ import { expect, test } from 'bun:test';
 import { findSingleRunFlag } from './find-single-run-flag.ts';
 
 test.each([
-  ['--watch', ['--bail', '--watch']],
-  ['--coverage', ['--coverage']],
-  ['--coverage-reporter=lcov', ['--coverage-reporter=lcov']],
-  ['--coverage-dir=out', ['--seed=1', '--coverage-dir=out']],
-  ['--reporter-outfile=report.xml', ['--reporter=junit', '--reporter-outfile=report.xml']],
-  ['--preload=./setup.ts', ['--preload=./setup.ts']],
-])('it finds %s, which needs one bun test run', (flag, flags) => {
-  expect(findSingleRunFlag(flags)).toBe(flag);
+  ['--watch', ['--bail', '--watch'], false],
+  ['--coverage', ['--coverage'], true],
+  ['--coverage-reporter=lcov', ['--coverage-reporter=lcov'], true],
+  ['--coverage-dir=out', ['--seed=1', '--coverage-dir=out'], true],
+  ['--reporter-outfile=report.xml', ['--reporter=junit', '--reporter-outfile=report.xml'], true],
+  ['--preload=./setup.ts', ['--preload=./setup.ts'], true],
+])('it finds %s, which needs one bun test run', (flag, flags, holdsPath) => {
+  expect(findSingleRunFlag(flags)).toStrictEqual({ flag, holdsPath });
 });
 
 test('it finds no flag in flags that any number of runs can take', () => {
