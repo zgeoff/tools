@@ -76,6 +76,7 @@
     "read-folder-sources.js",
     "collect-written-tables.js",
     "collect-sql-writes.js",
+    "collect-created-tables.js",
     "to-table-name.js",
     "resolve-repo-path.js",
     "is-in-test-utils.js",
