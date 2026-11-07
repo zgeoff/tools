@@ -32,9 +32,22 @@ const workspaceFields = [
 ] as const;
 
 function collectWorkspaceDependents(path: string, workspace: unknown): LockfileDependent[] {
-  const dependent = path === '' ? 'the root workspace' : path;
+  const dependent = buildWorkspaceID(path, workspace);
 
   return collectDeclaredRanges(dependent, workspace, workspaceFields);
+}
+
+// A nested override key names its parent by package name, whether the parent is a workspace or a
+// registry package, so a workspace with a name takes it in place of its path.
+function buildWorkspaceID(path: string, workspace: unknown): string {
+  const name = isRecord(workspace) ? workspace['name'] : undefined;
+  const version = isRecord(workspace) ? workspace['version'] : undefined;
+
+  if (typeof name !== 'string') {
+    return path === '' ? 'the root workspace' : path;
+  }
+
+  return typeof version === 'string' ? `${name}@${version}` : name;
 }
 
 function collectDeclaredRanges(

@@ -8,16 +8,31 @@ interface UnneededOverridesInput {
 }
 
 export function collectUnneededOverrides(input: UnneededOverridesInput): DependencyGateFinding[] {
-  return Object.entries(input.overrides).flatMap(([name, pin]) => {
+  return Object.entries(input.overrides).flatMap(([key, pin]) => {
+    const target = parseOverrideKey(key);
+
+    if (target === null) {
+      return [
+        {
+          path: 'package.json',
+          entry: key,
+          problem: 'bun ignores an override key with more than one parent level',
+        },
+      ];
+    }
+
     const ranges = input.dependents
-      .filter((dependent) => dependent.name === name)
-      .map((dependent) => resolveCatalogRange(input, name, dependent.range));
+      .filter(
+        (dependent) =>
+          dependent.name === target.name && isDependentOfParent(dependent, target.parent),
+      )
+      .map((dependent) => resolveCatalogRange(input, target.name, dependent.range));
 
     if (ranges.length === 0) {
       return [
         {
           path: 'package.json',
-          entry: name,
+          entry: key,
           problem: 'no package in bun.lock depends on the overridden package',
         },
       ];
@@ -27,7 +42,7 @@ export function collectUnneededOverrides(input: UnneededOverridesInput): Depende
       (range) => !isSemverRange(range) || !Bun.semver.satisfies(pin, range),
     );
 
-    const isPinTheCatalogVersion = input.catalog[name] === pin;
+    const isPinTheCatalogVersion = input.catalog[target.name] === pin;
 
     if (isPinOutsideARange || isPinTheCatalogVersion) {
       return [];
@@ -36,11 +51,72 @@ export function collectUnneededOverrides(input: UnneededOverridesInput): Depende
     return [
       {
         path: 'package.json',
-        entry: name,
+        entry: key,
         problem: `every range in bun.lock already admits ${pin}, so the override changes nothing`,
       },
     ];
   });
+}
+
+interface PackageSpec {
+  readonly name: string;
+  readonly range: string | null;
+}
+
+interface OverrideTarget {
+  readonly name: string;
+  readonly parent: PackageSpec | null;
+}
+
+// Bun splits a key at the first `>` that follows no space, `|`, `@` or `:`, so the `>` of a range
+// such as `left-pad@>=1` stays in the range.
+const parentSeparatorPattern = /[^ |@:]>/u;
+
+// A child range, as in `terser@4`, narrows the dependents bun applies the key to. The check keeps
+// every dependent of the name, so a narrower key can only look more needed, never less.
+function parseOverrideKey(key: string): OverrideTarget | null {
+  const separator = parentSeparatorPattern.exec(key);
+
+  if (separator === null) {
+    return { name: parsePackageSpec(key).name, parent: null };
+  }
+
+  const separatorIndex = separator.index + 1;
+  const child = key.slice(separatorIndex + 1).trim();
+
+  if (parentSeparatorPattern.test(child)) {
+    return null;
+  }
+
+  return {
+    name: parsePackageSpec(child).name,
+    parent: parsePackageSpec(key.slice(0, separatorIndex).trim()),
+  };
+}
+
+// A scoped name starts with `@`, so the range starts at the next `@`.
+function parsePackageSpec(spec: string): PackageSpec {
+  const rangeIndex = spec.indexOf('@', 1);
+
+  if (rangeIndex === -1) {
+    return { name: spec, range: null };
+  }
+
+  return { name: spec.slice(0, rangeIndex), range: spec.slice(rangeIndex + 1) };
+}
+
+function isDependentOfParent(dependent: LockfileDependent, parent: PackageSpec | null): boolean {
+  if (parent === null) {
+    return true;
+  }
+
+  const id = parsePackageSpec(dependent.dependent);
+
+  if (id.name !== parent.name) {
+    return false;
+  }
+
+  return parent.range === null || id.range === null || Bun.semver.satisfies(id.range, parent.range);
 }
 
 // bun.lock keeps a workspace's `catalog:` reference as it is written in its package.json.

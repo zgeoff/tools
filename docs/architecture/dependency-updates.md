@@ -202,8 +202,11 @@ working tree, and fails on each entry the repo can remove:
   in `bunfig.toml`. An exclude that names a version, such as `@zgeoff/std@0.4.0`, lets only that
   release through, so it does not count. A repo that sets no `minimumReleaseAge` passes.
 - A root override that every range in `bun.lock` admits, or one of a package that nothing in
-  `bun.lock` depends on. An override that pins the version the root `workspaces.catalog` holds
-  stays, because without it a dependent's range can resolve to a newer release than the catalog's.
+  `bun.lock` depends on. For a nested override, such as `parent@1.2.0>child` or a `parent` object
+  that names `child`, the check reads only the child ranges of each `parent` in `bun.lock` whose
+  version the key's range admits. An override key with more than one parent level fails, because bun
+  ignores it. An override that pins the version the root `workspaces.catalog` holds stays, because
+  without it a dependent's range can resolve to a newer release than the catalog's.
 - An `--ignore` flag in the `audit` script whose advisory `bun audit` no longer reports, or whose
   package `bun audit fix` can move to a patched release in range.
 

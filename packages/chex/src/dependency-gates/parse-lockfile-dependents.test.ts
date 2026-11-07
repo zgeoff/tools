@@ -28,8 +28,38 @@ test("it lists each workspace's declared ranges, its dev dependencies included",
   }`;
 
   expect(parseLockfileDependents(lockfile)).toStrictEqual([
+    { dependent: 'kettle', name: 'left-pad', range: '^1.0.0' },
+    { dependent: '@acme/spout', name: 'right-pad', range: 'catalog:' },
+  ]);
+});
+
+test('it names a workspace with a version by its name and version', () => {
+  const lockfile = `{
+    "lockfileVersion": 1,
+    "workspaces": {
+      "packages/spout": { "name": "@acme/spout", "version": "0.4.0", "dependencies": { "left-pad": "^1.0.0" } },
+    },
+    "packages": {},
+  }`;
+
+  expect(parseLockfileDependents(lockfile)).toStrictEqual([
+    { dependent: '@acme/spout@0.4.0', name: 'left-pad', range: '^1.0.0' },
+  ]);
+});
+
+test('it names a workspace with no name by its path', () => {
+  const lockfile = `{
+    "lockfileVersion": 1,
+    "workspaces": {
+      "": { "dependencies": { "left-pad": "^1.0.0" } },
+      "packages/spout": { "dependencies": { "right-pad": "^2.0.0" } },
+    },
+    "packages": {},
+  }`;
+
+  expect(parseLockfileDependents(lockfile)).toStrictEqual([
     { dependent: 'the root workspace', name: 'left-pad', range: '^1.0.0' },
-    { dependent: 'packages/spout', name: 'right-pad', range: 'catalog:' },
+    { dependent: 'packages/spout', name: 'right-pad', range: '^2.0.0' },
   ]);
 });
 

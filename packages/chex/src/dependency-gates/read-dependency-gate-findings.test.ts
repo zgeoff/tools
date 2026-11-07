@@ -113,6 +113,37 @@ test("it keeps an override of a workspace's own dependency that the workspace's 
   expect(findings).toStrictEqual([]);
 });
 
+test('it keeps a nested override whose parent is a workspace that the range excludes', () => {
+  const runProgram = mock(() => ({ exitCode: 0, stdout: '{}', stderr: '' }));
+
+  const files: Record<string, string> = {
+    'package.json': JSON.stringify({
+      workspaces: { packages: ['packages/*'] },
+      overrides: { '@acme/spout>left-pad': '2.0.0' },
+    }),
+    'bun.lock': `{
+      "lockfileVersion": 1,
+      "workspaces": {
+        "": { "name": "kettle" },
+        "packages/spout": { "name": "@acme/spout", "dependencies": { "left-pad": "^1.0.0" } },
+      },
+      "packages": {
+        "left-pad": ["left-pad@2.0.0", "", {}, "sha512-y"],
+      },
+    }`,
+  };
+
+  const findings = readDependencyGateFindings({
+    cwd: '/repo',
+    env: {},
+    today: '2026-03-09',
+    runProgram,
+    readRepoFile: (path) => files[path] ?? null,
+  });
+
+  expect(findings).toStrictEqual([]);
+});
+
 test('it reports a first-party package in bun.lock that bunfig.toml does not exclude', () => {
   const files: Record<string, string> = {
     'package.json': JSON.stringify({ name: 'kettle', dependencies: { '@zgeoff/chex': '0.0.5' } }),

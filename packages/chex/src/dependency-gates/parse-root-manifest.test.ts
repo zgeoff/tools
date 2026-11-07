@@ -49,12 +49,23 @@ test('it rejects a named catalog entry whose value is not a version', () => {
   );
 });
 
+test('it reads an override object as a key for its parent and a nested key for each child', () => {
+  const text = JSON.stringify({
+    overrides: { 'pad-tools': { '.': '2.0.1', 'left-pad': '1.3.1' } },
+  });
+
+  expect(parseRootManifest(text).overrides).toStrictEqual({
+    'pad-tools': '2.0.1',
+    'pad-tools>left-pad': '1.3.1',
+  });
+});
+
 test('it rejects an override whose value is not a version', () => {
-  const text = JSON.stringify({ overrides: { 'left-pad': { 'right-pad': '2.0.1' } } });
+  const text = JSON.stringify({ overrides: { 'pad-tools': { 'left-pad': 1 } } });
 
   expect(() => parseRootManifest(text)).toThrowWithMessage(
     TypeError,
-    'package.json sets the overrides entry for left-pad to a value that is not a version',
+    'package.json sets the overrides entry for pad-tools>left-pad to a value that is not a version',
   );
 });
 
