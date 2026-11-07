@@ -77,6 +77,8 @@
     "collect-written-tables.js",
     "collect-sql-writes.js",
     "collect-created-tables.js",
+    "find-const-init.js",
+    "find-variable.js",
     "to-table-name.js",
     "resolve-repo-path.js",
     "is-in-test-utils.js",

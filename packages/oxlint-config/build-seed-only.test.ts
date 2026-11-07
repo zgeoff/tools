@@ -33,6 +33,11 @@ test.each([
   ['a raw DELETE in an unsafe call', 'await pg.unsafe(`DELETE FROM kettles`);'],
   ['a raw INSERT in a sql call', "await sql('INSERT INTO kettles (id) VALUES (1)');"],
   ['a raw INSERT in a member sql tag', 'await ctx.sql`INSERT INTO kettles (id) VALUES (1)`;'],
+  [
+    'a raw INSERT held in a const',
+    "const insert = 'INSERT INTO kettles (id) VALUES (1)';\n  db.run(insert);",
+  ],
+  ['a raw DELETE joined from strings', "db.run('DELETE FROM ' + 'kettles');"],
 ])('it reports %s in a test file', async (_, write) => {
   const source = `test('it pours a kettle', async () => {\n  ${write}\n});\n`;
 
@@ -70,6 +75,14 @@ test.each([
   [
     "prose with a delete from in a regular expression's exec",
     "test('it finds no lid', () => {\n  expect(/lid/u.exec('the kettle ran no delete from cups')).toBeNull();\n});\n",
+  ],
+  [
+    'prose with a delete from in the exec of a regular expression held in a const',
+    "test('it finds no lid', () => {\n  const lid = /lid/u;\n\n  expect(lid.exec('the kettle ran no delete from cups')).toBeNull();\n});\n",
+  ],
+  [
+    'prose with a delete from in the exec of a new RegExp',
+    "test('it finds no lid', () => {\n  expect(new RegExp('lid', 'u').exec('the kettle ran no delete from cups')).toBeNull();\n});\n",
   ],
   [
     'SQL in a string that no SQL call takes',
@@ -334,6 +347,7 @@ test.each([
   ['a Kysely table in a variable', 'await db.insertInto(table).values({ id: 1 }).execute();'],
   ['a Kysely table in a template literal', 'await db.deleteFrom(`kettles`).execute();'],
   ['a raw table in an interpolation', 'db.run(`UPDATE ${table} SET full = 1`);'],
+  ['a raw table joined from a variable', "db.run('UPDATE ' + table + ' SET full = 1');"],
 ])('it reports %s as a non-literal table name', async (_, write) => {
   const source = `test('it pours a kettle', async () => {\n  ${write}\n});\n`;
 

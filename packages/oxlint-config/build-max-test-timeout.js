@@ -1,5 +1,7 @@
 import { basename } from 'node:path';
 import buildLaneLimits from './build-lane-limits.js';
+import findConstInit from './find-const-init.js';
+import findVariable from './find-variable.js';
 import getImportedName from './get-imported-name.js';
 import resolveSuiteDirectory from './resolve-suite-directory.js';
 
@@ -103,6 +105,7 @@ function findRunnerName(context, callee) {
 
   const variable = findVariable(context, current);
 
+  // a name with no declaration reads the global that `bun test` defines
   if (variable === null) {
     return current.name;
   }
@@ -122,19 +125,6 @@ function findRunnerName(context, callee) {
   }
 
   return definition.node.type === 'ImportSpecifier' ? getImportedName(definition.node) : null;
-}
-
-// a name with no declaration reads the global that `bun test` defines
-function findVariable(context, identifier) {
-  for (let scope = context.sourceCode.getScope(identifier); scope !== null; scope = scope.upper) {
-    const variable = scope.set.get(identifier.name);
-
-    if (variable !== undefined && variable.defs.length > 0) {
-      return variable;
-    }
-  }
-
-  return null;
 }
 
 function emitTimeouts(context, args, limit) {
@@ -182,16 +172,7 @@ function findNumber(context, node, seen) {
     return null;
   }
 
-  const definition = findVariable(context, node)?.defs[0];
+  const init = findConstInit(context, node);
 
-  if (
-    definition?.type !== 'Variable' ||
-    definition.parent.kind !== 'const' ||
-    definition.node.id.type !== 'Identifier' ||
-    definition.node.init === null
-  ) {
-    return null;
-  }
-
-  return findNumber(context, definition.node.init, new Set([...seen, node.name]));
+  return init === null ? null : findNumber(context, init, new Set([...seen, node.name]));
 }

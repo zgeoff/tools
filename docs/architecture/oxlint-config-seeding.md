@@ -26,8 +26,10 @@ events table" never counts. A SQL call takes the statement as one of these:
 | the first argument of a call of `sql`                                                     | `sql('…')`                              |
 | the template of a tag named `sql`, alone or as a member                                   | `` sql`…` ``, `` ctx.sql`…` ``          |
 
-The rule skips the `exec` of a regular expression literal. It misses a statement held in a variable
-or built by joining strings.
+The rule follows a `const` to the string it holds, and joins strings added with `+`. It reads a part
+it cannot follow, such as a parameter, as an interpolation. The rule skips the `exec` of a regular
+expression: a literal, a `RegExp` call, or a `const` that holds one of these. It misses a statement
+held in a parameter or a `let`.
 
 A write passes in these places:
 

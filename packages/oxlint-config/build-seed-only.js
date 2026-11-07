@@ -2,6 +2,7 @@ import { basename, dirname } from 'node:path';
 import collectCreatedTables from './collect-created-tables.js';
 import collectSQLWrites from './collect-sql-writes.js';
 import collectWrittenTables from './collect-written-tables.js';
+import findConstInit from './find-const-init.js';
 import findFunctionName from './find-function-name.js';
 import isInTestUtils from './is-in-test-utils.js';
 import isVerbMatch from './is-verb-match.js';
@@ -54,7 +55,7 @@ export default function buildSeedOnly(readFolderSources) {
       const createdTables = new Set();
 
       const collectText = (node) => {
-        const text = toSQLText(node);
+        const text = toSQLText(context, node, new Set());
 
         if (text === null) {
           return;
@@ -93,7 +94,7 @@ export default function buildSeedOnly(readFolderSources) {
             if (table !== null) {
               createdTables.add(table);
             }
-          } else if (isSQLCall(node.callee)) {
+          } else if (isSQLCall(context, node.callee)) {
             collectText(node.arguments[0]);
           }
         },
@@ -128,21 +129,36 @@ function pickFileKind(repoPath, name) {
   return isTest || inTestUtils ? { inTestUtils, isTest } : null;
 }
 
-function toSQLText(node) {
+// oxlint-disable-next-line no-template-curly-in-string -- marks an interpolation as a module's text shows it
+const interpolation = '${}';
+
+function toSQLText(context, node, seen) {
   if (node?.type === 'Literal' && typeof node.value === 'string') {
     return node.value;
   }
 
   if (node?.type === 'TemplateLiteral') {
-    return (
-      node.quasis
-        .map((quasi) => quasi.value.cooked ?? quasi.value.raw)
-        // oxlint-disable-next-line no-template-curly-in-string -- marks each interpolation as a module's text shows it
-        .join('${}')
-    );
+    return node.quasis.map((quasi) => quasi.value.cooked ?? quasi.value.raw).join(interpolation);
   }
 
-  return null;
+  // a part the rule cannot read stands for an interpolation, so its table name counts as not a
+  // string literal
+  if (node?.type === 'BinaryExpression' && node.operator === '+') {
+    const left = toSQLText(context, node.left, seen);
+    const right = toSQLText(context, node.right, seen);
+
+    return left === null && right === null
+      ? null
+      : `${left ?? interpolation}${right ?? interpolation}`;
+  }
+
+  if (node?.type !== 'Identifier' || seen.has(node.name)) {
+    return null;
+  }
+
+  const init = findConstInit(context, node);
+
+  return init === null ? null : toSQLText(context, init, new Set([...seen, node.name]));
 }
 
 const functionTypes = new Set([
@@ -204,7 +220,7 @@ function isKyselyCreateTable(node) {
 // through `sql.raw` and `CompiledQuery.raw`, and postgres.js through `sql(…)` and `sql.unsafe`
 const sqlMethods = new Set(['run', 'exec', 'query', 'prepare', 'raw', 'unsafe']);
 
-function isSQLCall(callee) {
+function isSQLCall(context, callee) {
   if (callee.type === 'Identifier') {
     return callee.name === 'sql';
   }
@@ -215,7 +231,22 @@ function isSQLCall(callee) {
     !callee.computed &&
     callee.property.type === 'Identifier' &&
     sqlMethods.has(callee.property.name) &&
-    callee.object.regex === undefined
+    !isRegExp(context, callee.object)
+  );
+}
+
+function isRegExp(context, node) {
+  if (node.type === 'Identifier') {
+    const init = findConstInit(context, node);
+
+    return init !== null && init.type !== 'Identifier' && isRegExp(context, init);
+  }
+
+  return (
+    node.regex !== undefined ||
+    ((node.type === 'NewExpression' || node.type === 'CallExpression') &&
+      node.callee.type === 'Identifier' &&
+      node.callee.name === 'RegExp')
   );
 }
 
