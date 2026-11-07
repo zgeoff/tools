@@ -2,6 +2,7 @@ import { basename, join, posix, relative, sep } from 'node:path';
 import buildImportSettings from './build-import-settings.js';
 import findFeatureFolder from './find-feature-folder.js';
 import pickFolderKind from './pick-folder-kind.js';
+import pickLooseModuleMessage from './pick-loose-module-message.js';
 import readLooseModules from './read-loose-modules.js';
 import readStalePending from './read-stale-pending.js';
 import resolveImportTarget from './resolve-import-target.js';
@@ -144,9 +145,9 @@ function checkLooseModule(file, at) {
   }
 
   const modules = readLooseModules(file.sourcePackage);
-  const name = basename(file.filename);
+  const messageID = pickLooseModuleMessage(modules, basename(file.filename), looseModuleLimit);
 
-  if (modules.length <= looseModuleLimit || !modules.includes(name)) {
+  if (messageID === null) {
     return;
   }
 
@@ -154,7 +155,7 @@ function checkLooseModule(file, at) {
 
   file.context.report({
     ...at,
-    messageId: modules[0] === name ? 'capExample' : 'cap',
+    messageId: messageID,
     data: { source, count: String(modules.length) },
   });
 }

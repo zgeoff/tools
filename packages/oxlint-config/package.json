@@ -61,6 +61,7 @@
     "resolve-import-target.js",
     "feature-folders.js",
     "pick-folder-kind.js",
+    "pick-loose-module-message.js",
     "collect-entry-targets.js",
     "read-loose-modules.js",
     "resolve-source-package.js",
