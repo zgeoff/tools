@@ -36,7 +36,6 @@ export interface BenchDeclaration {
 }
 
 export interface RigDeclaration {
-  // Globs relative to the repo root, such as `'docs/design/**'`, of paths that no lane tests.
   readonly ignore?: readonly string[];
 
   readonly lanes?: Readonly<Record<string, LaneDeclaration>>;
