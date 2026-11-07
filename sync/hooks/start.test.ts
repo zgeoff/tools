@@ -1297,7 +1297,9 @@ test('#runInstallOnce installs when the hook it waits for stops before its insta
     { ...NODE_INSTALL_DEPENDENCIES, sleep, runInstall },
   );
 
-  await waitFor(() => expect(sleep).toHaveBeenCalled());
+  await waitFor(() => {
+    expect(sleep).toHaveBeenCalled();
+  });
 
   holder.kill('SIGKILL');
 
