@@ -172,6 +172,45 @@ test('it gives the e2e lane the test files under its folders and leaves out a su
   expect(selection).toStrictEqual({ kind: 'files', files: ['./e2e/bake.test.ts'], flags: [] });
 });
 
+test('it leaves the paths that the config ignores out of the unit lane', () => {
+  const selection = buildTestSelection({
+    config: defineRig({ ignore: ['skip/**'] }),
+    lane: { name: 'unit', suffix: null },
+    repoRoot: '/repo',
+    isWorkspaceRepo: false,
+    trackedFiles: ['skip/oven.test.ts', 'skip/nested/tray.test.ts', 'pkg/src/oven.test.ts'],
+    args: { flags: [], paths: ['./'] },
+  });
+
+  expect(selection).toStrictEqual({ kind: 'files', files: ['./pkg/src/oven.test.ts'], flags: [] });
+});
+
+test('it selects nothing for a unit run given only an ignored folder', () => {
+  const selection = buildTestSelection({
+    config: defineRig({ ignore: ['skip/**'] }),
+    lane: { name: 'unit', suffix: null },
+    repoRoot: '/repo',
+    isWorkspaceRepo: false,
+    trackedFiles: ['skip/oven.test.ts', 'pkg/src/oven.test.ts'],
+    args: { flags: [], paths: ['./skip/'] },
+  });
+
+  expect(selection).toStrictEqual({ kind: 'none', paths: ['./skip/'] });
+});
+
+test('it finds the unit lane empty when the config ignores every unit test file', () => {
+  const selection = buildTestSelection({
+    config: defineRig({ ignore: ['skip/**'] }),
+    lane: { name: 'unit', suffix: null },
+    repoRoot: '/repo',
+    isWorkspaceRepo: false,
+    trackedFiles: ['skip/oven.test.ts', 'pkg/src/oven.ts'],
+    args: { flags: [], paths: [] },
+  });
+
+  expect(selection).toStrictEqual({ kind: 'empty' });
+});
+
 test('it gives the unit lane every test file outside the e2e folders and the suffixed lanes', () => {
   const selection = buildTestSelection({
     config: defineRig({ lanes: { kiln: { limit: '15s' } } }),

@@ -134,6 +134,31 @@ test('it says so and exits 0 when no path has a related test', async () => {
   expect(ctx.runCommand).not.toHaveBeenCalled();
 });
 
+test('it runs no test for a changed file under a path that the config ignores', async () => {
+  const ctx = setupTest();
+
+  ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 2 });
+
+  const exitCode = await runRelatedTests(
+    ['skip/oven.ts'],
+    defineRig({ ignore: ['skip/**'] }),
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      probeWorkspaceRepo: () => Promise.resolve(false),
+      readTrackedFiles: () => Promise.resolve([]),
+      sources: { cwd: '/repo', probeFile: () => true },
+      readWorkerCount: ctx.readWorkerCount,
+      runCommand: ctx.runCommand,
+      output: ctx.output,
+    },
+  );
+
+  expect(exitCode).toBe(0);
+  expect(ctx.output.out).toHaveBeenCalledExactlyOnceWith('rig related: no related tests\n');
+  expect(ctx.runCommand).not.toHaveBeenCalled();
+});
+
 test('it runs 50 related test files, the default cap', async () => {
   const ctx = setupTest();
 

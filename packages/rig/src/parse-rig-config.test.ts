@@ -104,12 +104,12 @@ test('it refuses a config by its first bad lane', () => {
   });
 });
 
-test('it reads a config from before programs existed as having none', () => {
+test('it reads a config from before programs and ignore existed as having neither', () => {
   const parsed = parseRigConfig({ lanes: defineRig({}).lanes });
 
   expect(parsed).toStrictEqual({
     kind: 'parsed',
-    config: { lanes: defineRig({}).lanes, programs: {}, benchLane: null },
+    config: { ignore: [], lanes: defineRig({}).lanes, programs: {}, benchLane: null },
   });
 });
 
@@ -122,5 +122,21 @@ test('it refuses a program that lacks a field', () => {
   expect(parsed).toStrictEqual({
     kind: 'refused',
     reason: 'its programs are no record of program declarations',
+  });
+});
+
+test('it keeps the ignore patterns that defineRig returns', () => {
+  const config = defineRig({ ignore: ['docs/drafts/**'] });
+
+  expect(parseRigConfig(config)).toStrictEqual({ kind: 'parsed', config });
+});
+
+test.each([
+  ['a string', 'docs/drafts/**'],
+  ['a list that holds a number', ['docs/drafts/**', 7]],
+])('it refuses an ignore that is %s', (_, ignore) => {
+  expect(parseRigConfig({ lanes: [], ignore })).toStrictEqual({
+    kind: 'refused',
+    reason: 'its ignore is no list of patterns',
   });
 });

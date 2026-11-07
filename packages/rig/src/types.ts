@@ -36,6 +36,9 @@ export interface BenchDeclaration {
 }
 
 export interface RigDeclaration {
+  // Globs relative to the repo root, such as `'docs/design/**'`, of paths that no lane tests.
+  readonly ignore?: readonly string[];
+
   readonly lanes?: Readonly<Record<string, LaneDeclaration>>;
 
   readonly programs?: Readonly<Record<string, ProgramDeclaration>>;
@@ -64,6 +67,8 @@ export interface ResolvedLane {
 }
 
 export interface RigConfig {
+  readonly ignore: readonly string[];
+
   readonly lanes: readonly ResolvedLane[];
 
   readonly programs: Readonly<Record<string, ProgramDeclaration>>;

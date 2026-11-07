@@ -105,3 +105,21 @@ test('it selects a test whose suffix no lane declares', () => {
     'src/sweep.radar.test.ts',
   ]);
 });
+
+test.each([['skip/oven.ts'], ['skip/oven.test.ts'], ['skip/nested/oven.tsx']])(
+  'it runs no test for the changed file %s under an ignored path',
+  (path) => {
+    const sources = { cwd: '/repo', probeFile: () => true };
+
+    expect(resolveRelatedTests([path], defineRig({ ignore: ['skip/**'] }), sources)).toBeEmpty();
+  },
+);
+
+test('it leaves out a sibling test that the config ignores', () => {
+  const sources = { cwd: '/repo', probeFile: () => true };
+  const config = defineRig({ ignore: ['**/*.slow.test.ts'] });
+
+  expect(resolveRelatedTests(['src/oven.slow.ts', 'src/loaf.ts'], config, sources)).toStrictEqual([
+    'src/loaf.test.ts',
+  ]);
+});

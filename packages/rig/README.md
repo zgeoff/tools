@@ -64,18 +64,17 @@ no file and fails the run.
 
 ## Configuration
 
-`rig.config.ts` at the repo root declares what differs from the built-in lanes:
+`rig.config.ts` at the repo root declares what differs from the built-in lanes, and in `ignore` the
+[paths that no lane tests](../../docs/architecture/rig.md#ignored-paths):
 
 ```ts
 import { defineRig } from '@zgeoff/rig';
 
 export default defineRig({
+  ignore: ['docs/drafts/**'],
   lanes: { kiln: { suffix: '.kiln', limit: '15s', start: './test-utils/start-kiln.ts' } },
 });
 ```
-
-Oxlint's plugin reads this file under Node 22.18 or later, or under Bun, because it imports the
-config to take the limits from it.
 
 A repo declares the programs its `e2e/` folders and benchmarks run in `programs`, which `rig e2e`
 and `rig bench` build first; `resolveProgram` gives each one's command. `rig bench` and `rig eval`
