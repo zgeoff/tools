@@ -158,3 +158,90 @@ test.each([
     },
   ]);
 });
+
+test.each([
+  ['a parent at a version', 'pad-tools@2.0.0>left-pad'],
+  ['a parent range', 'pad-tools@^2>left-pad'],
+  ['a parent with no version', 'pad-tools>left-pad'],
+  ['a scoped parent at a version', '@acme/pad-tools@2.0.0>left-pad'],
+])(
+  'it keeps a nested override for %s whose range for the child excludes the pin',
+  (_label, key) => {
+    expect(
+      collectUnneededOverrides({
+        overrides: { [key]: '1.3.1' },
+        catalog: {},
+        catalogs: {},
+        dependents: [
+          { dependent: 'pad-tools@2.0.0', name: 'left-pad', range: '1.2.0' },
+          { dependent: '@acme/pad-tools@2.0.0', name: 'left-pad', range: '1.2.0' },
+        ],
+      }),
+    ).toStrictEqual([]);
+  },
+);
+
+test('it reports a nested override whose parent admits the pin, when another dependent excludes it', () => {
+  expect(
+    collectUnneededOverrides({
+      overrides: { 'pad-tools@2.0.0>left-pad': '1.3.1' },
+      catalog: {},
+      catalogs: {},
+      dependents: [
+        { dependent: 'pad-tools@2.0.0', name: 'left-pad', range: '^1.3.0' },
+        { dependent: 'text-kit@4.1.0', name: 'left-pad', range: '1.2.0' },
+      ],
+    }),
+  ).toStrictEqual([
+    {
+      path: 'package.json',
+      entry: 'pad-tools@2.0.0>left-pad',
+      problem: 'every range in bun.lock already admits 1.3.1, so the override changes nothing',
+    },
+  ]);
+});
+
+test('it reports a nested override whose parent range admits no version in bun.lock', () => {
+  expect(
+    collectUnneededOverrides({
+      overrides: { 'pad-tools@^3>left-pad': '1.3.1' },
+      catalog: {},
+      catalogs: {},
+      dependents: [{ dependent: 'pad-tools@2.0.0', name: 'left-pad', range: '1.2.0' }],
+    }),
+  ).toStrictEqual([
+    {
+      path: 'package.json',
+      entry: 'pad-tools@^3>left-pad',
+      problem: 'no package in bun.lock depends on the overridden package',
+    },
+  ]);
+});
+
+test('it keeps a version-scoped override that a dependent range excludes', () => {
+  expect(
+    collectUnneededOverrides({
+      overrides: { 'left-pad@<1.3.1': '1.3.1' },
+      catalog: {},
+      catalogs: {},
+      dependents: [{ dependent: 'pad-tools@2.0.0', name: 'left-pad', range: '1.2.0' }],
+    }),
+  ).toStrictEqual([]);
+});
+
+test('it reports an override key with more than one parent level', () => {
+  expect(
+    collectUnneededOverrides({
+      overrides: { 'text-kit>pad-tools>left-pad': '1.3.1' },
+      catalog: {},
+      catalogs: {},
+      dependents: [{ dependent: 'pad-tools@2.0.0', name: 'left-pad', range: '1.2.0' }],
+    }),
+  ).toStrictEqual([
+    {
+      path: 'package.json',
+      entry: 'text-kit>pad-tools>left-pad',
+      problem: 'bun ignores an override key with more than one parent level',
+    },
+  ]);
+});

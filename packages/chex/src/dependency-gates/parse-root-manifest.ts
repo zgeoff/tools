@@ -21,11 +21,53 @@ export function parseRootManifest(text: string): RootManifest {
   const audit = isRecord(scripts) ? scripts['audit'] : undefined;
 
   return {
-    overrides: parseVersions(manifest['overrides'], 'overrides'),
+    overrides: parseOverrides(manifest['overrides']),
     catalog: parseVersions(catalog, 'workspaces.catalog'),
     catalogs: parseNamedCatalogs(catalogs),
     auditScript: typeof audit === 'string' ? audit : '',
   };
+}
+
+function parseOverrides(value: unknown): Record<string, string> {
+  if (value === undefined) {
+    return {};
+  }
+
+  if (!isRecord(value)) {
+    throw new TypeError('package.json sets overrides to a value that is not an object');
+  }
+
+  return Object.fromEntries(collectOverrideEntries('', value));
+}
+
+// Bun reads `{ "a": { ".": "1.0.0", "b": "2.0.0" } }` as the keys `a` and `a>b`.
+function collectOverrideEntries(
+  parentKey: string,
+  overrides: Record<string, unknown>,
+): [string, string][] {
+  return Object.entries(overrides).flatMap(([name, value]): [string, string][] => {
+    const key = buildOverrideKey(parentKey, name);
+
+    if (typeof value === 'string') {
+      return [[key, value]];
+    }
+
+    if (isRecord(value)) {
+      return collectOverrideEntries(key, value);
+    }
+
+    throw new TypeError(
+      `package.json sets the overrides entry for ${key} to a value that is not a version`,
+    );
+  });
+}
+
+function buildOverrideKey(parentKey: string, name: string): string {
+  if (name === '.') {
+    return parentKey;
+  }
+
+  return parentKey === '' ? name : `${parentKey}>${name}`;
 }
 
 function parseVersions(value: unknown, field: string): Record<string, string> {
