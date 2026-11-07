@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.3](https://github.com/zgeoff/tools/compare/@zgeoff/std@0.4.2...@zgeoff/std@0.4.3) (2026-11-07)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/testing bumped to 0.3.0
+
 ## [0.4.2](https://github.com/zgeoff/tools/compare/@zgeoff/std@0.4.1...@zgeoff/std@0.4.2) (2026-11-05)
 
 
