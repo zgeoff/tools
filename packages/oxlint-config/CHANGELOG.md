@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.8.6](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.8.5...@zgeoff/oxlint-config@0.8.6) (2026-11-07)
+
+
+### Features
+
+* **rig:** leave the paths in a config ignore list out of every lane ([#539](https://github.com/zgeoff/tools/issues/539)) ([3950701](https://github.com/zgeoff/tools/commit/3950701c1769e98c9920191251f624282b2e7c64))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/rig bumped to 0.1.6
+
 ## [0.8.5](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.8.4...@zgeoff/oxlint-config@0.8.5) (2026-11-05)
 
 
