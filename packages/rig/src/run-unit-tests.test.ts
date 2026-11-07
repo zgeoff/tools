@@ -91,24 +91,20 @@ test('it runs the unit command under diet in the repo and returns its exit code'
   );
 
   expect(exitCode).toBe(4);
-  expect(ctx.runCommand).toHaveBeenCalledTimes(1);
 
-  expect(ctx.runCommand.mock.calls[0]?.[0].slice(0, 6)).toStrictEqual([
-    'bash',
-    '/diet.sh',
-    '--',
-    'bun',
-    'test',
-    '--parallel=2',
+  expect(
+    ctx.runCommand.mock.calls.map(([command, options]) => ({
+      commandStart: command.slice(0, 6),
+      lastArg: command.at(-1),
+      options,
+    })),
+  ).toStrictEqual([
+    {
+      commandStart: ['bash', '/diet.sh', '--', 'bun', 'test', '--parallel=2'],
+      lastArg: './src/a.test.ts',
+      options: { cwd: '/repo', environment: { PATH: '/usr/bin' }, signal: ctx.signal },
+    },
   ]);
-
-  expect(ctx.runCommand.mock.calls[0]?.[0].at(-1)).toBe('./src/a.test.ts');
-
-  expect(ctx.runCommand.mock.calls[0]?.[1]).toStrictEqual({
-    cwd: '/repo',
-    environment: { PATH: '/usr/bin' },
-    signal: ctx.signal,
-  });
 });
 
 test('it gives diet the memory that the config declares for the unit lane', async () => {
@@ -217,11 +213,16 @@ test('it runs a test that a bunfigs entry matches from the repo root under that 
     },
   );
 
-  expect(ctx.runCommand.mock.calls[0]?.[1].cwd).toBe('/repo');
-
-  expect(ctx.runCommand.mock.calls[0]?.[0]).toIncludeAllMembers([
-    '--config=./bunfig.window.toml',
-    './packages/shop/src/counter.test.tsx',
+  expect(
+    ctx.runCommand.mock.calls.map(([command, options]) => ({ cwd: options.cwd, command })),
+  ).toStrictEqual([
+    {
+      cwd: '/repo',
+      command: expect.arrayContaining([
+        '--config=./bunfig.window.toml',
+        './packages/shop/src/counter.test.tsx',
+      ]),
+    },
   ]);
 });
 
