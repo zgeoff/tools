@@ -100,7 +100,7 @@ export function pickRecoveryStep<Module>(
     : { kind: 'install-and-retry' };
 }
 
-export interface LockDependencies {
+export interface InstallDependencies {
   readonly createDirectory: (directoryPath: string) => void;
   readonly readFile: (filePath: string) => string;
   readonly writeFile: (filePath: string, text: string) => void;
@@ -108,10 +108,11 @@ export interface LockDependencies {
   readonly remove: (filePath: string) => void;
   readonly signalProcess: (pid: number) => void;
   readonly sleep: (durationMs: number) => Promise<void>;
+  readonly runInstall: () => InstallResult;
 }
 
 // The entry point below runs at load, before any constant under it exists.
-export const NODE_LOCK_DEPENDENCIES: LockDependencies = {
+export const NODE_INSTALL_DEPENDENCIES: InstallDependencies = {
   createDirectory: (directoryPath) => {
     mkdirSync(directoryPath, { recursive: true });
   },
@@ -125,6 +126,8 @@ export const NODE_LOCK_DEPENDENCIES: LockDependencies = {
     process.kill(pid, 0);
   },
   sleep: setTimeout,
+  runInstall: () =>
+    spawnSync('bun', ['install', '--frozen-lockfile'], { cwd: ROOT, stdio: ['ignore', 2, 2] }),
 };
 
 if (import.meta.main) {
@@ -157,13 +160,19 @@ async function runHook(argv: readonly string[]): Promise<never> {
 
   console.error(`The agent hook could not load @zgeoff/agent-hooks: ${String(step.error)}`);
 
-  return refuseUnlessReadOnly(readPayloadText());
+  if (pickFallbackVerdict(readPayloadText()) === 'allow') {
+    return process.exit(0);
+  }
+
+  console.error(REFUSAL);
+
+  return process.exit(2);
 }
 
 async function runRetryAfterInstall(argv: readonly string[]): Promise<never> {
   const installFailure = await runInstallOnce(
     path.join(ROOT, 'node_modules', '.agent-hooks-install.lock'),
-    NODE_LOCK_DEPENDENCIES,
+    NODE_INSTALL_DEPENDENCIES,
   ).catch(String);
 
   if (installFailure !== null) {
@@ -186,9 +195,11 @@ async function runRetryAfterInstall(argv: readonly string[]): Promise<never> {
   return process.exit(retry.status ?? 2);
 }
 
-async function runInstallOnce(
+// A hook that waits out another hook's install claims the lock again when that hook stops before it
+// ends, since a stopped install leaves the package missing.
+export async function runInstallOnce(
   lockPath: string,
-  dependencies: LockDependencies,
+  dependencies: InstallDependencies,
 ): Promise<string | null> {
   dependencies.createDirectory(path.dirname(lockPath));
 
@@ -205,17 +216,19 @@ async function runInstallOnce(
   if (step === 'wait-for-install') {
     console.error('Another agent hook runs bun install here, so this one waits for it.');
 
-    while (readLockState(lockPath, dependencies) === 'held') {
+    let state = readLockState(lockPath, dependencies);
+
+    while (state === 'held') {
       await dependencies.sleep(100);
+
+      state = readLockState(lockPath, dependencies);
     }
 
-    return null;
+    return state === 'stale' ? runInstallOnce(lockPath, dependencies) : null;
   }
 
   try {
-    return findInstallFailure(
-      spawnSync('bun', ['install', '--frozen-lockfile'], { cwd: ROOT, stdio: ['ignore', 2, 2] }),
-    );
+    return findInstallFailure(dependencies.runInstall());
   } finally {
     dependencies.remove(lockPath);
   }
@@ -225,7 +238,7 @@ async function runInstallOnce(
 // without the guard, one hook could remove the lock that another hook has just taken.
 export async function claimInstallLock(
   lockPath: string,
-  dependencies: LockDependencies,
+  dependencies: InstallDependencies,
 ): Promise<'stop' | 'wait-for-install' | 'install'> {
   const guardPath = `${lockPath}${GUARD_SUFFIX}`;
 
@@ -265,7 +278,7 @@ export async function claimInstallLock(
 // A hard link fails when the lock exists and makes the lock appear with its process id already in
 // it, so a hook never reads a lock that is still empty. Any other failure repeats on every try, so
 // it ends the install instead of a retry.
-function tryLock(lockPath: string, dependencies: LockDependencies): boolean {
+function tryLock(lockPath: string, dependencies: InstallDependencies): boolean {
   const draftPath = `${lockPath}.${process.pid}`;
 
   try {
@@ -286,7 +299,7 @@ function tryLock(lockPath: string, dependencies: LockDependencies): boolean {
 
 // A hook that the harness killed leaves its lock behind, so a lock counts as held only while the
 // process it names runs.
-export function readLockState(lockPath: string, dependencies: LockDependencies): LockState {
+export function readLockState(lockPath: string, dependencies: InstallDependencies): LockState {
   const text = readLockText(lockPath, dependencies);
 
   if (text === null) {
@@ -308,7 +321,7 @@ export function readLockState(lockPath: string, dependencies: LockDependencies):
   }
 }
 
-function readLockText(lockPath: string, dependencies: LockDependencies): string | null {
+function readLockText(lockPath: string, dependencies: InstallDependencies): string | null {
   try {
     return dependencies.readFile(lockPath);
   } catch (error) {
@@ -329,27 +342,21 @@ function readPayloadText(): string {
 }
 
 // An agent can still run bun install by hand, and read the tree, while the package cannot load.
-function refuseUnlessReadOnly(payloadText: string): never {
+export function pickFallbackVerdict(payloadText: string): 'allow' | 'refuse' {
   const payload: unknown = parseJSON(payloadText);
-  const event = readField(payload, 'hook_event_name');
+  const event = findField(payload, 'hook_event_name');
 
   if (event !== undefined && event !== 'PreToolUse') {
-    process.exit(0);
+    return 'allow';
   }
 
-  const command = readField(readField(payload, 'tool_input'), 'command');
+  const command = findField(findField(payload, 'tool_input'), 'command');
 
-  if (
-    readField(payload, 'tool_name') === 'Bash' &&
+  return findField(payload, 'tool_name') === 'Bash' &&
     typeof command === 'string' &&
     isReadOnlyCommand(command)
-  ) {
-    process.exit(0);
-  }
-
-  console.error(REFUSAL);
-
-  return process.exit(2);
+    ? 'allow'
+    : 'refuse';
 }
 
 function parseJSON(text: string): unknown {
@@ -360,7 +367,7 @@ function parseJSON(text: string): unknown {
   }
 }
 
-function readField(value: unknown, key: string): unknown {
+function findField(value: unknown, key: string): unknown {
   return isRecord(value) ? value[key] : undefined;
 }
 

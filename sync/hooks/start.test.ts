@@ -9,15 +9,17 @@ import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { readStreamUntil } from '../test-utils/read-stream-until.ts';
 import { readTextOrEmpty } from '../test-utils/read-text-or-empty.ts';
 import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
-import type { LockDependencies } from './start.ts';
+import type { InstallDependencies } from './start.ts';
 import {
-  NODE_LOCK_DEPENDENCIES,
+  NODE_INSTALL_DEPENDENCIES,
   claimInstallLock,
   findInstallFailure,
   parseHookArgs,
+  pickFallbackVerdict,
   pickInstallStep,
   pickRecoveryStep,
   readLockState,
+  runInstallOnce,
 } from './start.ts';
 
 // Root ignores file modes, so a folder or a lock with no permissions cannot stop root from using it.
@@ -1012,10 +1014,10 @@ test.each([
 test('#readLockState reads an absent lock without a process check', async () => {
   const ctx = await setupTest();
 
-  const signalProcess = mock<LockDependencies['signalProcess']>();
+  const signalProcess = mock<InstallDependencies['signalProcess']>();
 
   const state = readLockState(join(ctx.directory, 'install.lock'), {
-    ...NODE_LOCK_DEPENDENCIES,
+    ...NODE_INSTALL_DEPENDENCIES,
     signalProcess,
   });
 
@@ -1030,10 +1032,10 @@ test('#readLockState reads a lock whose process runs as held', async () => {
 
   await writeFile(join(ctx.directory, 'install.lock'), '4242');
 
-  const signalProcess = mock<LockDependencies['signalProcess']>();
+  const signalProcess = mock<InstallDependencies['signalProcess']>();
 
   const state = readLockState(join(ctx.directory, 'install.lock'), {
-    ...NODE_LOCK_DEPENDENCIES,
+    ...NODE_INSTALL_DEPENDENCIES,
     signalProcess,
   });
 
@@ -1054,7 +1056,7 @@ test.each([
     await writeFile(join(ctx.directory, 'install.lock'), '4242');
 
     const state = readLockState(join(ctx.directory, 'install.lock'), {
-      ...NODE_LOCK_DEPENDENCIES,
+      ...NODE_INSTALL_DEPENDENCIES,
       signalProcess: mock(() => {
         throw Object.assign(new Error(`kill ${row.code}`), { code: row.code });
       }),
@@ -1073,8 +1075,8 @@ test.each([
   await writeFile(join(ctx.directory, 'install.lock'), row.contents);
 
   const state = readLockState(join(ctx.directory, 'install.lock'), {
-    ...NODE_LOCK_DEPENDENCIES,
-    signalProcess: mock<LockDependencies['signalProcess']>(),
+    ...NODE_INSTALL_DEPENDENCIES,
+    signalProcess: mock<InstallDependencies['signalProcess']>(),
   });
 
   expect(state).toBe('stale');
@@ -1088,7 +1090,7 @@ test('#claimInstallLock stops without a wait when a stopped hook left the guard'
   const sleep = mock(() => Promise.resolve());
 
   const step = await claimInstallLock(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), {
-    ...NODE_LOCK_DEPENDENCIES,
+    ...NODE_INSTALL_DEPENDENCIES,
     signalProcess: mock(() => {
       throw Object.assign(new Error('kill ESRCH'), { code: 'ESRCH' });
     }),
@@ -1110,8 +1112,8 @@ test('#claimInstallLock waits for the install and drops the guard when another h
   await writeTreeFiles(ctx.project, { 'node_modules/.agent-hooks-install.lock': '4242' });
 
   const step = await claimInstallLock(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), {
-    ...NODE_LOCK_DEPENDENCIES,
-    signalProcess: mock<LockDependencies['signalProcess']>(),
+    ...NODE_INSTALL_DEPENDENCIES,
+    signalProcess: mock<InstallDependencies['signalProcess']>(),
     sleep: mock(() => Promise.resolve()),
   });
 
@@ -1134,7 +1136,7 @@ test('#claimInstallLock takes a lock that a stopped hook left, and drops the gua
   await writeTreeFiles(ctx.project, { 'node_modules/.agent-hooks-install.lock': '4242' });
 
   const step = await claimInstallLock(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), {
-    ...NODE_LOCK_DEPENDENCIES,
+    ...NODE_INSTALL_DEPENDENCIES,
     signalProcess: mock(() => {
       throw Object.assign(new Error('kill ESRCH'), { code: 'ESRCH' });
     }),
@@ -1152,4 +1154,125 @@ test('#claimInstallLock takes a lock that a stopped hook left, and drops the gua
     files: ['.agent-hooks-install.lock'],
     lockText: String(process.pid),
   });
+});
+
+test('#runInstallOnce installs when the hook it waits for stops before its install ends', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.project, { 'node_modules/.agent-hooks-install.lock': '4242' });
+
+  const runInstall = mock(() => ({ status: 0, signal: null }));
+
+  const failure = await runInstallOnce(
+    join(ctx.project, 'node_modules/.agent-hooks-install.lock'),
+    {
+      ...NODE_INSTALL_DEPENDENCIES,
+      signalProcess: mock<InstallDependencies['signalProcess']>(() => {
+        throw Object.assign(new Error('kill ESRCH'), { code: 'ESRCH' });
+      })
+        .mockImplementationOnce(() => {})
+        .mockImplementationOnce(() => {}),
+      sleep: mock(() => Promise.resolve()),
+      runInstall,
+    },
+  );
+
+  const files = await readdir(join(ctx.project, 'node_modules'));
+
+  expect({ failure, installs: runInstall.mock.calls.length, files }).toStrictEqual({
+    failure: null,
+    installs: 1,
+    files: [],
+  });
+});
+
+test('#runInstallOnce runs no install when the install it waits for ends', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.project, { 'node_modules/.agent-hooks-install.lock': '4242' });
+
+  const runInstall = mock(() => ({ status: 0, signal: null }));
+
+  const failure = await runInstallOnce(
+    join(ctx.project, 'node_modules/.agent-hooks-install.lock'),
+    {
+      ...NODE_INSTALL_DEPENDENCIES,
+      signalProcess: mock<InstallDependencies['signalProcess']>(),
+      sleep: mock(() => rm(join(ctx.project, 'node_modules/.agent-hooks-install.lock'))),
+      runInstall,
+    },
+  );
+
+  expect({ failure, installs: runInstall.mock.calls.length }).toStrictEqual({
+    failure: null,
+    installs: 0,
+  });
+});
+
+test('#runInstallOnce reports the failure of its own install and drops the lock', async () => {
+  const ctx = await setupTest();
+
+  const failure = await runInstallOnce(
+    join(ctx.project, 'node_modules/.agent-hooks-install.lock'),
+    {
+      ...NODE_INSTALL_DEPENDENCIES,
+      runInstall: mock(() => ({ status: null, signal: 'SIGKILL' as const })),
+    },
+  );
+
+  const files = await readdir(join(ctx.project, 'node_modules'));
+
+  expect({ failure, files }).toStrictEqual({
+    failure: 'bun install stopped on SIGKILL',
+    files: [],
+  });
+});
+
+test.each([
+  {
+    label: 'allows a PostToolUse event',
+    payload: JSON.stringify({ hook_event_name: 'PostToolUse', tool_name: 'Write' }),
+    expected: 'allow',
+  },
+  {
+    label: 'allows a read-only Bash command',
+    payload: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Bash',
+      tool_input: { command: 'ls src' },
+    }),
+    expected: 'allow',
+  },
+  {
+    label: 'allows a read-only Bash command with no event name',
+    payload: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'pwd' } }),
+    expected: 'allow',
+  },
+  {
+    label: 'refuses a Bash command that writes',
+    payload: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Bash',
+      tool_input: { command: 'touch ledger.md' },
+    }),
+    expected: 'refuse',
+  },
+  {
+    label: 'refuses a Bash call with no command',
+    payload: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: [] }),
+    expected: 'refuse',
+  },
+  {
+    label: 'refuses an edit',
+    payload: JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Edit',
+      tool_input: { file_path: 'ledger.md' },
+    }),
+    expected: 'refuse',
+  },
+  { label: 'refuses a payload that is not JSON', payload: 'ledger', expected: 'refuse' },
+  { label: 'refuses an empty payload', payload: '', expected: 'refuse' },
+] as const)('#pickFallbackVerdict $label', (row) => {
+  expect(pickFallbackVerdict(row.payload)).toBe(row.expected);
 });
