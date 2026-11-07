@@ -1,5 +1,7 @@
+import { join } from 'node:path';
 import { buildDietCommand } from './build-diet-command.ts';
 import { buildUnitCommand } from './build-unit-command.ts';
+import { collectTestRuns } from './collect-test-runs.ts';
 import { pickE2EDirs } from './pick-e2e-dirs.ts';
 import type { CommandOptions } from './run-command.ts';
 import type { RigConfig, RigRun } from './types.ts';
@@ -7,7 +9,13 @@ import type { RigConfig, RigRun } from './types.ts';
 export interface UnitRequest {
   readonly workerCount: number;
 
-  readonly extraArgs: readonly string[];
+  readonly flags: readonly string[];
+
+  // The unit tests to run, relative to the repo root.
+  readonly tests: readonly string[];
+
+  // True when the run takes the whole unit lane, so the root run finds its own tests.
+  readonly isDiscovery: boolean;
 }
 
 export interface UnitRunDeps {
@@ -21,7 +29,7 @@ export interface UnitRunDeps {
 }
 
 // The unit lane's command is built from the lane table, so a lane that the table lists never
-// reaches the unit run.
+// reaches the unit run. Every run goes ahead after one fails, so the output shows every failure.
 export async function runUnitTests(
   config: RigConfig,
   request: UnitRequest,
@@ -34,12 +42,40 @@ export async function runUnitTests(
   const e2eDirs = pickE2EDirs(trackedFiles, isWorkspaceRepo);
   const memory = config.lanes.find((lane) => lane.name === 'unit')?.memory ?? null;
 
-  return deps.runCommand(
-    buildDietCommand(
-      deps.dietScript,
-      memory,
-      buildUnitCommand(config, e2eDirs, request.workerCount, request.extraArgs),
-    ),
-    { cwd: run.repoRoot, environment: run.environment, signal: run.signal },
-  );
+  const testRuns = collectTestRuns({
+    bunfigs: config.bunfigs,
+    trackedFiles,
+    tests: request.tests,
+    isDiscovery: request.isDiscovery,
+  });
+
+  let exitCode = 0;
+
+  for (const testRun of testRuns) {
+    const runExitCode = await deps.runCommand(
+      buildDietCommand(
+        deps.dietScript,
+        memory,
+        buildUnitCommand(config, {
+          e2eDirs,
+          workerCount: request.workerCount,
+          testRun,
+          flags: request.flags,
+        }),
+      ),
+      {
+        cwd: join(run.repoRoot, testRun.folder),
+        environment: run.environment,
+        signal: run.signal,
+      },
+    );
+
+    exitCode = exitCode === 0 ? runExitCode : exitCode;
+
+    if (run.signal.aborted) {
+      break;
+    }
+  }
+
+  return exitCode;
 }

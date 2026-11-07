@@ -228,3 +228,51 @@ test.each([[''], ['/srv/drafts/**'], ['../drafts/**'], ['docs/../../drafts/**']]
     );
   },
 );
+
+test('it resolves the declared bunfigs in their order', () => {
+  const config = defineRig({
+    bunfigs: [
+      { path: 'bunfig.window.toml', files: ['packages/shop/**/*.test.tsx'] },
+      { path: 'config/bunfig.db.toml', files: ['packages/till/**'] },
+    ],
+  });
+
+  expect(config.bunfigs).toStrictEqual([
+    { path: 'bunfig.window.toml', files: ['packages/shop/**/*.test.tsx'] },
+    { path: 'config/bunfig.db.toml', files: ['packages/till/**'] },
+  ]);
+});
+
+test('it resolves no bunfigs when none is declared', () => {
+  expect(defineRig({}).bunfigs).toStrictEqual([]);
+});
+
+test.each([['bunfig.window.json'], ['/srv/bunfig.window.toml'], ['../bunfig.window.toml']])(
+  'it refuses the bunfig path %j',
+  (path) => {
+    expect(() =>
+      defineRig({ bunfigs: [{ path, files: ['packages/shop/**'] }] }),
+    ).toThrowWithMessage(
+      Error,
+      `rig.config.ts: the bunfig path ${JSON.stringify(path)} must be a .toml file relative to the repo root, with no ".." segment`,
+    );
+  },
+);
+
+test('it refuses a bunfig with no file globs', () => {
+  expect(() =>
+    defineRig({ bunfigs: [{ path: 'bunfig.window.toml', files: [] }] }),
+  ).toThrowWithMessage(
+    Error,
+    'rig.config.ts: the bunfig "bunfig.window.toml" needs files, a list of globs',
+  );
+});
+
+test('it refuses a bunfig file glob that climbs out of the repo', () => {
+  expect(() =>
+    defineRig({ bunfigs: [{ path: 'bunfig.window.toml', files: ['../shop/**'] }] }),
+  ).toThrowWithMessage(
+    Error,
+    'rig.config.ts: the bunfig "bunfig.window.toml" file glob "../shop/**" must be a non-empty glob relative to the repo root, with no ".." segment',
+  );
+});

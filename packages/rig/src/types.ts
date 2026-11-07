@@ -35,8 +35,19 @@ export interface BenchDeclaration {
   readonly lane?: string;
 }
 
+// A bunfig that the unit tests matching its globs run under, such as one with a DOM preload.
+export interface BunfigDeclaration {
+  // A path relative to the repo root.
+  readonly path: string;
+
+  // Globs relative to the repo root.
+  readonly files: readonly string[];
+}
+
 export interface RigDeclaration {
   readonly ignore?: readonly string[];
+
+  readonly bunfigs?: readonly BunfigDeclaration[];
 
   readonly lanes?: Readonly<Record<string, LaneDeclaration>>;
 
@@ -67,6 +78,8 @@ export interface ResolvedLane {
 
 export interface RigConfig {
   readonly ignore: readonly string[];
+
+  readonly bunfigs: readonly BunfigDeclaration[];
 
   readonly lanes: readonly ResolvedLane[];
 

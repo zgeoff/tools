@@ -255,6 +255,71 @@ test.each([
   },
 );
 
+test('it skips with the CI notice when the branch changes a bunfig that the config names', async () => {
+  const ctx = setupTest();
+
+  ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 2 });
+
+  const exitCode = await runRelatedTests(
+    ['packages/shop/src/counter.tsx', 'bunfig.window.toml'],
+    defineRig({
+      bunfigs: [{ path: 'bunfig.window.toml', files: ['packages/shop/**/*.test.tsx'] }],
+    }),
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      probeWorkspaceRepo: () => Promise.resolve(false),
+      readTrackedFiles: () => Promise.resolve([]),
+      sources: { cwd: '/repo', probeFile: () => true },
+      readWorkerCount: ctx.readWorkerCount,
+      runCommand: ctx.runCommand,
+      output: ctx.output,
+    },
+  );
+
+  expect(exitCode).toBe(0);
+
+  expect(ctx.output.out).toHaveBeenCalledExactlyOnceWith(
+    'rig related: skipped, because the branch changes bunfig.window.toml, a shared test helper or config; CI runs the full suite\n',
+  );
+
+  expect(ctx.runCommand).not.toHaveBeenCalled();
+});
+
+test('it runs the related tests of each package with its own bunfig.toml from that package', async () => {
+  const ctx = setupTest();
+
+  ctx.readWorkerCount.mockResolvedValue({ kind: 'count', count: 2 });
+
+  await runRelatedTests(
+    ['packages/oven/src/heat.ts', 'packages/kettle/src/boil.ts'],
+    defineRig({}),
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      probeWorkspaceRepo: () => Promise.resolve(true),
+      readTrackedFiles: () =>
+        Promise.resolve([
+          'packages/oven/package.json',
+          'packages/oven/bunfig.toml',
+          'packages/kettle/package.json',
+          'packages/kettle/bunfig.toml',
+        ]),
+      sources: { cwd: '/repo', probeFile: () => true },
+      readWorkerCount: ctx.readWorkerCount,
+      runCommand: ctx.runCommand,
+      output: ctx.output,
+    },
+  );
+
+  expect(
+    ctx.runCommand.mock.calls.map(([command, options]) => [options.cwd, command.at(-1)]),
+  ).toStrictEqual([
+    ['/repo/packages/kettle', './src/boil.test.ts'],
+    ['/repo/packages/oven', './src/heat.test.ts'],
+  ]);
+});
+
 test('it names the shared test input over the file cap when the branch changes both', async () => {
   const ctx = setupTest();
 

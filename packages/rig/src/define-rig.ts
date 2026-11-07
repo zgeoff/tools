@@ -3,6 +3,7 @@ import { parseDuration } from './parse-duration.ts';
 import { standardLanes } from './standard-lanes.ts';
 import type { StandardLane } from './standard-lanes.ts';
 import type {
+  BunfigDeclaration,
   LaneDeclaration,
   ProgramDeclaration,
   ResolvedLane,
@@ -49,7 +50,8 @@ export function defineRig(declaration: RigDeclaration): RigConfig {
   );
 
   return {
-    ignore: (declaration.ignore ?? []).map((pattern) => readIgnorePattern(pattern)),
+    ignore: (declaration.ignore ?? []).map((pattern) => readGlob(pattern, 'the ignore pattern')),
+    bunfigs: (declaration.bunfigs ?? []).map((bunfig) => readBunfig(bunfig)),
     lanes,
     programs,
     benchLane: readBenchLane(declaration.bench?.lane, lanes),
@@ -250,9 +252,9 @@ function readProgram(name: string, program: ProgramDeclaration): ProgramDeclarat
   };
 }
 
-// bun test matches an ignore pattern against paths relative to the repo root, so an absolute
-// pattern or one that climbs out of the repo would never match.
-function readIgnorePattern(pattern: unknown): string {
+// rig matches each glob against paths relative to the repo root, so an absolute glob or one that
+// climbs out of the repo would never match.
+function readGlob(pattern: unknown, label: string): string {
   if (
     typeof pattern !== 'string' ||
     pattern === '' ||
@@ -260,11 +262,38 @@ function readIgnorePattern(pattern: unknown): string {
     pattern.split('/').includes('..')
   ) {
     throw new Error(
-      `rig.config.ts: the ignore pattern ${JSON.stringify(pattern)} must be a non-empty glob relative to the repo root, with no ".." segment`,
+      `rig.config.ts: ${label} ${JSON.stringify(pattern)} must be a non-empty glob relative to the repo root, with no ".." segment`,
     );
   }
 
   return pattern;
+}
+
+// rig runs the bunfig's tests from the repo root, so a path outside the repo would never load.
+function readBunfig(bunfig: BunfigDeclaration): BunfigDeclaration {
+  const path: unknown = bunfig.path;
+
+  if (
+    typeof path !== 'string' ||
+    !path.endsWith('.toml') ||
+    path.startsWith('/') ||
+    path.split('/').includes('..')
+  ) {
+    throw new Error(
+      `rig.config.ts: the bunfig path ${JSON.stringify(path)} must be a .toml file relative to the repo root, with no ".." segment`,
+    );
+  }
+
+  const files: unknown = bunfig.files;
+
+  if (!Array.isArray(files) || files.length === 0) {
+    throw new Error(`rig.config.ts: the bunfig "${path}" needs files, a list of globs`);
+  }
+
+  return {
+    path,
+    files: files.map((pattern: unknown) => readGlob(pattern, `the bunfig "${path}" file glob`)),
+  };
 }
 
 function readBenchLane(lane: string | undefined, lanes: readonly ResolvedLane[]): string | null {

@@ -57,13 +57,23 @@ export async function runUnit(
     .with({ kind: 'files' }, (files) =>
       runUnitTests(
         config,
-        { workerCount: workers.count, extraArgs: [...files.files, ...files.flags] },
+        { workerCount: workers.count, flags: files.flags, tests: files.files, isDiscovery: false },
         run,
         deps,
       ),
     )
     .with({ kind: 'lane' }, (laneRun) =>
-      runUnitTests(config, { workerCount: workers.count, extraArgs: laneRun.flags }, run, deps),
+      runUnitTests(
+        config,
+        {
+          workerCount: workers.count,
+          flags: laneRun.flags,
+          tests: laneRun.files,
+          isDiscovery: true,
+        },
+        run,
+        deps,
+      ),
     )
     .exhaustive();
 }

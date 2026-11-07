@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { buildTestSelection } from './build-test-selection.ts';
 import { defineRig } from './define-rig.ts';
 
-test('it keeps the lane selection and the flags when no argument is a path', () => {
+test('it keeps the lane selection, its files and the flags when no argument is a path', () => {
   const selection = buildTestSelection({
     config: defineRig({ lanes: { kiln: { limit: '15s' } } }),
     lane: { name: 'host', suffix: '.host' },
@@ -12,7 +12,11 @@ test('it keeps the lane selection and the flags when no argument is a path', () 
     args: { flags: ['--seed=1', '--bail'], paths: [] },
   });
 
-  expect(selection).toStrictEqual({ kind: 'lane', flags: ['--seed=1', '--bail'] });
+  expect(selection).toStrictEqual({
+    kind: 'lane',
+    files: ['pkg/src/oven.host.test.ts'],
+    flags: ['--seed=1', '--bail'],
+  });
 });
 
 test('it finds a suffix lane empty when git tracks none of its test files', () => {
@@ -79,7 +83,7 @@ test('it selects the one lane file that a file path names, and keeps the flags',
 
   expect(selection).toStrictEqual({
     kind: 'files',
-    files: ['./pkg/src/oven.test.ts'],
+    files: ['pkg/src/oven.test.ts'],
     flags: ['--bail'],
   });
 });
@@ -102,7 +106,7 @@ test('it selects the lane files under a folder path and none of the other lanes'
 
   expect(selection).toStrictEqual({
     kind: 'files',
-    files: ['./pkg/src/fire.kiln.test.ts', './pkg/src/glaze/coat.kiln.test.ts'],
+    files: ['pkg/src/fire.kiln.test.ts', 'pkg/src/glaze/coat.kiln.test.ts'],
     flags: [],
   });
 });
@@ -119,7 +123,7 @@ test('it reads an absolute path against the repo root', () => {
 
   expect(selection).toStrictEqual({
     kind: 'files',
-    files: ['./pkg/src/oven.host.test.ts'],
+    files: ['pkg/src/oven.host.test.ts'],
     flags: [],
   });
 });
@@ -136,7 +140,7 @@ test('it selects the lane files whose path holds a bare word, as bun test filter
 
   expect(selection).toStrictEqual({
     kind: 'files',
-    files: ['./pkg/src/oven.test.ts'],
+    files: ['pkg/src/oven.test.ts'],
     flags: [],
   });
 });
@@ -169,7 +173,7 @@ test('it gives the e2e lane the test files under its folders and leaves out a su
     args: { flags: [], paths: ['.'] },
   });
 
-  expect(selection).toStrictEqual({ kind: 'files', files: ['./e2e/bake.test.ts'], flags: [] });
+  expect(selection).toStrictEqual({ kind: 'files', files: ['e2e/bake.test.ts'], flags: [] });
 });
 
 test('it leaves the paths that the config ignores out of the unit lane', () => {
@@ -182,7 +186,7 @@ test('it leaves the paths that the config ignores out of the unit lane', () => {
     args: { flags: [], paths: ['./'] },
   });
 
-  expect(selection).toStrictEqual({ kind: 'files', files: ['./pkg/src/oven.test.ts'], flags: [] });
+  expect(selection).toStrictEqual({ kind: 'files', files: ['pkg/src/oven.test.ts'], flags: [] });
 });
 
 test('it leaves out a file named by its path under a folder that an ignore glob matches', () => {
@@ -242,7 +246,7 @@ test('it gives the unit lane every test file outside the e2e folders and the suf
 
   expect(selection).toStrictEqual({
     kind: 'files',
-    files: ['./pkg/src/oven.test.ts', './pkg/src/view.test.tsx'],
+    files: ['pkg/src/oven.test.ts', 'pkg/src/view.test.tsx'],
     flags: [],
   });
 });
@@ -263,7 +267,7 @@ test.each([
 
   expect(selection).toStrictEqual({
     kind: 'files',
-    files: ['./pkg/src/oven.test.ts'],
+    files: ['pkg/src/oven.test.ts'],
     flags: [],
   });
 });

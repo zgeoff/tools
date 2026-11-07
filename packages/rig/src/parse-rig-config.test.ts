@@ -104,12 +104,12 @@ test('it refuses a config by its first bad lane', () => {
   });
 });
 
-test('it reads a config from before programs and ignore existed as having neither', () => {
+test('it reads a config from before programs, ignore and bunfigs existed as having none', () => {
   const parsed = parseRigConfig({ lanes: defineRig({}).lanes });
 
   expect(parsed).toStrictEqual({
     kind: 'parsed',
-    config: { ignore: [], lanes: defineRig({}).lanes, programs: {}, benchLane: null },
+    config: { ignore: [], bunfigs: [], lanes: defineRig({}).lanes, programs: {}, benchLane: null },
   });
 });
 
@@ -138,5 +138,25 @@ test.each([
   expect(parseRigConfig({ lanes: [], ignore })).toStrictEqual({
     kind: 'refused',
     reason: 'its ignore is no list of patterns',
+  });
+});
+
+test('it keeps the bunfigs that defineRig returns', () => {
+  const config = defineRig({
+    bunfigs: [{ path: 'bunfig.window.toml', files: ['packages/shop/**/*.test.tsx'] }],
+  });
+
+  expect(parseRigConfig(config)).toStrictEqual({ kind: 'parsed', config });
+});
+
+test.each([
+  ['a string', 'bunfig.window.toml'],
+  ['a list that holds a string', ['bunfig.window.toml']],
+  ['a list whose entry has no files', [{ path: 'bunfig.window.toml' }]],
+  ['a list whose entry has a number for a glob', [{ path: 'bunfig.window.toml', files: [7] }]],
+])('it refuses bunfigs that are %s', (_, bunfigs) => {
+  expect(parseRigConfig({ lanes: [], bunfigs })).toStrictEqual({
+    kind: 'refused',
+    reason: 'its bunfigs are no list of bunfig declarations',
   });
 });

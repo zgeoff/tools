@@ -95,6 +95,36 @@ argument replaces the `pathIgnorePatterns` list there, and rig passes one to eve
   a suffix, because the e2e lane runs none of them.
 - `rig related` runs no test for a changed file, or a sibling test, that a glob matches.
 
+### The bunfig of each test
+
+`bun test` reads only the `bunfig.toml` of the folder it runs from, and resolves each preload
+against that folder, even when `--config` names another file. So `rig unit` and `rig related` split
+the unit tests into one `bun test` run for each bunfig:
+
+- A test that a glob of a `bunfigs` entry in `rig.config.ts` matches runs from the repo root with
+  `--config=<path>`, where `<path>` is the entry's bunfig. The first entry that matches the test
+  takes it, even from a package with a `bunfig.toml` of its own.
+- Any other test under a package folder with a tracked `bunfig.toml` runs from that folder. A
+  package folder holds a tracked `package.json`, and the deepest one above the test takes it. The
+  run gets its paths and ignore globs relative to the folder: rig keeps a glob that starts with
+  `**/`, strips the folder from a glob under it, and drops the rest.
+- Every other test runs from the repo root under its `bunfig.toml`. In a run of the whole lane,
+  `rig unit` lets `bun test` find these tests, and passes a path ignore for each package folder and
+  `bunfigs` glob that another run takes.
+
+The runs go one at a time, root run first. A run starts even when an earlier run failed, so the
+output shows every failure, and rig exits with the first failing run's exit code. After an abort,
+rig starts no further run. The other lanes run from the repo root under its `bunfig.toml`, where
+their hooks and program builds run.
+
+A repo whose React tests need a DOM preload names that bunfig and the tests it runs:
+
+```ts
+export default defineRig({
+  bunfigs: [{ path: 'bunfig.dom.toml', files: ['packages/viewer/**/*.test.tsx'] }],
+});
+```
+
 ## The browser lane
 
 The browser lane runs `.browser.test.ts` suites against Chrome through `Bun.WebView`, one file at a

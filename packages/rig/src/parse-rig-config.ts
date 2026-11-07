@@ -1,4 +1,10 @@
-import type { LaneParallelism, ProgramDeclaration, ResolvedLane, RigConfig } from './types.ts';
+import type {
+  BunfigDeclaration,
+  LaneParallelism,
+  ProgramDeclaration,
+  ResolvedLane,
+  RigConfig,
+} from './types.ts';
 
 export type ParsedRigConfig =
   | { readonly kind: 'parsed'; readonly config: RigConfig }
@@ -47,9 +53,15 @@ export function parseRigConfig(value: unknown): ParsedRigConfig {
     return { kind: 'refused', reason: 'its ignore is no list of patterns' };
   }
 
+  const bunfigs = parseBunfigs(Reflect.get(value, 'bunfigs'));
+
+  if (bunfigs === null) {
+    return { kind: 'refused', reason: 'its bunfigs are no list of bunfig declarations' };
+  }
+
   return {
     kind: 'parsed',
-    config: { ignore, lanes: resolved, programs, benchLane: benchLane ?? null },
+    config: { ignore, bunfigs, lanes: resolved, programs, benchLane: benchLane ?? null },
   };
 }
 
@@ -183,4 +195,36 @@ function parseIgnore(value: unknown): string[] | null {
   }
 
   return patterns;
+}
+
+// A config from before bunfigs existed has none, and means every unit test runs under the bunfig
+// of its folder.
+function parseBunfigs(value: unknown): BunfigDeclaration[] | null {
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const bunfigs: BunfigDeclaration[] = [];
+
+  for (const bunfig of value) {
+    if (typeof bunfig !== 'object' || bunfig === null) {
+      return null;
+    }
+
+    const path: unknown = Reflect.get(bunfig, 'path');
+    const files: unknown = Reflect.get(bunfig, 'files');
+    const globs = Array.isArray(files) ? parseIgnore(files) : null;
+
+    if (typeof path !== 'string' || globs === null) {
+      return null;
+    }
+
+    bunfigs.push({ path, files: globs });
+  }
+
+  return bunfigs;
 }
