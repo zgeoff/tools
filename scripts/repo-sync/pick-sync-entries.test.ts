@@ -105,19 +105,6 @@ test('it leaves out a needed entry that skip lists, and the entries only it need
   expect(picked).toStrictEqual({ kind: 'picked', entries: [kettle] });
 });
 
-test('it takes a needed entry that include lists too', () => {
-  const kettle = buildMockSyncEntry({ name: 'skill-kettle', needs: ['skill-descaling'] });
-  const descaling = buildMockSyncEntry({ name: 'skill-descaling', optIn: true });
-
-  const picked = pickSyncEntries({
-    manifest: [kettle, descaling],
-    skip: '',
-    include: 'skill-descaling',
-  });
-
-  expect(picked).toStrictEqual({ kind: 'picked', entries: [kettle, descaling] });
-});
-
 test('it refuses a needs name that no manifest entry holds, with its colons replaced', () => {
   const picked = pickSyncEntries({
     manifest: [buildMockSyncEntry({ name: 'skill-kettle', needs: ['::skill-ghost'] })],

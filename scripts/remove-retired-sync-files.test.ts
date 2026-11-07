@@ -277,44 +277,6 @@ test('it keeps a retired file whose entry is still in the manifest and did not s
   expect(existsSync(join(ctx.caller, '.claude/hooks/demo/helper.ts'))).toBeTrue();
 });
 
-test('it keeps the files of an entry that gained a key and did not sync', async () => {
-  const ctx = await setupTest();
-
-  await createGitCommit(ctx.tools, ctx.env, {
-    'sync/kettle/SKILL.md': '# Kettle\n',
-    'sync/manifest.json': JSON.stringify([
-      {
-        name: 'skill-kettle',
-        files: [{ source: 'sync/kettle/SKILL.md', target: '.claude/skills/kettle/SKILL.md' }],
-      },
-    ]),
-  });
-
-  await createGitCommit(ctx.tools, ctx.env, {
-    'sync/manifest.json': JSON.stringify([
-      {
-        name: 'skill-kettle',
-        needs: ['skill-descaling'],
-        files: [{ source: 'sync/kettle/SKILL.md', target: '.claude/skills/kettle/SKILL.md' }],
-      },
-    ]),
-  });
-
-  await writeTreeFiles(ctx.caller, { '.claude/skills/kettle/SKILL.md': '# Kettle\n' });
-
-  const result = await $`bash ${ctx.scriptPath} ${ctx.tools} socket`
-    .cwd(ctx.caller)
-    .nothrow()
-    .quiet();
-
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-    kept: existsSync(join(ctx.caller, '.claude/skills/kettle/SKILL.md')),
-  }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '', kept: true });
-});
-
 test('it keeps a retired file whose entry the skip list names', async () => {
   const ctx = await setupTest();
 

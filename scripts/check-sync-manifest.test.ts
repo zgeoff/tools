@@ -1575,6 +1575,36 @@ test('it fails when needs names an entry the manifest lacks', async () => {
   });
 });
 
+test('it fails with the read error when a Markdown source cannot be read', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, 'sync/kettle.md'), { recursive: true });
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'doc-kettle',
+        description: 'The kettle doc',
+        files: [{ source: 'sync/kettle.md', target: 'kettle.md' }],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      "check-sync-manifest: entry 'doc-kettle' lists source sync/kettle.md of zgeoff/tools, which does not exist\n" +
+      'check-sync-manifest: the Markdown sources cannot be read for the link rule: EISDIR: illegal operation on a directory, read\n',
+  });
+});
+
 test('it fails on a manifest whose entry has no description, which the sync refuses', async () => {
   const ctx = await setupTest();
 

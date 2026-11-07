@@ -311,14 +311,16 @@ done < <(jq -r '[.[].files[] | select(.repo == "zgeoff/skills") | .source
 # takes needs it, so a Markdown file that links another entry's file arrives
 # with a dead link unless that entry reaches every repo or is needed. A link
 # that resolves to no target, such as an example in a code block, passes.
-if links=$(bun "$scripts_dir/repo-sync/collect-undelivered-links.ts" "$manifest" "$skills_tree"); then
+if links=$(bun "$scripts_dir/repo-sync/read-undelivered-links.ts" "$manifest" "$skills_tree" 2> "$staging/links.err"); then
   while IFS=$'\t' read -r name source link owners; do
     if [ -n "$name" ]; then
       report "entry '$name' links $link from $source, which $owners delivers; add it to the entry's needs"
     fi
   done <<< "$links"
-else
+elif [ "$?" -eq 3 ]; then
   report "the repo-sync scripts cannot parse $manifest, so the sync would refuse it"
+else
+  report "the Markdown sources cannot be read for the link rule: $(cat "$staging/links.err")"
 fi
 
 exit "$errors"

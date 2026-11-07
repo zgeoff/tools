@@ -166,12 +166,13 @@ skill entries are not opt-in, and reach every repo:
 - `skill-cold-read`, because each repo's AGENTS.md has an agent run a cold read on a skill it
   changed.
 
-A skill links another skill by relative path, so an entry whose Markdown links a file of another
-opt-in entry lists that entry in `needs`. `scripts/check-sync-manifest.sh` fails on a link to such a
-file when the linking entry doesn't need its entry, directly or through another entry. A link that
-resolves to no target, such as an example in a code block, passes. The deslop and cold-read entries
-need the docs-writing and skill-writing entries, and the skill-writing entry needs the code-style,
-ci-design and testing entries, so every repo takes those five skills unless its stub skips one.
+A skill links another skill by relative path, so an entry whose Markdown links a file of an opt-in
+entry needs that entry, directly or through an entry it needs. `scripts/check-sync-manifest.sh`
+fails on a link to a file that a repo taking the linking entry can lack: the file of an opt-in entry
+that neither the linking entry nor an entry reaching every repo needs. The check reads code blocks
+like other text, so an example link there passes only when it resolves to no delivered file. A repo
+whose stub skips a needed entry lacks it, and every entry that only it needs, and the copies that
+link them arrive with dead links.
 
 A repo keeps its own rules for the same area in a `project-<name>` skill beside it, which repo-sync
 never touches, and the shared skill tells the reader to load both. The entry lists every file in its

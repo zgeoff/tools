@@ -1,7 +1,5 @@
 import type { SyncEntry } from './parse-sync-entries.ts';
 
-// A repo that takes an entry takes each entry it needs, and what those need in turn, but never a
-// skipped one, since skip leaves an entry alone.
 export function collectNeededNames(
   manifest: readonly SyncEntry[],
   requested: readonly SyncEntry[],

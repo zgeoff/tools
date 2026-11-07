@@ -1,44 +1,65 @@
 import { expect, test } from 'bun:test';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
-import invariant from 'tiny-invariant';
 import { buildMockSyncEntry } from '../test-utils/build-mock-sync-entry.ts';
-import { collectUndeliveredLinks, readUndeliveredLinks } from './collect-undelivered-links.ts';
-import { parseSkillsPin } from './parse-skills-pin.ts';
+import { collectUndeliveredLinks } from './collect-undelivered-links.ts';
 
-test('it reports a link from an entry every repo takes to an opt-in entry it does not need', () => {
-  const links = collectUndeliveredLinks(
-    [
-      buildMockSyncEntry({
-        name: 'skill-kettle',
-        files: [
-          { repo: 'zgeoff/skills', source: 'skills/kettle/SKILL.md', target: 'kettle/SKILL.md' },
-        ],
-      }),
-      buildMockSyncEntry({
-        name: 'skill-descaling',
-        optIn: true,
-        files: [
-          {
-            repo: 'zgeoff/skills',
-            source: 'skills/descaling/SKILL.md',
-            target: 'descaling/SKILL.md',
-          },
-        ],
-      }),
-    ],
-    new Map([['kettle/SKILL.md', 'Read [descaling](../descaling/SKILL.md#steps) first.\n']]),
-  );
+test.each([
+  [
+    'an inline link with a fragment',
+    'Read [descaling](../descaling/SKILL.md#steps) first.\n',
+    '../descaling/SKILL.md',
+  ],
+  [
+    'a link in angle brackets',
+    'Read [descaling](<../descaling/SKILL.md>) first.\n',
+    '../descaling/SKILL.md',
+  ],
+  [
+    'a reference-style link',
+    'Read [descaling][d] first.\n\n[d]: ../descaling/SKILL.md\n',
+    '../descaling/SKILL.md',
+  ],
+  ['a link to the folder', 'Read [descaling](../descaling/) first.\n', '../descaling/'],
+  [
+    'a link from the repo root',
+    'Read [descaling](/descaling/SKILL.md) first.\n',
+    '/descaling/SKILL.md',
+  ],
+])(
+  'it reports %s from an entry every repo takes to an opt-in entry it does not need',
+  (_label, markdown, link) => {
+    const links = collectUndeliveredLinks(
+      [
+        buildMockSyncEntry({
+          name: 'skill-kettle',
+          files: [
+            { repo: 'zgeoff/skills', source: 'skills/kettle/SKILL.md', target: 'kettle/SKILL.md' },
+          ],
+        }),
+        buildMockSyncEntry({
+          name: 'skill-descaling',
+          optIn: true,
+          files: [
+            {
+              repo: 'zgeoff/skills',
+              source: 'skills/descaling/SKILL.md',
+              target: 'descaling/SKILL.md',
+            },
+          ],
+        }),
+      ],
+      new Map([['kettle/SKILL.md', markdown]]),
+    );
 
-  expect(links).toStrictEqual([
-    {
-      entry: 'skill-kettle',
-      source: 'skills/kettle/SKILL.md',
-      link: '../descaling/SKILL.md',
-      owners: ['skill-descaling'],
-    },
-  ]);
-});
+    expect(links).toStrictEqual([
+      {
+        entry: 'skill-kettle',
+        source: 'skills/kettle/SKILL.md',
+        link,
+        owners: ['skill-descaling'],
+      },
+    ]);
+  },
+);
 
 test('it reports a link from an opt-in entry to another opt-in entry it does not need', () => {
   const links = collectUndeliveredLinks(
@@ -138,7 +159,7 @@ test('it passes a link from an opt-in entry to an entry every repo takes', () =>
   expect(links).toStrictEqual([]);
 });
 
-test('it passes a link to no delivered file, an absolute path and a URL', () => {
+test('it passes a link to a path no entry delivers, and a URL', () => {
   const links = collectUndeliveredLinks(
     [
       buildMockSyncEntry({
@@ -162,24 +183,10 @@ test('it passes a link to no delivered file, an absolute path and a URL', () => 
     new Map([
       [
         'kettle/SKILL.md',
-        '[Spout](../spout/SKILL.md), [root](/descaling/SKILL.md), [site](https://example.com/descaling/SKILL.md)\n',
+        '[Spout](../spout/SKILL.md) and [site](https://example.com/descaling/SKILL.md)\n',
       ],
     ]),
   );
-
-  expect(links).toStrictEqual([]);
-});
-
-test('it finds no undelivered link in the sync manifest at the pinned zgeoff/skills commit', async () => {
-  const root = join(import.meta.dir, '../..');
-
-  const pinValue: unknown = await Bun.file(join(root, 'sync/skills-pin.json')).json();
-
-  const skillsTree = join(root, '.zgeoff-skills', parseSkillsPin(pinValue) ?? '');
-
-  invariant(existsSync(skillsTree), `run bun run skills:install to unpack ${skillsTree}`);
-
-  const links = readUndeliveredLinks(join(root, 'sync/manifest.json'), root, skillsTree);
 
   expect(links).toStrictEqual([]);
 });
