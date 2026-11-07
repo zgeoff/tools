@@ -16,16 +16,14 @@ The merge of the repo-sync stub in step 5 starts the repo's first sync, so do th
    { "extends": "github:zgeoff/noslop-config" }
    ```
 
-   noslop reviews a pull request under the config on `main`, so the first sync pull request needs
-   this file on `main` first. noslop counts each file that the `synced` globs of the config match,
-   the shared config's globs included, as code the pull request did not write. So a finding in a
-   synced file takes a `deferred` reply that points at the issue for the fix in tools or
-   zgeoff/skills, as
+   noslop reviews a pull request under the config on `main`. It counts a file that the config's
+   `synced` globs match as code the pull request did not write, so you can defer most findings there
+   to an issue in the repo that owns the file.
    [Answer a finding](https://github.com/zgeoff/noslop/blob/main/docs/guides/answer-a-finding.md)
-   describes. Without the file on `main`, such a finding takes only `accepted-risk`, which only an
-   admin of the repo can record. When the repo takes a synced file that the shared `synced` list
-   misses, add a `synced` list of path globs, such as `["scripts/shared/**"]`, to `review.json`.
-   noslop appends it to the shared list.
+   lists the findings that never take `deferred`. Without this file on `main`, no finding in the
+   first sync pull request can be deferred. To mark more synced files, add a `synced` list of path
+   globs, such as `["scripts/shared/**"]`, to `review.json`. noslop appends it to the globs the
+   shared config lists.
 
    ```sh
    gh api repos/zgeoff/<repo>/contents/review.json --jq .path
