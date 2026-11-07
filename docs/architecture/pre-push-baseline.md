@@ -114,11 +114,17 @@ the table above, with these differences:
   `check-links.sh`, then `check-vision.sh` when the `docs-vision-check` entry put it beside them and
   the skill-writing skill's `check-skill.sh` when the repo takes that skill. In a repo without
   `.claude/skills/docs-writing/scripts/` it prints a notice and passes.
-- The test job runs `scripts/run-related-tests.ts`, which takes the lane suffixes from the `lanes`
-  option of `zgeoff/max-test-timeout` in the root `.oxlintrc.json`, as
+- The test job runs the repo's `test:related` script. The script that the build adds runs
+  `scripts/run-related-tests.ts`, which takes the lane suffixes from the `lanes` option of
+  `zgeoff/max-test-timeout` in the root `.oxlintrc.json`, as
   [the test timeout check](./oxlint-config-tests.md#the-test-timeout-check) reads it. It also drops
   each test that the `[test]` `pathIgnorePatterns` of the root `bunfig.toml` cover, because
   `bun test` exits 1 when every path it is given is ignored.
+- A repo on rig, whose root `package.json` lists `@zgeoff/rig` in `dependencies` or
+  `devDependencies`, runs its related tests through its own `test:related`, such as `rig related`.
+  There the build adds no `test:related` script, and deletes the copies of
+  `scripts/run-related-tests.ts` and `scripts/read-worker-count.ts` that the entry just wrote, so
+  the sync pull request deletes any copy that an earlier sync left in the repo.
 
 The entry delivers the check scripts from [`packages/chex/src/`](../../packages/chex/src/), under
 the same names in `scripts/`, so a delivered check runs the code that `chex <check>` runs. The
