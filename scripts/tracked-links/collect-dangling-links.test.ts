@@ -31,6 +31,39 @@ test.each([
   expect(collectDanglingLinks([row.link], row.trackedPaths)).toStrictEqual([]);
 });
 
+test('it passes a slash-ended link whose target folder sits behind another tracked link', () => {
+  const links = [
+    { path: 'alias', target: 'real' },
+    { path: 'outer', target: 'alias/' },
+  ];
+
+  expect(collectDanglingLinks(links, ['alias', 'outer', 'real/note.txt'])).toStrictEqual([]);
+});
+
+test('it reports each link of a chain that ends at a path a fresh clone lacks', () => {
+  const links = [
+    { path: 'outer', target: 'alias' },
+    { path: 'alias', target: 'missing' },
+  ];
+
+  expect(collectDanglingLinks(links, ['outer', 'alias'])).toStrictEqual([
+    { path: 'outer', target: 'alias', resolved: 'missing' },
+    { path: 'alias', target: 'missing', resolved: 'missing' },
+  ]);
+});
+
+test('it reports each link of a loop', () => {
+  const links = [
+    { path: 'ping', target: 'pong' },
+    { path: 'pong', target: 'ping' },
+  ];
+
+  expect(collectDanglingLinks(links, ['ping', 'pong'])).toStrictEqual([
+    { path: 'ping', target: 'pong', resolved: 'pong' },
+    { path: 'pong', target: 'ping', resolved: 'ping' },
+  ]);
+});
+
 test.each([
   {
     condition: 'no tracked file sits in its target folder',
