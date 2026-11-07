@@ -1,4 +1,4 @@
-import { basename, join, relative, sep } from 'node:path';
+import { basename, join, posix, relative, sep } from 'node:path';
 import buildImportSettings from './build-import-settings.js';
 import findFeatureFolder from './find-feature-folder.js';
 import pickFolderKind from './pick-folder-kind.js';
@@ -88,26 +88,26 @@ const featureFolders = {
 export default featureFolders;
 
 function toPendingPath(entry) {
-  return entry.replace(/^\.\//u, '').replace(/\/+$/u, '');
+  return posix.normalize(entry).replace(/(?<=.)\/+$/u, '');
 }
 
 function toRootPath(root, path) {
-  return relative(root, path).split(sep).join('/');
+  return relative(root, path).split(sep).join('/') || '.';
 }
 
 function buildUtilsVisitors(file) {
   const settings = buildImportSettings(file.root);
-  const check = (node, source) => {
-    if (source?.type === 'Literal' && typeof source.value === 'string') {
-      checkUtilsImport(file, { node, specifier: source.value, settings });
+  const check = (node) => {
+    if (node.source?.type === 'Literal' && typeof node.source.value === 'string') {
+      checkUtilsImport(file, { node, specifier: node.source.value, settings });
     }
   };
 
   return {
-    ImportDeclaration: (node) => check(node, node.source),
-    ExportNamedDeclaration: (node) => check(node, node.source),
-    ExportAllDeclaration: (node) => check(node, node.source),
-    ImportExpression: (node) => check(node, node.source),
+    ImportDeclaration: check,
+    ExportNamedDeclaration: check,
+    ExportAllDeclaration: check,
+    ImportExpression: check,
   };
 }
 
