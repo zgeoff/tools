@@ -75,6 +75,9 @@ The plugin is addressable on its own at `@zgeoff/oxlint-config/plugin` for confi
 - Test files: a test sits beside its module, holds only `setupTest()` and its tests, uses inline
   snapshots, keeps each timeout within its lane's limit, and waits on a condition, never a sleep.
   See [test-file rules](../../docs/architecture/oxlint-config-tests.md).
+- Seeding: test code writes database rows only where the testing skill's seeding rules allow, and
+  each seed has a test beside it. See
+  [seeding rules](../../docs/architecture/oxlint-config-seeding.md).
 - Require functions: `zgeoff/no-require` bans the `require` global and `createRequire`, and
   `import/no-commonjs` bans CommonJS exports. See
   [require functions](../../docs/architecture/oxlint-config.md#require-functions).

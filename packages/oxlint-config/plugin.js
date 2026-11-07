@@ -17,10 +17,13 @@ import noJSDoc from './no-jsdoc.js';
 import noRequire from './no-require.js';
 import noRestrictedWords from './no-restricted-words.js';
 import noTestSleep from './no-test-sleep.js';
+import readFolderSources from './read-folder-sources.js';
 import readRigLanes from './read-rig-lanes.js';
 import resolveRepoRoot from './resolve-repo-root.js';
+import buildSeedOnly from './seed-only.js';
 import setupTestOnly from './setup-test-only.js';
 import buildTestBesideModule from './test-beside-module.js';
+import testBesideSeed from './test-beside-seed.js';
 import testShape from './test-shape.js';
 import testTimeoutExceptionTicket from './test-timeout-exception-ticket.js';
 import verbContract from './verb-contract.js';
@@ -133,6 +136,8 @@ const plugin = {
     'test-shape': testShape,
     'import-zones': importZones,
     'feature-folders': featureFolders,
+    'seed-only': buildSeedOnly(readFolderSources),
+    'test-beside-seed': testBesideSeed,
   },
 };
 
