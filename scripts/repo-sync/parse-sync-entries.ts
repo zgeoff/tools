@@ -18,6 +18,9 @@ export interface SyncEntry {
 
   // Each package.json script the build writes, with the value it writes; empty for none.
   readonly scripts: Readonly<Record<string, string>>;
+
+  // The names of the entries a repo that takes this one also takes; empty for none.
+  readonly needs: readonly string[];
 }
 
 // Returns null when any entry breaks the contract, so a bad list fails the step before it syncs.
@@ -44,12 +47,14 @@ function parseSyncEntry(entry: unknown): SyncEntry | null {
   const build = entry['build'] ?? '';
   const optIn = entry['optIn'] ?? false;
   const scripts = entry['scripts'] ?? {};
+  const needs = entry['needs'] ?? [];
   const files = entry['files'].map((file: unknown) => parseSyncFile(file));
 
   if (
     typeof build !== 'string' ||
     typeof optIn !== 'boolean' ||
     !isStringRecord(scripts) ||
+    !isStringList(needs) ||
     !files.every((file) => file !== null)
   ) {
     return null;
@@ -62,6 +67,7 @@ function parseSyncEntry(entry: unknown): SyncEntry | null {
     build,
     optIn,
     scripts,
+    needs,
   };
 }
 

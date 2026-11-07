@@ -4,8 +4,8 @@
 # Two optional string inputs under `with:` change which entries run. `skip`
 # takes the comma-separated names of the entries to leave alone. `include`
 # takes the comma-separated names of the opt-in entries to sync, which reach
-# this repository only when they are listed. A name in `include` that is not an
-# opt-in entry fails the run.
+# this repository only when they are listed or an entry it takes needs them. A
+# name in `include` that is not an opt-in entry fails the run.
 #
 # The `uses:` line pins a commit on main of zgeoff/tools. A green main there
 # that changes a synced file sends this repository a repository_dispatch event

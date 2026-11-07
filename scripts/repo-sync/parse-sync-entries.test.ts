@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { parseSyncEntries } from './parse-sync-entries.ts';
 
-test('it reads each entry with its defaults for build, optIn and scripts, and each file in tools', () => {
+test('it reads each entry with its defaults for build, optIn, scripts and needs, and each file in tools', () => {
   const entries = parseSyncEntries([
     {
       name: 'editorconfig',
@@ -15,6 +15,7 @@ test('it reads each entry with its defaults for build, optIn and scripts, and ea
       build: 'bun install',
       optIn: true,
       scripts: { 'check:demo': 'true' },
+      needs: ['editorconfig'],
     },
   ]);
 
@@ -26,6 +27,7 @@ test('it reads each entry with its defaults for build, optIn and scripts, and ea
       build: '',
       optIn: false,
       scripts: {},
+      needs: [],
     },
     {
       name: 'hook-demo',
@@ -42,6 +44,7 @@ test('it reads each entry with its defaults for build, optIn and scripts, and ea
       build: 'bun install',
       optIn: true,
       scripts: { 'check:demo': 'true' },
+      needs: ['editorconfig'],
     },
   ]);
 });
@@ -76,6 +79,7 @@ test('it reads a file whose source sits in zgeoff/skills', () => {
       build: '',
       optIn: true,
       scripts: {},
+      needs: [],
     },
   ]);
 });
@@ -89,6 +93,7 @@ test('it reads what it wrote, so the sync job reads the entries the prepare job 
       build: 'true',
       optIn: false,
       scripts: { 'check:demo': 'true' },
+      needs: ['hook-demo'],
     },
   ]);
 
@@ -122,6 +127,10 @@ test.each([
         scripts: { 'check:demo': 3 },
       },
     ],
+  ],
+  [
+    'an entry whose needs is no list of names',
+    [{ name: 'editorconfig', description: 'The editor config', files: [], needs: 'socket' }],
   ],
   [
     'a file with no target',

@@ -40,9 +40,10 @@
 # actions: read.
 #
 # A manifest entry marked `"optIn": true` reaches a caller only when the caller
-# lists its name in the `include` input. `include` fails the run on a name that
-# is not an opt-in entry, because listing it has no effect. `skip` leaves out
-# any entry, opt-in or not.
+# lists its name in the `include` input, or when an entry the caller takes
+# lists it in `needs`. `include` fails the run on a name that is not an opt-in
+# entry, because listing it has no effect. `skip` leaves out any entry, opt-in,
+# needed or not.
 name: Repo sync (reusable)
 
 on:

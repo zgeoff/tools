@@ -1,3 +1,4 @@
+import { collectNeededNames } from './collect-needed-names.ts';
 import type { SyncEntry } from './parse-sync-entries.ts';
 
 export interface SyncEntrySelection {
@@ -38,11 +39,26 @@ export function pickSyncEntries(selection: SyncEntrySelection): PickedSyncEntrie
     return { kind: 'refused', message: `skip and include both list: ${formatLogNames(both)}` };
   }
 
-  const entries = selection.manifest
+  const names = new Set(selection.manifest.map((entry) => entry.name));
+
+  const unknownNeeds = selection.manifest.flatMap((entry) =>
+    entry.needs.filter((name) => !names.has(name)).map((name) => `${entry.name} needs ${name}`),
+  );
+
+  if (unknownNeeds.length > 0) {
+    return {
+      kind: 'refused',
+      message: `needs lists no manifest entry: ${formatLogNames(unknownNeeds)}`,
+    };
+  }
+
+  const requested = selection.manifest
     .filter((entry) => !skip.includes(entry.name))
     .filter((entry) => !entry.optIn || include.includes(entry.name));
 
-  return { kind: 'picked', entries };
+  const taken = collectNeededNames(selection.manifest, requested, skip);
+
+  return { kind: 'picked', entries: selection.manifest.filter((entry) => taken.has(entry.name)) };
 }
 
 function parseEntryNames(list: string): string[] {

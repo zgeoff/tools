@@ -28,9 +28,11 @@ under the skill's `references/`, until the session loads `skill-writing`, `docs-
 `deslop`. They match a skill in any `skills/` folder, such as `.claude/skills/`, `.agents/skills/`
 or `sync/skills/`.
 
-Every repo takes `deslop` from the `skill-deslop` entry. `skill-writing` and `docs-writing` come
-from opt-in entries, so a repo that leaves one out of `include` lacks that skill, and the gate skips
-it, as [Mistakes the gate tolerates](#mistakes-the-gate-tolerates) describes.
+Every repo takes `deslop`, and with it the `skill-writing` and `docs-writing` skills that it links,
+because a repo takes each entry that an entry it takes needs, as
+[Skills](../architecture/repo-sync.md#skills) describes. A repo that skips one of them lacks that
+skill, and the gate skips it, as [Mistakes the gate tolerates](#mistakes-the-gate-tolerates)
+describes.
 
 To give a repo gates of its own:
 

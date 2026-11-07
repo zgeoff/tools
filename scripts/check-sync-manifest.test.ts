@@ -273,7 +273,8 @@ test('it fails when a file names a repo the sync does not check out', async () =
     exitCode: 1,
     stdout: '',
     stderr:
-      'check-sync-manifest: entry \'editorconfig\' gives sync/editorconfig the repo "acme/kettle", which is neither zgeoff/tools nor zgeoff/skills\n',
+      'check-sync-manifest: entry \'editorconfig\' gives sync/editorconfig the repo "acme/kettle", which is neither zgeoff/tools nor zgeoff/skills\n' +
+      'check-sync-manifest: the repo-sync scripts cannot parse sync/manifest.json, so the sync would refuse it\n',
   });
 });
 
@@ -671,7 +672,8 @@ test('it fails when the scripts field holds a value that is not a string', async
     exitCode: 1,
     stdout: '',
     stderr:
-      "check-sync-manifest: entry 'demo' has a scripts field that is not an object of strings\n",
+      "check-sync-manifest: entry 'demo' has a scripts field that is not an object of strings\n" +
+      'check-sync-manifest: the repo-sync scripts cannot parse sync/manifest.json, so the sync would refuse it\n',
   });
 });
 
@@ -1445,4 +1447,184 @@ test("it passes when this repo's own skill-gate rules hold every shared ignore e
     stdout: result.stdout.toString(),
     stderr: result.stderr.toString(),
   }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+});
+
+test('it fails when a skill that every repo takes links an opt-in skill it does not need', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'tree/skills/kettle/SKILL.md': 'Descale it as [descaling](../descaling/SKILL.md) says.\n',
+    'tree/skills/descaling/SKILL.md': '# Descaling\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-kettle',
+        description: 'The kettle skill',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+        ],
+      },
+      {
+        name: 'skill-descaling',
+        description: 'The descaling skill',
+        optIn: true,
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/descaling/SKILL.md',
+            target: '.claude/skills/descaling/SKILL.md',
+          },
+        ],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath} sync/manifest.json tree`
+    .cwd(ctx.directory)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      "check-sync-manifest: entry 'skill-kettle' links ../descaling/SKILL.md from skills/kettle/SKILL.md, which skill-descaling delivers; add it to the entry's needs\n",
+  });
+});
+
+test('it passes a link to an opt-in skill that the linking entry needs, and a code-block link to no file', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'tree/skills/kettle/SKILL.md':
+      'Descale it as [descaling](../descaling/SKILL.md) says.\n\n```markdown\n[Spout](../spout/SKILL.md)\n```\n',
+    'tree/skills/descaling/SKILL.md': '# Descaling\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'skill-kettle',
+        description: 'The kettle skill',
+        needs: ['skill-descaling'],
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+        ],
+      },
+      {
+        name: 'skill-descaling',
+        description: 'The descaling skill',
+        optIn: true,
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/descaling/SKILL.md',
+            target: '.claude/skills/descaling/SKILL.md',
+          },
+        ],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath} sync/manifest.json tree`
+    .cwd(ctx.directory)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
+});
+
+test('it fails when needs names an entry the manifest lacks', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/editorconfig': 'root = true\n',
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'editorconfig',
+        description: 'The editor config',
+        needs: ['socket'],
+        files: [{ source: 'sync/editorconfig', target: '.editorconfig' }],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      "check-sync-manifest: entry 'editorconfig' has a needs field that is not a list of entry names\n",
+  });
+});
+
+test('it fails with the read error when a Markdown source cannot be read', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.directory, 'sync/kettle.md'), { recursive: true });
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/manifest.json': JSON.stringify([
+      {
+        name: 'doc-kettle',
+        description: 'The kettle doc',
+        files: [{ source: 'sync/kettle.md', target: 'kettle.md' }],
+      },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      "check-sync-manifest: entry 'doc-kettle' lists source sync/kettle.md of zgeoff/tools, which does not exist\n" +
+      'check-sync-manifest: the Markdown sources cannot be read for the link rule: EISDIR: illegal operation on a directory, read\n',
+  });
+});
+
+test('it fails on a manifest whose entry has no description, which the sync refuses', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'sync/editorconfig': 'root = true\n',
+    'sync/manifest.json': JSON.stringify([
+      { name: 'editorconfig', files: [{ source: 'sync/editorconfig', target: '.editorconfig' }] },
+    ]),
+  });
+
+  const result = await $`bash ${ctx.scriptPath}`.cwd(ctx.directory).nothrow().quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      'check-sync-manifest: the repo-sync scripts cannot parse sync/manifest.json, so the sync would refuse it\n',
+  });
 });

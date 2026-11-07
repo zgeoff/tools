@@ -9,6 +9,7 @@ export function buildMockSyncEntry(overrides: Partial<SyncEntry> = {}): SyncEntr
     build: '',
     optIn: false,
     scripts: {},
+    needs: [],
     ...overrides,
   };
 }
