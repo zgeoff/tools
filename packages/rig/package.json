@@ -30,12 +30,12 @@
       "default": "./dist/index.js"
     },
     "./e2e": {
-      "types": "./dist/e2e.d.ts",
-      "bun": "./src/e2e.ts"
+      "types": "./dist/programs/index.d.ts",
+      "bun": "./src/programs/index.ts"
     },
     "./bench": {
-      "types": "./dist/bench.d.ts",
-      "bun": "./src/bench.ts"
+      "types": "./dist/bench/index.d.ts",
+      "bun": "./src/bench/index.ts"
     },
     "./test-utils/*": "./src/test-utils/*.ts"
   },

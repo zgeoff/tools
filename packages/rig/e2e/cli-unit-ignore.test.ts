@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readGitEnv, readRunFolderPrefix, runGit, writeTreeFiles } from '@zgeoff/testing/helpers';
 import { run } from '@zgeoff/testing/process';
-import { resolveProgram } from '../src/e2e.ts';
+import { resolveProgram } from '../src/programs/index.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('rig-unit-ignore-')));

@@ -2,12 +2,12 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readLoadLedger } from './load-ledger.ts';
-import { recordCommandReads } from './record-codex-loads.ts';
+import { readLoadLedger } from './read-load-ledger.ts';
+import { recordCommandReads } from './record-command-reads.ts';
 import { resolveLedgerPath } from './resolve-state-dir.ts';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'record-codex-loads-'));
+  const directory = await mkdtemp(join(tmpdir(), 'record-command-reads-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { buildBrowserRun } from '../src/browser/build-browser-run.ts';
 import { pickChromeDirs } from '../src/browser/pick-chrome-dirs.ts';
-import { resolveProgram } from '../src/e2e.ts';
+import { resolveProgram } from '../src/programs/index.ts';
 import type { StubBuildRepo } from '../src/test-utils/create-stub-build-repo.ts';
 import { createStubBuildRepo } from '../src/test-utils/create-stub-build-repo.ts';
 import { probeProcess } from '../src/test-utils/probe-process.ts';
