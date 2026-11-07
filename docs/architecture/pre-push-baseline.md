@@ -93,8 +93,8 @@ the full suite, in two cases:
 The job passes `bun test` the [worker count](./memory-caps.md#the-worker-count) as `--parallel`,
 with `--no-isolate`, so the files of a worker share one global, as they do in the repo's own test
 run. With one worker it also raises the per-test timeout, because a host with one worker runs each
-file slower than CI does. The runner holds that timeout as one constant, the only place a run may
-raise the timeout.
+file slower than CI does. `scripts/build-related-test-command.ts`, which builds the runner's
+command, holds that timeout as one constant, the only place a run may raise the timeout.
 
 ## The delivered baseline
 
