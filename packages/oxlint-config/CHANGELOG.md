@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.10.0](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.9.0...@zgeoff/oxlint-config@0.10.0) (2026-11-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **oxlint-config:** a repo whose packages break the cap, keep a synonym folder or import a feature from utils/ fails lint until it folds them or lists them in pending.
+
+### Features
+
+* **oxlint-config:** add zgeoff/feature-folders to cap src/ roots ([#548](https://github.com/zgeoff/tools/issues/548)) ([fd9589d](https://github.com/zgeoff/tools/commit/fd9589d623094edd0eed5b62ef3c94d8a50b27b6))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/rig bumped to 0.2.1
+    * @zgeoff/std bumped to 0.4.3
+    * @zgeoff/testing bumped to 0.3.0
+
 ## [0.9.0](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.8.6...@zgeoff/oxlint-config@0.9.0) (2026-11-07)
 
 

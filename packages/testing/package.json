@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/testing",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Drive a real program from a Bun test, in a pseudo-terminal or as a process with a ready check",
   "keywords": [
     "bun",

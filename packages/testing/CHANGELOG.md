@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.0](https://github.com/zgeoff/tools/compare/@zgeoff/testing@0.2.1...@zgeoff/testing@0.3.0) (2026-11-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **oxlint-config:** a repo whose packages break the cap, keep a synonym folder or import a feature from utils/ fails lint until it folds them or lists them in pending.
+
+### Features
+
+* **oxlint-config:** add zgeoff/feature-folders to cap src/ roots ([#548](https://github.com/zgeoff/tools/issues/548)) ([fd9589d](https://github.com/zgeoff/tools/commit/fd9589d623094edd0eed5b62ef3c94d8a50b27b6))
+
 ## [0.2.1](https://github.com/zgeoff/tools/compare/@zgeoff/testing@0.2.0...@zgeoff/testing@0.2.1) (2026-11-05)
 
 

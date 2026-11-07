@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.1](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.2.0...@zgeoff/rig@0.2.1) (2026-11-07)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zgeoff/diet bumped to 0.2.2
+    * @zgeoff/std bumped to 0.4.3
+  * devDependencies
+    * @zgeoff/std bumped to 0.4.3
+    * @zgeoff/testing bumped to 0.3.0
+
 ## [0.2.0](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.1.6...@zgeoff/rig@0.2.0) (2026-11-07)
 
 
