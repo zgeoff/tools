@@ -1,5 +1,6 @@
 import { posix } from 'node:path';
 import { match } from 'ts-pattern';
+import { isTestFile } from './is-test-file.ts';
 import { makeIgnoreCheck } from './make-ignore-check.ts';
 import type { TestArgs } from './parse-test-args.ts';
 import { pickE2EDirs } from './pick-e2e-dirs.ts';
@@ -48,8 +49,6 @@ export function buildTestSelection(request: TestSelectionRequest): TestSelection
     : { kind: 'files', files: files.map((file) => `./${file}`), flags: split.flags };
 }
 
-const testFilePattern = /[._](?:test|spec)\.[jt]sx?$/u;
-
 // No lane takes a file that the config ignores. Of the rest, the unit lane takes every test file
 // that no other lane claims, the e2e lane the ones under its folders, and any other lane the ones
 // with its suffix.
@@ -66,7 +65,7 @@ function collectLaneTestFiles(request: TestSelectionRequest): readonly string[] 
   const isClaimedBySuffix = (file: string) =>
     config.lanes.some((other) => other.suffix !== null && hasLaneSuffix(file, other.suffix));
 
-  const testFiles = trackedFiles.filter((file) => testFilePattern.test(file) && !isIgnored(file));
+  const testFiles = trackedFiles.filter((file) => isTestFile(file) && !isIgnored(file));
   const suffix = lane.suffix;
 
   if (suffix !== null) {

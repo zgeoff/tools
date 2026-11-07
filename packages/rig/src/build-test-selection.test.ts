@@ -185,6 +185,19 @@ test('it leaves the paths that the config ignores out of the unit lane', () => {
   expect(selection).toStrictEqual({ kind: 'files', files: ['./pkg/src/oven.test.ts'], flags: [] });
 });
 
+test('it leaves out a file named by its path under a folder that an ignore glob matches', () => {
+  const selection = buildTestSelection({
+    config: defineRig({ ignore: ['skip/*'] }),
+    lane: { name: 'unit', suffix: null },
+    repoRoot: '/repo',
+    isWorkspaceRepo: false,
+    trackedFiles: ['skip/nested/oven.test.ts', 'pkg/src/oven.test.ts'],
+    args: { flags: [], paths: ['./skip/nested/oven.test.ts'] },
+  });
+
+  expect(selection).toStrictEqual({ kind: 'none', paths: ['./skip/nested/oven.test.ts'] });
+});
+
 test('it selects nothing for a unit run given only an ignored folder', () => {
   const selection = buildTestSelection({
     config: defineRig({ ignore: ['skip/**'] }),

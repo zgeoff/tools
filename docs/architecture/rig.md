@@ -82,14 +82,16 @@ scripts for the lanes the repo has and a starter config, and a second run change
 The config's `ignore` list holds globs, relative to the repo root, of paths that no lane tests, such
 as a design folder or a package with a test runner of its own. One list serves every lane, because a
 path that holds no test of the repo's lanes holds none for any of them. Every lane, `rig unit` and
-`rig related` drop a tracked file that a glob matches from their selection, and pass each glob to
-`bun test` as a `--path-ignore-patterns` argument. A repo lists these paths in `ignore`, and never
-in `bunfig.toml`, because a `--path-ignore-patterns` argument replaces the `pathIgnorePatterns` list
-there, and rig passes one to every unit and e2e run.
+`rig related` drop a tracked file from their selection when a glob matches the file or a folder
+above it, as `bun test` skips a matched folder, and pass each glob to `bun test` as a
+`--path-ignore-patterns` argument. `bun test` checks a file that a path names against the glob, but
+never against the folders above it, so rig drops ignored files from a path selection itself. A repo
+lists these paths in `ignore`, and never in `bunfig.toml`, because a `--path-ignore-patterns`
+argument replaces the `pathIgnorePatterns` list there, and rig passes one to every unit and e2e run.
 
 - A path argument that selects only ignored files fails the run, as one that selects only another
   lane's files does.
-- An `e2e` folder that holds only ignored files needs no program.
+- An `e2e` folder whose test files are all ignored needs no program.
 - `rig related` runs no test for a changed file, or a sibling test, that a glob matches.
 
 ## The browser lane

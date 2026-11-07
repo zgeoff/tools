@@ -13,6 +13,10 @@ test.each([
   expect(isIgnoredPath(path)).toBe(isIgnored);
 });
 
+test('it ignores a file under a folder that a glob matches, as bun test discovery does', () => {
+  expect(makeIgnoreCheck(['skip/*'])('skip/nested/oven.test.ts')).toBeTrue();
+});
+
 test('it ignores no path when the list is empty', () => {
   expect(makeIgnoreCheck([])('skip/oven.test.ts')).toBeFalse();
 });
