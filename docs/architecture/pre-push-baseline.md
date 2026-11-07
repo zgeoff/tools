@@ -41,11 +41,11 @@ when the branch changes a file that matches their glob, and the other jobs run o
 | chex-typecheck        | the repo's `typecheck` script            | the whole tree               |
 | chex-test             | `rig related`                            | the changed code files       |
 
-The repo's `check:docs` script names the docs checks it takes, such as `chex prose length links`,
-which `chex init` writes. A repo with no `check:docs` script fails the docs job, because the job
-never picks checks by the files a repo has. The baseline also runs `typecheck` before a commit that
-stages a code or JSON file, after the repo's own pre-commit jobs, so the type check sees what the
-fixers wrote.
+The repo's `check:docs` script names the docs checks it takes, such as `chex prose length links`.
+[`chex init`](../../packages/chex/README.md) writes a default when the repo has none. A repo with no
+`check:docs` script fails the docs job, because the job never picks checks by the files a repo has.
+The baseline also runs `typecheck` before a commit that stages a code or JSON file, after the repo's
+own pre-commit jobs, so the type check sees what the fixers wrote.
 
 The uncommitted check runs first. It fails the push when a file the branch changes or deletes
 differs from the pushed commit on disk or in the index, such as a staged change or a deleted file
