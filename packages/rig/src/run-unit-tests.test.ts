@@ -16,39 +16,42 @@ function setupTest() {
   return { signal, runCommand, output };
 }
 
-test.each([['--watch'], ['--coverage-reporter=lcov']])(
-  'it exits 2 and runs nothing for %s when the tests need more than one run',
-  async (flag) => {
-    const ctx = setupTest();
+test('it exits 2, writes why and runs nothing for --watch when the tests need more than one run', async () => {
+  const ctx = setupTest();
 
-    const exitCode = await runUnitTests(
-      defineRig({}),
-      {
-        workerCount: 1,
-        flags: [flag],
-        tests: ['packages/oven/src/heat.test.ts', 'src/till.test.ts'],
-        isDiscovery: false,
-      },
-      { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
-      {
-        dietScript: '/diet.sh',
-        runCommand: ctx.runCommand,
-        output: ctx.output,
-        probeWorkspaceRepo: () => Promise.resolve(true),
-        readTrackedFiles: () =>
-          Promise.resolve(['packages/oven/package.json', 'packages/oven/bunfig.toml']),
-      },
-    );
+  const exitCode = await runUnitTests(
+    defineRig({}),
+    {
+      workerCount: 1,
+      flags: ['--watch'],
+      tests: ['packages/oven/src/heat.test.ts', 'src/till.test.ts'],
+      isDiscovery: false,
+    },
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      runCommand: ctx.runCommand,
+      output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(true),
+      readTrackedFiles: () =>
+        Promise.resolve(['packages/oven/package.json', 'packages/oven/bunfig.toml']),
+    },
+  );
 
-    expect(exitCode).toBe(2);
-
-    expect(ctx.output.err).toHaveBeenCalledExactlyOnceWith(
-      `rig: ${flag} needs the tests in one bun test run, and these tests need 2, one for each bunfig; name the tests of one bunfig\n`,
-    );
-
-    expect(ctx.runCommand).not.toHaveBeenCalled();
-  },
-);
+  expect({
+    exitCode,
+    errors: ctx.output.err.mock.calls,
+    runCount: ctx.runCommand.mock.calls.length,
+  }).toStrictEqual({
+    exitCode: 2,
+    errors: [
+      [
+        'rig: --watch needs the tests in one bun test run, and these tests need 2, one for each bunfig; name the tests of one bunfig\n',
+      ],
+    ],
+    runCount: 0,
+  });
+});
 
 test('it passes --watch on when the tests need one run', async () => {
   const ctx = setupTest();

@@ -1,22 +1,16 @@
 import { join } from 'node:path';
+import { match } from 'ts-pattern';
 import { buildDietCommand } from './build-diet-command.ts';
 import { buildUnitCommand } from './build-unit-command.ts';
-import { collectTestRuns } from './collect-test-runs.ts';
-import { findSingleRunFlag } from './find-single-run-flag.ts';
+import type { TestRun } from './collect-test-runs.ts';
 import { pickE2EDirs } from './pick-e2e-dirs.ts';
+import type { UnitRunPlanRequest } from './pick-unit-run-plan.ts';
+import { pickUnitRunPlan } from './pick-unit-run-plan.ts';
 import type { CommandOptions } from './run-command.ts';
 import type { RigConfig, RigOutput, RigRun } from './types.ts';
 
-export interface UnitRequest {
+export interface UnitRequest extends UnitRunPlanRequest {
   readonly workerCount: number;
-
-  readonly flags: readonly string[];
-
-  // The unit tests to run, relative to the repo root.
-  readonly tests: readonly string[];
-
-  // True when the run takes the whole unit lane, so the root run finds its own tests.
-  readonly isDiscovery: boolean;
 }
 
 export interface UnitRunDeps {
@@ -31,8 +25,6 @@ export interface UnitRunDeps {
   readonly output: RigOutput;
 }
 
-// The unit lane's command is built from the lane table, so a lane that the table lists never
-// reaches the unit run. Every run goes ahead after one fails, so the output shows every failure.
 export async function runUnitTests(
   config: RigConfig,
   request: UnitRequest,
@@ -42,50 +34,65 @@ export async function runUnitTests(
   const trackedFiles = await deps.readTrackedFiles(run.repoRoot);
   const isWorkspaceRepo = await deps.probeWorkspaceRepo(run.repoRoot);
 
-  const e2eDirs = pickE2EDirs(trackedFiles, isWorkspaceRepo);
-  const memory = config.lanes.find((lane) => lane.name === 'unit')?.memory ?? null;
+  return match(pickUnitRunPlan(config, request, trackedFiles))
+    .with({ kind: 'refused' }, (refused) => {
+      deps.output.err(refused.message);
 
-  const testRuns = collectTestRuns({
-    bunfigs: config.bunfigs,
-    trackedFiles,
-    tests: request.tests,
-    isDiscovery: request.isDiscovery,
-  });
+      return 2;
+    })
+    .with({ kind: 'runs' }, (plan) =>
+      runTestRuns(plan.testRuns, pickE2EDirs(trackedFiles, isWorkspaceRepo), {
+        config,
+        request,
+        run,
+        deps,
+      }),
+    )
+    .exhaustive();
+}
 
-  const singleRunFlag = findSingleRunFlag(request.flags);
+interface TestRunsContext {
+  readonly config: RigConfig;
 
-  if (singleRunFlag !== undefined && testRuns.length > 1) {
-    deps.output.err(
-      `rig: ${singleRunFlag} needs the tests in one bun test run, and these tests need ${testRuns.length}, one for each bunfig; name the tests of one bunfig\n`,
-    );
+  readonly request: UnitRequest;
 
-    return 2;
-  }
+  readonly run: RigRun;
 
+  readonly deps: UnitRunDeps;
+}
+
+// The unit lane's command is built from the lane table, so a lane that the table lists never
+// reaches the unit run. Every run goes ahead after one fails, so the output shows every failure.
+async function runTestRuns(
+  testRuns: readonly TestRun[],
+  e2eDirs: readonly string[],
+  ctx: TestRunsContext,
+): Promise<number> {
+  const memory = ctx.config.lanes.find((lane) => lane.name === 'unit')?.memory ?? null;
   let exitCode = 0;
 
   for (const testRun of testRuns) {
-    const runExitCode = await deps.runCommand(
+    const runExitCode = await ctx.deps.runCommand(
       buildDietCommand(
-        deps.dietScript,
+        ctx.deps.dietScript,
         memory,
-        buildUnitCommand(config, {
+        buildUnitCommand(ctx.config, {
           e2eDirs,
-          workerCount: request.workerCount,
+          workerCount: ctx.request.workerCount,
           testRun,
-          flags: request.flags,
+          flags: ctx.request.flags,
         }),
       ),
       {
-        cwd: join(run.repoRoot, testRun.folder),
-        environment: run.environment,
-        signal: run.signal,
+        cwd: join(ctx.run.repoRoot, testRun.folder),
+        environment: ctx.run.environment,
+        signal: ctx.run.signal,
       },
     );
 
     exitCode = exitCode === 0 ? runExitCode : exitCode;
 
-    if (run.signal.aborted) {
+    if (ctx.run.signal.aborted) {
       break;
     }
   }
