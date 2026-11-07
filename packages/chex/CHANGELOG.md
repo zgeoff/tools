@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.2.1...@zgeoff/chex@0.2.2) (2026-11-07)
+
+
+### Bug Fixes
+
+* **chex:** add readmes to the check:docs script that init writes ([#563](https://github.com/zgeoff/tools/issues/563)) ([fe2d536](https://github.com/zgeoff/tools/commit/fe2d5368bf2e7acd2d8e4de44d0c8a51bce8b4c8))
+
 ## [0.2.1](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.2.0...@zgeoff/chex@0.2.1) (2026-11-07)
 
 
