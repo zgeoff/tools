@@ -25,11 +25,11 @@ test('it logs the call and links the package into node_modules', async () => {
   const ctx = await setupTest();
 
   const log = join(ctx.directory, 'install.log');
-  const packageDir = join(ctx.directory, 'ledger');
+  const packageDirectory = join(ctx.directory, 'ledger');
 
   await createStubInstall(ctx.bin, {
     log,
-    outcome: { kind: 'links', packageName: '@acme/ledger', packageDir },
+    outcome: { kind: 'links', packageName: '@acme/ledger', packageDirectory },
   });
 
   const install = Bun.spawnSync([join(ctx.bin, 'bun'), 'install', '--frozen-lockfile'], {
@@ -42,7 +42,7 @@ test('it logs the call and links the package into node_modules', async () => {
   const target = await readlink(join(ctx.project, 'node_modules/@acme/ledger'));
   const calls = await readFile(log, 'utf8');
 
-  expect(target).toBe(packageDir);
+  expect(target).toBe(packageDirectory);
   expect(calls).toBe(`bun install --frozen-lockfile in ${ctx.project}\n`);
 });
 
@@ -107,11 +107,11 @@ test('it links the package only once the release path exists', async () => {
   const ctx = await setupTest();
 
   const releasePath = join(ctx.directory, 'release');
-  const packageDir = join(ctx.directory, 'ledger');
+  const packageDirectory = join(ctx.directory, 'ledger');
 
   await createStubInstall(ctx.bin, {
     log: join(ctx.directory, 'install.log'),
-    outcome: { kind: 'links', packageName: 'ledger', packageDir },
+    outcome: { kind: 'links', packageName: 'ledger', packageDirectory },
     releasePath,
   });
 
@@ -138,5 +138,5 @@ test('it links the package only once the release path exists', async () => {
 
   expect(linkedBeforeRelease).toBeFalse();
   expect(exitCode).toBe(0);
-  expect(target).toBe(packageDir);
+  expect(target).toBe(packageDirectory);
 });

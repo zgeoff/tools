@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { chmod, copyFile, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { waitFor } from '@zgeoff/testing/helpers';
 import { buildPreToolUsePayload } from '../test-utils/build-pre-tool-use-payload.ts';
 import { createStubInstall } from '../test-utils/create-stub-install.ts';
 import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
@@ -22,9 +23,6 @@ import {
   runInstallOnce,
 } from './start.ts';
 
-// Root ignores file modes, so a folder or a lock with no permissions cannot stop root from using it.
-const isRoot = process.getuid?.() === 0;
-
 // The stub installs with the bun on PATH and runs the retry with its own runtime, so a stand-in bun
 // first on PATH stands in for the install alone. Its installed package re-exports this repo's
 // source, so the gate that runs after the install is the real one.
@@ -35,13 +33,13 @@ async function setupTest() {
 
   const project = join(directory, 'project');
   const fakeBin = join(directory, 'bin');
-  const packageDir = join(directory, 'package');
+  const packageDirectory = join(directory, 'package');
   const installLog = join(directory, 'install.log');
   const stubPath = join(project, '.claude/hooks/start.ts');
 
   await mkdir(join(project, '.claude/hooks'), { recursive: true });
   await mkdir(fakeBin);
-  await mkdir(packageDir);
+  await mkdir(packageDirectory);
   await copyFile(join(import.meta.dir, 'start.ts'), stubPath);
 
   const env = {
@@ -93,7 +91,7 @@ async function setupTest() {
     directory,
     project,
     fakeBin,
-    packageDir,
+    packageDirectory,
     agentHooksSource: join(import.meta.dir, '../../packages/agent-hooks/src/index.ts'),
     installLog,
     stubPath,
@@ -110,10 +108,14 @@ test('it installs the missing package in a fresh worktree, then blocks a gated e
 
   await createStubInstall(ctx.fakeBin, {
     log: ctx.installLog,
-    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+    outcome: {
+      kind: 'links',
+      packageName: '@zgeoff/agent-hooks',
+      packageDirectory: ctx.packageDirectory,
+    },
   });
 
-  await writeTreeFiles(ctx.packageDir, {
+  await writeTreeFiles(ctx.packageDirectory, {
     'package.json': JSON.stringify({
       name: '@zgeoff/agent-hooks',
       type: 'module',
@@ -135,63 +137,32 @@ test('it installs the missing package in a fresh worktree, then blocks a gated e
     [],
   );
 
-  expect(result.status).toBe(2);
-  expect(result.stdout).toBe('');
-
-  expect(result.stderr).toBe(
-    `stub install started\nLoad the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
-  );
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr: `stub install started\nLoad the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  });
 
   const installLog = await ctx.readInstallLog();
 
   expect(installLog).toBe(`bun install --frozen-lockfile in ${ctx.project}\n`);
 });
 
-test('it allows an ungated edit after the install with no output', async () => {
-  const ctx = await setupTest();
-
-  await createStubInstall(ctx.fakeBin, {
-    log: ctx.installLog,
-    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
-  });
-
-  await writeTreeFiles(ctx.packageDir, {
-    'package.json': JSON.stringify({
-      name: '@zgeoff/agent-hooks',
-      type: 'module',
-      exports: './index.ts',
-    }),
-    'index.ts': `export * from ${JSON.stringify(ctx.agentHooksSource)};\n`,
-  });
-
-  await writeTreeFiles(ctx.project, {
-    '.claude/skill-gate.json': JSON.stringify({
-      gates: [{ match: '**/*.md', skills: ['docs-writing'] }],
-    }),
-    '.claude/skills/docs-writing/SKILL.md': '# Docs writing\n',
-    'transcript.jsonl': '',
-  });
-
-  const result = ctx.runStub(
-    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'main.ts') }),
-    [],
-  );
-
-  expect(result.status).toBe(0);
-  expect(result.stdout).toBe('');
-});
-
-test.each([{ argv: ['--'] }, { argv: ['--harness', 'codex', '--'] }])(
-  'it allows an ungated edit after the install when its arguments are $argv',
+test.each([{ argv: [] }, { argv: ['--'] }, { argv: ['--harness', 'codex', '--'] }])(
+  'it allows an ungated edit after the install, with only the install output, when its arguments are $argv',
   async (row) => {
     const ctx = await setupTest();
 
     await createStubInstall(ctx.fakeBin, {
       log: ctx.installLog,
-      outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+      outcome: {
+        kind: 'links',
+        packageName: '@zgeoff/agent-hooks',
+        packageDirectory: ctx.packageDirectory,
+      },
     });
 
-    await writeTreeFiles(ctx.packageDir, {
+    await writeTreeFiles(ctx.packageDirectory, {
       'package.json': JSON.stringify({
         name: '@zgeoff/agent-hooks',
         type: 'module',
@@ -226,10 +197,14 @@ test('it runs no install when the package loads', async () => {
 
   await createStubInstall(ctx.fakeBin, {
     log: ctx.installLog,
-    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+    outcome: {
+      kind: 'links',
+      packageName: '@zgeoff/agent-hooks',
+      packageDirectory: ctx.packageDirectory,
+    },
   });
 
-  await writeTreeFiles(ctx.packageDir, {
+  await writeTreeFiles(ctx.packageDirectory, {
     'package.json': JSON.stringify({
       name: '@zgeoff/agent-hooks',
       type: 'module',
@@ -256,11 +231,11 @@ test('it runs no install when the package loads', async () => {
     [],
   );
 
-  expect(result.status).toBe(2);
-
-  expect(result.stderr).toBe(
-    `Load the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
-  );
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr: `Load the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  });
 
   const installLog = await ctx.readInstallLog();
 
@@ -320,10 +295,14 @@ test('it refuses a gated edit with the import error and the install message when
 
   await createStubInstall(ctx.fakeBin, {
     log: ctx.installLog,
-    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+    outcome: {
+      kind: 'links',
+      packageName: '@zgeoff/agent-hooks',
+      packageDirectory: ctx.packageDirectory,
+    },
   });
 
-  await writeTreeFiles(ctx.packageDir, {
+  await writeTreeFiles(ctx.packageDirectory, {
     'package.json': JSON.stringify({
       name: '@zgeoff/agent-hooks',
       type: 'module',
@@ -345,15 +324,53 @@ test('it refuses a gated edit with the import error and the install message when
   });
 });
 
+test('it refuses a gated edit when the installed package has no hook to run', async () => {
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: {
+      kind: 'links',
+      packageName: '@zgeoff/agent-hooks',
+      packageDirectory: ctx.packageDirectory,
+    },
+  });
+
+  await writeTreeFiles(ctx.packageDirectory, {
+    'package.json': JSON.stringify({
+      name: '@zgeoff/agent-hooks',
+      type: 'module',
+      exports: './index.ts',
+    }),
+    'index.ts': 'export const ledgerVersion = 3;\n',
+  });
+
+  const result = ctx.runStub(
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
+    [],
+  );
+
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr:
+      "stub install started\nThe agent hook failed: TypeError: step.agentHooks.runAgentHook is not a function. (In 'step.agentHooks.runAgentHook({ harness: args.harness })', 'step.agentHooks.runAgentHook' is undefined)\n",
+  });
+});
+
 test('it prints the import error and lets a PostToolUse event through when the installed package throws on import', async () => {
   const ctx = await setupTest();
 
   await createStubInstall(ctx.fakeBin, {
     log: ctx.installLog,
-    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+    outcome: {
+      kind: 'links',
+      packageName: '@zgeoff/agent-hooks',
+      packageDirectory: ctx.packageDirectory,
+    },
   });
 
-  await writeTreeFiles(ctx.packageDir, {
+  await writeTreeFiles(ctx.packageDirectory, {
     'package.json': JSON.stringify({
       name: '@zgeoff/agent-hooks',
       type: 'module',
@@ -407,11 +424,11 @@ test.each([
 
   const result = ctx.runStub(buildPreToolUsePayload(ctx.project, 'Bash', { command }), []);
 
-  expect(result.status).toBe(2);
-
-  expect(result.stderr).toEndWith(
-    'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n',
-  );
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr: `stub install started\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+  });
 });
 
 test.each([
@@ -438,11 +455,11 @@ test.each([
     [],
   );
 
-  expect(result.status).toBe(2);
-
-  expect(result.stderr).toEndWith(
-    'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n',
-  );
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr: `stub install started\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+  });
 });
 
 test.each([
@@ -458,8 +475,11 @@ test.each([
 
   const result = ctx.runStub(buildPreToolUsePayload(ctx.project, 'Bash', { command }), []);
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).toBe('');
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 0,
+    stdout: '',
+    stderr: `stub install started\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\n`,
+  });
 });
 
 test('it refuses a gated tool call when the install fails', async () => {
@@ -472,11 +492,11 @@ test('it refuses a gated tool call when the install fails', async () => {
     [],
   );
 
-  expect(result.status).toBe(2);
-
-  expect(result.stderr).toEndWith(
-    'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n',
-  );
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr: `stub install started\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+  });
 });
 
 test('it lets a prompt through when the install fails, so a person can still ask for the install', async () => {
@@ -489,8 +509,11 @@ test('it lets a prompt through when the install fails, so a person can still ask
     ['--harness', 'codex'],
   );
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).toBe('');
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 0,
+    stdout: '',
+    stderr: `stub install started\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\n`,
+  });
 });
 
 test('it runs one install for two parallel hook calls in one worktree', async () => {
@@ -500,11 +523,15 @@ test('it runs one install for two parallel hook calls in one worktree', async ()
 
   await createStubInstall(ctx.fakeBin, {
     log: ctx.installLog,
-    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+    outcome: {
+      kind: 'links',
+      packageName: '@zgeoff/agent-hooks',
+      packageDirectory: ctx.packageDirectory,
+    },
     releasePath,
   });
 
-  await writeTreeFiles(ctx.packageDir, {
+  await writeTreeFiles(ctx.packageDirectory, {
     'package.json': JSON.stringify({
       name: '@zgeoff/agent-hooks',
       type: 'module',
@@ -556,10 +583,14 @@ test('it installs over a lock that a stopped hook left behind', async () => {
 
   await createStubInstall(ctx.fakeBin, {
     log: ctx.installLog,
-    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+    outcome: {
+      kind: 'links',
+      packageName: '@zgeoff/agent-hooks',
+      packageDirectory: ctx.packageDirectory,
+    },
   });
 
-  await writeTreeFiles(ctx.packageDir, {
+  await writeTreeFiles(ctx.packageDirectory, {
     'package.json': JSON.stringify({
       name: '@zgeoff/agent-hooks',
       type: 'module',
@@ -586,11 +617,11 @@ test('it installs over a lock that a stopped hook left behind', async () => {
     [],
   );
 
-  expect(result.status).toBe(2);
-
-  expect(result.stderr).toBe(
-    `stub install started\nLoad the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
-  );
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr: `stub install started\nLoad the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  });
 });
 
 test.each([
@@ -601,10 +632,14 @@ test.each([
 
   await createStubInstall(ctx.fakeBin, {
     log: ctx.installLog,
-    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+    outcome: {
+      kind: 'links',
+      packageName: '@zgeoff/agent-hooks',
+      packageDirectory: ctx.packageDirectory,
+    },
   });
 
-  await writeTreeFiles(ctx.packageDir, {
+  await writeTreeFiles(ctx.packageDirectory, {
     'package.json': JSON.stringify({
       name: '@zgeoff/agent-hooks',
       type: 'module',
@@ -629,11 +664,11 @@ test.each([
     [],
   );
 
-  expect(result.status).toBe(2);
-
-  expect(result.stderr).toBe(
-    `stub install started\nLoad the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
-  );
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr: `stub install started\nLoad the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  });
 });
 
 test('it waits while another hook holds the guard on the install lock, then installs over a stale lock', async () => {
@@ -641,10 +676,14 @@ test('it waits while another hook holds the guard on the install lock, then inst
 
   await createStubInstall(ctx.fakeBin, {
     log: ctx.installLog,
-    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+    outcome: {
+      kind: 'links',
+      packageName: '@zgeoff/agent-hooks',
+      packageDirectory: ctx.packageDirectory,
+    },
   });
 
-  await writeTreeFiles(ctx.packageDir, {
+  await writeTreeFiles(ctx.packageDirectory, {
     'package.json': JSON.stringify({
       name: '@zgeoff/agent-hooks',
       type: 'module',
@@ -697,7 +736,11 @@ test('it skips the install and refuses when a stopped hook left the guard behind
 
   await createStubInstall(ctx.fakeBin, {
     log: ctx.installLog,
-    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+    outcome: {
+      kind: 'links',
+      packageName: '@zgeoff/agent-hooks',
+      packageDirectory: ctx.packageDirectory,
+    },
   });
 
   const stopped = spawnSync('true');
@@ -728,11 +771,15 @@ test('it runs one install for two hook calls that meet a stale lock at once', as
 
   await createStubInstall(ctx.fakeBin, {
     log: ctx.installLog,
-    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+    outcome: {
+      kind: 'links',
+      packageName: '@zgeoff/agent-hooks',
+      packageDirectory: ctx.packageDirectory,
+    },
     releasePath,
   });
 
-  await writeTreeFiles(ctx.packageDir, {
+  await writeTreeFiles(ctx.packageDirectory, {
     'package.json': JSON.stringify({
       name: '@zgeoff/agent-hooks',
       type: 'module',
@@ -782,24 +829,26 @@ test('it runs one install for two hook calls that meet a stale lock at once', as
 
   expect(firstStatus).toBe(2);
   expect(secondStatus).toBe(2);
-
-  expect(waiting).toInclude(
-    'Another agent hook runs bun install here, so this one waits for it.\n',
-  );
+  expect(waiting).toBe('Another agent hook runs bun install here, so this one waits for it.\n');
 
   const installLog = await ctx.readInstallLog();
 
   expect(installLog).toBe(`bun install --frozen-lockfile in ${ctx.project}\n`);
 });
 
-test.skipIf(isRoot)(
+// Root ignores file modes, so a folder or a lock with no permissions cannot stop root from using it.
+test.skipIf(process.getuid?.() === 0)(
   'it skips the install and refuses when it cannot create the install lock',
   async () => {
     const ctx = await setupTest();
 
     await createStubInstall(ctx.fakeBin, {
       log: ctx.installLog,
-      outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+      outcome: {
+        kind: 'links',
+        packageName: '@zgeoff/agent-hooks',
+        packageDirectory: ctx.packageDirectory,
+      },
     });
 
     await mkdir(join(ctx.project, 'node_modules'), { mode: 0o555 });
@@ -812,15 +861,12 @@ test.skipIf(isRoot)(
 
     const stderr = await new Response(hook.stderr).text();
 
-    expect(status).toBe(2);
-
-    expect(stderr).toStartWith(
-      `The agent hook could not run bun install: Error: EACCES: permission denied, open '${join(ctx.project, 'node_modules/.agent-hooks-install.lock.guard')}.`,
-    );
-
-    expect(stderr).toEndWith(
-      '\nTo work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n',
-    );
+    expect({ status, stderr }).toStrictEqual({
+      status: 2,
+      stderr: expect.stringMatching(
+        /^The agent hook could not run bun install: Error: EACCES: permission denied, open '.+\/node_modules\/\.agent-hooks-install\.lock\.guard\.\d+'\nThe agent hook could not load @zgeoff\/agent-hooks: ResolveMessage: Cannot find package '@zgeoff\/agent-hooks' imported from .+\nTo work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag\.\n$/u,
+      ),
+    });
 
     const installLog = await ctx.readInstallLog();
 
@@ -828,14 +874,19 @@ test.skipIf(isRoot)(
   },
 );
 
-test.skipIf(isRoot)(
+// Root ignores file modes, so a folder or a lock with no permissions cannot stop root from using it.
+test.skipIf(process.getuid?.() === 0)(
   'it skips the install and refuses when it cannot read the install lock',
   async () => {
     const ctx = await setupTest();
 
     await createStubInstall(ctx.fakeBin, {
       log: ctx.installLog,
-      outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+      outcome: {
+        kind: 'links',
+        packageName: '@zgeoff/agent-hooks',
+        packageDirectory: ctx.packageDirectory,
+      },
     });
 
     const stopped = spawnSync('true');
@@ -873,11 +924,11 @@ test('it refuses a harness it does not know', async () => {
     ['--harness', 'cursor'],
   );
 
-  expect(result.status).toBe(2);
-
-  expect(result.stderr).toBe(
-    'The agent hook does not know the harness cursor. Use codex or claude-code.\n',
-  );
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr: 'The agent hook does not know the harness cursor. Use codex or claude-code.\n',
+  });
 });
 
 // The stub retries with its own runtime, so a stand-in install that removes a copy of that runtime
@@ -950,7 +1001,7 @@ test.each([
         "The agent hook cannot read its arguments: TypeError [ERR_PARSE_ARGS_UNKNOWN_OPTION]: Unknown option '--verbose'",
     },
   },
-])('#parseHookArgs reads $argv', (row) => {
+])('#parseHookArgs reads $argv as $expected.kind', (row) => {
   expect(parseHookArgs(row.argv)).toStrictEqual(row.expected);
 });
 
@@ -984,14 +1035,53 @@ test.each([
 });
 
 test.each([
-  ['the guard is absent', { lock: 'guard', state: 'absent' }, 'retry-guard'],
-  ['another hook holds the guard', { lock: 'guard', state: 'held' }, 'wait-for-guard'],
-  ['a stopped hook left the guard', { lock: 'guard', state: 'stale' }, 'stop'],
-  ['the install lock is absent', { lock: 'install', state: 'absent' }, 'install'],
-  ['another hook holds the install lock', { lock: 'install', state: 'held' }, 'wait-for-install'],
-  ['a stopped hook left the install lock', { lock: 'install', state: 'stale' }, 'install'],
-] as const)('#pickInstallStep picks %s', (_, claim, expected) => {
-  expect(pickInstallStep(claim)).toBe(expected);
+  {
+    label: 'the guard is absent',
+    claim: { lock: 'guard', state: 'absent' },
+    expected: 'retry-guard',
+  },
+  {
+    label: 'another hook holds the guard',
+    claim: { lock: 'guard', state: 'held' },
+    expected: 'wait-for-guard',
+  },
+  {
+    label: 'a stopped hook left the guard',
+    claim: { lock: 'guard', state: 'stale' },
+    expected: 'stop',
+  },
+  {
+    label: 'the install lock is absent',
+    claim: { lock: 'install', state: 'absent' },
+    expected: 'install',
+  },
+  {
+    label: 'another hook holds the install lock',
+    claim: { lock: 'install', state: 'held' },
+    expected: 'wait-for-install',
+  },
+  {
+    label: 'a stopped hook left the install lock',
+    claim: { lock: 'install', state: 'stale' },
+    expected: 'install',
+  },
+  {
+    label: 'the install it waited for ended',
+    claim: { lock: 'waited', state: 'absent' },
+    expected: 'skip-install',
+  },
+  {
+    label: 'the install it waits for still runs',
+    claim: { lock: 'waited', state: 'held' },
+    expected: 'wait-for-install',
+  },
+  {
+    label: 'the hook it waited for stopped before its install ended',
+    claim: { lock: 'waited', state: 'stale' },
+    expected: 'claim-again',
+  },
+] as const)('#pickInstallStep picks $expected when $label', (row) => {
+  expect(pickInstallStep(row.claim)).toBe(row.expected);
 });
 
 test.each([
@@ -1030,41 +1120,40 @@ test('#readLockState reads an absent lock without a process check', async () => 
 test('#readLockState reads a lock whose process runs as held', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.directory, 'install.lock'), '4242');
+  await writeFile(join(ctx.directory, 'install.lock'), String(process.pid));
 
-  const signalProcess = mock<InstallDependencies['signalProcess']>();
+  const state = readLockState(join(ctx.directory, 'install.lock'), NODE_INSTALL_DEPENDENCIES);
+
+  expect(state).toBe('held');
+});
+
+test('#readLockState reads a lock whose process has stopped as stale', async () => {
+  const ctx = await setupTest();
+
+  const stopped = spawnSync('true');
+
+  await writeFile(join(ctx.directory, 'install.lock'), String(stopped.pid));
+
+  const state = readLockState(join(ctx.directory, 'install.lock'), NODE_INSTALL_DEPENDENCIES);
+
+  expect(state).toBe('stale');
+});
+
+// Root may signal any process, so a real EPERM cannot be had in a test that runs as root.
+test('#readLockState reads a lock as held when the process check fails with EPERM', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'install.lock'), '4242');
 
   const state = readLockState(join(ctx.directory, 'install.lock'), {
     ...NODE_INSTALL_DEPENDENCIES,
-    signalProcess,
+    signalProcess: mock(() => {
+      throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' });
+    }),
   });
 
-  expect({ state, signals: signalProcess.mock.calls }).toStrictEqual({
-    state: 'held',
-    signals: [[4242]],
-  });
+  expect(state).toBe('held');
 });
-
-test.each([
-  { code: 'ESRCH', expected: 'stale' },
-  { code: 'EPERM', expected: 'held' },
-])(
-  '#readLockState reads a lock as $expected when the process check fails with $code',
-  async (row) => {
-    const ctx = await setupTest();
-
-    await writeFile(join(ctx.directory, 'install.lock'), '4242');
-
-    const state = readLockState(join(ctx.directory, 'install.lock'), {
-      ...NODE_INSTALL_DEPENDENCIES,
-      signalProcess: mock(() => {
-        throw Object.assign(new Error(`kill ${row.code}`), { code: row.code });
-      }),
-    });
-
-    expect(state).toBe(row.expected);
-  },
-);
 
 test.each([
   { label: 'empty', contents: '' },
@@ -1085,17 +1174,19 @@ test.each([
 test('#claimInstallLock stops without a wait when a stopped hook left the guard', async () => {
   const ctx = await setupTest();
 
-  await writeTreeFiles(ctx.project, { 'node_modules/.agent-hooks-install.lock.guard': '4242' });
+  const stopped = spawnSync('true');
+
+  await writeTreeFiles(ctx.project, {
+    'node_modules/.agent-hooks-install.lock.guard': String(stopped.pid),
+  });
 
   const sleep = mock(() => Promise.resolve());
 
-  const step = await claimInstallLock(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), {
-    ...NODE_INSTALL_DEPENDENCIES,
-    signalProcess: mock(() => {
-      throw Object.assign(new Error('kill ESRCH'), { code: 'ESRCH' });
-    }),
-    sleep,
-  });
+  const step = await claimInstallLock(
+    join(ctx.project, 'node_modules/.agent-hooks-install.lock'),
+    Number.POSITIVE_INFINITY,
+    { ...NODE_INSTALL_DEPENDENCIES, sleep },
+  );
 
   const files = await readdir(join(ctx.project, 'node_modules'));
 
@@ -1109,13 +1200,15 @@ test('#claimInstallLock stops without a wait when a stopped hook left the guard'
 test('#claimInstallLock waits for the install and drops the guard when another hook holds the lock', async () => {
   const ctx = await setupTest();
 
-  await writeTreeFiles(ctx.project, { 'node_modules/.agent-hooks-install.lock': '4242' });
-
-  const step = await claimInstallLock(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), {
-    ...NODE_INSTALL_DEPENDENCIES,
-    signalProcess: mock<InstallDependencies['signalProcess']>(),
-    sleep: mock(() => Promise.resolve()),
+  await writeTreeFiles(ctx.project, {
+    'node_modules/.agent-hooks-install.lock': String(process.pid),
   });
+
+  const step = await claimInstallLock(
+    join(ctx.project, 'node_modules/.agent-hooks-install.lock'),
+    Number.POSITIVE_INFINITY,
+    NODE_INSTALL_DEPENDENCIES,
+  );
 
   const files = await readdir(join(ctx.project, 'node_modules'));
 
@@ -1126,22 +1219,24 @@ test('#claimInstallLock waits for the install and drops the guard when another h
   expect({ step, files, lockText }).toStrictEqual({
     step: 'wait-for-install',
     files: ['.agent-hooks-install.lock'],
-    lockText: '4242',
+    lockText: String(process.pid),
   });
 });
 
 test('#claimInstallLock takes a lock that a stopped hook left, and drops the guard', async () => {
   const ctx = await setupTest();
 
-  await writeTreeFiles(ctx.project, { 'node_modules/.agent-hooks-install.lock': '4242' });
+  const stopped = spawnSync('true');
 
-  const step = await claimInstallLock(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), {
-    ...NODE_INSTALL_DEPENDENCIES,
-    signalProcess: mock(() => {
-      throw Object.assign(new Error('kill ESRCH'), { code: 'ESRCH' });
-    }),
-    sleep: mock(() => Promise.resolve()),
+  await writeTreeFiles(ctx.project, {
+    'node_modules/.agent-hooks-install.lock': String(stopped.pid),
   });
+
+  const step = await claimInstallLock(
+    join(ctx.project, 'node_modules/.agent-hooks-install.lock'),
+    Number.POSITIVE_INFINITY,
+    NODE_INSTALL_DEPENDENCIES,
+  );
 
   const files = await readdir(join(ctx.project, 'node_modules'));
 
@@ -1156,27 +1251,59 @@ test('#claimInstallLock takes a lock that a stopped hook left, and drops the gua
   });
 });
 
+test('#claimInstallLock gives up when another hook holds the guard past the deadline', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.project, {
+    'node_modules/.agent-hooks-install.lock.guard': String(process.pid),
+  });
+
+  const sleep = mock(() => Promise.resolve());
+
+  const step = await claimInstallLock(
+    join(ctx.project, 'node_modules/.agent-hooks-install.lock'),
+    5000,
+    { ...NODE_INSTALL_DEPENDENCIES, now: () => 5000, sleep },
+  );
+
+  const files = await readdir(join(ctx.project, 'node_modules'));
+
+  expect({ step, sleeps: sleep.mock.calls, files }).toStrictEqual({
+    step: 'out-of-time',
+    sleeps: [],
+    files: ['.agent-hooks-install.lock.guard'],
+  });
+});
+
 test('#runInstallOnce installs when the hook it waits for stops before its install ends', async () => {
   const ctx = await setupTest();
 
-  await writeTreeFiles(ctx.project, { 'node_modules/.agent-hooks-install.lock': '4242' });
+  const holder = Bun.spawn(['sleep', '30']);
 
+  onTestFinished(() => {
+    holder.kill('SIGKILL');
+  });
+
+  await writeTreeFiles(ctx.project, {
+    'node_modules/.agent-hooks-install.lock': String(holder.pid),
+  });
+
+  const sleep = mock(NODE_INSTALL_DEPENDENCIES.sleep);
   const runInstall = mock(() => ({ status: 0, signal: null }));
 
-  const failure = await runInstallOnce(
+  const installing = runInstallOnce(
     join(ctx.project, 'node_modules/.agent-hooks-install.lock'),
-    {
-      ...NODE_INSTALL_DEPENDENCIES,
-      signalProcess: mock<InstallDependencies['signalProcess']>(() => {
-        throw Object.assign(new Error('kill ESRCH'), { code: 'ESRCH' });
-      })
-        .mockImplementationOnce(() => {})
-        .mockImplementationOnce(() => {}),
-      sleep: mock(() => Promise.resolve()),
-      runInstall,
-    },
+    Number.POSITIVE_INFINITY,
+    { ...NODE_INSTALL_DEPENDENCIES, sleep, runInstall },
   );
 
+  await waitFor(() => expect(sleep).toHaveBeenCalled());
+
+  holder.kill('SIGKILL');
+
+  await holder.exited;
+
+  const failure = await installing;
   const files = await readdir(join(ctx.project, 'node_modules'));
 
   expect({ failure, installs: runInstall.mock.calls.length, files }).toStrictEqual({
@@ -1186,27 +1313,39 @@ test('#runInstallOnce installs when the hook it waits for stops before its insta
   });
 });
 
-test('#runInstallOnce runs no install when the install it waits for ends', async () => {
+test('#runInstallOnce reports a failure when another hook holds the install lock past the deadline', async () => {
   const ctx = await setupTest();
 
-  await writeTreeFiles(ctx.project, { 'node_modules/.agent-hooks-install.lock': '4242' });
+  await writeTreeFiles(ctx.project, {
+    'node_modules/.agent-hooks-install.lock': String(process.pid),
+  });
 
   const runInstall = mock(() => ({ status: 0, signal: null }));
 
   const failure = await runInstallOnce(
     join(ctx.project, 'node_modules/.agent-hooks-install.lock'),
-    {
-      ...NODE_INSTALL_DEPENDENCIES,
-      signalProcess: mock<InstallDependencies['signalProcess']>(),
-      sleep: mock(() => rm(join(ctx.project, 'node_modules/.agent-hooks-install.lock'))),
-      runInstall,
-    },
+    5000,
+    { ...NODE_INSTALL_DEPENDENCIES, now: () => 5000, runInstall },
   );
 
-  expect({ failure, installs: runInstall.mock.calls.length }).toStrictEqual({
-    failure: null,
-    installs: 0,
+  expect({ failure, installs: runInstall.mock.calls }).toStrictEqual({
+    failure: `another agent hook held ${join(ctx.project, 'node_modules/.agent-hooks-install.lock')} past the deadline`,
+    installs: [],
   });
+});
+
+test('#runInstallOnce gives the install the time left before the deadline', async () => {
+  const ctx = await setupTest();
+
+  const runInstall = mock<InstallDependencies['runInstall']>(() => ({ status: 0, signal: null }));
+
+  await runInstallOnce(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), 31_000, {
+    ...NODE_INSTALL_DEPENDENCIES,
+    now: () => 1000,
+    runInstall,
+  });
+
+  expect(runInstall.mock.calls).toStrictEqual([[30_000]]);
 });
 
 test('#runInstallOnce reports the failure of its own install and drops the lock', async () => {
@@ -1214,6 +1353,7 @@ test('#runInstallOnce reports the failure of its own install and drops the lock'
 
   const failure = await runInstallOnce(
     join(ctx.project, 'node_modules/.agent-hooks-install.lock'),
+    Number.POSITIVE_INFINITY,
     {
       ...NODE_INSTALL_DEPENDENCIES,
       runInstall: mock(() => ({ status: null, signal: 'SIGKILL' as const })),

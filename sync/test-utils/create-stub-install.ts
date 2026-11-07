@@ -6,7 +6,7 @@ export type StubInstallOutcome =
   | { readonly kind: 'fails' }
   | { readonly kind: 'killed' }
   | { readonly kind: 'removes'; readonly path: string }
-  | { readonly kind: 'links'; readonly packageName: string; readonly packageDir: string };
+  | { readonly kind: 'links'; readonly packageName: string; readonly packageDirectory: string };
 
 export interface StubInstallOptions {
   readonly log: string;
@@ -36,7 +36,7 @@ export async function createStubInstall(
     .with({ kind: 'removes' }, (outcome) => [`rm -f '${outcome.path}'`, 'exit 1'])
     .with({ kind: 'links' }, (outcome) => [
       `mkdir -p "node_modules/$(dirname '${outcome.packageName}')"`,
-      `ln -s '${outcome.packageDir}' 'node_modules/${outcome.packageName}'`,
+      `ln -s '${outcome.packageDirectory}' 'node_modules/${outcome.packageName}'`,
     ])
     .exhaustive();
 

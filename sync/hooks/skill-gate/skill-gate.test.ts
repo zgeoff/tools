@@ -281,19 +281,19 @@ test('it blocks an edit and names the load failure when a dependency of @zgeoff/
   const ctx = await setupTest();
 
   const copiedHookPath = join(ctx.directory, '.claude/hooks/skill-gate/skill-gate.ts');
-  const packageDir = join(ctx.directory, 'node_modules/@zgeoff/skill-gate');
+  const packageDirectory = join(ctx.directory, 'node_modules/@zgeoff/skill-gate');
 
   await mkdir(join(ctx.directory, '.claude/hooks/skill-gate'), { recursive: true });
   await copyFile(ctx.hookPath, copiedHookPath);
-  await mkdir(packageDir, { recursive: true });
+  await mkdir(packageDirectory, { recursive: true });
 
   await writeFile(
-    join(packageDir, 'package.json'),
+    join(packageDirectory, 'package.json'),
     JSON.stringify({ name: '@zgeoff/skill-gate', type: 'module', exports: './index.js' }),
   );
 
   await writeFile(
-    join(packageDir, 'index.js'),
+    join(packageDirectory, 'index.js'),
     "import { isRecord } from '@zgeoff/std';\nexport const runSkillGate = isRecord;\n",
   );
 

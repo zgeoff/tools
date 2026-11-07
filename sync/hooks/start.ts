@@ -1,17 +1,20 @@
+// A harness runs the call when a PreToolUse hook exits with any status but 2, so a static import
+// that fails would let the call through. This file therefore imports only Node builtins.
 import type { SpawnSyncReturns } from 'node:child_process';
 import { spawnSync } from 'node:child_process';
 import { linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { setTimeout } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 
-// A harness runs the call when a PreToolUse hook exits with any status but 2, so a static import
-// that fails would let the call through. This file therefore imports only Node builtins.
 const REFUSAL =
   'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.';
 
 const AFTER_INSTALL_OPTION = 'after-install';
 const GUARD_SUFFIX = '.guard';
+
+// Both harnesses stop a command hook after 600 s by default and then run the call, so the install
+// and its waits end sooner and refuse.
+const INSTALL_BUDGET_MS = 540_000;
 
 const READ_ONLY_PROGRAMS = new Set(['cat', 'ls', 'pwd']);
 
@@ -20,32 +23,101 @@ const ROOT = path.resolve(import.meta.dirname, '../..');
 
 type LockState = 'absent' | 'held' | 'stale';
 
-type InstallStep = 'retry-guard' | 'wait-for-guard' | 'stop' | 'wait-for-install' | 'install';
+type InstallStep =
+  | 'retry-guard'
+  | 'wait-for-guard'
+  | 'stop'
+  | 'wait-for-install'
+  | 'install'
+  | 'skip-install'
+  | 'claim-again';
 
 // The guard can vanish between a failed link and the read, so an absent guard means another try.
 const INSTALL_STEPS = {
   guard: { absent: 'retry-guard', held: 'wait-for-guard', stale: 'stop' },
   install: { absent: 'install', held: 'wait-for-install', stale: 'install' },
+  waited: { absent: 'skip-install', held: 'wait-for-install', stale: 'claim-again' },
 } as const satisfies Readonly<Record<string, Readonly<Record<LockState, InstallStep>>>>;
-
-interface Claim {
-  readonly lock: keyof typeof INSTALL_STEPS;
-  readonly state: LockState;
-}
-
-export function pickInstallStep(claim: Claim): InstallStep {
-  return INSTALL_STEPS[claim.lock][claim.state];
-}
 
 type InstallResult = Pick<SpawnSyncReturns<Buffer>, 'error' | 'status' | 'signal'>;
 
-// spawnSync reports a launch failure in `error` and a signal as a null status, and throws neither.
-export function findInstallFailure(result: InstallResult): string | null {
-  if (result.error !== undefined) {
-    return String(result.error);
+export interface InstallDependencies {
+  readonly createDirectory: (directoryPath: string) => void;
+  readonly readFile: (filePath: string) => string;
+  readonly writeFile: (filePath: string, text: string) => void;
+  readonly link: (existingPath: string, newPath: string) => void;
+  readonly remove: (filePath: string) => void;
+  readonly signalProcess: (pid: number) => void;
+  readonly sleep: (durationMs: number) => Promise<void>;
+  readonly now: () => number;
+  readonly runInstall: (timeoutMs: number) => InstallResult;
+}
+
+// The entry point below runs at load, before any constant under it exists.
+export const NODE_INSTALL_DEPENDENCIES: InstallDependencies = {
+  createDirectory: (directoryPath) => {
+    mkdirSync(directoryPath, { recursive: true });
+  },
+  readFile: (filePath) => readFileSync(filePath, 'utf8'),
+  writeFile: writeFileSync,
+  link: linkSync,
+  remove: (filePath) => {
+    rmSync(filePath, { force: true });
+  },
+  signalProcess: (pid) => {
+    process.kill(pid, 0);
+  },
+  sleep: (durationMs) => Bun.sleep(durationMs),
+  now: Date.now,
+  runInstall: (timeoutMs) =>
+    spawnSync('bun', ['install', '--frozen-lockfile'], {
+      cwd: ROOT,
+      stdio: ['ignore', 2, 2],
+      timeout: timeoutMs,
+    }),
+};
+
+if (import.meta.main) {
+  await runHook(process.argv.slice(2), NODE_INSTALL_DEPENDENCIES).catch((error: unknown) => {
+    console.error(`The agent hook failed: ${String(error)}`);
+
+    return process.exit(2);
+  });
+}
+
+async function runHook(argv: readonly string[], dependencies: InstallDependencies): Promise<never> {
+  const args = parseHookArgs(argv);
+
+  if (args.kind === 'error') {
+    console.error(args.message);
+
+    return process.exit(2);
   }
 
-  return result.status === null ? `bun install stopped on ${String(result.signal)}` : null;
+  const agentHooksImport = await import('@zgeoff/agent-hooks').then(
+    (agentHooks) => ({ kind: 'loaded', agentHooks }) as const,
+    (error: unknown) => ({ kind: 'failed', error }) as const,
+  );
+
+  const step = pickRecoveryStep(agentHooksImport, args.afterInstall);
+
+  if (step.kind === 'run-hook') {
+    return step.agentHooks.runAgentHook({ harness: args.harness });
+  }
+
+  if (step.kind === 'install-and-retry') {
+    return runRetryAfterInstall(argv, dependencies);
+  }
+
+  console.error(`The agent hook could not load @zgeoff/agent-hooks: ${String(step.error)}`);
+
+  if (pickFallbackVerdict(readPayloadText()) === 'allow') {
+    return process.exit(0);
+  }
+
+  console.error(REFUSAL);
+
+  return process.exit(2);
 }
 
 type HookArgs =
@@ -100,79 +172,14 @@ export function pickRecoveryStep<Module>(
     : { kind: 'install-and-retry' };
 }
 
-export interface InstallDependencies {
-  readonly createDirectory: (directoryPath: string) => void;
-  readonly readFile: (filePath: string) => string;
-  readonly writeFile: (filePath: string, text: string) => void;
-  readonly link: (existingPath: string, newPath: string) => void;
-  readonly remove: (filePath: string) => void;
-  readonly signalProcess: (pid: number) => void;
-  readonly sleep: (durationMs: number) => Promise<void>;
-  readonly runInstall: () => InstallResult;
-}
-
-// The entry point below runs at load, before any constant under it exists.
-export const NODE_INSTALL_DEPENDENCIES: InstallDependencies = {
-  createDirectory: (directoryPath) => {
-    mkdirSync(directoryPath, { recursive: true });
-  },
-  readFile: (filePath) => readFileSync(filePath, 'utf8'),
-  writeFile: writeFileSync,
-  link: linkSync,
-  remove: (filePath) => {
-    rmSync(filePath, { force: true });
-  },
-  signalProcess: (pid) => {
-    process.kill(pid, 0);
-  },
-  sleep: setTimeout,
-  runInstall: () =>
-    spawnSync('bun', ['install', '--frozen-lockfile'], { cwd: ROOT, stdio: ['ignore', 2, 2] }),
-};
-
-if (import.meta.main) {
-  await runHook(process.argv.slice(2));
-}
-
-async function runHook(argv: readonly string[]): Promise<never> {
-  const args = parseHookArgs(argv);
-
-  if (args.kind === 'error') {
-    console.error(args.message);
-
-    return process.exit(2);
-  }
-
-  const agentHooksImport = await import('@zgeoff/agent-hooks').then(
-    (agentHooks) => ({ kind: 'loaded', agentHooks }) as const,
-    (error: unknown) => ({ kind: 'failed', error }) as const,
-  );
-
-  const step = pickRecoveryStep(agentHooksImport, args.afterInstall);
-
-  if (step.kind === 'run-hook') {
-    return step.agentHooks.runAgentHook({ harness: args.harness });
-  }
-
-  if (step.kind === 'install-and-retry') {
-    return runRetryAfterInstall(argv);
-  }
-
-  console.error(`The agent hook could not load @zgeoff/agent-hooks: ${String(step.error)}`);
-
-  if (pickFallbackVerdict(readPayloadText()) === 'allow') {
-    return process.exit(0);
-  }
-
-  console.error(REFUSAL);
-
-  return process.exit(2);
-}
-
-async function runRetryAfterInstall(argv: readonly string[]): Promise<never> {
+async function runRetryAfterInstall(
+  argv: readonly string[],
+  dependencies: InstallDependencies,
+): Promise<never> {
   const installFailure = await runInstallOnce(
     path.join(ROOT, 'node_modules', '.agent-hooks-install.lock'),
-    NODE_INSTALL_DEPENDENCIES,
+    dependencies.now() + INSTALL_BUDGET_MS,
+    dependencies,
   ).catch(String);
 
   if (installFailure !== null) {
@@ -195,15 +202,14 @@ async function runRetryAfterInstall(argv: readonly string[]): Promise<never> {
   return process.exit(retry.status ?? 2);
 }
 
-// A hook that waits out another hook's install claims the lock again when that hook stops before it
-// ends, since a stopped install leaves the package missing.
 export async function runInstallOnce(
   lockPath: string,
+  deadlineMs: number,
   dependencies: InstallDependencies,
 ): Promise<string | null> {
   dependencies.createDirectory(path.dirname(lockPath));
 
-  const step = await claimInstallLock(lockPath, dependencies);
+  const step = await claimInstallLock(lockPath, deadlineMs, dependencies);
 
   if (step === 'stop') {
     console.error(
@@ -213,51 +219,54 @@ export async function runInstallOnce(
     return null;
   }
 
+  if (step === 'out-of-time') {
+    return `another agent hook held ${lockPath}${GUARD_SUFFIX} past the deadline`;
+  }
+
   if (step === 'wait-for-install') {
     console.error('Another agent hook runs bun install here, so this one waits for it.');
 
-    let state = readLockState(lockPath, dependencies);
-
-    while (state === 'held') {
-      await dependencies.sleep(100);
-
-      state = readLockState(lockPath, dependencies);
-    }
-
-    return state === 'stale' ? runInstallOnce(lockPath, dependencies) : null;
+    return runAfterInstallWait(lockPath, deadlineMs, dependencies);
   }
 
+  // A harness that kills this hook leaves the install running under a lock that reads stale, so
+  // the next hook can install beside it. The budget keeps the hook inside the harness timeout, so
+  // only a person's interrupt leaves an install behind.
+  const timeoutMs = Math.max(1, deadlineMs - dependencies.now());
+
   try {
-    return findInstallFailure(dependencies.runInstall());
+    return findInstallFailure(dependencies.runInstall(timeoutMs));
   } finally {
     dependencies.remove(lockPath);
   }
 }
 
-// Two hooks can both find the install lock stale, so every change to it happens under a guard lock;
-// without the guard, one hook could remove the lock that another hook has just taken.
+// This file can import no package, so it cannot take a shared file lock and keeps its own. Two hooks
+// can both find the install lock stale, so every change to it happens under a guard lock; without
+// the guard, one hook could remove the lock that another hook has just taken.
 export async function claimInstallLock(
   lockPath: string,
+  deadlineMs: number,
   dependencies: InstallDependencies,
-): Promise<'stop' | 'wait-for-install' | 'install'> {
+): Promise<'stop' | 'out-of-time' | 'wait-for-install' | 'install'> {
   const guardPath = `${lockPath}${GUARD_SUFFIX}`;
 
-  for (let attempt = 0; !tryLock(guardPath, dependencies); attempt += 1) {
+  for (let attempt = 0; !createLock(guardPath, dependencies); attempt += 1) {
     const step = pickInstallStep({ lock: 'guard', state: readLockState(guardPath, dependencies) });
 
     if (step === 'stop') {
       return step;
     }
 
-    if (step === 'wait-for-guard') {
-      if (attempt === 0) {
-        console.error(
-          'Another agent hook claims the install lock here, so this one waits its turn.',
-        );
-      }
-
-      await dependencies.sleep(10);
+    if (dependencies.now() >= deadlineMs) {
+      return 'out-of-time';
     }
+
+    if (step === 'wait-for-guard' && attempt === 0) {
+      console.error('Another agent hook claims the install lock here, so this one waits its turn.');
+    }
+
+    await dependencies.sleep(10);
   }
 
   try {
@@ -269,7 +278,11 @@ export async function claimInstallLock(
 
     dependencies.remove(lockPath);
 
-    return tryLock(lockPath, dependencies) ? 'install' : 'wait-for-install';
+    if (!createLock(lockPath, dependencies)) {
+      throw new Error(`${lockPath} appeared while this agent hook held its guard`);
+    }
+
+    return 'install';
   } finally {
     dependencies.remove(guardPath);
   }
@@ -278,7 +291,7 @@ export async function claimInstallLock(
 // A hard link fails when the lock exists and makes the lock appear with its process id already in
 // it, so a hook never reads a lock that is still empty. Any other failure repeats on every try, so
 // it ends the install instead of a retry.
-function tryLock(lockPath: string, dependencies: InstallDependencies): boolean {
+function createLock(lockPath: string, dependencies: InstallDependencies): boolean {
   const draftPath = `${lockPath}.${process.pid}`;
 
   try {
@@ -331,6 +344,48 @@ function readLockText(lockPath: string, dependencies: InstallDependencies): stri
 
     throw error;
   }
+}
+
+interface Claim {
+  readonly lock: keyof typeof INSTALL_STEPS;
+  readonly state: LockState;
+}
+
+export function pickInstallStep(claim: Claim): InstallStep {
+  return INSTALL_STEPS[claim.lock][claim.state];
+}
+
+async function runAfterInstallWait(
+  lockPath: string,
+  deadlineMs: number,
+  dependencies: InstallDependencies,
+): Promise<string | null> {
+  for (;;) {
+    const step = pickInstallStep({ lock: 'waited', state: readLockState(lockPath, dependencies) });
+
+    if (step === 'skip-install') {
+      return null;
+    }
+
+    if (step === 'claim-again') {
+      return runInstallOnce(lockPath, deadlineMs, dependencies);
+    }
+
+    if (dependencies.now() >= deadlineMs) {
+      return `another agent hook held ${lockPath} past the deadline`;
+    }
+
+    await dependencies.sleep(100);
+  }
+}
+
+// spawnSync reports a launch failure in `error` and a signal as a null status, and throws neither.
+export function findInstallFailure(result: InstallResult): string | null {
+  if (result.error !== undefined) {
+    return String(result.error);
+  }
+
+  return result.status === null ? `bun install stopped on ${String(result.signal)}` : null;
 }
 
 function readPayloadText(): string {
