@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.10](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.1.9...@zgeoff/chex@0.1.10) (2026-11-07)
+
+
+### Bug Fixes
+
+* **chex:** read the lane limits from rig.config.ts when the repo has one ([#546](https://github.com/zgeoff/tools/issues/546)) ([d6a9ebd](https://github.com/zgeoff/tools/commit/d6a9ebd453de42a6c0af525ccf9118a765ef618f))
+
 ## [0.1.9](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.1.8...@zgeoff/chex@0.1.9) (2026-11-07)
 
 
