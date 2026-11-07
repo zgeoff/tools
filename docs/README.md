@@ -23,8 +23,9 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 - [@zgeoff/oxlint-config](./architecture/oxlint-config.md), with its
   [code-style rules](./architecture/oxlint-config-code-style.md),
   [import zones](./architecture/oxlint-config-import-zones.md),
-  [feature folders](./architecture/oxlint-config-feature-folders.md) and
-  [test-file rules](./architecture/oxlint-config-tests.md).
+  [feature folders](./architecture/oxlint-config-feature-folders.md),
+  [test-file rules](./architecture/oxlint-config-tests.md) and
+  [seeding rules](./architecture/oxlint-config-seeding.md).
 - [std typed helpers](./architecture/std-typed-helpers.md): the helpers in `@zgeoff/std` that each
   hold the one type assertion their job needs.
 - [std file lock](./architecture/std-file-lock.md): `withFileLock`, the cross-process lock in

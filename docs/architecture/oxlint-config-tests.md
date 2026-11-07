@@ -7,6 +7,7 @@ Seven rules of the `zgeoff/*` plugin in `@zgeoff/oxlint-config` check test files
 `zgeoff/no-file-snapshot` bans file snapshots, `zgeoff/max-test-timeout` keeps each test within the
 time limit of its lane, `zgeoff/test-timeout-exception-ticket` makes each disable of that rule name
 a ticket or a floor, and `zgeoff/no-test-sleep` bans a fixed delay in a test file. The
+[seeding rules](./oxlint-config-seeding.md) check where test code writes a database, and the
 [config overview](./oxlint-config.md) covers the rest of the config.
 
 ## `zgeoff/test-beside-module`

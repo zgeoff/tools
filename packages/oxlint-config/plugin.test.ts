@@ -315,6 +315,50 @@ test('it skips names listed in the exemptNames option', async () => {
   expect(result.exitCode).toBe(0);
 });
 
+test.each([
+  ['a module', 'src/fill-kettle.ts'],
+  ['a test file', 'src/fill-kettle.test.ts'],
+  ['a folder whose name only holds test-utils', 'src/kettle-test-utils/fill-kettle.ts'],
+])('it reports a seed in %s outside test-utils', async (_, path) => {
+  const source = 'export function seedKettle(): void {}\n';
+
+  const result = await runLintTree({ [path]: source }, path, { 'zgeoff/function-verb': 'error' });
+
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout).toInclude(
+    "'seedKettle' starts with 'seed', which only test code in a `test-utils` folder may use",
+  );
+});
+
+test.each([
+  ['a seed', 'src/test-utils/seed-kettle.ts', 'export function seedKettle(): void {}\n'],
+  ['a bare seed', 'test-utils/seed.ts', 'export const seed = (): void => {};\n'],
+  [
+    'a word that only starts with seed',
+    'src/plant.ts',
+    'export function seedlingCount(): number {\n  return 1;\n}\n',
+  ],
+])('it accepts %s', async (_, path, source) => {
+  const result = await runLintTree({ [path]: source }, path, { 'zgeoff/function-verb': 'error' });
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it reads test-utils below the repo root only', async () => {
+  const result = await runLintTree(
+    {
+      'test-utils/.git/HEAD': '',
+      'test-utils/src/fill-kettle.ts': 'export function seedKettle(): void {}\n',
+    },
+    'test-utils/src/fill-kettle.ts',
+    { 'zgeoff/function-verb': 'error' },
+  );
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude("'seedKettle' starts with 'seed'");
+});
+
 test('it rejects every verb the shared skill bans', async () => {
   const markdown = await readPinnedSkillText(
     nodeFileSystem,

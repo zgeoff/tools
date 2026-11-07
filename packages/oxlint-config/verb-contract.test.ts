@@ -296,6 +296,14 @@ export function buildThing(): string {
     "'buildThing' starts with 'build', which promises no I/O, but it calls 'readConfig', whose verb may do I/O",
   ],
   [
+    'a call of a seed',
+    `export function buildKettle(deps: { seedKettle(): string }): string {
+  return deps.seedKettle();
+}
+`,
+    "'buildKettle' starts with 'build', which promises no I/O, but it calls 'seedKettle', whose verb may do I/O",
+  ],
+  [
     'a local alias of a helper with an effectful verb',
     `function readConfig(): string {
   return '';

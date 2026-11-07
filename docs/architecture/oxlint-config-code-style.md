@@ -10,8 +10,10 @@ The [config overview](./oxlint-config.md) covers the rest of the config.
 
 The rule reports a function, method, or function-valued variable or property whose name starts with
 a banned verb, and it names the role-table verb to use instead (`fetchUser` → use `read`). It also
-reports a bare template prefix, such as a function named `on`. A name that does not start with a
-lowercase letter passes. The `exemptNames` option lists names that a library contract fixes:
+reports a bare template prefix, such as a function named `on`. The role table keeps the `seed` verb
+for test code, so the rule reports a function whose name starts with `seed` in a file outside a
+`test-utils` folder below the repo root. A name that does not start with a lowercase letter passes.
+The `exemptNames` option lists names that a library contract fixes:
 
 ```jsonc
 {

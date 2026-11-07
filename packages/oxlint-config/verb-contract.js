@@ -157,6 +157,7 @@ const effectfulVerbs = [
   'insert',
   'refresh',
   'restart',
+  'seed',
 ];
 
 const flagVerbs = [...effectfulVerbs, 'try', 'use', 'on', 'handle'];

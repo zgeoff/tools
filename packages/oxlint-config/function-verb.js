@@ -1,5 +1,7 @@
 import findFunctionName from './find-function-name.js';
+import isInTestUtils from './is-in-test-utils.js';
 import isVerbMatch from './is-verb-match.js';
+import resolveRepoPath from './resolve-repo-path.js';
 
 const functionVerb = {
   meta: {
@@ -8,6 +10,8 @@ const functionVerb = {
       bannedVerb: "'{{name}}' starts with the banned verb '{{verb}}' — use `{{replacement}}`.",
       vagueVerb: "'{{name}}' starts with the banned verb '{{verb}}' — name what the function does.",
       bareTemplate: "'{{name}}' is a bare prefix — add what it applies to, as in `{{name}}Thing`.",
+      seedOutsideTestUtils:
+        "'{{name}}' starts with 'seed', which only test code in a `test-utils` folder may use — move the seed to the package's `src/test-utils/`, or name what the function does.",
     },
     schema: [
       {
@@ -22,9 +26,12 @@ const functionVerb = {
   create(context) {
     const exemptNames = new Set(context.options[0]?.exemptNames);
 
+    const probeSeedAllowed = () =>
+      isInTestUtils(resolveRepoPath(context.physicalFilename, context.cwd));
+
     const checkFunction = (node) => {
       const id = findFunctionName(node);
-      const report = id === null ? null : planReport(id.name, exemptNames);
+      const report = id === null ? null : planReport(id.name, exemptNames, probeSeedAllowed);
 
       if (report !== null) {
         context.report({ node: id, messageId: report.messageId, data: report.data });
@@ -43,9 +50,13 @@ export default functionVerb;
 
 const suffixRequiredVerbs = new Set(['to', 'with', 'make', 'use', 'on']);
 
-function planReport(name, exemptNames) {
+function planReport(name, exemptNames, probeSeedAllowed) {
   if (exemptNames.has(name) || !/^[a-z]/u.test(name)) {
     return null;
+  }
+
+  if (isVerbMatch(name, 'seed') && !probeSeedAllowed()) {
+    return { messageId: 'seedOutsideTestUtils', data: { name } };
   }
 
   if (suffixRequiredVerbs.has(name)) {

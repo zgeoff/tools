@@ -3,9 +3,9 @@
 `@zgeoff/oxlint-config` is the shareable oxlint config of the zgeoff repos, with a bundled JS plugin
 of `zgeoff/*` rules for the shapes that no native oxlint rule can express. This doc covers the
 config's ban on type assertions, its comment rules, its ban on require functions, the React overlay,
-and `zgeoff/no-restricted-words`. Four more docs cover the plugin's other rules:
+and `zgeoff/no-restricted-words`. Five more docs cover the plugin's other rules:
 [code style](./oxlint-config-code-style.md), [test files](./oxlint-config-tests.md),
-[import zones](./oxlint-config-import-zones.md) and
+[seeding](./oxlint-config-seeding.md), [import zones](./oxlint-config-import-zones.md) and
 [feature folders](./oxlint-config-feature-folders.md). The
 [package README](../../packages/oxlint-config/README.md) holds the install and the setup.
 
