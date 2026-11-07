@@ -104,12 +104,12 @@ test('it refuses a config by its first bad lane', () => {
   });
 });
 
-test('it reads a config from before programs and ignore existed as having neither', () => {
+test('it reads a config from before programs, ignore and bunfigs existed as having none', () => {
   const parsed = parseRigConfig({ lanes: defineRig({}).lanes });
 
   expect(parsed).toStrictEqual({
     kind: 'parsed',
-    config: { ignore: [], lanes: defineRig({}).lanes, programs: {}, benchLane: null },
+    config: { ignore: [], bunfigs: [], lanes: defineRig({}).lanes, programs: {}, benchLane: null },
   });
 });
 
@@ -134,9 +134,40 @@ test('it keeps the ignore patterns that defineRig returns', () => {
 test.each([
   ['a string', 'docs/drafts/**'],
   ['a list that holds a number', ['docs/drafts/**', 7]],
+  ['a list that holds a glob with a ./ segment', ['./docs/drafts/**']],
+  ['a list that holds a glob that climbs out of the repo', ['../drafts/**']],
 ])('it refuses an ignore that is %s', (_, ignore) => {
   expect(parseRigConfig({ lanes: [], ignore })).toStrictEqual({
     kind: 'refused',
     reason: 'its ignore is no list of patterns',
+  });
+});
+
+test('it keeps the bunfigs that defineRig returns', () => {
+  const config = defineRig({
+    bunfigs: [{ path: 'bunfig.window.toml', files: ['packages/shop/**/*.test.tsx'] }],
+  });
+
+  expect(parseRigConfig(config)).toStrictEqual({ kind: 'parsed', config });
+});
+
+test.each([
+  ['a string', 'bunfig.window.toml'],
+  ['a list that holds a string', ['bunfig.window.toml']],
+  ['a list whose entry has no files', [{ path: 'bunfig.window.toml' }]],
+  ['a list whose entry has a number for a glob', [{ path: 'bunfig.window.toml', files: [7] }]],
+  ['a list whose entry has an empty list of globs', [{ path: 'bunfig.window.toml', files: [] }]],
+  ['a list whose entry names no .toml file', [{ path: 'bunfig.window', files: ['src/**'] }]],
+  ['a list whose entry climbs out of the repo', [{ path: '../bunfig.toml', files: ['src/**'] }]],
+  ['a list whose entry has an absolute path', [{ path: '/srv/bunfig.toml', files: ['src/**'] }]],
+  [
+    'a list whose entry has a glob with a ./ segment',
+    [{ path: 'bunfig.window.toml', files: ['./packages/shop/**'] }],
+  ],
+  ['a list whose entry has an empty glob', [{ path: 'bunfig.window.toml', files: [''] }]],
+])('it refuses bunfigs that are %s', (_, bunfigs) => {
+  expect(parseRigConfig({ lanes: [], bunfigs })).toStrictEqual({
+    kind: 'refused',
+    reason: 'its bunfigs are no list of bunfig declarations',
   });
 });

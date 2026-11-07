@@ -16,7 +16,7 @@ export const chexJobCases: readonly BaselineJobCase[] = [
       await writeStubPrograms(sandbox.bin, { shellcheck: 'exit 1' });
 
       const run = await sandbox.runJob(
-        { hook: 'pre-push', name: 'shell', files: ['brew.sh'] },
+        { hook: 'pre-push', name: 'chex-shell', files: ['brew.sh'] },
         sandbox.env,
       );
 
@@ -35,7 +35,7 @@ export const chexJobCases: readonly BaselineJobCase[] = [
       });
 
       const run = await sandbox.runJob(
-        { hook: 'pre-push', name: 'shell', files: ['brew.sh'] },
+        { hook: 'pre-push', name: 'chex-shell', files: ['brew.sh'] },
         sandbox.env,
       );
 
@@ -54,7 +54,7 @@ export const chexJobCases: readonly BaselineJobCase[] = [
       });
 
       const run = await sandbox.runJob(
-        { hook: 'pre-push', name: 'workflows', files: ['.github/workflows/brew.yml'] },
+        { hook: 'pre-push', name: 'chex-workflows', files: ['.github/workflows/brew.yml'] },
         sandbox.env,
       );
 
@@ -79,7 +79,7 @@ export const chexJobCases: readonly BaselineJobCase[] = [
       await writeStubPrograms(join(sandbox.repo, 'node_modules/.bin'), { chex: 'exit 0' });
 
       const run = await sandbox.runJob(
-        { hook: 'pre-push', name: 'workflows', files: ['.github/workflows/brew.yml'] },
+        { hook: 'pre-push', name: 'chex-workflows', files: ['.github/workflows/brew.yml'] },
         sandbox.env,
       );
 
@@ -96,7 +96,7 @@ export const chexJobCases: readonly BaselineJobCase[] = [
       await writeFile(join(sandbox.repo, 'package.json'), JSON.stringify({ scripts: {} }));
 
       const run = await sandbox.runJob(
-        { hook: 'pre-push', name: 'docs', files: ['README.md'] },
+        { hook: 'pre-push', name: 'chex-docs', files: ['README.md'] },
         sandbox.env,
       );
 
@@ -109,7 +109,7 @@ export const chexJobCases: readonly BaselineJobCase[] = [
     title: 'the uncommitted job fails and downloads nothing when the repo does not install chex',
     check: async (sandbox) => {
       const run = await sandbox.runJob(
-        { hook: 'pre-push', name: 'uncommitted', files: [] },
+        { hook: 'pre-push', name: 'chex-uncommitted', files: [] },
         sandbox.env,
       );
 
@@ -130,7 +130,7 @@ export const chexJobCases: readonly BaselineJobCase[] = [
       });
 
       const run = await sandbox.runJob(
-        { hook: 'pre-push', name: 'test', files: ['kettle.ts'] },
+        { hook: 'pre-push', name: 'chex-test', files: ['kettle.ts'] },
         { ...sandbox.env, GIT_DIR: '/srv/kettle/.git/worktrees/lid', GIT_WORK_TREE: '/srv/lid' },
       );
 
@@ -182,7 +182,8 @@ export const chexJobCases: readonly BaselineJobCase[] = [
 
       const output = result.stdout.toString();
 
-      return result.exitCode === 0 && output.includes('typecheck (skip) no matching staged files')
+      return result.exitCode === 0 &&
+        output.includes('chex-typecheck (skip) no matching staged files')
         ? null
         : `lefthook exited ${result.exitCode} without skipping typecheck: ${output.trim()}`;
     },

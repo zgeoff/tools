@@ -175,7 +175,7 @@ test('it keys each lane but unit by its suffix, and a directory lane by its name
 
   const parseRigConfig = (): ParsedRigConfig => ({
     kind: 'parsed',
-    config: { ignore: [], lanes, programs: {}, benchLane: null },
+    config: { ignore: [], bunfigs: [], lanes, programs: {}, benchLane: null },
   });
 
   const modules: Readonly<Record<string, unknown>> = {

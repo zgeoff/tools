@@ -8,7 +8,7 @@ import { pickE2EDirs } from './pick-e2e-dirs.ts';
 import type { ResolvedLane, RigConfig } from './types.ts';
 
 export type TestSelection =
-  | { readonly kind: 'lane'; readonly flags: readonly string[] }
+  | { readonly kind: 'lane'; readonly files: readonly string[]; readonly flags: readonly string[] }
   | { readonly kind: 'empty' }
   | { readonly kind: 'files'; readonly files: readonly string[]; readonly flags: readonly string[] }
   | { readonly kind: 'none'; readonly paths: readonly string[] };
@@ -34,7 +34,9 @@ export function buildTestSelection(request: TestSelectionRequest): TestSelection
   const laneFiles = collectLaneTestFiles(request);
 
   if (split.paths.length === 0) {
-    return laneFiles.length === 0 ? { kind: 'empty' } : { kind: 'lane', flags: split.flags };
+    return laneFiles.length === 0
+      ? { kind: 'empty' }
+      : { kind: 'lane', files: laneFiles, flags: split.flags };
   }
 
   const selectors = split.paths.map((path) =>
@@ -47,7 +49,7 @@ export function buildTestSelection(request: TestSelectionRequest): TestSelection
 
   return files.length === 0
     ? { kind: 'none', paths: split.paths }
-    : { kind: 'files', files: files.map((file) => `./${file}`), flags: split.flags };
+    : { kind: 'files', files, flags: split.flags };
 }
 
 function collectLaneTestFiles(request: TestSelectionRequest): readonly string[] {

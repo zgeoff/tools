@@ -64,8 +64,9 @@ no file and fails the run.
 
 ## Configuration
 
-`rig.config.ts` at the repo root declares what differs from the built-in lanes, and in `ignore` the
-[paths that no lane tests](../../docs/architecture/rig.md#ignored-paths):
+`rig.config.ts` at the repo root declares what differs from the built-in lanes, in `ignore` the
+[paths that no lane tests](../../docs/architecture/rig.md#ignored-paths), and in `bunfigs` the
+[bunfig of a set of unit tests](../../docs/architecture/rig.md#the-bunfig-of-each-test):
 
 ```ts
 import { defineRig } from '@zgeoff/rig';

@@ -99,7 +99,10 @@ one `extends` line in place of the repo-sync entry:
 3. Edit `check:docs` to name the docs checks the repo takes, such as
    `chex prose length links vision`. CI runs each check that it names as its own step.
 4. In `lefthook.yml`, delete `parallel` and the baseline's jobs from `pre-push` and `pre-commit`, as
-   step 2 of [Opting in to the pre-push baseline](#opting-in-to-the-pre-push-baseline) describes.
+   step 2 of [Opting in to the pre-push baseline](#opting-in-to-the-pre-push-baseline) describes. To
+   keep a job of the repo's own in place of a baseline job, such as a typecheck under a lower memory
+   cap, list the baseline job's name, such as `chex-typecheck`, under the hook's `exclude_tags`, as
+   [Limits of the baseline](../architecture/pre-push-baseline.md#limits-of-the-baseline) shows.
 5. If the repo takes the `pre-push-baseline` entry, delete it from `include` in
    `.github/workflows/repo-sync.yml`, and delete `.lefthook/pre-push-baseline.yml` from `extends` in
    `lefthook.yml`, so the push runs one baseline.

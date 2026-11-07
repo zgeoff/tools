@@ -6,12 +6,10 @@ import { parseTestArgs } from './parse-test-args.ts';
 import type { WorkerCount } from './read-worker-count.ts';
 import type { UnitRunDeps } from './run-unit-tests.ts';
 import { runUnitTests } from './run-unit-tests.ts';
-import type { RigConfig, RigOutput, RigRun } from './types.ts';
+import type { RigConfig, RigRun } from './types.ts';
 
 export interface UnitDeps extends UnitRunDeps {
   readonly readWorkerCount: () => Promise<WorkerCount>;
-
-  readonly output: RigOutput;
 }
 
 export async function runUnit(
@@ -57,13 +55,23 @@ export async function runUnit(
     .with({ kind: 'files' }, (files) =>
       runUnitTests(
         config,
-        { workerCount: workers.count, extraArgs: [...files.files, ...files.flags] },
+        { workerCount: workers.count, flags: files.flags, tests: files.files, isDiscovery: false },
         run,
         deps,
       ),
     )
     .with({ kind: 'lane' }, (laneRun) =>
-      runUnitTests(config, { workerCount: workers.count, extraArgs: laneRun.flags }, run, deps),
+      runUnitTests(
+        config,
+        {
+          workerCount: workers.count,
+          flags: laneRun.flags,
+          tests: laneRun.files,
+          isDiscovery: true,
+        },
+        run,
+        deps,
+      ),
     )
     .exhaustive();
 }

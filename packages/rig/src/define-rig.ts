@@ -1,8 +1,11 @@
+import { bunfigDeclarationSchema } from './bunfig-declaration-schema.ts';
 import { isCommandName } from './is-command-name.ts';
 import { parseDuration } from './parse-duration.ts';
+import { repoGlobSchema } from './repo-glob-schema.ts';
 import { standardLanes } from './standard-lanes.ts';
 import type { StandardLane } from './standard-lanes.ts';
 import type {
+  BunfigDeclaration,
   LaneDeclaration,
   ProgramDeclaration,
   ResolvedLane,
@@ -50,6 +53,7 @@ export function defineRig(declaration: RigDeclaration): RigConfig {
 
   return {
     ignore: (declaration.ignore ?? []).map((pattern) => readIgnorePattern(pattern)),
+    bunfigs: (declaration.bunfigs ?? []).map((bunfig) => readBunfig(bunfig)),
     lanes,
     programs,
     benchLane: readBenchLane(declaration.bench?.lane, lanes),
@@ -250,21 +254,40 @@ function readProgram(name: string, program: ProgramDeclaration): ProgramDeclarat
   };
 }
 
-// bun test matches an ignore pattern against paths relative to the repo root, so an absolute
-// pattern or one that climbs out of the repo would never match.
 function readIgnorePattern(pattern: unknown): string {
-  if (
-    typeof pattern !== 'string' ||
-    pattern === '' ||
-    pattern.startsWith('/') ||
-    pattern.split('/').includes('..')
-  ) {
+  const parsed = repoGlobSchema.safeParse(pattern);
+
+  if (!parsed.success) {
     throw new Error(
-      `rig.config.ts: the ignore pattern ${JSON.stringify(pattern)} must be a non-empty glob relative to the repo root, with no ".." segment`,
+      `rig.config.ts: the ignore pattern ${JSON.stringify(pattern)} must be a non-empty glob relative to the repo root, with no "." or ".." segment`,
     );
   }
 
-  return pattern;
+  return parsed.data;
+}
+
+function readBunfig(bunfig: BunfigDeclaration): BunfigDeclaration {
+  const parsed = bunfigDeclarationSchema.safeParse(bunfig);
+
+  if (!parsed.success) {
+    throw new Error(formatBunfigError(bunfig, parsed.error.issues.at(0)?.path ?? []));
+  }
+
+  return parsed.data;
+}
+
+function formatBunfigError(bunfig: BunfigDeclaration, issuePath: readonly PropertyKey[]): string {
+  const [field, index] = issuePath;
+
+  if (field === 'path') {
+    return `rig.config.ts: the bunfig path ${JSON.stringify(bunfig.path)} must be a .toml file relative to the repo root, with no "." or ".." segment`;
+  }
+
+  if (typeof index === 'number') {
+    return `rig.config.ts: the bunfig "${bunfig.path}" file glob ${JSON.stringify(bunfig.files[index])} must be a non-empty glob relative to the repo root, with no "." or ".." segment`;
+  }
+
+  return `rig.config.ts: the bunfig "${bunfig.path}" needs files, a list of globs`;
 }
 
 function readBenchLane(lane: string | undefined, lanes: readonly ResolvedLane[]): string | null {

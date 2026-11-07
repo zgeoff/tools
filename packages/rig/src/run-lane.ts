@@ -130,8 +130,13 @@ function pickLaneTestArgs(
 ): readonly string[] {
   const timeoutArg = `--timeout=${lane.limitMs}`;
 
+  // bun test reads a bare argument as a name filter; the ./ makes it a path.
   return match(selection)
-    .with({ kind: 'files' }, (files) => [timeoutArg, ...files.files, ...files.flags])
+    .with({ kind: 'files' }, (files) => [
+      timeoutArg,
+      ...files.files.map((file) => `./${file}`),
+      ...files.flags,
+    ])
     .with({ kind: 'lane' }, (laneRun) => [
       timeoutArg,
       ...pickLaneSelection(lane, e2eDirs),

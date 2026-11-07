@@ -5,7 +5,7 @@ import { resolveRelatedTests } from './resolve-related-tests.ts';
 import type { RelatedTestSources } from './resolve-related-tests.ts';
 import type { UnitRunDeps } from './run-unit-tests.ts';
 import { runUnitTests } from './run-unit-tests.ts';
-import type { RigConfig, RigOutput, RigRun } from './types.ts';
+import type { RigConfig, RigRun } from './types.ts';
 
 // A host with one worker runs each file slower than CI, and a test that passes there must not fail
 // the push.
@@ -15,8 +15,6 @@ export interface RelatedTestDeps extends UnitRunDeps {
   readonly sources: Readonly<RelatedTestSources>;
 
   readonly readWorkerCount: () => Promise<WorkerCount>;
-
-  readonly output: RigOutput;
 }
 
 // The related run is the unit lane on the tests beside the changed files, in this process.
@@ -36,6 +34,7 @@ export async function runRelatedTests(
 
   const plan = buildRelatedTestPlan(
     options.paths,
+    config,
     resolveRelatedTests(options.paths, config, deps.sources),
   );
 
@@ -55,10 +54,12 @@ export async function runRelatedTests(
 
   const timeoutArgs = workers.count === 1 ? [`--timeout=${slowHostTestTimeoutMs}`] : [];
 
-  // bun test reads a bare argument as a name filter; the ./ makes it a path.
-  const testArgs = [...timeoutArgs, ...plan.tests.map((path) => `./${path}`)];
-
-  return runUnitTests(config, { workerCount: workers.count, extraArgs: testArgs }, run, deps);
+  return runUnitTests(
+    config,
+    { workerCount: workers.count, flags: timeoutArgs, tests: plan.tests, isDiscovery: false },
+    run,
+    deps,
+  );
 }
 
 type RelatedTestArgs =
@@ -83,8 +84,13 @@ type RelatedTestPlan =
 
 const maxTestFiles = 50;
 
-function buildRelatedTestPlan(paths: readonly string[], tests: readonly string[]): RelatedTestPlan {
-  const shared = paths.find((path) => isSharedTestInput(path));
+function buildRelatedTestPlan(
+  paths: readonly string[],
+  config: RigConfig,
+  tests: readonly string[],
+): RelatedTestPlan {
+  const bunfigPaths = config.bunfigs.map((bunfig) => bunfig.path);
+  const shared = paths.find((path) => isSharedTestInput(path, bunfigPaths));
 
   if (shared !== undefined) {
     return {
@@ -107,7 +113,12 @@ function buildRelatedTestPlan(paths: readonly string[], tests: readonly string[]
   return { kind: 'run', tests };
 }
 
-// A shared helper or a bunfig.toml reaches tests beyond the siblings of the files it changes.
-function isSharedTestInput(path: string): boolean {
-  return /(?:^|\/)test-utils\//u.test(path) || basename(path) === 'bunfig.toml';
+// A shared helper, a bunfig.toml or a bunfig that the config names reaches tests beyond the
+// siblings of the files it changes.
+function isSharedTestInput(path: string, bunfigPaths: readonly string[]): boolean {
+  return (
+    /(?:^|\/)test-utils\//u.test(path) ||
+    basename(path) === 'bunfig.toml' ||
+    bunfigPaths.includes(path)
+  );
 }

@@ -1,4 +1,13 @@
-import type { LaneParallelism, ProgramDeclaration, ResolvedLane, RigConfig } from './types.ts';
+import { z } from 'zod';
+import { bunfigDeclarationSchema } from './bunfig-declaration-schema.ts';
+import { repoGlobSchema } from './repo-glob-schema.ts';
+import type {
+  BunfigDeclaration,
+  LaneParallelism,
+  ProgramDeclaration,
+  ResolvedLane,
+  RigConfig,
+} from './types.ts';
 
 export type ParsedRigConfig =
   | { readonly kind: 'parsed'; readonly config: RigConfig }
@@ -47,9 +56,15 @@ export function parseRigConfig(value: unknown): ParsedRigConfig {
     return { kind: 'refused', reason: 'its ignore is no list of patterns' };
   }
 
+  const bunfigs = parseBunfigs(Reflect.get(value, 'bunfigs'));
+
+  if (bunfigs === null) {
+    return { kind: 'refused', reason: 'its bunfigs are no list of bunfig declarations' };
+  }
+
   return {
     kind: 'parsed',
-    config: { ignore, lanes: resolved, programs, benchLane: benchLane ?? null },
+    config: { ignore, bunfigs, lanes: resolved, programs, benchLane: benchLane ?? null },
   };
 }
 
@@ -164,23 +179,14 @@ function parseProgram(value: unknown): ProgramDeclaration | null {
 }
 
 function parseIgnore(value: unknown): string[] | null {
-  if (value === undefined) {
-    return [];
-  }
+  const parsed = z.array(repoGlobSchema).optional().safeParse(value);
 
-  if (!Array.isArray(value)) {
-    return null;
-  }
+  return parsed.success ? (parsed.data ?? []) : null;
+}
 
-  const patterns: string[] = [];
+// A config may leave bunfigs out, and then every unit test runs under the bunfig of its folder.
+function parseBunfigs(value: unknown): readonly BunfigDeclaration[] | null {
+  const parsed = z.array(bunfigDeclarationSchema).optional().safeParse(value);
 
-  for (const pattern of value) {
-    if (typeof pattern !== 'string') {
-      return null;
-    }
-
-    patterns.push(pattern);
-  }
-
-  return patterns;
+  return parsed.success ? (parsed.data ?? []) : null;
 }
