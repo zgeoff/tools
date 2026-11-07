@@ -50,9 +50,6 @@ export function buildTestSelection(request: TestSelectionRequest): TestSelection
     : { kind: 'files', files: files.map((file) => `./${file}`), flags: split.flags };
 }
 
-// No lane takes a file that the config ignores. Of the rest, the unit lane takes every test file
-// that no other lane claims, the e2e lane the ones under its folders, and any other lane the ones
-// with its suffix.
 function collectLaneTestFiles(request: TestSelectionRequest): readonly string[] {
   const config = request.config;
   const lane = request.lane;
