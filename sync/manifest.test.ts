@@ -9,6 +9,8 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
+  await $`git init --quiet`.cwd(directory);
+
   const manifestPath = join(import.meta.dir, 'manifest.json');
 
   const build =
@@ -16,20 +18,16 @@ async function setupTest() {
 
   return {
     directory,
-    runBuild: () => $`bash -euo pipefail -c ${build}`.cwd(directory).quiet(),
+    runBuild: async () => {
+      await $`git add -A`.cwd(directory).quiet();
+
+      return $`bash -euo pipefail -c ${build}`.cwd(directory).quiet();
+    },
     readPackageJSON: async () => {
       const packageJSON: unknown = await Bun.file(join(directory, 'package.json')).json();
 
       return packageJSON;
     },
-    probeScripts: async () => ({
-      'run-related-tests.ts': await Bun.file(
-        join(directory, 'scripts/run-related-tests.ts'),
-      ).exists(),
-      'read-worker-count.ts': await Bun.file(
-        join(directory, 'scripts/read-worker-count.ts'),
-      ).exists(),
-    }),
   };
 }
 
@@ -157,10 +155,12 @@ test.each(['dependencies', 'devDependencies'])(
     await ctx.runBuild();
 
     expect({
-      scripts: await ctx.probeScripts(),
+      runner: await Bun.file(join(ctx.directory, 'scripts/run-related-tests.ts')).exists(),
+      helper: await Bun.file(join(ctx.directory, 'scripts/read-worker-count.ts')).exists(),
       packageJSON: await ctx.readPackageJSON(),
     }).toStrictEqual({
-      scripts: { 'run-related-tests.ts': false, 'read-worker-count.ts': false },
+      runner: false,
+      helper: false,
       packageJSON: {
         scripts: {
           'test:related': 'rig related',
@@ -204,10 +204,12 @@ test.each([
     await ctx.runBuild();
 
     expect({
-      scripts: await ctx.probeScripts(),
+      runner: await Bun.file(join(ctx.directory, 'scripts/run-related-tests.ts')).exists(),
+      helper: await Bun.file(join(ctx.directory, 'scripts/read-worker-count.ts')).exists(),
       packageJSON: await ctx.readPackageJSON(),
     }).toStrictEqual({
-      scripts: { 'run-related-tests.ts': true, 'read-worker-count.ts': true },
+      runner: true,
+      helper: true,
       packageJSON: {
         scripts: {
           'test:related': 'bun scripts/run-related-tests.ts',
@@ -243,10 +245,12 @@ test('it runs a pre-push-baseline build that keeps the related-tests runner and 
   await ctx.runBuild();
 
   expect({
-    scripts: await ctx.probeScripts(),
+    runner: await Bun.file(join(ctx.directory, 'scripts/run-related-tests.ts')).exists(),
+    helper: await Bun.file(join(ctx.directory, 'scripts/read-worker-count.ts')).exists(),
     packageJSON: await ctx.readPackageJSON(),
   }).toStrictEqual({
-    scripts: { 'run-related-tests.ts': true, 'read-worker-count.ts': true },
+    runner: true,
+    helper: true,
     packageJSON: {
       scripts: {
         test: 'bun test',
@@ -266,11 +270,10 @@ test('it runs a pre-push-baseline build that keeps the related-tests runner and 
   });
 });
 
-test('it runs a pre-push-baseline build that removes the related-tests runner but keeps the worker-count helper in a repo on @zgeoff/rig whose own script calls the helper', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(
-    join(ctx.directory, 'package.json'),
+test.each([
+  [
+    'its root package.json',
+    'package.json',
     JSON.stringify({
       scripts: {
         'test:related': 'rig related',
@@ -278,6 +281,63 @@ test('it runs a pre-push-baseline build that removes the related-tests runner bu
       },
       devDependencies: { '@zgeoff/rig': '0.1.6' },
     }),
+  ],
+  [
+    'a workspace package.json',
+    'packages/kiln/package.json',
+    JSON.stringify({
+      scripts: { test: 'bun test --parallel=$(bun ../../scripts/read-worker-count.ts)' },
+    }),
+  ],
+  [
+    'a workflow',
+    '.github/workflows/test.yml',
+    'run: bun test --parallel=$(bun scripts/read-worker-count.ts)\n',
+  ],
+])(
+  'it runs a pre-push-baseline build that removes the related-tests runner but keeps the worker-count helper in a repo on @zgeoff/rig where %s calls the helper',
+  async (_case, caller, callerText) => {
+    const ctx = await setupTest();
+
+    await writeFile(
+      join(ctx.directory, 'package.json'),
+      JSON.stringify({
+        scripts: { 'test:related': 'rig related' },
+        devDependencies: { '@zgeoff/rig': '0.1.6' },
+      }),
+    );
+
+    await mkdir(join(ctx.directory, caller, '..'), { recursive: true });
+    await writeFile(join(ctx.directory, caller), callerText);
+    await mkdir(join(ctx.directory, 'scripts'), { recursive: true });
+    await writeFile(join(ctx.directory, 'scripts/run-related-tests.ts'), 'export {};\n');
+    await writeFile(join(ctx.directory, 'scripts/read-worker-count.ts'), 'export {};\n');
+
+    await ctx.runBuild();
+
+    expect({
+      runner: await Bun.file(join(ctx.directory, 'scripts/run-related-tests.ts')).exists(),
+      helper: await Bun.file(join(ctx.directory, 'scripts/read-worker-count.ts')).exists(),
+    }).toStrictEqual({ runner: false, helper: true });
+  },
+);
+
+test('it runs a pre-push-baseline build that keeps the related-tests runner and the worker-count helper in a repo on @zgeoff/rig whose workflow calls the runner', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({
+      scripts: { 'test:related': 'rig related' },
+      devDependencies: { '@zgeoff/rig': '0.1.6' },
+    }),
+  );
+
+  await mkdir(join(ctx.directory, '.github/workflows'), { recursive: true });
+
+  await writeFile(
+    join(ctx.directory, '.github/workflows/test.yml'),
+    'run: bun scripts/run-related-tests.ts src/kiln.ts\n',
   );
 
   await mkdir(join(ctx.directory, 'scripts'));
@@ -286,9 +346,10 @@ test('it runs a pre-push-baseline build that removes the related-tests runner bu
 
   await ctx.runBuild();
 
-  const scripts = await ctx.probeScripts();
-
-  expect(scripts).toStrictEqual({ 'run-related-tests.ts': false, 'read-worker-count.ts': true });
+  expect({
+    runner: await Bun.file(join(ctx.directory, 'scripts/run-related-tests.ts')).exists(),
+    helper: await Bun.file(join(ctx.directory, 'scripts/read-worker-count.ts')).exists(),
+  }).toStrictEqual({ runner: true, helper: true });
 });
 
 test('it runs a pre-push-baseline build that keeps the related-tests runner in a repo without @zgeoff/rig whose own test:related never calls it', async () => {
@@ -305,7 +366,8 @@ test('it runs a pre-push-baseline build that keeps the related-tests runner in a
 
   await ctx.runBuild();
 
-  const scripts = await ctx.probeScripts();
-
-  expect(scripts).toStrictEqual({ 'run-related-tests.ts': true, 'read-worker-count.ts': true });
+  expect({
+    runner: await Bun.file(join(ctx.directory, 'scripts/run-related-tests.ts')).exists(),
+    helper: await Bun.file(join(ctx.directory, 'scripts/read-worker-count.ts')).exists(),
+  }).toStrictEqual({ runner: true, helper: true });
 });
