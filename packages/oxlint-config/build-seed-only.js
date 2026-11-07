@@ -53,7 +53,11 @@ export default function buildSeedOnly(readFolderSources) {
       const writes = [];
       const createdTables = new Set();
 
-      const collectText = (node, text) => {
+      // reports at the statement, so a disable comment above a statement inside a multi-line call
+      // covers it
+      const collectText = (node) => {
+        const text = toSQLText(node);
+
         if (text === null) {
           return;
         }
@@ -84,12 +88,12 @@ export default function buildSeedOnly(readFolderSources) {
           if (isKyselyWrite(node)) {
             writes.push({ node, table: findLiteralTable(node.arguments[0]) });
           } else if (isSQLCall(node.callee)) {
-            collectText(node, toSQLText(node.arguments[0]));
+            collectText(node.arguments[0]);
           }
         },
         TaggedTemplateExpression(node) {
           if (isSQLTag(node.tag)) {
-            collectText(node, toSQLText(node.quasi));
+            collectText(node.quasi);
           }
         },
         'Program:exit'() {
@@ -116,6 +120,23 @@ function pickFileKind(repoPath, name) {
   }
 
   return isTest || inTestUtils ? { inTestUtils, isTest } : null;
+}
+
+function toSQLText(node) {
+  if (node?.type === 'Literal' && typeof node.value === 'string') {
+    return node.value;
+  }
+
+  if (node?.type === 'TemplateLiteral') {
+    return (
+      node.quasis
+        .map((quasi) => quasi.value.cooked ?? quasi.value.raw)
+        // oxlint-disable-next-line no-template-curly-in-string -- marks each interpolation as a module's text shows it
+        .join('${}')
+    );
+  }
+
+  return null;
 }
 
 const functionTypes = new Set([
@@ -177,23 +198,6 @@ function isSQLCall(callee) {
     callee.property.type === 'Identifier' &&
     sqlMethods.has(callee.property.name)
   );
-}
-
-function toSQLText(node) {
-  if (node?.type === 'Literal' && typeof node.value === 'string') {
-    return node.value;
-  }
-
-  if (node?.type === 'TemplateLiteral') {
-    return (
-      node.quasis
-        .map((quasi) => quasi.value.cooked ?? quasi.value.raw)
-        // oxlint-disable-next-line no-template-curly-in-string -- marks each interpolation as a module's text shows it
-        .join('${}')
-    );
-  }
-
-  return null;
 }
 
 function isSQLTag(tag) {

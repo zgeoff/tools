@@ -310,6 +310,17 @@ test('it honours a file-level disable comment in a test of code whose product is
   expect(result.exitCode).toBe(0);
 });
 
+test('it honours a next-line disable comment above a statement inside a multi-line call', async () => {
+  const source =
+    "test('it rewinds the ledger', () => {\n  db.run(\n    // oxlint-disable-next-line zgeoff/seed-only -- a migration test rewinds the ledger\n    \"DELETE FROM kettle_ledger WHERE name = '002_add_lid'\",\n  );\n});\n";
+
+  const result = await runLintTree({ 'src/pour.test.ts': source }, 'src/pour.test.ts', {
+    'zgeoff/seed-only': 'error',
+  });
+
+  expect(result.exitCode).toBe(0);
+});
+
 test.each([
   ['a Kysely table in a variable', 'await db.insertInto(table).values({ id: 1 }).execute();'],
   ['a Kysely table in a template literal', 'await db.deleteFrom(`kettles`).execute();'],
