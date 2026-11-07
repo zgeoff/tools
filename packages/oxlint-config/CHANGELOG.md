@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.10.2](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.10.1...@zgeoff/oxlint-config@0.10.2) (2026-11-07)
+
+
+### Features
+
+* **oxlint-config:** lint file names for kebab-case and the main export ([#574](https://github.com/zgeoff/tools/issues/574)) ([52b8bc5](https://github.com/zgeoff/tools/commit/52b8bc573699b6c5f8c04f76463aa0d7ac02e33c))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/rig bumped to 0.2.2
+
 ## [0.10.1](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.10.0...@zgeoff/oxlint-config@0.10.1) (2026-11-07)
 
 

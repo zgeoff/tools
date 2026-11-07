@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.5](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.2.4...@zgeoff/chex@0.2.5) (2026-11-07)
+
+
+### Features
+
+* **oxlint-config:** lint file names for kebab-case and the main export ([#574](https://github.com/zgeoff/tools/issues/574)) ([52b8bc5](https://github.com/zgeoff/tools/commit/52b8bc573699b6c5f8c04f76463aa0d7ac02e33c))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/rig bumped to 0.2.2
+
 ## [0.2.4](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.2.3...@zgeoff/chex@0.2.4) (2026-11-07)
 
 
