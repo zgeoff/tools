@@ -3,9 +3,6 @@ import type { TestRun } from './collect-test-runs.ts';
 import { testRunArgs } from './test-run-args.ts';
 import type { RigConfig } from './types.ts';
 
-// The e2e lane has no suffix, so the unit run leaves out the folders that the e2e lane selects,
-// from the same list. A --path-ignore-patterns argument replaces bunfig.toml's pathIgnorePatterns,
-// so the config's ignore list is the only place a repo can leave a path out of the unit run.
 export interface UnitCommandRequest {
   readonly e2eDirs: readonly string[];
 
@@ -16,6 +13,9 @@ export interface UnitCommandRequest {
   readonly flags: readonly string[];
 }
 
+// The e2e lane has no suffix, so the unit run leaves out the folders that the e2e lane selects,
+// from the same list. A --path-ignore-patterns argument replaces bunfig.toml's pathIgnorePatterns,
+// so the config's ignore list is the only place a repo can leave a path out of the unit run.
 export function buildUnitCommand(
   config: RigConfig,
   request: UnitCommandRequest,

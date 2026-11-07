@@ -197,8 +197,7 @@ function parseIgnore(value: unknown): string[] | null {
   return patterns;
 }
 
-// A config from before bunfigs existed has none, and means every unit test runs under the bunfig
-// of its folder.
+// A config may leave bunfigs out, and then every unit test runs under the bunfig of its folder.
 function parseBunfigs(value: unknown): BunfigDeclaration[] | null {
   if (value === undefined) {
     return [];
