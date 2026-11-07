@@ -37,7 +37,7 @@
     },
     "packages/agent-hooks": {
       "name": "@zgeoff/agent-hooks",
-      "version": "0.2.8",
+      "version": "0.2.9",
       "bin": {
         "agent-hooks": "./dist/cli.js",
       },
@@ -101,7 +101,7 @@
     },
     "packages/chex": {
       "name": "@zgeoff/chex",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "bin": {
         "chex": "./src/cli.ts",
       },
@@ -138,7 +138,7 @@
     },
     "packages/diet": {
       "name": "@zgeoff/diet",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "bin": {
         "diet": "./diet.sh",
       },
@@ -193,7 +193,7 @@
     },
     "packages/oxlint-config": {
       "name": "@zgeoff/oxlint-config",
-      "version": "0.9.0",
+      "version": "0.10.0",
       "dependencies": {
         "@stylistic/eslint-plugin": "catalog:",
       },
@@ -221,7 +221,7 @@
     },
     "packages/rig": {
       "name": "@zgeoff/rig",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "bin": {
         "rig": "./src/cli.ts",
       },
@@ -243,7 +243,7 @@
     },
     "packages/skill-gate": {
       "name": "@zgeoff/skill-gate",
-      "version": "0.2.24",
+      "version": "0.2.25",
       "dependencies": {
         "@zgeoff/agent-hooks": "workspace:*",
       },
@@ -255,7 +255,7 @@
     },
     "packages/std": {
       "name": "@zgeoff/std",
-      "version": "0.4.2",
+      "version": "0.4.3",
       "devDependencies": {
         "@types/bun": "catalog:",
         "@zgeoff/testing": "workspace:*",
@@ -267,7 +267,7 @@
     },
     "packages/testing": {
       "name": "@zgeoff/testing",
-      "version": "0.2.1",
+      "version": "0.3.0",
       "dependencies": {
         "bun-pty": "catalog:",
       },
