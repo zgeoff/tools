@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.1.6...@zgeoff/rig@0.2.0) (2026-11-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* run unit tests under their package's bunfig, prefix chex jobs ([#542](https://github.com/zgeoff/tools/issues/542))
+
+### Bug Fixes
+
+* run unit tests under their package's bunfig, prefix chex jobs ([#542](https://github.com/zgeoff/tools/issues/542)) ([f4c4152](https://github.com/zgeoff/tools/commit/f4c4152f8d28e6605a2dd54c11b25ceb0727a8b2))
+
 ## [0.1.6](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.1.5...@zgeoff/rig@0.1.6) (2026-11-07)
 
 
