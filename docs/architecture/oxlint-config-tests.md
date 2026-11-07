@@ -141,27 +141,25 @@ the reason.
 ### The test timeout check
 
 oxlint lints only JavaScript and TypeScript files, so it cannot read a `package.json` script or a
-`bunfig.toml`. [`run-test-timeouts-check.ts`](../../packages/chex/src/run-test-timeouts-check.ts)
-checks those files as the commit at `HEAD` holds them. It runs in the `test-timeouts` job of the
-pre-push hook that repo-sync delivers, and in the `Check test timeouts` step of the shared
-`bun-checks` workflow that each repo's pull-request CI calls. It reports:
+`bunfig.toml`. The pre-push baseline's
+[`run-test-timeouts-check.ts`](../../packages/chex/src/run-test-timeouts-check.ts) reads them as
+`HEAD` holds them, as the `test-timeouts` job before a push and the `Check test timeouts` step of
+the shared pull-request checks. It reports:
 
-- each `bun test` timeout in a `package.json` script above the script's lane limit, in the
-  `--timeout 20000` or the `--timeout=20000` form, and each `--timeout` of 0, which Bun reads as no
-  timeout. The check reads the arguments as the shell hands them to Bun, so quotes and escapes make
-  no difference;
+- each `--timeout` above the script's limit, and each `--timeout` of 0, which Bun reads as no
+  timeout, in either the `--timeout 20000` or the `--timeout=20000` form. The check reads the words
+  that a `bun test` command in a `package.json` script hands Bun after the shell removes quotes and
+  escapes, up to `--`. Options may come before `test` in the `--name=value` form, as in
+  `bun --no-env-file test`. A newline or an operator such as `&&` ends a command, and a command
+  named `echo` or `printf`, quoted or bare, runs no `bun test`;
 - each `bunfig.toml` whose `[test] timeout` is above the limit of its directory's lane;
-- each setting in an oxlint config file anywhere in the repo, in its top-level rules or in an
-  override, that turns `zgeoff/max-test-timeout` or `zgeoff/test-timeout-exception-ticket` off or
-  down to a warning. Such a setting escapes the limits as a disable comment does. The check skips a
-  setting when a comment names a ticket or a `floor:` on the setting's line, directly above the
-  setting, or directly above its override.
+- each setting in an oxlint config, at any depth of the tree, that turns `zgeoff/max-test-timeout`
+  or `zgeoff/test-timeout-exception-ticket` off or down to a warning, unless a comment on its line,
+  directly above it, or directly above its override names a ticket or a `floor:`. Such a setting
+  escapes the limits as a disable comment does.
 
-A `test:<lane>` script gets the limit of its lane, and every other script gets the unit limit. A
-`bunfig.toml` gets the e2e limit when it sits under an `e2e/` directory at the repo root or in an
-app root, or under a package whose directory name ends in `-e2e`, as for
-`zgeoff/test-beside-module`. The check skips the `test:related` script, because the shared
-related-test runner it calls sets its own timeout.
+A `test:<lane>` script gets the limit of its lane, and every other script gets the unit limit. The
+check exempts the `test:related` script, which runs the shared related-test runner.
 
 The check takes the lanes and their limits from one source:
 
