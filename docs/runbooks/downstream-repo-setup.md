@@ -78,14 +78,14 @@ The merge of the repo-sync stub in step 5 starts the repo's first sync, so do th
 ## Opting in to the agent hooks
 
 A repo opts in to the `hook-start` entry in five steps, plus a sixth for a repo that uses Codex.
-`agent-hooks init` refuses to run until `.claude/hooks/start.ts` exists, so that file arrives first:
+`agent-hooks init` refuses to run until the stub exists, so the stub arrives first:
 
 1. Add `hook-start` to `include` in `.github/workflows/repo-sync.yml`.
 2. Dispatch repo-sync with `gh workflow run repo-sync.yml -R zgeoff/<repo>`, and merge its pull
-   request. Expect `main` to hold `.claude/hooks/start.ts`.
+   request. Expect the default branch to hold `.claude/hooks/start.ts`.
 3. Run `bun add -d @zgeoff/agent-hooks` at the repo root. Expect `bun.lock` to list the package.
-4. Check that `main` holds `.claude/skill-gate.json`, which a new repo takes from repo-sync. For
-   gates of the repo's own, follow
+4. Check that the default branch holds `.claude/skill-gate.json`, which a new repo takes from
+   repo-sync. For gates of the repo's own, follow
    [The shared rules](../guides/skill-gate-rules.md#the-shared-rules).
 5. Run `bunx agent-hooks init` at the repo root. Expect
    `agent-hooks init wrote .claude/settings.json and .codex/hooks.json`.
@@ -150,7 +150,7 @@ one `extends` line in place of the repo-sync entry:
    `pre-commit` or `pre-push` hook whose jobs are not a block list; for these, write the jobs as a
    block list, then run `chex init` again.
 3. Edit `check:docs` to name the docs checks the repo takes, such as
-   `chex prose length links vision`. CI runs each check that `check:docs` names as its own step.
+   `chex prose length links vision`. CI runs each check that it names as its own step.
 4. In `lefthook.yml`, delete `parallel` and the baseline's jobs from `pre-push` and `pre-commit`, as
    step 2 of [Opting in to the pre-push baseline](#opting-in-to-the-pre-push-baseline) describes. To
    keep a job of the repo's own in place of a baseline job, such as a typecheck under a lower memory
