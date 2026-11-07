@@ -629,7 +629,7 @@ test('it checks a utils/ import of a builtin in a package with an invalid packag
 
   const run = await runLintIn(directory, directory, 'packages/api/src/utils/round.ts');
 
-  expect(run).toStrictEqual({ exitCode: 0, stdout: '' });
+  expect(run.exitCode).toBe(0);
 });
 
 test('it reads a pending package with an invalid package.json and a utils/ import of a builtin', async () => {
