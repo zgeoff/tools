@@ -81,11 +81,15 @@ fits a 2 GiB host. A repo opts in with three changes:
 
 ## Opting in to the knip runner
 
-knip run in a worktree inside another checkout, such as `<clone>/.worktrees/<branch>`, reads the
-outer checkout's `tsconfig.json`. When that file extends a package the outer checkout has not
-installed, knip fails with `File '<package>/tsconfig.json' not found`, where `<package>` is the
-package in its `extends` field. The `knip-runner` entry delivers `scripts/run-knip.sh`, which runs
-knip so that it reads the repo's own `tsconfig.json`. A repo opts in with three steps:
+knip run in a worktree inside another checkout, such as `<clone>/.worktrees/<branch>`, where
+`<clone>` is the outer checkout and `<branch>` the worktree's branch, reads the outer checkout's
+`tsconfig.json`. When that file extends a package the outer checkout has not installed, knip fails
+with `File '<package>/tsconfig.json' not found`, where `<package>` is the package in its `extends`
+field. The `knip-runner` entry delivers `scripts/run-knip.sh`, which runs knip so that it reads the
+repo's own `tsconfig.json`. The runner needs a `tsconfig.json` at the repo root, and it analyses the
+whole repo, so only the root `package.json` calls it. knip reads a relative path given to
+`--reporter`, `--cache-location` or `--directory` from the `scripts/` folder, so give each of these
+an absolute path. A repo opts in with three steps:
 
 1. Add `knip-runner` to `include` in `.github/workflows/repo-sync.yml`.
 2. Dispatch repo-sync with `gh workflow run repo-sync.yml -R zgeoff/<repo>`, and merge its pull
