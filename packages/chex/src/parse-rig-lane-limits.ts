@@ -4,8 +4,9 @@ export type ParsedRigLaneLimits =
   | { readonly kind: 'parsed'; readonly limits: ReadonlyMap<string, number> }
   | { readonly kind: 'refused'; readonly reason: string };
 
-// The CI step downloads the check without rig, so the check reads rig.config.ts's default export
-// field by field. defineRig resolves every standard lane into its lanes, each with its limit in ms.
+// chex has no dependency on rig, and the copy that repo-sync puts in each repo imports no package,
+// so this reads the rig config's default export field by field. That export holds every standard
+// lane too, each with its limit in ms.
 export function parseRigLaneLimits(rigConfig: unknown): ParsedRigLaneLimits {
   const lanes = findMember(rigConfig, 'lanes');
 

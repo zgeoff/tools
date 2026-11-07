@@ -153,6 +153,29 @@ test('it holds a bunfig.toml in an e2e/ directory to the e2e limit that rig.conf
   ]);
 });
 
+test('it throws when the working tree changes the rig.config.ts that HEAD holds', async () => {
+  const ctx = await setupTest();
+
+  const defineRigPath = join(import.meta.dir, '..', '..', 'rig', 'src', 'define-rig.ts');
+
+  await writeFile(
+    join(ctx.directory, 'rig.config.ts'),
+    `import { defineRig } from ${JSON.stringify(defineRigPath)};\n\nexport default defineRig({ lanes: { kiln: { limit: '5s' } } });\n`,
+  );
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  await writeFile(
+    join(ctx.directory, 'rig.config.ts'),
+    `import { defineRig } from ${JSON.stringify(defineRigPath)};\n\nexport default defineRig({ lanes: { kiln: { limit: '10s' } } });\n`,
+  );
+
+  expect(ctx.runCheck()).rejects.toThrow(
+    'rig.config.ts in the working tree differs from HEAD; commit or stash the change',
+  );
+});
+
 test('it throws when the default export of rig.config.ts has no lanes', async () => {
   const ctx = await setupTest();
 
@@ -771,4 +794,30 @@ test('it exits 2 and names the file when run as a script on a package.json that 
   expect(result.exitCode).toBe(2);
   expect(result.stdout.toString()).toBe('');
   expect(result.stderr.toString()).toStartWith('test-timeouts: cannot parse package.json: ');
+});
+
+test('it exits 2 and gives the reason when run as a script on a rig.config.ts with no lanes', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'rig.config.ts'), 'export default {};\n');
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  const result = await $`bun ${join(import.meta.dir, 'run-test-timeouts-check.ts')}`
+    .cwd(ctx.directory)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr:
+      'test-timeouts: cannot read the lanes of rig.config.ts: its default export has no list of lanes\n',
+  });
 });

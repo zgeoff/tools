@@ -141,32 +141,41 @@ the reason.
 ### The test timeout check
 
 oxlint lints only JavaScript and TypeScript files, so it cannot read a `package.json` script or a
-`bunfig.toml`. The pre-push baseline's
-[`run-test-timeouts-check.ts`](../../packages/chex/src/run-test-timeouts-check.ts) reads them as
-`HEAD` holds them, as the `test-timeouts` job before a push and the `Check test timeouts` step of
-the shared pull-request checks. It reports:
+`bunfig.toml`. [`run-test-timeouts-check.ts`](../../packages/chex/src/run-test-timeouts-check.ts)
+checks those files as the commit at `HEAD` holds them. It runs in the `test-timeouts` job of the
+pre-push hook that repo-sync delivers, and in the `Check test timeouts` step of the shared
+`bun-checks` workflow that each repo's pull-request CI calls. It reports:
 
-- each `--timeout` above the script's limit, and each `--timeout` of 0, which Bun reads as no
-  timeout, in either the `--timeout 20000` or the `--timeout=20000` form. The check reads the words
-  that a `bun test` command in a `package.json` script hands Bun after the shell removes quotes and
-  escapes, up to `--`. Options may come before `test` in the `--name=value` form, as in
-  `bun --no-env-file test`. A newline or an operator such as `&&` ends a command, and a command
-  named `echo` or `printf`, quoted or bare, runs no `bun test`;
+- each `bun test` timeout in a `package.json` script above the script's lane limit, in the
+  `--timeout 20000` or the `--timeout=20000` form, and each `--timeout` of 0, which Bun reads as no
+  timeout. The check reads the arguments as the shell hands them to Bun, so quotes and escapes make
+  no difference;
 - each `bunfig.toml` whose `[test] timeout` is above the limit of its directory's lane;
-- each setting in an oxlint config, at any depth of the tree, that turns `zgeoff/max-test-timeout`
-  or `zgeoff/test-timeout-exception-ticket` off or down to a warning, unless a comment on its line,
-  directly above it, or directly above its override names a ticket or a `floor:`. Such a setting
-  escapes the limits as a disable comment does.
+- each setting in an oxlint config file anywhere in the repo, in its top-level rules or in an
+  override, that turns `zgeoff/max-test-timeout` or `zgeoff/test-timeout-exception-ticket` off or
+  down to a warning. Such a setting escapes the limits as a disable comment does. The check skips a
+  setting when a comment names a ticket or a `floor:` on the setting's line, directly above the
+  setting, or directly above its override.
 
-A `test:<lane>` script gets the limit of its lane, and every other script gets the unit limit. The
-check exempts the `test:related` script, which runs the shared related-test runner. In a repo with a
-`rig.config.ts`, the check imports that file from the working tree and takes each lane and its limit
-from the table `defineRig` resolves, and it ignores the `lanes` option of the oxlint config. When
-the file's default export has no list of lanes, the check exits 2. In a repo without one, the check
-reads the lanes from the `lanes` option of `zgeoff/max-test-timeout` in the root `.oxlintrc.json`,
-with the same standard lanes as the rule. The check keeps its own copy of the standard limits,
-because the shared pull-request checks download it without the oxlint config package, and a test
-pins both copies to the skill's table.
+A `test:<lane>` script gets the limit of its lane, and every other script gets the unit limit. A
+`bunfig.toml` gets the e2e limit when it sits under an `e2e/` directory at the repo root or in an
+app root, or under a package whose directory name ends in `-e2e`, as for
+`zgeoff/test-beside-module`. The check skips the `test:related` script, because the shared
+related-test runner it calls sets its own timeout.
+
+The check takes the lanes and their limits from one source:
+
+- in a repo with a [`rig.config.ts`](./rig.md#one-source-for-the-limits), from the lane table that
+  the file's `defineRig` call returns. The check ignores the `lanes` option of the oxlint config
+  there. Only an import runs the `defineRig` call, and an import reads the working tree, so the
+  check exits 2 when the working tree's `rig.config.ts` differs from `HEAD`. It also exits 2 when
+  the default export holds no list of lanes;
+- in a repo without one, from the `lanes` option of `zgeoff/max-test-timeout` in the root
+  `.oxlintrc.json`, beside the standard lanes of that rule.
+
+The check keeps its own copy of the standard limits, because neither chex nor the copy of the check
+that repo-sync puts in each repo can import the oxlint config package. A test pins both copies to
+the Lanes table of the testing skill.
 
 ## `zgeoff/test-shape`
 

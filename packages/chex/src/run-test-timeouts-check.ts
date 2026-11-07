@@ -11,9 +11,7 @@ export interface TestTimeoutsCheckOptions {
   readonly cwd: string;
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly runProgram: RunProgram;
-
-  // Loads a module by its absolute path.
-  readonly importModule: (path: string) => Promise<unknown>;
+  readonly importModule: (absolutePath: string) => Promise<unknown>;
 }
 
 export interface TestTimeoutFinding {
@@ -23,8 +21,7 @@ export interface TestTimeoutFinding {
   readonly message: string;
 }
 
-// The check reads the files as HEAD holds them, so a push checks what it sends. It loads a
-// rig.config.ts from the working tree, because only an import runs the file's defineRig call.
+// The check reads the files as HEAD holds them, so a push checks what it sends.
 export async function runTestTimeoutsCheck(
   options: Readonly<TestTimeoutsCheckOptions>,
 ): Promise<TestTimeoutFinding[]> {
@@ -84,6 +81,23 @@ async function readLaneLimits(
       : null;
 
     return parseLaneLimits(configText);
+  }
+
+  // Only an import resolves the rig config's lanes, and an import reads the working tree, so the
+  // check runs only while the working tree holds HEAD's copy.
+  const diff = options.runProgram(['git', 'diff', '--quiet', 'HEAD', '--', rigConfigPath], {
+    cwd: options.cwd,
+    env: options.env,
+  });
+
+  if (diff.exitCode === 1) {
+    throw new Error(
+      `${rigConfigPath} in the working tree differs from HEAD; commit or stash the change, because the check reads the lane limits from HEAD`,
+    );
+  }
+
+  if (diff.exitCode !== 0) {
+    throw new Error(`git diff --quiet HEAD -- ${rigConfigPath} failed: ${diff.stderr.trim()}`);
   }
 
   const loaded = await options.importModule(join(options.cwd, rigConfigPath));
