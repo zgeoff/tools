@@ -52,6 +52,18 @@ test('it reports each link of a chain that ends at a path a fresh clone lacks', 
   ]);
 });
 
+test('it reports each link whose path steps out of a file with ..', () => {
+  const links = [
+    { path: 'outer', target: 'alias/child' },
+    { path: 'alias', target: 'file/..' },
+  ];
+
+  expect(collectDanglingLinks(links, ['outer', 'alias', 'file', 'child'])).toStrictEqual([
+    { path: 'outer', target: 'alias/child', resolved: 'alias/child' },
+    { path: 'alias', target: 'file/..', resolved: '.' },
+  ]);
+});
+
 test('it reports each link of a loop', () => {
   const links = [
     { path: 'ping', target: 'pong' },
