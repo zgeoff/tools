@@ -76,7 +76,7 @@ test('it writes lefthook.yml and package.json to the repo folder, and reports ea
     lines: [
       'out chex init: lefthook.yml extends node_modules/@zgeoff/chex/lefthook.yml\n' +
         'chex init: lefthook.yml runs chex-baseline first in pre-commit and pre-push, which fails when node_modules/@zgeoff/chex/lefthook.yml is missing\n' +
-        'chex init: package.json runs "chex prose length links skill" as check:docs\n',
+        'chex init: package.json runs "chex prose length links readmes skill" as check:docs\n',
     ],
   });
 
@@ -84,7 +84,7 @@ test('it writes lefthook.yml and package.json to the repo folder, and reports ea
     `extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\n${buildInitGuardHooks()}`,
   );
 
-  expect(files[0]).toInclude('"check:docs": "chex prose length links skill"');
+  expect(files[0]).toInclude('"check:docs": "chex prose length links readmes skill"');
 });
 
 test('it leaves every file as it was on a second run', async () => {
@@ -137,7 +137,7 @@ test('it adds the chex baseline to the end of the one-entry inline list that the
     lines: [
       'out chex init: lefthook.yml extends node_modules/@zgeoff/chex/lefthook.yml\n' +
         'chex init: lefthook.yml runs chex-baseline first in pre-commit and pre-push, which fails when node_modules/@zgeoff/chex/lefthook.yml is missing\n' +
-        'chex init: package.json runs "chex prose length links skill" as check:docs\n',
+        'chex init: package.json runs "chex prose length links readmes skill" as check:docs\n',
     ],
   });
 
