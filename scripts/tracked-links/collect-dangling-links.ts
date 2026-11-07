@@ -28,10 +28,14 @@ export function collectDanglingLinks(
         ? link.target
         : posix.normalize(posix.join(posix.dirname(link.path), link.target)).replace(/\/+$/u, ''),
     }))
-    .filter(
-      (link) =>
-        link.resolved !== '.' &&
-        !tracked.has(link.resolved) &&
-        !trackedPaths.some((path) => path.startsWith(`${link.resolved}/`)),
-    );
+    .filter((link) => {
+      if (link.resolved === '.') {
+        return false;
+      }
+
+      const isFolder = trackedPaths.some((path) => path.startsWith(`${link.resolved}/`));
+
+      // The file system refuses a slash-ended target that names a file, with ENOTDIR.
+      return link.target.endsWith('/') ? !isFolder : !isFolder && !tracked.has(link.resolved);
+    });
 }

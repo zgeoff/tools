@@ -51,6 +51,12 @@ test.each([
     resolved: '../shared/lib',
   },
   {
+    condition: 'its target ends in a slash but names a tracked file',
+    link: { path: 'docs/notes', target: 'notes.md/' },
+    trackedPaths: ['docs/notes', 'docs/notes.md'],
+    resolved: 'docs/notes.md',
+  },
+  {
     condition: 'its target is absolute',
     link: { path: 'bin/node', target: '/usr/bin/node' },
     trackedPaths: ['bin/node'],
