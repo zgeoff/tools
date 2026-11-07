@@ -80,6 +80,21 @@ test.each([
     'src/pour-kettle.ts',
     'export namespace PourKettle.Spout {\n  export const cups = 2;\n}\n',
   ],
+  [
+    'a default export under as',
+    'src/pour-kettle.ts',
+    'const pourKettle = { cups: 2 };\n\nexport default pourKettle as object;\n',
+  ],
+  [
+    'a default export under a non-null assertion',
+    'src/pour-kettle.ts',
+    'const pourKettle = { cups: 2 };\n\nexport default pourKettle!;\n',
+  ],
+  [
+    'an export assignment',
+    'src/pour-kettle.ts',
+    'const pourKettle = { cups: 2 };\n\nexport = pourKettle;\n',
+  ],
 ])('it accepts a file named for %s', async (_, path, source) => {
   const result = await runLintTree({ [path]: source }, path, {
     'zgeoff/file-named-for-export': 'error',
