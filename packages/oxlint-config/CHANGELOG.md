@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.3](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.10.2...@zgeoff/oxlint-config@0.10.3) (2026-11-07)
+
+
+### Bug Fixes
+
+* **oxlint-config:** read seed-only writes only in sql calls ([#577](https://github.com/zgeoff/tools/issues/577)) ([4e629cd](https://github.com/zgeoff/tools/commit/4e629cd4c9bd16cc2b89793ac12f6941b370b45f))
+
 ## [0.10.2](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.10.1...@zgeoff/oxlint-config@0.10.2) (2026-11-07)
 
 

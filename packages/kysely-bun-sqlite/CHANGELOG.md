@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/zgeoff/tools/compare/@zgeoff/kysely-bun-sqlite@0.3.1...@zgeoff/kysely-bun-sqlite@0.3.2) (2026-11-07)
+
+
+### Bug Fixes
+
+* **oxlint-config:** read seed-only writes only in sql calls ([#577](https://github.com/zgeoff/tools/issues/577)) ([4e629cd](https://github.com/zgeoff/tools/commit/4e629cd4c9bd16cc2b89793ac12f6941b370b45f))
+
 ## [0.3.1](https://github.com/zgeoff/tools/compare/@zgeoff/kysely-bun-sqlite@0.3.0...@zgeoff/kysely-bun-sqlite@0.3.1) (2026-11-07)
 
 
