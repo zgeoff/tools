@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.2.2...@zgeoff/chex@0.2.3) (2026-11-07)
+
+
+### Bug Fixes
+
+* **chex:** match nested override keys in dependency-gates ([#566](https://github.com/zgeoff/tools/issues/566)) ([6222891](https://github.com/zgeoff/tools/commit/6222891bd1dde10bc381da39c1b65d2dbf153cd0))
+
 ## [0.2.2](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.2.1...@zgeoff/chex@0.2.2) (2026-11-07)
 
 
