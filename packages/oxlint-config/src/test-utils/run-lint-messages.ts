@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { isRecord } from '@zgeoff/std';
 import { runOxlint } from './run-oxlint.ts';
 
 export interface LintMessage {
@@ -36,10 +37,6 @@ function parseLintMessages(stdout: string, rule: string): LintMessage[] {
     .toSorted(
       (left, right) => left.filename.localeCompare(right.filename) || left.line - right.line,
     );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }
 
 function toLintMessage(diagnostic: unknown): LintMessage {
