@@ -1,4 +1,12 @@
 {
   "extends": "../tsconfig.base.json",
-  "include": ["hooks", "pre-push", "skill-gate", "skills", "test-utils", "workflow-callers"]
+  "include": [
+    "deadcode",
+    "hooks",
+    "pre-push",
+    "skill-gate",
+    "skills",
+    "test-utils",
+    "workflow-callers"
+  ]
 }

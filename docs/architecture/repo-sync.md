@@ -27,6 +27,8 @@ repo or in [zgeoff/skills](https://github.com/zgeoff/skills):
   entry point.
 - [`sync/pre-push/`](../../sync/pre-push/): the [pre-push baseline](./pre-push-baseline.md) that the
   `pre-push-baseline` entry delivers, and the [memory-cap script](./memory-caps.md).
+- [`sync/deadcode/`](../../sync/deadcode/): the
+  [knip runner](../runbooks/downstream-repo-setup.md#opting-in-to-the-knip-runner).
 - [`packages/chex/src/`](../../packages/chex/src/): the docs check scripts that the skill entries
   and the `docs-vision-check` entry deliver, and the check scripts of the `pre-push-baseline` entry.
   [`@zgeoff/chex`](../../packages/chex/README.md) runs the same scripts as `chex <check>`.

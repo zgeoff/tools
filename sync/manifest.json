@@ -387,6 +387,18 @@
     ]
   },
   {
+    "name": "knip-runner",
+    "description": "The script that runs knip from inside the repo, so knip in a worktree inside another checkout reads the worktree's tsconfig.json; a repo that takes it runs knip through it",
+    "optIn": true,
+    "files": [
+      {
+        "source": "sync/deadcode/run-knip.sh",
+        "target": "scripts/run-knip.sh",
+        "mode": "0755"
+      }
+    ]
+  },
+  {
     "name": "pre-push-baseline",
     "description": "The light pre-push baseline: lefthook jobs that check only what the branch changes and run one at a time under a memory cap, a pre-commit typecheck, the scripts they call, the package scripts files:branch, lint:files, test:related, check:commits, check:local-paths, check:test-timeouts, check:dependency-gates, check:workflows, check:uncommitted and memory-capped where the repo lacks them, and a move of a files:branch script left on the old script path",
     "optIn": true,

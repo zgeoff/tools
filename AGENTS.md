@@ -49,6 +49,7 @@ sync/               the sources that repo-sync delivers, listed in sync/manifest
   workflow-callers/ workflow stubs that call this repo's reusable workflows, all opt-in but the
                     repo-sync guard
   hooks/            the agent hooks' start-up stub and the skill gate's older entry point
+  deadcode/         the knip runner that the opt-in knip-runner entry delivers
   skill-gate/       the skill gate's rules, which repo-sync writes to .claude/skill-gate.json in
                     each repo its except list leaves out; this repo keeps its own copy there,
                     with a gate of its own on TypeScript, and check:sync fails when the copy lacks
