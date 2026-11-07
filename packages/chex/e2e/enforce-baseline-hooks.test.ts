@@ -191,6 +191,73 @@ test("it fails the commit when typecheck fails, after the repo's own pre-commit 
   expect(ran).toBe('fixer\ntypecheck\n');
 });
 
+test("it runs the repo's own pre-push typecheck job, and the baseline's chex-typecheck after it", async () => {
+  const ctx = await setupTest();
+
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
+    realChecks: [],
+    scripts: {
+      'format:check': 'true',
+      typecheck: 'echo "baseline typecheck ran"',
+      'check:docs': 'true',
+    },
+    files: {
+      'lefthook.yml':
+        'extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\npre-push:\n  jobs:\n    - name: typecheck\n      run: echo "own typecheck ran"\n',
+      'fixture.ts': 'export {};\n',
+    },
+    rig: 'exit 0',
+    oxlint: 'exit 0',
+    withCommitlint: false,
+  });
+
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixture');
+
+  const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
+
+  expect({
+    exitCode: result.exitCode,
+    typecheckLines: [...result.output.matchAll(/^(?:own|baseline) typecheck ran$/gmu)].map(
+      (line) => line[0],
+    ),
+  }).toStrictEqual({
+    exitCode: 0,
+    typecheckLines: ['own typecheck ran', 'baseline typecheck ran'],
+  });
+});
+
+test("it runs only the repo's own typecheck when the repo lists chex-typecheck under the hook's exclude_tags", async () => {
+  const ctx = await setupTest();
+
+  await createChexBaselineRepo(ctx.worktree, ctx.install, {
+    realChecks: [],
+    scripts: {
+      'format:check': 'true',
+      typecheck: 'echo "baseline typecheck ran"',
+      'check:docs': 'true',
+    },
+    files: {
+      'lefthook.yml':
+        'extends:\n  - node_modules/@zgeoff/chex/lefthook.yml\npre-push:\n  exclude_tags:\n    - chex-typecheck\n  jobs:\n    - name: typecheck\n      run: echo "own typecheck ran"\n',
+      'fixture.ts': 'export {};\n',
+    },
+    rig: 'exit 0',
+    oxlint: 'exit 0',
+    withCommitlint: false,
+  });
+
+  await commitAllFiles(ctx.worktree, ctx.env, 'test: add the fixture');
+
+  const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
+
+  expect({
+    exitCode: result.exitCode,
+    typecheckLines: [...result.output.matchAll(/^(?:own|baseline) typecheck ran$/gmu)].map(
+      (line) => line[0],
+    ),
+  }).toStrictEqual({ exitCode: 0, typecheckLines: ['own typecheck ran'] });
+});
+
 test('it fails the push on the uncommitted job and names the file when a file the branch changes holds an uncommitted change', async () => {
   const ctx = await setupTest();
 
@@ -211,7 +278,7 @@ test('it fails the push on the uncommitted job and names the file when a file th
   const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
 
   expect(result.exitCode).not.toBe(0);
-  expect(result.failedJobs).toStrictEqual(['uncommitted']);
+  expect(result.failedJobs).toStrictEqual(['chex-uncommitted']);
   expect(result.output).toMatch(/^guide\.md$/mu);
   expect(result.output).toMatch(/^bounced: uncommitted$/mu);
 });
@@ -237,7 +304,7 @@ test("it fails the push on the format:check job when the repo's format:check scr
   const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
 
   expect(result.exitCode).not.toBe(0);
-  expect(result.failedJobs).toStrictEqual(['format:check']);
+  expect(result.failedJobs).toStrictEqual(['chex-format:check']);
   expect(result.output).toInclude('kettle.ts needs formatting');
 });
 
@@ -258,7 +325,7 @@ test('it fails the push on the lint job when oxlint fails a file the branch chan
   const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
 
   expect(result.exitCode).not.toBe(0);
-  expect(result.failedJobs).toStrictEqual(['lint']);
+  expect(result.failedJobs).toStrictEqual(['chex-lint']);
   expect(result.output).toInclude('lint failed: --no-error-on-unmatched-pattern src/kettle.ts');
 });
 
@@ -279,6 +346,6 @@ test('it fails the push on the local-paths job when a commit of the branch adds 
   const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
 
   expect(result.exitCode).not.toBe(0);
-  expect(result.failedJobs).toStrictEqual(['local-paths']);
+  expect(result.failedJobs).toStrictEqual(['chex-local-paths']);
   expect(result.output).toInclude('cache.txt:1: commit ');
 });

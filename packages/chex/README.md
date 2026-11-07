@@ -94,7 +94,6 @@ extends:
   - node_modules/@zgeoff/chex/lefthook.yml
 ```
 
-The baseline's jobs call `chex <check>` for the repo checks, `bun run check:docs` for the docs
-checks the repo names, `rig related` for the tests beside the changed files, and the repo's own
-`format:check` and `typecheck` scripts.
+The baseline's jobs call `chex <check>`, `bun run check:docs`, `rig related` and the repo's own
+`format:check` and `typecheck` scripts. Each job's name starts with `chex-`.
 [The pre-push baseline](../../docs/architecture/pre-push-baseline.md) describes each job.

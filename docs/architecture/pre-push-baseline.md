@@ -23,23 +23,23 @@ the job prints the path and `run bun install, then try again`, and fails the com
 The baseline runs `format:check`, `typecheck` and the
 [dependency gates check](./dependency-updates.md#the-dependency-gates-check) over the whole tree,
 and plain `oxlint`, the shell, docs and workflows checks and the sibling tests over the files the
-branch changes. The lint, shell, docs, workflows and test jobs run only when the branch changes a
-file that matches their glob, and the other jobs run on every push:
+branch changes. The chex-lint, chex-shell, chex-docs, chex-workflows and chex-test jobs run only
+when the branch changes a file that matches their glob, and the other jobs run on every push:
 
-| Job              | Runs                                     | Reads                        |
-| ---------------- | ---------------------------------------- | ---------------------------- |
-| uncommitted      | `chex uncommitted`                       | the files the branch changes |
-| format:check     | the repo's `format:check` script         | the whole tree               |
-| lint             | `oxlint --no-error-on-unmatched-pattern` | the changed code files       |
-| shell            | `shellcheck` and `shfmt -d`              | the changed shell files      |
-| docs             | the repo's `check:docs` script           | the docs each check picks    |
-| workflows        | `actionlint`, then `chex workflows`      | the changed workflows        |
-| commits          | `chex commits --pushed-refs`             | the pushed commits           |
-| local-paths      | `chex local-paths --pushed-refs`         | the pushed commits           |
-| test-timeouts    | `chex test-timeouts`                     | the files `HEAD` holds       |
-| dependency-gates | `chex dependency-gates`                  | the working tree             |
-| typecheck        | the repo's `typecheck` script            | the whole tree               |
-| test             | `rig related`                            | the changed code files       |
+| Job                   | Runs                                     | Reads                        |
+| --------------------- | ---------------------------------------- | ---------------------------- |
+| chex-uncommitted      | `chex uncommitted`                       | the files the branch changes |
+| chex-format:check     | the repo's `format:check` script         | the whole tree               |
+| chex-lint             | `oxlint --no-error-on-unmatched-pattern` | the changed code files       |
+| chex-shell            | `shellcheck` and `shfmt -d`              | the changed shell files      |
+| chex-docs             | the repo's `check:docs` script           | the docs each check picks    |
+| chex-workflows        | `actionlint`, then `chex workflows`      | the changed workflows        |
+| chex-commits          | `chex commits --pushed-refs`             | the pushed commits           |
+| chex-local-paths      | `chex local-paths --pushed-refs`         | the pushed commits           |
+| chex-test-timeouts    | `chex test-timeouts`                     | the files `HEAD` holds       |
+| chex-dependency-gates | `chex dependency-gates`                  | the working tree             |
+| chex-typecheck        | the repo's `typecheck` script            | the whole tree               |
+| chex-test             | `rig related`                            | the changed code files       |
 
 The repo's `check:docs` script names the docs checks it takes, such as `chex prose length links`,
 which `chex init` writes. A repo with no `check:docs` script fails the docs job, because the job
@@ -82,13 +82,17 @@ notice and passes.
 
 ## The related tests
 
-The test job runs unit tests only, through `rig related`, which leaves out the lane files that
+The chex-test job runs unit tests only, through `rig related`, which leaves out the lane files that
 [rig's lane table](./rig.md#the-lane-table) names. It skips, and passes with a notice that CI runs
 the full suite, in two cases:
 
-- The branch changes a shared test input, a file under a `test-utils/` folder or a `bunfig.toml`,
-  which reaches tests beyond the siblings of the files it changes.
+- The branch changes a shared test input, a file under a `test-utils/` folder, a `bunfig.toml` or a
+  bunfig that `rig.config.ts` names, which reaches tests beyond the siblings of the files it
+  changes.
 - The branch has more than 50 related unit test files.
+
+The job runs each related test from the folder of the package that owns it, or under a bunfig that
+`rig.config.ts` names, as [The bunfig of each test](./rig.md#the-bunfig-of-each-test) describes.
 
 The job passes `bun test` the [worker count](./memory-caps.md#the-worker-count) as `--parallel`,
 with `--no-isolate`, so the files of a worker share one global, as they do in the repo's own test
@@ -139,6 +143,19 @@ A job that a repo adds in its `lefthook.yml` runs before the uncommitted check, 
 uncommitted copy of a file the branch changes.
 
 A repo changes what the `format:check`, `typecheck` and docs jobs run through the package script
-that each job calls. The other jobs call their programs directly, so a repo cannot change them. A
-job of the same name in `lefthook.yml` does not override a baseline job, because lefthook merges the
-extended file over the repo's own.
+that each job calls. The other jobs call their programs directly, so a repo cannot change them.
+
+lefthook 2.2.2 lets a job of an extended file replace the job of the same name in the repo's
+`lefthook.yml`. So each baseline job has a name that starts with `chex-`, in both the chex baseline
+and the delivered one, and a repo's own job of any other name runs beside the baseline's. To run its
+own job in place of a baseline job, such as a typecheck under a lower memory cap, a repo lists the
+baseline job's name under the hook's `exclude_tags`, which lefthook matches against job names too:
+
+```yaml
+pre-push:
+  exclude_tags:
+    - chex-typecheck
+  jobs:
+    - name: typecheck
+      run: bun run typecheck:low-memory
+```
