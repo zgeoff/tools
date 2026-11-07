@@ -30,8 +30,8 @@ const testBesideSeed = {
           return;
         }
 
-        // anchor on the first statement, as test-beside-module does, so a disable comment at the
-        // top of the file covers the report
+        // a disable comment at the top of the file sits above the first statement, so it covers the
+        // report there
         const start = context.sourceCode.ast.body[0]?.loc.start ?? { line: 1, column: 0 };
 
         context.report({ loc: { start, end: start }, messageId: 'missing', data: { base } });
@@ -42,7 +42,6 @@ const testBesideSeed = {
 
 export default testBesideSeed;
 
-// a lane suite of the seed, such as `seed-note.host.test.ts`, counts as its test
 function probeSeedTest(directory, base) {
   return readdirSync(directory).some(
     (entry) => entry.startsWith(`${base}.`) && /\.test\.tsx?$/u.test(entry),

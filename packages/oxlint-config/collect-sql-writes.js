@@ -1,10 +1,15 @@
 import toTableName from './to-table-name.js';
 
-// upper case only, so prose such as a test title that says "update" never reads as SQL
+const tablePattern = String.raw`(?<table>[^\s(),;'\x60]+)`;
+
 const sqlWritePatterns = [
-  /\bINSERT\s+(?:OR\s+[A-Z]+\s+)?INTO\s+(?<table>[^\s(),;'`]+)/gu,
-  /\bUPDATE\s+(?:OR\s+[A-Z]+\s+)?(?<table>[^\s(),;'`]+)\s+SET\b/gu,
-  /\bDELETE\s+FROM\s+(?<table>[^\s(),;'`]+)/gu,
+  new RegExp(String.raw`\binsert\s+(?:or\s+[a-z]+\s+)?into\s+${tablePattern}`, 'giu'),
+  new RegExp(String.raw`(?<!\bor\s+)\breplace\s+into\s+${tablePattern}`, 'giu'),
+  new RegExp(
+    String.raw`\bupdate\s+(?:or\s+[a-z]+\s+)?${tablePattern}(?:\s+(?:as\s+)?\w+)?\s+set\b`,
+    'giu',
+  ),
+  new RegExp(String.raw`\bdelete\s+from\s+${tablePattern}`, 'giu'),
 ];
 
 export default function collectSQLWrites(text) {

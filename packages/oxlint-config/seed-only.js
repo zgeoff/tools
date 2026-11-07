@@ -1,6 +1,8 @@
 import { basename, dirname } from 'node:path';
 import collectSQLWrites from './collect-sql-writes.js';
 import collectWrittenTables from './collect-written-tables.js';
+import findBunTestName from './find-bun-test-name.js';
+import findChainRoot from './find-chain-root.js';
 import findFunctionName from './find-function-name.js';
 import isInTestUtils from './is-in-test-utils.js';
 import isVerbMatch from './is-verb-match.js';
@@ -18,7 +20,9 @@ export default function buildSeedOnly(readFolderSources) {
     }
 
     const tables = new Set(
-      readFolderSources(directory).flatMap((text) => collectWrittenTables(text)),
+      readFolderSources(directory)
+        .filter((source) => !source.name.startsWith('seed-'))
+        .flatMap((source) => collectWrittenTables(source.text)),
     );
 
     folderTables.set(directory, tables);
@@ -57,6 +61,14 @@ export default function buildSeedOnly(readFolderSources) {
         }
       };
 
+      const checkText = (node, text) => {
+        if (!isTestTitle(context, node)) {
+          for (const table of collectSQLWrites(text)) {
+            checkWrite(node, table);
+          }
+        }
+      };
+
       return {
         CallExpression(node) {
           if (isKyselyWrite(node)) {
@@ -65,9 +77,7 @@ export default function buildSeedOnly(readFolderSources) {
         },
         Literal(node) {
           if (typeof node.value === 'string') {
-            for (const table of collectSQLWrites(node.value)) {
-              checkWrite(node, table);
-            }
+            checkText(node, node.value);
           }
         },
         TemplateLiteral(node) {
@@ -76,9 +86,7 @@ export default function buildSeedOnly(readFolderSources) {
             // oxlint-disable-next-line no-template-curly-in-string -- marks each interpolation as a module's text shows it
             .join('${}');
 
-          for (const table of collectSQLWrites(text)) {
-            checkWrite(node, table);
-          }
+          checkText(node, text);
         },
       };
     },
@@ -87,14 +95,14 @@ export default function buildSeedOnly(readFolderSources) {
 
 const testFilePattern = /\.test\.tsx?$/u;
 const seedTestPattern = /^seed-.+\.test\.tsx?$/u;
-const migrationPattern = /migrat(?:e|ion)/iu;
+const migrationWords = new Set(['migrate', 'migration', 'migrations']);
 
-// a migration test and a seed's own test may write tables directly, and only test code is checked
 function pickFileKind(repoPath, name) {
   const inTestUtils = isInTestUtils(repoPath);
   const isTest = testFilePattern.test(name);
+  const isMigrationTest = repoPath.split(/[-./\\_]/u).some((word) => migrationWords.has(word));
 
-  if (isTest && (migrationPattern.test(repoPath) || (inTestUtils && seedTestPattern.test(name)))) {
+  if (isTest && (isMigrationTest || (inTestUtils && seedTestPattern.test(name)))) {
     return null;
   }
 
@@ -107,20 +115,37 @@ const functionTypes = new Set([
   'ArrowFunctionExpression',
 ]);
 
+// a seed's callbacks write for the seed, while a seed-named helper inside another function does not
 function isInSeedFunction(node) {
+  let outermost = null;
+
   for (
     let current = node.parent;
     current !== null && current !== undefined;
     current = current.parent
   ) {
-    const name = functionTypes.has(current.type) ? findFunctionName(current) : null;
-
-    if (name !== null && isVerbMatch(name.name, 'seed')) {
-      return true;
+    if (functionTypes.has(current.type)) {
+      outermost = current;
     }
   }
 
-  return false;
+  const name = outermost === null ? null : findFunctionName(outermost);
+
+  return name !== null && isVerbMatch(name.name, 'seed');
+}
+
+const testRunnerNames = new Set(['test', 'it', 'describe']);
+
+function isTestTitle(context, node) {
+  const call = node.parent;
+
+  if (call?.type !== 'CallExpression' || call.arguments[0] !== node) {
+    return false;
+  }
+
+  const root = findChainRoot(call.callee, true);
+
+  return root !== null && testRunnerNames.has(findBunTestName(context, root));
 }
 
 const kyselyWriteMethods = new Set(['insertInto', 'updateTable', 'deleteFrom']);

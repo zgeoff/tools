@@ -26,7 +26,6 @@ const functionVerb = {
   create(context) {
     const exemptNames = new Set(context.options[0]?.exemptNames);
 
-    // resolves the repo root only for a file that names a seed
     const probeSeedAllowed = () =>
       isInTestUtils(resolveRepoPath(context.physicalFilename, context.cwd));
 

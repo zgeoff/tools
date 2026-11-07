@@ -15,6 +15,10 @@ test.each([
   ['a raw INSERT OR REPLACE', "db.run('INSERT OR REPLACE INTO kettles (id) VALUES (1)');"],
   ['a raw UPDATE', 'db.run(`UPDATE kettles SET full = 1`);'],
   ['a raw DELETE', 'await db.execute(sql`DELETE FROM kettles WHERE id = ${1}`);'],
+  ['a lower-case raw INSERT', "db.run('insert into kettles (id) values (1)');"],
+  ['a lower-case raw DELETE in a sql tag', 'await sql`delete from kettles`.execute(db);'],
+  ['a raw REPLACE', "db.run('REPLACE INTO kettles (id) VALUES (1)');"],
+  ['a raw UPDATE of an aliased table', "db.run('UPDATE kettles AS k SET full = 1');"],
 ])('it reports %s in a test file', async (_, write) => {
   const source = `test('it pours a kettle', async () => {\n  ${write}\n});\n`;
 
@@ -32,6 +36,10 @@ test.each([
     'a lower-case insert in a title',
     "test('it can insert into kettles and update them', () => {});\n",
   ],
+  [
+    'an upper-case delete in a test.each title',
+    "test.each([1])('DELETE FROM a list drops row %d', () => {});\n",
+  ],
   ['a select', "test('it reads', () => {\n  db.run('SELECT * FROM kettles');\n});\n"],
   [
     'an upsert clause',
@@ -45,13 +53,29 @@ test.each([
   expect(result.exitCode).toBe(0);
 });
 
-test('it reports a write in a test-utils helper outside a seed function', async () => {
-  const source =
-    "export async function writeKettle(db: Db) {\n  await db.insertInto('kettles').values({ id: 1 }).execute();\n}\n";
+test.each([
+  [
+    'a helper',
+    'src/test-utils/write-kettle.ts',
+    "export async function writeKettle(db: Db) {\n  await db.insertInto('kettles').values({ id: 1 }).execute();\n}\n",
+  ],
+  [
+    'a seed-named function inside a helper',
+    'src/test-utils/write-kettle.ts',
+    "export async function writeKettle(db: Db) {\n  const seedIt = () => db.insertInto('kettles').values({ id: 1 }).execute();\n\n  await seedIt();\n}\n",
+  ],
+  [
+    'a test that is not a seed test, beside a seed that writes the table',
+    'src/test-utils/build-app.test.ts',
+    "test('it builds an app', async () => {\n  await db.insertInto('kettles').values({ id: 1 }).execute();\n});\n",
+  ],
+])('it reports a write in test-utils inside %s', async (_, path, source) => {
+  const seed =
+    "export const seedCrackedKettle = (db: Db) => db.insertInto('kettles').values({ cracked: true });\n";
 
   const result = await runLintTree(
-    { 'src/test-utils/write-kettle.ts': source },
-    'src/test-utils/write-kettle.ts',
+    { 'src/test-utils/seed-cracked-kettle.ts': seed, [path]: source },
+    path,
     { 'zgeoff/seed-only': 'error' },
   );
 
@@ -96,6 +120,10 @@ test.each([
     "export const fill = (db: Db) => db.insertInto('kettles').values({ id: 1 });\n",
   ],
   ['a raw write', "export const fill = (db: Db) => db.run('UPDATE kettles SET full = 1');\n"],
+  [
+    'a lower-case raw write',
+    "export const fill = (db: Db) => db.run('insert into kettles (id) values (1)');\n",
+  ],
   [
     'a schema-qualified raw write',
     'export const fill = (db: Db) => db.run(\'DELETE FROM "main"."kettles"\');\n',
@@ -160,6 +188,7 @@ test.each([
 test.each([
   ['a migration test', 'src/db/migrations/0003-add-spout.test.ts'],
   ['a test of a migrate module', 'src/db/migrate.test.ts'],
+  ['a test of a run-migrations module', 'src/db/run-migrations.test.ts'],
   ["a seed's own test", 'src/test-utils/seed-cracked-kettle.test.ts'],
 ])('it accepts a write in %s', async (_, path) => {
   const source =
@@ -168,6 +197,20 @@ test.each([
   const result = await runLintTree({ [path]: source }, path, { 'zgeoff/seed-only': 'error' });
 
   expect(result.exitCode).toBe(0);
+});
+
+test('it reports a write in a test whose path only holds migration inside a word', async () => {
+  const source =
+    "test('it grants a visa', async () => {\n  await db.insertInto('visas').values({ id: 1 }).execute();\n});\n";
+
+  const result = await runLintTree(
+    { 'src/immigration/visa.test.ts': source },
+    'src/immigration/visa.test.ts',
+    { 'zgeoff/seed-only': 'error' },
+  );
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude("Seed 'visas' through the module that writes it");
 });
 
 test('it honours a file-level disable comment in a test of code whose product is SQL', async () => {
