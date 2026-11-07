@@ -67,6 +67,8 @@
     "find-feature-folder.js",
     "build-import-settings.js",
     "read-stale-pending.js",
+    "read-package-manifest.js",
+    "read-module-paths.js",
     "index.js"
   ],
   "type": "module",

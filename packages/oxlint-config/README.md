@@ -80,8 +80,8 @@ The plugin is addressable on its own at `@zgeoff/oxlint-config/plugin` for confi
   [require functions](../../docs/architecture/oxlint-config.md#require-functions).
 - Import boundaries: `zgeoff/import-zones` fails an import that crosses a declared zone boundary.
   See [import zones](../../docs/architecture/oxlint-config-import-zones.md).
-- Feature folders: `zgeoff/feature-folders` caps the loose modules at the root of a package's `src/`
-  at 8, and keeps shared code in `src/utils/`. See
+- Feature folders: `zgeoff/feature-folders` caps the loose modules at the root of a package's
+  `src/`, and keeps shared code in `src/utils/`. See
   [feature folders](../../docs/architecture/oxlint-config-feature-folders.md).
 
 ## Configuration
@@ -90,10 +90,7 @@ Every rule runs as the config ships it, and `zgeoff/no-comment-rule-override` ke
 loosening the comment and type-assertion rules. `zgeoff/no-restricted-words` and
 `zgeoff/import-zones` stay off until a repo configures them;
 [the config overview](../../docs/architecture/oxlint-config.md) and
-[import zones](../../docs/architecture/oxlint-config-import-zones.md) hold their options. A repo
-lists the packages it has yet to fold in the `pending` option of `zgeoff/feature-folders`, as
-[feature folders](../../docs/architecture/oxlint-config-feature-folders.md#the-pending-option)
-shows.
+[import zones](../../docs/architecture/oxlint-config-import-zones.md) hold their options.
 
 ## Documentation
 

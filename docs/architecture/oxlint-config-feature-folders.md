@@ -7,8 +7,8 @@ a package's `src/` in feature folders: one folder per thing the package does, wi
 ## What the rule checks
 
 The rule is on in the shared config. It judges each file under the `src/` of a package, the nearest
-folder above the file that holds a `package.json`, and reports on that file, in a lint run and in an
-editor through `oxlint --lsp`:
+folder above the file that holds both a `package.json` and a `src/` the file sits in, and reports on
+that file, in a lint run and in an editor through `oxlint --lsp`:
 
 - **The cap.** When the root of `src/` holds more than 8 counted modules, each counted module
   reports. The first in sorted order gets the full error with an example tree, and the others get
@@ -18,8 +18,8 @@ editor through `oxlint --lsp`:
   directly under `src/`, so `src/payments/lib/` passes.
 - **`utils/` importing a feature.** An import in a file below `src/utils/` that resolves to a file
   in a feature folder reports. A feature folder is any folder under `src/` but `utils/`,
-  `test-utils/` and `generated/`. `utils/` may import other `utils/` files, the loose root modules,
-  `generated/` and packages.
+  `test-utils/`, `generated/` and the four shared-folder names above. `utils/` may import other
+  `utils/` files, the loose root modules, `generated/` and packages.
 
 A module is a file with a `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` or `.cjs` extension.
 The cap does not count:
@@ -31,12 +31,12 @@ The cap does not count:
   `bun run src/serve.ts`.
 
 A target with a `*`, such as `"./*": "./src/*.ts"`, makes no file exempt, because it would exempt
-the whole root.
+the whole root. A `package.json` that does not parse names no entry files.
 
 ## The `pending` option
 
-A repo lists the package folders it has yet to fold in `pending`, as paths from the repo root. The
-rule skips every check in a listed package:
+A repo lists the package folders it has yet to fold in `pending`, as paths from the repo root, with
+`.` for a package at the root. The rule skips every check in a listed package:
 
 ```jsonc
 {
@@ -52,5 +52,6 @@ package.
 
 oxlint runs a rule once per file, with no hook for the whole run. The rule reads the pending
 packages from the first file it judges in each repo, and reports a stale entry on that file only.
-For the `utils/` check there, it scans each `utils/` file's text for import specifiers in place of a
-parse, so a specifier in a comment or a string keeps the entry listed.
+For the `utils/` check there, it drops the comments of each `utils/` file and scans the rest for
+import specifiers in place of a parse, so an import specifier that only a string holds keeps the
+entry listed.

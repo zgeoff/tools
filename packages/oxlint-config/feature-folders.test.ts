@@ -1,4 +1,6 @@
 import { expect, test } from 'bun:test';
+import { symlink } from 'node:fs/promises';
+import { join } from 'node:path';
 import { createLintTree } from './src/test-utils/create-lint-tree.ts';
 import { runLintMessages } from './src/test-utils/run-lint-messages.ts';
 
@@ -423,5 +425,257 @@ test('it reports a stale pending entry on one file of the run', async () => {
 
   const messages = await runLintMessages(directory, 'zgeoff/feature-folders', ['packages/web']);
 
-  expect(messages).toHaveLength(1);
+  expect(messages).toStrictEqual([
+    {
+      filename: expect.stringMatching(/^packages\/web\/src\/(?:index|types)\.ts$/u),
+      line: 1,
+      message:
+        '`packages/billing` in the `pending` option of zgeoff/feature-folders names no package; remove it from `pending`.',
+    },
+  ]);
+});
+
+test('it reports a pending entry whose package has no src/ as passing', async () => {
+  const directory = await createLintTree(
+    {
+      'packages/api/package.json': '{ "name": "api" }',
+      'packages/api/serve.ts': 'export {};\n',
+      'packages/web/package.json': '{ "name": "web" }',
+      'packages/web/src/index.ts': 'export {};\n',
+    },
+    { 'zgeoff/feature-folders': ['error', { pending: ['packages/api'] }] },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/feature-folders', [
+    'packages/web/src/index.ts',
+  ]);
+
+  expect(messages).toStrictEqual([
+    {
+      filename: 'packages/web/src/index.ts',
+      line: 1,
+      message:
+        '`packages/api` in the `pending` option of zgeoff/feature-folders now passes the rule; remove it from `pending`.',
+    },
+  ]);
+});
+
+test('it keeps a pending entry whose package has a utils/ import of a feature folder, and skips the check there', async () => {
+  const directory = await createLintTree(
+    {
+      'packages/api/package.json': '{ "name": "api" }',
+      'packages/api/src/utils/to-cents.ts':
+        "import { chargeCard } from '../payments/charge-card.ts';\n",
+      'packages/api/src/payments/charge-card.ts': 'export function chargeCard(): void {}\n',
+    },
+    { 'zgeoff/feature-folders': ['error', { pending: ['packages/api'] }] },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/feature-folders', [
+    'packages/api/src/utils/to-cents.ts',
+  ]);
+
+  expect(messages).toStrictEqual([]);
+});
+
+test.each([
+  ['an empty synonym folder', { 'packages/api/src/lib/README.md': '# notes\n' }],
+  [
+    'a specifier in a comment of a utils/ file',
+    {
+      'packages/api/src/utils/round.ts': "// moved from '../payments/charge-card.ts'\nexport {};\n",
+      'packages/api/src/payments/charge-card.ts': 'export {};\n',
+    },
+  ],
+])('it reports a pending entry as passing when its package has only %s', async (_, extra) => {
+  const directory = await createLintTree(
+    {
+      'packages/api/package.json': '{ "name": "api" }',
+      'packages/api/src/index.ts': 'export {};\n',
+      'packages/web/package.json': '{ "name": "web" }',
+      'packages/web/src/index.ts': 'export {};\n',
+      ...extra,
+    },
+    { 'zgeoff/feature-folders': ['error', { pending: ['packages/api'] }] },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/feature-folders', [
+    'packages/web/src/index.ts',
+  ]);
+
+  expect(messages).toStrictEqual([
+    {
+      filename: 'packages/web/src/index.ts',
+      line: 1,
+      message:
+        '`packages/api` in the `pending` option of zgeoff/feature-folders now passes the rule; remove it from `pending`.',
+    },
+  ]);
+});
+
+test('it skips a package at the repo root that pending lists as .', async () => {
+  const directory = await createLintTree(
+    {
+      'package.json': '{ "name": "api" }',
+      'src/apply-discount.ts': 'export {};\n',
+      'src/charge-card.ts': 'export {};\n',
+      'src/create-invoice.ts': 'export {};\n',
+      'src/format-total.ts': 'export {};\n',
+      'src/parse-order.ts': 'export {};\n',
+      'src/read-config.ts': 'export {};\n',
+      'src/refund-payment.ts': 'export {};\n',
+      'src/send-receipt.ts': 'export {};\n',
+      'src/to-cents.ts': 'export {};\n',
+    },
+    { 'zgeoff/feature-folders': ['error', { pending: ['.'] }] },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/feature-folders', ['src']);
+
+  expect(messages).toStrictEqual([]);
+});
+
+test('it reports a stale . entry by its name', async () => {
+  const directory = await createLintTree(
+    { 'package.json': '{ "name": "api" }', 'src/index.ts': 'export {};\n' },
+    { 'zgeoff/feature-folders': ['error', { pending: ['./'] }] },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/feature-folders', ['src/index.ts']);
+
+  expect(messages).toStrictEqual([
+    {
+      filename: 'src/index.ts',
+      line: 1,
+      message:
+        '`.` in the `pending` option of zgeoff/feature-folders now passes the rule; remove it from `pending`.',
+    },
+  ]);
+});
+
+test.each([
+  ['an invalid package.json', '{ "name": '],
+  ['a package.json that holds null', 'null'],
+])('it counts the root of a package with %s', async (_, manifest) => {
+  const directory = await createLintTree(
+    {
+      'packages/api/package.json': manifest,
+      'packages/api/src/apply-discount.ts': 'export {};\n',
+      'packages/api/src/charge-card.ts': 'export {};\n',
+      'packages/api/src/create-invoice.ts': 'export {};\n',
+      'packages/api/src/format-total.ts': 'export {};\n',
+      'packages/api/src/parse-order.ts': 'export {};\n',
+      'packages/api/src/read-config.ts': 'export {};\n',
+      'packages/api/src/refund-payment.ts': 'export {};\n',
+      'packages/api/src/send-receipt.ts': 'export {};\n',
+      'packages/api/src/to-cents.ts': 'export {};\n',
+    },
+    { 'zgeoff/feature-folders': 'error' },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/feature-folders', [
+    'packages/api/src/to-cents.ts',
+  ]);
+
+  expect(messages).toStrictEqual([
+    {
+      filename: 'packages/api/src/to-cents.ts',
+      line: 1,
+      message:
+        'packages/api/src/ holds 9 loose modules, and the limit is 8. Group them into one folder per thing the package does:',
+    },
+  ]);
+});
+
+test('it reads a pending package with an invalid package.json without a crash', async () => {
+  const directory = await createLintTree(
+    {
+      'packages/api/package.json': '{',
+      'packages/api/src/lib/round.ts': 'export {};\n',
+      'packages/web/package.json': '{ "name": "web" }',
+      'packages/web/src/index.ts': 'export {};\n',
+    },
+    { 'zgeoff/feature-folders': ['error', { pending: ['packages/api'] }] },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/feature-folders', [
+    'packages/web/src/index.ts',
+  ]);
+
+  expect(messages).toStrictEqual([]);
+});
+
+test('it takes the package from the folder above src/ when src/ holds a package.json', async () => {
+  const directory = await createLintTree(
+    {
+      'packages/api/package.json': '{ "name": "api" }',
+      'packages/api/src/package.json': '{ "type": "module" }',
+      'packages/api/src/lib/round.ts': 'export {};\n',
+    },
+    { 'zgeoff/feature-folders': 'error' },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/feature-folders', [
+    'packages/api/src/lib/round.ts',
+  ]);
+
+  expect(messages).toStrictEqual([
+    {
+      filename: 'packages/api/src/lib/round.ts',
+      line: 1,
+      message:
+        'packages/api/src/lib/ is a shared folder under another name; rename it to src/utils/.',
+    },
+  ]);
+});
+
+test.each([
+  ['a file of a package outside src/', 'packages/api/lib/round.ts'],
+  ['a src/ that is not a direct child of the package', 'packages/api/tools/src/lib/round.ts'],
+  ['a file outside any package', 'scripts/lib/round.ts'],
+])('it leaves %s unreported', async (_, path) => {
+  const directory = await createLintTree(
+    { 'packages/api/package.json': '{ "name": "api" }', [path]: 'export {};\n' },
+    { 'zgeoff/feature-folders': 'error' },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/feature-folders', [path]);
+
+  expect(messages).toStrictEqual([]);
+});
+
+test('it counts a symlinked root module', async () => {
+  const directory = await createLintTree(
+    {
+      'packages/api/package.json': '{ "name": "api" }',
+      'packages/api/src/apply-discount.ts': 'export {};\n',
+      'packages/api/src/charge-card.ts': 'export {};\n',
+      'packages/api/src/create-invoice.ts': 'export {};\n',
+      'packages/api/src/format-total.ts': 'export {};\n',
+      'packages/api/src/parse-order.ts': 'export {};\n',
+      'packages/api/src/read-config.ts': 'export {};\n',
+      'packages/api/src/refund-payment.ts': 'export {};\n',
+      'packages/api/src/send-receipt.ts': 'export {};\n',
+      'shared/to-cents.ts': 'export {};\n',
+    },
+    { 'zgeoff/feature-folders': 'error' },
+  );
+
+  await symlink(
+    join(directory, 'shared/to-cents.ts'),
+    join(directory, 'packages/api/src/to-cents.ts'),
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/feature-folders', [
+    'packages/api/src/to-cents.ts',
+  ]);
+
+  expect(messages).toStrictEqual([
+    {
+      filename: 'packages/api/src/to-cents.ts',
+      line: 1,
+      message:
+        'packages/api/src/ holds 9 loose modules, and the limit is 8. Group them into one folder per thing the package does:',
+    },
+  ]);
 });
