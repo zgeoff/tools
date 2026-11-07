@@ -1,8 +1,9 @@
 # Setting up a downstream repo
 
 A downstream repo takes the files tools shares through [repo sync](../architecture/repo-sync.md).
-Wire the repo up once, then opt in to each opt-in entry it runs. The agent hooks and the pre-push
-baseline need changes in the repo beyond the `include` line, which repo-sync never makes.
+Wire the repo up once, then opt in to each opt-in entry it runs. The agent hooks, the pre-push
+baseline and the knip runner need changes in the repo beyond the `include` line, which repo-sync
+never makes.
 
 ## Wiring up a downstream repo
 
@@ -77,6 +78,26 @@ fits a 2 GiB host. A repo opts in with three changes:
    before the baseline's, so keep only cheap repo-specific gates there.
 3. Move every whole-tree check the baseline drops, such as type-aware lint, dead code and the full
    suite, into CI as a required check, if CI does not run it already.
+
+## Opting in to the knip runner
+
+knip run in a worktree inside another checkout, such as `<clone>/.worktrees/<branch>`, where
+`<clone>` is the outer checkout and `<branch>` the worktree's branch, reads the outer checkout's
+`tsconfig.json`. When that file extends a package the outer checkout has not installed, knip fails
+with `File '<package>/tsconfig.json' not found`, where `<package>` is the package in its `extends`
+field. The `knip-runner` entry delivers `scripts/run-knip.sh`, which runs knip so that it reads the
+repo's own `tsconfig.json`. The runner needs a `tsconfig.json` at the repo root, and it analyses the
+whole repo, so only the root `package.json` calls it. knip reads a relative path given to
+`--reporter`, `--cache-location` or `--directory` from the `scripts/` folder, so give each of these
+an absolute path. A repo opts in with three steps:
+
+1. Add `knip-runner` to `include` in `.github/workflows/repo-sync.yml`.
+2. Dispatch repo-sync with `gh workflow run repo-sync.yml -R zgeoff/<repo>`, and merge its pull
+   request. Expect the default branch to hold `scripts/run-knip.sh`.
+3. In `package.json`, replace each `knip` command in the `deadcode` script with
+   `bash scripts/run-knip.sh`, and keep its arguments, as in
+   `bash scripts/run-knip.sh --production`. Expect `bun run deadcode` to pass in a worktree under
+   `.worktrees/`.
 
 ## Taking the baseline from chex
 
