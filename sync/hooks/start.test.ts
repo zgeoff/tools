@@ -398,6 +398,39 @@ test('it lets a prompt through when the installed package has no hook to run', a
   });
 });
 
+test('it prints the signal and refuses a gated edit when its retry stops on a signal', async () => {
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: {
+      kind: 'links',
+      packageName: '@zgeoff/agent-hooks',
+      packageDirectory: ctx.packageDirectory,
+    },
+  });
+
+  await writeTreeFiles(ctx.packageDirectory, {
+    'package.json': JSON.stringify({
+      name: '@zgeoff/agent-hooks',
+      type: 'module',
+      exports: './index.ts',
+    }),
+    'index.ts': "process.kill(process.pid, 'SIGTERM');\n",
+  });
+
+  const result = ctx.runStub(
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
+    [],
+  );
+
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr: "stub install started\nThe agent hook's retry stopped on SIGTERM, so it refuses.\n",
+  });
+});
+
 test('it prints the import error and lets a PostToolUse event through when the installed package throws on import', async () => {
   const ctx = await setupTest();
 
