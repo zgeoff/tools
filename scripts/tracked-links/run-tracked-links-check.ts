@@ -1,3 +1,4 @@
+import { writeStdout } from '../../packages/std/src/write-stdout.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
@@ -81,8 +82,6 @@ if (import.meta.main) {
     cwd: process.cwd(),
     env: process.env,
     runCommand,
-    writeOutput: (text) => {
-      process.stdout.write(text);
-    },
+    writeOutput: writeStdout,
   });
 }
