@@ -53,8 +53,6 @@ export default function buildSeedOnly(readFolderSources) {
       const writes = [];
       const createdTables = new Set();
 
-      // reports at the statement, so a disable comment above a statement inside a multi-line call
-      // covers it
       const collectText = (node) => {
         const text = toSQLText(node);
 
@@ -63,6 +61,8 @@ export default function buildSeedOnly(readFolderSources) {
         }
 
         for (const table of collectSQLWrites(text)) {
+          // the statement, not its call, so a disable comment above a statement inside a
+          // multi-line call covers it
           writes.push({ node, table });
         }
 
@@ -87,6 +87,12 @@ export default function buildSeedOnly(readFolderSources) {
         CallExpression(node) {
           if (isKyselyWrite(node)) {
             writes.push({ node, table: findLiteralTable(node.arguments[0]) });
+          } else if (isKyselyCreateTable(node)) {
+            const table = findLiteralTable(node.arguments[0]);
+
+            if (table !== null) {
+              createdTables.add(table);
+            }
           } else if (isSQLCall(node.callee)) {
             collectText(node.arguments[0]);
           }
@@ -183,6 +189,17 @@ function findLiteralTable(argument) {
     : null;
 }
 
+function isKyselyCreateTable(node) {
+  const callee = node.callee;
+
+  return (
+    callee.type === 'MemberExpression' &&
+    !callee.computed &&
+    callee.property.type === 'Identifier' &&
+    callee.property.name === 'createTable'
+  );
+}
+
 // bun:sqlite and better-sqlite3 run SQL through `run`, `exec`, `query` and `prepare`, Kysely
 // through `sql.raw` and `CompiledQuery.raw`, and postgres.js through `sql(…)` and `sql.unsafe`
 const sqlMethods = new Set(['run', 'exec', 'query', 'prepare', 'raw', 'unsafe']);
@@ -192,11 +209,13 @@ function isSQLCall(callee) {
     return callee.name === 'sql';
   }
 
+  // a regular expression's `exec` takes prose
   return (
     callee.type === 'MemberExpression' &&
     !callee.computed &&
     callee.property.type === 'Identifier' &&
-    sqlMethods.has(callee.property.name)
+    sqlMethods.has(callee.property.name) &&
+    callee.object.regex === undefined
   );
 }
 

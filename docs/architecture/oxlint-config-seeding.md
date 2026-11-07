@@ -26,7 +26,8 @@ events table" never counts. A SQL call takes the statement as one of these:
 | the first argument of a call of `sql`                                                     | `sql('…')`                              |
 | the template of a tag named `sql`, alone or as a member                                   | `` sql`…` ``, `` ctx.sql`…` ``          |
 
-The rule misses a statement held in a variable or built by joining strings.
+The rule skips the `exec` of a regular expression literal. It misses a statement held in a variable
+or built by joining strings.
 
 A write passes in these places:
 
@@ -38,13 +39,23 @@ A write passes in these places:
 - in a migration test: a test file whose path below the repo root holds `migrate`, `migration` or
   `migrations` as a whole word between `/`, `-`, `_` or `.`, such as `run-migrations.test.ts`;
 - in a seed's own test: a `seed-<name>.test.ts` file under `test-utils`;
-- to a table the same file creates with `CREATE TABLE`, in a SQL call anywhere in the file.
+- to a table the same file creates, anywhere in the file, with a `CREATE TABLE` statement in a SQL
+  call or with a Kysely `createTable` call.
 
 The last place covers the testing skill's "a test of code whose product is SQL or storage, such as a
-database dialect". Such a test makes a table of its own to drive the code, as a test of a database
-opener, a transaction helper, a query-plan reader, a backup or a raw file reader does. No module
-owns that table, so no seed can make it. The rule reads `CREATE TABLE`, `CREATE TEMP TABLE`,
-`CREATE TEMPORARY TABLE` and `CREATE VIRTUAL TABLE`, each with or without `IF NOT EXISTS`.
+database dialect". Such a test makes the tables it needs to drive the code, as a test of a database
+opener, a transaction helper, a query-plan reader, a backup or a raw file reader does. The rule
+passes a write to a table the file creates even when a module writes a table of that name, because a
+reader of another build's file makes tables with the real names. The rule reads `CREATE TABLE`,
+`CREATE TEMP TABLE`, `CREATE TEMPORARY TABLE` and `CREATE VIRTUAL TABLE`, each with or without
+`IF NOT EXISTS`, and a `createTable` call whose first argument is a string literal.
+
+A test of storage code whose table the file does not create, such as one that opens a database file
+kept in the repo, takes a file-level disable comment with the case as its reason:
+
+```ts
+// oxlint-disable zgeoff/seed-only -- tests the file reader, whose product is storage
+```
 
 The rule finds a table's owner by the table's name, so outside a seed it reports a table name that
 is not a string literal, such as a variable or an interpolation in the statement. The rule reads a

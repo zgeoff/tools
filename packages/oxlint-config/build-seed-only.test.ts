@@ -68,6 +68,10 @@ test.each([
     "test('it pours', () => {\n  const note = 'the kettle may Insert Into a cup';\n\n  expect(note).toBeString();\n});\n",
   ],
   [
+    "prose with a delete from in a regular expression's exec",
+    "test('it finds no lid', () => {\n  expect(/lid/u.exec('the kettle ran no delete from cups')).toBeNull();\n});\n",
+  ],
+  [
     'SQL in a string that no SQL call takes',
     "test('it logs', () => {\n  logger.info('INSERT INTO kettles (id) VALUES (1)');\n});\n",
   ],
@@ -230,6 +234,11 @@ test.each([
     'a database dialect, whose product is SQL',
     'src/build-dialect.test.ts',
     "test('it compiles an insert', async () => {\n  ctx.sqlite.run('CREATE TABLE kettles (id INTEGER)');\n  await ctx.db.insertInto('kettles').values({ id: 1 }).execute();\n});\n",
+  ],
+  [
+    'a database dialect, with the table made through the schema builder',
+    'src/build-dialect.test.ts',
+    "test('it compiles an insert', async () => {\n  await ctx.db.schema.createTable('kettles').addColumn('id', 'integer').execute();\n  await ctx.db.insertInto('kettles').values({ id: 1 }).execute();\n});\n",
   ],
   [
     'a database driver, whose product is storage',
