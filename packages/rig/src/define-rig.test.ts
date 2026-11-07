@@ -219,15 +219,18 @@ test('it resolves no ignore patterns when none is declared', () => {
   expect(defineRig({}).ignore).toStrictEqual([]);
 });
 
-test.each([[''], ['/srv/drafts/**'], ['../drafts/**'], ['docs/../../drafts/**']])(
-  'it refuses the ignore pattern %j',
-  (pattern) => {
-    expect(() => defineRig({ ignore: [pattern] })).toThrowWithMessage(
-      Error,
-      `rig.config.ts: the ignore pattern ${JSON.stringify(pattern)} must be a non-empty glob relative to the repo root, with no ".." segment`,
-    );
-  },
-);
+test.each([
+  [''],
+  ['/srv/drafts/**'],
+  ['../drafts/**'],
+  ['docs/../../drafts/**'],
+  ['./docs/drafts/**'],
+])('it refuses the ignore pattern %j', (pattern) => {
+  expect(() => defineRig({ ignore: [pattern] })).toThrowWithMessage(
+    Error,
+    `rig.config.ts: the ignore pattern ${JSON.stringify(pattern)} must be a non-empty glob relative to the repo root, with no "." or ".." segment`,
+  );
+});
 
 test('it resolves the declared bunfigs in their order', () => {
   const config = defineRig({
@@ -247,17 +250,17 @@ test('it resolves no bunfigs when none is declared', () => {
   expect(defineRig({}).bunfigs).toStrictEqual([]);
 });
 
-test.each([['bunfig.window.json'], ['/srv/bunfig.window.toml'], ['../bunfig.window.toml']])(
-  'it refuses the bunfig path %j',
-  (path) => {
-    expect(() =>
-      defineRig({ bunfigs: [{ path, files: ['packages/shop/**'] }] }),
-    ).toThrowWithMessage(
-      Error,
-      `rig.config.ts: the bunfig path ${JSON.stringify(path)} must be a .toml file relative to the repo root, with no ".." segment`,
-    );
-  },
-);
+test.each([
+  ['bunfig.window.json'],
+  ['/srv/bunfig.window.toml'],
+  ['../bunfig.window.toml'],
+  ['./bunfig.window.toml'],
+])('it refuses the bunfig path %j', (path) => {
+  expect(() => defineRig({ bunfigs: [{ path, files: ['packages/shop/**'] }] })).toThrowWithMessage(
+    Error,
+    `rig.config.ts: the bunfig path ${JSON.stringify(path)} must be a .toml file relative to the repo root, with no "." or ".." segment`,
+  );
+});
 
 test('it refuses a bunfig with no file globs', () => {
   expect(() =>
@@ -268,11 +271,14 @@ test('it refuses a bunfig with no file globs', () => {
   );
 });
 
-test('it refuses a bunfig file glob that climbs out of the repo', () => {
-  expect(() =>
-    defineRig({ bunfigs: [{ path: 'bunfig.window.toml', files: ['../shop/**'] }] }),
-  ).toThrowWithMessage(
-    Error,
-    'rig.config.ts: the bunfig "bunfig.window.toml" file glob "../shop/**" must be a non-empty glob relative to the repo root, with no ".." segment',
-  );
-});
+test.each([['../shop/**'], ['./packages/shop/**']])(
+  'it refuses the bunfig file glob %j',
+  (pattern) => {
+    expect(() =>
+      defineRig({ bunfigs: [{ path: 'bunfig.window.toml', files: [pattern] }] }),
+    ).toThrowWithMessage(
+      Error,
+      `rig.config.ts: the bunfig "bunfig.window.toml" file glob ${JSON.stringify(pattern)} must be a non-empty glob relative to the repo root, with no "." or ".." segment`,
+    );
+  },
+);
