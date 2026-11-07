@@ -65,7 +65,8 @@ backtick, a line break and a control character all fail. Git stays off the list,
 can make any git command run a program, such as an fsmonitor program.
 
 The refusal message holds the two install commands word for word, so an agent that wrote the install
-with a `cd` or a pipe knows the form to retry.
+with a `cd` or a pipe knows the form to retry. On every event, the retry first prints its import
+error on stderr, so a reader can tell a missing package from one that installs and then throws.
 
 On any event but `PreToolUse`, the stub exits 0. After a tool call there is nothing left to block,
 and a blocked prompt would stop a person from asking the agent to run the install.
