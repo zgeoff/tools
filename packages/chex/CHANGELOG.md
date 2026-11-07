@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.2.3...@zgeoff/chex@0.2.4) (2026-11-07)
+
+
+### Bug Fixes
+
+* **chex:** count gradle builds as package manifests in readmes ([#569](https://github.com/zgeoff/tools/issues/569)) ([bdf3cc5](https://github.com/zgeoff/tools/commit/bdf3cc557f49002e19e3d6c04dc2cd3ab3951258))
+
 ## [0.2.3](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.2.2...@zgeoff/chex@0.2.3) (2026-11-07)
 
 
