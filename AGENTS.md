@@ -108,6 +108,9 @@ says.
   a job that keeps git's repository variables or breaks the behaviour its case expects. CI runs it.
 - `bun run check:test-layout` runs `chex test-layout`, which fails a test folder, a test helper or a
   helper import outside the layout that the `testing` skill sets. CI runs it.
+- `bun run check:tracked-links` fails a tracked link whose target is neither a tracked file nor a
+  folder that holds one, since that link breaks in a fresh clone. It reads the git index, so stage a
+  change before you run it. CI runs it.
 - `bun x chex workflows` runs the shared workflow lint over the workflows HEAD holds, so commit a
   workflow change before you run it. CI runs it. `bun run check:docs` runs the docs checks that this
   repo takes, which the pre-push hook and CI run too.

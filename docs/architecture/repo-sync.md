@@ -175,10 +175,10 @@ links each skill that `defaultPinnedSkills` in
 [`write-pinned-skills.ts`](../../scripts/skills/write-pinned-skills.ts) lists from
 `.agents/skills/`, which the tracked link `.claude/skills` points to. The folder holds a tracked
 `.gitkeep`, so the link resolves in a fresh clone before the install runs: a Claude Code session
-that starts while the link is broken never registers the skills that the install links later. Two
-installs in one checkout run one at a time, through the lock file `.zgeoff-skills.lock`. The
-verb-contract test reads code-style's role table from that tree, and the function-verb test reads
-its banned verbs.
+that starts while the link is broken never registers the skills that the install links later.
+`bun run check:tracked-links` fails CI when the folder holds no tracked file. Two installs in one
+checkout run one at a time, through the lock file `.zgeoff-skills.lock`. The verb-contract test
+reads code-style's role table from that tree, and the function-verb test reads its banned verbs.
 
 A reference that fits only some repos, such as one for a language a repo never uses, names the other
 repos in its `except`, so they never load it. Every link to it in the entry's Markdown files sits in

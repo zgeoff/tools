@@ -58,6 +58,7 @@ jobs:
       - run: bun run check:lefthook-guard
       - run: bun run check:baseline-jobs
       - run: bun run check:test-layout
+      - run: bun run check:tracked-links
       - run: bun run format:check
       - run: bun run lint:full
       - run: bun run typecheck
