@@ -55,7 +55,7 @@ test('it reports an exclude with no removal comment', () => {
   ]);
 });
 
-test('it never reports a first-party exclude', () => {
+test('it never reports a zgeoff or impz exclude with no removal comment', () => {
   const bunfig = ['[install]', 'minimumReleaseAgeExcludes = ["@zgeoff/std", "@impz/client"]'].join(
     '\n',
   );
