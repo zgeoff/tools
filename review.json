@@ -1,5 +1,6 @@
 {
   "extends": "github:zgeoff/noslop-config",
+  "synced": null,
   "rules": [
     "github:zgeoff/skills/skills/code-style/SKILL.md",
     {
