@@ -24,7 +24,11 @@ The rule skips these files:
 - a file with no exports;
 - a file with a role suffix between its name and its extension, such as `rig.config.ts`,
   `boil.bench.ts` or `pour.test.ts`, because the tool that loads it sets its exports;
-- a file with an `export * from`, which hides the names it exports.
+- a file with an `export * from` or an `export { default } from`, which hides the name it exports.
+
+A file with only `export {}` has no exports. A default export wrapped in `satisfies` or `as` counts
+under the name it wraps, and a dotted namespace such as `PourKettle.Spout` counts under its first
+name.
 
 A file whose path a convention fixes keeps its name with a file-level disable comment that gives the
 reason:

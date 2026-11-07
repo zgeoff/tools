@@ -54,9 +54,12 @@ const exportTypes = new Set([
   'TSExportAssignment',
 ]);
 
-// an `export * from` hides the names it exports, so names is null and the file passes
+// an `export * from` or an `export { default } from` hides the name it exports, so names is null
+// and the file passes
 function collectExports(body) {
-  const statements = body.filter((statement) => exportTypes.has(statement.type));
+  const statements = body.filter(
+    (statement) => exportTypes.has(statement.type) && !isEmptyExport(statement),
+  );
   const names = [];
 
   for (const statement of statements) {
@@ -70,6 +73,15 @@ function collectExports(body) {
   }
 
   return { statements, names };
+}
+
+// `export {}` only marks a script as a module
+function isEmptyExport(statement) {
+  return (
+    statement.type === 'ExportNamedDeclaration' &&
+    statement.declaration === null &&
+    statement.specifiers.length === 0
+  );
 }
 
 function collectExportNames(statement) {
@@ -89,18 +101,26 @@ function collectExportNames(statement) {
     return collectDeclarationNames(statement.declaration);
   }
 
-  return statement.specifiers.map((specifier) => {
+  const names = statement.specifiers.map((specifier) => {
     const exported = toExportName(specifier.exported);
 
     return exported === 'default' ? toExportName(specifier.local) : exported;
   });
+
+  return statement.source !== null && names.includes('default') ? null : names;
 }
 
 function toExportName(node) {
   return node.type === 'Identifier' ? node.name : node.value;
 }
 
+const wrapperTypes = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression']);
+
 function collectValueNames(value) {
+  if (wrapperTypes.has(value.type)) {
+    return collectValueNames(value.expression);
+  }
+
   if (value.type === 'Identifier') {
     return [value.name];
   }
@@ -113,7 +133,9 @@ function collectDeclarationNames(declaration) {
     return declaration.declarations.flatMap((declarator) => collectPatternNames(declarator.id));
   }
 
-  return declaration.id?.type === 'Identifier' ? [declaration.id.name] : [];
+  return declaration.id === null || declaration.id === undefined
+    ? []
+    : [toRootName(declaration.id)];
 }
 
 function collectPatternNames(pattern) {
@@ -140,6 +162,14 @@ function collectPatternNames(pattern) {
   }
 
   return pattern.type === 'RestElement' ? collectPatternNames(pattern.argument) : [];
+}
+
+function toRootName(name) {
+  if (name.type === 'TSQualifiedName') {
+    return toRootName(name.left);
+  }
+
+  return toExportName(name);
 }
 
 function toComparableName(name) {

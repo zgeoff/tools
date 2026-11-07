@@ -12,6 +12,10 @@ test.each([
     'export function pourKettleTwice(): void {}\n',
   ],
   ['an anonymous default export', 'export default { cups: 2 };\n'],
+  [
+    'a default export with another name under satisfies',
+    'const boilKettle = { cups: 2 };\n\nexport default boilKettle satisfies object;\n',
+  ],
 ])('it reports a file with %s', async (_, source) => {
   const result = await runLintTree({ 'src/pour-kettle.ts': source }, 'src/pour-kettle.ts', {
     'zgeoff/file-named-for-export': 'error',
@@ -66,6 +70,16 @@ test.each([
     'src/kettle-card.tsx',
     'export function KettleCard(): null {\n  return null;\n}\n',
   ],
+  [
+    'a default export under satisfies',
+    'src/pour-kettle.ts',
+    'const pourKettle = { cups: 2 };\n\nexport default pourKettle satisfies object;\n',
+  ],
+  [
+    'the root of a dotted namespace',
+    'src/pour-kettle.ts',
+    'export namespace PourKettle.Spout {\n  export const cups = 2;\n}\n',
+  ],
 ])('it accepts a file named for %s', async (_, path, source) => {
   const result = await runLintTree({ [path]: source }, path, {
     'zgeoff/file-named-for-export': 'error',
@@ -102,6 +116,16 @@ test.each([
     'a file that re-exports every name of a module',
     'src/pour-kettle.ts',
     "export * from './boil-kettle.ts';\n",
+  ],
+  [
+    'a file that re-exports the default export of a module',
+    'src/pour-kettle.ts',
+    "export { default } from './boil-kettle.ts';\n",
+  ],
+  [
+    'a script that only marks itself a module with an empty export',
+    'src/pour-kettle.ts',
+    'console.log(2);\n\nexport {};\n',
   ],
 ])('it skips %s', async (_, path, source) => {
   const result = await runLintTree({ [path]: source }, path, {
