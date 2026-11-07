@@ -218,7 +218,9 @@ carries the import error. When the file's default export is no table that `defin
 error carries the parser's reason.
 
 A repo with a `rig.config.ts` that also sets the rules' `lanes` option gets one config error from
-each rule. A repo without the file keeps the rules' own table.
+each rule. A repo without the file keeps the rules' own table. The
+[test timeout check](./oxlint-config-tests.md#the-test-timeout-check) takes its lane limits from the
+same resolved table.
 
 ## The journeys that test rig
 

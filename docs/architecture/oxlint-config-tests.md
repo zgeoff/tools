@@ -159,11 +159,21 @@ the shared pull-request checks. It reports:
   escapes the limits as a disable comment does.
 
 A `test:<lane>` script gets the limit of its lane, and every other script gets the unit limit. The
-check exempts the `test:related` script, which runs the shared related-test runner. It reads the
-lanes from the `lanes` option of `zgeoff/max-test-timeout` in the root `.oxlintrc.json`, with the
-same standard lanes as the rule. The check keeps its own copy of the standard limits, because the
-shared pull-request checks download it without the oxlint config package, and a test pins both
-copies to the skill's table.
+check exempts the `test:related` script, which runs the shared related-test runner.
+
+The check takes the lanes and their limits from one source:
+
+- in a repo with a [`rig.config.ts`](./rig.md#one-source-for-the-limits), from the lane table that
+  the file's `defineRig` call returns. The check ignores the `lanes` option of the oxlint config
+  there. Only an import runs the `defineRig` call, and an import reads the working tree, so the
+  check exits 2 when the working tree's `rig.config.ts` differs from `HEAD`. It also exits 2 when
+  the default export holds no list of lanes;
+- in a repo without one, from the `lanes` option of `zgeoff/max-test-timeout` in the root
+  `.oxlintrc.json`, beside the standard lanes of that rule.
+
+The check keeps its own copy of the standard limits, because neither chex nor the copy of the check
+that repo-sync puts in each repo can import the oxlint config package. A test pins both copies to
+the Lanes table of the testing skill.
 
 ## `zgeoff/test-shape`
 

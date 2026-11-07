@@ -27,7 +27,17 @@ async function setupTest() {
 
   await $`git init --quiet`.cwd(directory).env(env);
 
-  return { directory, env };
+  return {
+    directory,
+    env,
+    runCheck: () =>
+      runTestTimeoutsCheck({
+        cwd: directory,
+        env,
+        runProgram,
+        importModule: (path) => import(path),
+      }),
+  };
 }
 
 test('it passes a repo whose scripts and bunfig keep the default timeout', async () => {
@@ -43,9 +53,155 @@ test('it passes a repo whose scripts and bunfig keep the default timeout', async
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(findings).toStrictEqual([]);
+});
+
+test('it holds each test lane script to the limit that rig.config.ts gives its lane', async () => {
+  const ctx = await setupTest();
+
+  const defineRigPath = join(import.meta.dir, '..', '..', 'rig', 'src', 'define-rig.ts');
+
+  await writeFile(
+    join(ctx.directory, 'rig.config.ts'),
+    `import { defineRig } from ${JSON.stringify(defineRigPath)};\n\nexport default defineRig({ lanes: { kiln: { limit: '5s' }, e2e: { limit: '60s' } } });\n`,
+  );
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'test:kiln': 'bun test --timeout=6000 kiln',
+        'test:e2e': 'bun test --timeout=45000 e2e',
+      },
+    }),
+  );
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = await ctx.runCheck();
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'package.json',
+      message:
+        'script "test:kiln" passes --timeout=6000 to bun test, above the 5000 ms limit of the kiln lane; find its cause in the "Slow tests" section of the testing skill and fix it',
+    },
+  ]);
+});
+
+test('it ignores the lanes option of the oxlint config in a repo with a rig.config.ts', async () => {
+  const ctx = await setupTest();
+
+  const defineRigPath = join(import.meta.dir, '..', '..', 'rig', 'src', 'define-rig.ts');
+
+  await writeFile(
+    join(ctx.directory, 'rig.config.ts'),
+    `import { defineRig } from ${JSON.stringify(defineRigPath)};\n\nexport default defineRig({ lanes: { kiln: { limit: '5s' } } });\n`,
+  );
+
+  await writeFile(
+    join(ctx.directory, '.oxlintrc.json'),
+    '{ "rules": { "zgeoff/max-test-timeout": ["error", { "lanes": { "kiln": 30000 } }] } }',
+  );
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { 'test:kiln': 'bun test --timeout=6000 kiln' } }),
+  );
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = await ctx.runCheck();
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'package.json',
+      message:
+        'script "test:kiln" passes --timeout=6000 to bun test, above the 5000 ms limit of the kiln lane; find its cause in the "Slow tests" section of the testing skill and fix it',
+    },
+  ]);
+});
+
+test('it holds a bunfig.toml in an e2e/ directory to the e2e limit that rig.config.ts gives', async () => {
+  const ctx = await setupTest();
+
+  const defineRigPath = join(import.meta.dir, '..', '..', 'rig', 'src', 'define-rig.ts');
+
+  await writeFile(
+    join(ctx.directory, 'rig.config.ts'),
+    `import { defineRig } from ${JSON.stringify(defineRigPath)};\n\nexport default defineRig({ lanes: { e2e: { limit: '20s' } } });\n`,
+  );
+
+  await mkdir(join(ctx.directory, 'e2e'), { recursive: true });
+  await writeFile(join(ctx.directory, 'e2e/bunfig.toml'), '[test]\ntimeout = 25000\n');
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  const findings = await ctx.runCheck();
+
+  expect(findings).toStrictEqual([
+    {
+      path: 'e2e/bunfig.toml',
+      message:
+        '[test] timeout = 25000 applies to every test, above the 20000 ms limit of the e2e lane; find its cause in the "Slow tests" section of the testing skill and fix it',
+    },
+  ]);
+});
+
+test('it throws when the working tree changes the rig.config.ts that HEAD holds', async () => {
+  const ctx = await setupTest();
+
+  const defineRigPath = join(import.meta.dir, '..', '..', 'rig', 'src', 'define-rig.ts');
+
+  await writeFile(
+    join(ctx.directory, 'rig.config.ts'),
+    `import { defineRig } from ${JSON.stringify(defineRigPath)};\n\nexport default defineRig({ lanes: { kiln: { limit: '5s' } } });\n`,
+  );
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  await writeFile(
+    join(ctx.directory, 'rig.config.ts'),
+    `import { defineRig } from ${JSON.stringify(defineRigPath)};\n\nexport default defineRig({ lanes: { kiln: { limit: '10s' } } });\n`,
+  );
+
+  expect(ctx.runCheck()).rejects.toThrow(
+    'rig.config.ts in the working tree differs from HEAD; commit or stash the change',
+  );
+});
+
+test('it throws with the git error when git cannot compare rig.config.ts with HEAD', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'rig.config.ts'), 'export default { lanes: [] };\n');
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  await writeFile(join(ctx.directory, '.git/index'), 'not an index');
+
+  expect(ctx.runCheck()).rejects.toThrow(
+    /^git diff --quiet HEAD -- rig\.config\.ts failed: fatal: /u,
+  );
+});
+
+test('it throws when the default export of rig.config.ts has no lanes', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'rig.config.ts'), 'export default {};\n');
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  expect(ctx.runCheck()).rejects.toThrow(
+    'cannot read the lanes of rig.config.ts: its default export has no list of lanes',
+  );
 });
 
 test('it reports each bun test timeout above 5 s in a package script, in both flag forms', async () => {
@@ -66,7 +222,7 @@ test('it reports each bun test timeout above 5 s in a package script, in both fl
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(findings).toStrictEqual([
     {
@@ -95,7 +251,7 @@ test('it leaves a --timeout of a command other than bun test alone', async () =>
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(findings).toStrictEqual([]);
 });
@@ -113,7 +269,7 @@ test('it reports a bun test that a wrapper script runs', async () => {
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(findings).toStrictEqual([
     {
@@ -150,7 +306,7 @@ test.each([
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(findings).toStrictEqual([]);
 });
@@ -177,7 +333,7 @@ test.each([
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(findings).toStrictEqual([
     {
@@ -212,7 +368,7 @@ test.each([
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(findings).toStrictEqual([{ path: 'package.json', message }]);
 });
@@ -228,7 +384,7 @@ test('it exempts test:related', async () => {
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(findings).toStrictEqual([]);
 });
@@ -254,7 +410,7 @@ test('it gives a lane in the array form of the lanes option a 15 s limit', async
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(findings).toStrictEqual([
     {
@@ -286,7 +442,7 @@ test('it reads the limit of a lane that the object form of the lanes option decl
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(findings).toStrictEqual([
     {
@@ -326,7 +482,7 @@ test('it holds the same lane limits as the Lanes table in the shared testing ski
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(rows.length).toBe(7);
 
@@ -353,7 +509,7 @@ test('it reports a lane script that the lanes option does not declare', async ()
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(findings).toStrictEqual([
     {
@@ -373,7 +529,7 @@ test('it reports a bunfig.toml whose test timeout is above 5 s', async () => {
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(findings).toStrictEqual([
     {
@@ -395,7 +551,7 @@ test('it reports a bunfig.toml whose test timeout of 0 turns the timeout off, an
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(findings).toStrictEqual([
     {
@@ -419,7 +575,7 @@ test('it reads a bunfig.toml in an e2e/ directory against the e2e limit', async 
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(findings).toStrictEqual([
     {
@@ -439,7 +595,7 @@ test('it reads a bunfig.toml in an evals/ directory against the unit limit', asy
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(findings).toStrictEqual([
     {
@@ -495,7 +651,7 @@ test('it reports an oxlint config that turns a timeout rule off or down to a war
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(findings).toStrictEqual([
     {
@@ -562,7 +718,7 @@ test('it accepts a setting whose override names a ticket or a floor in its own c
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(findings).toStrictEqual([
     {
@@ -599,7 +755,7 @@ test('it reads the files as HEAD holds them, not the working tree', async () => 
     JSON.stringify({ scripts: { test: 'bun test --timeout=20000' } }),
   );
 
-  const findings = runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram });
+  const findings = await ctx.runCheck();
 
   expect(findings).toStrictEqual([]);
 });
@@ -612,9 +768,7 @@ test('it throws with the path of a package.json that is not JSON', async () => {
   await $`git add --all`.cwd(ctx.directory).env(ctx.env);
   await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
 
-  expect(() => runTestTimeoutsCheck({ cwd: ctx.directory, env: ctx.env, runProgram })).toThrow(
-    'cannot parse package.json',
-  );
+  expect(ctx.runCheck()).rejects.toThrow('cannot parse package.json');
 });
 
 test('it exits 1 and prints each finding when run as a script', async () => {
@@ -655,4 +809,30 @@ test('it exits 2 and names the file when run as a script on a package.json that 
   expect(result.exitCode).toBe(2);
   expect(result.stdout.toString()).toBe('');
   expect(result.stderr.toString()).toStartWith('test-timeouts: cannot parse package.json: ');
+});
+
+test('it exits 2 and gives the reason when run as a script on a rig.config.ts with no lanes', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'rig.config.ts'), 'export default {};\n');
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  const result = await $`bun ${join(import.meta.dir, 'run-test-timeouts-check.ts')}`
+    .cwd(ctx.directory)
+    .env(ctx.env)
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr:
+      'test-timeouts: cannot read the lanes of rig.config.ts: its default export has no list of lanes\n',
+  });
 });
