@@ -163,7 +163,6 @@ function parseProgram(value: unknown): ProgramDeclaration | null {
   return { package: packageFolder, source, build, artifact };
 }
 
-// A config from before ignore existed has none, and means no ignored paths.
 function parseIgnore(value: unknown): string[] | null {
   if (value === undefined) {
     return [];
