@@ -12,9 +12,7 @@
 # fixers. A repo adds its own jobs under pre-commit.jobs and pre-push.jobs in
 # lefthook.yml; they run before these. lefthook 2.2.2 lets a job of an
 # extended file replace the job of the same name in lefthook.yml, so each job
-# here has a name that starts with chex-. A repo that runs its own job in
-# place of one of these lists that job's name under the hook's exclude_tags,
-# such as exclude_tags: [chex-typecheck]. A repo changes what a job runs through
+# name here starts with chex-. A repo changes what a job runs through
 # the package script it calls, except the shell, docs and workflows jobs,
 # which call their tools directly. Each job that calls a package script runs
 # it through the memory-capped script, so a run that outgrows the host fails
