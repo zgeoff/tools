@@ -69,6 +69,28 @@ test('it passes the root, package, docs index and design READMEs', async () => {
   });
 });
 
+test.each(['build.gradle.kts', 'build.gradle', 'settings.gradle.kts'])(
+  'it passes a package README beside a %s',
+  async (manifest) => {
+    const ctx = await setupTest();
+
+    await ctx.writeText(`plugins/exporter/${manifest}`, '\n');
+    await ctx.writeText('plugins/exporter/README.md', '# Exporter\n');
+
+    const result = await ctx.run();
+
+    expect({
+      exitCode: result.exitCode,
+      stdout: result.stdout.toString(),
+      stderr: result.stderr.toString(),
+    }).toStrictEqual({
+      exitCode: 0,
+      stdout: 'check-readmes: 1 READMEs, 0 not one of the five kinds\n',
+      stderr: '',
+    });
+  },
+);
+
 test('it passes spike READMEs and the index of a folder of spikes', async () => {
   const ctx = await setupTest();
 

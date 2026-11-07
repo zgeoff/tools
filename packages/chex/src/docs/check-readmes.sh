@@ -5,7 +5,8 @@
 # Usage (from the repo root): check-readmes.sh
 # The five kinds:
 # 1. the root README.md;
-# 2. a README in a folder that holds a package.json, go.mod or Cargo.toml;
+# 2. a README in a folder that holds a package.json, go.mod, Cargo.toml, build.gradle.kts,
+#    build.gradle or settings.gradle.kts;
 # 3. docs/README.md;
 # 4. a design README: docs/design/<work>/README.md, or the README of a folder inside a design folder
 #    whose own README is a design README, outside any spikes/ folder;
@@ -78,12 +79,16 @@ is_design() {
   [ -n "${listed[$parent]:-}" ] && is_design "$parent"
 }
 
+manifests=(package.json go.mod Cargo.toml build.gradle.kts build.gradle settings.gradle.kts)
+
 is_known() {
-  local readme=$1 dir
+  local readme=$1 dir manifest
   dir=$(dirname "$readme")
 
   [ "$readme" = README.md ] && return 0
-  [ -f "$dir/package.json" ] || [ -f "$dir/go.mod" ] || [ -f "$dir/Cargo.toml" ] && return 0
+  for manifest in "${manifests[@]}"; do
+    [ -f "$dir/$manifest" ] && return 0
+  done
   [ "$readme" = docs/README.md ] && return 0
   is_design "$readme" && return 0
   is_spike "$readme" && return 0
