@@ -114,11 +114,21 @@ the table above, with these differences:
   `check-links.sh`, then `check-vision.sh` when the `docs-vision-check` entry put it beside them and
   the skill-writing skill's `check-skill.sh` when the repo takes that skill. In a repo without
   `.claude/skills/docs-writing/scripts/` it prints a notice and passes.
-- The test job runs `scripts/run-related-tests.ts`, which takes the lane suffixes from the `lanes`
-  option of `zgeoff/max-test-timeout` in the root `.oxlintrc.json`, as
+- The test job runs the repo's `test:related` script. The script that the build adds runs
+  `scripts/run-related-tests.ts`, which takes the lane suffixes from the `lanes` option of
+  `zgeoff/max-test-timeout` in the root `.oxlintrc.json`, as
   [the test timeout check](./oxlint-config-tests.md#the-test-timeout-check) reads it. It also drops
   each test that the `[test]` `pathIgnorePatterns` of the root `bunfig.toml` cover, because
   `bun test` exits 1 when every path it is given is ignored.
+- In a repo whose root `package.json` lists `@zgeoff/rig` in `dependencies` or `devDependencies`,
+  and has its own `test:related`, such as `rig related`, the build deletes
+  `scripts/run-related-tests.ts` when `git grep` finds that path in no tracked file but the two
+  delivered scripts. A caller can sit in any tracked file, such as a workspace package's
+  `package.json` or a workflow. After it deletes the runner, the build deletes
+  `scripts/read-worker-count.ts` by the same test. The build deletes the copies that the entry just
+  wrote, so the sync pull request deletes any copy that an earlier sync left in the repo. A repo on
+  rig whose `test:related` is missing or still runs the runner keeps both files, so its pre-push
+  test job still finds the script it calls.
 
 The entry delivers the check scripts from [`packages/chex/src/`](../../packages/chex/src/), under
 the same names in `scripts/`, so a delivered check runs the code that `chex <check>` runs. The
