@@ -120,11 +120,12 @@ the table above, with these differences:
   [the test timeout check](./oxlint-config-tests.md#the-test-timeout-check) reads it. It also drops
   each test that the `[test]` `pathIgnorePatterns` of the root `bunfig.toml` cover, because
   `bun test` exits 1 when every path it is given is ignored.
-- A repo on rig, whose root `package.json` lists `@zgeoff/rig` in `dependencies` or
-  `devDependencies`, runs its related tests through its own `test:related`, such as `rig related`.
-  There the build adds no `test:related` script, and deletes the copies of
-  `scripts/run-related-tests.ts` and `scripts/read-worker-count.ts` that the entry just wrote, so
-  the sync pull request deletes any copy that an earlier sync left in the repo.
+- In a repo whose root `package.json` lists `@zgeoff/rig` in `dependencies` or `devDependencies`,
+  and whose own `test:related` never runs `scripts/run-related-tests.ts`, such as one that runs
+  `rig related`, the build deletes the runner and `scripts/read-worker-count.ts`. The build deletes
+  the copies that the entry just wrote, so the sync pull request deletes any copy that an earlier
+  sync left in the repo. A repo on rig whose `test:related` is missing or still runs the runner
+  keeps both files, so its pre-push test job still finds the script it calls.
 
 The entry delivers the check scripts from [`packages/chex/src/`](../../packages/chex/src/), under
 the same names in `scripts/`, so a delivered check runs the code that `chex <check>` runs. The

@@ -138,13 +138,16 @@ test('it runs a pre-push-baseline build that adds the package scripts a repo lac
 });
 
 test.each(['dependencies', 'devDependencies'])(
-  'it runs a pre-push-baseline build that removes the related-tests runner and leaves out the default test:related script in a repo whose %s list @zgeoff/rig',
+  'it runs a pre-push-baseline build that removes the related-tests runner from a repo whose %s list @zgeoff/rig and whose test:related runs rig',
   async (field) => {
     const ctx = await setupTest();
 
     await writeFile(
       join(ctx.directory, 'package.json'),
-      JSON.stringify({ scripts: { test: 'rig unit' }, [field]: { '@zgeoff/rig': '0.1.6' } }),
+      JSON.stringify({
+        scripts: { 'test:related': 'rig related' },
+        [field]: { '@zgeoff/rig': '0.1.6' },
+      }),
     );
 
     await mkdir(join(ctx.directory, 'scripts'));
@@ -160,7 +163,7 @@ test.each(['dependencies', 'devDependencies'])(
       scripts: { 'run-related-tests.ts': false, 'read-worker-count.ts': false },
       packageJSON: {
         scripts: {
-          test: 'rig unit',
+          'test:related': 'rig related',
           'files:branch': 'bun scripts/read-branch-files.ts',
           'lint:files': 'oxlint --no-error-on-unmatched-pattern',
           'check:commits': 'bun scripts/run-commits-check.ts',
@@ -178,37 +181,52 @@ test.each(['dependencies', 'devDependencies'])(
   },
 );
 
-test("it runs a pre-push-baseline build that keeps a rig repo's own test:related script", async () => {
-  const ctx = await setupTest();
+test.each([
+  [
+    'a test:related that still runs the runner',
+    { 'test:related': 'bun scripts/run-related-tests.ts' },
+  ],
+  ['no test:related', {}],
+])(
+  'it runs a pre-push-baseline build that keeps the related-tests runner in a repo on @zgeoff/rig with %s',
+  async (_case, scripts) => {
+    const ctx = await setupTest();
 
-  await writeFile(
-    join(ctx.directory, 'package.json'),
-    JSON.stringify({
-      scripts: { 'test:related': 'rig related' },
-      devDependencies: { '@zgeoff/rig': '0.1.6' },
-    }),
-  );
+    await writeFile(
+      join(ctx.directory, 'package.json'),
+      JSON.stringify({ scripts, devDependencies: { '@zgeoff/rig': '0.1.6' } }),
+    );
 
-  await ctx.runBuild();
+    await mkdir(join(ctx.directory, 'scripts'));
+    await writeFile(join(ctx.directory, 'scripts/run-related-tests.ts'), 'export {};\n');
+    await writeFile(join(ctx.directory, 'scripts/read-worker-count.ts'), 'export {};\n');
 
-  const packageJSON = await ctx.readPackageJSON();
+    await ctx.runBuild();
 
-  expect(packageJSON).toStrictEqual({
-    scripts: {
-      'test:related': 'rig related',
-      'files:branch': 'bun scripts/read-branch-files.ts',
-      'lint:files': 'oxlint --no-error-on-unmatched-pattern',
-      'check:commits': 'bun scripts/run-commits-check.ts',
-      'check:local-paths': 'bun scripts/run-local-paths-check.ts',
-      'check:test-timeouts': 'bun scripts/run-test-timeouts-check.ts',
-      'check:dependency-gates': 'bun scripts/dependency-gates/run-dependency-gates-check.ts',
-      'check:workflows': 'bun scripts/run-workflows-check.ts',
-      'check:uncommitted': 'bun scripts/run-uncommitted-check.ts',
-      'memory-capped': 'bash scripts/run-memory-capped.sh "$(bun scripts/read-memory-budget.ts)"',
-    },
-    devDependencies: { '@zgeoff/rig': '0.1.6' },
-  });
-});
+    expect({
+      scripts: await ctx.probeScripts(),
+      packageJSON: await ctx.readPackageJSON(),
+    }).toStrictEqual({
+      scripts: { 'run-related-tests.ts': true, 'read-worker-count.ts': true },
+      packageJSON: {
+        scripts: {
+          'test:related': 'bun scripts/run-related-tests.ts',
+          'files:branch': 'bun scripts/read-branch-files.ts',
+          'lint:files': 'oxlint --no-error-on-unmatched-pattern',
+          'check:commits': 'bun scripts/run-commits-check.ts',
+          'check:local-paths': 'bun scripts/run-local-paths-check.ts',
+          'check:test-timeouts': 'bun scripts/run-test-timeouts-check.ts',
+          'check:dependency-gates': 'bun scripts/dependency-gates/run-dependency-gates-check.ts',
+          'check:workflows': 'bun scripts/run-workflows-check.ts',
+          'check:uncommitted': 'bun scripts/run-uncommitted-check.ts',
+          'memory-capped':
+            'bash scripts/run-memory-capped.sh "$(bun scripts/read-memory-budget.ts)"',
+        },
+        devDependencies: { '@zgeoff/rig': '0.1.6' },
+      },
+    });
+  },
+);
 
 test('it runs a pre-push-baseline build that keeps the related-tests runner and adds the default test:related script in a repo without @zgeoff/rig', async () => {
   const ctx = await setupTest();
