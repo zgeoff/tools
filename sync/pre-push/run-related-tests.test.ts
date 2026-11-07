@@ -441,6 +441,34 @@ test('#runRelatedTests exits 2 with the reason and runs no test for a TEST_WORKE
   });
 });
 
+test('#runRelatedTests skips with the CI notice and exits 0 for a TEST_WORKERS it refuses when the branch changes a shared test input', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { test: 'echo test-args' } }),
+  );
+
+  await writeFile(join(ctx.directory, 'src/a.test.ts'), '');
+
+  const result = await $`bun ${join(import.meta.dir, 'run-related-tests.ts')} src/a.ts bunfig.toml`
+    .cwd(ctx.directory)
+    .env({ PATH: process.env['PATH'] ?? '', TEST_WORKERS: 'four' })
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'run-related-tests: skipped, because the branch changes bunfig.toml, a shared test helper or config; CI runs the full suite\n',
+    stderr: '',
+  });
+});
+
 test('#runRelatedTests runs no test of a lane that the oxlint config declares', async () => {
   const ctx = await setupTest();
 

@@ -122,11 +122,11 @@ the table above, with these differences:
 
 The entry delivers the check scripts from [`packages/chex/src/`](../../packages/chex/src/), under
 the same names in `scripts/`, so a delivered check runs the code that `chex <check>` runs. The
-related-tests runner, `scripts/read-worker-count.ts` and `scripts/read-memory-budget.ts` come from
-[`sync/pre-push/`](../../sync/pre-push/). The check scripts exit 0 when clean or skipped, 1 with a
-problem, and 2 when they cannot run, such as in a clone without origin's default branch. One
-exception: the workflow lint exits 0 with a problem, because it only warns. A repo opts in with
-three changes, which
+related-tests runner, `scripts/build-related-test-command.ts`, `scripts/read-worker-count.ts` and
+`scripts/read-memory-budget.ts` come from [`sync/pre-push/`](../../sync/pre-push/). The check
+scripts exit 0 when clean or skipped, 1 with a problem, and 2 when they cannot run, such as in a
+clone without origin's default branch. One exception: the workflow lint exits 0 with a problem,
+because it only warns. A repo opts in with three changes, which
 [Opting in to the pre-push baseline](../runbooks/downstream-repo-setup.md#opting-in-to-the-pre-push-baseline)
 lists.
 
