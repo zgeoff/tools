@@ -6,39 +6,6 @@ import { linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:f
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
-const REFUSAL =
-  'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.';
-
-const AFTER_INSTALL_OPTION = 'after-install';
-const GUARD_SUFFIX = '.guard';
-
-// Both harnesses stop a command hook after 600 s by default and then run the call, so the install
-// and its waits end sooner and refuse.
-const INSTALL_BUDGET_MS = 540_000;
-
-const READ_ONLY_PROGRAMS = new Set(['cat', 'ls', 'pwd']);
-
-const PLAIN_WORDS = /^[\w./@:=+,-]+(?: [\w./@:=+,-]+)*$/u;
-const ROOT = path.resolve(import.meta.dirname, '../..');
-
-type LockState = 'absent' | 'held' | 'stale';
-
-type InstallStep =
-  | 'retry-guard'
-  | 'wait-for-guard'
-  | 'stop'
-  | 'wait-for-install'
-  | 'install'
-  | 'skip-install'
-  | 'claim-again';
-
-// The guard can vanish between a failed link and the read, so an absent guard means another try.
-const INSTALL_STEPS = {
-  guard: { absent: 'retry-guard', held: 'wait-for-guard', stale: 'stop' },
-  install: { absent: 'install', held: 'wait-for-install', stale: 'install' },
-  waited: { absent: 'skip-install', held: 'wait-for-install', stale: 'claim-again' },
-} as const satisfies Readonly<Record<string, Readonly<Record<LockState, InstallStep>>>>;
-
 type InstallResult = Pick<SpawnSyncReturns<Buffer>, 'error' | 'status' | 'signal'>;
 
 export interface InstallDependencies {
@@ -53,37 +20,8 @@ export interface InstallDependencies {
   readonly runInstall: (timeoutMs: number) => InstallResult;
 }
 
-// The entry point below runs at load, before any constant under it exists.
-export const NODE_INSTALL_DEPENDENCIES: InstallDependencies = {
-  createDirectory: (directoryPath) => {
-    mkdirSync(directoryPath, { recursive: true });
-  },
-  readFile: (filePath) => readFileSync(filePath, 'utf8'),
-  writeFile: writeFileSync,
-  link: linkSync,
-  remove: (filePath) => {
-    rmSync(filePath, { force: true });
-  },
-  signalProcess: (pid) => {
-    process.kill(pid, 0);
-  },
-  sleep: (durationMs) => Bun.sleep(durationMs),
-  now: Date.now,
-  runInstall: (timeoutMs) =>
-    spawnSync('bun', ['install', '--frozen-lockfile'], {
-      cwd: ROOT,
-      stdio: ['ignore', 2, 2],
-      timeout: timeoutMs,
-    }),
-};
-
-if (import.meta.main) {
-  await runHook(process.argv.slice(2), NODE_INSTALL_DEPENDENCIES).catch((error: unknown) => {
-    console.error(`The agent hook failed: ${String(error)}`);
-
-    return process.exit(2);
-  });
-}
+const REFUSAL =
+  'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.';
 
 async function runHook(argv: readonly string[], dependencies: InstallDependencies): Promise<never> {
   const args = parseHookArgs(argv);
@@ -111,14 +49,10 @@ async function runHook(argv: readonly string[], dependencies: InstallDependencie
 
   console.error(`The agent hook could not load @zgeoff/agent-hooks: ${String(step.error)}`);
 
-  if (pickFallbackVerdict(readPayloadText()) === 'allow') {
-    return process.exit(0);
-  }
-
-  console.error(REFUSAL);
-
-  return process.exit(2);
+  return exitWithFallbackVerdict();
 }
+
+const AFTER_INSTALL_OPTION = 'after-install';
 
 type HookArgs =
   | {
@@ -172,6 +106,12 @@ export function pickRecoveryStep<Module>(
     : { kind: 'install-and-retry' };
 }
 
+const ROOT = path.resolve(import.meta.dirname, '../..');
+
+// Both harnesses stop a command hook after 600 s by default and then run the call, so the install
+// and its waits end sooner and refuse.
+const INSTALL_BUDGET_MS = 540_000;
+
 async function runRetryAfterInstall(
   argv: readonly string[],
   dependencies: InstallDependencies,
@@ -201,6 +141,8 @@ async function runRetryAfterInstall(
 
   return process.exit(retry.status ?? 2);
 }
+
+const GUARD_SUFFIX = '.guard';
 
 export async function runInstallOnce(
   lockPath: string,
@@ -252,14 +194,14 @@ export async function claimInstallLock(
   const guardPath = `${lockPath}${GUARD_SUFFIX}`;
 
   for (let attempt = 0; !createLock(guardPath, dependencies); attempt += 1) {
-    const step = pickInstallStep({ lock: 'guard', state: readLockState(guardPath, dependencies) });
+    const step = pickInstallStep({
+      lock: 'guard',
+      state: readLockState(guardPath, dependencies),
+      timedOut: dependencies.now() >= deadlineMs,
+    });
 
-    if (step === 'stop') {
+    if (step === 'stop' || step === 'out-of-time') {
       return step;
-    }
-
-    if (dependencies.now() >= deadlineMs) {
-      return 'out-of-time';
     }
 
     if (step === 'wait-for-guard' && attempt === 0) {
@@ -270,7 +212,11 @@ export async function claimInstallLock(
   }
 
   try {
-    const step = pickInstallStep({ lock: 'install', state: readLockState(lockPath, dependencies) });
+    const step = pickInstallStep({
+      lock: 'install',
+      state: readLockState(lockPath, dependencies),
+      timedOut: dependencies.now() >= deadlineMs,
+    });
 
     if (step === 'wait-for-install') {
       return step;
@@ -310,6 +256,8 @@ function createLock(lockPath: string, dependencies: InstallDependencies): boolea
   }
 }
 
+type LockState = 'absent' | 'held' | 'stale';
+
 // A hook that the harness killed leaves its lock behind, so a lock counts as held only while the
 // process it names runs.
 export function readLockState(lockPath: string, dependencies: InstallDependencies): LockState {
@@ -346,13 +294,41 @@ function readLockText(lockPath: string, dependencies: InstallDependencies): stri
   }
 }
 
+type InstallStep =
+  | 'retry-guard'
+  | 'wait-for-guard'
+  | 'stop'
+  | 'out-of-time'
+  | 'wait-for-install'
+  | 'install'
+  | 'skip-install'
+  | 'claim-again';
+
+type InstallSteps = Readonly<Record<string, Readonly<Record<LockState, InstallStep>>>>;
+
+// The guard can vanish between a failed link and the read, so an absent guard means another try.
+const INSTALL_STEPS = {
+  guard: { absent: 'retry-guard', held: 'wait-for-guard', stale: 'stop' },
+  install: { absent: 'install', held: 'wait-for-install', stale: 'install' },
+  waited: { absent: 'skip-install', held: 'wait-for-install', stale: 'claim-again' },
+} as const satisfies InstallSteps;
+
+// Past the deadline, a hook stops each wait. A hook that holds the guard still checks the install
+// lock, since a held lock sends it to the wait, where the deadline stops it.
+const LATE_INSTALL_STEPS = {
+  guard: { absent: 'out-of-time', held: 'out-of-time', stale: 'stop' },
+  install: INSTALL_STEPS.install,
+  waited: { absent: 'skip-install', held: 'out-of-time', stale: 'claim-again' },
+} as const satisfies InstallSteps;
+
 interface Claim {
   readonly lock: keyof typeof INSTALL_STEPS;
   readonly state: LockState;
+  readonly timedOut: boolean;
 }
 
 export function pickInstallStep(claim: Claim): InstallStep {
-  return INSTALL_STEPS[claim.lock][claim.state];
+  return (claim.timedOut ? LATE_INSTALL_STEPS : INSTALL_STEPS)[claim.lock][claim.state];
 }
 
 async function runAfterInstallWait(
@@ -361,7 +337,11 @@ async function runAfterInstallWait(
   dependencies: InstallDependencies,
 ): Promise<string | null> {
   for (;;) {
-    const step = pickInstallStep({ lock: 'waited', state: readLockState(lockPath, dependencies) });
+    const step = pickInstallStep({
+      lock: 'waited',
+      state: readLockState(lockPath, dependencies),
+      timedOut: dependencies.now() >= deadlineMs,
+    });
 
     if (step === 'skip-install') {
       return null;
@@ -371,7 +351,7 @@ async function runAfterInstallWait(
       return runInstallOnce(lockPath, deadlineMs, dependencies);
     }
 
-    if (dependencies.now() >= deadlineMs) {
+    if (step === 'out-of-time') {
       return `another agent hook held ${lockPath} past the deadline`;
     }
 
@@ -386,6 +366,18 @@ export function findInstallFailure(result: InstallResult): string | null {
   }
 
   return result.status === null ? `bun install stopped on ${String(result.signal)}` : null;
+}
+
+// The package reads stdin before it can throw, so a failure after that read finds no payload here
+// and refuses.
+function exitWithFallbackVerdict(): never {
+  if (pickFallbackVerdict(readPayloadText()) === 'allow') {
+    return process.exit(0);
+  }
+
+  console.error(REFUSAL);
+
+  return process.exit(2);
 }
 
 function readPayloadText(): string {
@@ -430,6 +422,10 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+const READ_ONLY_PROGRAMS = new Set(['cat', 'ls', 'pwd']);
+
+const PLAIN_WORDS = /^[\w./@:=+,-]+(?: [\w./@:=+,-]+)*$/u;
+
 // A shell can build a path from a variable, a glob or a substitution, and runs a second command
 // after a line break, so a command passes only as plain words between single spaces. Git is left
 // out: its config can make even a `git diff` with external diffs off run an fsmonitor program.
@@ -451,4 +447,36 @@ function isReadOnlyCommand(command: string): boolean {
     subcommand === 'install' &&
     options.every((option) => option === '--frozen-lockfile')
   );
+}
+
+export const NODE_INSTALL_DEPENDENCIES: InstallDependencies = {
+  createDirectory: (directoryPath) => {
+    mkdirSync(directoryPath, { recursive: true });
+  },
+  readFile: (filePath) => readFileSync(filePath, 'utf8'),
+  writeFile: writeFileSync,
+  link: linkSync,
+  remove: (filePath) => {
+    rmSync(filePath, { force: true });
+  },
+  signalProcess: (pid) => {
+    process.kill(pid, 0);
+  },
+  sleep: (durationMs) => Bun.sleep(durationMs),
+  now: Date.now,
+  runInstall: (timeoutMs) =>
+    spawnSync('bun', ['install', '--frozen-lockfile'], {
+      cwd: ROOT,
+      stdio: ['ignore', 2, 2],
+      timeout: timeoutMs,
+    }),
+};
+
+// A top-level await holds back every line under it, so the entry point sits last.
+if (import.meta.main) {
+  await runHook(process.argv.slice(2), NODE_INSTALL_DEPENDENCIES).catch((error: unknown) => {
+    console.error(`The agent hook failed: ${String(error)}`);
+
+    return exitWithFallbackVerdict();
+  });
 }

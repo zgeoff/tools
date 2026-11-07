@@ -354,6 +354,40 @@ test('it refuses a gated edit when the installed package has no hook to run', as
     status: 2,
     stdout: '',
     stderr:
+      "stub install started\nThe agent hook failed: TypeError: step.agentHooks.runAgentHook is not a function. (In 'step.agentHooks.runAgentHook({ harness: args.harness })', 'step.agentHooks.runAgentHook' is undefined)\nTo work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n",
+  });
+});
+
+test('it lets a prompt through when the installed package has no hook to run', async () => {
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: {
+      kind: 'links',
+      packageName: '@zgeoff/agent-hooks',
+      packageDirectory: ctx.packageDirectory,
+    },
+  });
+
+  await writeTreeFiles(ctx.packageDirectory, {
+    'package.json': JSON.stringify({
+      name: '@zgeoff/agent-hooks',
+      type: 'module',
+      exports: './index.ts',
+    }),
+    'index.ts': 'export const ledgerVersion = 3;\n',
+  });
+
+  const result = ctx.runStub(
+    JSON.stringify({ hook_event_name: 'UserPromptSubmit', cwd: ctx.project, prompt: 'Fix it' }),
+    [],
+  );
+
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 0,
+    stdout: '',
+    stderr:
       "stub install started\nThe agent hook failed: TypeError: step.agentHooks.runAgentHook is not a function. (In 'step.agentHooks.runAgentHook({ harness: args.harness })', 'step.agentHooks.runAgentHook' is undefined)\n",
   });
 });
@@ -1037,47 +1071,92 @@ test.each([
 test.each([
   {
     label: 'the guard is absent',
-    claim: { lock: 'guard', state: 'absent' },
+    claim: { lock: 'guard', state: 'absent', timedOut: false },
     expected: 'retry-guard',
   },
   {
     label: 'another hook holds the guard',
-    claim: { lock: 'guard', state: 'held' },
+    claim: { lock: 'guard', state: 'held', timedOut: false },
     expected: 'wait-for-guard',
   },
   {
     label: 'a stopped hook left the guard',
-    claim: { lock: 'guard', state: 'stale' },
+    claim: { lock: 'guard', state: 'stale', timedOut: false },
     expected: 'stop',
   },
   {
     label: 'the install lock is absent',
-    claim: { lock: 'install', state: 'absent' },
+    claim: { lock: 'install', state: 'absent', timedOut: false },
     expected: 'install',
   },
   {
     label: 'another hook holds the install lock',
-    claim: { lock: 'install', state: 'held' },
+    claim: { lock: 'install', state: 'held', timedOut: false },
     expected: 'wait-for-install',
   },
   {
     label: 'a stopped hook left the install lock',
-    claim: { lock: 'install', state: 'stale' },
+    claim: { lock: 'install', state: 'stale', timedOut: false },
     expected: 'install',
   },
   {
     label: 'the install it waited for ended',
-    claim: { lock: 'waited', state: 'absent' },
+    claim: { lock: 'waited', state: 'absent', timedOut: false },
     expected: 'skip-install',
   },
   {
     label: 'the install it waits for still runs',
-    claim: { lock: 'waited', state: 'held' },
+    claim: { lock: 'waited', state: 'held', timedOut: false },
     expected: 'wait-for-install',
   },
   {
     label: 'the hook it waited for stopped before its install ended',
-    claim: { lock: 'waited', state: 'stale' },
+    claim: { lock: 'waited', state: 'stale', timedOut: false },
+    expected: 'claim-again',
+  },
+  {
+    label: 'the guard is absent past the deadline',
+    claim: { lock: 'guard', state: 'absent', timedOut: true },
+    expected: 'out-of-time',
+  },
+  {
+    label: 'another hook holds the guard past the deadline',
+    claim: { lock: 'guard', state: 'held', timedOut: true },
+    expected: 'out-of-time',
+  },
+  {
+    label: 'a stopped hook left the guard past the deadline',
+    claim: { lock: 'guard', state: 'stale', timedOut: true },
+    expected: 'stop',
+  },
+  {
+    label: 'the install lock is absent past the deadline',
+    claim: { lock: 'install', state: 'absent', timedOut: true },
+    expected: 'install',
+  },
+  {
+    label: 'another hook holds the install lock past the deadline',
+    claim: { lock: 'install', state: 'held', timedOut: true },
+    expected: 'wait-for-install',
+  },
+  {
+    label: 'a stopped hook left the install lock past the deadline',
+    claim: { lock: 'install', state: 'stale', timedOut: true },
+    expected: 'install',
+  },
+  {
+    label: 'the install it waited for ended past the deadline',
+    claim: { lock: 'waited', state: 'absent', timedOut: true },
+    expected: 'skip-install',
+  },
+  {
+    label: 'the install it waits for still runs past the deadline',
+    claim: { lock: 'waited', state: 'held', timedOut: true },
+    expected: 'out-of-time',
+  },
+  {
+    label: 'the hook it waited for stopped past the deadline',
+    claim: { lock: 'waited', state: 'stale', timedOut: true },
     expected: 'claim-again',
   },
 ] as const)('#pickInstallStep picks $expected when $label', (row) => {
@@ -1278,10 +1357,10 @@ test('#claimInstallLock gives up when another hook holds the guard past the dead
 test('#runInstallOnce installs when the hook it waits for stops before its install ends', async () => {
   const ctx = await setupTest();
 
-  const holder = Bun.spawn(['sleep', '30']);
+  const holder = Bun.spawn(['sleep', '30'], { detached: true });
 
   onTestFinished(() => {
-    holder.kill('SIGKILL');
+    Bun.spawnSync(['kill', '-KILL', '--', `-${holder.pid}`]);
   });
 
   await writeTreeFiles(ctx.project, {
@@ -1312,6 +1391,27 @@ test('#runInstallOnce installs when the hook it waits for stops before its insta
     failure: null,
     installs: 1,
     files: [],
+  });
+});
+
+test('#runInstallOnce reports a failure and runs no install when another hook holds the guard past the deadline', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.project, {
+    'node_modules/.agent-hooks-install.lock.guard': String(process.pid),
+  });
+
+  const runInstall = mock<InstallDependencies['runInstall']>(() => ({ status: 0, signal: null }));
+
+  const failure = await runInstallOnce(
+    join(ctx.project, 'node_modules/.agent-hooks-install.lock'),
+    5000,
+    { ...NODE_INSTALL_DEPENDENCIES, now: () => 5000, runInstall },
+  );
+
+  expect({ failure, installs: runInstall.mock.calls }).toStrictEqual({
+    failure: `another agent hook held ${join(ctx.project, 'node_modules/.agent-hooks-install.lock.guard')} past the deadline`,
+    installs: [],
   });
 });
 
