@@ -9,6 +9,7 @@ import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { readStreamUntil } from '../test-utils/read-stream-until.ts';
 import { readTextOrEmpty } from '../test-utils/read-text-or-empty.ts';
 import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
+import type { LockDependencies } from './start.ts';
 import {
   NODE_LOCK_DEPENDENCIES,
   claimInstallLock,
@@ -1008,7 +1009,7 @@ test.each([
 test('#readLockState reads an absent lock without a process check', async () => {
   const ctx = await setupTest();
 
-  const signalProcess = mock();
+  const signalProcess = mock<LockDependencies['signalProcess']>();
 
   const state = readLockState(join(ctx.directory, 'install.lock'), {
     ...NODE_LOCK_DEPENDENCIES,
@@ -1026,7 +1027,7 @@ test('#readLockState reads a lock whose process runs as held', async () => {
 
   await writeFile(join(ctx.directory, 'install.lock'), '4242');
 
-  const signalProcess = mock();
+  const signalProcess = mock<LockDependencies['signalProcess']>();
 
   const state = readLockState(join(ctx.directory, 'install.lock'), {
     ...NODE_LOCK_DEPENDENCIES,
@@ -1070,7 +1071,7 @@ test.each([
 
   const state = readLockState(join(ctx.directory, 'install.lock'), {
     ...NODE_LOCK_DEPENDENCIES,
-    signalProcess: mock(),
+    signalProcess: mock<LockDependencies['signalProcess']>(),
   });
 
   expect(state).toBe('stale');
@@ -1107,7 +1108,7 @@ test('#claimInstallLock waits for the install and drops the guard when another h
 
   const step = await claimInstallLock(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), {
     ...NODE_LOCK_DEPENDENCIES,
-    signalProcess: mock(),
+    signalProcess: mock<LockDependencies['signalProcess']>(),
     sleep: mock(() => Promise.resolve()),
   });
 

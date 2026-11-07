@@ -112,12 +112,18 @@ export interface LockDependencies {
 
 // The entry point below runs at load, before any constant under it exists.
 export const NODE_LOCK_DEPENDENCIES: LockDependencies = {
-  createDirectory: (directoryPath) => mkdirSync(directoryPath, { recursive: true }),
+  createDirectory: (directoryPath) => {
+    mkdirSync(directoryPath, { recursive: true });
+  },
   readFile: (filePath) => readFileSync(filePath, 'utf8'),
   writeFile: writeFileSync,
   link: linkSync,
-  remove: (filePath) => rmSync(filePath, { force: true }),
-  signalProcess: (pid) => process.kill(pid, 0),
+  remove: (filePath) => {
+    rmSync(filePath, { force: true });
+  },
+  signalProcess: (pid) => {
+    process.kill(pid, 0);
+  },
   sleep: setTimeout,
 };
 
