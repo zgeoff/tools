@@ -127,13 +127,16 @@ the table above, with these differences:
   `bun test` exits 1 when every path it is given is ignored.
 - In a repo whose root `package.json` lists `@zgeoff/rig` in `dependencies` or `devDependencies`,
   and has its own `test:related`, such as `rig related`, the build deletes
-  `scripts/run-related-tests.ts` when `git grep` finds that path in no tracked file but the two
-  delivered scripts. A caller can sit in any tracked file, such as a workspace package's
-  `package.json` or a workflow. After it deletes the runner, the build deletes
-  `scripts/read-worker-count.ts` by the same test. The build deletes the copies that the entry just
-  wrote, so the sync pull request deletes any copy that an earlier sync left in the repo. A repo on
-  rig whose `test:related` is missing or still runs the runner keeps both files, so its pre-push
-  test job still finds the script it calls.
+  `scripts/run-related-tests.ts` when `git grep` finds that path in no tracked file but the runner's
+  own scripts. A caller can sit in any tracked file, such as a workspace package's `package.json` or
+  a workflow. With the runner, the build deletes `scripts/build-related-test-command.ts`, because
+  that script imports `./read-worker-count.ts` and has no other caller. The entry never delivers a
+  test of that script, and the build deletes `scripts/build-related-test-command.test.ts` too when
+  the repo holds one. Then the build deletes `scripts/read-worker-count.ts` by the same `git grep`
+  test. The build deletes the scripts that the entry just wrote, so the sync pull request deletes
+  any copy that an earlier sync left in the repo. A repo on rig whose `test:related` is missing or
+  still runs the runner keeps all three scripts, so its pre-push test job still finds the script it
+  calls.
 
 The entry delivers the check scripts from [`packages/chex/src/`](../../packages/chex/src/), under
 the same names in `scripts/`, so a delivered check runs the code that `chex <check>` runs. The
