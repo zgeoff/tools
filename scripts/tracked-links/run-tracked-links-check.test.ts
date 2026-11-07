@@ -32,7 +32,7 @@ async function setupTest() {
       },
     });
 
-  return { directory, output, runGit, runCheck };
+  return { directory, env, output, runGit, runCheck };
 }
 
 test('it exits 0 when a tracked link points at a folder that holds a tracked file', async () => {
@@ -90,6 +90,72 @@ test('it exits 0 when the staged link points at a tracked folder and the unstage
 
   await rm(linkPath);
   await symlink('../.agents/missing', linkPath);
+
+  const exitCode = await ctx.runCheck();
+
+  expect({ exitCode, output: ctx.output }).toStrictEqual({ exitCode: 0, output: [] });
+});
+
+test.each([
+  {
+    condition: 'its target leaves the repo',
+    file: 'vendor/readme.md',
+    link: { path: 'vendor/lib', target: '../../shared/lib' },
+    message: 'vendor/lib links to ../../shared/lib, which leads outside the repo',
+  },
+  {
+    condition: 'its target needs a tracked file to be a folder',
+    file: 'docs/notes.md',
+    link: { path: 'docs/notes', target: 'notes.md/' },
+    message:
+      'docs/notes links through docs/notes.md, a tracked file where its target needs a folder',
+  },
+  {
+    condition: 'it links to itself',
+    file: 'readme.md',
+    link: { path: 'loop', target: 'loop' },
+    message: 'loop reaches its target through more than 40 links, which Linux refuses',
+  },
+])('it exits 1 and names the cause when $condition', async (row) => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, { [row.file]: '' });
+  await symlink(row.link.target, join(ctx.directory, row.link.path));
+
+  await ctx.runGit(['add', row.file, row.link.path]);
+
+  const exitCode = await ctx.runCheck();
+
+  expect({ exitCode, output: ctx.output }).toStrictEqual({
+    exitCode: 1,
+    output: [`tracked-links: ${row.message}\n`],
+  });
+});
+
+test('it skips a link that a merge leaves in conflict', async () => {
+  const ctx = await setupTest();
+
+  const linkPath = join(ctx.directory, 'docs', 'guide');
+
+  await writeTreeFiles(ctx.directory, { 'docs/intro.md': '# Intro\n' });
+  await symlink('intro.md', linkPath);
+
+  await ctx.runGit(['add', 'docs']);
+  await ctx.runGit(['commit', '--quiet', '-m', 'add the guide link']);
+  await ctx.runGit(['switch', '--quiet', '-c', 'side']);
+
+  await rm(linkPath);
+  await symlink('missing-on-side.md', linkPath);
+
+  await ctx.runGit(['commit', '--quiet', '-am', 'point the guide link at the side page']);
+  await ctx.runGit(['switch', '--quiet', '-']);
+
+  await rm(linkPath);
+  await symlink('missing-on-base.md', linkPath);
+
+  await ctx.runGit(['commit', '--quiet', '-am', 'point the guide link at the base page']);
+
+  await runCommand(['git', 'merge', '--quiet', 'side'], { cwd: ctx.directory, env: ctx.env });
 
   const exitCode = await ctx.runCheck();
 

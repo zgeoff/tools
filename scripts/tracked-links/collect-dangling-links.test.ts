@@ -47,20 +47,20 @@ test('it reports each link of a chain that ends at a path a fresh clone lacks', 
   ];
 
   expect(collectDanglingLinks(links, ['outer', 'alias'])).toStrictEqual([
-    { path: 'outer', target: 'alias', resolved: 'missing' },
-    { path: 'alias', target: 'missing', resolved: 'missing' },
+    { path: 'outer', target: 'alias', cause: { kind: 'missing', path: 'missing' } },
+    { path: 'alias', target: 'missing', cause: { kind: 'missing', path: 'missing' } },
   ]);
 });
 
-test('it reports each link whose path steps out of a file with ..', () => {
+test('it reports each link whose path steps out of a file with .. as needing a folder', () => {
   const links = [
     { path: 'outer', target: 'alias/child' },
     { path: 'alias', target: 'file/..' },
   ];
 
   expect(collectDanglingLinks(links, ['outer', 'alias', 'file', 'child'])).toStrictEqual([
-    { path: 'outer', target: 'alias/child', resolved: 'alias/child' },
-    { path: 'alias', target: 'file/..', resolved: '.' },
+    { path: 'outer', target: 'alias/child', cause: { kind: 'not-a-folder', path: 'file' } },
+    { path: 'alias', target: 'file/..', cause: { kind: 'not-a-folder', path: 'file' } },
   ]);
 });
 
@@ -75,26 +75,38 @@ test('it passes a chain of 40 links that ends at a tracked file', () => {
   );
 });
 
-test('it reports the first link of a chain of 41 links, which Linux refuses as a loop', () => {
+test('it reports the first link of a chain of 41 links as a loop, as Linux refuses it', () => {
   const links = Array.from({ length: 41 }, (_, index) => ({
     path: `hop-${index}`,
     target: index === 40 ? 'end.txt' : `hop-${index + 1}`,
   }));
 
   expect(collectDanglingLinks(links, [...links.map((link) => link.path), 'end.txt'])).toStrictEqual(
-    [{ path: 'hop-0', target: 'hop-1', resolved: 'hop-1' }],
+    [{ path: 'hop-0', target: 'hop-1', cause: { kind: 'loop' } }],
   );
 });
 
-test('it reports each link of a loop', () => {
+test('it reports each link of a loop as a loop', () => {
   const links = [
     { path: 'ping', target: 'pong' },
     { path: 'pong', target: 'ping' },
   ];
 
   expect(collectDanglingLinks(links, ['ping', 'pong'])).toStrictEqual([
-    { path: 'ping', target: 'pong', resolved: 'pong' },
-    { path: 'pong', target: 'ping', resolved: 'ping' },
+    { path: 'ping', target: 'pong', cause: { kind: 'loop' } },
+    { path: 'pong', target: 'ping', cause: { kind: 'loop' } },
+  ]);
+});
+
+test('it reports a link whose target sits behind a link to an absolute path as outside the repo', () => {
+  const links = [
+    { path: 'tools/node', target: 'bin/node' },
+    { path: 'tools/bin', target: '/usr/bin' },
+  ];
+
+  expect(collectDanglingLinks(links, ['tools/node', 'tools/bin'])).toStrictEqual([
+    { path: 'tools/node', target: 'bin/node', cause: { kind: 'outside-repo' } },
+    { path: 'tools/bin', target: '/usr/bin', cause: { kind: 'outside-repo' } },
   ]);
 });
 
@@ -103,34 +115,46 @@ test.each([
     condition: 'no tracked file sits in its target folder',
     link: { path: '.claude/skills', target: '../.agents/skills' },
     trackedPaths: ['.claude/skills', '.claude/settings.json'],
-    resolved: '.agents/skills',
+    cause: { kind: 'missing', path: '.agents/skills' },
   },
   {
     condition: 'only a path that shares its name prefix is tracked',
     link: { path: 'docs/guide', target: 'guides' },
     trackedPaths: ['docs/guide', 'docs/guides-old/intro.md'],
-    resolved: 'docs/guides',
+    cause: { kind: 'missing', path: 'docs/guides' },
+  },
+  {
+    condition: 'a folder on the way to its target is missing',
+    link: { path: 'docs/guide', target: 'guides/intro.md' },
+    trackedPaths: ['docs/guide', 'docs/readme.md'],
+    cause: { kind: 'missing', path: 'docs/guides/intro.md' },
+  },
+  {
+    condition: 'its target steps back with .. out of a missing folder',
+    link: { path: 'docs/guide', target: 'drafts/../intro.md' },
+    trackedPaths: ['docs/guide', 'docs/intro.md'],
+    cause: { kind: 'missing', path: 'docs/drafts' },
   },
   {
     condition: 'its target leaves the repo',
     link: { path: 'vendor/lib', target: '../../shared/lib' },
     trackedPaths: ['vendor/lib', 'shared/lib/index.ts'],
-    resolved: '../shared/lib',
+    cause: { kind: 'outside-repo' },
   },
   {
     condition: 'its target ends in a slash but names a tracked file',
     link: { path: 'docs/notes', target: 'notes.md/' },
     trackedPaths: ['docs/notes', 'docs/notes.md'],
-    resolved: 'docs/notes.md',
+    cause: { kind: 'not-a-folder', path: 'docs/notes.md' },
   },
   {
     condition: 'its target is absolute',
     link: { path: 'bin/node', target: '/usr/bin/node' },
     trackedPaths: ['bin/node'],
-    resolved: '/usr/bin/node',
+    cause: { kind: 'outside-repo' },
   },
 ])('it reports a link when $condition', (row) => {
   expect(collectDanglingLinks([row.link], row.trackedPaths)).toStrictEqual([
-    { ...row.link, resolved: row.resolved },
+    { ...row.link, cause: row.cause },
   ]);
 });

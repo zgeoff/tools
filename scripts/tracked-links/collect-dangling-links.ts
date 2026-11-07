@@ -9,10 +9,14 @@ export interface TrackedLink {
   readonly target: string;
 }
 
+export type DanglingCause =
+  | { readonly kind: 'missing'; readonly path: string }
+  | { readonly kind: 'not-a-folder'; readonly path: string }
+  | { readonly kind: 'outside-repo' }
+  | { readonly kind: 'loop' };
+
 export interface DanglingLink extends TrackedLink {
-  // The path the link reaches from the repo root, after every tracked link on the way; an absolute
-  // target stays as it is.
-  readonly resolved: string;
+  readonly cause: DanglingCause;
 }
 
 interface LinkTree {
@@ -36,20 +40,11 @@ export function collectDanglingLinks(
     targets: new Map(links.map((link) => [link.path, link.target])),
   };
 
-  const dangling: DanglingLink[] = [];
+  return links.flatMap((link) => {
+    const cause = findDanglingCause(link, tree);
 
-  for (const link of links) {
-    const resolved = resolveLinkPath(link, tree);
-
-    const isReachable =
-      resolved !== null && (tree.folders.has(resolved) || tree.files.has(resolved));
-
-    if (!isReachable) {
-      dangling.push({ ...link, resolved: resolved ?? joinTarget(link) });
-    }
-  }
-
-  return dangling;
+    return cause === null ? [] : [{ ...link, cause }];
+  });
 }
 
 function collectFolders(trackedPaths: readonly string[]): Set<string> {
@@ -68,11 +63,11 @@ function collectFolders(trackedPaths: readonly string[]): Set<string> {
 const maxLinkHops = 40;
 
 // Walks the target one part at a time, as the file system does: a `..` or a later part needs the
-// path so far to be a folder, which a collapsed path such as `file/..` would hide. Returns the
-// path reached, an absolute target as it is, or null for a path the file system refuses.
-function resolveLinkPath(link: TrackedLink, tree: LinkTree): string | null {
+// path so far to be a folder, which a collapsed path such as `file/..` would hide. A part joins the
+// path so far only once it is known to be a folder or is the last part.
+function findDanglingCause(link: TrackedLink, tree: LinkTree): DanglingCause | null {
   if (posix.isAbsolute(link.target)) {
-    return link.target;
+    return { kind: 'outside-repo' };
   }
 
   const parent = posix.dirname(link.path);
@@ -87,20 +82,13 @@ function resolveLinkPath(link: TrackedLink, tree: LinkTree): string | null {
 
     invariant(part !== undefined, 'a non-empty list has a first part');
 
-    const current = reached.length === 0 ? '.' : reached.join('/');
-
     if (part === '.' || part === '') {
-      // An empty part follows a slash, and a slash needs a folder before it.
-      if (part === '' && !tree.folders.has(current)) {
-        return null;
-      }
-
       continue;
     }
 
     if (part === '..') {
-      if (reached.length === 0 || !tree.folders.has(current)) {
-        return null;
+      if (reached.length === 0) {
+        return { kind: 'outside-repo' };
       }
 
       reached.pop();
@@ -114,11 +102,11 @@ function resolveLinkPath(link: TrackedLink, tree: LinkTree): string | null {
       hops += 1;
 
       if (hops > maxLinkHops) {
-        return null;
+        return { kind: 'loop' };
       }
 
       if (posix.isAbsolute(target)) {
-        return target;
+        return { kind: 'outside-repo' };
       }
 
       pending.unshift(...target.split('/'));
@@ -126,19 +114,24 @@ function resolveLinkPath(link: TrackedLink, tree: LinkTree): string | null {
     }
 
     if (pending.length > 0 && !tree.folders.has(candidate)) {
-      return null;
+      return tree.files.has(candidate)
+        ? { kind: 'not-a-folder', path: candidate }
+        : { kind: 'missing', path: buildMissingPath(candidate, pending) };
     }
 
     reached.push(part);
   }
 
-  return reached.length === 0 ? '.' : reached.join('/');
+  const path = reached.length === 0 ? '.' : reached.join('/');
+
+  return tree.folders.has(path) || tree.files.has(path) ? null : { kind: 'missing', path };
 }
 
-function joinTarget(link: TrackedLink): string {
-  if (posix.isAbsolute(link.target)) {
-    return link.target;
-  }
+// Once one part is missing, so is each part after it, up to a `..`, which can lead back to a path
+// that exists.
+function buildMissingPath(candidate: string, pending: readonly string[]): string {
+  const stepBack = pending.indexOf('..');
+  const rest = stepBack === -1 ? pending : pending.slice(0, stepBack);
 
-  return posix.normalize(posix.join(posix.dirname(link.path), link.target)).replace(/\/+$/u, '');
+  return [candidate, ...rest.filter((part) => part !== '' && part !== '.')].join('/');
 }
