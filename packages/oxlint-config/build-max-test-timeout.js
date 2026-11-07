@@ -1,6 +1,6 @@
 import { basename } from 'node:path';
 import buildLaneLimits from './build-lane-limits.js';
-import findConstInit from './find-const-init.js';
+import findConstInitializer from './find-const-initializer.js';
 import findVariable from './find-variable.js';
 import getImportedName from './get-imported-name.js';
 import resolveSuiteDirectory from './resolve-suite-directory.js';
@@ -172,7 +172,9 @@ function findNumber(context, node, seen) {
     return null;
   }
 
-  const init = findConstInit(context, node);
+  const initializer = findConstInitializer(context, node);
 
-  return init === null ? null : findNumber(context, init, new Set([...seen, node.name]));
+  return initializer === null
+    ? null
+    : findNumber(context, initializer, new Set([...seen, node.name]));
 }

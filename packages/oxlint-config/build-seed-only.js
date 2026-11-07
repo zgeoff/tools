@@ -2,7 +2,7 @@ import { basename, dirname } from 'node:path';
 import collectCreatedTables from './collect-created-tables.js';
 import collectSQLWrites from './collect-sql-writes.js';
 import collectWrittenTables from './collect-written-tables.js';
-import findConstInit from './find-const-init.js';
+import findConstInitializer from './find-const-initializer.js';
 import findFunctionName from './find-function-name.js';
 import isInTestUtils from './is-in-test-utils.js';
 import isVerbMatch from './is-verb-match.js';
@@ -156,9 +156,11 @@ function toSQLText(context, node, seen) {
     return null;
   }
 
-  const init = findConstInit(context, node);
+  const initializer = findConstInitializer(context, node);
 
-  return init === null ? null : toSQLText(context, init, new Set([...seen, node.name]));
+  return initializer === null
+    ? null
+    : toSQLText(context, initializer, new Set([...seen, node.name]));
 }
 
 const functionTypes = new Set([
@@ -231,15 +233,19 @@ function isSQLCall(context, callee) {
     !callee.computed &&
     callee.property.type === 'Identifier' &&
     sqlMethods.has(callee.property.name) &&
-    !isRegExp(context, callee.object)
+    !isRegularExpression(context, callee.object)
   );
 }
 
-function isRegExp(context, node) {
+function isRegularExpression(context, node) {
   if (node.type === 'Identifier') {
-    const init = findConstInit(context, node);
+    const initializer = findConstInitializer(context, node);
 
-    return init !== null && init.type !== 'Identifier' && isRegExp(context, init);
+    return (
+      initializer !== null &&
+      initializer.type !== 'Identifier' &&
+      isRegularExpression(context, initializer)
+    );
   }
 
   return (

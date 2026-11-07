@@ -1,6 +1,6 @@
 import findVariable from './find-variable.js';
 
-export default function findConstInit(context, identifier) {
+export default function findConstInitializer(context, identifier) {
   const definition = findVariable(context, identifier)?.defs[0];
 
   if (
