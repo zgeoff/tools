@@ -1,6 +1,6 @@
-import { expect, onTestFinished, test } from 'bun:test';
+import { expect, mock, onTestFinished, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';
-import { chmod, copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildPreToolUsePayload } from '../test-utils/build-pre-tool-use-payload.ts';
@@ -9,7 +9,15 @@ import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { readStreamUntil } from '../test-utils/read-stream-until.ts';
 import { readTextOrEmpty } from '../test-utils/read-text-or-empty.ts';
 import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
-import { parseHookArgs, pickClaimStep, pickRecoveryStep } from './start.ts';
+import {
+  NODE_LOCK_DEPENDENCIES,
+  claimInstallLock,
+  findInstallFailure,
+  parseHookArgs,
+  pickInstallStep,
+  pickRecoveryStep,
+  readLockState,
+} from './start.ts';
 
 // Root ignores file modes, so a folder or a lock with no permissions cannot stop root from using it.
 const isRoot = process.getuid?.() === 0;
@@ -49,6 +57,15 @@ async function setupTest() {
   const runStub = (payload: string, args: readonly string[]) =>
     runStubWithRuntime(process.execPath, payload, args);
 
+  // The retry runs with the stub's own runtime, so a PATH of the empty stand-in folder leaves only
+  // the install unable to start.
+  const runStubWithoutBun = (payload: string) =>
+    spawnSync(process.execPath, ['--no-install', stubPath], {
+      encoding: 'utf8',
+      env: { ...env, PATH: fakeBin },
+      input: payload,
+    });
+
   const startStub = (payload: string) => {
     const child = Bun.spawn([process.execPath, '--no-install', stubPath], {
       env,
@@ -78,6 +95,7 @@ async function setupTest() {
     installLog,
     stubPath,
     runStub,
+    runStubWithoutBun,
     runStubWithRuntime,
     startStub,
     readInstallLog,
@@ -260,6 +278,37 @@ test('it refuses an edit with the install message when the install fails', async
     status: 2,
     stdout: '',
     stderr: `stub install started\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+  });
+});
+
+test('it prints why bun install could not start, then refuses an edit', async () => {
+  const ctx = await setupTest();
+
+  const result = ctx.runStubWithoutBun(
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
+  );
+
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr: `The agent hook could not run bun install: Error: Executable not found in $PATH: "bun"\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+  });
+});
+
+test('it prints the signal that stopped bun install, then refuses an edit', async () => {
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, { log: ctx.installLog, outcome: { kind: 'killed' } });
+
+  const result = ctx.runStub(
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
+    [],
+  );
+
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr: `stub install started\nThe agent hook could not run bun install: bun install stopped on SIGKILL\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
   });
 });
 
@@ -931,10 +980,172 @@ test.each([
 test.each([
   ['the guard is absent', { lock: 'guard', state: 'absent' }, 'retry-guard'],
   ['another hook holds the guard', { lock: 'guard', state: 'held' }, 'wait-for-guard'],
-  ['a stopped hook left the guard', { lock: 'guard', state: 'stale' }, 'give-up'],
-  ['the install lock is absent', { lock: 'install', state: 'absent' }, 'take-lock'],
+  ['a stopped hook left the guard', { lock: 'guard', state: 'stale' }, 'stop'],
+  ['the install lock is absent', { lock: 'install', state: 'absent' }, 'install'],
   ['another hook holds the install lock', { lock: 'install', state: 'held' }, 'wait-for-install'],
-  ['a stopped hook left the install lock', { lock: 'install', state: 'stale' }, 'take-lock'],
-] as const)('it picks the claim step when %s', (_, claim, expected) => {
-  expect(pickClaimStep(claim)).toBe(expected);
+  ['a stopped hook left the install lock', { lock: 'install', state: 'stale' }, 'install'],
+] as const)('#pickInstallStep picks %s', (_, claim, expected) => {
+  expect(pickInstallStep(claim)).toBe(expected);
+});
+
+test.each([
+  {
+    label: 'the install could not start',
+    result: { error: new Error('spawnSync bun ENOENT'), status: null, signal: null },
+    expected: 'Error: spawnSync bun ENOENT',
+  },
+  {
+    label: 'a signal stopped the install',
+    result: { status: null, signal: 'SIGTERM' },
+    expected: 'bun install stopped on SIGTERM',
+  },
+  { label: 'the install failed', result: { status: 1, signal: null }, expected: null },
+  { label: 'the install passed', result: { status: 0, signal: null }, expected: null },
+] as const)('#findInstallFailure reports $expected when $label', (row) => {
+  expect(findInstallFailure(row.result)).toBe(row.expected);
+});
+
+test('#readLockState reads an absent lock without a process check', async () => {
+  const ctx = await setupTest();
+
+  const signalProcess = mock();
+
+  const state = readLockState(join(ctx.directory, 'install.lock'), {
+    ...NODE_LOCK_DEPENDENCIES,
+    signalProcess,
+  });
+
+  expect({ state, signals: signalProcess.mock.calls }).toStrictEqual({
+    state: 'absent',
+    signals: [],
+  });
+});
+
+test('#readLockState reads a lock whose process runs as held', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'install.lock'), '4242');
+
+  const signalProcess = mock();
+
+  const state = readLockState(join(ctx.directory, 'install.lock'), {
+    ...NODE_LOCK_DEPENDENCIES,
+    signalProcess,
+  });
+
+  expect({ state, signals: signalProcess.mock.calls }).toStrictEqual({
+    state: 'held',
+    signals: [[4242]],
+  });
+});
+
+test.each([
+  { code: 'ESRCH', expected: 'stale' },
+  { code: 'EPERM', expected: 'held' },
+])(
+  '#readLockState reads a lock as $expected when the process check fails with $code',
+  async (row) => {
+    const ctx = await setupTest();
+
+    await writeFile(join(ctx.directory, 'install.lock'), '4242');
+
+    const state = readLockState(join(ctx.directory, 'install.lock'), {
+      ...NODE_LOCK_DEPENDENCIES,
+      signalProcess: mock(() => {
+        throw Object.assign(new Error(`kill ${row.code}`), { code: row.code });
+      }),
+    });
+
+    expect(state).toBe(row.expected);
+  },
+);
+
+test.each([
+  { label: 'empty', contents: '' },
+  { label: 'not a process id', contents: 'install' },
+])('#readLockState reads a lock whose contents are $label as stale', async (row) => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'install.lock'), row.contents);
+
+  const state = readLockState(join(ctx.directory, 'install.lock'), {
+    ...NODE_LOCK_DEPENDENCIES,
+    signalProcess: mock(),
+  });
+
+  expect(state).toBe('stale');
+});
+
+test('#claimInstallLock stops without a wait when a stopped hook left the guard', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.project, { 'node_modules/.agent-hooks-install.lock.guard': '4242' });
+
+  const sleep = mock(() => Promise.resolve());
+
+  const step = await claimInstallLock(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), {
+    ...NODE_LOCK_DEPENDENCIES,
+    signalProcess: mock(() => {
+      throw Object.assign(new Error('kill ESRCH'), { code: 'ESRCH' });
+    }),
+    sleep,
+  });
+
+  const files = await readdir(join(ctx.project, 'node_modules'));
+
+  expect({ step, sleeps: sleep.mock.calls, files }).toStrictEqual({
+    step: 'stop',
+    sleeps: [],
+    files: ['.agent-hooks-install.lock.guard'],
+  });
+});
+
+test('#claimInstallLock waits for the install and drops the guard when another hook holds the lock', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.project, { 'node_modules/.agent-hooks-install.lock': '4242' });
+
+  const step = await claimInstallLock(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), {
+    ...NODE_LOCK_DEPENDENCIES,
+    signalProcess: mock(),
+    sleep: mock(() => Promise.resolve()),
+  });
+
+  const files = await readdir(join(ctx.project, 'node_modules'));
+
+  const lockText = await readTextOrEmpty(
+    join(ctx.project, 'node_modules/.agent-hooks-install.lock'),
+  );
+
+  expect({ step, files, lockText }).toStrictEqual({
+    step: 'wait-for-install',
+    files: ['.agent-hooks-install.lock'],
+    lockText: '4242',
+  });
+});
+
+test('#claimInstallLock takes a lock that a stopped hook left, and drops the guard', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.project, { 'node_modules/.agent-hooks-install.lock': '4242' });
+
+  const step = await claimInstallLock(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), {
+    ...NODE_LOCK_DEPENDENCIES,
+    signalProcess: mock(() => {
+      throw Object.assign(new Error('kill ESRCH'), { code: 'ESRCH' });
+    }),
+    sleep: mock(() => Promise.resolve()),
+  });
+
+  const files = await readdir(join(ctx.project, 'node_modules'));
+
+  const lockText = await readTextOrEmpty(
+    join(ctx.project, 'node_modules/.agent-hooks-install.lock'),
+  );
+
+  expect({ step, files, lockText }).toStrictEqual({
+    step: 'install',
+    files: ['.agent-hooks-install.lock'],
+    lockText: String(process.pid),
+  });
 });
