@@ -60,8 +60,6 @@ export function collectUnneededOverrides(input: UnneededOverridesInput): Depende
 
 interface PackageSpec {
   readonly name: string;
-
-  // The text after the name: a version in a bun.lock id, a range in an override key.
   readonly range: string | null;
 }
 
@@ -70,24 +68,29 @@ interface OverrideTarget {
   readonly parent: PackageSpec | null;
 }
 
+// Bun splits a key at the first `>` that follows no space, `|`, `@` or `:`, so the `>` of a range
+// such as `left-pad@>=1` stays in the range.
+const parentSeparatorPattern = /[^ |@:]>/u;
+
 // A child range, as in `terser@4`, narrows the dependents bun applies the key to. The check keeps
 // every dependent of the name, so a narrower key can only look more needed, never less.
 function parseOverrideKey(key: string): OverrideTarget | null {
-  const separatorIndex = key.indexOf('>');
+  const separator = parentSeparatorPattern.exec(key);
 
-  if (separatorIndex === -1) {
+  if (separator === null) {
     return { name: parsePackageSpec(key).name, parent: null };
   }
 
-  const child = key.slice(separatorIndex + 1);
+  const separatorIndex = separator.index + 1;
+  const child = key.slice(separatorIndex + 1).trim();
 
-  if (child.includes('>')) {
+  if (parentSeparatorPattern.test(child)) {
     return null;
   }
 
   return {
     name: parsePackageSpec(child).name,
-    parent: parsePackageSpec(key.slice(0, separatorIndex)),
+    parent: parsePackageSpec(key.slice(0, separatorIndex).trim()),
   };
 }
 

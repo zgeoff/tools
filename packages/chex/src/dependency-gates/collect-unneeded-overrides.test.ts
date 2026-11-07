@@ -164,6 +164,8 @@ test.each([
   ['a parent range', 'pad-tools@^2>left-pad'],
   ['a parent with no version', 'pad-tools>left-pad'],
   ['a scoped parent at a version', '@acme/pad-tools@2.0.0>left-pad'],
+  ['a parent range of comparators', 'pad-tools@>=2.0.0 <3>left-pad'],
+  ['a child range', 'pad-tools>left-pad@>=1.0.0'],
 ])(
   'it keeps a nested override for %s whose range for the child excludes the pin',
   (_label, key) => {
@@ -218,10 +220,13 @@ test('it reports a nested override whose parent range admits no version in bun.l
   ]);
 });
 
-test('it keeps a version-scoped override that a dependent range excludes', () => {
+test.each([
+  ['an upper bound', 'left-pad@<1.3.1'],
+  ['a lower bound', 'left-pad@>=1.0.0'],
+])('it keeps a version-scoped override with %s that a dependent range excludes', (_label, key) => {
   expect(
     collectUnneededOverrides({
-      overrides: { 'left-pad@<1.3.1': '1.3.1' },
+      overrides: { [key]: '1.3.1' },
       catalog: {},
       catalogs: {},
       dependents: [{ dependent: 'pad-tools@2.0.0', name: 'left-pad', range: '1.2.0' }],
