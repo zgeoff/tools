@@ -69,7 +69,7 @@ test('it passes the root, package, docs index and design READMEs', async () => {
   });
 });
 
-test.each(['build.gradle.kts', 'build.gradle', 'settings.gradle.kts'])(
+test.each(['build.gradle.kts', 'build.gradle', 'settings.gradle.kts', 'settings.gradle'])(
   'it passes a package README beside a %s',
   async (manifest) => {
     const ctx = await setupTest();
