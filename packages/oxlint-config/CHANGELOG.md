@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.9.0](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.8.6...@zgeoff/oxlint-config@0.9.0) (2026-11-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* run unit tests under their package's bunfig, prefix chex jobs ([#542](https://github.com/zgeoff/tools/issues/542))
+
+### Bug Fixes
+
+* run unit tests under their package's bunfig, prefix chex jobs ([#542](https://github.com/zgeoff/tools/issues/542)) ([f4c4152](https://github.com/zgeoff/tools/commit/f4c4152f8d28e6605a2dd54c11b25ceb0727a8b2))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/rig bumped to 0.2.0
+
 ## [0.8.6](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.8.5...@zgeoff/oxlint-config@0.8.6) (2026-11-07)
 
 
