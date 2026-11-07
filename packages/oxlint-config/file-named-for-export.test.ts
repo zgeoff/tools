@@ -27,95 +27,85 @@ test.each([
 });
 
 test.each([
-  ['a function', 'src/pour-kettle.ts', 'export function pourKettle(): void {}\n'],
+  ['a file named for a function', 'src/pour-kettle.ts', 'export function pourKettle(): void {}\n'],
   [
-    'a name that differs only in case',
+    'a file named for a name that differs only in case',
     'src/parse-cli-args.ts',
     'export function parseCLIArgs(): void {}\n',
   ],
-  ['a type', 'src/kettle-state.ts', "export type KettleState = 'cold' | 'hot';\n"],
+  ['a file named for a type', 'src/kettle-state.ts', "export type KettleState = 'cold' | 'hot';\n"],
   [
-    'an interface',
+    'a file named for an interface',
     'src/kettle-state.ts',
     'export interface KettleState {\n  readonly cups: number;\n}\n',
   ],
-  ['a SCREAMING_SNAKE_CASE const', 'src/max-kettles.ts', 'export const MAX_KETTLES = 4;\n'],
   [
-    'a named default export',
+    'a file named for a SCREAMING_SNAKE_CASE const',
+    'src/max-kettles.ts',
+    'export const MAX_KETTLES = 4;\n',
+  ],
+  [
+    'a file named for a named default export',
     'src/pour-kettle.ts',
     'export default function pourKettle(): void {}\n',
   ],
   [
-    'a default export of an identifier',
+    'a file named for a default export of an identifier',
     'src/pour-kettle.ts',
     'const pourKettle = { cups: 2 };\n\nexport default pourKettle;\n',
   ],
   [
-    'one export among several',
+    'a file named for one export among several',
     'src/pour-kettle.ts',
     'export const kettleCups = 2;\n\nexport function pourKettle(): void {}\n',
   ],
   [
-    'a destructured const',
+    'a file named for a destructured const',
     'src/pour-kettle.ts',
     'const kettle = { pourKettle: 1 };\n\nexport const { pourKettle } = kettle;\n',
   ],
   [
-    'a re-export under the file name',
+    'a file named for a re-export under the file name',
     'src/pour-kettle.ts',
     "export { boilKettle as pourKettle } from './boil-kettle.ts';\n",
   ],
   [
-    'a component in a .tsx file',
+    'a file named for a component in a .tsx file',
     'src/kettle-card.tsx',
     'export function KettleCard(): null {\n  return null;\n}\n',
   ],
   [
-    'a default export under satisfies',
+    'a file named for a default export under satisfies',
     'src/pour-kettle.ts',
     'const pourKettle = { cups: 2 };\n\nexport default pourKettle satisfies object;\n',
   ],
   [
-    'the root of a dotted namespace',
+    'a file named for the root of a dotted namespace',
     'src/pour-kettle.ts',
     'export namespace PourKettle.Spout {\n  export const cups = 2;\n}\n',
   ],
   [
-    'a default export under as',
+    'a file named for a default export under as',
     'src/pour-kettle.ts',
     'const pourKettle = { cups: 2 };\n\nexport default pourKettle as object;\n',
   ],
   [
-    'a default export under a non-null assertion',
+    'a file named for a default export under a non-null assertion',
     'src/pour-kettle.ts',
     'const pourKettle = { cups: 2 };\n\nexport default pourKettle!;\n',
   ],
   [
-    'an export assignment',
+    'a file named for an export assignment',
     'src/pour-kettle.ts',
     'const pourKettle = { cups: 2 };\n\nexport = pourKettle;\n',
   ],
-])('it accepts a file named for %s', async (_, path, source) => {
-  const result = await runLintTree({ [path]: source }, path, {
-    'zgeoff/file-named-for-export': 'error',
-  });
-
-  expect(result.exitCode).toBe(0);
-});
-
-test.each([
-  ['index.ts', 'src/index.ts'],
-  ['types.ts', 'src/types.ts'],
-  ['constants.ts', 'src/constants.ts'],
-])('it exempts %s', async (_, path) => {
-  const result = await runLintTree({ [path]: 'export const kettleCups = 2;\n' }, path, {
-    'zgeoff/file-named-for-export': 'error',
-  });
-
-  expect(result.exitCode).toBe(0);
-});
-
-test.each([
+  ['index.ts with an export of another name', 'src/index.ts', 'export const kettleCups = 2;\n'],
+  ['types.ts with an export of another name', 'src/types.ts', 'export const kettleCups = 2;\n'],
+  [
+    'constants.ts with an export of another name',
+    'src/constants.ts',
+    'export const kettleCups = 2;\n',
+  ],
   [
     'a file with no exports',
     'src/pour-kettle.ts',
@@ -142,7 +132,7 @@ test.each([
     'src/pour-kettle.ts',
     'console.log(2);\n\nexport {};\n',
   ],
-])('it skips %s', async (_, path, source) => {
+])('it passes %s', async (_, path, source) => {
   const result = await runLintTree({ [path]: source }, path, {
     'zgeoff/file-named-for-export': 'error',
   });
