@@ -396,6 +396,49 @@ test('it runs a pre-push-baseline build that keeps the related-tests runner in a
   }).toStrictEqual({ runner: true, helper: true });
 });
 
+test.each([
+  [
+    'removes',
+    'a repo on @zgeoff/rig',
+    { scripts: { 'test:related': 'rig related' }, devDependencies: { '@zgeoff/rig': '0.1.6' } },
+    false,
+  ],
+  [
+    'keeps',
+    'a repo without @zgeoff/rig',
+    { scripts: { test: 'bun test' }, devDependencies: { '@zgeoff/chex': '0.9.0' } },
+    true,
+  ],
+])(
+  'it runs a pre-push-baseline build that %s the related-tests runner, its command builder, the test of that builder and the worker-count helper in %s, where the builder and its test name the runner and the helper',
+  async (_verb, _case, packageJSON, kept) => {
+    const ctx = await setupTest();
+
+    await writeTreeFiles(ctx.directory, {
+      'package.json': JSON.stringify(packageJSON),
+      'scripts/run-related-tests.ts': 'export {};\n',
+      'scripts/build-related-test-command.ts':
+        '// Called by scripts/run-related-tests.ts with scripts/read-worker-count.ts.\nexport {};\n',
+      'scripts/build-related-test-command.test.ts':
+        "test('scripts/run-related-tests.ts reads scripts/read-worker-count.ts', () => {});\n",
+      'scripts/read-worker-count.ts': 'export {};\n',
+    });
+
+    await ctx.runBuild();
+
+    expect({
+      runner: await Bun.file(join(ctx.directory, 'scripts/run-related-tests.ts')).exists(),
+      command: await Bun.file(
+        join(ctx.directory, 'scripts/build-related-test-command.ts'),
+      ).exists(),
+      commandTest: await Bun.file(
+        join(ctx.directory, 'scripts/build-related-test-command.test.ts'),
+      ).exists(),
+      helper: await Bun.file(join(ctx.directory, 'scripts/read-worker-count.ts')).exists(),
+    }).toStrictEqual({ runner: kept, command: kept, commandTest: kept, helper: kept });
+  },
+);
+
 test('it runs a pre-push-baseline build that leaves no delivered script importing a file the build removed in a repo on @zgeoff/rig', async () => {
   const ctx = await setupTest();
   const manifestJSON: unknown = await Bun.file(join(import.meta.dir, 'manifest.json')).json();
