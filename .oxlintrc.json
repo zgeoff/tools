@@ -9,5 +9,11 @@
     ".worktrees/**",
     "**/*.json",
     ".zgeoff-skills/**"
-  ]
+  ],
+  "rules": {
+    "zgeoff/feature-folders": [
+      "error",
+      { "pending": ["packages/rig", "packages/chex", "packages/std"] }
+    ]
+  }
 }

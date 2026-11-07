@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 // oxlint-disable-next-line zgeoff/no-require -- only resolves rig's path from the repo root; an import loads it
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import featureFolders from './feature-folders.js';
 import functionVerb from './function-verb.js';
 import importZones from './import-zones.js';
 import maxConsecutiveLineComments from './max-consecutive-line-comments.js';
@@ -131,6 +132,7 @@ const plugin = {
     'no-require': noRequire,
     'test-shape': testShape,
     'import-zones': importZones,
+    'feature-folders': featureFolders,
   },
 };
 
