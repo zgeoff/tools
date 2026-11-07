@@ -176,6 +176,21 @@ test('it throws when the working tree changes the rig.config.ts that HEAD holds'
   );
 });
 
+test('it throws with the git error when git cannot compare rig.config.ts with HEAD', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'rig.config.ts'), 'export default { lanes: [] };\n');
+
+  await $`git add --all`.cwd(ctx.directory).env(ctx.env);
+  await $`git commit --quiet -m ${'chore: add the scenario'}`.cwd(ctx.directory).env(ctx.env);
+
+  await writeFile(join(ctx.directory, '.git/index'), 'not an index');
+
+  expect(ctx.runCheck()).rejects.toThrow(
+    /^git diff --quiet HEAD -- rig\.config\.ts failed: fatal: /u,
+  );
+});
+
 test('it throws when the default export of rig.config.ts has no lanes', async () => {
   const ctx = await setupTest();
 
