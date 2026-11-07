@@ -159,6 +159,41 @@ test('it passes a link from an opt-in entry to an entry every repo takes', () =>
   expect(links).toStrictEqual([]);
 });
 
+test('it passes a link from an opt-in entry to an opt-in entry that only an entry every repo takes needs', () => {
+  const links = collectUndeliveredLinks(
+    [
+      buildMockSyncEntry({
+        name: 'skill-kettle',
+        optIn: true,
+        files: [
+          { repo: 'zgeoff/skills', source: 'skills/kettle/SKILL.md', target: 'kettle/SKILL.md' },
+        ],
+      }),
+      buildMockSyncEntry({
+        name: 'skill-teapot',
+        needs: ['skill-descaling'],
+        files: [
+          { repo: 'zgeoff/skills', source: 'skills/teapot/SKILL.md', target: 'teapot/SKILL.md' },
+        ],
+      }),
+      buildMockSyncEntry({
+        name: 'skill-descaling',
+        optIn: true,
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/descaling/SKILL.md',
+            target: 'descaling/SKILL.md',
+          },
+        ],
+      }),
+    ],
+    new Map([['kettle/SKILL.md', 'Read [descaling](../descaling/SKILL.md) first.\n']]),
+  );
+
+  expect(links).toStrictEqual([]);
+});
+
 test('it passes a link to a path no entry delivers, and a URL', () => {
   const links = collectUndeliveredLinks(
     [
