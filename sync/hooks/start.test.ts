@@ -160,6 +160,46 @@ test('it allows an ungated edit after the install with no output', async () => {
   expect(result.stdout).toBe('');
 });
 
+test.each([{ argv: ['--'] }, { argv: ['--harness', 'codex', '--'] }])(
+  'it allows an ungated edit after the install when its arguments are $argv',
+  async (row) => {
+    const ctx = await setupTest();
+
+    await createStubInstall(ctx.fakeBin, {
+      log: ctx.installLog,
+      outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+    });
+
+    await writeTreeFiles(ctx.packageDir, {
+      'package.json': JSON.stringify({
+        name: '@zgeoff/agent-hooks',
+        type: 'module',
+        exports: './index.ts',
+      }),
+      'index.ts': `export * from ${JSON.stringify(ctx.agentHooksSource)};\n`,
+    });
+
+    await writeTreeFiles(ctx.project, {
+      '.claude/skill-gate.json': JSON.stringify({
+        gates: [{ match: '**/*.md', skills: ['docs-writing'] }],
+      }),
+      '.claude/skills/docs-writing/SKILL.md': '# Docs writing\n',
+      'transcript.jsonl': '',
+    });
+
+    const result = ctx.runStub(
+      buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'main.ts') }),
+      row.argv,
+    );
+
+    expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+      status: 0,
+      stdout: '',
+      stderr: 'stub install started\n',
+    });
+  },
+);
+
 test('it runs no install when the package loads', async () => {
   const ctx = await setupTest();
 

@@ -129,10 +129,11 @@ async function runRetryAfterInstall(argv: readonly string[]): Promise<never> {
   }
 
   // Bun can keep a failed package lookup for the life of the process, so the retry is a new
-  // process, which reads the hook payload from the same stdin.
+  // process, which reads the hook payload from the same stdin. A `--` in the arguments ends the
+  // options, so the retry flag goes before them.
   const retry = spawnSync(
     process.execPath,
-    ['--no-install', import.meta.filename, ...argv, `--${AFTER_INSTALL_OPTION}`],
+    ['--no-install', import.meta.filename, `--${AFTER_INSTALL_OPTION}`, ...argv],
     { stdio: 'inherit' },
   );
 
