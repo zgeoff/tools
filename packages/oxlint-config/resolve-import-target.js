@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { isBuiltin } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
+import readManifestFile from './read-package-manifest.js';
 
 export default function resolveImportTarget(filename, specifier, settings) {
   if (isPathSpecifier(specifier)) {
@@ -64,7 +65,7 @@ function readPackageManifest(directory, root) {
   let manifest = null;
 
   if (existsSync(path)) {
-    manifest = { directory, ...JSON.parse(readFileSync(path, 'utf8')) };
+    manifest = { directory, ...readManifestFile(directory) };
   } else if (directory !== root && parent !== directory) {
     manifest = readPackageManifest(parent, root);
   }

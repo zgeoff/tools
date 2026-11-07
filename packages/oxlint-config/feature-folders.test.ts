@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import { symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createLintTree } from './src/test-utils/create-lint-tree.ts';
+import { runLintIn } from './src/test-utils/run-lint-in.ts';
 import { runLintMessages } from './src/test-utils/run-lint-messages.ts';
 
 test('it gives the first loose module over the cap the example tree, and the others line one', async () => {
@@ -603,6 +604,42 @@ test('it reads a pending package with an invalid package.json without a crash', 
   ]);
 
   expect(messages).toStrictEqual([]);
+});
+
+test('it checks a utils/ import of a builtin in a package with an invalid package.json', async () => {
+  const directory = await createLintTree(
+    {
+      'packages/api/package.json': '{',
+      'packages/api/src/utils/round.ts': "import { join } from 'node:path';\n\nexport { join };\n",
+    },
+    { 'zgeoff/feature-folders': 'error' },
+  );
+
+  const run = await runLintIn(directory, directory, 'packages/api/src/utils/round.ts');
+
+  expect(run).toStrictEqual({
+    exitCode: 0,
+    stdout: expect.not.stringContaining('Error running JS plugin'),
+  });
+});
+
+test('it reads a pending package with an invalid package.json and a utils/ import of a builtin', async () => {
+  const directory = await createLintTree(
+    {
+      'packages/api/package.json': '{',
+      'packages/api/src/utils/round.ts': "import { join } from 'node:path';\n\nexport { join };\n",
+      'packages/web/package.json': '{ "name": "web" }',
+      'packages/web/src/index.ts': 'export {};\n',
+    },
+    { 'zgeoff/feature-folders': ['error', { pending: ['packages/api'] }] },
+  );
+
+  const run = await runLintIn(directory, directory, 'packages/web/src/index.ts');
+
+  expect(run).toStrictEqual({
+    exitCode: 1,
+    stdout: expect.stringContaining('now passes the rule'),
+  });
 });
 
 test('it takes the package from the folder above src/ when src/ holds a package.json', async () => {
