@@ -600,6 +600,48 @@ test('it needs no program for an e2e folder whose test files the config all igno
   expect(exitCode).toBe(0);
 });
 
+test('it needs no program for an e2e folder whose only unignored test belongs to a suffix lane', async () => {
+  const ctx = setupTest();
+
+  const config = defineRig({
+    ignore: ['packages/teapot/e2e/cli-pour.test.ts'],
+    programs: {
+      'kettle-cli': {
+        package: 'packages/kettle',
+        source: 'src/cli.ts',
+        build: 'true',
+        artifact: 'dist/cli.js',
+      },
+    },
+  });
+
+  const lane = config.lanes.find((candidate) => candidate.name === 'e2e');
+
+  invariant(lane, 'the config holds no e2e lane');
+
+  const exitCode = await runLane(
+    { config, lane, extraArgs: [] },
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(true),
+      readTrackedFiles: () =>
+        Promise.resolve([
+          ...ctx.kettleFiles,
+          'packages/teapot/package.json',
+          'packages/teapot/e2e/cli-pour.test.ts',
+          'packages/teapot/e2e/view.browser.test.ts',
+        ]),
+      importModule: ctx.importModule,
+      runCommand: ctx.runCommand,
+      wireBrowserLaneHooks: ctx.wireBrowserLaneHooks,
+    },
+  );
+
+  expect(exitCode).toBe(0);
+});
+
 test('it leaves the paths that the config ignores out of a suffix lane run', async () => {
   const ctx = setupTest();
   const config = defineRig({ ignore: ['docs/drafts/**'], lanes: { kiln: { limit: '15s' } } });

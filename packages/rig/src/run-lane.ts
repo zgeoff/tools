@@ -7,6 +7,7 @@ import { buildTestSelection } from './build-test-selection.ts';
 import { collectUnprogrammedE2EDirs } from './collect-unprogrammed-e2e-dirs.ts';
 import { formatNoMatchMessage } from './format-no-match-message.ts';
 import { formatNoTestsMessage } from './format-no-tests-message.ts';
+import { hasLaneSuffix } from './has-lane-suffix.ts';
 import { isTestFile } from './is-test-file.ts';
 import type { LaneHooks } from './lane-hooks.ts';
 import { makeIgnoreCheck } from './make-ignore-check.ts';
@@ -68,10 +69,10 @@ export async function runLane(request: LaneRequest, run: RigRun, deps: LaneDeps)
     return 0;
   }
 
-  const e2eDirs = collectUnignoredE2EDirs(
+  const e2eDirs = collectRunnableE2EDirs(
     pickE2EDirs(trackedFiles, isWorkspaceRepo),
     trackedFiles,
-    request.config.ignore,
+    request.config,
   );
 
   const testArgs = pickLaneTestArgs(request.config, lane, selection, e2eDirs);
@@ -104,19 +105,20 @@ export async function runLane(request: LaneRequest, run: RigRun, deps: LaneDeps)
   return pickExitCodeAfterTests(exitCode, run.signal.aborted);
 }
 
-// An e2e folder whose test files the config all ignores has no tests to run, so it needs no
-// program.
-function collectUnignoredE2EDirs(
+function collectRunnableE2EDirs(
   e2eDirs: readonly string[],
   trackedFiles: readonly string[],
-  ignore: readonly string[],
+  config: RigConfig,
 ): readonly string[] {
-  const isIgnored = makeIgnoreCheck(ignore);
+  const isIgnored = makeIgnoreCheck(config.ignore);
+
+  const isE2ETest = (file: string) =>
+    isTestFile(file) &&
+    !isIgnored(file) &&
+    !config.lanes.some((lane) => lane.suffix !== null && hasLaneSuffix(file, lane.suffix));
 
   return e2eDirs.filter((directory) =>
-    trackedFiles.some(
-      (file) => file.startsWith(`${directory}/`) && isTestFile(file) && !isIgnored(file),
-    ),
+    trackedFiles.some((file) => file.startsWith(`${directory}/`) && isE2ETest(file)),
   );
 }
 

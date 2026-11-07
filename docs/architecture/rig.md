@@ -91,7 +91,8 @@ argument replaces the `pathIgnorePatterns` list there, and rig passes one to eve
 
 - A path argument that selects only ignored files fails the run, as one that selects only another
   lane's files does.
-- An `e2e` folder whose test files are all ignored needs no program.
+- An `e2e` folder needs no program when each of its test files is ignored or belongs to a lane with
+  a suffix, because the e2e lane runs none of them.
 - `rig related` runs no test for a changed file, or a sibling test, that a glob matches.
 
 ## The browser lane

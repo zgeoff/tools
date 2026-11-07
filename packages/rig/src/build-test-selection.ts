@@ -1,5 +1,6 @@
 import { posix } from 'node:path';
 import { match } from 'ts-pattern';
+import { hasLaneSuffix } from './has-lane-suffix.ts';
 import { isTestFile } from './is-test-file.ts';
 import { makeIgnoreCheck } from './make-ignore-check.ts';
 import type { TestArgs } from './parse-test-args.ts';
@@ -75,10 +76,6 @@ function collectLaneTestFiles(request: TestSelectionRequest): readonly string[] 
   return lane.name === 'e2e'
     ? testFiles.filter((file) => isUnderE2EDir(file) && !isClaimedBySuffix(file))
     : testFiles.filter((file) => !isUnderE2EDir(file) && !isClaimedBySuffix(file));
-}
-
-function hasLaneSuffix(file: string, suffix: string): boolean {
-  return file.endsWith(`${suffix}.test.ts`) || file.endsWith(`${suffix}.test.tsx`);
 }
 
 type Selector =
