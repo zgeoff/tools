@@ -8,6 +8,8 @@ import { parseArgs } from 'node:util';
 
 type InstallResult = Pick<SpawnSyncReturns<Buffer>, 'error' | 'status' | 'signal'>;
 
+type RetryResult = Pick<SpawnSyncReturns<Buffer>, 'error' | 'status'>;
+
 export interface InstallDependencies {
   readonly createDirectory: (directoryPath: string) => void;
   readonly readFile: (filePath: string) => string;
@@ -18,6 +20,8 @@ export interface InstallDependencies {
   readonly sleep: (durationMs: number) => Promise<void>;
   readonly now: () => number;
   readonly runInstall: (timeoutMs: number) => InstallResult;
+  readonly runRetry: (args: readonly string[]) => RetryResult;
+  readonly readPayload: () => string;
 }
 
 async function runHook(argv: readonly string[], dependencies: InstallDependencies): Promise<never> {
@@ -46,7 +50,7 @@ async function runHook(argv: readonly string[], dependencies: InstallDependencie
 
   console.error(`The agent hook could not load @zgeoff/agent-hooks: ${String(step.error)}`);
 
-  return exitWithFallbackVerdict();
+  return exitWithFallbackVerdict(dependencies);
 }
 
 const AFTER_INSTALL_OPTION = 'after-install';
@@ -124,21 +128,33 @@ async function runRetryAfterInstall(
   }
 
   // Bun can keep a failed package lookup for the life of the process, so the retry is a new
-  // process, which reads the hook payload from the same stdin. A `--` in the arguments ends the
-  // options, so the retry flag goes before them.
-  const retry = spawnSync(
-    process.execPath,
-    ['--no-install', import.meta.filename, `--${AFTER_INSTALL_OPTION}`, ...argv],
-    { stdio: 'inherit' },
-  );
+  // process, which reads the hook payload from the same stdin.
+  const retry = dependencies.runRetry(buildRetryArgs(import.meta.filename, argv));
+  const outcome = pickRetryOutcome(retry);
 
-  if (retry.error !== undefined) {
+  if (outcome.kind === 'fallback') {
     console.error(`The agent hook could not start its retry: ${String(retry.error)}`);
 
-    return exitWithFallbackVerdict();
+    return exitWithFallbackVerdict(dependencies);
   }
 
-  return process.exit(retry.status ?? 2);
+  return process.exit(outcome.status);
+}
+
+// A `--` in the arguments ends the options, so the retry flag goes before them.
+export function buildRetryArgs(stubPath: string, argv: readonly string[]): readonly string[] {
+  return ['--no-install', stubPath, `--${AFTER_INSTALL_OPTION}`, ...argv];
+}
+
+type RetryOutcome =
+  | { readonly kind: 'exit'; readonly status: number }
+  | { readonly kind: 'fallback' };
+
+// A retry that never started has not read the payload, so the fallback can still read it.
+export function pickRetryOutcome(retry: RetryResult): RetryOutcome {
+  return retry.error === undefined
+    ? { kind: 'exit', status: retry.status ?? 2 }
+    : { kind: 'fallback' };
 }
 
 const GUARD_SUFFIX = '.guard';
@@ -414,7 +430,11 @@ export function findInstallFailure(result: InstallResult): string | null {
     return String(result.error);
   }
 
-  return result.status === null ? `bun install stopped on ${String(result.signal)}` : null;
+  if (result.status === null) {
+    return `bun install stopped on ${String(result.signal)}`;
+  }
+
+  return result.status === 0 ? null : `bun install exited with status ${String(result.status)}`;
 }
 
 const REFUSAL =
@@ -422,22 +442,14 @@ const REFUSAL =
 
 // The package reads stdin before it can throw, so a failure after that read finds no payload here
 // and refuses.
-function exitWithFallbackVerdict(): never {
-  if (pickFallbackVerdict(readPayloadText()) === 'allow') {
+function exitWithFallbackVerdict(dependencies: InstallDependencies): never {
+  if (pickFallbackVerdict(dependencies.readPayload()) === 'allow') {
     return process.exit(0);
   }
 
   console.error(REFUSAL);
 
   return process.exit(2);
-}
-
-function readPayloadText(): string {
-  try {
-    return readFileSync(0, 'utf8');
-  } catch {
-    return '';
-  }
 }
 
 // An agent can still run bun install by hand, and read the tree, while the package cannot load.
@@ -516,6 +528,14 @@ export const NODE_INSTALL_DEPENDENCIES: InstallDependencies = {
   },
   sleep: Bun.sleep,
   now: Date.now,
+  runRetry: (args) => spawnSync(process.execPath, args, { stdio: 'inherit' }),
+  readPayload: () => {
+    try {
+      return readFileSync(0, 'utf8');
+    } catch {
+      return '';
+    }
+  },
   runInstall: (timeoutMs) =>
     spawnSync('bun', ['install', '--frozen-lockfile'], {
       cwd: ROOT,
@@ -529,6 +549,6 @@ if (import.meta.main) {
   await runHook(process.argv.slice(2), NODE_INSTALL_DEPENDENCIES).catch((error: unknown) => {
     console.error(`The agent hook failed: ${String(error)}`);
 
-    return exitWithFallbackVerdict();
+    return exitWithFallbackVerdict(NODE_INSTALL_DEPENDENCIES);
   });
 }
