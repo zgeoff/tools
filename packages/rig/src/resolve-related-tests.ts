@@ -1,4 +1,5 @@
 import { basename, join } from 'node:path';
+import { makeIgnoreCheck } from './make-ignore-check.ts';
 import type { RigConfig } from './types.ts';
 
 export interface RelatedTestSources {
@@ -7,21 +8,20 @@ export interface RelatedTestSources {
   readonly probeFile: (path: string) => boolean;
 }
 
-// The unit run covers a changed file through the test beside it, so each changed path maps to its
-// sibling test, and the files of a lane drop out.
 export function resolveRelatedTests(
   paths: readonly string[],
   config: RigConfig,
   sources: Readonly<RelatedTestSources>,
 ): string[] {
   const suffixes = config.lanes.flatMap((lane) => (lane.suffix === null ? [] : [lane.suffix]));
+  const isIgnored = makeIgnoreCheck(config.ignore);
 
   const selected = new Set<string>();
 
   for (const path of paths) {
-    const test = findRelatedTest(path, suffixes);
+    const test = isIgnored(path) ? undefined : findRelatedTest(path, suffixes);
 
-    if (test !== undefined && sources.probeFile(join(sources.cwd, test))) {
+    if (test !== undefined && !isIgnored(test) && sources.probeFile(join(sources.cwd, test))) {
       selected.add(test);
     }
   }

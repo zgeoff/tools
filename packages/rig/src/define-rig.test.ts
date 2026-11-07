@@ -208,3 +208,23 @@ test('it refuses a bench lane that names no lane', () => {
     'rig.config.ts: bench.lane "kiln" names no lane',
   );
 });
+
+test('it resolves the declared ignore patterns in their order', () => {
+  const config = defineRig({ ignore: ['docs/drafts/**', 'notes/**'] });
+
+  expect(config.ignore).toStrictEqual(['docs/drafts/**', 'notes/**']);
+});
+
+test('it resolves no ignore patterns when none is declared', () => {
+  expect(defineRig({}).ignore).toStrictEqual([]);
+});
+
+test.each([[''], ['/srv/drafts/**'], ['../drafts/**'], ['docs/../../drafts/**']])(
+  'it refuses the ignore pattern %j',
+  (pattern) => {
+    expect(() => defineRig({ ignore: [pattern] })).toThrowWithMessage(
+      Error,
+      `rig.config.ts: the ignore pattern ${JSON.stringify(pattern)} must be a non-empty glob relative to the repo root, with no ".." segment`,
+    );
+  },
+);

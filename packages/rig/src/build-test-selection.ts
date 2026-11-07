@@ -1,5 +1,8 @@
 import { posix } from 'node:path';
 import { match } from 'ts-pattern';
+import { hasLaneSuffix } from './has-lane-suffix.ts';
+import { isTestFile } from './is-test-file.ts';
+import { makeIgnoreCheck } from './make-ignore-check.ts';
 import type { TestArgs } from './parse-test-args.ts';
 import { pickE2EDirs } from './pick-e2e-dirs.ts';
 import type { ResolvedLane, RigConfig } from './types.ts';
@@ -47,15 +50,12 @@ export function buildTestSelection(request: TestSelectionRequest): TestSelection
     : { kind: 'files', files: files.map((file) => `./${file}`), flags: split.flags };
 }
 
-const testFilePattern = /[._](?:test|spec)\.[jt]sx?$/u;
-
-// The unit lane takes every test file that no other lane claims, the e2e lane the ones under its
-// folders, and any other lane the ones with its suffix.
 function collectLaneTestFiles(request: TestSelectionRequest): readonly string[] {
   const config = request.config;
   const lane = request.lane;
   const trackedFiles = request.trackedFiles;
   const e2eDirs = pickE2EDirs(trackedFiles, request.isWorkspaceRepo);
+  const isIgnored = makeIgnoreCheck(config.ignore);
 
   const isUnderE2EDir = (file: string) =>
     e2eDirs.some((directory) => file.startsWith(`${directory}/`));
@@ -63,7 +63,7 @@ function collectLaneTestFiles(request: TestSelectionRequest): readonly string[] 
   const isClaimedBySuffix = (file: string) =>
     config.lanes.some((other) => other.suffix !== null && hasLaneSuffix(file, other.suffix));
 
-  const testFiles = trackedFiles.filter((file) => testFilePattern.test(file));
+  const testFiles = trackedFiles.filter((file) => isTestFile(file) && !isIgnored(file));
   const suffix = lane.suffix;
 
   if (suffix !== null) {
@@ -73,10 +73,6 @@ function collectLaneTestFiles(request: TestSelectionRequest): readonly string[] 
   return lane.name === 'e2e'
     ? testFiles.filter((file) => isUnderE2EDir(file) && !isClaimedBySuffix(file))
     : testFiles.filter((file) => !isUnderE2EDir(file) && !isClaimedBySuffix(file));
-}
-
-function hasLaneSuffix(file: string, suffix: string): boolean {
-  return file.endsWith(`${suffix}.test.ts`) || file.endsWith(`${suffix}.test.tsx`);
 }
 
 type Selector =

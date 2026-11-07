@@ -7,7 +7,10 @@ import { buildTestSelection } from './build-test-selection.ts';
 import { collectUnprogrammedE2EDirs } from './collect-unprogrammed-e2e-dirs.ts';
 import { formatNoMatchMessage } from './format-no-match-message.ts';
 import { formatNoTestsMessage } from './format-no-tests-message.ts';
+import { hasLaneSuffix } from './has-lane-suffix.ts';
+import { isTestFile } from './is-test-file.ts';
 import type { LaneHooks } from './lane-hooks.ts';
+import { makeIgnoreCheck } from './make-ignore-check.ts';
 import { makeRepoLaneHooks } from './make-repo-lane-hooks.ts';
 import { parseTestArgs } from './parse-test-args.ts';
 import { pickE2EDirs } from './pick-e2e-dirs.ts';
@@ -66,7 +69,12 @@ export async function runLane(request: LaneRequest, run: RigRun, deps: LaneDeps)
     return 0;
   }
 
-  const e2eDirs = pickE2EDirs(trackedFiles, isWorkspaceRepo);
+  const e2eDirs = collectRunnableE2EDirs(
+    pickE2EDirs(trackedFiles, isWorkspaceRepo),
+    trackedFiles,
+    request.config,
+  );
+
   const testArgs = pickLaneTestArgs(request.config, lane, selection, e2eDirs);
   const programs = lane.name === 'e2e' ? request.config.programs : {};
 
@@ -97,6 +105,23 @@ export async function runLane(request: LaneRequest, run: RigRun, deps: LaneDeps)
   return pickExitCodeAfterTests(exitCode, run.signal.aborted);
 }
 
+function collectRunnableE2EDirs(
+  e2eDirs: readonly string[],
+  trackedFiles: readonly string[],
+  config: RigConfig,
+): readonly string[] {
+  const isIgnored = makeIgnoreCheck(config.ignore);
+
+  const isE2ETest = (file: string) =>
+    isTestFile(file) &&
+    !isIgnored(file) &&
+    !config.lanes.some((lane) => lane.suffix !== null && hasLaneSuffix(file, lane.suffix));
+
+  return e2eDirs.filter((directory) =>
+    trackedFiles.some((file) => file.startsWith(`${directory}/`) && isE2ETest(file)),
+  );
+}
+
 function pickLaneTestArgs(
   config: RigConfig,
   lane: ResolvedLane,
@@ -110,25 +135,27 @@ function pickLaneTestArgs(
     .with({ kind: 'lane' }, (laneRun) => [
       timeoutArg,
       ...pickLaneSelection(lane, e2eDirs),
-      ...pickOtherLaneIgnoreArgs(config, lane),
+      ...pickLaneIgnoreArgs(config, lane),
       ...laneRun.flags,
     ])
     .exhaustive();
 }
 
 // A folder selection takes every test file under it, so the e2e lane leaves out the files that
-// belong to a lane with a suffix.
-function pickOtherLaneIgnoreArgs(config: RigConfig, lane: ResolvedLane): readonly string[] {
-  if (lane.suffix !== null) {
-    return [];
-  }
+// belong to a lane with a suffix. A --path-ignore-patterns argument replaces bunfig.toml's
+// pathIgnorePatterns, so every lane passes the config's ignore list itself.
+function pickLaneIgnoreArgs(config: RigConfig, lane: ResolvedLane): readonly string[] {
+  const otherLanePatterns =
+    lane.suffix === null
+      ? config.lanes.flatMap((other) =>
+          other.suffix === null
+            ? []
+            : [`**/*${other.suffix}.test.ts`, `**/*${other.suffix}.test.tsx`],
+        )
+      : [];
 
-  return config.lanes.flatMap((other) =>
-    other.suffix === null
-      ? []
-      : [`**/*${other.suffix}.test.ts`, `**/*${other.suffix}.test.tsx`].map(
-          (pattern) => `--path-ignore-patterns=${pattern}`,
-        ),
+  return [...otherLanePatterns, ...config.ignore].map(
+    (pattern) => `--path-ignore-patterns=${pattern}`,
   );
 }
 

@@ -502,3 +502,195 @@ test('it exits 2 and runs nothing when an e2e folder sits in a package that no p
     'rig: packages/teapot/e2e has no program to run: declare the program in rig.config.ts programs, with the package it belongs to\n',
   );
 });
+
+test('it leaves the paths that the config ignores out of the e2e run, and needs no program for an ignored e2e folder', async () => {
+  const ctx = setupTest();
+
+  const config = defineRig({
+    ignore: ['packages/teapot/**'],
+    programs: {
+      'kettle-cli': {
+        package: 'packages/kettle',
+        source: 'src/cli.ts',
+        build: 'true',
+        artifact: 'dist/cli.js',
+      },
+    },
+  });
+
+  const lane = config.lanes.find((candidate) => candidate.name === 'e2e');
+
+  invariant(lane, 'the config holds no e2e lane');
+
+  const exitCode = await runLane(
+    { config, lane, extraArgs: [] },
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(true),
+      readTrackedFiles: () =>
+        Promise.resolve([
+          ...ctx.kettleFiles,
+          'packages/teapot/package.json',
+          'packages/teapot/e2e/cli-pour.test.ts',
+        ]),
+      importModule: ctx.importModule,
+      runCommand: ctx.runCommand,
+      wireBrowserLaneHooks: ctx.wireBrowserLaneHooks,
+    },
+  );
+
+  const testCommand = ctx.runCommand.mock.calls.at(-1)?.[0];
+
+  invariant(testCommand, 'the lane ran no command');
+
+  expect({
+    exitCode,
+    hasKettleFolder: testCommand.includes('./packages/kettle/e2e/'),
+    hasTeapotFolder: testCommand.includes('./packages/teapot/e2e/'),
+    hasIgnoreArg: testCommand.includes('--path-ignore-patterns=packages/teapot/**'),
+  }).toStrictEqual({
+    exitCode: 0,
+    hasKettleFolder: true,
+    hasTeapotFolder: false,
+    hasIgnoreArg: true,
+  });
+});
+
+test('it needs no program for an e2e folder whose test files the config all ignores, beside its other files', async () => {
+  const ctx = setupTest();
+
+  const config = defineRig({
+    ignore: ['packages/teapot/e2e/**/*.test.ts'],
+    programs: {
+      'kettle-cli': {
+        package: 'packages/kettle',
+        source: 'src/cli.ts',
+        build: 'true',
+        artifact: 'dist/cli.js',
+      },
+    },
+  });
+
+  const lane = config.lanes.find((candidate) => candidate.name === 'e2e');
+
+  invariant(lane, 'the config holds no e2e lane');
+
+  const exitCode = await runLane(
+    { config, lane, extraArgs: [] },
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(true),
+      readTrackedFiles: () =>
+        Promise.resolve([
+          ...ctx.kettleFiles,
+          'packages/teapot/package.json',
+          'packages/teapot/e2e/README.md',
+          'packages/teapot/e2e/cli-pour.test.ts',
+        ]),
+      importModule: ctx.importModule,
+      runCommand: ctx.runCommand,
+      wireBrowserLaneHooks: ctx.wireBrowserLaneHooks,
+    },
+  );
+
+  expect(exitCode).toBe(0);
+});
+
+test('it needs no program for an e2e folder whose only unignored test belongs to a suffix lane', async () => {
+  const ctx = setupTest();
+
+  const config = defineRig({
+    ignore: ['packages/teapot/e2e/cli-pour.test.ts'],
+    programs: {
+      'kettle-cli': {
+        package: 'packages/kettle',
+        source: 'src/cli.ts',
+        build: 'true',
+        artifact: 'dist/cli.js',
+      },
+    },
+  });
+
+  const lane = config.lanes.find((candidate) => candidate.name === 'e2e');
+
+  invariant(lane, 'the config holds no e2e lane');
+
+  const exitCode = await runLane(
+    { config, lane, extraArgs: [] },
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(true),
+      readTrackedFiles: () =>
+        Promise.resolve([
+          ...ctx.kettleFiles,
+          'packages/teapot/package.json',
+          'packages/teapot/e2e/cli-pour.test.ts',
+          'packages/teapot/e2e/view.browser.test.ts',
+        ]),
+      importModule: ctx.importModule,
+      runCommand: ctx.runCommand,
+      wireBrowserLaneHooks: ctx.wireBrowserLaneHooks,
+    },
+  );
+
+  expect(exitCode).toBe(0);
+});
+
+test('it leaves the paths that the config ignores out of a suffix lane run', async () => {
+  const ctx = setupTest();
+  const config = defineRig({ ignore: ['docs/drafts/**'], lanes: { kiln: { limit: '15s' } } });
+  const lane = config.lanes.find((candidate) => candidate.name === 'kiln');
+
+  invariant(lane, 'the config holds no kiln lane');
+
+  await runLane(
+    { config, lane, extraArgs: [] },
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(false),
+      readTrackedFiles: () =>
+        Promise.resolve(['pkg/src/fire.kiln.test.ts', 'docs/drafts/glaze.kiln.test.ts']),
+      importModule: ctx.importModule,
+      runCommand: ctx.runCommand,
+      wireBrowserLaneHooks: ctx.wireBrowserLaneHooks,
+    },
+  );
+
+  expect(ctx.runCommand.mock.calls.at(-1)?.[0]).toIncludeAllMembers([
+    '.kiln.test.ts',
+    '--path-ignore-patterns=docs/drafts/**',
+  ]);
+});
+
+test('it finds a suffix lane empty when the config ignores every one of its test files', async () => {
+  const ctx = setupTest();
+  const config = defineRig({ ignore: ['docs/drafts/**'], lanes: { kiln: { limit: '15s' } } });
+  const lane = config.lanes.find((candidate) => candidate.name === 'kiln');
+
+  invariant(lane, 'the config holds no kiln lane');
+
+  const exitCode = await runLane(
+    { config, lane, extraArgs: [] },
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(false),
+      readTrackedFiles: () => Promise.resolve(['docs/drafts/glaze.kiln.test.ts']),
+      importModule: ctx.importModule,
+      runCommand: ctx.runCommand,
+      wireBrowserLaneHooks: ctx.wireBrowserLaneHooks,
+    },
+  );
+
+  expect(exitCode).toBe(0);
+  expect(ctx.runCommand).not.toHaveBeenCalled();
+});

@@ -41,9 +41,15 @@ export function parseRigConfig(value: unknown): ParsedRigConfig {
     return { kind: 'refused', reason: `its benchLane is ${JSON.stringify(benchLane)}` };
   }
 
+  const ignore = parseIgnore(Reflect.get(value, 'ignore'));
+
+  if (ignore === null) {
+    return { kind: 'refused', reason: 'its ignore is no list of patterns' };
+  }
+
   return {
     kind: 'parsed',
-    config: { lanes: resolved, programs, benchLane: benchLane ?? null },
+    config: { ignore, lanes: resolved, programs, benchLane: benchLane ?? null },
   };
 }
 
@@ -155,4 +161,26 @@ function parseProgram(value: unknown): ProgramDeclaration | null {
   }
 
   return { package: packageFolder, source, build, artifact };
+}
+
+function parseIgnore(value: unknown): string[] | null {
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const patterns: string[] = [];
+
+  for (const pattern of value) {
+    if (typeof pattern !== 'string') {
+      return null;
+    }
+
+    patterns.push(pattern);
+  }
+
+  return patterns;
 }

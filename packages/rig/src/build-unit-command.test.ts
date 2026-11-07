@@ -41,6 +41,16 @@ test('it leaves out the files of a lane that the config declares', () => {
   ]);
 });
 
+test('it leaves out the paths that the config ignores', () => {
+  const config = defineRig({ ignore: ['docs/drafts/**', 'notes/**'] });
+  const command = buildUnitCommand(config, [], 1, []);
+
+  expect(command).toIncludeAllMembers([
+    '--path-ignore-patterns=docs/drafts/**',
+    '--path-ignore-patterns=notes/**',
+  ]);
+});
+
 test('it ends with the arguments the caller passes', () => {
   const command = buildUnitCommand(defineRig({}), [], 2, ['--timeout=15000', './src/a.test.ts']);
 

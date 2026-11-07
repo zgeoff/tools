@@ -48,7 +48,12 @@ export function defineRig(declaration: RigDeclaration): RigConfig {
     ]),
   );
 
-  return { lanes, programs, benchLane: readBenchLane(declaration.bench?.lane, lanes) };
+  return {
+    ignore: (declaration.ignore ?? []).map((pattern) => readIgnorePattern(pattern)),
+    lanes,
+    programs,
+    benchLane: readBenchLane(declaration.bench?.lane, lanes),
+  };
 }
 
 function resolveStandardLane(
@@ -243,6 +248,23 @@ function readProgram(name: string, program: ProgramDeclaration): ProgramDeclarat
     build: program.build,
     artifact: program.artifact,
   };
+}
+
+// bun test matches an ignore pattern against paths relative to the repo root, so an absolute
+// pattern or one that climbs out of the repo would never match.
+function readIgnorePattern(pattern: unknown): string {
+  if (
+    typeof pattern !== 'string' ||
+    pattern === '' ||
+    pattern.startsWith('/') ||
+    pattern.split('/').includes('..')
+  ) {
+    throw new Error(
+      `rig.config.ts: the ignore pattern ${JSON.stringify(pattern)} must be a non-empty glob relative to the repo root, with no ".." segment`,
+    );
+  }
+
+  return pattern;
 }
 
 function readBenchLane(lane: string | undefined, lanes: readonly ResolvedLane[]): string | null {

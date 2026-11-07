@@ -36,6 +36,8 @@ export interface BenchDeclaration {
 }
 
 export interface RigDeclaration {
+  readonly ignore?: readonly string[];
+
   readonly lanes?: Readonly<Record<string, LaneDeclaration>>;
 
   readonly programs?: Readonly<Record<string, ProgramDeclaration>>;
@@ -64,6 +66,8 @@ export interface ResolvedLane {
 }
 
 export interface RigConfig {
+  readonly ignore: readonly string[];
+
   readonly lanes: readonly ResolvedLane[];
 
   readonly programs: Readonly<Record<string, ProgramDeclaration>>;
