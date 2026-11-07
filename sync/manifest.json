@@ -444,6 +444,10 @@
         "target": "scripts/parse-lane-limits.ts"
       },
       {
+        "source": "packages/chex/src/parse-rig-lane-limits.ts",
+        "target": "scripts/parse-rig-lane-limits.ts"
+      },
+      {
         "source": "sync/pre-push/read-memory-budget.ts",
         "target": "scripts/read-memory-budget.ts"
       },
