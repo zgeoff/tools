@@ -93,8 +93,8 @@ the full suite, in two cases:
 The job passes `bun test` the [worker count](./memory-caps.md#the-worker-count) as `--parallel`,
 with `--no-isolate`, so the files of a worker share one global, as they do in the repo's own test
 run. With one worker it also raises the per-test timeout, because a host with one worker runs each
-file slower than CI does. The runner holds that timeout as one constant, the only place a run may
-raise the timeout.
+file slower than CI does. `scripts/build-related-test-command.ts`, which builds the runner's
+command, holds that timeout as one constant, the only place a run may raise the timeout.
 
 ## The delivered baseline
 
@@ -122,11 +122,11 @@ the table above, with these differences:
 
 The entry delivers the check scripts from [`packages/chex/src/`](../../packages/chex/src/), under
 the same names in `scripts/`, so a delivered check runs the code that `chex <check>` runs. The
-related-tests runner, `scripts/read-worker-count.ts` and `scripts/read-memory-budget.ts` come from
-[`sync/pre-push/`](../../sync/pre-push/). The check scripts exit 0 when clean or skipped, 1 with a
-problem, and 2 when they cannot run, such as in a clone without origin's default branch. One
-exception: the workflow lint exits 0 with a problem, because it only warns. A repo opts in with
-three changes, which
+related-tests runner, `scripts/build-related-test-command.ts`, `scripts/read-worker-count.ts` and
+`scripts/read-memory-budget.ts` come from [`sync/pre-push/`](../../sync/pre-push/). The check
+scripts exit 0 when clean or skipped, 1 with a problem, and 2 when they cannot run, such as in a
+clone without origin's default branch. One exception: the workflow lint exits 0 with a problem,
+because it only warns. A repo opts in with three changes, which
 [Opting in to the pre-push baseline](../runbooks/downstream-repo-setup.md#opting-in-to-the-pre-push-baseline)
 lists.
 

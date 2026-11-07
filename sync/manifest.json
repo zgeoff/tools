@@ -404,6 +404,10 @@
         "target": "scripts/run-related-tests.ts"
       },
       {
+        "source": "sync/pre-push/build-related-test-command.ts",
+        "target": "scripts/build-related-test-command.ts"
+      },
+      {
         "source": "packages/chex/src/read-branch-base.ts",
         "target": "scripts/read-branch-base.ts"
       },
