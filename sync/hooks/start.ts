@@ -20,9 +20,6 @@ export interface InstallDependencies {
   readonly runInstall: (timeoutMs: number) => InstallResult;
 }
 
-const REFUSAL =
-  'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.';
-
 async function runHook(argv: readonly string[], dependencies: InstallDependencies): Promise<never> {
   const args = parseHookArgs(argv);
 
@@ -137,6 +134,8 @@ async function runRetryAfterInstall(
 
   if (retry.error !== undefined) {
     console.error(`The agent hook could not start its retry: ${String(retry.error)}`);
+
+    return exitWithFallbackVerdict();
   }
 
   return process.exit(retry.status ?? 2);
@@ -169,6 +168,10 @@ export async function runInstallOnce(
     console.error('Another agent hook runs bun install here, so this one waits for it.');
 
     return runAfterInstallWait(lockPath, deadlineMs, dependencies);
+  }
+
+  if (step !== 'install') {
+    return failUnhandledStep(step);
   }
 
   // A harness that kills this hook leaves the install running under a lock that reads stale, so
@@ -208,6 +211,10 @@ export async function claimInstallLock(
       console.error('Another agent hook claims the install lock here, so this one waits its turn.');
     }
 
+    if (step !== 'retry-guard' && step !== 'wait-for-guard') {
+      return failUnhandledStep(step);
+    }
+
     await dependencies.sleep(10);
   }
 
@@ -220,6 +227,10 @@ export async function claimInstallLock(
 
     if (step === 'wait-for-install' || step === 'out-of-time') {
       return step;
+    }
+
+    if (step !== 'install') {
+      return failUnhandledStep(step);
     }
 
     dependencies.remove(lockPath);
@@ -258,28 +269,13 @@ function createLock(lockPath: string, dependencies: InstallDependencies): boolea
 
 type LockState = 'absent' | 'held' | 'stale';
 
-// A hook that the harness killed leaves its lock behind, so a lock counts as held only while the
-// process it names runs.
+type LockPID = number | 'absent' | 'malformed';
+
 export function readLockState(lockPath: string, dependencies: InstallDependencies): LockState {
-  const text = readLockText(lockPath, dependencies);
+  const pid = parseLockPID(readLockText(lockPath, dependencies));
+  const signalError = typeof pid === 'number' ? readSignalError(pid, dependencies) : null;
 
-  if (text === null) {
-    return 'absent';
-  }
-
-  const pid = Number(text);
-
-  if (!Number.isSafeInteger(pid) || pid <= 0) {
-    return 'stale';
-  }
-
-  try {
-    dependencies.signalProcess(pid);
-
-    return 'held';
-  } catch (error) {
-    return error instanceof Error && 'code' in error && error.code === 'EPERM' ? 'held' : 'stale';
-  }
+  return pickLockState(pid, signalError);
 }
 
 function readLockText(lockPath: string, dependencies: InstallDependencies): string | null {
@@ -292,6 +288,40 @@ function readLockText(lockPath: string, dependencies: InstallDependencies): stri
 
     throw error;
   }
+}
+
+export function parseLockPID(text: string | null): LockPID {
+  if (text === null) {
+    return 'absent';
+  }
+
+  const pid = Number(text);
+
+  return Number.isSafeInteger(pid) && pid > 0 ? pid : 'malformed';
+}
+
+function readSignalError(pid: number, dependencies: InstallDependencies): string | null {
+  try {
+    dependencies.signalProcess(pid);
+
+    return null;
+  } catch (error) {
+    return error instanceof Error && 'code' in error ? String(error.code) : String(error);
+  }
+}
+
+// A hook that the harness killed leaves its lock behind, so a lock counts as held only while the
+// process it names runs. EPERM comes from a process that runs as another user.
+export function pickLockState(pid: LockPID, signalError: string | null): LockState {
+  if (pid === 'absent') {
+    return 'absent';
+  }
+
+  if (pid === 'malformed') {
+    return 'stale';
+  }
+
+  return signalError === null || signalError === 'EPERM' ? 'held' : 'stale';
 }
 
 type InstallStep =
@@ -319,13 +349,24 @@ const LATE_INSTALL_STEPS = {
   waited: { absent: 'skip-install', held: 'out-of-time', stale: 'claim-again' },
 } as const satisfies InstallSteps;
 
-interface Claim {
-  readonly lock: keyof typeof INSTALL_STEPS;
+type InstallLock = keyof typeof INSTALL_STEPS;
+
+interface Claim<Lock extends InstallLock> {
+  readonly lock: Lock;
   readonly state: LockState;
   readonly timedOut: boolean;
 }
 
-export function pickInstallStep(claim: Claim): InstallStep {
+type StepOf<Lock extends InstallLock> =
+  | (typeof INSTALL_STEPS)[Lock][LockState]
+  | (typeof LATE_INSTALL_STEPS)[Lock][LockState];
+
+export function pickInstallStep(claim: Claim<'guard'>): StepOf<'guard'>;
+export function pickInstallStep(claim: Claim<'install'>): StepOf<'install'>;
+export function pickInstallStep(claim: Claim<'waited'>): StepOf<'waited'>;
+export function pickInstallStep(claim: Claim<InstallLock>): InstallStep;
+
+export function pickInstallStep(claim: Claim<InstallLock>): InstallStep {
   return (claim.timedOut ? LATE_INSTALL_STEPS : INSTALL_STEPS)[claim.lock][claim.state];
 }
 
@@ -353,8 +394,18 @@ async function runAfterInstallWait(
       return `another agent hook held ${lockPath} past the deadline`;
     }
 
+    if (step !== 'wait-for-install') {
+      return failUnhandledStep(step);
+    }
+
     await dependencies.sleep(100);
   }
+}
+
+// Each step function returns a union, so a branch that misses a new member fails the type check
+// here instead of falling through to the install.
+function failUnhandledStep(step: never): never {
+  throw new Error(`The agent hook has no branch for the install step ${String(step)}`);
 }
 
 // spawnSync reports a launch failure in `error` and a signal as a null status, and throws neither.
@@ -365,6 +416,9 @@ export function findInstallFailure(result: InstallResult): string | null {
 
   return result.status === null ? `bun install stopped on ${String(result.signal)}` : null;
 }
+
+const REFUSAL =
+  'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.';
 
 // The package reads stdin before it can throw, so a failure after that read finds no payload here
 // and refuses.

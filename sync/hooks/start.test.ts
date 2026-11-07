@@ -16,8 +16,10 @@ import {
   claimInstallLock,
   findInstallFailure,
   parseHookArgs,
+  parseLockPID,
   pickFallbackVerdict,
   pickInstallStep,
+  pickLockState,
   pickRecoveryStep,
   readLockState,
   runInstallOnce,
@@ -431,7 +433,8 @@ test('it prints the import error and lets a PostToolUse event through when the i
   });
 });
 
-// A parser cannot see a gated path that the shell builds, so any shell syntax refuses the command.
+// A parser cannot see a gated path that the shell builds, so only cat, ls, pwd and a bare bun
+// install, as plain words, get through.
 test.each([
   'ext=ts; printf x > packages/core/src/sample.$ext',
   'printf x > guide.md',
@@ -533,7 +536,7 @@ test('it refuses a gated tool call when the install fails', async () => {
   });
 });
 
-test('it lets a prompt through when the install fails, so a person can still ask for the install', async () => {
+test('it lets a prompt through when the install fails', async () => {
   const ctx = await setupTest();
 
   await createStubInstall(ctx.fakeBin, { log: ctx.installLog, outcome: { kind: 'fails' } });
@@ -586,7 +589,7 @@ test('it runs one install for two parallel hook calls in one worktree', async ()
     buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
   );
 
-  await readStreamUntil(first.stderr, 'stub install started');
+  const firstStart = await readStreamUntil(first.stderr, 'stub install started');
 
   const second = ctx.startStub(
     buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
@@ -600,12 +603,32 @@ test('it runs one install for two parallel hook calls in one worktree', async ()
   const firstStatus = await first.exited;
   const secondStatus = await second.exited;
 
-  expect(firstStatus).toBe(2);
-  expect(secondStatus).toBe(2);
+  const firstStdout = await new Response(first.stdout).text();
+  const secondStdout = await new Response(second.stdout).text();
 
-  expect(`${waiting}${decided}`).toBe(
-    `Another agent hook runs bun install here, so this one waits for it.\nLoad the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
-  );
+  // No hook writes a NUL, so each read runs to the end of its stream.
+  const firstRest = await readStreamUntil(first.stderr, '\u0000');
+  const secondRest = await readStreamUntil(second.stderr, '\u0000');
+
+  expect({
+    status: firstStatus,
+    stdout: firstStdout,
+    stderr: `${firstStart}${firstRest}`,
+  }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr: `stub install started\nLoad the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  });
+
+  expect({
+    status: secondStatus,
+    stdout: secondStdout,
+    stderr: `${waiting}${decided}${secondRest}`,
+  }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr: `Another agent hook runs bun install here, so this one waits for it.\nLoad the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  });
 
   const installLog = await ctx.readInstallLog();
 
@@ -788,8 +811,9 @@ test('it skips the install and refuses when a stopped hook left the guard behind
     [],
   );
 
-  expect({ status: result.status, stderr: result.stderr }).toStrictEqual({
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
     status: 2,
+    stdout: '',
     stderr: `A stopped agent hook left ${join(ctx.project, 'node_modules/.agent-hooks-install.lock.guard')} behind, so this one skips the install. Remove that file.\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
   });
 
@@ -847,23 +871,43 @@ test('it runs one install for two hook calls that meet a stale lock at once', as
     buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
   );
 
-  await readStreamUntil(first.stderr, 'waits its turn');
-  await readStreamUntil(second.stderr, 'waits its turn');
+  const firstTurn = await readStreamUntil(first.stderr, 'waits its turn');
+  const secondTurn = await readStreamUntil(second.stderr, 'waits its turn');
+
   await rm(join(ctx.project, 'node_modules/.agent-hooks-install.lock.guard'));
 
-  const waiting = await Promise.race([
-    readStreamUntil(first.stderr, 'Another agent hook runs bun install here'),
-    readStreamUntil(second.stderr, 'Another agent hook runs bun install here'),
-  ]);
+  const firstRead = readStreamUntil(first.stderr, 'Another agent hook runs bun install here');
+  const secondRead = readStreamUntil(second.stderr, 'Another agent hook runs bun install here');
+
+  await Promise.race([firstRead, secondRead]);
 
   await writeFile(releasePath, '');
 
   const firstStatus = await first.exited;
   const secondStatus = await second.exited;
 
-  expect(firstStatus).toBe(2);
-  expect(secondStatus).toBe(2);
-  expect(waiting).toBe('Another agent hook runs bun install here, so this one waits for it.\n');
+  const firstStdout = await new Response(first.stdout).text();
+  const secondStdout = await new Response(second.stdout).text();
+
+  // No hook writes a NUL, so each read runs to the end of its stream.
+  const firstStderr = `${firstTurn}${await firstRead}${await readStreamUntil(first.stderr, '\u0000')}`;
+  const secondStderr = `${secondTurn}${await secondRead}${await readStreamUntil(second.stderr, '\u0000')}`;
+
+  expect([
+    { status: firstStatus, stdout: firstStdout, stderr: firstStderr },
+    { status: secondStatus, stdout: secondStdout, stderr: secondStderr },
+  ]).toIncludeSameMembers([
+    {
+      status: 2,
+      stdout: '',
+      stderr: `Another agent hook claims the install lock here, so this one waits its turn.\nstub install started\nLoad the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+    },
+    {
+      status: 2,
+      stdout: '',
+      stderr: `Another agent hook claims the install lock here, so this one waits its turn.\nAnother agent hook runs bun install here, so this one waits for it.\nLoad the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+    },
+  ]);
 
   const installLog = await ctx.readInstallLog();
 
@@ -950,6 +994,36 @@ test.skipIf(process.getuid?.() === 0)(
   },
 );
 
+test('it skips the install and refuses when the install lock is a folder', async () => {
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: {
+      kind: 'links',
+      packageName: '@zgeoff/agent-hooks',
+      packageDirectory: ctx.packageDirectory,
+    },
+  });
+
+  await mkdir(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), { recursive: true });
+
+  const result = ctx.runStub(
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
+    [],
+  );
+
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr: `The agent hook could not run bun install: Error: EISDIR: illegal operation on a directory, read\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+  });
+
+  const installLog = await ctx.readInstallLog();
+
+  expect(installLog).toBe('');
+});
+
 test('it refuses a harness it does not know', async () => {
   const ctx = await setupTest();
 
@@ -989,6 +1063,33 @@ test('it prints the spawn error and refuses when its retry cannot start', async 
 
   expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
     status: 2,
+    stdout: '',
+    stderr: `stub install started\nThe agent hook could not start its retry: Error: ENOENT: no such file or directory, posix_spawn '${runtimePath}'\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+  });
+});
+
+test('it prints the spawn error and lets a prompt through when its retry cannot start', async () => {
+  const ctx = await setupTest();
+
+  const runtimePath = join(ctx.directory, 'runtime/bun');
+
+  await mkdir(join(ctx.directory, 'runtime'));
+  await copyFile(process.execPath, runtimePath);
+  await chmod(runtimePath, 0o755);
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: { kind: 'removes', path: runtimePath },
+  });
+
+  const result = ctx.runStubWithRuntime(
+    runtimePath,
+    JSON.stringify({ hook_event_name: 'UserPromptSubmit', cwd: ctx.project, prompt: 'Fix it' }),
+    [],
+  );
+
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 0,
     stdout: '',
     stderr: `stub install started\nThe agent hook could not start its retry: Error: ENOENT: no such file or directory, posix_spawn '${runtimePath}'\n`,
   });
@@ -1218,36 +1319,31 @@ test('#readLockState reads a lock whose process has stopped as stale', async () 
   expect(state).toBe('stale');
 });
 
-// Root may signal any process, so a real EPERM cannot be had in a test that runs as root.
-test('#readLockState reads a lock as held when the process check fails with EPERM', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(join(ctx.directory, 'install.lock'), '4242');
-
-  const state = readLockState(join(ctx.directory, 'install.lock'), {
-    ...NODE_INSTALL_DEPENDENCIES,
-    signalProcess: mock(() => {
-      throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' });
-    }),
-  });
-
-  expect(state).toBe('held');
+test.each([
+  { label: 'no lock', text: null, expected: 'absent' },
+  { label: 'an empty lock', text: '', expected: 'malformed' },
+  { label: 'a lock that holds a word', text: 'install', expected: 'malformed' },
+  { label: 'a lock that holds 0', text: '0', expected: 'malformed' },
+  { label: 'a lock that holds a negative number', text: '-3', expected: 'malformed' },
+  { label: 'a lock that holds a fraction', text: '42.5', expected: 'malformed' },
+  { label: 'a lock that holds a process id', text: '4242', expected: 4242 },
+] as const)('#parseLockPID reads $label as $expected', (row) => {
+  expect(parseLockPID(row.text)).toBe(row.expected);
 });
 
 test.each([
-  { label: 'empty', contents: '' },
-  { label: 'not a process id', contents: 'install' },
-])('#readLockState reads a lock whose contents are $label as stale', async (row) => {
-  const ctx = await setupTest();
-
-  await writeFile(join(ctx.directory, 'install.lock'), row.contents);
-
-  const state = readLockState(join(ctx.directory, 'install.lock'), {
-    ...NODE_INSTALL_DEPENDENCIES,
-    signalProcess: mock<InstallDependencies['signalProcess']>(),
-  });
-
-  expect(state).toBe('stale');
+  { label: 'no lock', pid: 'absent', signalError: null, expected: 'absent' },
+  { label: 'a malformed lock', pid: 'malformed', signalError: null, expected: 'stale' },
+  { label: 'a lock whose process runs', pid: 4242, signalError: null, expected: 'held' },
+  {
+    label: 'a lock whose process runs as another user',
+    pid: 4242,
+    signalError: 'EPERM',
+    expected: 'held',
+  },
+  { label: 'a lock whose process has stopped', pid: 4242, signalError: 'ESRCH', expected: 'stale' },
+] as const)('#pickLockState picks $expected for $label', (row) => {
+  expect(pickLockState(row.pid, row.signalError)).toBe(row.expected);
 });
 
 test('#claimInstallLock stops without a wait when a stopped hook left the guard', async () => {
@@ -1461,13 +1557,34 @@ test('#runInstallOnce gives the install the time left before the deadline', asyn
 
   const runInstall = mock<InstallDependencies['runInstall']>(() => ({ status: 0, signal: null }));
 
-  await runInstallOnce(join(ctx.project, 'node_modules/.agent-hooks-install.lock'), 31_000, {
-    ...NODE_INSTALL_DEPENDENCIES,
-    now: () => 1000,
-    runInstall,
-  });
+  const failure = await runInstallOnce(
+    join(ctx.project, 'node_modules/.agent-hooks-install.lock'),
+    31_000,
+    { ...NODE_INSTALL_DEPENDENCIES, now: () => 1000, runInstall },
+  );
 
-  expect(runInstall.mock.calls).toStrictEqual([[30_000]]);
+  expect({ failure, installs: runInstall.mock.calls }).toStrictEqual({
+    failure: null,
+    installs: [[30_000]],
+  });
+});
+
+// A spawnSync timeout of 0 sets no limit, so an install that starts at the deadline still needs one.
+test('#runInstallOnce gives the install 1 ms when the deadline passes after the claim', async () => {
+  const ctx = await setupTest();
+
+  const runInstall = mock<InstallDependencies['runInstall']>(() => ({ status: 0, signal: null }));
+
+  const failure = await runInstallOnce(
+    join(ctx.project, 'node_modules/.agent-hooks-install.lock'),
+    5000,
+    { ...NODE_INSTALL_DEPENDENCIES, now: makeRepeatingAnswerQueue([0, 5000]), runInstall },
+  );
+
+  expect({ failure, installs: runInstall.mock.calls }).toStrictEqual({
+    failure: null,
+    installs: [[1]],
+  });
 });
 
 test('#runInstallOnce reports the failure of its own install and drops the lock', async () => {
