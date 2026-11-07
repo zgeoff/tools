@@ -9,7 +9,7 @@ import { parseArgs } from 'node:util';
 const REFUSAL =
   'To work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.';
 
-const AFTER_INSTALL = '--after-install';
+const AFTER_INSTALL_OPTION = 'after-install';
 const GUARD_SUFFIX = '.guard';
 
 const READ_ONLY_PROGRAMS = new Set(['cat', 'ls', 'pwd']);
@@ -36,64 +36,111 @@ export function pickClaimStep(claim: Claim): ClaimStep {
   return CLAIM_STEPS[claim.lock][claim.state];
 }
 
+type HookArgs =
+  | {
+      readonly kind: 'args';
+      readonly harness: 'claude-code' | 'codex';
+      readonly afterInstall: boolean;
+    }
+  | { readonly kind: 'error'; readonly message: string };
+
+export function parseHookArgs(args: readonly string[]): HookArgs {
+  try {
+    const values = parseArgs({
+      args: [...args],
+      options: { harness: { type: 'string' }, [AFTER_INSTALL_OPTION]: { type: 'boolean' } },
+    }).values;
+
+    const harness = values.harness ?? 'claude-code';
+
+    if (harness === 'claude-code' || harness === 'codex') {
+      return { kind: 'args', harness, afterInstall: values[AFTER_INSTALL_OPTION] ?? false };
+    }
+
+    return {
+      kind: 'error',
+      message: `The agent hook does not know the harness ${harness}. Use codex or claude-code.`,
+    };
+  } catch (error) {
+    return { kind: 'error', message: `The agent hook cannot read its arguments: ${String(error)}` };
+  }
+}
+
+type AgentHooksImport<Module> =
+  | { readonly kind: 'loaded'; readonly agentHooks: Module }
+  | { readonly kind: 'failed'; readonly error: unknown };
+
+type RecoveryStep<Module> =
+  | { readonly kind: 'run-hook'; readonly agentHooks: Module }
+  | { readonly kind: 'install-and-retry' }
+  | { readonly kind: 'refuse'; readonly error: unknown };
+
+export function pickRecoveryStep<Module>(
+  agentHooksImport: AgentHooksImport<Module>,
+  afterInstall: boolean,
+): RecoveryStep<Module> {
+  if (agentHooksImport.kind === 'loaded') {
+    return { kind: 'run-hook', agentHooks: agentHooksImport.agentHooks };
+  }
+
+  return afterInstall
+    ? { kind: 'refuse', error: agentHooksImport.error }
+    : { kind: 'install-and-retry' };
+}
+
 if (import.meta.main) {
   await runHook(process.argv.slice(2));
 }
 
-async function runHook(args: readonly string[]): Promise<void> {
-  const harness = parseHarness(args.filter((arg) => arg !== AFTER_INSTALL));
+async function runHook(argv: readonly string[]): Promise<never> {
+  const args = parseHookArgs(argv);
+
+  if (args.kind === 'error') {
+    console.error(args.message);
+
+    return process.exit(2);
+  }
 
   const agentHooksImport = await import('@zgeoff/agent-hooks').then(
-    (agentHooks) => ({ agentHooks, error: null }),
-    (error: unknown) => ({ agentHooks: null, error }),
+    (agentHooks) => ({ kind: 'loaded', agentHooks }) as const,
+    (error: unknown) => ({ kind: 'failed', error }) as const,
   );
 
-  if (agentHooksImport.agentHooks !== null) {
-    await agentHooksImport.agentHooks.runAgentHook({ harness });
+  const step = pickRecoveryStep(agentHooksImport, args.afterInstall);
+
+  if (step.kind === 'run-hook') {
+    return step.agentHooks.runAgentHook({ harness: args.harness });
   }
 
-  if (!args.includes(AFTER_INSTALL)) {
-    try {
-      await runInstallOnce(path.join(ROOT, 'node_modules', '.agent-hooks-install.lock'));
-    } catch (error) {
-      console.error(`The agent hook could not run bun install: ${String(error)}`);
-    }
-
-    // Bun can keep a failed package lookup for the life of the process, so the retry is a new
-    // process, which reads the hook payload from the same stdin.
-    const retry = spawnSync(
-      process.execPath,
-      ['--no-install', import.meta.filename, ...args, AFTER_INSTALL],
-      {
-        stdio: 'inherit',
-      },
-    );
-
-    process.exit(retry.status ?? 2);
+  if (step.kind === 'install-and-retry') {
+    return runRetryAfterInstall(argv);
   }
 
-  console.error(
-    `The agent hook could not load @zgeoff/agent-hooks: ${String(agentHooksImport.error)}`,
-  );
+  console.error(`The agent hook could not load @zgeoff/agent-hooks: ${String(step.error)}`);
 
-  refuseUnlessReadOnly(readPayloadText());
+  return refuseUnlessReadOnly(readPayloadText());
 }
 
-function parseHarness(harnessArgs: readonly string[]): 'claude-code' | 'codex' {
+async function runRetryAfterInstall(argv: readonly string[]): Promise<never> {
   try {
-    const value = parseArgs({ args: [...harnessArgs], options: { harness: { type: 'string' } } })
-      .values.harness;
-
-    if (value === undefined || value === 'claude-code' || value === 'codex') {
-      return value ?? 'claude-code';
-    }
-
-    console.error(`The agent hook does not know the harness ${value}. Use codex or claude-code.`);
+    await runInstallOnce(path.join(ROOT, 'node_modules', '.agent-hooks-install.lock'));
   } catch (error) {
-    console.error(`The agent hook cannot read its arguments: ${String(error)}`);
+    console.error(`The agent hook could not run bun install: ${String(error)}`);
   }
 
-  return process.exit(2);
+  // Bun can keep a failed package lookup for the life of the process, so the retry is a new
+  // process, which reads the hook payload from the same stdin.
+  const retry = spawnSync(
+    process.execPath,
+    ['--no-install', import.meta.filename, ...argv, `--${AFTER_INSTALL_OPTION}`],
+    { stdio: 'inherit' },
+  );
+
+  if (retry.error !== undefined) {
+    console.error(`The agent hook could not start its retry: ${String(retry.error)}`);
+  }
+
+  return process.exit(retry.status ?? 2);
 }
 
 async function runInstallOnce(lockPath: string): Promise<void> {
