@@ -85,6 +85,10 @@ test.each([
     "test('it finds no lid', () => {\n  expect(new RegExp('lid', 'u').exec('the kettle ran no delete from cups')).toBeNull();\n});\n",
   ],
   [
+    'prose with a delete from in the exec of a RegExp call',
+    "test('it finds no lid', () => {\n  expect(RegExp('lid', 'u').exec('the kettle ran no delete from cups')).toBeNull();\n});\n",
+  ],
+  [
     'SQL in a string that no SQL call takes',
     "test('it logs', () => {\n  logger.info('INSERT INTO kettles (id) VALUES (1)');\n});\n",
   ],
