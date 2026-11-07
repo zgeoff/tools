@@ -64,6 +64,26 @@ test('it logs the call and fails with no node_modules', async () => {
   expect(calls).toBe(`bun install in ${ctx.project}\n`);
 });
 
+test('it logs the call, removes the path and fails', async () => {
+  const ctx = await setupTest();
+
+  const log = join(ctx.directory, 'install.log');
+  const doomed = join(ctx.directory, 'ledger.bin');
+
+  await writeFile(doomed, 'ledger');
+  await createStubInstall(ctx.bin, { log, outcome: { kind: 'removes', path: doomed } });
+
+  const install = Bun.spawnSync([join(ctx.bin, 'bun'), 'install'], { cwd: ctx.project });
+
+  expect(install.exitCode).toBe(1);
+
+  const doomedExists = await Bun.file(doomed).exists();
+  const calls = await readFile(log, 'utf8');
+
+  expect(doomedExists).toBeFalse();
+  expect(calls).toBe(`bun install in ${ctx.project}\n`);
+});
+
 test('it links the package only once the release path exists', async () => {
   const ctx = await setupTest();
 

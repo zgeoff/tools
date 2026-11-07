@@ -9,7 +9,7 @@ import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 import { readStreamUntil } from '../test-utils/read-stream-until.ts';
 import { readTextOrEmpty } from '../test-utils/read-text-or-empty.ts';
 import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
-import { pickClaimStep } from './start.ts';
+import { parseHookArgs, pickClaimStep, pickRecoveryStep } from './start.ts';
 
 // Root ignores file modes, so a folder or a lock with no permissions cannot stop root from using it.
 const isRoot = process.getuid?.() === 0;
@@ -39,12 +39,15 @@ async function setupTest() {
     CLAUDE_PROJECT_DIR: project,
   };
 
-  const runStub = (payload: string, args: readonly string[]) =>
-    spawnSync(process.execPath, ['--no-install', stubPath, ...args], {
+  const runStubWithRuntime = (runtimePath: string, payload: string, args: readonly string[]) =>
+    spawnSync(runtimePath, ['--no-install', stubPath, ...args], {
       encoding: 'utf8',
       env,
       input: payload,
     });
+
+  const runStub = (payload: string, args: readonly string[]) =>
+    runStubWithRuntime(process.execPath, payload, args);
 
   const startStub = (payload: string) => {
     const child = Bun.spawn([process.execPath, '--no-install', stubPath], {
@@ -75,6 +78,7 @@ async function setupTest() {
     installLog,
     stubPath,
     runStub,
+    runStubWithRuntime,
     startStub,
     readInstallLog,
   };
@@ -155,6 +159,46 @@ test('it allows an ungated edit after the install with no output', async () => {
   expect(result.status).toBe(0);
   expect(result.stdout).toBe('');
 });
+
+test.each([{ argv: ['--'] }, { argv: ['--harness', 'codex', '--'] }])(
+  'it allows an ungated edit after the install when its arguments are $argv',
+  async (row) => {
+    const ctx = await setupTest();
+
+    await createStubInstall(ctx.fakeBin, {
+      log: ctx.installLog,
+      outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+    });
+
+    await writeTreeFiles(ctx.packageDir, {
+      'package.json': JSON.stringify({
+        name: '@zgeoff/agent-hooks',
+        type: 'module',
+        exports: './index.ts',
+      }),
+      'index.ts': `export * from ${JSON.stringify(ctx.agentHooksSource)};\n`,
+    });
+
+    await writeTreeFiles(ctx.project, {
+      '.claude/skill-gate.json': JSON.stringify({
+        gates: [{ match: '**/*.md', skills: ['docs-writing'] }],
+      }),
+      '.claude/skills/docs-writing/SKILL.md': '# Docs writing\n',
+      'transcript.jsonl': '',
+    });
+
+    const result = ctx.runStub(
+      buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'main.ts') }),
+      row.argv,
+    );
+
+    expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+      status: 0,
+      stdout: '',
+      stderr: 'stub install started\n',
+    });
+  },
+);
 
 test('it runs no install when the package loads', async () => {
   const ctx = await setupTest();
@@ -779,6 +823,109 @@ test('it refuses a harness it does not know', async () => {
   expect(result.stderr).toBe(
     'The agent hook does not know the harness cursor. Use codex or claude-code.\n',
   );
+});
+
+// The stub retries with its own runtime, so a stand-in install that removes a copy of that runtime
+// makes the retry fail to start.
+test('it prints the spawn error and refuses when its retry cannot start', async () => {
+  const ctx = await setupTest();
+
+  const runtimePath = join(ctx.directory, 'runtime/bun');
+
+  await mkdir(join(ctx.directory, 'runtime'));
+  await copyFile(process.execPath, runtimePath);
+  await chmod(runtimePath, 0o755);
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: { kind: 'removes', path: runtimePath },
+  });
+
+  const result = ctx.runStubWithRuntime(
+    runtimePath,
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
+    [],
+  );
+
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr: `stub install started\nThe agent hook could not start its retry: Error: ENOENT: no such file or directory, posix_spawn '${runtimePath}'\n`,
+  });
+});
+
+test.each([
+  { argv: [], expected: { kind: 'args', harness: 'claude-code', afterInstall: false } },
+  {
+    argv: ['--harness', 'codex'],
+    expected: { kind: 'args', harness: 'codex', afterInstall: false },
+  },
+  {
+    argv: ['--after-install'],
+    expected: { kind: 'args', harness: 'claude-code', afterInstall: true },
+  },
+  {
+    argv: ['--harness', 'codex', '--after-install'],
+    expected: { kind: 'args', harness: 'codex', afterInstall: true },
+  },
+  {
+    argv: ['--after-install', '--harness=codex'],
+    expected: { kind: 'args', harness: 'codex', afterInstall: true },
+  },
+  {
+    argv: ['--harness', 'cursor', '--after-install'],
+    expected: {
+      kind: 'error',
+      message: 'The agent hook does not know the harness cursor. Use codex or claude-code.',
+    },
+  },
+  {
+    argv: ['--after-install=yes'],
+    expected: {
+      kind: 'error',
+      message:
+        "The agent hook cannot read its arguments: TypeError [ERR_PARSE_ARGS_INVALID_OPTION_VALUE]: Option '--after-install' does not take an argument",
+    },
+  },
+  {
+    argv: ['--verbose'],
+    expected: {
+      kind: 'error',
+      message:
+        "The agent hook cannot read its arguments: TypeError [ERR_PARSE_ARGS_UNKNOWN_OPTION]: Unknown option '--verbose'",
+    },
+  },
+])('#parseHookArgs reads $argv', (row) => {
+  expect(parseHookArgs(row.argv)).toStrictEqual(row.expected);
+});
+
+test.each([
+  {
+    label: 'runs the hook when the package loads on the first run',
+    agentHooksImport: { kind: 'loaded', agentHooks: 'ledger-module' },
+    afterInstall: false,
+    expected: { kind: 'run-hook', agentHooks: 'ledger-module' },
+  },
+  {
+    label: 'runs the hook when the package loads on the retry',
+    agentHooksImport: { kind: 'loaded', agentHooks: 'ledger-module' },
+    afterInstall: true,
+    expected: { kind: 'run-hook', agentHooks: 'ledger-module' },
+  },
+  {
+    label: 'installs and retries when the package fails to load on the first run',
+    agentHooksImport: { kind: 'failed', error: 'no ledger' },
+    afterInstall: false,
+    expected: { kind: 'install-and-retry' },
+  },
+  {
+    label: 'refuses with the import error when the package fails to load on the retry',
+    agentHooksImport: { kind: 'failed', error: 'no ledger' },
+    afterInstall: true,
+    expected: { kind: 'refuse', error: 'no ledger' },
+  },
+] as const)('#pickRecoveryStep $label', (row) => {
+  expect(pickRecoveryStep(row.agentHooksImport, row.afterInstall)).toStrictEqual(row.expected);
 });
 
 test.each([
