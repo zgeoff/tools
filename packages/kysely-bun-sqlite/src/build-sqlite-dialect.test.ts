@@ -4,8 +4,6 @@ import { setImmediate } from 'node:timers/promises';
 import { Kysely } from 'kysely';
 import { buildSQLiteDialect } from './build-sqlite-dialect.ts';
 
-// oxlint-disable zgeoff/seed-only -- tests a database dialect, whose product is SQL
-
 interface GardenSchema {
   plants: { species: string };
 }

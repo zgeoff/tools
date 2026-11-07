@@ -1,6 +1,6 @@
 import toTableName from './to-table-name.js';
 
-const tablePattern = String.raw`(?<table>[^\s(),;'\x60]+)`;
+export const tablePattern = String.raw`(?<table>[^\s(),;'\x60]+)`;
 
 const sqlWritePatterns = [
   new RegExp(String.raw`\binsert\s+(?:or\s+[a-z]+\s+)?into\s+${tablePattern}`, 'giu'),
