@@ -72,6 +72,7 @@
     "check:chex-pin": "bun scripts/renovate/run-chex-pin-check.ts",
     "check:renovate-config": "bun scripts/renovate/run-renovate-config-check.ts",
     "check:test-layout": "chex test-layout",
+    "check:tracked-links": "bun scripts/tracked-links/run-tracked-links-check.ts",
     "ci:install-tool": "bun scripts/ci/run-pinned-tool-step.ts",
     "ci:dispatch-publish": "bun scripts/publish/dispatch-release-publish.ts",
     "ci:plan-sync-dispatch": "bun scripts/repo-sync/write-sync-dispatch-plan.ts",
