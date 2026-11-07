@@ -5,7 +5,7 @@ import { resolveRelatedTests } from './resolve-related-tests.ts';
 import type { RelatedTestSources } from './resolve-related-tests.ts';
 import type { UnitRunDeps } from './run-unit-tests.ts';
 import { runUnitTests } from './run-unit-tests.ts';
-import type { RigConfig, RigOutput, RigRun } from './types.ts';
+import type { RigConfig, RigRun } from './types.ts';
 
 // A host with one worker runs each file slower than CI, and a test that passes there must not fail
 // the push.
@@ -15,8 +15,6 @@ export interface RelatedTestDeps extends UnitRunDeps {
   readonly sources: Readonly<RelatedTestSources>;
 
   readonly readWorkerCount: () => Promise<WorkerCount>;
-
-  readonly output: RigOutput;
 }
 
 // The related run is the unit lane on the tests beside the changed files, in this process.

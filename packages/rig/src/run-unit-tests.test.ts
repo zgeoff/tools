@@ -2,6 +2,7 @@ import { expect, mock, test } from 'bun:test';
 import { defineRig } from './define-rig.ts';
 import type { CommandOptions } from './run-command.ts';
 import { runUnitTests } from './run-unit-tests.ts';
+import { makeRecordingStub } from './test-utils/make-recording-stub.ts';
 
 function setupTest() {
   const signal = new AbortController().signal;
@@ -10,8 +11,63 @@ function setupTest() {
     () => Promise.resolve(0),
   );
 
-  return { signal, runCommand };
+  const output = { out: makeRecordingStub(), err: makeRecordingStub() };
+
+  return { signal, runCommand, output };
 }
+
+test.each([['--watch'], ['--coverage-reporter=lcov']])(
+  'it exits 2 and runs nothing for %s when the tests need more than one run',
+  async (flag) => {
+    const ctx = setupTest();
+
+    const exitCode = await runUnitTests(
+      defineRig({}),
+      {
+        workerCount: 1,
+        flags: [flag],
+        tests: ['packages/oven/src/heat.test.ts', 'src/till.test.ts'],
+        isDiscovery: false,
+      },
+      { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+      {
+        dietScript: '/diet.sh',
+        runCommand: ctx.runCommand,
+        output: ctx.output,
+        probeWorkspaceRepo: () => Promise.resolve(true),
+        readTrackedFiles: () =>
+          Promise.resolve(['packages/oven/package.json', 'packages/oven/bunfig.toml']),
+      },
+    );
+
+    expect(exitCode).toBe(2);
+
+    expect(ctx.output.err).toHaveBeenCalledExactlyOnceWith(
+      `rig: ${flag} needs the tests in one bun test run, and these tests need 2, one for each bunfig; name the tests of one bunfig\n`,
+    );
+
+    expect(ctx.runCommand).not.toHaveBeenCalled();
+  },
+);
+
+test('it passes --watch on when the tests need one run', async () => {
+  const ctx = setupTest();
+
+  await runUnitTests(
+    defineRig({}),
+    { workerCount: 1, flags: ['--watch'], tests: ['src/till.test.ts'], isDiscovery: false },
+    { repoRoot: '/repo', environment: {}, signal: ctx.signal, runID: '4417' },
+    {
+      dietScript: '/diet.sh',
+      runCommand: ctx.runCommand,
+      output: ctx.output,
+      probeWorkspaceRepo: () => Promise.resolve(false),
+      readTrackedFiles: () => Promise.resolve(['src/till.test.ts']),
+    },
+  );
+
+  expect(ctx.runCommand.mock.calls[0]?.[0]).toContain('--watch');
+});
 
 test('it runs the unit command under diet in the repo and returns its exit code', async () => {
   const ctx = setupTest();
@@ -25,6 +81,7 @@ test('it runs the unit command under diet in the repo and returns its exit code'
     {
       dietScript: '/diet.sh',
       runCommand: ctx.runCommand,
+      output: ctx.output,
       probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve([]),
     },
@@ -61,6 +118,7 @@ test('it gives diet the memory that the config declares for the unit lane', asyn
     {
       dietScript: '/diet.sh',
       runCommand: ctx.runCommand,
+      output: ctx.output,
       probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve(['src/a.test.ts']),
     },
@@ -85,6 +143,7 @@ test('it leaves out the e2e folders that git tracks and runs a src/e2e folder th
     {
       dietScript: '/diet.sh',
       runCommand: ctx.runCommand,
+      output: ctx.output,
       probeWorkspaceRepo: () => Promise.resolve(false),
       readTrackedFiles: () => Promise.resolve(['e2e/login.test.ts', 'src/e2e/codec.test.ts']),
     },
@@ -111,6 +170,7 @@ test('it runs the tests of a package with its own bunfig.toml from the package f
     {
       dietScript: '/diet.sh',
       runCommand: ctx.runCommand,
+      output: ctx.output,
       probeWorkspaceRepo: () => Promise.resolve(true),
       readTrackedFiles: () =>
         Promise.resolve([
@@ -147,6 +207,7 @@ test('it runs a test that a bunfigs entry matches from the repo root under that 
     {
       dietScript: '/diet.sh',
       runCommand: ctx.runCommand,
+      output: ctx.output,
       probeWorkspaceRepo: () => Promise.resolve(true),
       readTrackedFiles: () =>
         Promise.resolve(['packages/shop/package.json', 'packages/shop/src/counter.test.tsx']),
@@ -178,6 +239,7 @@ test('it runs every run after one fails and returns the first failing exit code'
     {
       dietScript: '/diet.sh',
       runCommand: ctx.runCommand,
+      output: ctx.output,
       probeWorkspaceRepo: () => Promise.resolve(true),
       readTrackedFiles: () =>
         Promise.resolve(['packages/oven/package.json', 'packages/oven/bunfig.toml']),
@@ -211,6 +273,7 @@ test('it starts no further run once the run is aborted', async () => {
     {
       dietScript: '/diet.sh',
       runCommand: ctx.runCommand,
+      output: ctx.output,
       probeWorkspaceRepo: () => Promise.resolve(true),
       readTrackedFiles: () =>
         Promise.resolve(['packages/oven/package.json', 'packages/oven/bunfig.toml']),

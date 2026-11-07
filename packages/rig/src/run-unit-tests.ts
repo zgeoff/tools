@@ -2,9 +2,10 @@ import { join } from 'node:path';
 import { buildDietCommand } from './build-diet-command.ts';
 import { buildUnitCommand } from './build-unit-command.ts';
 import { collectTestRuns } from './collect-test-runs.ts';
+import { findSingleRunFlag } from './find-single-run-flag.ts';
 import { pickE2EDirs } from './pick-e2e-dirs.ts';
 import type { CommandOptions } from './run-command.ts';
-import type { RigConfig, RigRun } from './types.ts';
+import type { RigConfig, RigOutput, RigRun } from './types.ts';
 
 export interface UnitRequest {
   readonly workerCount: number;
@@ -26,6 +27,8 @@ export interface UnitRunDeps {
   readonly readTrackedFiles: (repoRoot: string) => Promise<readonly string[]>;
 
   readonly runCommand: (command: readonly string[], options: CommandOptions) => Promise<number>;
+
+  readonly output: RigOutput;
 }
 
 // The unit lane's command is built from the lane table, so a lane that the table lists never
@@ -48,6 +51,16 @@ export async function runUnitTests(
     tests: request.tests,
     isDiscovery: request.isDiscovery,
   });
+
+  const singleRunFlag = findSingleRunFlag(request.flags);
+
+  if (singleRunFlag !== undefined && testRuns.length > 1) {
+    deps.output.err(
+      `rig: ${singleRunFlag} needs the tests in one bun test run, and these tests need ${testRuns.length}, one for each bunfig; name the tests of one bunfig\n`,
+    );
+
+    return 2;
+  }
 
   let exitCode = 0;
 

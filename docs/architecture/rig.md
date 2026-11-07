@@ -114,8 +114,10 @@ the unit tests into one `bun test` run for each bunfig:
 
 The runs go one at a time, root run first. A run starts even when an earlier run failed, so the
 output shows every failure, and rig exits with the first failing run's exit code. After an abort,
-rig starts no further run. The other lanes run from the repo root under its `bunfig.toml`, where
-their hooks and program builds run.
+rig starts no further run. A `--watch` run never exits, and each `--coverage` run writes its report
+over the one before, so rig refuses either flag with exit 2 when the tests need more than one run.
+The other lanes run from the repo root under its `bunfig.toml`, where their hooks and program builds
+run.
 
 A repo whose React tests need a DOM preload names that bunfig and the tests it runs:
 

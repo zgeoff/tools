@@ -6,12 +6,10 @@ import { parseTestArgs } from './parse-test-args.ts';
 import type { WorkerCount } from './read-worker-count.ts';
 import type { UnitRunDeps } from './run-unit-tests.ts';
 import { runUnitTests } from './run-unit-tests.ts';
-import type { RigConfig, RigOutput, RigRun } from './types.ts';
+import type { RigConfig, RigRun } from './types.ts';
 
 export interface UnitDeps extends UnitRunDeps {
   readonly readWorkerCount: () => Promise<WorkerCount>;
-
-  readonly output: RigOutput;
 }
 
 export async function runUnit(
