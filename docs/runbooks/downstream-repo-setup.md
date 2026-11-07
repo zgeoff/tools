@@ -94,9 +94,9 @@ an absolute path. A repo opts in with one pull request that makes three changes:
 1. Add `knip-runner` to `include` in `.github/workflows/repo-sync.yml`.
 2. Copy [`run-knip.sh`](../../sync/deadcode/run-knip.sh) to `scripts/run-knip.sh` with its mode, as
    in `install -m 0755 <tools>/sync/deadcode/run-knip.sh scripts/run-knip.sh`, where `<tools>` is a
-   checkout of tools at the newest commit on `main`. Expect `git ls-files -s scripts/run-knip.sh` to
-   show `100755` once you stage it. If it shows `100644`, run
-   `git update-index --chmod=+x scripts/run-knip.sh`.
+   checkout of tools at the newest commit on `main` whose `Main` run passed. Expect
+   `git ls-files -s scripts/run-knip.sh` to show `100755` once you stage it. If it shows `100644`,
+   run `git update-index --chmod=+x scripts/run-knip.sh`.
 3. In `package.json`, replace each `knip` command in the `deadcode` script with
    `bash scripts/run-knip.sh`, and keep its arguments, as in
    `bash scripts/run-knip.sh --production`. Expect `bun run deadcode` to pass in a worktree under
