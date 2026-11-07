@@ -2,11 +2,14 @@ import { existsSync } from 'node:fs';
 // oxlint-disable-next-line zgeoff/no-require -- only resolves rig's path from the repo root; an import loads it
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import buildMaxTestTimeout from './build-max-test-timeout.js';
+import buildSeedOnly from './build-seed-only.js';
+import buildTestBesideModule from './build-test-beside-module.js';
 import featureFolders from './feature-folders.js';
+import fileNamedForExport from './file-named-for-export.js';
 import functionVerb from './function-verb.js';
 import importZones from './import-zones.js';
 import maxConsecutiveLineComments from './max-consecutive-line-comments.js';
-import buildMaxTestTimeout from './max-test-timeout.js';
 import moduleOrder from './module-order.js';
 import noAbbreviatedNames from './no-abbreviated-names.js';
 import noClass from './no-class.js';
@@ -20,9 +23,7 @@ import noTestSleep from './no-test-sleep.js';
 import readFolderSources from './read-folder-sources.js';
 import readRigLanes from './read-rig-lanes.js';
 import resolveRepoRoot from './resolve-repo-root.js';
-import buildSeedOnly from './seed-only.js';
 import setupTestOnly from './setup-test-only.js';
-import buildTestBesideModule from './test-beside-module.js';
 import testBesideSeed from './test-beside-seed.js';
 import testShape from './test-shape.js';
 import testTimeoutExceptionTicket from './test-timeout-exception-ticket.js';
@@ -138,6 +139,7 @@ const plugin = {
     'feature-folders': featureFolders,
     'seed-only': buildSeedOnly(readFolderSources),
     'test-beside-seed': testBesideSeed,
+    'file-named-for-export': fileNamedForExport,
   },
 };
 
