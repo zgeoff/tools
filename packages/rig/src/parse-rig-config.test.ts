@@ -154,6 +154,8 @@ test.each([
   ['a list that holds a string', ['bunfig.window.toml']],
   ['a list whose entry has no files', [{ path: 'bunfig.window.toml' }]],
   ['a list whose entry has a number for a glob', [{ path: 'bunfig.window.toml', files: [7] }]],
+  ['a list whose entry has an empty list of globs', [{ path: 'bunfig.window.toml', files: [] }]],
+  ['a list whose entry names no .toml file', [{ path: 'bunfig.window', files: ['src/**'] }]],
 ])('it refuses bunfigs that are %s', (_, bunfigs) => {
   expect(parseRigConfig({ lanes: [], bunfigs })).toStrictEqual({
     kind: 'refused',

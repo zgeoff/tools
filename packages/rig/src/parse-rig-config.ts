@@ -218,7 +218,12 @@ function parseBunfigs(value: unknown): BunfigDeclaration[] | null {
     const files: unknown = Reflect.get(bunfig, 'files');
     const globs = Array.isArray(files) ? parseIgnore(files) : null;
 
-    if (typeof path !== 'string' || globs === null) {
+    if (
+      typeof path !== 'string' ||
+      !path.endsWith('.toml') ||
+      globs === null ||
+      globs.length === 0
+    ) {
       return null;
     }
 
