@@ -91,8 +91,9 @@ the full suite, in two cases:
   changes.
 - The branch has more than 50 related unit test files.
 
-The job runs each related test from the folder of the package that owns it, or under a bunfig that
-`rig.config.ts` names, as [The bunfig of each test](./rig.md#the-bunfig-of-each-test) describes.
+The job runs each related test under a bunfig that `rig.config.ts` names when an entry matches the
+test, from the folder of its package when that package has its own tracked `bunfig.toml`, and from
+the repo root otherwise, as [The bunfig of each test](./rig.md#the-bunfig-of-each-test) describes.
 
 The job passes `bun test` the [worker count](./memory-caps.md#the-worker-count) as `--parallel`,
 with `--no-isolate`, so the files of a worker share one global, as they do in the repo's own test
