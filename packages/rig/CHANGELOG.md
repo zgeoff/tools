@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.6](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.1.5...@zgeoff/rig@0.1.6) (2026-11-07)
+
+
+### Features
+
+* **rig:** leave the paths in a config ignore list out of every lane ([#539](https://github.com/zgeoff/tools/issues/539)) ([3950701](https://github.com/zgeoff/tools/commit/3950701c1769e98c9920191251f624282b2e7c64))
+
 ## [0.1.5](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.1.4...@zgeoff/rig@0.1.5) (2026-11-05)
 
 
