@@ -1,3 +1,6 @@
+import { z } from 'zod';
+import { bunfigDeclarationSchema } from './bunfig-declaration-schema.ts';
+import { repoGlobSchema } from './repo-glob-schema.ts';
 import type {
   BunfigDeclaration,
   LaneParallelism,
@@ -176,59 +179,14 @@ function parseProgram(value: unknown): ProgramDeclaration | null {
 }
 
 function parseIgnore(value: unknown): string[] | null {
-  if (value === undefined) {
-    return [];
-  }
+  const parsed = z.array(repoGlobSchema).optional().safeParse(value);
 
-  if (!Array.isArray(value)) {
-    return null;
-  }
-
-  const patterns: string[] = [];
-
-  for (const pattern of value) {
-    if (typeof pattern !== 'string') {
-      return null;
-    }
-
-    patterns.push(pattern);
-  }
-
-  return patterns;
+  return parsed.success ? (parsed.data ?? []) : null;
 }
 
 // A config may leave bunfigs out, and then every unit test runs under the bunfig of its folder.
-function parseBunfigs(value: unknown): BunfigDeclaration[] | null {
-  if (value === undefined) {
-    return [];
-  }
+function parseBunfigs(value: unknown): readonly BunfigDeclaration[] | null {
+  const parsed = z.array(bunfigDeclarationSchema).optional().safeParse(value);
 
-  if (!Array.isArray(value)) {
-    return null;
-  }
-
-  const bunfigs: BunfigDeclaration[] = [];
-
-  for (const bunfig of value) {
-    if (typeof bunfig !== 'object' || bunfig === null) {
-      return null;
-    }
-
-    const path: unknown = Reflect.get(bunfig, 'path');
-    const files: unknown = Reflect.get(bunfig, 'files');
-    const globs = Array.isArray(files) ? parseIgnore(files) : null;
-
-    if (
-      typeof path !== 'string' ||
-      !path.endsWith('.toml') ||
-      globs === null ||
-      globs.length === 0
-    ) {
-      return null;
-    }
-
-    bunfigs.push({ path, files: globs });
-  }
-
-  return bunfigs;
+  return parsed.success ? (parsed.data ?? []) : null;
 }

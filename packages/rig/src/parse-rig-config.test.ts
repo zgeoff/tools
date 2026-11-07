@@ -134,6 +134,8 @@ test('it keeps the ignore patterns that defineRig returns', () => {
 test.each([
   ['a string', 'docs/drafts/**'],
   ['a list that holds a number', ['docs/drafts/**', 7]],
+  ['a list that holds a glob with a ./ segment', ['./docs/drafts/**']],
+  ['a list that holds a glob that climbs out of the repo', ['../drafts/**']],
 ])('it refuses an ignore that is %s', (_, ignore) => {
   expect(parseRigConfig({ lanes: [], ignore })).toStrictEqual({
     kind: 'refused',
@@ -156,6 +158,13 @@ test.each([
   ['a list whose entry has a number for a glob', [{ path: 'bunfig.window.toml', files: [7] }]],
   ['a list whose entry has an empty list of globs', [{ path: 'bunfig.window.toml', files: [] }]],
   ['a list whose entry names no .toml file', [{ path: 'bunfig.window', files: ['src/**'] }]],
+  ['a list whose entry climbs out of the repo', [{ path: '../bunfig.toml', files: ['src/**'] }]],
+  ['a list whose entry has an absolute path', [{ path: '/srv/bunfig.toml', files: ['src/**'] }]],
+  [
+    'a list whose entry has a glob with a ./ segment',
+    [{ path: 'bunfig.window.toml', files: ['./packages/shop/**'] }],
+  ],
+  ['a list whose entry has an empty glob', [{ path: 'bunfig.window.toml', files: [''] }]],
 ])('it refuses bunfigs that are %s', (_, bunfigs) => {
   expect(parseRigConfig({ lanes: [], bunfigs })).toStrictEqual({
     kind: 'refused',

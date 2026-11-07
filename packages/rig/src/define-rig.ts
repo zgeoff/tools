@@ -1,5 +1,7 @@
+import { bunfigDeclarationSchema } from './bunfig-declaration-schema.ts';
 import { isCommandName } from './is-command-name.ts';
 import { parseDuration } from './parse-duration.ts';
+import { repoGlobSchema } from './repo-glob-schema.ts';
 import { standardLanes } from './standard-lanes.ts';
 import type { StandardLane } from './standard-lanes.ts';
 import type {
@@ -50,7 +52,7 @@ export function defineRig(declaration: RigDeclaration): RigConfig {
   );
 
   return {
-    ignore: (declaration.ignore ?? []).map((pattern) => readGlob(pattern, 'the ignore pattern')),
+    ignore: (declaration.ignore ?? []).map((pattern) => readIgnorePattern(pattern)),
     bunfigs: (declaration.bunfigs ?? []).map((bunfig) => readBunfig(bunfig)),
     lanes,
     programs,
@@ -252,53 +254,40 @@ function readProgram(name: string, program: ProgramDeclaration): ProgramDeclarat
   };
 }
 
-// rig matches each glob against bare paths relative to the repo root, so an absolute glob, one
-// that climbs out of the repo, or one with a `./` segment would never match.
-function readGlob(pattern: unknown, label: string): string {
-  if (
-    typeof pattern !== 'string' ||
-    pattern === '' ||
-    pattern.startsWith('/') ||
-    hasDotSegment(pattern)
-  ) {
+function readIgnorePattern(pattern: unknown): string {
+  const parsed = repoGlobSchema.safeParse(pattern);
+
+  if (!parsed.success) {
     throw new Error(
-      `rig.config.ts: ${label} ${JSON.stringify(pattern)} must be a non-empty glob relative to the repo root, with no "." or ".." segment`,
+      `rig.config.ts: the ignore pattern ${JSON.stringify(pattern)} must be a non-empty glob relative to the repo root, with no "." or ".." segment`,
     );
   }
 
-  return pattern;
+  return parsed.data;
 }
 
-function hasDotSegment(path: string): boolean {
-  return path.split('/').some((segment) => segment === '.' || segment === '..');
-}
-
-// rig runs the bunfig's tests from the repo root, so a path outside the repo would never load, and
-// it compares a changed file's bare path with this one, so a `./` segment would never match.
 function readBunfig(bunfig: BunfigDeclaration): BunfigDeclaration {
-  const path: unknown = bunfig.path;
+  const parsed = bunfigDeclarationSchema.safeParse(bunfig);
 
-  if (
-    typeof path !== 'string' ||
-    !path.endsWith('.toml') ||
-    path.startsWith('/') ||
-    hasDotSegment(path)
-  ) {
-    throw new Error(
-      `rig.config.ts: the bunfig path ${JSON.stringify(path)} must be a .toml file relative to the repo root, with no "." or ".." segment`,
-    );
+  if (!parsed.success) {
+    throw new Error(formatBunfigError(bunfig, parsed.error.issues.at(0)?.path ?? []));
   }
 
-  const files: unknown = bunfig.files;
+  return parsed.data;
+}
 
-  if (!Array.isArray(files) || files.length === 0) {
-    throw new Error(`rig.config.ts: the bunfig "${path}" needs files, a list of globs`);
+function formatBunfigError(bunfig: BunfigDeclaration, issuePath: readonly PropertyKey[]): string {
+  const [field, index] = issuePath;
+
+  if (field === 'path') {
+    return `rig.config.ts: the bunfig path ${JSON.stringify(bunfig.path)} must be a .toml file relative to the repo root, with no "." or ".." segment`;
   }
 
-  return {
-    path,
-    files: files.map((pattern: unknown) => readGlob(pattern, `the bunfig "${path}" file glob`)),
-  };
+  if (typeof index === 'number') {
+    return `rig.config.ts: the bunfig "${bunfig.path}" file glob ${JSON.stringify(bunfig.files[index])} must be a non-empty glob relative to the repo root, with no "." or ".." segment`;
+  }
+
+  return `rig.config.ts: the bunfig "${bunfig.path}" needs files, a list of globs`;
 }
 
 function readBenchLane(lane: string | undefined, lanes: readonly ResolvedLane[]): string | null {
