@@ -26,10 +26,11 @@ export function collectDanglingLinks(
       ...link,
       resolved: posix.isAbsolute(link.target)
         ? link.target
-        : posix.normalize(posix.join(posix.dirname(link.path), link.target)),
+        : posix.normalize(posix.join(posix.dirname(link.path), link.target)).replace(/\/+$/u, ''),
     }))
     .filter(
       (link) =>
+        link.resolved !== '.' &&
         !tracked.has(link.resolved) &&
         !trackedPaths.some((path) => path.startsWith(`${link.resolved}/`)),
     );

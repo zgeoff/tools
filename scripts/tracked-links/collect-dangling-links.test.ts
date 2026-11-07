@@ -13,6 +13,16 @@ test.each([
     trackedPaths: ['sync/pre-push/parse-limits.ts', 'packages/chex/parse-limits.ts'],
   },
   {
+    condition: 'its target folder ends in a slash',
+    link: { path: '.claude/skills', target: '../.agents/skills/' },
+    trackedPaths: ['.claude/skills', '.agents/skills/.gitkeep'],
+  },
+  {
+    condition: 'its target is the repo root',
+    link: { path: 'docs/root', target: '..' },
+    trackedPaths: ['docs/root', 'package.json'],
+  },
+  {
     condition: 'its target is a tracked link',
     link: { path: 'hooks/start.ts', target: 'start-link.ts' },
     trackedPaths: ['hooks/start.ts', 'hooks/start-link.ts'],
