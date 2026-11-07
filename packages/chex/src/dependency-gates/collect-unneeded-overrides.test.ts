@@ -166,6 +166,7 @@ test.each([
   ['a scoped parent at a version', '@acme/pad-tools@2.0.0>left-pad'],
   ['a parent range of comparators', 'pad-tools@>=2.0.0 <3>left-pad'],
   ['a child range', 'pad-tools>left-pad@>=1.0.0'],
+  ['a parent dist-tag', 'pad-tools@latest>left-pad'],
 ])(
   'it keeps a nested override for %s whose range for the child excludes the pin',
   (_label, key) => {

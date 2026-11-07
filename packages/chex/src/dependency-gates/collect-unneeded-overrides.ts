@@ -116,12 +116,19 @@ function isDependentOfParent(dependent: LockfileDependent, parent: PackageSpec |
     return false;
   }
 
-  return (
-    parent.range === null ||
-    id.range === null ||
-    !isSemverRange(parent.range) ||
-    Bun.semver.satisfies(id.range, parent.range)
-  );
+  return parent.range === null || id.range === null || Bun.semver.satisfies(id.range, parent.range);
+}
+
+// bun.lock keeps a workspace's `catalog:` reference as it is written in its package.json.
+function resolveCatalogRange(input: UnneededOverridesInput, name: string, range: string): string {
+  if (!range.startsWith('catalog:')) {
+    return range;
+  }
+
+  const catalogName = range.slice('catalog:'.length);
+  const catalog = catalogName === '' ? input.catalog : input.catalogs[catalogName];
+
+  return catalog?.[name] ?? range;
 }
 
 const comparatorPattern =
@@ -136,16 +143,4 @@ function isSemverRange(range: string): boolean {
       .split(/\s+/u)
       .every((token) => token === '' || token === '-' || comparatorPattern.test(token)),
   );
-}
-
-// bun.lock keeps a workspace's `catalog:` reference as it is written in its package.json.
-function resolveCatalogRange(input: UnneededOverridesInput, name: string, range: string): string {
-  if (!range.startsWith('catalog:')) {
-    return range;
-  }
-
-  const catalogName = range.slice('catalog:'.length);
-  const catalog = catalogName === '' ? input.catalog : input.catalogs[catalogName];
-
-  return catalog?.[name] ?? range;
 }
