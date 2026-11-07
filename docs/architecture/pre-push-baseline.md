@@ -121,11 +121,12 @@ the table above, with these differences:
   each test that the `[test]` `pathIgnorePatterns` of the root `bunfig.toml` cover, because
   `bun test` exits 1 when every path it is given is ignored.
 - In a repo whose root `package.json` lists `@zgeoff/rig` in `dependencies` or `devDependencies`,
-  and whose own `test:related` never runs `scripts/run-related-tests.ts`, such as one that runs
-  `rig related`, the build deletes the runner and `scripts/read-worker-count.ts`. The build deletes
-  the copies that the entry just wrote, so the sync pull request deletes any copy that an earlier
-  sync left in the repo. A repo on rig whose `test:related` is missing or still runs the runner
-  keeps both files, so its pre-push test job still finds the script it calls.
+  has its own `test:related`, such as `rig related`, and has no script that runs
+  `scripts/run-related-tests.ts`, the build deletes the runner. It also deletes
+  `scripts/read-worker-count.ts` there, unless a script runs that helper. The build deletes the
+  copies that the entry just wrote, so the sync pull request deletes any copy that an earlier sync
+  left in the repo. A repo on rig whose `test:related` is missing or still runs the runner keeps
+  both files, so its pre-push test job still finds the script it calls.
 
 The entry delivers the check scripts from [`packages/chex/src/`](../../packages/chex/src/), under
 the same names in `scripts/`, so a delivered check runs the code that `chex <check>` runs. The

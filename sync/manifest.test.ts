@@ -265,3 +265,47 @@ test('it runs a pre-push-baseline build that keeps the related-tests runner and 
     },
   });
 });
+
+test('it runs a pre-push-baseline build that removes the related-tests runner but keeps the worker-count helper in a repo on @zgeoff/rig whose own script calls the helper', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({
+      scripts: {
+        'test:related': 'rig related',
+        'test:workers': 'bun test --parallel=$(bun scripts/read-worker-count.ts)',
+      },
+      devDependencies: { '@zgeoff/rig': '0.1.6' },
+    }),
+  );
+
+  await mkdir(join(ctx.directory, 'scripts'));
+  await writeFile(join(ctx.directory, 'scripts/run-related-tests.ts'), 'export {};\n');
+  await writeFile(join(ctx.directory, 'scripts/read-worker-count.ts'), 'export {};\n');
+
+  await ctx.runBuild();
+
+  const scripts = await ctx.probeScripts();
+
+  expect(scripts).toStrictEqual({ 'run-related-tests.ts': false, 'read-worker-count.ts': true });
+});
+
+test('it runs a pre-push-baseline build that keeps the related-tests runner in a repo without @zgeoff/rig whose own test:related never calls it', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'package.json'),
+    JSON.stringify({ scripts: { 'test:related': 'bun test' } }),
+  );
+
+  await mkdir(join(ctx.directory, 'scripts'));
+  await writeFile(join(ctx.directory, 'scripts/run-related-tests.ts'), 'export {};\n');
+  await writeFile(join(ctx.directory, 'scripts/read-worker-count.ts'), 'export {};\n');
+
+  await ctx.runBuild();
+
+  const scripts = await ctx.probeScripts();
+
+  expect(scripts).toStrictEqual({ 'run-related-tests.ts': true, 'read-worker-count.ts': true });
+});
