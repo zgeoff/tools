@@ -73,6 +73,7 @@ async function setupTest() {
     packageDir,
     agentHooksSource: join(import.meta.dir, '../../packages/agent-hooks/src/index.ts'),
     installLog,
+    stubPath,
     runStub,
     startStub,
     readInstallLog,
@@ -211,12 +212,76 @@ test('it refuses an edit with the install message when the install fails', async
     [],
   );
 
-  expect(result.status).toBe(2);
-  expect(result.stdout).toBe('');
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr: `stub install started\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+  });
+});
 
-  expect(result.stderr).toBe(
-    'stub install started\nTo work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n',
+test('it refuses a gated edit with the import error and the install message when the installed package throws on import', async () => {
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+  });
+
+  await writeTreeFiles(ctx.packageDir, {
+    'package.json': JSON.stringify({
+      name: '@zgeoff/agent-hooks',
+      type: 'module',
+      exports: './index.ts',
+    }),
+    'index.ts': "throw new Error('the gate table has no rows');\n",
+  });
+
+  const result = ctx.runStub(
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
+    [],
   );
+
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr:
+      'stub install started\nThe agent hook could not load @zgeoff/agent-hooks: Error: the gate table has no rows\nTo work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag.\n',
+  });
+});
+
+test('it prints the import error and lets a PostToolUse event through when the installed package throws on import', async () => {
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: { kind: 'links', packageName: '@zgeoff/agent-hooks', packageDir: ctx.packageDir },
+  });
+
+  await writeTreeFiles(ctx.packageDir, {
+    'package.json': JSON.stringify({
+      name: '@zgeoff/agent-hooks',
+      type: 'module',
+      exports: './index.ts',
+    }),
+    'index.ts': "throw new Error('the gate table has no rows');\n",
+  });
+
+  const result = ctx.runStub(
+    JSON.stringify({
+      hook_event_name: 'PostToolUse',
+      cwd: ctx.project,
+      tool_name: 'Write',
+      tool_input: { file_path: join(ctx.project, 'guide.md') },
+    }),
+    [],
+  );
+
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 0,
+    stdout: '',
+    stderr:
+      'stub install started\nThe agent hook could not load @zgeoff/agent-hooks: Error: the gate table has no rows\n',
+  });
 });
 
 // A parser cannot see a gated path that the shell builds, so any shell syntax refuses the command.
@@ -547,11 +612,10 @@ test('it skips the install and refuses when a stopped hook left the guard behind
     [],
   );
 
-  expect(result.status).toBe(2);
-
-  expect(result.stderr).toBe(
-    `A stopped agent hook left ${join(ctx.project, 'node_modules/.agent-hooks-install.lock.guard')} behind, so this one skips the install. Remove that file.\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
-  );
+  expect({ status: result.status, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stderr: `A stopped agent hook left ${join(ctx.project, 'node_modules/.agent-hooks-install.lock.guard')} behind, so this one skips the install. Remove that file.\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+  });
 
   const installLog = await ctx.readInstallLog();
 
@@ -691,11 +755,10 @@ test.skipIf(isRoot)(
 
     const stderr = await new Response(hook.stderr).text();
 
-    expect(status).toBe(2);
-
-    expect(stderr).toBe(
-      `The agent hook could not run bun install: Error: EACCES: permission denied, open '${join(ctx.project, 'node_modules/.agent-hooks-install.lock')}'\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
-    );
+    expect({ status, stderr }).toStrictEqual({
+      status: 2,
+      stderr: `The agent hook could not run bun install: Error: EACCES: permission denied, open '${join(ctx.project, 'node_modules/.agent-hooks-install.lock')}'\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+    });
 
     const installLog = await ctx.readInstallLog();
 
