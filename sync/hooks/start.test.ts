@@ -396,6 +396,8 @@ test.each([
   'cd packages && bun install',
   'bun install 2>&1 | tail',
   'bun install --verbose',
+  'bun',
+  'date',
 ])('it refuses the Bash command %s when the install fails', async (command) => {
   const ctx = await setupTest();
 
@@ -423,6 +425,7 @@ test.each([
   { label: 'an input redirect', command: 'cat <package.json' },
   { label: 'a control character', command: 'pwd\u0007' },
   { label: 'a leading space', command: ' pwd' },
+  { label: 'no words', command: '' },
 ])('it refuses a Bash command with $label when the install fails', async (row) => {
   const ctx = await setupTest();
 
