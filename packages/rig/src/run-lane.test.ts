@@ -541,7 +541,9 @@ test('it leaves the paths that the config ignores out of the e2e run, and needs 
     },
   );
 
-  const testCommand = ctx.runCommand.mock.calls.at(-1)?.[0] ?? [];
+  const testCommand = ctx.runCommand.mock.calls.at(-1)?.[0];
+
+  invariant(testCommand, 'the lane ran no command');
 
   expect({
     exitCode,
