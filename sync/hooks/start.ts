@@ -162,7 +162,7 @@ export async function runInstallOnce(
   }
 
   if (step === 'out-of-time') {
-    return `another agent hook held ${lockPath}${GUARD_SUFFIX} past the deadline`;
+    return `the deadline passed before this agent hook could claim ${lockPath}`;
   }
 
   if (step === 'wait-for-install') {
@@ -218,7 +218,7 @@ export async function claimInstallLock(
       timedOut: dependencies.now() >= deadlineMs,
     });
 
-    if (step === 'wait-for-install') {
+    if (step === 'wait-for-install' || step === 'out-of-time') {
       return step;
     }
 
@@ -313,11 +313,9 @@ const INSTALL_STEPS = {
   waited: { absent: 'skip-install', held: 'wait-for-install', stale: 'claim-again' },
 } as const satisfies InstallSteps;
 
-// Past the deadline, a hook stops each wait. A hook that holds the guard still checks the install
-// lock, since a held lock sends it to the wait, where the deadline stops it.
 const LATE_INSTALL_STEPS = {
   guard: { absent: 'out-of-time', held: 'out-of-time', stale: 'stop' },
-  install: INSTALL_STEPS.install,
+  install: { absent: 'out-of-time', held: 'out-of-time', stale: 'out-of-time' },
   waited: { absent: 'skip-install', held: 'out-of-time', stale: 'claim-again' },
 } as const satisfies InstallSteps;
 
@@ -462,7 +460,7 @@ export const NODE_INSTALL_DEPENDENCIES: InstallDependencies = {
   signalProcess: (pid) => {
     process.kill(pid, 0);
   },
-  sleep: (durationMs) => Bun.sleep(durationMs),
+  sleep: Bun.sleep,
   now: Date.now,
   runInstall: (timeoutMs) =>
     spawnSync('bun', ['install', '--frozen-lockfile'], {

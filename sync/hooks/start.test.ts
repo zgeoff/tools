@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { chmod, copyFile, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { waitFor } from '@zgeoff/testing/helpers';
+import { makeRepeatingAnswerQueue, waitFor } from '@zgeoff/testing/helpers';
 import { buildPreToolUsePayload } from '../test-utils/build-pre-tool-use-payload.ts';
 import { createStubInstall } from '../test-utils/create-stub-install.ts';
 import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
@@ -1132,17 +1132,17 @@ test.each([
   {
     label: 'the install lock is absent past the deadline',
     claim: { lock: 'install', state: 'absent', timedOut: true },
-    expected: 'install',
+    expected: 'out-of-time',
   },
   {
     label: 'another hook holds the install lock past the deadline',
     claim: { lock: 'install', state: 'held', timedOut: true },
-    expected: 'wait-for-install',
+    expected: 'out-of-time',
   },
   {
     label: 'a stopped hook left the install lock past the deadline',
     claim: { lock: 'install', state: 'stale', timedOut: true },
-    expected: 'install',
+    expected: 'out-of-time',
   },
   {
     label: 'the install it waited for ended past the deadline',
@@ -1410,12 +1410,32 @@ test('#runInstallOnce reports a failure and runs no install when another hook ho
   );
 
   expect({ failure, installs: runInstall.mock.calls }).toStrictEqual({
-    failure: `another agent hook held ${join(ctx.project, 'node_modules/.agent-hooks-install.lock.guard')} past the deadline`,
+    failure: `the deadline passed before this agent hook could claim ${join(ctx.project, 'node_modules/.agent-hooks-install.lock')}`,
     installs: [],
   });
 });
 
-test('#runInstallOnce reports a failure when another hook holds the install lock past the deadline', async () => {
+test('#runInstallOnce runs no install when it claims a free lock past the deadline', async () => {
+  const ctx = await setupTest();
+
+  const runInstall = mock<InstallDependencies['runInstall']>(() => ({ status: 0, signal: null }));
+
+  const failure = await runInstallOnce(
+    join(ctx.project, 'node_modules/.agent-hooks-install.lock'),
+    5000,
+    { ...NODE_INSTALL_DEPENDENCIES, now: () => 5000, runInstall },
+  );
+
+  const files = await readdir(join(ctx.project, 'node_modules'));
+
+  expect({ failure, installs: runInstall.mock.calls, files }).toStrictEqual({
+    failure: `the deadline passed before this agent hook could claim ${join(ctx.project, 'node_modules/.agent-hooks-install.lock')}`,
+    installs: [],
+    files: [],
+  });
+});
+
+test('#runInstallOnce reports a failure when the deadline passes while another hook holds the install lock', async () => {
   const ctx = await setupTest();
 
   await writeTreeFiles(ctx.project, {
@@ -1427,7 +1447,7 @@ test('#runInstallOnce reports a failure when another hook holds the install lock
   const failure = await runInstallOnce(
     join(ctx.project, 'node_modules/.agent-hooks-install.lock'),
     5000,
-    { ...NODE_INSTALL_DEPENDENCIES, now: () => 5000, runInstall },
+    { ...NODE_INSTALL_DEPENDENCIES, now: makeRepeatingAnswerQueue([0, 5000]), runInstall },
   );
 
   expect({ failure, installs: runInstall.mock.calls }).toStrictEqual({
