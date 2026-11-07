@@ -50,8 +50,8 @@ The rule reports an entry that names no `package.json`, and an entry whose packa
 three checks, with the fix "remove it from `pending`". An empty list means the repo has folded every
 package.
 
-oxlint runs a rule once per file, with no hook for the whole run. The rule reads the pending
-packages from the first file it judges in each repo, and reports a stale entry on that file only.
-For the `utils/` check there, it drops the comments of each `utils/` file and scans the rest for
-import specifiers in place of a parse, so an import specifier that only a string holds keeps the
-entry listed.
+oxlint runs a rule once per file, with no hook for the whole run. The rule checks the pending
+packages on the first file that oxlint lints in each repo, whether or not that file sits under a
+package's `src/`, and reports a stale entry on that file only. For the `utils/` check there, it
+drops the comments of each `utils/` file and scans the rest for import specifiers in place of a
+parse, so an import specifier that only a string holds keeps the entry listed.
