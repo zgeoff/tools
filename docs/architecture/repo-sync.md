@@ -116,7 +116,11 @@ An entry holds:
   receive the file. The workflow copies each file verbatim, except that a workflow target's calls to
   `zgeoff/tools` workflows move to the commit the run syncs from, and a Markdown target loses the
   blocks that need a file the repo does not receive.
-- `optIn` (optional) — `true` delivers the entry only to a repo whose stub lists it in `include`.
+- `optIn` (optional) — `true` delivers the entry only to a repo whose stub lists it in `include`, or
+  that takes an entry whose `needs` names it.
+- `needs` (optional) — the names of the entries that a repo taking this entry takes too, and what
+  those need in turn, other than an entry the repo's stub lists in `skip`. A run refuses a name that
+  is no entry of the manifest.
 - `build` (optional) — a bash command the workflow runs in the downstream checkout after the copy,
   for a file that is generated from a copied one. The runner has bash, git and jq, and nothing from
   the downstream repo's toolchain is installed, so the command uses those only.
@@ -153,14 +157,21 @@ Claude Code reads them, to `../.agents/skills`, so the copy lands in `.agents/sk
 targets stay under `.claude/skills/`: in a repo whose `.claude/skills` is a folder, a target under
 `.agents/skills/` lands where Claude Code never reads, and the retired-file step deletes the copy it
 does read. The run checks out zgeoff/skills at the commit that `sync/skills-pin.json` holds in the
-tools commit it syncs, so a repo's sync pull request names both commits. A skill entry is opt-in, so
-a repo takes only the skills for the work it holds. These skill entries are not opt-in, and reach
-every repo:
+tools commit it syncs, so a repo's sync pull request names both commits. A skill entry is opt-in,
+and a repo takes it when its stub lists it in `include` or an entry the repo takes needs it. These
+skill entries are not opt-in, and reach every repo:
 
 - `skill-pr-evidence`, because every agent that opens a pull request needs it.
 - `skill-deslop`, because the skill gate makes an agent load it before a skill edit.
 - `skill-cold-read`, because each repo's AGENTS.md has an agent run a cold read on a skill it
   changed.
+
+A skill links another skill by relative path, so an entry whose Markdown links a file of another
+opt-in entry lists that entry in `needs`. `scripts/check-sync-manifest.sh` fails on a link to such a
+file when the linking entry doesn't need its entry, directly or through another entry. A link that
+resolves to no target, such as an example in a code block, passes. The deslop and cold-read entries
+need the docs-writing and skill-writing entries, and the skill-writing entry needs the code-style,
+ci-design and testing entries, so every repo takes those five skills unless its stub skips one.
 
 A repo keeps its own rules for the same area in a `project-<name>` skill beside it, which repo-sync
 never touches, and the shared skill tells the reader to load both. The entry lists every file in its

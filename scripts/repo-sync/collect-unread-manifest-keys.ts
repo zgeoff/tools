@@ -12,6 +12,7 @@ const entryKeys = new Set([
   'optIn',
   'scripts',
   'packages',
+  'needs',
 ]);
 
 const fileKeys = new Set(['repo', 'source', 'target', 'mode', 'except']);

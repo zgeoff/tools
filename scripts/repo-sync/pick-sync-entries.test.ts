@@ -55,3 +55,78 @@ test('it leaves out a skipped entry and an opt-in entry that include does not li
 
   expect(picked).toStrictEqual({ kind: 'picked', entries: [editorconfig] });
 });
+
+test('it takes each entry that a taken entry needs, and what that entry needs in turn', () => {
+  const kettle = buildMockSyncEntry({ name: 'skill-kettle', needs: ['skill-descaling'] });
+
+  const descaling = buildMockSyncEntry({
+    name: 'skill-descaling',
+    optIn: true,
+    needs: ['skill-limescale'],
+  });
+
+  const limescale = buildMockSyncEntry({ name: 'skill-limescale', optIn: true });
+
+  const picked = pickSyncEntries({
+    manifest: [
+      kettle,
+      descaling,
+      limescale,
+      buildMockSyncEntry({ name: 'skill-teapot', optIn: true }),
+    ],
+    skip: '',
+    include: '',
+  });
+
+  expect(picked).toStrictEqual({ kind: 'picked', entries: [kettle, descaling, limescale] });
+});
+
+test('it takes each entry once when two entries need each other', () => {
+  const kettle = buildMockSyncEntry({ name: 'skill-kettle', optIn: true, needs: ['skill-teapot'] });
+  const teapot = buildMockSyncEntry({ name: 'skill-teapot', optIn: true, needs: ['skill-kettle'] });
+  const picked = pickSyncEntries({ manifest: [kettle, teapot], skip: '', include: 'skill-teapot' });
+
+  expect(picked).toStrictEqual({ kind: 'picked', entries: [kettle, teapot] });
+});
+
+test('it leaves out a needed entry that skip lists, and the entries only it needs', () => {
+  const kettle = buildMockSyncEntry({ name: 'skill-kettle', needs: ['skill-descaling'] });
+
+  const picked = pickSyncEntries({
+    manifest: [
+      kettle,
+      buildMockSyncEntry({ name: 'skill-descaling', optIn: true, needs: ['skill-limescale'] }),
+      buildMockSyncEntry({ name: 'skill-limescale', optIn: true }),
+    ],
+    skip: 'skill-descaling',
+    include: '',
+  });
+
+  expect(picked).toStrictEqual({ kind: 'picked', entries: [kettle] });
+});
+
+test('it takes a needed entry that include lists too', () => {
+  const kettle = buildMockSyncEntry({ name: 'skill-kettle', needs: ['skill-descaling'] });
+  const descaling = buildMockSyncEntry({ name: 'skill-descaling', optIn: true });
+
+  const picked = pickSyncEntries({
+    manifest: [kettle, descaling],
+    skip: '',
+    include: 'skill-descaling',
+  });
+
+  expect(picked).toStrictEqual({ kind: 'picked', entries: [kettle, descaling] });
+});
+
+test('it refuses a needs name that no manifest entry holds, with its colons replaced', () => {
+  const picked = pickSyncEntries({
+    manifest: [buildMockSyncEntry({ name: 'skill-kettle', needs: ['::skill-ghost'] })],
+    skip: '',
+    include: '',
+  });
+
+  expect(picked).toStrictEqual({
+    kind: 'refused',
+    message: 'needs lists no manifest entry: skill-kettle needs   skill-ghost',
+  });
+});

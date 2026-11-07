@@ -9,6 +9,7 @@ test('it returns no key for an entry that holds every key of the manifest format
     build: 'true',
     scripts: { boil: 'bun kettle.ts' },
     packages: ['zod'],
+    needs: ['teapot'],
     files: [
       {
         repo: 'zgeoff/tools',

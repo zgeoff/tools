@@ -9,6 +9,7 @@ test('it builds a default sync entry', () => {
     build: '',
     optIn: false,
     scripts: {},
+    needs: [],
   });
 });
 
@@ -22,5 +23,6 @@ test('it applies overrides on top of the defaults', () => {
     build: '',
     optIn: true,
     scripts: {},
+    needs: [],
   });
 });

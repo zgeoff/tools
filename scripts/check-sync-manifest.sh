@@ -6,8 +6,11 @@
 # `except` that lists owner/repo names, no link to an excepted file outside a
 # block that needs it, a `repo` that names zgeoff/tools or zgeoff/skills, no
 # key the repo-sync scripts do not read,
-# every file under skills/<name>/ in zgeoff/skills listed by the entry that
-# ships that skill, except the tests, every package a code source imports
+# a `needs` that lists entry names, every file under skills/<name>/ in
+# zgeoff/skills listed by the entry that ships that skill, except the tests,
+# a manifest the repo-sync scripts can parse, no link from a Markdown source to
+# another entry's file unless that entry reaches every repo or the linking
+# entry needs it, every package a code source imports
 # listed in its entry's `packages`, every relative import of a code source
 # delivered by the same entry, and this repo's own .claude/skill-gate.json
 # holding every ignore entry and gate of the source that targets that path.
@@ -65,6 +68,12 @@ while IFS= read -r name; do
   report "entry '$name' has a scripts field that is not an object of strings"
 done < <(jq -r '.[] | select(has("scripts"))
   | select((.scripts | type) != "object" or any(.scripts[]; type != "string")) | .name' "$manifest")
+
+while IFS= read -r name; do
+  report "entry '$name' has a needs field that is not a list of entry names"
+done < <(jq -r '[.[].name] as $names | .[] | select(has("needs"))
+  | select((.needs | type) != "array"
+    or any(.needs[]; type != "string" or (. as $need | $names | index($need) | not))) | .name' "$manifest")
 
 while IFS= read -r name; do
   report "entry '$name' has a packages field that is not a list of strings"
@@ -297,5 +306,19 @@ while IFS= read -r prefix; do
   done < <(find "$skills_tree/$prefix" -type f -not -name '*.test.ts' | sort)
 done < <(jq -r '[.[].files[] | select(.repo == "zgeoff/skills") | .source
   | select(startswith("skills/")) | split("/")[0:2] | join("/") + "/"] | unique | .[]' "$manifest")
+
+# A repo takes an opt-in entry only when its stub includes it or an entry it
+# takes needs it, so a Markdown file that links another entry's file arrives
+# with a dead link unless that entry reaches every repo or is needed. A link
+# that resolves to no target, such as an example in a code block, passes.
+if links=$(bun "$scripts_dir/repo-sync/collect-undelivered-links.ts" "$manifest" "$skills_tree"); then
+  while IFS=$'\t' read -r name source link owners; do
+    if [ -n "$name" ]; then
+      report "entry '$name' links $link from $source, which $owners delivers; add it to the entry's needs"
+    fi
+  done <<< "$links"
+else
+  report "the repo-sync scripts cannot parse $manifest, so the sync would refuse it"
+fi
 
 exit "$errors"

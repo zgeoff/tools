@@ -83,6 +83,7 @@
     "name": "skill-testing",
     "description": "The shared testing skill and its references; a repo keeps its own rules in a project-testing skill",
     "optIn": true,
+    "needs": ["skill-ci-design"],
     "files": [
       {
         "repo": "zgeoff/skills",
@@ -183,6 +184,7 @@
     "name": "skill-code-style",
     "description": "The shared code-style skill, whose role table the verb-contract lint rule's test pins; a repo keeps its own rules in a project-code-style skill",
     "optIn": true,
+    "needs": ["skill-testing"],
     "files": [
       {
         "repo": "zgeoff/skills",
@@ -242,6 +244,7 @@
     "name": "skill-skill-writing",
     "description": "The shared skill-writing skill and its check-skill script",
     "optIn": true,
+    "needs": ["skill-docs-writing", "skill-code-style", "skill-ci-design", "skill-testing"],
     "files": [
       {
         "repo": "zgeoff/skills",
@@ -281,6 +284,7 @@
     "name": "skill-ci-design",
     "description": "The shared ci-design skill, which holds the patterns for a GitHub Actions pipeline; a repo keeps its own pipeline in a project-ci-design skill",
     "optIn": true,
+    "needs": ["skill-testing"],
     "files": [
       {
         "repo": "zgeoff/skills",
@@ -303,6 +307,7 @@
   {
     "name": "skill-deslop",
     "description": "The shared deslop skill, which edits existing prose so it reads plainly; every repo takes it, because the skill-gate-rules entry makes an agent load it before a skill edit",
+    "needs": ["skill-docs-writing", "skill-skill-writing"],
     "files": [
       {
         "repo": "zgeoff/skills",
@@ -314,6 +319,7 @@
   {
     "name": "skill-cold-read",
     "description": "The shared cold-read skill and the brief its fresh subagent follows; every repo takes it, because each repo's AGENTS.md has an agent run a cold read on a skill it changed, and put the findings in the PR description",
+    "needs": ["skill-docs-writing", "skill-skill-writing"],
     "files": [
       {
         "repo": "zgeoff/skills",
