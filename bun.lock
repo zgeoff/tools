@@ -169,7 +169,7 @@
     },
     "packages/kysely-bun-sqlite": {
       "name": "@zgeoff/kysely-bun-sqlite",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "devDependencies": {
         "@types/bun": "catalog:",
         "kysely": "catalog:",
@@ -194,7 +194,7 @@
     },
     "packages/oxlint-config": {
       "name": "@zgeoff/oxlint-config",
-      "version": "0.10.0",
+      "version": "0.10.1",
       "dependencies": {
         "@stylistic/eslint-plugin": "catalog:",
       },

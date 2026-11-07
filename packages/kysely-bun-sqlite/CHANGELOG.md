@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/zgeoff/tools/compare/@zgeoff/kysely-bun-sqlite@0.3.0...@zgeoff/kysely-bun-sqlite@0.3.1) (2026-11-07)
+
+
+### Features
+
+* **oxlint-config:** add the seed-only and test-beside-seed rules ([#571](https://github.com/zgeoff/tools/issues/571)) ([7fdff02](https://github.com/zgeoff/tools/commit/7fdff02a80294ffdd1d093286fa9f56c01567b24))
+
 ## [0.3.0](https://github.com/zgeoff/tools/compare/@zgeoff/kysely-bun-sqlite@0.2.0...@zgeoff/kysely-bun-sqlite@0.3.0) (2026-10-20)
 
 ### ⚠ BREAKING CHANGES
