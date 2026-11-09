@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.2.2...@zgeoff/rig@0.2.3) (2026-11-09)
+
+
+### Bug Fixes
+
+* **rig:** keep the scripts a repo already defines in rig init ([#589](https://github.com/zgeoff/tools/issues/589)) ([72b3891](https://github.com/zgeoff/tools/commit/72b38911a881a2bc5926a13c90b91f8de546144b))
+
 ## [0.2.2](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.2.1...@zgeoff/rig@0.2.2) (2026-11-07)
 
 
