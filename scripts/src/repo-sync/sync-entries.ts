@@ -399,7 +399,7 @@ async function removeRetiredFiles(
   taken: readonly string[],
   copied: readonly string[],
 ): Promise<RetiredFiles> {
-  const script = '.repo-sync/scripts/src/remove-retired-sync-files.sh';
+  const script = '.repo-sync/scripts/remove-retired-sync-files.sh';
 
   const hasScript = await context.fileSystem.probePath(join(context.cwd, script));
 

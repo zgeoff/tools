@@ -39,18 +39,14 @@ async function setupTest() {
   await mkdir(bin);
   await createStubPullRequestGH(bin, state);
 
-  // The tools checkout holds the shell scripts the sync runs, as the code under test.
+  // The tools checkout holds the shell scripts the sync runs, and their stubs, as the code under
+  // test.
   await mkdir(join(tools, 'scripts', 'src'), { recursive: true });
 
-  await cp(
-    join(source, 'remove-excluded-blocks.sh'),
-    join(tools, 'scripts', 'src', 'remove-excluded-blocks.sh'),
-  );
-
-  await cp(
-    join(source, 'remove-retired-sync-files.sh'),
-    join(tools, 'scripts', 'src', 'remove-retired-sync-files.sh'),
-  );
+  for (const name of ['remove-excluded-blocks.sh', 'remove-retired-sync-files.sh']) {
+    await cp(join(source, name), join(tools, 'scripts', 'src', name));
+    await cp(join(source, '..', name), join(tools, 'scripts', name));
+  }
 
   await $`git -C ${tools} init -q`.env(env).quiet();
 
@@ -870,6 +866,7 @@ test('it syncs from a tools ref that has no retired-file cleanup', async () => {
 
   await ctx.writeMainCommit('README.md', '# app\n');
   await ctx.writeManifestCommit([]);
+  await ctx.removeSource('scripts/remove-retired-sync-files.sh');
   await ctx.removeSource('scripts/src/remove-retired-sync-files.sh');
   await ctx.writeSource('sync/editorconfig', 'root = true\n');
 
@@ -1334,6 +1331,65 @@ test('it leaves out a file excepted for the caller and drops the Markdown block 
 
   await ctx.writeMainCommit('README.md', '# app\n');
   await ctx.writeManifestCommit([]);
+
+  await ctx.writeSource(
+    'sync/skills/demo/SKILL.md',
+    [
+      '# Demo',
+      '',
+      '<!-- repo-sync needs references/rust.md -->',
+      'Read [the Rust notes](references/rust.md).',
+      '<!-- repo-sync end -->',
+      '',
+      'Boil the kettle.',
+      '',
+    ].join('\n'),
+  );
+
+  await ctx.writeSource('sync/skills/demo/references/rust.md', '# Rust\n');
+
+  const exitCode = await ctx.runSync([
+    {
+      name: 'skill-demo',
+      description: 'The demo skill',
+      files: [
+        { source: 'sync/skills/demo/SKILL.md', target: '.claude/skills/demo/SKILL.md' },
+        {
+          source: 'sync/skills/demo/references/rust.md',
+          target: '.claude/skills/demo/references/rust.md',
+          except: ['Example/App'],
+        },
+      ],
+    },
+  ]);
+
+  const files = await ctx.readBranchFiles('repo-sync/zgeoff-tools');
+  const skill = await ctx.readBranch('repo-sync/zgeoff-tools', '.claude/skills/demo/SKILL.md');
+
+  expect(exitCode).toBe(0);
+  expect(files).toStrictEqual(['.claude/skills/demo/SKILL.md', 'README.md']);
+  expect(skill).toBe('# Demo\n\nBoil the kettle.\n');
+});
+
+test('it strips a Markdown block and removes a retired file from a tools ref with no scripts/src/', async () => {
+  const ctx = await setupTest();
+
+  for (const name of ['remove-excluded-blocks.sh', 'remove-retired-sync-files.sh']) {
+    const script = await readFile(join(import.meta.dir, '..', name), 'utf8');
+
+    await ctx.removeSource(`scripts/src/${name}`);
+    await ctx.writeSource(`scripts/${name}`, script);
+  }
+
+  await ctx.writeMainCommit('README.md', '# app\n');
+  await ctx.writeManifestCommit([]);
+
+  const kettle = { source: 'sync/kettle.md', target: 'kettle.md' };
+
+  await ctx.writeSource(kettle.source, '# Kettle\n');
+  await ctx.writeManifestCommit([{ name: 'kettle', files: [kettle] }]);
+  await ctx.writeManifestCommit([]);
+  await ctx.writeBranch('main', kettle.target, '# Kettle\n');
 
   await ctx.writeSource(
     'sync/skills/demo/SKILL.md',

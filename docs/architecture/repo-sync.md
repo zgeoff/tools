@@ -101,10 +101,10 @@ request, so the scripts never copy it with the key ignored. The run fails after 
 sync, and the first run on a pin that reads the key syncs the entry.
 
 The step scripts run two shell scripts from the synced commit, not from the pin: the Markdown block
-stripper and the retired-file cleanup. Their source sits under `scripts/src/`. The scripts of an
-older pin call them at `scripts/remove-excluded-blocks.sh` and
-`scripts/remove-retired-sync-files.sh`, so each of those paths holds a stub that runs the script
-under `scripts/src/` with the same arguments.
+stripper and the retired-file cleanup. The step scripts of every pin call them at
+`scripts/remove-excluded-blocks.sh` and `scripts/remove-retired-sync-files.sh`, the paths they have
+in every tools commit, whether the synced commit is older or newer than the pin. Their source sits
+under `scripts/src/`, and each of those paths holds a stub that runs it with the same arguments.
 
 When the open sync pull request has a failing check and is more than a day old, the workflow's alarm
 job opens one issue for it in the repo, so a red sync never waits unseen. The alarm runs with the

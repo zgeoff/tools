@@ -43,7 +43,7 @@ export async function writeCopyPlan(context: CopyPlanContext, plan: CopyPlan): P
   for (const target of plan.strippedTargets) {
     await runChecked(context, [
       'bash',
-      '.repo-sync/scripts/src/remove-excluded-blocks.sh',
+      '.repo-sync/scripts/remove-excluded-blocks.sh',
       target,
       ...plan.excluded,
     ]);
