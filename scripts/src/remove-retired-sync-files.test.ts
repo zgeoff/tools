@@ -108,7 +108,7 @@ test('it keeps a retired copy that reaches the file of a current target through 
 
   await writeTreeFiles(ctx.caller, { '.agents/skills/demo/SKILL.md': '# Demo\n' });
   await mkdir(join(ctx.caller, '.claude'));
-  await symlink('../../.agents/skills', join(ctx.caller, '.claude/skills'));
+  await symlink('../.agents/skills', join(ctx.caller, '.claude/skills'));
 
   const result = await $`bash ${ctx.scriptPath} ${ctx.tools} skill-demo`
     .cwd(ctx.caller)
