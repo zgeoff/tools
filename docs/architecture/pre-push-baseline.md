@@ -105,8 +105,8 @@ command, holds that timeout as one constant, the only place a run may raise the 
 
 The `pre-push-baseline` entry delivers the baseline to a repo that does not install chex, as
 `.lefthook/pre-push-baseline.yml`, from
-[`sync/pre-push/lefthook-pre-push.yml`](../../sync/pre-push/lefthook-pre-push.yml). Its jobs match
-the table above, with these differences:
+[`sync/src/pre-push/lefthook-pre-push.yml`](../../sync/src/pre-push/lefthook-pre-push.yml). Its jobs
+match the table above, with these differences:
 
 - Each job calls a package script that the entry's build adds to `package.json` when the repo lacks
   it: `files:branch`, `lint:files`, `test:related`, `check:commits`, `check:local-paths`,
@@ -141,9 +141,9 @@ the table above, with these differences:
 The entry delivers the check scripts from [`packages/chex/src/`](../../packages/chex/src/), under
 the same names in `scripts/`, so a delivered check runs the code that `chex <check>` runs. The
 related-tests runner, `scripts/build-related-test-command.ts`, `scripts/read-worker-count.ts` and
-`scripts/read-memory-budget.ts` come from [`sync/pre-push/`](../../sync/pre-push/). The check
-scripts exit 0 when clean or skipped, 1 with a problem, and 2 when they cannot run, such as in a
-clone without origin's default branch. One exception: the workflow lint exits 0 with a problem,
+`scripts/read-memory-budget.ts` come from [`sync/src/pre-push/`](../../sync/src/pre-push/). The
+check scripts exit 0 when clean or skipped, 1 with a problem, and 2 when they cannot run, such as in
+a clone without origin's default branch. One exception: the workflow lint exits 0 with a problem,
 because it only warns. A repo opts in with three changes, which
 [Opting in to the pre-push baseline](../runbooks/downstream-repo-setup.md#opting-in-to-the-pre-push-baseline)
 lists.

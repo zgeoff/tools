@@ -4,10 +4,10 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildCopyPlan } from '../../scripts/src/repo-sync/build-copy-plan.ts';
-import { parseSyncEntries } from '../../scripts/src/repo-sync/parse-sync-entries.ts';
-import { pickSyncEntries } from '../../scripts/src/repo-sync/pick-sync-entries.ts';
-import { selectSyncFiles } from '../../scripts/src/repo-sync/select-sync-files.ts';
+import { buildCopyPlan } from '../../../scripts/src/repo-sync/build-copy-plan.ts';
+import { parseSyncEntries } from '../../../scripts/src/repo-sync/parse-sync-entries.ts';
+import { pickSyncEntries } from '../../../scripts/src/repo-sync/pick-sync-entries.ts';
+import { selectSyncFiles } from '../../../scripts/src/repo-sync/select-sync-files.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'skill-gate-rules-'));
@@ -17,10 +17,10 @@ async function setupTest() {
   const project = join(directory, 'project');
   const transcriptPath = join(directory, 'transcript.jsonl');
   const rulesPath = join(import.meta.dir, 'skill-gate.json');
-  const manifestPath = join(import.meta.dir, '../manifest.json');
+  const manifestPath = join(import.meta.dir, '../../manifest.json');
 
   const indexPath = fileURLToPath(
-    new URL('../../packages/agent-hooks/src/index.ts', import.meta.url),
+    new URL('../../../packages/agent-hooks/src/index.ts', import.meta.url),
   );
 
   const runEdit = (relativePath: string) =>
@@ -194,7 +194,7 @@ test.each(['zgeoff/llm', 'zgeoff/dotfiles', 'zgeoff/nixie-definitions'])(
     const copies = await ctx.planSyncCopies(repo);
 
     expect(copies).toContainEqual({
-      source: '.repo-sync/sync/skill-gate/skill-gate.json',
+      source: '.repo-sync/sync/src/skill-gate/skill-gate.json',
       target: '.claude/skill-gate.json',
     });
   },

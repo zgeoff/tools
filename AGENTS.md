@@ -40,9 +40,10 @@ tools is one Bun workspace.
 ```text
 packages/           the @zgeoff/* packages; release-please versions each one and publishes the
                     public ones to npm, as RELEASING.md describes
-sync/               the sources that repo-sync delivers, listed in sync/manifest.json; an edit here
-                    reaches every repo that takes the entry, as docs/architecture/repo-sync.md
-                    describes; skills-pin.json pins the zgeoff/skills commit of the skill text
+sync/               a private workspace; its src/ holds the sources that repo-sync delivers, listed
+                    in sync/manifest.json; an edit there reaches every repo that takes the entry,
+                    as docs/architecture/repo-sync.md describes; skills-pin.json pins the
+                    zgeoff/skills commit of the skill text; the folders below sit in its src/
   pre-push/         the pre-push baseline that the pre-push-baseline entry delivers; its check
                     scripts come from packages/chex, whose own baseline this repo's lefthook.yml
                     extends
@@ -91,8 +92,9 @@ says.
   oxlint runs both through tsrslint (`@maschwenk/tsrslint`), a Rust port of tsgolint, in tsgolint's
   place, because stock tsgolint runs out of memory under 2 GiB on impz. `lint:full` is CI-only:
   never run it locally.
-- `bun run typecheck` runs `tsrs` per workspace and over the root `rig.config.ts` and `sync/`. CI
-  runs it beside `lint:full`, and when the two type checks disagree, `tsrs` is right.
+- `bun run typecheck` runs `tsrs` per workspace and over the root `rig.config.ts` and
+  `.claude/hooks/`. CI runs it beside `lint:full`, and when the two type checks disagree, `tsrs` is
+  right.
 - `bun run check:sync` checks `sync/manifest.json` against the rules repo-sync assumes. Run it after
   you change the manifest or a file an entry lists. CI runs it, and the pre-push hook does not.
 - `bun run check:release-workflow` checks the tag step of the shared release job in
@@ -100,7 +102,7 @@ says.
   packages, in any dependency field, which stops release-please. CI and the pre-push hook run it.
 - `bun run check:chex-pin` fails when no custom manager in `renovate.json` captures the chex release
   that `.github/workflows/bun-checks.yml` pins, which Renovate then never bumps. CI runs it.
-- `bun run check:repo-sync-workflows` checks the stub `sync/repo-sync.yml` against
+- `bun run check:repo-sync-workflows` checks the stub `sync/src/repo-sync.yml` against
   `.github/workflows/repo-sync.yml`: two dispatches of different tools commits get two concurrency
   groups, the sync job queues every waiting run, the stub grants every permission a job asks for,
   and the alarm job asks for `actions: read`. CI and the pre-push hook run it.

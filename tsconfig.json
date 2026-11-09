@@ -1,4 +1,4 @@
 {
   "extends": "./tsconfig.base.json",
-  "include": ["rig.config.ts"]
+  "include": ["rig.config.ts", ".claude/hooks/*.ts"]
 }

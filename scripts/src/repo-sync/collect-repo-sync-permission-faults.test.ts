@@ -40,7 +40,7 @@ test('it reports a job permission that the stub withholds', () => {
   const faults = collectRepoSyncPermissionFaults(stubText, workflowText);
 
   expect(faults).toStrictEqual([
-    'sync/repo-sync.yml: the alarm job asks for actions: read, which the stub withholds',
+    'sync/src/repo-sync.yml: the alarm job asks for actions: read, which the stub withholds',
   ]);
 });
 
@@ -66,7 +66,7 @@ test('it reports a write that the stub grants only as a read', () => {
   const faults = collectRepoSyncPermissionFaults(stubText, workflowText);
 
   expect(faults).toStrictEqual([
-    'sync/repo-sync.yml: the alarm job asks for issues: write, which the stub withholds',
+    'sync/src/repo-sync.yml: the alarm job asks for issues: write, which the stub withholds',
   ]);
 });
 

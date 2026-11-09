@@ -22,7 +22,7 @@
 # pins every call to a workflow here, in the caller's own workflows too, to the
 # commit it syncs from.
 #
-# Callers install sync/repo-sync.yml as .github/workflows/repo-sync.yml and set
+# Callers install sync/src/repo-sync.yml as .github/workflows/repo-sync.yml and set
 # the REPO_SYNC_APP_CLIENT_ID and REPO_SYNC_APP_PRIVATE_KEY secrets. The job
 # mints a GitHub App token from them to push the branch and open the pull
 # request, so the caller's own workflows run on it; a push with the default

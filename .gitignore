@@ -8,7 +8,7 @@ packages/*/.test-*
 scripts/src/.test-*
 scripts/src/*/.test-*
 packages/*/src/test-utils/.test-*
-sync/test-utils/.test-*
+sync/src/test-utils/.test-*
 # zgeoff/skills at the pinned commit, which bun run skills:install unpacks and links this repo's
 # skills to.
 /.zgeoff-skills/

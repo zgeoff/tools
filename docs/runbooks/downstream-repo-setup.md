@@ -60,8 +60,8 @@ The merge of the repo-sync stub in step 5 starts the repo's first sync, so do th
 
    Expect: `git ls-files -s .claude/skills` prints mode `120000`.
 
-5. Copy [`repo-sync.yml`](../../sync/repo-sync.yml) to `.github/workflows/repo-sync.yml`. Pin its
-   `uses:` line to the newest commit on `main` of tools whose `Main` workflow run passed. A repo
+5. Copy [`repo-sync.yml`](../../sync/src/repo-sync.yml) to `.github/workflows/repo-sync.yml`. Pin
+   its `uses:` line to the newest commit on `main` of tools whose `Main` workflow run passed. A repo
    pinned to a commit whose run failed or still runs skips the sync until a newer commit turns
    green, and a sync pull request moves the pin to that commit. Print the newest green commit:
 
@@ -117,9 +117,9 @@ whole repo, so only the root `package.json` calls it. knip reads a relative path
 an absolute path. A repo opts in with one pull request that makes three changes:
 
 1. Add `knip-runner` to `include` in `.github/workflows/repo-sync.yml`.
-2. Copy [`run-knip.sh`](../../sync/deadcode/run-knip.sh) to `scripts/run-knip.sh` with its mode, as
-   in `install -m 0755 <tools>/sync/deadcode/run-knip.sh scripts/run-knip.sh`, where `<tools>` is a
-   checkout of tools at the newest commit on `main` whose `Main` run passed. Expect
+2. Copy [`run-knip.sh`](../../sync/src/deadcode/run-knip.sh) to `scripts/run-knip.sh` with its mode,
+   as in `install -m 0755 <tools>/sync/src/deadcode/run-knip.sh scripts/run-knip.sh`, where
+   `<tools>` is a checkout of tools at the newest commit on `main` whose `Main` run passed. Expect
    `git ls-files -s scripts/run-knip.sh` to show `100755` once you stage it. If it shows `100644`,
    run `git update-index --chmod=+x scripts/run-knip.sh`.
 3. In `package.json`, replace each `knip` command in the `deadcode` script with

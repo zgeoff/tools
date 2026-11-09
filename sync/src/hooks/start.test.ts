@@ -1,6 +1,15 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';
-import { chmod, copyFile, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { makeRepeatingAnswerQueue, waitFor } from '@zgeoff/testing/helpers';
@@ -98,7 +107,7 @@ async function setupTest() {
     project,
     fakeBin,
     packageDirectory,
-    agentHooksSource: join(import.meta.dir, '../../packages/agent-hooks/src/index.ts'),
+    agentHooksSource: join(import.meta.dir, '../../../packages/agent-hooks/src/index.ts'),
     installLog,
     stubPath,
     runStub,
@@ -1797,4 +1806,11 @@ test.each([
   });
 
   expect(verdict).toBe(row.expected);
+});
+
+test("it matches the copy that this repo's own hooks run, which sits at the depth every repo's copy does", async () => {
+  const stubText = await readFile(join(import.meta.dir, 'start.ts'), 'utf8');
+  const copyText = await readFile(join(import.meta.dir, '../../../.claude/hooks/start.ts'), 'utf8');
+
+  expect(copyText).toBe(stubText);
 });

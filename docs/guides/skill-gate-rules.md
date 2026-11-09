@@ -14,8 +14,8 @@ read [The shared rules](#the-shared-rules) before you change it.
 
 ## The shared rules
 
-Repo-sync copies [`sync/skill-gate/skill-gate.json`](../../sync/skill-gate/skill-gate.json) to
-`.claude/skill-gate.json`, through the `skill-gate-rules` entry of its
+Repo-sync copies [`sync/src/skill-gate/skill-gate.json`](../../sync/src/skill-gate/skill-gate.json)
+to `.claude/skill-gate.json`, through the `skill-gate-rules` entry of its
 [manifest](../architecture/repo-sync.md#manifest-entries). Each sync overwrites the copy, so change
 the shared gates in the source file in this repo.
 

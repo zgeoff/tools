@@ -6,28 +6,30 @@ Repo sync keeps the files every downstream repo carries a copy of current in eac
 one pull request on the branch `repo-sync/zgeoff-tools`, with one commit for each entry that
 changed. A run while that pull request is open updates it, and the pull request merges on green
 checks with no review, as [Auto-merge](#auto-merge) describes.
-[`repo-sync.yml`](../../sync/repo-sync.yml) is the stub a downstream repo installs to call it. A
+[`repo-sync.yml`](../../sync/src/repo-sync.yml) is the stub a downstream repo installs to call it. A
 merge to `main` here that changes a synced file reaches each repo as that pull request once `main`
 is green, as [Delivery](#delivery) describes.
 
 ## The sources
 
-The entries name their sources under [`sync/`](../../sync/), and a source can sit elsewhere in the
-repo or in [zgeoff/skills](https://github.com/zgeoff/skills):
+The entries name their sources under [`sync/src/`](../../sync/src/), and a source can sit elsewhere
+in the repo or in [zgeoff/skills](https://github.com/zgeoff/skills). `sync/` is a private workspace,
+and its manifest and pin sit at its root, because a run reads both by path from a commit newer than
+its step scripts:
 
 - [`sync/manifest.json`](../../sync/manifest.json): the entries, which
   `scripts/src/check-sync-manifest.sh` checks in CI.
-- [`sync/repo-sync.yml`](../../sync/repo-sync.yml): the stub that calls the repo-sync workflow at a
-  pinned commit.
-- [`sync/workflow-callers/`](../../sync/workflow-callers/): workflows that each call a reusable
-  workflow in this repo, all opt-in but the repo-sync guard.
+- [`sync/src/repo-sync.yml`](../../sync/src/repo-sync.yml): the stub that calls the repo-sync
+  workflow at a pinned commit.
+- [`sync/src/workflow-callers/`](../../sync/src/workflow-callers/): workflows that each call a
+  reusable workflow in this repo, all opt-in but the repo-sync guard.
 - [`sync/skills-pin.json`](../../sync/skills-pin.json): the commit of zgeoff/skills that each skill
   entry copies its text from, as [Skills](#skills) describes.
-- [`sync/hooks/`](../../sync/hooks/): the agent hooks' start-up stub and the skill gate's older
-  entry point.
-- [`sync/pre-push/`](../../sync/pre-push/): the [pre-push baseline](./pre-push-baseline.md) that the
-  `pre-push-baseline` entry delivers, and the [memory-cap script](./memory-caps.md).
-- [`sync/deadcode/`](../../sync/deadcode/): the
+- [`sync/src/hooks/`](../../sync/src/hooks/): the agent hooks' start-up stub and the skill gate's
+  older entry point.
+- [`sync/src/pre-push/`](../../sync/src/pre-push/): the [pre-push baseline](./pre-push-baseline.md)
+  that the `pre-push-baseline` entry delivers, and the [memory-cap script](./memory-caps.md).
+- [`sync/src/deadcode/`](../../sync/src/deadcode/): the
   [knip runner](../runbooks/downstream-repo-setup.md#opting-in-to-the-knip-runner).
 - [`packages/chex/src/`](../../packages/chex/src/): the docs check scripts that the skill entries
   and the `docs-vision-check` entry deliver, and the check scripts of the `pre-push-baseline` entry.
@@ -148,13 +150,13 @@ in its source. Without it, the workflow never overwrites a workflow file the rep
 
 ## Workflow callers
 
-Files under [`workflow-callers/`](../../sync/workflow-callers/) are short workflows that each call a
-reusable workflow in this repo. Each is an opt-in entry, which a repo lists in the stub's `include`
-input. One exception: `workflow-repo-sync-guard` reaches every repo, because every repo's sync pull
-request merges on its own, as [Auto-merge](#auto-merge) describes. A caller reads repo-specific
-values from repo variables, which its header comment names, since the copy is otherwise verbatim.
-`workflow-bun-pr` runs [`bun-checks.yml`](../../.github/workflows/bun-checks.yml), the standard Bun
-pull-request checks.
+Files under [`workflow-callers/`](../../sync/src/workflow-callers/) are short workflows that each
+call a reusable workflow in this repo. Each is an opt-in entry, which a repo lists in the stub's
+`include` input. One exception: `workflow-repo-sync-guard` reaches every repo, because every repo's
+sync pull request merges on its own, as [Auto-merge](#auto-merge) describes. A caller reads
+repo-specific values from repo variables, which its header comment names, since the copy is
+otherwise verbatim. `workflow-bun-pr` runs
+[`bun-checks.yml`](../../.github/workflows/bun-checks.yml), the standard Bun pull-request checks.
 
 ## Skills
 
@@ -219,7 +221,7 @@ holds a copy from before its `except` removes that copy itself.
 
 ## Hooks
 
-Files under [`hooks/`](../../sync/hooks/) are agent hooks, delivered as opt-in entries to
+Files under [`hooks/`](../../sync/src/hooks/) are agent hooks, delivered as opt-in entries to
 `.claude/hooks/`. Their tests stay in tools. `hook-start` delivers the start-up stub that every hook
 entry runs, which runs the hooks from [`@zgeoff/agent-hooks`](../../packages/agent-hooks/README.md)
 and installs the package when it is missing, as [Agent hooks](./agent-hooks.md) describes. A repo

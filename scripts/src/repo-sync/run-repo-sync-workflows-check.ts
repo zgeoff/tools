@@ -42,7 +42,7 @@ export async function runRepoSyncWorkflowsCheck(
 
 async function runCLI(): Promise<void> {
   process.exitCode = await runRepoSyncWorkflowsCheck({
-    readStub: () => nodeFileSystem.readText('sync/repo-sync.yml'),
+    readStub: () => nodeFileSystem.readText('sync/src/repo-sync.yml'),
     readWorkflow: () => nodeFileSystem.readText('.github/workflows/repo-sync.yml'),
     writeOutput: (text) => {
       process.stdout.write(text);

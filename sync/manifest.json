@@ -53,7 +53,7 @@
     "optIn": true,
     "files": [
       {
-        "source": "sync/workflow-callers/pr.yml",
+        "source": "sync/src/workflow-callers/pr.yml",
         "target": ".github/workflows/pr.yml"
       }
     ]
@@ -64,7 +64,7 @@
     "optIn": true,
     "files": [
       {
-        "source": "sync/workflow-callers/audit-fix.yml",
+        "source": "sync/src/workflow-callers/audit-fix.yml",
         "target": ".github/workflows/audit-fix.yml"
       }
     ]
@@ -74,7 +74,7 @@
     "description": "The workflow that turns off auto-merge of the repo-sync pull request when anyone but its author pushes to the sync branch",
     "files": [
       {
-        "source": "sync/workflow-callers/repo-sync-guard.yml",
+        "source": "sync/src/workflow-callers/repo-sync-guard.yml",
         "target": ".github/workflows/repo-sync-guard.yml"
       }
     ]
@@ -350,7 +350,7 @@
     "packages": ["@zgeoff/skill-gate"],
     "files": [
       {
-        "source": "sync/hooks/skill-gate/skill-gate.ts",
+        "source": "sync/src/hooks/skill-gate/skill-gate.ts",
         "target": ".claude/hooks/skill-gate/skill-gate.ts"
       }
     ]
@@ -362,7 +362,7 @@
     "packages": ["@zgeoff/agent-hooks"],
     "files": [
       {
-        "source": "sync/hooks/start.ts",
+        "source": "sync/src/hooks/start.ts",
         "target": ".claude/hooks/start.ts"
       }
     ]
@@ -372,7 +372,7 @@
     "description": "The skill gate's rules, which make an agent load skill-writing, docs-writing and deslop before it creates or changes a skill's SKILL.md or a file under its references/; every repo takes them but those the except list holds, which kept rules of their own before this entry and add these gates by hand",
     "files": [
       {
-        "source": "sync/skill-gate/skill-gate.json",
+        "source": "sync/src/skill-gate/skill-gate.json",
         "target": ".claude/skill-gate.json",
         "except": [
           "zgeoff/atc",
@@ -396,7 +396,7 @@
     "description": "The script that runs a command inside a cgroup memory cap with no swap, and prints the run's peak memory and OOM kills; every repo takes it, because the pre-push baseline runs its jobs under it",
     "files": [
       {
-        "source": "sync/pre-push/run-memory-capped.sh",
+        "source": "sync/src/pre-push/run-memory-capped.sh",
         "target": "scripts/run-memory-capped.sh",
         "mode": "0755"
       }
@@ -408,7 +408,7 @@
     "optIn": true,
     "files": [
       {
-        "source": "sync/deadcode/run-knip.sh",
+        "source": "sync/src/deadcode/run-knip.sh",
         "target": "scripts/run-knip.sh",
         "mode": "0755"
       }
@@ -420,7 +420,7 @@
     "optIn": true,
     "files": [
       {
-        "source": "sync/pre-push/lefthook-pre-push.yml",
+        "source": "sync/src/pre-push/lefthook-pre-push.yml",
         "target": ".lefthook/pre-push-baseline.yml"
       },
       {
@@ -428,11 +428,11 @@
         "target": "scripts/read-branch-files.ts"
       },
       {
-        "source": "sync/pre-push/run-related-tests.ts",
+        "source": "sync/src/pre-push/run-related-tests.ts",
         "target": "scripts/run-related-tests.ts"
       },
       {
-        "source": "sync/pre-push/build-related-test-command.ts",
+        "source": "sync/src/pre-push/build-related-test-command.ts",
         "target": "scripts/build-related-test-command.ts"
       },
       {
@@ -480,7 +480,7 @@
         "target": "scripts/parse-rig-lane-limits.ts"
       },
       {
-        "source": "sync/pre-push/read-memory-budget.ts",
+        "source": "sync/src/pre-push/read-memory-budget.ts",
         "target": "scripts/read-memory-budget.ts"
       },
       {
@@ -488,7 +488,7 @@
         "target": "scripts/read-optional-text.ts"
       },
       {
-        "source": "sync/pre-push/read-worker-count.ts",
+        "source": "sync/src/pre-push/read-worker-count.ts",
         "target": "scripts/read-worker-count.ts"
       },
       {

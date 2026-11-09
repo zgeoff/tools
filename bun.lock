@@ -5,7 +5,6 @@
     "": {
       "name": "tools",
       "devDependencies": {
-        "@actions/expressions": "catalog:",
         "@commitlint/cli": "catalog:",
         "@maschwenk/tsrslint": "catalog:",
         "@tsconfig/strictest": "catalog:",
@@ -27,8 +26,6 @@
         "lefthook": "catalog:",
         "oxfmt": "catalog:",
         "oxlint": "catalog:",
-        "tiny-invariant": "catalog:",
-        "ts-pattern": "catalog:",
         "tsrs": "catalog:",
         "typescript": "catalog:",
       },
@@ -300,6 +297,19 @@
         "@types/bun": "catalog:",
         "@zgeoff/testing": "workspace:*",
         "msw": "catalog:",
+        "tsrs": "catalog:",
+      },
+    },
+    "sync": {
+      "name": "@zgeoff/tools-sync",
+      "devDependencies": {
+        "@actions/expressions": "catalog:",
+        "@types/bun": "catalog:",
+        "@zgeoff/agent-hooks": "workspace:*",
+        "@zgeoff/skill-gate": "workspace:*",
+        "@zgeoff/testing": "workspace:*",
+        "tiny-invariant": "catalog:",
+        "ts-pattern": "catalog:",
         "tsrs": "catalog:",
       },
     },
@@ -761,6 +771,8 @@
     "@zgeoff/testing": ["@zgeoff/testing@workspace:packages/testing"],
 
     "@zgeoff/tools-scripts": ["@zgeoff/tools-scripts@workspace:scripts"],
+
+    "@zgeoff/tools-sync": ["@zgeoff/tools-sync@workspace:sync"],
 
     "@zgeoff/tsconfig": ["@zgeoff/tsconfig@workspace:packages/tsconfig"],
 

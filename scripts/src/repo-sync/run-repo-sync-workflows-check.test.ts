@@ -62,7 +62,7 @@ test('it prints each fault of the repo-sync workflows and returns 1', async () =
   expect(exitCode).toBe(1);
 
   expect(output).toStrictEqual([
-    'sync/repo-sync.yml: the workflow sets no concurrency group\n',
+    'sync/src/repo-sync.yml: the workflow sets no concurrency group\n',
     '.github/workflows/repo-sync.yml: the sync job must set queue: max, or a newer run replaces a pending one\n',
     '.github/workflows/repo-sync.yml: the alarm job must ask for actions: read, or it cannot read the checks of a private repo\n',
   ]);
@@ -75,7 +75,7 @@ test('it returns 2 with the cause when a workflow cannot be read', async () => {
   const errors: string[] = [];
 
   const exitCode = await runRepoSyncWorkflowsCheck({
-    readStub: () => Promise.reject(new Error('ENOENT: no such file, open sync/repo-sync.yml')),
+    readStub: () => Promise.reject(new Error('ENOENT: no such file, open sync/src/repo-sync.yml')),
     readWorkflow: () => Promise.resolve(''),
     writeOutput: (line) => {
       output.push(line);
@@ -89,7 +89,7 @@ test('it returns 2 with the cause when a workflow cannot be read', async () => {
   expect(output).toBeEmpty();
 
   expect(errors).toStrictEqual([
-    'repo-sync-workflows: ENOENT: no such file, open sync/repo-sync.yml\n',
+    'repo-sync-workflows: ENOENT: no such file, open sync/src/repo-sync.yml\n',
   ]);
 });
 
