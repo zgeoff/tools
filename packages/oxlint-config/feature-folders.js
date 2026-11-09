@@ -1,4 +1,4 @@
-import { basename, join, posix, relative, sep } from 'node:path';
+import { basename, join } from 'node:path';
 import buildImportSettings from './build-import-settings.js';
 import findFeatureFolder from './find-feature-folder.js';
 import pickFolderKind from './pick-folder-kind.js';
@@ -8,6 +8,8 @@ import readStalePending from './read-stale-pending.js';
 import resolveImportTarget from './resolve-import-target.js';
 import resolveRepoRoot from './resolve-repo-root.js';
 import resolveSourcePackage from './resolve-source-package.js';
+import toPendingPath from './to-pending-path.js';
+import toRootPath from './to-root-path.js';
 
 const looseModuleLimit = 8;
 
@@ -87,14 +89,6 @@ const featureFolders = {
 };
 
 export default featureFolders;
-
-function toPendingPath(entry) {
-  return posix.normalize(entry).replace(/(?<=.)\/+$/u, '');
-}
-
-function toRootPath(root, path) {
-  return relative(root, path).split(sep).join('/') || '.';
-}
 
 function buildUtilsVisitors(file) {
   const settings = buildImportSettings(file.root);
