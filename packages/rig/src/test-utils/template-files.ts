@@ -1,5 +1,5 @@
 import { rename } from 'node:fs/promises';
-import { nodeFileSystem } from '../../../../scripts/ci/node-file-system.ts';
+import { nodeFileSystem } from '../../../../scripts/src/ci/node-file-system.ts';
 import { hasErrorCode } from '../browser/has-error-code.ts';
 import { readDirNames } from '../browser/read-dir-names.ts';
 

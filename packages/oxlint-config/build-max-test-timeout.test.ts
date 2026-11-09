@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { nodeFileSystem } from '../../scripts/ci/node-file-system.ts';
+import { nodeFileSystem } from '../../scripts/src/ci/node-file-system.ts';
 import { buildRigConfigSource } from './src/test-utils/build-rig-config-source.ts';
 import { buildTimeoutSource } from './src/test-utils/build-timeout-source.ts';
 import { createLintTree } from './src/test-utils/create-lint-tree.ts';

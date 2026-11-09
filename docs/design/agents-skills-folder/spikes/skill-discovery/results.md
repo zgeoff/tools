@@ -112,7 +112,7 @@ takes in a repo. Its workflow copies each file to its target with the `install` 
 each retired copy (a copy whose target the manifest no longer lists), and opens one pull request. It
 turns on auto-merge only when every path the pull request changes is a target it copied or a retired
 copy it deleted. One more change also qualifies: a `package.json` change that only sets the scripts
-the manifest declares [read in the code: `scripts/repo-sync/write-sync-auto-merge.ts` and
+the manifest declares [read in the code: `scripts/src/repo-sync/write-sync-auto-merge.ts` and
 `collect-undelivered-paths.ts`].
 
 In a repo where `.claude/skills` is a folder link, `install` writes the target

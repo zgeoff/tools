@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { join } from 'node:path';
-import { nodeFileSystem } from '../../../scripts/ci/node-file-system.ts';
+import { nodeFileSystem } from '../../../scripts/src/ci/node-file-system.ts';
 import { standardLanes } from './standard-lanes.ts';
 import { readPinnedSkillText } from './test-utils/read-pinned-skill-text.ts';
 

@@ -1,6 +1,6 @@
 # Reusable workflow: turns a red `bun audit` on the caller's default branch, or
 # on `base-branch`, into a pull request against that branch.
-# scripts/audit-fix/run-audit-fix.ts updates each vulnerable package to a fixed
+# scripts/src/audit-fix/run-audit-fix.ts updates each vulnerable package to a fixed
 # release, excludes a fix younger than the minimumReleaseAge gate in bunfig.toml
 # with a dated comment, and records each advisory it cannot fix in
 # audit-ignores.json with a reason and an expiry, mirrored as an --ignore flag in
@@ -84,8 +84,8 @@ jobs:
             fromJSON(toJSON(job)).workflow_sha }}
         run:
           curl -fsSL --retry 3 --retry-all-errors --create-dirs -o "$RUNNER_TEMP/tools/.bun-version"
-          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts"
-          "$TOOLS_URL/scripts/ci/download-step-scripts.ts"
+          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/src/ci/download-step-scripts.ts"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -97,7 +97,7 @@ jobs:
 
       - name: Download the audit-fix scripts
         env: *tools-url
-        run: bun "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts" audit-fix
+        run: bun "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts" audit-fix
 
       # An open fix branch's ignores keep their expiry on a rerun, so the
       # rerun builds the same tree.
@@ -105,7 +105,7 @@ jobs:
         env:
           EXPIRY_DAYS: ${{ inputs.expiry-days }}
           NO_COLOR: 1
-        run: bun "$RUNNER_TEMP/tools/scripts/audit-fix/fix-advisories.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/src/audit-fix/fix-advisories.ts"
 
       # An ignore must not ride an auto-merge armed for an earlier fix, so
       # auto-merge goes off before the push, and a rerun that makes the tree
@@ -114,7 +114,7 @@ jobs:
         id: push
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: bun "$RUNNER_TEMP/tools/scripts/audit-fix/commit-audit-fix.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/src/audit-fix/commit-audit-fix.ts"
 
       - name: Open or update the pull request
         if: steps.push.outputs.pushed == 'true'
@@ -123,4 +123,4 @@ jobs:
           AUTOMERGE: ${{ inputs.automerge }}
           RUN_URL:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: bun "$RUNNER_TEMP/tools/scripts/audit-fix/open-audit-fix-pull-request.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/src/audit-fix/open-audit-fix-pull-request.ts"

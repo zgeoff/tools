@@ -32,8 +32,8 @@ jobs:
             fromJSON(toJSON(job)).workflow_sha }}
         run:
           curl -fsSL --retry 3 --retry-all-errors --create-dirs -o "$RUNNER_TEMP/tools/.bun-version"
-          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts"
-          "$TOOLS_URL/scripts/ci/download-step-scripts.ts"
+          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/src/ci/download-step-scripts.ts"
 
       # No cache: a job that holds a write token must not run a Bun binary
       # that another run's cache entry could have replaced.
@@ -45,7 +45,7 @@ jobs:
 
       - name: Download the guard script
         env: *tools-url
-        run: bun "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts" repo-sync-guard
+        run: bun "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts" repo-sync-guard
 
       - name: Turn off auto-merge after a hand push
         env:
@@ -53,4 +53,4 @@ jobs:
           BRANCH: ${{ github.ref_name }}
           PUSHER: ${{ github.event.sender.login }}
           GH_TOKEN: ${{ github.token }}
-        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/hold-hand-pushed-sync.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/src/repo-sync/hold-hand-pushed-sync.ts"

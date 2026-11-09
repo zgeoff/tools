@@ -1,40 +1,38 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { $ } from 'bun';
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'remove-excluded-blocks-'));
+  const directory = await mkdtemp(join(tmpdir(), 'remove-excluded-blocks-stub-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
-
-  await mkdir(join(directory, 'skill/references'), { recursive: true });
 
   const scriptPath = fileURLToPath(new URL('remove-excluded-blocks.sh', import.meta.url));
 
   return { directory, scriptPath };
 }
 
-test('it removes a block that needs an excluded file and the blank line after it', async () => {
+test('it strips a block when a run from another folder calls the path outside src/', async () => {
   const ctx = await setupTest();
 
-  const markdown = join(ctx.directory, 'skill/SKILL.md');
+  const markdown = join(ctx.directory, 'SKILL.md');
 
   await writeFile(
     markdown,
-    '# Demo\n\n' +
-      '<!-- repo-sync needs ./references/rust.md -->\n\n' +
-      'For Rust, read [Rust](./references/rust.md).\n\n' +
+    '# Kettle\n\n' +
+      '<!-- repo-sync needs ./references/steam.md -->\n\n' +
+      'Read [Steam](./references/steam.md).\n\n' +
       '<!-- repo-sync end -->\n\n' +
-      'Read [HTTP](./references/http.md).\n',
+      'Read [Spout](./references/spout.md).\n',
   );
 
-  const result =
-    await $`bash ${ctx.scriptPath} ${markdown} ${join(ctx.directory, 'skill/references/rust.md')}`
-      .nothrow()
-      .quiet();
+  const result = await $`bash ${ctx.scriptPath} SKILL.md references/steam.md`
+    .cwd(ctx.directory)
+    .nothrow()
+    .quiet();
 
   const stripped = await readFile(markdown, 'utf8');
 
@@ -42,89 +40,7 @@ test('it removes a block that needs an excluded file and the blank line after it
     exitCode: result.exitCode,
     stdout: result.stdout.toString(),
     stderr: result.stderr.toString(),
-  }).toStrictEqual({
-    exitCode: 0,
-    stdout: '',
-    stderr: '',
-  });
+  }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
 
-  expect(stripped).toBe('# Demo\n\nRead [HTTP](./references/http.md).\n');
-});
-
-test('it keeps a block whose file the repo receives', async () => {
-  const ctx = await setupTest();
-
-  const markdown = join(ctx.directory, 'skill/SKILL.md');
-
-  const content =
-    '# Demo\n\n' +
-    '<!-- repo-sync needs ./references/kotlin.md -->\n\n' +
-    'For Kotlin, read [Kotlin](./references/kotlin.md).\n\n' +
-    '<!-- repo-sync end -->\n';
-
-  await writeFile(markdown, content);
-
-  const result =
-    await $`bash ${ctx.scriptPath} ${markdown} ${join(ctx.directory, 'skill/references/rust.md')}`
-      .nothrow()
-      .quiet();
-
-  const kept = await readFile(markdown, 'utf8');
-
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  }).toStrictEqual({
-    exitCode: 0,
-    stdout: '',
-    stderr: '',
-  });
-
-  expect(kept).toBe(content);
-});
-
-test('it fails on a block that never closes', async () => {
-  const ctx = await setupTest();
-
-  const markdown = join(ctx.directory, 'skill/SKILL.md');
-
-  await writeFile(markdown, '<!-- repo-sync needs ./references/rust.md -->\n\nRust.\n');
-
-  const result = await $`bash ${ctx.scriptPath} ${markdown}`.nothrow().quiet();
-
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  }).toStrictEqual({
-    exitCode: 1,
-    stdout: '',
-    stderr: `remove-excluded-blocks: ${markdown} ends inside a block\n`,
-  });
-});
-
-test('it fails on a block opened inside another block', async () => {
-  const ctx = await setupTest();
-
-  const markdown = join(ctx.directory, 'skill/SKILL.md');
-
-  await writeFile(
-    markdown,
-    '<!-- repo-sync needs ./references/rust.md -->\n' +
-      '<!-- repo-sync needs ./references/kotlin.md -->\n' +
-      '<!-- repo-sync end -->\n',
-  );
-
-  const result = await $`bash ${ctx.scriptPath} ${markdown}`.nothrow().quiet();
-
-  expect({
-    exitCode: result.exitCode,
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-  }).toStrictEqual({
-    exitCode: 1,
-    stdout: '',
-    stderr: `remove-excluded-blocks: ${markdown}:2 opens a block inside another block\n`,
-  });
+  expect(stripped).toBe('# Kettle\n\nRead [Spout](./references/spout.md).\n');
 });

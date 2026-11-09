@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
-import { collectRelativeImports } from '../scripts/collect-relative-imports.ts';
-import { parseSyncEntries } from '../scripts/repo-sync/parse-sync-entries.ts';
+import { collectRelativeImports } from '../scripts/src/collect-relative-imports.ts';
+import { parseSyncEntries } from '../scripts/src/repo-sync/parse-sync-entries.ts';
 import { writeTreeFiles } from './test-utils/write-tree-files.ts';
 
 async function setupTest() {
