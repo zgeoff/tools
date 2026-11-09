@@ -31,7 +31,6 @@ export function buildInitScripts(
   };
 
   // Renovate reruns init on each rig bump, so a script the repo already defines stays as it is.
-  // Only `test` moves to `rig unit`, because that is how a repo adopts rig.
   const missingScripts = Object.entries(rigScripts).filter(
     ([name]) => !Object.hasOwn(oldScripts, name),
   );
