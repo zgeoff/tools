@@ -1809,8 +1809,8 @@ test.each([
 });
 
 test("it matches the copy that this repo's own hooks run, which sits at the depth every repo's copy does", async () => {
-  const source = await readFile(join(import.meta.dir, 'start.ts'), 'utf8');
-  const copy = await readFile(join(import.meta.dir, '../../../.claude/hooks/start.ts'), 'utf8');
+  const stubText = await readFile(join(import.meta.dir, 'start.ts'), 'utf8');
+  const copyText = await readFile(join(import.meta.dir, '../../../.claude/hooks/start.ts'), 'utf8');
 
-  expect(copy).toBe(source);
+  expect(copyText).toBe(stubText);
 });
