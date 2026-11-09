@@ -277,6 +277,51 @@ test('it blocks an edit when the hook command passes --no-install and the repo h
   );
 });
 
+test("it blocks an edit when only a parent folder's node_modules holds @zgeoff/skill-gate", async () => {
+  const ctx = await setupTest();
+
+  const project = join(ctx.directory, 'project');
+  const copiedHookPath = join(project, '.claude/hooks/skill-gate/skill-gate.ts');
+  const parentPackageDirectory = join(ctx.directory, 'node_modules/@zgeoff/skill-gate');
+
+  await mkdir(join(project, '.claude/hooks/skill-gate'), { recursive: true });
+  await mkdir(join(project, 'node_modules'));
+  await copyFile(ctx.hookPath, copiedHookPath);
+  await mkdir(parentPackageDirectory, { recursive: true });
+
+  await writeFile(
+    join(parentPackageDirectory, 'package.json'),
+    JSON.stringify({ name: '@zgeoff/skill-gate', type: 'module', exports: './index.js' }),
+  );
+
+  await writeFile(
+    join(parentPackageDirectory, 'index.js'),
+    "export function runSkillGate() {\n  console.error('the outer checkout ran its gate');\n  process.exit(0);\n}\n",
+  );
+
+  await writeFile(
+    join(project, '.claude/skill-gate.json'),
+    JSON.stringify({ gates: [{ match: '**/*.md', skills: ['docs-writing'] }] }),
+  );
+
+  const result = spawnSync('bun', ['--no-install', copiedHookPath], {
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'], CLAUDE_PROJECT_DIR: project },
+    input: JSON.stringify({
+      cwd: project,
+      transcript_path: join(project, 'transcript.jsonl'),
+      tool_name: 'Write',
+      tool_input: { file_path: join(project, 'guide.md'), content: '# Guide\n' },
+    }),
+  });
+
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr: `The skill gate cannot load, so it blocks this call to Write: Cannot find package '@zgeoff/skill-gate' in ${join(project, 'node_modules')}. To work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+  });
+});
+
 test('it blocks an edit and names the load failure when a dependency of @zgeoff/skill-gate is missing', async () => {
   const ctx = await setupTest();
 

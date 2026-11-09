@@ -1,15 +1,33 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { parseArgs } from 'node:util';
 
 // Claude Code runs the call when a PreToolUse hook exits with any status but 2, so a static import
 // that fails would let a gated edit through. This file therefore imports only Node builtins.
 const harness = parseHarness(process.argv.slice(2));
 
-const runGate = await import('@zgeoff/skill-gate').then(
+const runGate = await importOwnSkillGate().then(
   (gate) => gate.runSkillGate,
   (error: unknown) => () => reportLoadFailure(formatError(error)),
 );
 
 await runGate(harness);
+
+// Bun also resolves a bare name through each parent folder's node_modules, so a clone nested in
+// another checkout would run that checkout's gate.
+interface SkillGateModule {
+  readonly runSkillGate: (harness: Harness) => Promise<never>;
+}
+
+function importOwnSkillGate(): Promise<SkillGateModule> {
+  const nodeModules = path.resolve(import.meta.dirname, '../../../node_modules');
+
+  if (!existsSync(path.join(nodeModules, '@zgeoff/skill-gate/package.json'))) {
+    return Promise.reject(new Error(`Cannot find package '@zgeoff/skill-gate' in ${nodeModules}`));
+  }
+
+  return import('@zgeoff/skill-gate');
+}
 
 type Harness = 'claude-code' | 'codex';
 
