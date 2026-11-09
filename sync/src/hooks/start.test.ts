@@ -8,6 +8,7 @@ import {
   readFile,
   readdir,
   rm,
+  symlink,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -1864,8 +1865,17 @@ test.each([
   expect(verdict).toBe(row.expected);
 });
 
-test("#probeOwnAgentHooks finds the package that this repo's own node_modules links to its workspace", () => {
-  expect(probeOwnAgentHooks(join(import.meta.dir, '../../..'))).toBe(true);
+test("#probeOwnAgentHooks finds a package that the repo's own node_modules links to a workspace folder", async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.packageDirectory, {
+    'package.json': JSON.stringify({ name: '@zgeoff/agent-hooks' }),
+  });
+
+  await mkdir(join(ctx.project, 'node_modules/@zgeoff'), { recursive: true });
+  await symlink(ctx.packageDirectory, join(ctx.project, 'node_modules/@zgeoff/agent-hooks'));
+
+  expect(probeOwnAgentHooks(ctx.project)).toBe(true);
 });
 
 test("#probeOwnAgentHooks misses a package that only a parent folder's node_modules holds", async () => {

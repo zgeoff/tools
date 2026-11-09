@@ -37,7 +37,7 @@ bare name through every parent folder's `node_modules` too, so a clone inside an
 run the outer checkout's copy and never install its own. The stub therefore counts a package that
 only a parent folder holds as missing. A repo that is a member of a parent Bun workspace, with its
 packages hoisted to the parent's `node_modules`, never gets the package in its own `node_modules`,
-so the stub installs and then refuses there.
+so there the stub runs the install on every hook call and then refuses.
 
 When the import fails, the stub runs `bun install --frozen-lockfile` at the repo root, then runs
 itself again in a new process, which reads the payload from the same stdin. The retry is a new
