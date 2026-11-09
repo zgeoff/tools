@@ -477,7 +477,13 @@ sub check_markdown {
     my $text = $visible;
     my @spans;
     $text =~ s/(`+)(.+?)\1/push @spans, $2; ""/ge;
-    $open_span = $1 if $text =~ s/(`+).*\z//;
+    # A backtick run left open starts a span only when a later line of the paragraph closes it, as
+    # CommonMark renders an unclosed run as text.
+    my ($unclosed) = $text =~ /(`+)/;
+    if (defined $unclosed && has_closing_run($unclosed, @lines[$line_number .. $#lines])) {
+      $open_span = $unclosed;
+      $text =~ s/`+.*\z//;
+    }
 
     if ($line_number <= 30) {
       $contents_links++ while $text =~ /\]\(#[^)\s]+\)/g;
@@ -533,6 +539,16 @@ sub check_markdown {
   if ($reference && @lines > 100 && $headings >= 2 && $contents_links < 2) {
     warn_about($file, scalar(@lines) . " lines with no contents list near the top; open with links to its headings");
   }
+}
+
+# Returns true when a line before the next blank line holds a backtick run as long as the one given.
+sub has_closing_run {
+  my ($run, @rest) = @_;
+  for my $line (@rest) {
+    return 0 if $line =~ /^\s*$/;
+    return 1 if $line =~ /(?<!`)\Q$run\E(?!`)/;
+  }
+  return 0;
 }
 
 sub resolve_path {

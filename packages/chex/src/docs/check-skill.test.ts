@@ -643,6 +643,16 @@ test('it fails a link with a line anchor, but not one inside code', async () => 
     '```markdown',
     '[x](y.ts#L1)',
     '```',
+    '',
+    'Write the link as follows:',
+    '',
+    '    [x](y.ts#L1)',
+    '',
+    'Set `stack',
+    '[x](y.ts#L1)` here.',
+    '',
+    'Type a ` then see [z](w.ts#L2).',
+    'See [v](u.ts#L3).',
   ]);
 
   const result = await ctx.run();
@@ -655,7 +665,9 @@ test('it fails a link with a line anchor, but not one inside code', async () => 
     exitCode: 1,
     stdout:
       '.claude/skills/demo/SKILL.md:7: link ../../../src/load-theme.ts#L42 has a line anchor; name the target in the link text instead\n' +
-      'check-skill: 1 skills, 1 errors, 0 warnings\n',
+      '.claude/skills/demo/SKILL.md:21: link w.ts#L2 has a line anchor; name the target in the link text instead\n' +
+      '.claude/skills/demo/SKILL.md:22: link u.ts#L3 has a line anchor; name the target in the link text instead\n' +
+      'check-skill: 1 skills, 3 errors, 0 warnings\n',
     stderr: '',
   });
 });
@@ -699,7 +711,7 @@ test('it fails each coined term in a skill and names its plain wording', async (
   });
 });
 
-test('it fails a coined term in a reference, a footnote, the description, and across a line break', async () => {
+test('it fails a coined term in a reference, a footnote, the description, after a stray backtick, and across a line break', async () => {
   const ctx = await setupTest();
 
   await ctx.writePage('.claude/skills/demo/SKILL.md', [
@@ -723,6 +735,8 @@ test('it fails a coined term in a reference, a footnote, the description, and ac
     'limit.',
     '',
     '[^1]: lanes are slow here.',
+    '',
+    'Type a ` then read the lane.',
   ]);
 
   const result = await ctx.run();
@@ -739,7 +753,8 @@ test('it fails a coined term in a reference, a footnote, the description, and ac
       '.claude/skills/demo/references/slow.md:6: "unit run" is a coined term; write the command that runs the tests, `bun run test`\n' +
       '.claude/skills/demo/references/slow.md:7: "unit limit" is a coined term; write the timeout and the command it applies to, such as "the 5 s timeout of `bun run test`"\n' +
       '.claude/skills/demo/references/slow.md:9: "lanes" is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them\n' +
-      'check-skill: 1 skills, 5 errors, 0 warnings\n',
+      '.claude/skills/demo/references/slow.md:11: "lane" is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them\n' +
+      'check-skill: 1 skills, 6 errors, 0 warnings\n',
     stderr: '',
   });
 });
