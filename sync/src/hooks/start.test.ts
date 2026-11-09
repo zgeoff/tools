@@ -8,6 +8,7 @@ import {
   readFile,
   readdir,
   rm,
+  symlink,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -32,6 +33,7 @@ import {
   pickLockState,
   pickRecoveryStep,
   pickRetryOutcome,
+  probeOwnAgentHooks,
   readFallbackVerdict,
   readLockState,
   runInstallOnce,
@@ -137,6 +139,61 @@ test('it installs the missing package in a fresh worktree, then blocks a gated e
       exports: './index.ts',
     }),
     'index.ts': `export * from ${JSON.stringify(ctx.agentHooksSource)};\n`,
+  });
+
+  await writeTreeFiles(ctx.project, {
+    '.claude/skill-gate.json': JSON.stringify({
+      gates: [{ match: '**/*.md', skills: ['docs-writing'] }],
+    }),
+    '.claude/skills/docs-writing/SKILL.md': '# Docs writing\n',
+    'transcript.jsonl': '',
+  });
+
+  const result = ctx.runStub(
+    buildPreToolUsePayload(ctx.project, 'Write', { file_path: join(ctx.project, 'guide.md') }),
+    [],
+  );
+
+  expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
+    status: 2,
+    stdout: '',
+    stderr: `stub install started\nLoad the \`docs-writing\` skill with the Skill tool before editing ${join(ctx.project, 'guide.md')}, then retry the edit. Change a gated path only with Edit, Write or MultiEdit, never through Bash. .claude/skill-gate.json lists the skills each path needs.\n`,
+  });
+
+  const installLog = await ctx.readInstallLog();
+
+  expect(installLog).toBe(`bun install --frozen-lockfile in ${ctx.project}\n`);
+});
+
+test("it installs its own copy, then blocks a gated edit with the gate reason, when only a parent folder's node_modules holds the package", async () => {
+  const ctx = await setupTest();
+
+  await createStubInstall(ctx.fakeBin, {
+    log: ctx.installLog,
+    outcome: {
+      kind: 'links',
+      packageName: '@zgeoff/agent-hooks',
+      packageDirectory: ctx.packageDirectory,
+    },
+  });
+
+  await writeTreeFiles(ctx.packageDirectory, {
+    'package.json': JSON.stringify({
+      name: '@zgeoff/agent-hooks',
+      type: 'module',
+      exports: './index.ts',
+    }),
+    'index.ts': `export * from ${JSON.stringify(ctx.agentHooksSource)};\n`,
+  });
+
+  await writeTreeFiles(join(ctx.directory, 'node_modules/@zgeoff/agent-hooks'), {
+    'package.json': JSON.stringify({
+      name: '@zgeoff/agent-hooks',
+      type: 'module',
+      exports: './index.ts',
+    }),
+    'index.ts':
+      "export function runAgentHook() {\n  console.error('the outer checkout ran its hook');\n  process.exit(0);\n}\n",
   });
 
   await writeTreeFiles(ctx.project, {
@@ -270,7 +327,7 @@ test('it refuses an edit with the install message when the install fails', async
   expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
     status: 2,
     stdout: '',
-    stderr: `stub install started\nThe agent hook's bun install failed: bun install exited with status 1\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+    stderr: `stub install started\nThe agent hook's bun install failed: bun install exited with status 1\nThe agent hook could not load @zgeoff/agent-hooks: Error: Cannot find package '@zgeoff/agent-hooks' in ${join(ctx.project, 'node_modules')}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
   });
 });
 
@@ -284,7 +341,7 @@ test('it prints why bun install could not start, then refuses an edit', async ()
   expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
     status: 2,
     stdout: '',
-    stderr: `The agent hook's bun install failed: Error: Executable not found in $PATH: "bun"\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+    stderr: `The agent hook's bun install failed: Error: Executable not found in $PATH: "bun"\nThe agent hook could not load @zgeoff/agent-hooks: Error: Cannot find package '@zgeoff/agent-hooks' in ${join(ctx.project, 'node_modules')}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
   });
 });
 
@@ -301,7 +358,7 @@ test('it prints the signal that stopped bun install, then refuses an edit', asyn
   expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
     status: 2,
     stdout: '',
-    stderr: `stub install started\nThe agent hook's bun install failed: bun install stopped on SIGKILL\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+    stderr: `stub install started\nThe agent hook's bun install failed: bun install stopped on SIGKILL\nThe agent hook could not load @zgeoff/agent-hooks: Error: Cannot find package '@zgeoff/agent-hooks' in ${join(ctx.project, 'node_modules')}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
   });
 });
 
@@ -510,7 +567,7 @@ test.each([
   expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
     status: 2,
     stdout: '',
-    stderr: `stub install started\nThe agent hook's bun install failed: bun install exited with status 1\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+    stderr: `stub install started\nThe agent hook's bun install failed: bun install exited with status 1\nThe agent hook could not load @zgeoff/agent-hooks: Error: Cannot find package '@zgeoff/agent-hooks' in ${join(ctx.project, 'node_modules')}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
   });
 });
 
@@ -541,7 +598,7 @@ test.each([
   expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
     status: 2,
     stdout: '',
-    stderr: `stub install started\nThe agent hook's bun install failed: bun install exited with status 1\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+    stderr: `stub install started\nThe agent hook's bun install failed: bun install exited with status 1\nThe agent hook could not load @zgeoff/agent-hooks: Error: Cannot find package '@zgeoff/agent-hooks' in ${join(ctx.project, 'node_modules')}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
   });
 });
 
@@ -561,7 +618,7 @@ test.each([
   expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
     status: 0,
     stdout: '',
-    stderr: `stub install started\nThe agent hook's bun install failed: bun install exited with status 1\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\n`,
+    stderr: `stub install started\nThe agent hook's bun install failed: bun install exited with status 1\nThe agent hook could not load @zgeoff/agent-hooks: Error: Cannot find package '@zgeoff/agent-hooks' in ${join(ctx.project, 'node_modules')}\n`,
   });
 });
 
@@ -578,7 +635,7 @@ test('it refuses a gated tool call when the install fails', async () => {
   expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
     status: 2,
     stdout: '',
-    stderr: `stub install started\nThe agent hook's bun install failed: bun install exited with status 1\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+    stderr: `stub install started\nThe agent hook's bun install failed: bun install exited with status 1\nThe agent hook could not load @zgeoff/agent-hooks: Error: Cannot find package '@zgeoff/agent-hooks' in ${join(ctx.project, 'node_modules')}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
   });
 });
 
@@ -595,7 +652,7 @@ test('it lets a prompt through when the install fails', async () => {
   expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
     status: 0,
     stdout: '',
-    stderr: `stub install started\nThe agent hook's bun install failed: bun install exited with status 1\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\n`,
+    stderr: `stub install started\nThe agent hook's bun install failed: bun install exited with status 1\nThe agent hook could not load @zgeoff/agent-hooks: Error: Cannot find package '@zgeoff/agent-hooks' in ${join(ctx.project, 'node_modules')}\n`,
   });
 });
 
@@ -860,7 +917,7 @@ test('it skips the install and refuses when a stopped hook left the guard behind
   expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
     status: 2,
     stdout: '',
-    stderr: `A stopped agent hook left ${join(ctx.project, 'node_modules/.agent-hooks-install.lock.guard')} behind, so this one skips the install. Remove that file.\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+    stderr: `A stopped agent hook left ${join(ctx.project, 'node_modules/.agent-hooks-install.lock.guard')} behind, so this one skips the install. Remove that file.\nThe agent hook could not load @zgeoff/agent-hooks: Error: Cannot find package '@zgeoff/agent-hooks' in ${join(ctx.project, 'node_modules')}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
   });
 
   const installLog = await ctx.readInstallLog();
@@ -988,7 +1045,7 @@ test.skipIf(process.getuid?.() === 0)(
     expect({ status, stderr }).toStrictEqual({
       status: 2,
       stderr: expect.stringMatching(
-        /^The agent hook's bun install failed: Error: EACCES: permission denied, open '.+\/node_modules\/\.agent-hooks-install\.lock\.guard\.\d+'\nThe agent hook could not load @zgeoff\/agent-hooks: ResolveMessage: Cannot find package '@zgeoff\/agent-hooks' imported from .+\nTo work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag\.\n$/u,
+        /^The agent hook's bun install failed: Error: EACCES: permission denied, open '.+\/node_modules\/\.agent-hooks-install\.lock\.guard\.\d+'\nThe agent hook could not load @zgeoff\/agent-hooks: Error: Cannot find package '@zgeoff\/agent-hooks' in .+\/node_modules\nTo work here, run exactly `bun install` or `bun install --frozen-lockfile` as its own Bash command, with no cd, pipe, redirect or other flag\.\n$/u,
       ),
     });
 
@@ -1031,7 +1088,7 @@ test.skipIf(process.getuid?.() === 0)(
 
     expect({ status, stderr }).toStrictEqual({
       status: 2,
-      stderr: `The agent hook's bun install failed: Error: EACCES: permission denied, open '${join(ctx.project, 'node_modules/.agent-hooks-install.lock')}'\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+      stderr: `The agent hook's bun install failed: Error: EACCES: permission denied, open '${join(ctx.project, 'node_modules/.agent-hooks-install.lock')}'\nThe agent hook could not load @zgeoff/agent-hooks: Error: Cannot find package '@zgeoff/agent-hooks' in ${join(ctx.project, 'node_modules')}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
     });
 
     const installLog = await ctx.readInstallLog();
@@ -1062,7 +1119,7 @@ test('it skips the install and refuses when the install lock is a folder', async
   expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toStrictEqual({
     status: 2,
     stdout: '',
-    stderr: `The agent hook's bun install failed: Error: EISDIR: illegal operation on a directory, read\nThe agent hook could not load @zgeoff/agent-hooks: ResolveMessage: Cannot find package '@zgeoff/agent-hooks' imported from ${ctx.stubPath}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
+    stderr: `The agent hook's bun install failed: Error: EISDIR: illegal operation on a directory, read\nThe agent hook could not load @zgeoff/agent-hooks: Error: Cannot find package '@zgeoff/agent-hooks' in ${join(ctx.project, 'node_modules')}\nTo work here, run exactly \`bun install\` or \`bun install --frozen-lockfile\` as its own Bash command, with no cd, pipe, redirect or other flag.\n`,
   });
 
   const installLog = await ctx.readInstallLog();
@@ -1806,6 +1863,29 @@ test.each([
   });
 
   expect(verdict).toBe(row.expected);
+});
+
+test("#probeOwnAgentHooks finds a package that the repo's own node_modules links to a workspace folder", async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.packageDirectory, {
+    'package.json': JSON.stringify({ name: '@zgeoff/agent-hooks' }),
+  });
+
+  await mkdir(join(ctx.project, 'node_modules/@zgeoff'), { recursive: true });
+  await symlink(ctx.packageDirectory, join(ctx.project, 'node_modules/@zgeoff/agent-hooks'));
+
+  expect(probeOwnAgentHooks(ctx.project)).toBe(true);
+});
+
+test("#probeOwnAgentHooks misses a package that only a parent folder's node_modules holds", async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(join(ctx.directory, 'node_modules/@zgeoff/agent-hooks'), {
+    'package.json': JSON.stringify({ name: '@zgeoff/agent-hooks' }),
+  });
+
+  expect(probeOwnAgentHooks(ctx.project)).toBe(false);
 });
 
 test("it matches the copy that this repo's own hooks run, which sits at the depth every repo's copy does", async () => {

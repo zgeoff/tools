@@ -32,6 +32,13 @@ with a dynamic import that cannot crash it. The hook command runs Bun with `--no
 in a checkout with no `node_modules` Bun otherwise fetches a missing package from npm at its latest
 version, whatever the lockfile says.
 
+The stub loads the package only from the repo's own `node_modules`, at the repo root. Bun resolves a
+bare name through every parent folder's `node_modules` too, so a clone inside another checkout would
+run the outer checkout's copy and never install its own. The stub therefore counts a package that
+only a parent folder holds as missing. A repo that is a member of a parent Bun workspace, with its
+packages hoisted to the parent's `node_modules`, never gets the package in its own `node_modules`,
+so there the stub runs the install on every hook call and then refuses.
+
 When the import fails, the stub runs `bun install --frozen-lockfile` at the repo root, then runs
 itself again in a new process, which reads the payload from the same stdin. The retry is a new
 process because Bun can keep a failed package lookup for the life of the process. The retry never
