@@ -120,7 +120,7 @@ directory alone selects it. Any other file under an `e2e/` directory or a `-e2e`
 `zgeoff/test-beside-module` exempts is in the `e2e` lane, and every other file is in the unit run,
 `integration/` and `evals/` included. The standard lanes and their limits are the ones in the
 skill's
-[Lanes](https://github.com/zgeoff/skills/blob/main/skills/testing/references/slow-tests.md#lanes)
+[Where each test runs](https://github.com/zgeoff/skills/blob/main/skills/testing/references/slow-tests.md#where-each-test-runs)
 table, which a test of the rule pins. A repo with a `rig.config.ts` gets every lane and limit from
 the table that file resolves, and the rule reports a `lanes` option there as
 `zgeoff/test-beside-module` does. In a repo without one, the `lanes` option maps a lane to its limit

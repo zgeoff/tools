@@ -643,6 +643,25 @@ test('it fails a link with a line anchor, but not one inside code', async () => 
     '```markdown',
     '[x](y.ts#L1)',
     '```',
+    '',
+    'Write the link as follows:',
+    '',
+    '    [x](y.ts#L1)',
+    '',
+    'Set `stack',
+    '[x](y.ts#L1)` here.',
+    '',
+    'Type a ` then see [z](w.ts#L2).',
+    'See [v](u.ts#L3).',
+    '',
+    '- Press ` to open [c](d.ts#L5).',
+    '- Run [x](y.ts#L1) with `bun run test:e2e`.',
+    '',
+    'Type a ` here.',
+    '```sh',
+    'echo `date`',
+    '```',
+    'See [q](r.ts#L4).',
   ]);
 
   const result = await ctx.run();
@@ -655,7 +674,178 @@ test('it fails a link with a line anchor, but not one inside code', async () => 
     exitCode: 1,
     stdout:
       '.claude/skills/demo/SKILL.md:7: link ../../../src/load-theme.ts#L42 has a line anchor; name the target in the link text instead\n' +
+      '.claude/skills/demo/SKILL.md:21: link w.ts#L2 has a line anchor; name the target in the link text instead\n' +
+      '.claude/skills/demo/SKILL.md:22: link u.ts#L3 has a line anchor; name the target in the link text instead\n' +
+      '.claude/skills/demo/SKILL.md:24: link d.ts#L5 has a line anchor; name the target in the link text instead\n' +
+      '.claude/skills/demo/SKILL.md:25: link y.ts#L1 has a line anchor; name the target in the link text instead\n' +
+      '.claude/skills/demo/SKILL.md:31: link r.ts#L4 has a line anchor; name the target in the link text instead\n' +
+      'check-skill: 1 skills, 6 errors, 0 warnings\n',
+    stderr: '',
+  });
+});
+
+test('it fails each coined term in a skill and names its plain wording', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/project-testing/SKILL.md', [
+    '---',
+    'name: project-testing',
+    'description: Where each test of the demo service goes, and the command that runs it.',
+    '---',
+    '',
+    '- Put a test that needs s2-lite or Garage in the `e2e` lane of its language, in place of a',
+    '  `<name>.docker.test.ts` file in the `docker` lane of',
+    '  [Lanes](../testing/references/slow-tests.md#lanes). pepys runs no `docker` lane. The unit run',
+    "  can't hold these tests either: on a machine without the s2-lite image, a pull of the image and a",
+    '  start of s2-lite took 7.9 s, past the 5 s unit limit.',
+  ]);
+
+  const result = await ctx.run();
+
+  const lane =
+    'is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them';
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      `.claude/skills/project-testing/SKILL.md:6: "lane" ${lane}\n` +
+      `.claude/skills/project-testing/SKILL.md:7: "lane" ${lane}\n` +
+      `.claude/skills/project-testing/SKILL.md:8: "lanes" ${lane}\n` +
+      `.claude/skills/project-testing/SKILL.md:8: "lane" ${lane}\n` +
+      '.claude/skills/project-testing/SKILL.md:8: "unit run" is a coined term; write the command that runs the tests, `bun run test`\n' +
+      '.claude/skills/project-testing/SKILL.md:10: "unit limit" is a coined term; write the timeout and the command it applies to, such as "the 5 s timeout of `bun run test`"\n' +
+      'check-skill: 1 skills, 6 errors, 0 warnings\n',
+    stderr: '',
+  });
+});
+
+test('it fails a coined term in a reference, a footnote, the description, after a stray backtick, and across a line break', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description: Commands for the demo service, by lane. Load it before a demo test.',
+    '---',
+    '',
+    '## References',
+    '',
+    '- [Slow tests](./references/slow.md): a test over its timeout.',
+  ]);
+
+  await ctx.writePage('.claude/skills/demo/references/slow.md', [
+    '# Slow tests',
+    '',
+    'Move a slow test out of the Unit-Run.',
+    '',
+    'Keep it out of the unit',
+    'run, and under the unit',
+    'limit.',
+    '',
+    '[^1]: lanes are slow here.',
+    '',
+    'Type a ` then read the lane.',
+  ]);
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      '.claude/skills/demo/SKILL.md:3: "lane" is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them\n' +
+      '.claude/skills/demo/references/slow.md:3: "unit-run" is a coined term; write the command that runs the tests, `bun run test`\n' +
+      '.claude/skills/demo/references/slow.md:6: "unit run" is a coined term; write the command that runs the tests, `bun run test`\n' +
+      '.claude/skills/demo/references/slow.md:7: "unit limit" is a coined term; write the timeout and the command it applies to, such as "the 5 s timeout of `bun run test`"\n' +
+      '.claude/skills/demo/references/slow.md:9: "lanes" is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them\n' +
+      '.claude/skills/demo/references/slow.md:11: "lane" is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them\n' +
+      'check-skill: 1 skills, 6 errors, 0 warnings\n',
+    stderr: '',
+  });
+});
+
+test('it reads the indented text of a list item, and skips each line of an indented code block', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description: Commands for the demo service. Load it before a demo test.',
+    '---',
+    '',
+    '- Put the test here.',
+    '',
+    '    It runs in the e2e lane.',
+    '',
+    'Set the stack in the config:',
+    '',
+    '    lanes:',
+    '    [x](y.ts#L1)',
+  ]);
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      '.claude/skills/demo/SKILL.md:8: "lane" is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them\n' +
       'check-skill: 1 skills, 1 errors, 0 warnings\n',
+    stderr: '',
+  });
+});
+
+test('it passes a coined term inside code, a link target or label, an HTML tag, a URL or a longer word', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description: Commands for the demo service. Load it before a demo test.',
+    '---',
+    '',
+    '- Declare the stack under `lanes` in `rig.config.ts`, and run it with `rig e2e`.',
+    '- Read [the timeouts](./guide.md#lanes), or <https://example.com/lanes>.',
+    '- Read https://example.com/unit-run/ for the flags.',
+    '- Run the checks with nix-unit runs, then plane and laneway tests.',
+    '<!-- the unit run -->',
+    '',
+    'Read [the guide](./a_(b)lanes.md), [the guide][lanes] and <a href="./guide.md#lanes">the guide</a>.',
+    '',
+    '[lanes]: ./guide.md#lanes',
+    '',
+    'Set the stack in the config:',
+    '',
+    '    lanes: {}',
+    '',
+    'Set `stack',
+    'lanes` in the config.',
+    '',
+    '```yaml',
+    'lanes:',
+    '  e2e: {}',
+    '```',
+  ]);
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-skill: 1 skills, 0 errors, 0 warnings\n',
     stderr: '',
   });
 });
