@@ -44,9 +44,9 @@ async function setupTest() {
   // test.
   await mkdir(join(tools, 'scripts', 'src'), { recursive: true });
 
-  for (const name of ['remove-excluded-blocks.sh', 'remove-retired-sync-files.sh']) {
-    await cp(join(scriptsSourceFolder, name), join(tools, 'scripts', 'src', name));
-    await cp(join(stubFolder, name), join(tools, 'scripts', name));
+  for (const scriptName of ['remove-excluded-blocks.sh', 'remove-retired-sync-files.sh']) {
+    await cp(join(scriptsSourceFolder, scriptName), join(tools, 'scripts', 'src', scriptName));
+    await cp(join(stubFolder, scriptName), join(tools, 'scripts', scriptName));
   }
 
   await $`git -C ${tools} init -q`.env(env).quiet();
@@ -1375,11 +1375,11 @@ test('it leaves out a file excepted for the caller and drops the Markdown block 
 test('it strips a Markdown block and removes a retired file from a tools ref with no scripts/src/', async () => {
   const ctx = await setupTest();
 
-  for (const name of ['remove-excluded-blocks.sh', 'remove-retired-sync-files.sh']) {
-    const script = await readFile(join(import.meta.dir, '..', name), 'utf8');
+  for (const scriptName of ['remove-excluded-blocks.sh', 'remove-retired-sync-files.sh']) {
+    const scriptText = await readFile(join(import.meta.dir, '..', scriptName), 'utf8');
 
-    await ctx.removeSource(`scripts/src/${name}`);
-    await ctx.writeSource(`scripts/${name}`, script);
+    await ctx.removeSource(`scripts/src/${scriptName}`);
+    await ctx.writeSource(`scripts/${scriptName}`, scriptText);
   }
 
   await ctx.writeMainCommit('README.md', '# app\n');
