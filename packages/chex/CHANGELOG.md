@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.0...@zgeoff/chex@0.3.1) (2026-11-09)
+
+
+### Bug Fixes
+
+* **chex:** lint the workflow callers under sync/src/workflow-callers ([#596](https://github.com/zgeoff/tools/issues/596)) ([80b7339](https://github.com/zgeoff/tools/commit/80b7339b4a485d2641825de8b987d8702dc3aa3c))
+
 ## [0.3.0](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.2.6...@zgeoff/chex@0.3.0) (2026-11-09)
 
 
