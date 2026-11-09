@@ -20,7 +20,8 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const source = join(import.meta.dir, '..');
+  const scriptsSourceFolder = join(import.meta.dir, '..');
+  const stubFolder = join(import.meta.dir, '..', '..');
   const origin = join(directory, 'origin.git');
   const tools = join(directory, 'tools');
   const skills = join(directory, 'skills');
@@ -44,8 +45,8 @@ async function setupTest() {
   await mkdir(join(tools, 'scripts', 'src'), { recursive: true });
 
   for (const name of ['remove-excluded-blocks.sh', 'remove-retired-sync-files.sh']) {
-    await cp(join(source, name), join(tools, 'scripts', 'src', name));
-    await cp(join(source, '..', name), join(tools, 'scripts', name));
+    await cp(join(scriptsSourceFolder, name), join(tools, 'scripts', 'src', name));
+    await cp(join(stubFolder, name), join(tools, 'scripts', name));
   }
 
   await $`git -C ${tools} init -q`.env(env).quiet();
