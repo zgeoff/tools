@@ -430,9 +430,8 @@ sub check_markdown {
   for my $line (@lines) {
     $line_number++;
     if ($open eq "") {
-      # A blank line ends a paragraph, and with it any code span left open.
       if ($line =~ /^\s*$/) {
-        ($after_blank, $open_span) = (1, "");
+        $after_blank = 1;
         next;
       }
       # Four spaces after a blank line start an indented code block, except inside a list, where
@@ -541,14 +540,21 @@ sub check_markdown {
   }
 }
 
-# Returns true when a line before the next blank line holds a backtick run as long as the one given.
+# Returns true when a line of the same paragraph holds a backtick run as long as the one given.
 sub has_closing_run {
   my ($run, @rest) = @_;
   for my $line (@rest) {
-    return 0 if $line =~ /^\s*$/;
+    return 0 if is_block_start($line);
     return 1 if $line =~ /(?<!`)\Q$run\E(?!`)/;
   }
   return 0;
+}
+
+# A blank line, a list item, a heading, a fence, a table row or a block quote ends a paragraph, so a
+# code span never runs past one.
+sub is_block_start {
+  my ($line) = @_;
+  return $line =~ /^\s*$|^\s*(?:[-*+]|\d+[.)])\s|^\s{0,3}#{1,6}(?:\s|$)|^\s*(?:`{3,}|~{3,})|^\s*[|>]/;
 }
 
 sub resolve_path {

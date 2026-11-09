@@ -653,6 +653,15 @@ test('it fails a link with a line anchor, but not one inside code', async () => 
     '',
     'Type a ` then see [z](w.ts#L2).',
     'See [v](u.ts#L3).',
+    '',
+    '- Press ` to open [c](d.ts#L5).',
+    '- Run [x](y.ts#L1) with `bun run test:e2e`.',
+    '',
+    'Type a ` here.',
+    '```sh',
+    'echo `date`',
+    '```',
+    'See [q](r.ts#L4).',
   ]);
 
   const result = await ctx.run();
@@ -667,7 +676,10 @@ test('it fails a link with a line anchor, but not one inside code', async () => 
       '.claude/skills/demo/SKILL.md:7: link ../../../src/load-theme.ts#L42 has a line anchor; name the target in the link text instead\n' +
       '.claude/skills/demo/SKILL.md:21: link w.ts#L2 has a line anchor; name the target in the link text instead\n' +
       '.claude/skills/demo/SKILL.md:22: link u.ts#L3 has a line anchor; name the target in the link text instead\n' +
-      'check-skill: 1 skills, 3 errors, 0 warnings\n',
+      '.claude/skills/demo/SKILL.md:24: link d.ts#L5 has a line anchor; name the target in the link text instead\n' +
+      '.claude/skills/demo/SKILL.md:25: link y.ts#L1 has a line anchor; name the target in the link text instead\n' +
+      '.claude/skills/demo/SKILL.md:31: link r.ts#L4 has a line anchor; name the target in the link text instead\n' +
+      'check-skill: 1 skills, 6 errors, 0 warnings\n',
     stderr: '',
   });
 });
@@ -755,6 +767,40 @@ test('it fails a coined term in a reference, a footnote, the description, after 
       '.claude/skills/demo/references/slow.md:9: "lanes" is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them\n' +
       '.claude/skills/demo/references/slow.md:11: "lane" is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them\n' +
       'check-skill: 1 skills, 6 errors, 0 warnings\n',
+    stderr: '',
+  });
+});
+
+test('it reads the indented text of a list item, and skips each line of an indented code block', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description: Commands for the demo service. Load it before a demo test.',
+    '---',
+    '',
+    '- Put the test here.',
+    '',
+    '    It runs in the e2e lane.',
+    '',
+    'Set the stack in the config:',
+    '',
+    '    lanes:',
+    '    [x](y.ts#L1)',
+  ]);
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      '.claude/skills/demo/SKILL.md:8: "lane" is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them\n' +
+      'check-skill: 1 skills, 1 errors, 0 warnings\n',
     stderr: '',
   });
 });
