@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.0](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.2.6...@zgeoff/chex@0.3.0) (2026-11-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **chex:** chex skill fails a skill that holds one of these terms, so a repo whose skills use them fails the check until it rewrites them.
+
+### Features
+
+* **chex:** fail a skill that uses a coined term ([#583](https://github.com/zgeoff/tools/issues/583)) ([0f0e4ea](https://github.com/zgeoff/tools/commit/0f0e4ea6a20fa262d4c2d8d778c80dc30f1a7883))
+
 ## [0.2.6](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.2.5...@zgeoff/chex@0.2.6) (2026-11-09)
 
 
