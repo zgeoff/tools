@@ -35,7 +35,7 @@ test('it reports a stub whose group gives dispatches of two tools commits one gr
   const faults = collectRepoSyncConcurrencyFaults(stubText, workflowText);
 
   expect(faults).toStrictEqual([
-    `sync/repo-sync.yml: dispatches of two tools commits share the concurrency group bakery-sync-\${{ github.sha }}, so a newer dispatch replaces a pending one`,
+    `sync/src/repo-sync.yml: dispatches of two tools commits share the concurrency group bakery-sync-\${{ github.sha }}, so a newer dispatch replaces a pending one`,
   ]);
 });
 
@@ -44,7 +44,7 @@ test('it reports a stub with no concurrency group', () => {
   const workflowText = ['jobs:', '  sync:', '    concurrency:', '      queue: max', ''].join('\n');
   const faults = collectRepoSyncConcurrencyFaults(stubText, workflowText);
 
-  expect(faults).toStrictEqual(['sync/repo-sync.yml: the workflow sets no concurrency group']);
+  expect(faults).toStrictEqual(['sync/src/repo-sync.yml: the workflow sets no concurrency group']);
 });
 
 test('it reports a sync job that keeps the default queue', () => {

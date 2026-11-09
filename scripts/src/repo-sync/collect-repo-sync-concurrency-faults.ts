@@ -17,7 +17,7 @@ function collectStubFaults(stubText: string): string[] {
   const group = findField(findField(stub, 'concurrency'), 'group');
 
   if (typeof group !== 'string') {
-    return ['sync/repo-sync.yml: the workflow sets no concurrency group'];
+    return ['sync/src/repo-sync.yml: the workflow sets no concurrency group'];
   }
 
   const [first, second] = toolsCommits.map((commit) =>
@@ -30,7 +30,7 @@ function collectStubFaults(stubText: string): string[] {
 
   return first === second
     ? [
-        `sync/repo-sync.yml: dispatches of two tools commits share the concurrency group ${group}, so a newer dispatch replaces a pending one`,
+        `sync/src/repo-sync.yml: dispatches of two tools commits share the concurrency group ${group}, so a newer dispatch replaces a pending one`,
       ]
     : [];
 }

@@ -15,7 +15,7 @@ async function setupTest() {
   // The real HOME keeps bun install on the shared cache.
   const env = { PATH: process.env['PATH'], HOME: process.env['HOME'] };
   const repoRoot = join(import.meta.dir, '../..');
-  const stubPath = join(repoRoot, 'sync/hooks/start.ts');
+  const stubPath = join(repoRoot, 'sync/src/hooks/start.ts');
 
   // The bundle takes in @zgeoff/std, the declaration build extends the base tsconfig, and this
   // file holds the recipe that writes the template.

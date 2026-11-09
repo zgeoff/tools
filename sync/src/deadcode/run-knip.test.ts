@@ -13,7 +13,7 @@ async function setupTest() {
 
   const worktree = join(checkout, '.worktrees', 'fix-branch');
 
-  const knipPath = await realpath(join(import.meta.dir, '../../node_modules/.bin/knip'));
+  const knipPath = await realpath(join(import.meta.dir, '../../../node_modules/.bin/knip'));
 
   await mkdir(join(worktree, 'scripts'), { recursive: true });
   await copyFile(join(import.meta.dir, 'run-knip.sh'), join(worktree, 'scripts', 'run-knip.sh'));

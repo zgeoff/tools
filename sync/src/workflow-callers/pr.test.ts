@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 
 test('it gives a caller that sets no time limit the reusable workflow default', async () => {
   const reusableText = await Bun.file(
-    new URL('../../.github/workflows/bun-checks.yml', import.meta.url),
+    new URL('../../../.github/workflows/bun-checks.yml', import.meta.url),
   ).text();
 
   const callerText = await Bun.file(new URL('pr.yml', import.meta.url)).text();

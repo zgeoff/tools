@@ -1,0 +1,18 @@
+{
+  "name": "@zgeoff/tools-sync",
+  "private": true,
+  "description": "The sources that repo-sync delivers to each repo, with their manifest and tests",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsrs"
+  },
+  "devDependencies": {
+    "@actions/expressions": "catalog:",
+    "@types/bun": "catalog:",
+    "@zgeoff/std": "workspace:*",
+    "@zgeoff/testing": "workspace:*",
+    "tiny-invariant": "catalog:",
+    "ts-pattern": "catalog:",
+    "tsrs": "catalog:"
+  }
+}

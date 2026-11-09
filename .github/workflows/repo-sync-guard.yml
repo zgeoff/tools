@@ -5,7 +5,7 @@
 # on through a later push by a user with write access, so a hand-pushed commit
 # would otherwise merge on green with no review.
 #
-# Callers install sync/workflow-callers/repo-sync-guard.yml, which runs on each
+# Callers install sync/src/workflow-callers/repo-sync-guard.yml, which runs on each
 # push to the sync branch.
 name: Repo sync guard (reusable)
 

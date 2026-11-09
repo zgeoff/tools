@@ -17,7 +17,7 @@
 # The caller needs Bun 1.4.0 or newer in .bun-version, for `bun audit fix`, and
 # the REPO_SYNC_APP_CLIENT_ID and REPO_SYNC_APP_PRIVATE_KEY secrets that
 # repo-sync uses: a push with the default GITHUB_TOKEN starts no checks on the
-# pull request. sync/workflow-callers/audit-fix.yml is the caller.
+# pull request. sync/src/workflow-callers/audit-fix.yml is the caller.
 name: Audit fix (reusable)
 
 on:

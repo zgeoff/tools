@@ -98,7 +98,7 @@ async function setupTest() {
     project,
     fakeBin,
     packageDirectory,
-    agentHooksSource: join(import.meta.dir, '../../packages/agent-hooks/src/index.ts'),
+    agentHooksSource: join(import.meta.dir, '../../../packages/agent-hooks/src/index.ts'),
     installLog,
     stubPath,
     runStub,

@@ -4,7 +4,8 @@
   "workspaces": {
     "packages": [
       "packages/*",
-      "scripts"
+      "scripts",
+      "sync"
     ],
     "catalog": {
       "@actions/expressions": "0.3.61",
@@ -51,7 +52,7 @@
   "type": "module",
   "scripts": {
     "prepare": "lefthook install --force || true; bun run build && bun run skills:install",
-    "typecheck": "bun run --filter '*' typecheck && tsrs -p . && tsrs -p sync",
+    "typecheck": "bun run --filter '*' typecheck && tsrs -p .",
     "test": "bun scripts/src/test-cleanup/run-test-folder-sweep.ts && rig unit",
     "test:related": "bun scripts/src/test-cleanup/run-test-folder-sweep.ts && rig related",
     "test:browser": "bun scripts/src/test-cleanup/run-test-folder-sweep.ts && rig browser",
@@ -83,7 +84,6 @@
     "ci:publish-packages": "bun scripts/src/publish/publish-packages.ts"
   },
   "devDependencies": {
-    "@actions/expressions": "catalog:",
     "@commitlint/cli": "catalog:",
     "@maschwenk/tsrslint": "catalog:",
     "@tsconfig/strictest": "catalog:",
@@ -105,8 +105,6 @@
     "lefthook": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
-    "tiny-invariant": "catalog:",
-    "ts-pattern": "catalog:",
     "tsrs": "catalog:",
     "typescript": "catalog:"
   }

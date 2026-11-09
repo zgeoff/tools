@@ -1,1 +1,1 @@
-../../sync/hooks/start.ts
+../../sync/src/hooks/start.ts

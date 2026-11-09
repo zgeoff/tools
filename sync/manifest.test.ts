@@ -6,7 +6,7 @@ import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 import { collectRelativeImports } from '../scripts/src/collect-relative-imports.ts';
 import { parseSyncEntries } from '../scripts/src/repo-sync/parse-sync-entries.ts';
-import { writeTreeFiles } from './test-utils/write-tree-files.ts';
+import { writeTreeFiles } from './src/test-utils/write-tree-files.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'manifest-'));

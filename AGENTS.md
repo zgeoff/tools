@@ -40,9 +40,10 @@ tools is one Bun workspace.
 ```text
 packages/           the @zgeoff/* packages; release-please versions each one and publishes the
                     public ones to npm, as RELEASING.md describes
-sync/               the sources that repo-sync delivers, listed in sync/manifest.json; an edit here
-                    reaches every repo that takes the entry, as docs/architecture/repo-sync.md
-                    describes; skills-pin.json pins the zgeoff/skills commit of the skill text
+sync/               a private workspace; its src/ holds the sources that repo-sync delivers, listed
+                    in sync/manifest.json; an edit there reaches every repo that takes the entry,
+                    as docs/architecture/repo-sync.md describes; skills-pin.json pins the
+                    zgeoff/skills commit of the skill text; the folders below sit in its src/
   pre-push/         the pre-push baseline that the pre-push-baseline entry delivers; its check
                     scripts come from packages/chex, whose own baseline this repo's lefthook.yml
                     extends
@@ -100,7 +101,7 @@ says.
   packages, in any dependency field, which stops release-please. CI and the pre-push hook run it.
 - `bun run check:chex-pin` fails when no custom manager in `renovate.json` captures the chex release
   that `.github/workflows/bun-checks.yml` pins, which Renovate then never bumps. CI runs it.
-- `bun run check:repo-sync-workflows` checks the stub `sync/repo-sync.yml` against
+- `bun run check:repo-sync-workflows` checks the stub `sync/src/repo-sync.yml` against
   `.github/workflows/repo-sync.yml`: two dispatches of different tools commits get two concurrency
   groups, the sync job queues every waiting run, the stub grants every permission a job asks for,
   and the alarm job asks for `actions: read`. CI and the pre-push hook run it.

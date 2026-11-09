@@ -10,7 +10,7 @@ import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
 // the command it gets, so the baseline's typecheck job runs the repo's typecheck script.
 async function setupTest() {
   const baselinePath = join(import.meta.dir, 'lefthook-pre-push.yml');
-  const lefthookPath = join(import.meta.dir, '../../node_modules/.bin/lefthook');
+  const lefthookPath = join(import.meta.dir, '../../../node_modules/.bin/lefthook');
 
   const repo = await mkdtemp(join(tmpdir(), readRunFolderPrefix('lefthook-pre-push-')));
 

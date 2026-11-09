@@ -50,7 +50,7 @@ pre-push:
     - name: repo-sync-workflows
       glob:
         - '.github/workflows/repo-sync.yml'
-        - 'sync/repo-sync.yml'
+        - 'sync/src/repo-sync.yml'
       run: bun run --silent check:repo-sync-workflows
     - name: lefthook-guard
       glob:

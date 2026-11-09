@@ -31,7 +31,7 @@ function collectWithheldFaults(stub: unknown, jobs: Record<string, unknown>): st
       .filter(([scope, level]) => !isGranted(granted[scope], level))
       .map(
         ([scope, level]) =>
-          `sync/repo-sync.yml: the ${jobName} job asks for ${scope}: ${level}, which the stub withholds`,
+          `sync/src/repo-sync.yml: the ${jobName} job asks for ${scope}: ${level}, which the stub withholds`,
       );
   });
 }
