@@ -295,6 +295,11 @@
         "repo": "zgeoff/skills",
         "source": "skills/ci-design/references/dependency-exceptions.md",
         "target": ".claude/skills/ci-design/references/dependency-exceptions.md"
+      },
+      {
+        "repo": "zgeoff/skills",
+        "source": "skills/ci-design/references/run-times.md",
+        "target": ".claude/skills/ci-design/references/run-times.md"
       }
     ]
   },
