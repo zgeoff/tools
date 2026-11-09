@@ -8,7 +8,8 @@
 # .gitattributes.
 # Fails on: a missing name or description, a name that differs from the folder or breaks the name
 # format, a description over 1,024 characters, a plain description that holds a colon YAML reads as a
-# key, frontmatter that Bun.YAML.parse refuses (at the line it fails on), a link with a line anchor outside code, and a SKILL.md body over 1,700 words.
+# key, frontmatter that Bun.YAML.parse refuses (at the line it fails on), a link with a line anchor outside code, a
+# coined term outside code, such as "lane" or "the unit run", and a SKILL.md body over 1,700 words.
 # Warns on: a SKILL.md body over 1,500 words, a SKILL.md over 500
 # lines, a reference that SKILL.md does not list under ## References, a reference over 100 lines
 # with two or more headings and no contents list near its top, a code-formatted span outside a table that names an existing repo file, and a bullet in
@@ -74,6 +75,15 @@ use strict;
 use warnings;
 
 my ($errors, $warnings) = (0, 0);
+
+# The terms that project skills copied from the shared testing skill, each with its plain wording.
+# A reader takes a coined term for a name they should know, so a written rule against them has not
+# held.
+my @coined_terms = (
+  [qr/\blanes?\b/i, "write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them"],
+  [qr/(?<![\w-])unit[ -]runs?\b/i, "write the command that runs the tests, `bun run test`"],
+  [qr/\bunit limit\b/i, "write the timeout and the command it applies to, such as \"the 5 s timeout of `bun run test`\""],
+);
 
 for my $dir (@ARGV) {
   $dir =~ s{^\./}{};
@@ -456,6 +466,19 @@ sub check_markdown {
       $target =~ s/^<(.*)>$/$1/;
       fail("$file:$line_number", "link $target has a line anchor; name the target in the link text instead")
         if $target =~ /#L[0-9]+/;
+    }
+
+    # A link target or a URL holds a path or an anchor, such as #lanes, that the reader never reads.
+    my $prose = $text =~ s/\]\([^)]*\)/]/gr =~ s/^\s{0,3}\[[^\]]+\]:\s*\S+//r =~ s/<[^>\s]*>//gr
+      =~ s{\bhttps?://\S+}{}gr;
+    my %seen;
+    for my $coined (@coined_terms) {
+      my ($pattern, $plain) = @$coined;
+      while ($prose =~ /$pattern/g) {
+        my $term = lc $&;
+        next if $seen{$term}++;
+        fail("$file:$line_number", "\"$term\" is a coined term; $plain");
+      }
     }
 
     # A span inside link text is already a link, so only the spans left after links drop are read.

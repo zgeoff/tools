@@ -660,6 +660,115 @@ test('it fails a link with a line anchor, but not one inside code', async () => 
   });
 });
 
+test('it fails each coined term in a skill and names its plain wording', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/project-testing/SKILL.md', [
+    '---',
+    'name: project-testing',
+    'description: Where each test of the demo service goes, and the command that runs it.',
+    '---',
+    '',
+    '- Put a test that needs s2-lite or Garage in the `e2e` lane of its language, in place of a',
+    '  `<name>.docker.test.ts` file in the `docker` lane of',
+    '  [Lanes](../testing/references/slow-tests.md#lanes). pepys runs no `docker` lane. The unit run',
+    "  can't hold these tests either: on a machine without the s2-lite image, a pull of the image and a",
+    '  start of s2-lite took 7.9 s, past the 5 s unit limit.',
+  ]);
+
+  const result = await ctx.run();
+
+  const lane =
+    'is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them';
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      `.claude/skills/project-testing/SKILL.md:6: "lane" ${lane}\n` +
+      `.claude/skills/project-testing/SKILL.md:7: "lane" ${lane}\n` +
+      `.claude/skills/project-testing/SKILL.md:8: "lanes" ${lane}\n` +
+      `.claude/skills/project-testing/SKILL.md:8: "lane" ${lane}\n` +
+      '.claude/skills/project-testing/SKILL.md:8: "unit run" is a coined term; write the command that runs the tests, `bun run test`\n' +
+      '.claude/skills/project-testing/SKILL.md:10: "unit limit" is a coined term; write the timeout and the command it applies to, such as "the 5 s timeout of `bun run test`"\n' +
+      'check-skill: 1 skills, 6 errors, 0 warnings\n',
+    stderr: '',
+  });
+});
+
+test('it fails a coined term in a reference and in the description', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description: Commands for the demo service, by lane. Load it before a demo test.',
+    '---',
+    '',
+    '## References',
+    '',
+    '- [Slow tests](./references/slow.md): a test over its timeout.',
+  ]);
+
+  await ctx.writePage('.claude/skills/demo/references/slow.md', [
+    '# Slow tests',
+    '',
+    'Move a slow test out of the Unit-Run.',
+  ]);
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      '.claude/skills/demo/SKILL.md:3: "lane" is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them\n' +
+      '.claude/skills/demo/references/slow.md:3: "unit-run" is a coined term; write the command that runs the tests, `bun run test`\n' +
+      'check-skill: 1 skills, 2 errors, 0 warnings\n',
+    stderr: '',
+  });
+});
+
+test('it passes a coined term inside code, a link target, a URL or a longer word', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/demo/SKILL.md', [
+    '---',
+    'name: demo',
+    'description: Commands for the demo service. Load it before a demo test.',
+    '---',
+    '',
+    '- Declare the stack under `lanes` in `rig.config.ts`, and run it with `rig e2e`.',
+    '- Read [the timeouts](./guide.md#lanes), or <https://example.com/lanes>.',
+    '- Read https://example.com/unit-run/ for the flags.',
+    '- Run the checks with nix-unit runs, then plane and laneway tests.',
+    '<!-- the unit run -->',
+    '',
+    '```yaml',
+    'lanes:',
+    '  e2e: {}',
+    '```',
+  ]);
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-skill: 1 skills, 0 errors, 0 warnings\n',
+    stderr: '',
+  });
+});
+
 test('it warns and passes when SKILL.md is over 500 lines', async () => {
   const ctx = await setupTest();
 
