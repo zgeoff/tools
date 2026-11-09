@@ -67,8 +67,8 @@ until an actionlint release that knows the key replaces the ignore.
 
 The workflow lint checks the rules that the ci-design skill's
 [Step scripts](https://github.com/zgeoff/skills/blob/main/skills/ci-design/SKILL.md#step-scripts)
-section lists, over the changed files under `.github/workflows/` and `sync/src/workflow-callers/`.
-It runs when the machine lacks actionlint or actionlint fails, and it prints each fault as a warning
+section lists, over the changed files under `.github/workflows/` and `sync/workflow-callers/`. It
+runs when the machine lacks actionlint or actionlint fails, and it prints each fault as a warning
 and passes the push.
 
 Each job runs its command under [`diet`](./memory-caps.md), so in a
