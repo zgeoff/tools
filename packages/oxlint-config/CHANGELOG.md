@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.4](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.10.3...@zgeoff/oxlint-config@0.10.4) (2026-11-09)
+
+
+### Features
+
+* **oxlint-config:** add a pending list to file-named-for-export ([#582](https://github.com/zgeoff/tools/issues/582)) ([502b5e1](https://github.com/zgeoff/tools/commit/502b5e19d5b69108c9ceae9bb6f6649019648d44))
+
 ## [0.10.3](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.10.2...@zgeoff/oxlint-config@0.10.3) (2026-11-07)
 
 
