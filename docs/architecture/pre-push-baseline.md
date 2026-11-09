@@ -113,6 +113,8 @@ match the table above, with these differences:
   `check:test-timeouts`, `check:dependency-gates`, `check:workflows`, `check:uncommitted` and
   `memory-capped`. The build also moves a `files:branch` that runs the old
   `scripts/collect-branch-files.ts` to `scripts/read-branch-files.ts`.
+- The workflow lint job reads changed files under `sync/workflow-callers/` in place of
+  `sync/src/workflow-callers/`, a folder that only tools holds.
 - Each job runs through the `memory-capped` script, which the build points at the
   [memory-cap script](./memory-caps.md) with the host's memory budget as the cap.
 - The docs job runs the docs-writing skill's `check-prose.sh`, `check-length.sh` and
