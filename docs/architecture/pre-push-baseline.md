@@ -67,9 +67,10 @@ until an actionlint release that knows the key replaces the ignore.
 
 The workflow lint checks the rules that the ci-design skill's
 [Step scripts](https://github.com/zgeoff/skills/blob/main/skills/ci-design/SKILL.md#step-scripts)
-section lists, over the changed files under `.github/workflows/` and `sync/workflow-callers/`. It
-runs when the machine lacks actionlint or actionlint fails, and it prints each fault as a warning
-and passes the push.
+section lists, over the changed files under `.github/workflows/` and `sync/src/workflow-callers/`,
+where tools keeps the callers it delivers. It runs when the machine lacks actionlint or actionlint
+fails, and it prints each fault as a warning and passes the push. The delivered baseline reads
+`sync/workflow-callers/` instead, as [The delivered baseline](#the-delivered-baseline) lists.
 
 Each job runs its command under [`diet`](./memory-caps.md), so in a
 [mode](./memory-caps.md#the-modes) that caps, a job that outgrows the host fails alone, and every
@@ -113,6 +114,8 @@ match the table above, with these differences:
   `check:test-timeouts`, `check:dependency-gates`, `check:workflows`, `check:uncommitted` and
   `memory-capped`. The build also moves a `files:branch` that runs the old
   `scripts/collect-branch-files.ts` to `scripts/read-branch-files.ts`.
+- The workflow lint job reads changed files under `sync/workflow-callers/` in place of
+  `sync/src/workflow-callers/`, a folder that only tools holds.
 - Each job runs through the `memory-capped` script, which the build points at the
   [memory-cap script](./memory-caps.md) with the host's memory budget as the cap.
 - The docs job runs the docs-writing skill's `check-prose.sh`, `check-length.sh` and

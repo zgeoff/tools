@@ -86,7 +86,7 @@ pre-push:
       glob: '*.md'
       run: '{clear-git-env} bun x --no-install diet -- bun run --silent check:docs'
     # GitHub runs no workflow from a subfolder of .github/workflows, and
-    # sync/workflow-callers holds the workflows that tools delivers. actionlint
+    # sync/src/workflow-callers holds the workflows that tools delivers. actionlint
     # 1.7.12 rejects the concurrency queue key that GitHub documents, until
     # rhysd/actionlint#654 ships; the ignore lapses on the same date as in CI.
     # The workflow lint runs after actionlint, even when actionlint is missing
@@ -97,7 +97,7 @@ pre-push:
         node_modules/@zgeoff/chex/src/read-branch-files.ts
       glob:
         - '.github/workflows/*.{yml,yaml}'
-        - 'sync/workflow-callers/*.{yml,yaml}'
+        - 'sync/src/workflow-callers/*.{yml,yaml}'
       run: |
         {clear-git-env}
         status=0
