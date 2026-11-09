@@ -145,6 +145,7 @@ test.each([
 test.each([
   ['packages/api/src/pour-kettle.ts', 'packages/api'],
   ['packages/api/src/pour-kettle.ts', './packages/api/'],
+  ['packages/api/src/pour-kettle.ts', String.raw`packages\api`],
   ['packages/api/scripts/pour-kettle.ts', 'packages/api'],
   ['src/pour-kettle.ts', '.'],
 ])('it passes a mismatched %s when pending lists its package as %s', async (path, entry) => {
@@ -250,6 +251,42 @@ test('it passes a mismatched file under a package.json inside the src/ of a pack
 
   const messages = await runLintMessages(directory, 'zgeoff/file-named-for-export', [
     'packages/api/src/pour-kettle.ts',
+  ]);
+
+  expect(messages).toStrictEqual([]);
+});
+
+test('it passes a mismatched file inside a package of the src/ of a package that pending lists', async () => {
+  const directory = await createLintTree(
+    {
+      'packages/api/package.json': '{ "name": "api" }',
+      'packages/api/src/fixtures/kettle/package.json': '{ "name": "kettle" }',
+      'packages/api/src/fixtures/kettle/src/pour-kettle.ts':
+        'export function boilKettle(): void {}\n',
+    },
+    { 'zgeoff/file-named-for-export': ['error', { pending: ['packages/api'] }] },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/file-named-for-export', [
+    'packages/api/src/fixtures/kettle/src/pour-kettle.ts',
+  ]);
+
+  expect(messages).toStrictEqual([]);
+});
+
+test('it ignores a package.json above the repo root when it finds the package of a pending file', async () => {
+  const directory = await createLintTree(
+    {
+      'package.json': '{ "name": "workspace" }',
+      'src/repo/.git/HEAD': 'ref: refs/heads/main\n',
+      'src/repo/packages/api/package.json': '{ "name": "api" }',
+      'src/repo/packages/api/scripts/pour-kettle.ts': 'export function boilKettle(): void {}\n',
+    },
+    { 'zgeoff/file-named-for-export': ['error', { pending: ['packages/api'] }] },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/file-named-for-export', [
+    'src/repo/packages/api/scripts/pour-kettle.ts',
   ]);
 
   expect(messages).toStrictEqual([]);

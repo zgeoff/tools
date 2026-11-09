@@ -32,7 +32,7 @@ const fileNamedForExport = {
     const filename = context.physicalFilename;
     const root = resolveRepoRoot(filename) ?? context.cwd;
     const pending = (context.options[0]?.pending ?? []).map((entry) => toPendingPath(entry));
-    const directory = pending.length === 0 ? null : resolvePackageDirectory(filename);
+    const directory = pending.length === 0 ? null : resolvePackageDirectory(filename, root);
     const isPending = directory !== null && pending.includes(toRootPath(root, directory));
 
     if (!anchorFiles.has(root)) {

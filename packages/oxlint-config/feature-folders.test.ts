@@ -305,28 +305,31 @@ test.each([
   expect(messages).toStrictEqual([]);
 });
 
-test('it skips every check in a package that pending lists', async () => {
-  const directory = await createLintTree(
-    {
-      'packages/api/package.json': '{ "name": "api" }',
-      'packages/api/src/apply-discount.ts': 'export {};\n',
-      'packages/api/src/charge-card.ts': 'export {};\n',
-      'packages/api/src/create-invoice.ts': 'export {};\n',
-      'packages/api/src/format-total.ts': 'export {};\n',
-      'packages/api/src/parse-order.ts': 'export {};\n',
-      'packages/api/src/read-config.ts': 'export {};\n',
-      'packages/api/src/refund-payment.ts': 'export {};\n',
-      'packages/api/src/send-receipt.ts': 'export {};\n',
-      'packages/api/src/to-cents.ts': 'export {};\n',
-      'packages/api/src/lib/round.ts': 'export {};\n',
-    },
-    { 'zgeoff/feature-folders': ['error', { pending: ['packages/api'] }] },
-  );
+test.each([['packages/api'], [String.raw`packages\api`]])(
+  'it skips every check in a package that pending lists as %s',
+  async (entry) => {
+    const directory = await createLintTree(
+      {
+        'packages/api/package.json': '{ "name": "api" }',
+        'packages/api/src/apply-discount.ts': 'export {};\n',
+        'packages/api/src/charge-card.ts': 'export {};\n',
+        'packages/api/src/create-invoice.ts': 'export {};\n',
+        'packages/api/src/format-total.ts': 'export {};\n',
+        'packages/api/src/parse-order.ts': 'export {};\n',
+        'packages/api/src/read-config.ts': 'export {};\n',
+        'packages/api/src/refund-payment.ts': 'export {};\n',
+        'packages/api/src/send-receipt.ts': 'export {};\n',
+        'packages/api/src/to-cents.ts': 'export {};\n',
+        'packages/api/src/lib/round.ts': 'export {};\n',
+      },
+      { 'zgeoff/feature-folders': ['error', { pending: [entry] }] },
+    );
 
-  const messages = await runLintMessages(directory, 'zgeoff/feature-folders', ['packages/api']);
+    const messages = await runLintMessages(directory, 'zgeoff/feature-folders', ['packages/api']);
 
-  expect(messages).toStrictEqual([]);
-});
+    expect(messages).toStrictEqual([]);
+  },
+);
 
 test.each([
   ['a root over the cap', { 'packages/api/src/to-cents.ts': 'export {};\n' }],

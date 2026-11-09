@@ -38,7 +38,7 @@ reason:
 ```
 
 To bump the config before every file passes, list the packages that still fail in the `pending`
-option, as paths from the repo root, with `.` for a package at the root. The option has the shape of
+option, which has the shape of
 [`zgeoff/feature-folders`'s `pending`](./oxlint-config-feature-folders.md#the-pending-option). The
 rule skips every file of a listed package:
 
@@ -50,16 +50,18 @@ rule skips every file of a listed package:
 }
 ```
 
-The rule takes a file's package to be the nearest folder above the file that holds a `package.json`,
-so it still checks a package nested inside a listed one. A `package.json` inside a package's `src/`,
-such as one that only sets the `type` field, does not start a package. With no list, or an empty
-one, the rule checks every file.
+The rule takes a file's package to be the nearest folder above the file, up to the repo root, that
+holds a `package.json`, so it still checks a package nested inside a listed one. A folder whose
+`src/` holds the file wins over each `package.json` below it, such as one inside `src/` that only
+sets the `type` field. With no list, or an empty one, the rule checks every file.
 
 The rule reports an entry with no `package.json` at its path, with the fix "remove it from
-`pending`", once per lint run, on the first file that oxlint lints. It never reports an entry whose
-package passes the rule, because oxlint hands a rule only the file it lints, and that report needs a
-parse of every file in the package. To find such an entry, remove it and run oxlint over its
-package.
+`pending`". It never reports an entry whose package passes the rule, because that report needs a
+parse of every file in the package. To find such an entry:
+
+1. Remove the entry from `pending`.
+2. Run `oxlint <entry>`. Expect: no `zgeoff(file-named-for-export)` report. When one shows, put the
+   entry back.
 
 ## `zgeoff/function-verb`
 

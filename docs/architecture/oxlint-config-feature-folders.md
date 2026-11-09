@@ -36,7 +36,8 @@ the whole root. A `package.json` that does not parse names no entry files.
 ## The `pending` option
 
 A repo lists the package folders it has yet to fold in `pending`, as paths from the repo root, with
-`.` for a package at the root. The rule skips every check in a listed package:
+`.` for a package at the root. The rule reads a `\` in an entry as a `/`. The rule skips every check
+in a listed package:
 
 ```jsonc
 {
