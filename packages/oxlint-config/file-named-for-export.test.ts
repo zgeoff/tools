@@ -1,4 +1,6 @@
 import { expect, test } from 'bun:test';
+import { createLintTree } from './src/test-utils/create-lint-tree.ts';
+import { runLintMessages } from './src/test-utils/run-lint-messages.ts';
 import { runLintTree } from './src/test-utils/run-lint-tree.ts';
 
 test.each([
@@ -138,4 +140,178 @@ test.each([
   });
 
   expect(result.exitCode).toBe(0);
+});
+
+test.each([
+  ['packages/api/src/pour-kettle.ts', 'packages/api'],
+  ['packages/api/src/pour-kettle.ts', './packages/api/'],
+  ['packages/api/src/pour-kettle.ts', String.raw`packages\api`],
+  ['packages/api/scripts/pour-kettle.ts', 'packages/api'],
+  ['src/pour-kettle.ts', '.'],
+])('it passes a mismatched %s when pending lists its package as %s', async (path, entry) => {
+  const directory = await createLintTree(
+    {
+      'package.json': '{ "name": "kettles" }',
+      'packages/api/package.json': '{ "name": "api" }',
+      [path]: 'export function boilKettle(): void {}\n',
+    },
+    { 'zgeoff/file-named-for-export': ['error', { pending: [entry] }] },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/file-named-for-export', [path]);
+
+  expect(messages).toStrictEqual([]);
+});
+
+test('it reports a mismatched file in a package that pending leaves out', async () => {
+  const directory = await createLintTree(
+    {
+      'packages/api/package.json': '{ "name": "api" }',
+      'packages/api/src/pour-kettle.ts': 'export function boilKettle(): void {}\n',
+      'packages/web/package.json': '{ "name": "web" }',
+      'packages/web/src/pour-kettle.ts': 'export function boilKettle(): void {}\n',
+    },
+    { 'zgeoff/file-named-for-export': ['error', { pending: ['packages/api'] }] },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/file-named-for-export', [
+    'packages/api/src/pour-kettle.ts',
+    'packages/web/src/pour-kettle.ts',
+  ]);
+
+  expect(messages).toStrictEqual([
+    {
+      filename: 'packages/web/src/pour-kettle.ts',
+      line: 1,
+      message:
+        "No export of 'pour-kettle.ts' is named for the file: name the main export 'pour-kettle' in camelCase, PascalCase or SCREAMING_SNAKE_CASE, or rename the file for its main export.",
+    },
+  ]);
+});
+
+test.each([
+  ['no options', 'error'],
+  ['an empty pending list', ['error', { pending: [] }]],
+])('it reports a mismatched file in a package with %s', async (_, setting) => {
+  const directory = await createLintTree(
+    {
+      'packages/api/package.json': '{ "name": "api" }',
+      'packages/api/src/pour-kettle.ts': 'export function boilKettle(): void {}\n',
+    },
+    { 'zgeoff/file-named-for-export': setting },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/file-named-for-export', [
+    'packages/api/src/pour-kettle.ts',
+  ]);
+
+  expect(messages).toStrictEqual([
+    {
+      filename: 'packages/api/src/pour-kettle.ts',
+      line: 1,
+      message:
+        "No export of 'pour-kettle.ts' is named for the file: name the main export 'pour-kettle' in camelCase, PascalCase or SCREAMING_SNAKE_CASE, or rename the file for its main export.",
+    },
+  ]);
+});
+
+test('it reports a mismatched file in a package nested inside one that pending lists', async () => {
+  const directory = await createLintTree(
+    {
+      'packages/api/package.json': '{ "name": "api" }',
+      'packages/api/plugins/brew/package.json': '{ "name": "brew" }',
+      'packages/api/plugins/brew/src/pour-kettle.ts': 'export function boilKettle(): void {}\n',
+    },
+    { 'zgeoff/file-named-for-export': ['error', { pending: ['packages/api'] }] },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/file-named-for-export', [
+    'packages/api/plugins/brew/src/pour-kettle.ts',
+  ]);
+
+  expect(messages).toStrictEqual([
+    {
+      filename: 'packages/api/plugins/brew/src/pour-kettle.ts',
+      line: 1,
+      message:
+        "No export of 'pour-kettle.ts' is named for the file: name the main export 'pour-kettle' in camelCase, PascalCase or SCREAMING_SNAKE_CASE, or rename the file for its main export.",
+    },
+  ]);
+});
+
+test('it passes a mismatched file under a package.json inside the src/ of a package that pending lists', async () => {
+  const directory = await createLintTree(
+    {
+      'packages/api/package.json': '{ "name": "api" }',
+      'packages/api/src/package.json': '{ "type": "module" }',
+      'packages/api/src/pour-kettle.ts': 'export function boilKettle(): void {}\n',
+    },
+    { 'zgeoff/file-named-for-export': ['error', { pending: ['packages/api'] }] },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/file-named-for-export', [
+    'packages/api/src/pour-kettle.ts',
+  ]);
+
+  expect(messages).toStrictEqual([]);
+});
+
+test('it passes a mismatched file inside a package of the src/ of a package that pending lists', async () => {
+  const directory = await createLintTree(
+    {
+      'packages/api/package.json': '{ "name": "api" }',
+      'packages/api/src/fixtures/kettle/package.json': '{ "name": "kettle" }',
+      'packages/api/src/fixtures/kettle/src/pour-kettle.ts':
+        'export function boilKettle(): void {}\n',
+    },
+    { 'zgeoff/file-named-for-export': ['error', { pending: ['packages/api'] }] },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/file-named-for-export', [
+    'packages/api/src/fixtures/kettle/src/pour-kettle.ts',
+  ]);
+
+  expect(messages).toStrictEqual([]);
+});
+
+test('it ignores a package.json above the repo root when it finds the package of a pending file', async () => {
+  const directory = await createLintTree(
+    {
+      'package.json': '{ "name": "workspace" }',
+      'src/repo/.git/HEAD': 'ref: refs/heads/main\n',
+      'src/repo/packages/api/package.json': '{ "name": "api" }',
+      'src/repo/packages/api/scripts/pour-kettle.ts': 'export function boilKettle(): void {}\n',
+    },
+    { 'zgeoff/file-named-for-export': ['error', { pending: ['packages/api'] }] },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/file-named-for-export', [
+    'src/repo/packages/api/scripts/pour-kettle.ts',
+  ]);
+
+  expect(messages).toStrictEqual([]);
+});
+
+test('it reports a pending entry that names no package on one file of the run', async () => {
+  const directory = await createLintTree(
+    {
+      'packages/web/package.json': '{ "name": "web" }',
+      'packages/web/src/pour-kettle.ts': 'export function pourKettle(): void {}\n',
+      'packages/web/src/boil-kettle.ts': 'export function boilKettle(): void {}\n',
+    },
+    { 'zgeoff/file-named-for-export': ['error', { pending: ['packages/billing'] }] },
+  );
+
+  const messages = await runLintMessages(directory, 'zgeoff/file-named-for-export', [
+    'packages/web',
+  ]);
+
+  expect(messages).toStrictEqual([
+    {
+      filename: expect.stringMatching(/^packages\/web\/src\/(?:pour|boil)-kettle\.ts$/u),
+      line: 1,
+      message:
+        '`packages/billing` in the `pending` option of zgeoff/file-named-for-export names no package; remove it from `pending`.',
+    },
+  ]);
 });

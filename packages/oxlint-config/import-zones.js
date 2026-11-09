@@ -1,5 +1,4 @@
 import { isBuiltin } from 'node:module';
-import { relative, sep } from 'node:path';
 import collectZoneNames from './collect-zone-names.js';
 import getZoneOptions from './get-zone-options.js';
 import importZonesSchema from './import-zones-schema.js';
@@ -9,6 +8,7 @@ import isInAnyZone from './is-in-any-zone.js';
 import loadWorkspaceManifests from './load-workspace-manifests.js';
 import resolveImportTarget from './resolve-import-target.js';
 import resolveRepoRoot from './resolve-repo-root.js';
+import toRootPath from './to-root-path.js';
 
 const importZones = {
   meta: {
@@ -98,10 +98,6 @@ function loadFileState(context) {
     workspaces,
     zones: collectZoneNames(options.zones, path),
   };
-}
-
-function toRootPath(root, path) {
-  return relative(root, path).split(sep).join('/');
 }
 
 function checkUnzoned(file, program) {

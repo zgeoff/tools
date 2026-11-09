@@ -37,6 +37,32 @@ reason:
 // oxlint-disable zgeoff/file-named-for-export -- the testing skill names this file mocks/node.ts
 ```
 
+To bump the config before every file passes, list the packages that still fail in the `pending`
+option, which has the shape of
+[`zgeoff/feature-folders`'s `pending`](./oxlint-config-feature-folders.md#the-pending-option). The
+rule skips every file of a listed package:
+
+```jsonc
+{
+  "rules": {
+    "zgeoff/file-named-for-export": ["error", { "pending": ["packages/api", "packages/cli"] }],
+  },
+}
+```
+
+The rule takes a file's package to be the nearest folder above the file, up to the repo root, that
+holds a `package.json`, so it still checks a package nested inside a listed one. A folder whose
+`src/` holds the file wins over each `package.json` below it, such as one inside `src/` that only
+sets the `type` field. With no list, or an empty one, the rule checks every file.
+
+The rule reports an entry with no `package.json` at its path, with the fix "remove it from
+`pending`". It never reports an entry whose package passes the rule, because that report needs a
+parse of every file in the package. To find such an entry:
+
+1. Remove the entry from `pending`.
+2. Run `oxlint <entry>`. Expect: no `zgeoff(file-named-for-export)` report. When one shows, put the
+   entry back.
+
 ## `zgeoff/function-verb`
 
 The rule reports a function, method, or function-valued variable or property whose name starts with
