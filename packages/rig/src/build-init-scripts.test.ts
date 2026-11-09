@@ -40,15 +40,55 @@ test('it adds a script for a lane the config declares, even with no test file ye
   expect(scripts['test:kiln']).toBe('rig kiln');
 });
 
-test('it replaces a lane script that runs something else', () => {
+test('it keeps a lane script that the repo already defines', () => {
+  const config = defineRig({ lanes: { 'alert-rules': { limit: '15s' } } });
+
+  const scripts = buildInitScripts(
+    { 'test:alert-rules': 'bash scripts/run-shell-suites.sh alert-rules' },
+    config,
+    [],
+    false,
+  );
+
+  expect(scripts['test:alert-rules']).toBe('bash scripts/run-shell-suites.sh alert-rules');
+});
+
+test('it adds a missing lane script beside a lane script the repo already defines', () => {
+  const config = defineRig({ lanes: { kiln: { limit: '15s' } } });
+
   const scripts = buildInitScripts(
     { 'test:host': 'bun test .host.test.ts' },
-    defineRig({}),
+    config,
     ['src/clock.host.test.ts'],
     false,
   );
 
-  expect(scripts['test:host']).toBe('rig host');
+  expect(scripts).toStrictEqual({
+    'test:host': 'bun test .host.test.ts',
+    test: 'rig unit',
+    'test:related': 'rig related',
+    'test:kiln': 'rig kiln',
+  });
+});
+
+test('it keeps the related, bench and eval scripts that the repo already defines', () => {
+  const scripts = buildInitScripts(
+    {
+      'test:related': 'bun scripts/run-related-tests.ts',
+      bench: 'bun bench/run.ts',
+      eval: 'bun evals/run.ts',
+    },
+    defineRig({}),
+    ['bench/boil.bench.ts', 'evals/taste/run-taste-eval.ts'],
+    false,
+  );
+
+  expect(scripts).toStrictEqual({
+    'test:related': 'bun scripts/run-related-tests.ts',
+    bench: 'bun bench/run.ts',
+    eval: 'bun evals/run.ts',
+    test: 'rig unit',
+  });
 });
 
 test('it adds the bench and eval scripts when git tracks benchmarks and evaluations', () => {

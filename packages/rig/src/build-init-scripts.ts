@@ -23,14 +23,19 @@ export function buildInitScripts(
 
   const evalScripts = collectEvalFiles(trackedFiles).length > 0 ? { eval: 'rig eval' } : {};
 
-  return {
-    ...oldScripts,
-    test: 'rig unit',
+  const rigScripts: PackageScripts = {
     'test:related': 'rig related',
     ...Object.fromEntries(laneScripts),
     ...benchScripts,
     ...evalScripts,
   };
+
+  // Renovate reruns init on each rig bump, so a script the repo already defines stays as it is.
+  const missingScripts = Object.entries(rigScripts).filter(
+    ([name]) => !Object.hasOwn(oldScripts, name),
+  );
+
+  return { ...oldScripts, test: 'rig unit', ...Object.fromEntries(missingScripts) };
 }
 
 function isLaneWanted(
