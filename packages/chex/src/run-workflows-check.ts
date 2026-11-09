@@ -28,7 +28,7 @@ export interface WorkflowsCheckOptions {
 }
 
 // GitHub runs no workflow from a subfolder of .github/workflows.
-const workflowPathPattern = /^(?:\.github\/workflows|sync\/workflow-callers)\/[^/]+\.ya?ml$/u;
+const workflowPathPattern = /^(?:\.github\/workflows|sync\/src\/workflow-callers)\/[^/]+\.ya?ml$/u;
 
 // The check reads the files as HEAD holds them, so a push checks what it sends.
 export function runWorkflowsCheck(options: Readonly<WorkflowsCheckOptions>): WorkflowFinding[] {

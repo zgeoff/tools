@@ -1168,7 +1168,7 @@ test('it reads the workflows and the workflow callers, and skips a subfolder', a
   ].join('\n');
 
   await ctx.commitFiles({
-    'sync/workflow-callers/tidy.yaml': brokenJob,
+    'sync/src/workflow-callers/tidy.yaml': brokenJob,
     '.github/workflows/nested/tidy.yml': brokenJob,
     '.github/workflows/tidy.yml': brokenJob,
   });
@@ -1184,7 +1184,7 @@ test('it reads the workflows and the workflow callers, and skips a subfolder', a
   expect(findings).toStrictEqual([
     { path: '.github/workflows/tidy.yml', line: 3, message: 'job tidy sets no timeout-minutes' },
     {
-      path: 'sync/workflow-callers/tidy.yaml',
+      path: 'sync/src/workflow-callers/tidy.yaml',
       line: 3,
       message: 'job tidy sets no timeout-minutes',
     },
@@ -1205,21 +1205,21 @@ test('it reads only the workflow files among the paths it is given', async () =>
   ].join('\n');
 
   await ctx.commitFiles({
-    'sync/workflow-callers/tidy.yaml': brokenJob,
+    'sync/src/workflow-callers/tidy.yaml': brokenJob,
     '.github/workflows/tidy.yml': brokenJob,
   });
 
   const findings = runWorkflowsCheck({
     cwd: ctx.directory,
     env: ctx.env,
-    paths: ['sync/workflow-callers/tidy.yaml', 'src/index.ts'],
+    paths: ['sync/src/workflow-callers/tidy.yaml', 'src/index.ts'],
     profile: undefined,
     runProgram,
   });
 
   expect(findings).toStrictEqual([
     {
-      path: 'sync/workflow-callers/tidy.yaml',
+      path: 'sync/src/workflow-callers/tidy.yaml',
       line: 3,
       message: 'job tidy sets no timeout-minutes',
     },
