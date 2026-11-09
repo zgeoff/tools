@@ -74,8 +74,8 @@ path ignore for every lane suffix and for the `e2e` folders. A lane declared in 
 therefore leaves the unit run without any ignore list in `package.json`. Like a lane, `rig unit`
 exits 0 when git tracks no unit test file. `rig related` runs the unit lane in its own process on
 the tests beside the changed files, takes the lane suffixes from the table, and skips when the
-branch changes a shared test input or has more than 50 related files. `rig init` writes the package
-scripts for the lanes the repo has and a starter config, and a second run changes nothing.
+branch changes a shared test input or has more than 50 related files. `rig init` adds the lane
+scripts the repo lacks and a starter config, and a second run changes nothing.
 
 ### Ignored paths
 
