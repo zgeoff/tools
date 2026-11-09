@@ -699,7 +699,7 @@ test('it fails each coined term in a skill and names its plain wording', async (
   });
 });
 
-test('it fails a coined term in a reference and in the description', async () => {
+test('it fails a coined term in a reference, a footnote, the description, and across a line break', async () => {
   const ctx = await setupTest();
 
   await ctx.writePage('.claude/skills/demo/SKILL.md', [
@@ -717,6 +717,12 @@ test('it fails a coined term in a reference and in the description', async () =>
     '# Slow tests',
     '',
     'Move a slow test out of the Unit-Run.',
+    '',
+    'Keep it out of the unit',
+    'run, and under the unit',
+    'limit.',
+    '',
+    '[^1]: lanes are slow here.',
   ]);
 
   const result = await ctx.run();
@@ -730,12 +736,15 @@ test('it fails a coined term in a reference and in the description', async () =>
     stdout:
       '.claude/skills/demo/SKILL.md:3: "lane" is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them\n' +
       '.claude/skills/demo/references/slow.md:3: "unit-run" is a coined term; write the command that runs the tests, `bun run test`\n' +
-      'check-skill: 1 skills, 2 errors, 0 warnings\n',
+      '.claude/skills/demo/references/slow.md:6: "unit run" is a coined term; write the command that runs the tests, `bun run test`\n' +
+      '.claude/skills/demo/references/slow.md:7: "unit limit" is a coined term; write the timeout and the command it applies to, such as "the 5 s timeout of `bun run test`"\n' +
+      '.claude/skills/demo/references/slow.md:9: "lanes" is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them\n' +
+      'check-skill: 1 skills, 5 errors, 0 warnings\n',
     stderr: '',
   });
 });
 
-test('it passes a coined term inside code, a link target, a URL or a longer word', async () => {
+test('it passes a coined term inside code, a link target or label, an HTML tag, a URL or a longer word', async () => {
   const ctx = await setupTest();
 
   await ctx.writePage('.claude/skills/demo/SKILL.md', [
@@ -749,6 +758,17 @@ test('it passes a coined term inside code, a link target, a URL or a longer word
     '- Read https://example.com/unit-run/ for the flags.',
     '- Run the checks with nix-unit runs, then plane and laneway tests.',
     '<!-- the unit run -->',
+    '',
+    'Read [the guide](./a_(b)lanes.md), [the guide][lanes] and <a href="./guide.md#lanes">the guide</a>.',
+    '',
+    '[lanes]: ./guide.md#lanes',
+    '',
+    'Set the stack in the config:',
+    '',
+    '    lanes: {}',
+    '',
+    'Set `stack',
+    'lanes` in the config.',
     '',
     '```yaml',
     'lanes:',
