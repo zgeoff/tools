@@ -25,8 +25,7 @@ its step scripts:
   reusable workflow in this repo, all opt-in but the repo-sync guard.
 - [`sync/skills-pin.json`](../../sync/skills-pin.json): the commit of zgeoff/skills that each skill
   entry copies its text from, as [Skills](#skills) describes.
-- [`sync/src/hooks/`](../../sync/src/hooks/): the agent hooks' start-up stub and the skill gate's
-  older entry point.
+- [`sync/src/hooks/`](../../sync/src/hooks/): the agent hooks' start-up stub.
 - [`sync/src/pre-push/`](../../sync/src/pre-push/): the [pre-push baseline](./pre-push-baseline.md)
   that the `pre-push-baseline` entry delivers, and the [memory-cap script](./memory-caps.md).
 - [`sync/src/deadcode/`](../../sync/src/deadcode/): the
@@ -228,8 +227,7 @@ and installs the package when it is missing, as [Agent hooks](./agent-hooks.md) 
 takes a hook fix by bumping the package, and the stub changes only when the package's API does. A
 repo opts in with the changes that
 [Opting in to the agent hooks](../runbooks/downstream-repo-setup.md#opting-in-to-the-agent-hooks)
-lists, which repo-sync never touches. `hook-skill-gate` delivers the skill gate's older entry point,
-which runs the gate from `@zgeoff/skill-gate`.
+lists, which repo-sync never touches.
 
 The `skill-gate-rules` entry delivers the gate's rules to `.claude/skill-gate.json` in each repo
 that its `except` list leaves out, as
