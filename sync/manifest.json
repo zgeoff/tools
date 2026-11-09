@@ -290,6 +290,11 @@
         "repo": "zgeoff/skills",
         "source": "skills/ci-design/SKILL.md",
         "target": ".claude/skills/ci-design/SKILL.md"
+      },
+      {
+        "repo": "zgeoff/skills",
+        "source": "skills/ci-design/references/dependency-exceptions.md",
+        "target": ".claude/skills/ci-design/references/dependency-exceptions.md"
       }
     ]
   },
