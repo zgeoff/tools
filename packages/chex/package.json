@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/chex",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Run each shared docs and repo check as one subcommand, with the lefthook pre-push baseline that calls them",
   "keywords": [
     "checks",
