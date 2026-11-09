@@ -4,10 +4,10 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildCopyPlan } from '../../scripts/repo-sync/build-copy-plan.ts';
-import { parseSyncEntries } from '../../scripts/repo-sync/parse-sync-entries.ts';
-import { pickSyncEntries } from '../../scripts/repo-sync/pick-sync-entries.ts';
-import { selectSyncFiles } from '../../scripts/repo-sync/select-sync-files.ts';
+import { buildCopyPlan } from '../../scripts/src/repo-sync/build-copy-plan.ts';
+import { parseSyncEntries } from '../../scripts/src/repo-sync/parse-sync-entries.ts';
+import { pickSyncEntries } from '../../scripts/src/repo-sync/pick-sync-entries.ts';
+import { selectSyncFiles } from '../../scripts/src/repo-sync/select-sync-files.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'skill-gate-rules-'));

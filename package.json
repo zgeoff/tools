@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": {
     "packages": [
-      "packages/*"
+      "packages/*",
+      "scripts"
     ],
     "catalog": {
       "@actions/expressions": "0.3.61",
@@ -50,36 +51,36 @@
   "type": "module",
   "scripts": {
     "prepare": "lefthook install --force || true; bun run build && bun run skills:install",
-    "typecheck": "bun run --filter '*' typecheck && tsrs -p . && tsrs -p scripts && tsrs -p sync",
-    "test": "bun scripts/test-cleanup/run-test-folder-sweep.ts && rig unit",
-    "test:related": "bun scripts/test-cleanup/run-test-folder-sweep.ts && rig related",
-    "test:browser": "bun scripts/test-cleanup/run-test-folder-sweep.ts && rig browser",
-    "test:e2e": "bun scripts/test-cleanup/run-test-folder-sweep.ts && rig e2e",
-    "test:host": "bun scripts/test-cleanup/run-test-folder-sweep.ts && rig host",
+    "typecheck": "bun run --filter '*' typecheck && tsrs -p . && tsrs -p sync",
+    "test": "bun scripts/src/test-cleanup/run-test-folder-sweep.ts && rig unit",
+    "test:related": "bun scripts/src/test-cleanup/run-test-folder-sweep.ts && rig related",
+    "test:browser": "bun scripts/src/test-cleanup/run-test-folder-sweep.ts && rig browser",
+    "test:e2e": "bun scripts/src/test-cleanup/run-test-folder-sweep.ts && rig e2e",
+    "test:host": "bun scripts/src/test-cleanup/run-test-folder-sweep.ts && rig host",
     "bench": "rig bench",
     "build": "bun run --filter '*' build",
-    "skills:install": "bun scripts/skills/write-pinned-skills.ts",
+    "skills:install": "bun scripts/src/skills/write-pinned-skills.ts",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "lint:full": "tsgolint=$(tsrslint-path) && OXLINT_TSGOLINT_PATH=$tsgolint oxlint --type-aware --type-check --report-unused-disable-directives-severity error",
     "format": "oxfmt . && bun packages/format-codemod/src/cli.ts --quiet .",
     "format:check": "oxfmt --check . && bun packages/format-codemod/src/cli.ts --check --quiet .",
     "check:docs": "chex prose length links readmes skill",
-    "check:sync": "bash scripts/check-sync-manifest.sh",
-    "check:release-workflow": "bun scripts/release/run-release-workflow-check.ts && bun scripts/release/run-workspace-cycle-check.ts",
-    "check:repo-sync-workflows": "bun scripts/repo-sync/run-repo-sync-workflows-check.ts",
-    "check:lefthook-guard": "bun scripts/lefthook/run-lefthook-guard-check.ts",
-    "check:baseline-jobs": "bun scripts/lefthook/run-baseline-jobs-check.ts",
-    "check:chex-pin": "bun scripts/renovate/run-chex-pin-check.ts",
-    "check:renovate-config": "bun scripts/renovate/run-renovate-config-check.ts",
+    "check:sync": "bash scripts/src/check-sync-manifest.sh",
+    "check:release-workflow": "bun scripts/src/release/run-release-workflow-check.ts && bun scripts/src/release/run-workspace-cycle-check.ts",
+    "check:repo-sync-workflows": "bun scripts/src/repo-sync/run-repo-sync-workflows-check.ts",
+    "check:lefthook-guard": "bun scripts/src/lefthook/run-lefthook-guard-check.ts",
+    "check:baseline-jobs": "bun scripts/src/lefthook/run-baseline-jobs-check.ts",
+    "check:chex-pin": "bun scripts/src/renovate/run-chex-pin-check.ts",
+    "check:renovate-config": "bun scripts/src/renovate/run-renovate-config-check.ts",
     "check:test-layout": "chex test-layout",
-    "check:tracked-links": "bun scripts/tracked-links/run-tracked-links-check.ts",
-    "ci:install-tool": "bun scripts/ci/run-pinned-tool-step.ts",
-    "ci:dispatch-publish": "bun scripts/publish/dispatch-release-publish.ts",
-    "ci:plan-sync-dispatch": "bun scripts/repo-sync/write-sync-dispatch-plan.ts",
-    "ci:send-sync-dispatches": "bun scripts/repo-sync/write-sync-dispatches.ts",
-    "ci:write-skills-pin-pull-request": "bun scripts/repo-sync/write-skills-pin-pull-request.ts",
-    "ci:publish-packages": "bun scripts/publish/publish-packages.ts"
+    "check:tracked-links": "bun scripts/src/tracked-links/run-tracked-links-check.ts",
+    "ci:install-tool": "bun scripts/src/ci/run-pinned-tool-step.ts",
+    "ci:dispatch-publish": "bun scripts/src/publish/dispatch-release-publish.ts",
+    "ci:plan-sync-dispatch": "bun scripts/src/repo-sync/write-sync-dispatch-plan.ts",
+    "ci:send-sync-dispatches": "bun scripts/src/repo-sync/write-sync-dispatches.ts",
+    "ci:write-skills-pin-pull-request": "bun scripts/src/repo-sync/write-skills-pin-pull-request.ts",
+    "ci:publish-packages": "bun scripts/src/publish/publish-packages.ts"
   },
   "devDependencies": {
     "@actions/expressions": "catalog:",
@@ -102,14 +103,11 @@
     "@zgeoff/tsconfig": "workspace:*",
     "knip": "catalog:",
     "lefthook": "catalog:",
-    "msw": "catalog:",
-    "oxc-parser": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "tiny-invariant": "catalog:",
     "ts-pattern": "catalog:",
     "tsrs": "catalog:",
-    "typescript": "catalog:",
-    "zod": "catalog:"
+    "typescript": "catalog:"
   }
 }

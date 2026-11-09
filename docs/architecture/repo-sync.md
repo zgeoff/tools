@@ -16,7 +16,7 @@ The entries name their sources under [`sync/`](../../sync/), and a source can si
 repo or in [zgeoff/skills](https://github.com/zgeoff/skills):
 
 - [`sync/manifest.json`](../../sync/manifest.json): the entries, which
-  `scripts/check-sync-manifest.sh` checks in CI.
+  `scripts/src/check-sync-manifest.sh` checks in CI.
 - [`sync/repo-sync.yml`](../../sync/repo-sync.yml): the stub that calls the repo-sync workflow at a
   pinned commit.
 - [`sync/workflow-callers/`](../../sync/workflow-callers/): workflows that each call a reusable
@@ -100,6 +100,12 @@ scripts. An entry that holds a key those scripts do not read fails, and stays ou
 request, so the scripts never copy it with the key ignored. The run fails after the other entries
 sync, and the first run on a pin that reads the key syncs the entry.
 
+The step scripts run two shell scripts from the synced commit, not from the pin: the Markdown block
+stripper and the retired-file cleanup. The step scripts of every pin call them at
+`scripts/remove-excluded-blocks.sh` and `scripts/remove-retired-sync-files.sh`, the paths they have
+in every tools commit, whether the synced commit is older or newer than the pin. Their source sits
+under `scripts/src/`, and each of those paths holds a stub that runs it with the same arguments.
+
 When the open sync pull request has a failing check and is more than a day old, the workflow's alarm
 job opens one issue for it in the repo, so a red sync never waits unseen. The alarm runs with the
 repo's own token, which is why the stub grants `issues: write`, `pull-requests: read`,
@@ -128,17 +134,17 @@ An entry holds:
   the downstream repo's toolchain is installed, so the command uses those only.
 - `scripts` (needed when the `build` writes `package.json` scripts) — each script key the `build`
   writes, with the value it writes, so a check of a sync pull request can hold its `package.json`
-  change to those lines. `scripts/check-sync-manifest.sh` runs each `build` on an empty
+  change to those lines. `scripts/src/check-sync-manifest.sh` runs each `build` on an empty
   `package.json` and fails when the scripts it writes there differ from this field.
 - `packages` (needed when a code file of the entry imports a package) — each npm package that the
   entry's TypeScript and JavaScript files import, which a repo that takes the entry must list in its
   `package.json`. A file that imports a package the repo lacks fails the repo's dead-code check, and
-  fails to run. `scripts/check-sync-manifest.sh` fails on an import of any package this field does
-  not list, other than a `node:` or `bun` module.
+  fails to run. `scripts/src/check-sync-manifest.sh` fails on an import of any package this field
+  does not list, other than a `node:` or `bun` module.
 
 A target under `.github/workflows/` needs the line `repo-sync delivers this file from zgeoff/tools`
 in its source. Without it, the workflow never overwrites a workflow file the repo wrote itself.
-`scripts/check-sync-manifest.sh` checks these rules in CI.
+`scripts/src/check-sync-manifest.sh` checks these rules in CI.
 
 ## Workflow callers
 
@@ -169,7 +175,7 @@ skill entries are not opt-in, and reach every repo:
   changed.
 
 A skill links another skill by relative path, so an entry whose Markdown links a file of an opt-in
-entry needs that entry, directly or through an entry it needs. `scripts/check-sync-manifest.sh`
+entry needs that entry, directly or through an entry it needs. `scripts/src/check-sync-manifest.sh`
 fails on a link to a file that a repo taking the linking entry can lack: the file of an opt-in entry
 that neither the linking entry nor an entry reaching every repo needs. The check reads code blocks
 like other text, so an example link there passes only when it resolves to no delivered file. A repo
@@ -179,14 +185,14 @@ link them arrive with dead links.
 A repo keeps its own rules for the same area in a `project-<name>` skill beside it, which repo-sync
 never touches, and the shared skill tells the reader to load both. The entry lists every file in its
 skill folder, since the skill links its references by relative path;
-`scripts/check-sync-manifest.sh` fails on a file the entry omits, and reads zgeoff/skills from the
-tree that `bun run skills:install` unpacks. The docs-writing and skill-writing entries also deliver
-the docs check scripts from this repo.
+`scripts/src/check-sync-manifest.sh` fails on a file the entry omits, and reads zgeoff/skills from
+the tree that `bun run skills:install` unpacks. The docs-writing and skill-writing entries also
+deliver the docs check scripts from this repo.
 
 This repo takes skills from the same pin. `bun run skills:install`, which `bun install` runs,
 unpacks zgeoff/skills at the pinned commit into the git-ignored `.zgeoff-skills/<commit>/`, and
 links each skill that `defaultPinnedSkills` in
-[`write-pinned-skills.ts`](../../scripts/skills/write-pinned-skills.ts) lists from
+[`write-pinned-skills.ts`](../../scripts/src/skills/write-pinned-skills.ts) lists from
 `.agents/skills/`, which the tracked link `.claude/skills` points to. The folder holds a tracked
 `.gitkeep`, so the link resolves in a fresh clone before the install runs: a Claude Code session
 that starts while the link is broken never registers the skills that the install links later.
@@ -207,9 +213,9 @@ For Rust, read [Rust testing](./references/rust.md).
 <!-- repo-sync end -->
 ```
 
-The path is relative to the Markdown file. `scripts/check-sync-manifest.sh` fails on a link to an
-excepted file outside its block. The workflow leaves an excepted file in place, so a repo that holds
-a copy from before its `except` removes that copy itself.
+The path is relative to the Markdown file. `scripts/src/check-sync-manifest.sh` fails on a link to
+an excepted file outside its block. The workflow leaves an excepted file in place, so a repo that
+holds a copy from before its `except` removes that copy itself.
 
 ## Hooks
 
@@ -246,8 +252,8 @@ entry, because the entry's current files can still need it. A retired path that 
 a current target through a symlink stays too, because it is that target's fresh copy. That covers an
 entry the repo skips or leaves out of `include`, and an entry that failed. A retired file of an
 entry that the manifest no longer holds stays when the repo lists that entry in `skip`.
-[`scripts/remove-retired-sync-files.sh`](../../scripts/remove-retired-sync-files.sh) reads the
-earlier manifests from this repo's history, and the versions of a zgeoff/skills source from that
+[`scripts/src/remove-retired-sync-files.sh`](../../scripts/src/remove-retired-sync-files.sh) reads
+the earlier manifests from this repo's history, and the versions of a zgeoff/skills source from that
 repo's history, so the workflow checks out the full history of both.
 
 ## Auto-merge

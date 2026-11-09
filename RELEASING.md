@@ -18,7 +18,7 @@ The shared files under `sync/` reach each repo on every green `main` instead, as
    release-please, which opens (or updates) a release PR for the affected packages: version bump per
    conventional-commit type, `CHANGELOG.md`, manifest update. The job syncs `bun.lock` on the PR
    branch (versions are recorded there too) and merges the PR when every check on its head passes in
-   the wait. `scripts/merge-release-prs.sh` waits up to 15 minutes for those checks to start and
+   the wait. `scripts/src/merge-release-prs.sh` waits up to 15 minutes for those checks to start and
    finish, and fails the run when one fails. When the PR is merged already, by a person or by a
    merge call that failed and still landed, it stops, and the run of the merge's push tags the
    release. When the checks run longer, it leaves the PR open. When a ruleset on `main` requires
@@ -28,8 +28,8 @@ The shared files under `sync/` reach each repo on every green `main` instead, as
    on the merge commit and creates the GitHub release. The App token has no Workflows permission, so
    GitHub is expected to refuse it the tag once a workflow change lands on `main` after the merge
    commit. Tagging at once narrows that window to seconds without closing it, so the job first runs
-   `scripts/check-release-head.sh`: when `main` moved past the merge commit with a workflow change,
-   it fails with both commits named, and the release needs the steps in
+   `scripts/src/check-release-head.sh`: when `main` moved past the merge commit with a workflow
+   change, it fails with both commits named, and the release needs the steps in
    [Recover an untagged release PR](#recover-an-untagged-release-pr).
 4. `main.yml`'s publish job dispatches `main.yml` at the tag. The publish job of that run runs
    `bun pm pack` (resolves `catalog:`/`workspace:` to exact versions — never pack with npm) then

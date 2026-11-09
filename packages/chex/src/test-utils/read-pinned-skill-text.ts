@@ -1,8 +1,8 @@
 import { join } from 'node:path';
-import type { FileSystem } from '../../../../scripts/ci/file-system.ts';
-import { parseSkillsPin } from '../../../../scripts/repo-sync/parse-skills-pin.ts';
-import { skillsPinPath } from '../../../../scripts/repo-sync/skills-pin-path.ts';
-import { pinnedSkillsFolder } from '../../../../scripts/skills/pinned-skills-folder.ts';
+import type { FileSystem } from '../../../../scripts/src/ci/file-system.ts';
+import { parseSkillsPin } from '../../../../scripts/src/repo-sync/parse-skills-pin.ts';
+import { skillsPinPath } from '../../../../scripts/src/repo-sync/skills-pin-path.ts';
+import { pinnedSkillsFolder } from '../../../../scripts/src/skills/pinned-skills-folder.ts';
 
 // Reads a file of zgeoff/skills, by its path in that repo, at the commit the tools checkout at the
 // root pins, from the tree that `bun run skills:install` unpacks.

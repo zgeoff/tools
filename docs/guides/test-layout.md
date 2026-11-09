@@ -9,8 +9,7 @@ standard lanes, the lanes of `.oxlintrc.json` and the resolved lanes of `rig.con
 
 - a root `e2e/` or `test-utils/` folder, a root `evals/` or `bench/` folder in a workspace repo, and
   any folder named `test`, `tests`, `__tests__` or `integration`. A package keeps its helpers in
-  `src/test-utils/`, and a top-level folder outside the workspaces, such as `scripts/`, may keep its
-  own `test-utils/`.
+  `src/test-utils/`, and a top-level folder outside the workspaces may keep its own `test-utils/`.
 - a subfolder in `e2e/` other than `e2e/fixtures/`, a subfolder in `bench/`, and a subfolder below
   `evals/<name>/`.
 - an `e2e/*.test.ts` file whose name does not start with `start-`, `stop-`, `recover-`, `cli-`,

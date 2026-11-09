@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { symlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { nodeFileSystem } from '../../scripts/ci/node-file-system.ts';
+import { nodeFileSystem } from '../../scripts/src/ci/node-file-system.ts';
 import { collectBannedVerbs } from './src/test-utils/collect-banned-verbs.ts';
 import { createLintTree } from './src/test-utils/create-lint-tree.ts';
 import { readPinnedSkillText } from './src/test-utils/read-pinned-skill-text.ts';

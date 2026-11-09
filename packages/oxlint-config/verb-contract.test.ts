@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
-import { nodeFileSystem } from '../../scripts/ci/node-file-system.ts';
+import { nodeFileSystem } from '../../scripts/src/ci/node-file-system.ts';
 import { readPinnedSkillText } from './src/test-utils/read-pinned-skill-text.ts';
 
 async function setupTest() {

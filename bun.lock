@@ -25,15 +25,12 @@
         "@zgeoff/tsconfig": "workspace:*",
         "knip": "catalog:",
         "lefthook": "catalog:",
-        "msw": "catalog:",
-        "oxc-parser": "catalog:",
         "oxfmt": "catalog:",
         "oxlint": "catalog:",
         "tiny-invariant": "catalog:",
         "ts-pattern": "catalog:",
         "tsrs": "catalog:",
         "typescript": "catalog:",
-        "zod": "catalog:",
       },
     },
     "packages/agent-hooks": {
@@ -288,6 +285,22 @@
         "@types/bun": "catalog:",
         "tsrs": "catalog:",
         "typescript": "catalog:",
+      },
+    },
+    "scripts": {
+      "name": "@zgeoff/tools-scripts",
+      "dependencies": {
+        "@actions/expressions": "catalog:",
+        "oxc-parser": "catalog:",
+        "tiny-invariant": "catalog:",
+        "ts-pattern": "catalog:",
+        "zod": "catalog:",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "@zgeoff/testing": "workspace:*",
+        "msw": "catalog:",
+        "tsrs": "catalog:",
       },
     },
   },
@@ -746,6 +759,8 @@
     "@zgeoff/std": ["@zgeoff/std@workspace:packages/std"],
 
     "@zgeoff/testing": ["@zgeoff/testing@workspace:packages/testing"],
+
+    "@zgeoff/tools-scripts": ["@zgeoff/tools-scripts@workspace:scripts"],
 
     "@zgeoff/tsconfig": ["@zgeoff/tsconfig@workspace:packages/tsconfig"],
 

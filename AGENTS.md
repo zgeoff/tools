@@ -20,7 +20,7 @@ The rules a task needs are not repeated here. Load the skill for the work before
 Each source is a folder of zgeoff/skills, at the commit that `sync/skills-pin.json` pins.
 `bun run skills:install`, which `bun install` runs, unpacks that commit into
 `.zgeoff-skills/<commit>/` and links the skills that `defaultPinnedSkills` in
-[`write-pinned-skills.ts`](scripts/skills/write-pinned-skills.ts) lists into `.agents/skills/`.
+[`write-pinned-skills.ts`](scripts/src/skills/write-pinned-skills.ts) lists into `.agents/skills/`.
 `.claude/skills` is a link to `.agents/skills`, so Claude Code and Codex read the same skills. For a
 skill that list leaves out, read its `SKILL.md` under `.zgeoff-skills/<commit>/skills/<name>/`.
 
@@ -54,10 +54,11 @@ sync/               the sources that repo-sync delivers, listed in sync/manifest
                     each repo its except list leaves out; this repo keeps its own copy there,
                     with a gate of its own on TypeScript, and check:sync fails when the copy lacks
                     a shared gate
-scripts/            the step scripts that this repo's workflows run, one folder per area, and the
-                    shell scripts that repo-sync and the release job run; tests sit beside them; a
-                    reusable workflow downloads each step script as it is, so a step script imports
-                    no package, and a step that needs one runs a chex subcommand from npm
+scripts/            a private workspace; its src/ holds the step scripts that this repo's workflows
+                    run, one folder per area, and the shell scripts that repo-sync and the release
+                    job run; tests sit beside them; a reusable workflow downloads each step script
+                    as it is, so a step script imports no package, and a step that needs one runs a
+                    chex subcommand from npm
 .github/workflows/  this repo's CI, release and sync dispatch, and the reusable workflows that other repos call:
                     bun-checks, repo-sync and its guard, audit-fix, release-please and the
                     paths-changed gate
@@ -90,8 +91,8 @@ says.
   oxlint runs both through tsrslint (`@maschwenk/tsrslint`), a Rust port of tsgolint, in tsgolint's
   place, because stock tsgolint runs out of memory under 2 GiB on impz. `lint:full` is CI-only:
   never run it locally.
-- `bun run typecheck` runs `tsrs` per package and over the root `rig.config.ts`, `scripts/` and
-  `sync/`. CI runs it beside `lint:full`, and when the two type checks disagree, `tsrs` is right.
+- `bun run typecheck` runs `tsrs` per workspace and over the root `rig.config.ts` and `sync/`. CI
+  runs it beside `lint:full`, and when the two type checks disagree, `tsrs` is right.
 - `bun run check:sync` checks `sync/manifest.json` against the rules repo-sync assumes. Run it after
   you change the manifest or a file an entry lists. CI runs it, and the pre-push hook does not.
 - `bun run check:release-workflow` checks the tag step of the shared release job in

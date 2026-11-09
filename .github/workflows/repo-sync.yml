@@ -95,8 +95,8 @@ jobs:
             fromJSON(toJSON(job)).workflow_sha }}
         run:
           curl -fsSL --retry 3 --retry-all-errors --create-dirs -o "$RUNNER_TEMP/tools/.bun-version"
-          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts"
-          "$TOOLS_URL/scripts/ci/download-step-scripts.ts"
+          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/src/ci/download-step-scripts.ts"
 
       # No cache: a job that holds an App token must not run a Bun binary
       # that another run's cache entry could have replaced.
@@ -108,7 +108,7 @@ jobs:
 
       - name: Download the sync scripts
         env: *tools-url
-        run: bun "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts" repo-sync
+        run: bun "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts" repo-sync
 
       - name: Pick the commit to sync
         id: ref
@@ -116,7 +116,7 @@ jobs:
           REF: ${{ inputs.ref }}
           WORKFLOW_COMMIT: ${{ job.workflow_sha }}
           GH_TOKEN: ${{ github.token }}
-        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/write-sync-ref.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/src/repo-sync/write-sync-ref.ts"
 
       - name: Check out the manifest
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -136,7 +136,7 @@ jobs:
         env:
           SKIP: ${{ inputs.skip }}
           INCLUDE: ${{ inputs.include }}
-        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/write-sync-entries.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/src/repo-sync/write-sync-entries.ts"
 
   sync:
     name: Sync the entries
@@ -210,8 +210,8 @@ jobs:
             fromJSON(toJSON(job)).workflow_sha }}
         run:
           curl -fsSL --retry 3 --retry-all-errors --create-dirs -o "$RUNNER_TEMP/tools/.bun-version"
-          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts"
-          "$TOOLS_URL/scripts/ci/download-step-scripts.ts"
+          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/src/ci/download-step-scripts.ts"
 
       # No cache: a job that holds an App token must not run a Bun binary
       # that another run's cache entry could have replaced.
@@ -223,7 +223,7 @@ jobs:
 
       - name: Download the sync scripts
         env: *sync-tools-url
-        run: bun "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts" repo-sync
+        run: bun "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts" repo-sync
 
       # Each entry becomes one commit on the sync branch. An entry that fails,
       # through a conflict or its build, is reset away and left out, the other
@@ -258,7 +258,7 @@ jobs:
           SKIP: ${{ inputs.skip }}
           BASE: ${{ github.ref_name }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/sync-entries.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/src/repo-sync/sync-entries.ts"
 
   alarm:
     name: Raise a red sync pull request
@@ -283,8 +283,8 @@ jobs:
         env: *tools-url
         run:
           curl -fsSL --retry 3 --retry-all-errors --create-dirs -o "$RUNNER_TEMP/tools/.bun-version"
-          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts"
-          "$TOOLS_URL/scripts/ci/download-step-scripts.ts"
+          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/src/ci/download-step-scripts.ts"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -294,11 +294,11 @@ jobs:
 
       - name: Download the sync scripts
         env: *tools-url
-        run: bun "$RUNNER_TEMP/tools/scripts/ci/download-step-scripts.ts" repo-sync
+        run: bun "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts" repo-sync
 
       - name: Open an issue for a sync pull request red for more than a day
         env:
           BRANCH: repo-sync/zgeoff-tools
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
-        run: bun "$RUNNER_TEMP/tools/scripts/repo-sync/write-sync-alarm.ts"
+        run: bun "$RUNNER_TEMP/tools/scripts/src/repo-sync/write-sync-alarm.ts"

@@ -1,0 +1,22 @@
+{
+  "name": "@zgeoff/tools-scripts",
+  "private": true,
+  "description": "The step scripts of this repo's workflows, and the shell scripts that repo-sync and the release job run",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsrs"
+  },
+  "dependencies": {
+    "@actions/expressions": "catalog:",
+    "oxc-parser": "catalog:",
+    "tiny-invariant": "catalog:",
+    "ts-pattern": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@zgeoff/testing": "workspace:*",
+    "msw": "catalog:",
+    "tsrs": "catalog:"
+  }
+}
