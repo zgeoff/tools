@@ -9,7 +9,8 @@
   "devDependencies": {
     "@actions/expressions": "catalog:",
     "@types/bun": "catalog:",
-    "@zgeoff/std": "workspace:*",
+    "@zgeoff/agent-hooks": "workspace:*",
+    "@zgeoff/skill-gate": "workspace:*",
     "@zgeoff/testing": "workspace:*",
     "tiny-invariant": "catalog:",
     "ts-pattern": "catalog:",

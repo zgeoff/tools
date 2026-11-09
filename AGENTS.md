@@ -92,8 +92,9 @@ says.
   oxlint runs both through tsrslint (`@maschwenk/tsrslint`), a Rust port of tsgolint, in tsgolint's
   place, because stock tsgolint runs out of memory under 2 GiB on impz. `lint:full` is CI-only:
   never run it locally.
-- `bun run typecheck` runs `tsrs` per workspace and over the root `rig.config.ts` and `sync/`. CI
-  runs it beside `lint:full`, and when the two type checks disagree, `tsrs` is right.
+- `bun run typecheck` runs `tsrs` per workspace and over the root `rig.config.ts` and
+  `.claude/hooks/`. CI runs it beside `lint:full`, and when the two type checks disagree, `tsrs` is
+  right.
 - `bun run check:sync` checks `sync/manifest.json` against the rules repo-sync assumes. Run it after
   you change the manifest or a file an entry lists. CI runs it, and the pre-push hook does not.
 - `bun run check:release-workflow` checks the tag step of the shared release job in
