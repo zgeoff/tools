@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.6](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.10.5...@zgeoff/oxlint-config@0.10.6) (2026-11-11)
+
+
+### Features
+
+* **oxlint-config:** add the bench-shape rule for benchmark files ([#620](https://github.com/zgeoff/tools/issues/620)) ([55c197f](https://github.com/zgeoff/tools/commit/55c197f7d080fbc7f5dfc4e9491430b3e63f280c))
+
 ## [0.10.5](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.10.4...@zgeoff/oxlint-config@0.10.5) (2026-11-09)
 
 
