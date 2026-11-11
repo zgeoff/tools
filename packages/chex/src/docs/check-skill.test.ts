@@ -684,7 +684,7 @@ test('it fails a link with a line anchor, but not one inside code', async () => 
   });
 });
 
-test('it fails each coined term in a skill and names its plain wording', async () => {
+test('it fails a coined term in a skill and names its plain wording', async () => {
   const ctx = await setupTest();
 
   await ctx.writePage('.claude/skills/project-testing/SKILL.md', [
@@ -693,17 +693,12 @@ test('it fails each coined term in a skill and names its plain wording', async (
     'description: Where each test of the demo service goes, and the command that runs it.',
     '---',
     '',
-    '- Put a test that needs s2-lite or Garage in the `e2e` lane of its language, in place of a',
-    '  `<name>.docker.test.ts` file in the `docker` lane of',
-    '  [Lanes](../testing/references/slow-tests.md#lanes). pepys runs no `docker` lane. The unit run',
-    "  can't hold these tests either: on a machine without the s2-lite image, a pull of the image and a",
-    '  start of s2-lite took 7.9 s, past the 5 s unit limit.',
+    '- Put a test that needs the kiln or the glaze store in an `e2e/` folder. On a machine without',
+    '  the kiln image, a pull of the image and a start of the kiln took 7.9 s, past the 5 s unit',
+    '  limit. A test of the glaze store alone stays under the Unit Limit.',
   ]);
 
   const result = await ctx.run();
-
-  const lane =
-    'is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them';
 
   expect({
     exitCode: result.exitCode,
@@ -712,13 +707,53 @@ test('it fails each coined term in a skill and names its plain wording', async (
   }).toStrictEqual({
     exitCode: 1,
     stdout:
-      `.claude/skills/project-testing/SKILL.md:6: "lane" ${lane}\n` +
-      `.claude/skills/project-testing/SKILL.md:7: "lane" ${lane}\n` +
-      `.claude/skills/project-testing/SKILL.md:8: "lanes" ${lane}\n` +
-      `.claude/skills/project-testing/SKILL.md:8: "lane" ${lane}\n` +
-      '.claude/skills/project-testing/SKILL.md:8: "unit run" is a coined term; write the command that runs the tests, `bun run test`\n' +
-      '.claude/skills/project-testing/SKILL.md:10: "unit limit" is a coined term; write the timeout and the command it applies to, such as "the 5 s timeout of `bun run test`"\n' +
-      'check-skill: 1 skills, 6 errors, 0 warnings\n',
+      '.claude/skills/project-testing/SKILL.md:8: "unit limit" is a coined term; write the timeout and the command it applies to, such as "the 5 s timeout of `bun run test`"\n' +
+      'check-skill: 1 skills, 1 errors, 0 warnings\n',
+    stderr: '',
+  });
+});
+
+test('it passes each term that rig defines, in a skill and in a reference', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writePage('.claude/skills/project-testing/SKILL.md', [
+    '---',
+    'name: project-testing',
+    'description: Where each test of the demo service goes, by lane. Load it before a demo test.',
+    '---',
+    '',
+    '## Facts',
+    '',
+    '| Fact          | Value                                                |',
+    '| ------------- | ---------------------------------------------------- |',
+    '| Test commands | the unit lane `bun run test`, the e2e lane `rig e2e` |',
+    '',
+    '- Put a test that needs the kiln in the `e2e` lane, and keep it out of the unit lane.',
+    '- The unit run leaves every other lane out, so a kiln test never slows the Unit-Run. Two unit',
+    '  runs in a row share no state, and the lanes run one after another.',
+    '- A systemd user unit runs the kiln daemon on the host.',
+    '',
+    '## References',
+    '',
+    '- [Slow tests](./references/slow.md): a test over the limit of its lane.',
+  ]);
+
+  await ctx.writePage('.claude/skills/project-testing/references/slow.md', [
+    '# Slow tests',
+    '',
+    'Move a slow test out of the unit',
+    'run and into the lane that starts the kiln.',
+  ]);
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-skill: 1 skills, 0 errors, 0 warnings\n',
     stderr: '',
   });
 });
@@ -729,7 +764,7 @@ test('it fails a coined term in a reference, a footnote, the description, after 
   await ctx.writePage('.claude/skills/demo/SKILL.md', [
     '---',
     'name: demo',
-    'description: Commands for the demo service, by lane. Load it before a demo test.',
+    'description: Commands for the demo service, under the unit limit. Load it before a demo test.',
     '---',
     '',
     '## References',
@@ -740,15 +775,14 @@ test('it fails a coined term in a reference, a footnote, the description, after 
   await ctx.writePage('.claude/skills/demo/references/slow.md', [
     '# Slow tests',
     '',
-    'Move a slow test out of the Unit-Run.',
+    'Move a slow test that runs past the Unit Limit.',
     '',
-    'Keep it out of the unit',
-    'run, and under the unit',
+    'Keep it under the unit',
     'limit.',
     '',
-    '[^1]: lanes are slow here.',
+    '[^1]: The unit limit is 5 s here.',
     '',
-    'Type a ` then read the lane.',
+    'Type a ` then read the unit limit.',
   ]);
 
   const result = await ctx.run();
@@ -760,13 +794,12 @@ test('it fails a coined term in a reference, a footnote, the description, after 
   }).toStrictEqual({
     exitCode: 1,
     stdout:
-      '.claude/skills/demo/SKILL.md:3: "lane" is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them\n' +
-      '.claude/skills/demo/references/slow.md:3: "unit-run" is a coined term; write the command that runs the tests, `bun run test`\n' +
-      '.claude/skills/demo/references/slow.md:6: "unit run" is a coined term; write the command that runs the tests, `bun run test`\n' +
-      '.claude/skills/demo/references/slow.md:7: "unit limit" is a coined term; write the timeout and the command it applies to, such as "the 5 s timeout of `bun run test`"\n' +
-      '.claude/skills/demo/references/slow.md:9: "lanes" is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them\n' +
-      '.claude/skills/demo/references/slow.md:11: "lane" is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them\n' +
-      'check-skill: 1 skills, 6 errors, 0 warnings\n',
+      '.claude/skills/demo/SKILL.md:3: "unit limit" is a coined term; write the timeout and the command it applies to, such as "the 5 s timeout of `bun run test`"\n' +
+      '.claude/skills/demo/references/slow.md:3: "unit limit" is a coined term; write the timeout and the command it applies to, such as "the 5 s timeout of `bun run test`"\n' +
+      '.claude/skills/demo/references/slow.md:6: "unit limit" is a coined term; write the timeout and the command it applies to, such as "the 5 s timeout of `bun run test`"\n' +
+      '.claude/skills/demo/references/slow.md:8: "unit limit" is a coined term; write the timeout and the command it applies to, such as "the 5 s timeout of `bun run test`"\n' +
+      '.claude/skills/demo/references/slow.md:10: "unit limit" is a coined term; write the timeout and the command it applies to, such as "the 5 s timeout of `bun run test`"\n' +
+      'check-skill: 1 skills, 5 errors, 0 warnings\n',
     stderr: '',
   });
 });
@@ -782,11 +815,11 @@ test('it reads the indented text of a list item, and skips each line of an inden
     '',
     '- Put the test here.',
     '',
-    '    It runs in the e2e lane.',
+    '    It runs under the unit limit.',
     '',
-    'Set the stack in the config:',
+    'Set the timeout in the config:',
     '',
-    '    lanes:',
+    '    unit limit: 5s',
     '    [x](y.ts#L1)',
   ]);
 
@@ -799,7 +832,7 @@ test('it reads the indented text of a list item, and skips each line of an inden
   }).toStrictEqual({
     exitCode: 1,
     stdout:
-      '.claude/skills/demo/SKILL.md:8: "lane" is a coined term; write the command that runs those tests, such as `bun run test:e2e`, or the folder or file suffix that holds them\n' +
+      '.claude/skills/demo/SKILL.md:8: "unit limit" is a coined term; write the timeout and the command it applies to, such as "the 5 s timeout of `bun run test`"\n' +
       'check-skill: 1 skills, 1 errors, 0 warnings\n',
     stderr: '',
   });
@@ -814,26 +847,25 @@ test('it passes a coined term inside code, a link target or label, an HTML tag, 
     'description: Commands for the demo service. Load it before a demo test.',
     '---',
     '',
-    '- Declare the stack under `lanes` in `rig.config.ts`, and run it with `rig e2e`.',
-    '- Read [the timeouts](./guide.md#lanes), or <https://example.com/lanes>.',
-    '- Read https://example.com/unit-run/ for the flags.',
-    '- Run the checks with nix-unit runs, then plane and laneway tests.',
-    '<!-- the unit run -->',
+    '- Read the timeout from `unit limit` in the report of `rig unit`.',
+    '- Read [the timeouts](<./guide.md#unit limit>), or <https://example.com/unit limit>.',
+    '- Read https://example.com/unit%20limit/ for the flags.',
+    '- Each subunit limit and each unit limiter has a test.',
+    '<!-- the unit limit -->',
     '',
-    'Read [the guide](./a_(b)lanes.md), [the guide][lanes] and <a href="./guide.md#lanes">the guide</a>.',
+    'Read [the guide](<./a_(b)unit limit.md>), [the guide][unit limit] and <a href="./guide.md#unit limit">the guide</a>.',
     '',
-    '[lanes]: ./guide.md#lanes',
+    '[unit limit]: ./guide.md#timeouts',
     '',
-    'Set the stack in the config:',
+    'Set the timeout in the config:',
     '',
-    '    lanes: {}',
+    '    unit limit: 5s',
     '',
-    'Set `stack',
-    'lanes` in the config.',
+    'Set `the',
+    'unit limit` in the config.',
     '',
     '```yaml',
-    'lanes:',
-    '  e2e: {}',
+    'unit limit: 5s',
     '```',
   ]);
 

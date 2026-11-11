@@ -1118,6 +1118,36 @@ test('it reports a unit joined to its number in files named with an equals sign,
   });
 });
 
+test('it passes each term that rig defines in a skill', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText(
+    '.claude/skills/project-testing/SKILL.md',
+    [
+      '---',
+      'name: project-testing',
+      'description: Where each test of the demo service goes, by lane. Load it before a demo test.',
+      '---',
+      '',
+      '- Put a test that needs the kiln in the `e2e` lane, and keep it out of the unit lane.',
+      '- The unit run leaves every other lane out, so the lanes never share a kiln.',
+      '',
+    ].join('\n'),
+  );
+
+  const result = await ctx.run('.claude/skills/project-testing/SKILL.md');
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
+});
+
 test('it passes a banned word in a code span or a code block', async () => {
   const ctx = await setupTest();
 
