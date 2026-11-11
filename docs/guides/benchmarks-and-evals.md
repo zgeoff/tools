@@ -4,8 +4,9 @@
 
 ## Benchmarks
 
-A benchmark is a `bench/<name>.bench.ts` file in a package whose default export is a `defineBench`
-result:
+A benchmark is a `<name>.bench.ts` file whose default export is a `defineBench` result. A benchmark
+of one module sits beside it under the package's `src/`, and a benchmark of a running program sits
+in the package's `bench/` folder:
 
 ```ts
 import { defineBench } from '@zgeoff/rig/bench';
@@ -19,13 +20,14 @@ export default defineBench({
 ```
 
 `budget` is a duration string written like a lane `limit`. `rig bench` imports each tracked
-`**/bench/*.bench.ts` file in a folder that holds a `package.json`, or at the root of a
-single-package repo. It calls `setup` once, runs `run` 5 times to warm up, then 20 times measured,
-prints the median, the spread and the budget, and fails when the median is over the budget. The
-spread is the interquartile range of the measured times. `rig bench <name>` runs the benchmark file
-with that name, such as `boil` for `bench/boil.bench.ts`. A benchmark that needs a running system
-sets `bench: { lane: 'kiln' }` in `rig.config.ts`: `rig bench` then runs that lane's `start` hook
-first, hands its environment to the benchmarks, and runs its `stop` hook after.
+`bench/*.bench.ts` and `src/**/*.bench.ts` file of a folder that holds a `package.json`, or of the
+root of a single-package repo. It calls `setup` once, runs `run` 5 times to warm up, then 20 times
+measured, prints the median, the spread and the budget, and fails when the median is over the
+budget. The spread is the interquartile range of the measured times. `rig bench <name>` runs the
+benchmark file with that name, such as `boil` for `bench/boil.bench.ts` or `src/boil.bench.ts`. A
+benchmark that needs a running system sets `bench: { lane: 'kiln' }` in `rig.config.ts`: `rig bench`
+then runs that lane's `start` hook first, hands its environment to the benchmarks, and runs its
+`stop` hook after.
 
 Before the benchmarks run, `rig bench` builds each program in `programs` in `rig.config.ts` once, as
 `rig e2e` does, and sets `RIG_PROGRAM_<NAME>` to each artifact path. A failed build fails the run,
@@ -88,9 +90,6 @@ that starts a server starts one from each side. The worktree is removed when the
 can't remove it, `rig bench` keeps it, prints the `git worktree remove --force` command to run, and
 exits 1. The budget holds on the head only, and a benchmark that exists on one side only shows `-`
 on the other. `rig bench --base <ref> <name>` compares one benchmark file.
-
-A `src/<module>.bench.ts` benchmark beside its module is a module benchmark, which `rig bench`
-leaves alone.
 
 ## Evaluations
 
