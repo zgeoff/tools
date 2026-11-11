@@ -24,6 +24,9 @@ The preset sorts each update by its kind:
 | `@zgeoff/*` package   | none             | one per package, at any level                | on green checks |
 | `@impz/*` package     | none             | one per package, at any level                | on green checks |
 | `@heynixie/*` package | none             | one per package, at any level                | on green checks |
+| `@atcx/*` package     | none             | one per package, at any level                | on green checks |
+| `@pepys/*` package    | none             | one per package, at any level                | on green checks |
+| `@boxxy/*` package    | none             | one per package, at any level                | on green checks |
 | Lock-file maintenance | none             | weekly, for the dependencies of dependencies | on green checks |
 
 A TanStack router release, React Start among its packages, reaches a repo as one pull request for
@@ -35,22 +38,22 @@ one's exact version, so their patch and minor bumps reach a repo as one pull req
 `wringer packages` group, and the packages never mix versions. The group opens at any time, as the
 TanStack group does. A major bump of one of them gets its own pull request, as any major does.
 
-A `@zgeoff/*`, `@impz/*` or `@heynixie/*` bump ignores Renovate's concurrent limit of 10 update
-branches per repo. A busy repo keeps more than 10 update branches open, and Renovate would hold such
-a bump on its Dependency Dashboard under Rate-Limited until a person closed some of them. Their rule
-sets `prConcurrentLimit` and `branchConcurrentLimit` to 0, which Renovate reads as no limit for a
-branch that holds their updates.
+A `@zgeoff/*`, `@impz/*`, `@heynixie/*`, `@atcx/*`, `@pepys/*` or `@boxxy/*` bump ignores Renovate's
+concurrent limit of 10 update branches per repo. A busy repo keeps more than 10 update branches
+open, and Renovate would hold such a bump on its Dependency Dashboard under Rate-Limited until a
+person closed some of them. Their rule sets `prConcurrentLimit` and `branchConcurrentLimit` to 0,
+which Renovate reads as no limit for a branch that holds their updates.
 
 The release-age wait matches the `minimumReleaseAge = 604800` gate in each repo's `bunfig.toml`, so
 Renovate proposes no version that `bun install` would refuse. Security fixes come from OSV, through
 `osvVulnerabilityAlerts`, for every package Renovate finds. Their lock refresh runs
 `bun install --minimum-release-age=0`, so a fix younger than the gate installs, and so do the new
-dependencies it brings. A first-party package, one under `@zgeoff/`, `@impz/`, `@wringer/` or
-`@heynixie/`, keeps the gate in `bun install`: the new release installs only when the repo lists the
-package in `minimumReleaseAgeExcludes`, and so does each first-party dependency it brings. The
-[dependency gates check](#the-dependency-gates-check) fails while a first-party package in
-`bun.lock` has no exclude. Bun takes only a full package name in that list, never a scope, so each
-package gets its own entry.
+dependencies it brings. A first-party package, one under `@zgeoff/`, `@impz/`, `@wringer/`,
+`@heynixie/`, `@atcx/`, `@pepys/` or `@boxxy/`, keeps the gate in `bun install`: the new release
+installs only when the repo lists the package in `minimumReleaseAgeExcludes`, and so does each
+first-party dependency it brings. The [dependency gates check](#the-dependency-gates-check) fails
+while a first-party package in `bun.lock` has no exclude. Bun takes only a full package name in that
+list, never a scope, so each package gets its own entry.
 
 The preset sets `rebaseWhen` to `conflicted`, so Renovate rebases an open pull request only when it
 conflicts with the base branch. Renovate's default rebases every auto-merge pull request that falls
