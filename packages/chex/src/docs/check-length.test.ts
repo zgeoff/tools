@@ -272,6 +272,28 @@ test('it holds a runbook to a cap of 300 lines', async () => {
   });
 });
 
+test('it holds a design doc to a cap of 400 lines', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('docs/design/sync.md', '- The tool reads one file.\n'.repeat(300));
+  await ctx.writeText('docs/design/cache/eviction.md', '- The tool reads one file.\n'.repeat(401));
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'docs/design/cache/eviction.md: 401 lines, over the docs cap of 400 (warning: cut points, then split at a concept boundary)\n' +
+      '\n' +
+      'check-length: 0 READMEs, 0 over the line limit\n',
+    stderr: '',
+  });
+});
+
 test('it reads docs/README.md as a doc, not as a README', async () => {
   const ctx = await setupTest();
 
