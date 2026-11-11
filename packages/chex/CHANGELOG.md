@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.4](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.3...@zgeoff/chex@0.3.4) (2026-11-11)
+
+
+### Features
+
+* **chex:** raise the design doc length warning to 400 lines ([#617](https://github.com/zgeoff/tools/issues/617)) ([8118054](https://github.com/zgeoff/tools/commit/81180541e3bd9b0fad7ece05c69147bff8a3e5d0))
+
 ## [0.3.3](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.2...@zgeoff/chex@0.3.3) (2026-11-11)
 
 
