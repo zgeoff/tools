@@ -1,12 +1,13 @@
 # oxlint-config test-file rules
 
-Seven rules of the `zgeoff/*` plugin in `@zgeoff/oxlint-config` check test files.
-`zgeoff/test-beside-module` keeps each test file beside the module it tests,
+Eight rules of the `zgeoff/*` plugin in `@zgeoff/oxlint-config` check test files and benchmark
+files. `zgeoff/test-beside-module` keeps each test file beside the module it tests,
 `zgeoff/setup-test-only` keeps a test file's module level to `setupTest()` and its tests,
 `zgeoff/test-shape` keeps a `bun:test` file to flat `test()` calls with titled behaviour,
 `zgeoff/no-file-snapshot` bans file snapshots, `zgeoff/max-test-timeout` keeps each test within the
 time limit of its lane, `zgeoff/test-timeout-exception-ticket` makes each disable of that rule name
-a ticket or a floor, and `zgeoff/no-test-sleep` bans a fixed delay in a test file. The
+a ticket or a floor, `zgeoff/no-test-sleep` bans a fixed delay in a test file, and
+`zgeoff/bench-shape` keeps a benchmark file to one `defineBench` benchmark. The
 [seeding rules](./oxlint-config-seeding.md) check where test code writes a database, and the
 [config overview](./oxlint-config.md) covers the rest of the config.
 
@@ -223,3 +224,14 @@ A sleep inside a wait helper passes. A wait helper is a function whose name star
 `waitUntilIdle`. Its name comes from its declaration, or from the variable, the object key or the
 method that holds it. A sleep inside a function that the helper holds passes too, so a helper may
 poll its condition in a loop with a short sleep between reads. `waitForward` is not a wait helper.
+
+## `zgeoff/bench-shape`
+
+`rig bench` runs a benchmark file only through its default export, and measures it against the
+budget that `defineBench` takes ([benchmarks and evals](../guides/benchmarks-and-evals.md)). A file
+that times its code another way never runs under `rig bench`, and no budget fails it.
+
+In a `<name>.bench.ts` or `<name>.bench.tsx` file, the rule reports a default export that is not a
+call of `defineBench`, imported by that name from `@zgeoff/rig/bench`. The import may give it
+another local name. The rule reports a file with no default export at its first statement. A
+`defineBench` that the file declares, or imports from another module, does not count.
