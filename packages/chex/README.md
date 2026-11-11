@@ -48,7 +48,7 @@ The docs checks read the repo's READMEs, its `docs/` tree and its skills:
 | `links`   | a relative link or anchor that does not resolve                                                                                           | the paths      |
 | `readmes` | a README of none of the [five kinds](https://github.com/zgeoff/skills/blob/main/skills/docs-writing/references/readmes.md#the-five-kinds) | none           |
 | `vision`  | a missing `docs/vision.md`, or one past 60 lines                                                                                          | none           |
-| `skill`   | a skill's frontmatter, its word limit, a link with a line anchor, and a coined term such as "lane" or "the unit run"                      | the skill dirs |
+| `skill`   | a skill's frontmatter, its word limit, a link with a line anchor, and a coined term such as "the unit limit"                              | the skill dirs |
 
 The repo checks read the branch, the pushed commits and the repo's config:
 
