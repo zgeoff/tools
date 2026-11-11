@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 // oxlint-disable-next-line zgeoff/no-require -- only resolves rig's path from the repo root; an import loads it
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import benchShape from './bench-shape.js';
 import buildMaxTestTimeout from './build-max-test-timeout.js';
 import buildSeedOnly from './build-seed-only.js';
 import buildTestBesideModule from './build-test-beside-module.js';
@@ -140,6 +141,7 @@ const plugin = {
     'seed-only': buildSeedOnly(readFolderSources),
     'test-beside-seed': testBesideSeed,
     'file-named-for-export': fileNamedForExport,
+    'bench-shape': benchShape,
   },
 };
 
