@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.1...@zgeoff/chex@0.3.2) (2026-11-11)
+
+
+### Bug Fixes
+
+* **chex:** accept rig's terms in the coined-term check ([#611](https://github.com/zgeoff/tools/issues/611)) ([395245d](https://github.com/zgeoff/tools/commit/395245dbe7e528ee731303840987865ceb8690cc))
+
 ## [0.3.1](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.0...@zgeoff/chex@0.3.1) (2026-11-09)
 
 
