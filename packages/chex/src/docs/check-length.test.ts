@@ -227,7 +227,7 @@ test('it accepts --package and ignores it', async () => {
   });
 });
 
-test('it warns and passes when a docs file is over its cap', async () => {
+test('it fails when a docs file is over its cap', async () => {
   const ctx = await setupTest();
 
   await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(10));
@@ -240,10 +240,11 @@ test('it warns and passes when a docs file is over its cap', async () => {
     stdout: result.stdout.toString(),
     stderr: result.stderr.toString(),
   }).toStrictEqual({
-    exitCode: 0,
+    exitCode: 1,
     stdout:
       'README.md: 10 lines (front page README; target 80, limit 100)\n' +
-      'docs/architecture/overview.md: 251 lines, over the docs cap of 250 (warning: cut points, then split at a concept boundary)\n' +
+      'docs/architecture/overview.md: 251 lines, over the docs cap of 250 ' +
+      '(error: split it at a concept boundary, move shapes into sketch files, and move working notes out of the repo; to keep it whole, list it with a reason under chex.docsLengthExceptions in package.json)\n' +
       '\n' +
       'check-length: 1 READMEs, 0 over the line limit\n',
     stderr: '',
@@ -263,9 +264,10 @@ test('it holds a runbook to a cap of 300 lines', async () => {
     stdout: result.stdout.toString(),
     stderr: result.stderr.toString(),
   }).toStrictEqual({
-    exitCode: 0,
+    exitCode: 1,
     stdout:
-      'docs/runbooks/releasing.md: 301 lines, over the docs cap of 300 (warning: cut points, then split at a concept boundary)\n' +
+      'docs/runbooks/releasing.md: 301 lines, over the docs cap of 300 ' +
+      '(error: split it at a concept boundary, move shapes into sketch files, and move working notes out of the repo; to keep it whole, list it with a reason under chex.docsLengthExceptions in package.json)\n' +
       '\n' +
       'check-length: 0 READMEs, 0 over the line limit\n',
     stderr: '',
@@ -403,4 +405,70 @@ test('it exits 2 and asks for a git work tree when run outside one', async () =>
     exitCode: 2,
     stderr: 'check-length: run it inside a git work tree, because it lists the files with git\n',
   });
+});
+
+test('it accepts a docs file over its cap when package.json lists it with a reason', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('docs/design/queue.md', '- The tool reads one file.\n'.repeat(251));
+
+  await ctx.writeText(
+    'package.json',
+    JSON.stringify({
+      chex: {
+        docsLengthExceptions: [{ path: 'docs/design/queue.md', reason: 'one table of 200 rows' }],
+      },
+    }),
+  );
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'docs/design/queue.md: 251 lines, over the docs cap of 250 (accepted: one table of 200 rows)\n' +
+      '\n' +
+      'check-length: 0 READMEs, 0 over the line limit\n',
+    stderr: '',
+  });
+});
+
+test('it fails a docs exception that gives no reason', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('docs/design/queue.md', '- The tool reads one file.\n'.repeat(251));
+
+  await ctx.writeText(
+    'package.json',
+    JSON.stringify({ chex: { docsLengthExceptions: [{ path: 'docs/design/queue.md' }] } }),
+  );
+
+  const result = await ctx.run();
+
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout.toString()).toContain(
+    'docs/design/queue.md: a docsLengthExceptions entry needs a reason (error)\n',
+  );
+});
+
+test('it fails a docs file that another file in the exception list does not cover', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('docs/design/queue.md', '- The tool reads one file.\n'.repeat(251));
+
+  await ctx.writeText(
+    'package.json',
+    JSON.stringify({
+      chex: { docsLengthExceptions: [{ path: 'docs/design/other.md', reason: 'a long table' }] },
+    }),
+  );
+
+  const result = await ctx.run();
+
+  expect(result.exitCode).toBe(1);
 });

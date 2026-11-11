@@ -39,12 +39,13 @@ code among them: 0 when each clears, 1 when a check finds a fault, and 2 when a 
 chex also exits 2 for a check that throws or exits with any other code, such as 127 for a missing
 program. `chex <check> <args...>` hands the arguments to that one check.
 
-The docs checks read the repo's READMEs, its `docs/` tree and its skills:
+The docs checks read the repo's READMEs, its `docs/` tree and its skills; the
+[docs checks guide](../../docs/guides/docs-checks-config.md) gives the doc cap and the config:
 
 | Check     | Fails on                                                                                                                                  | Arguments      |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
-| `prose`   | banned words, process residue and over-long paragraphs                                                                                    | the paths      |
-| `length`  | a README over its line limit, and warns on a doc over its cap                                                                             | none           |
+| `prose`   | banned words, process residue, over-long paragraphs, working-record phrases under `docs/`, and tracker IDs when configured                | the paths      |
+| `length`  | a README over its line limit, and a doc over its cap                                                                                      | none           |
 | `links`   | a relative link or anchor that does not resolve                                                                                           | the paths      |
 | `readmes` | a README of none of the [five kinds](https://github.com/zgeoff/skills/blob/main/skills/docs-writing/references/readmes.md#the-five-kinds) | none           |
 | `vision`  | a missing `docs/vision.md`, or one past 60 lines                                                                                          | none           |

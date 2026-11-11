@@ -30,6 +30,26 @@ if [ "$#" -eq 0 ]; then
     ':(glob).claude/skills/**/*.md' ':(glob)skills/**/*.md' ':(glob)sync/skills/**/*.md'
 fi
 
+# A repo turns on the tracker ID check with its team prefixes in package.json, such as
+# {"chex": {"trackerPrefixes": ["ABC"]}}. Reading that key needs jq. The check stays off without it,
+# because a bare pattern such as [A-Z]+-[0-9]+ matches UTF-8, SHA-256 and ISO-8601.
+tracker_prefixes=
+if [ -f package.json ]; then
+  if command -v jq > /dev/null 2>&1; then
+    if ! tracker_prefixes=$(jq -r '(.chex.trackerPrefixes // []) | join("|")' package.json); then
+      echo "check-prose: package.json holds chex.trackerPrefixes that is not a list of prefixes" >&2
+      exit 2
+    fi
+  elif grep -q trackerPrefixes package.json; then
+    echo "check-prose: package.json names trackerPrefixes, and jq is not installed to read them" >&2
+    exit 2
+  fi
+fi
+if [ -n "$tracker_prefixes" ] && ! grep -qxP '[A-Z][A-Z0-9]*(\|[A-Z][A-Z0-9]*)*' <<< "$tracker_prefixes"; then
+  echo "check-prose: chex.trackerPrefixes holds a prefix of other than capital letters and digits" >&2
+  exit 2
+fi
+
 # The paragraph limits in words. repo-sync overwrites this file, so a repo cannot loosen them.
 paragraph_warn=150
 paragraph_fail=250
@@ -173,6 +193,49 @@ report 'Banned words:' \
       print text "\037" file_name()":"FNR":"$0
     }' | grep -aPi "^[^\\x1f]*(?:$banned_words)" | cut -d $'\037' -f 2-
   )"
+
+# A tracker ID in committed prose names work by its ticket, so a reader who has no tracker sees an
+# opaque string. Fenced code blocks and code spans are exempt, as for the banned words.
+if [ -n "$tracker_prefixes" ]; then
+  tracker_pattern="\\b(?:$tracker_prefixes)-[0-9]+\\b"
+  report 'Tracker IDs (name the work by what it does; the ID goes in the pull request body or the private tracker):' \
+    "$(
+      grep_docs -nP "$tracker_pattern" -- "$@" ':(exclude)*.md'
+      list_markdown "$@" | xargs -0 -r awk "$fence_awk"'
+      {
+        m = fence_marker($0)
+        if (m != "") {
+          rest = fence_rest($0, m)
+          if (open == "") open = m
+          else if (closes(m, rest)) open = ""
+          next
+        }
+        if (open != "") next
+        text = $0
+        gsub(/`[^`]*`/, " ", text)
+        print text "\037" file_name()":"FNR":"$0
+      }' | grep -aP "^[^\x1f]*(?:$tracker_pattern)" | cut -d $'\037' -f 2-
+    )"
+fi
+
+# A phrase that marks a session's working record belongs in the session, not in a doc. A decision
+# record under docs/decisions/ says who decided, so the check skips it. Fenced code blocks and code
+# spans are exempt, so a doc can quote a phrase.
+report 'Working-record phrases under docs/ (state the rule as it stands, for a reader who was not there):' \
+  "$(markdown_dir=docs/ list_markdown "$@" | xargs -0 -r awk "$fence_awk"'
+    {
+      m = fence_marker($0)
+      if (m != "") {
+        rest = fence_rest($0, m)
+        if (open == "") open = m
+        else if (closes(m, rest)) open = ""
+        next
+      }
+      if (open != "" || file_name() ~ /^docs\/decisions\//) next
+      text = $0
+      gsub(/`[^`]*`/, " ", text)
+      if (tolower(text) ~ /you decided|decided by you|an earlier copy|a default that you can change|waits for you/) print file_name()":"FNR":"$0
+    }')"
 
 report 'Filler with no term-of-art use:' \
   "$(grep_docs -nPi 'organically|earns its complexity|cheap insurance|lays (the )?foundation|the right level' -- "$@")"

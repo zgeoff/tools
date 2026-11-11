@@ -106,5 +106,17 @@
     "oxlint": "catalog:",
     "tsrs": "catalog:",
     "typescript": "catalog:"
+  },
+  "chex": {
+    "docsLengthExceptions": [
+      {
+        "path": "docs/architecture/repo-sync.md",
+        "reason": "one delivery flow told end to end; a split is not yet done"
+      },
+      {
+        "path": "docs/architecture/rig.md",
+        "reason": "one tool's reference told end to end; a split is not yet done"
+      }
+    ]
   }
 }

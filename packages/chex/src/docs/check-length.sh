@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Checks each README against its line limit and each docs/ file against its cap. A README over its
-# limit fails the run; a README over its target and a docs/ file over its cap print a warning and
-# never fail it. Its last line counts the READMEs and those over their limit.
+# limit and a docs/ file over its cap fail the run; a README over its target prints a warning and
+# never fails it. Its last line counts the READMEs and those over their limit.
+# A repo accepts a docs/ file over its cap in package.json, with a reason for each file:
+# {"chex": {"docsLengthExceptions": [{"path": "docs/design/queue.md", "reason": "..."}]}}
+# Reading that key needs jq.
 # Usage (from the repo root): check-length.sh
 # A README's limit comes from its path alone: the root README and each packages/*/README.md take the
 # front page and package limits, and every other README takes the folder limit. A spike README under
@@ -63,6 +66,29 @@ pick_readme_kind() {
   fi
 }
 
+# Prints one tab-separated line, path then reason, for each docs length exception in package.json.
+list_exceptions() {
+  [ -f package.json ] || return 0
+  if ! command -v jq > /dev/null 2>&1; then
+    if grep -q docsLengthExceptions package.json; then
+      echo "check-length: package.json names docsLengthExceptions, and jq is not installed to read them" >&2
+      exit 2
+    fi
+    return 0
+  fi
+  if ! jq -r '(.chex.docsLengthExceptions // [])[] | [(.path // ""), (.reason // "")] | @tsv' package.json; then
+    echo "check-length: package.json holds chex.docsLengthExceptions that is not a list of {path, reason}" >&2
+    exit 2
+  fi
+}
+
+exception_list=$(list_exceptions) || exit 2
+
+# Prints the reason for the path's exception, and fails when the path has none.
+find_exception_reason() {
+  awk -F '\t' -v path="$1" '$1 == path { print $2; found = 1 } END { exit !found }' <<< "$exception_list"
+}
+
 fail=0
 readmes=0
 over_limit=0
@@ -108,9 +134,23 @@ while IFS= read -r doc; do
   lines=$(count_lines "$doc")
 
   if [ "$lines" -gt "$cap" ]; then
-    echo "$doc: $lines lines, over the docs cap of $cap (warning: cut points, then split at a concept boundary)"
+    reason=$(find_exception_reason "$doc")
+    if [ -n "$reason" ]; then
+      echo "$doc: $lines lines, over the docs cap of $cap (accepted: $reason)"
+    else
+      fail=1
+      echo "$doc: $lines lines, over the docs cap of $cap (error: split it at a concept boundary, move shapes into sketch files, and move working notes out of the repo; to keep it whole, list it with a reason under chex.docsLengthExceptions in package.json)"
+    fi
   fi
 done <<< "$docs"
+
+# An entry with no reason accepts nothing, and fails the run.
+while IFS=$'\t' read -r exception_path exception_reason; do
+  if [ -n "$exception_path" ] && [ -z "$exception_reason" ]; then
+    fail=1
+    echo "$exception_path: a docsLengthExceptions entry needs a reason (error)"
+  fi
+done <<< "$exception_list"
 
 echo
 echo "check-length: $readmes READMEs, $over_limit over the line limit"

@@ -1541,3 +1541,89 @@ test('it exits 2 and asks for a git work tree when run outside one', async () =>
     stderr: 'check-prose: run it inside a git work tree, because it lists the files with git\n',
   });
 });
+
+test('it fails on a tracker ID of a configured prefix, and only there', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('package.json', JSON.stringify({ chex: { trackerPrefixes: ['ABC'] } }));
+
+  await ctx.writeText(
+    'guide.md',
+    '# Guide\n\nThe queue fix (ABC-123) shipped. The file uses UTF-8 and SHA-256.\n\n```text\nABC-9\n```\n\nThe `ABC-7` span passes.\n',
+  );
+
+  const result = await ctx.run('guide.md');
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'Tracker IDs (name the work by what it does; the ID goes in the pull request body or the private tracker):\n' +
+      'guide.md:3:The queue fix (ABC-123) shipped. The file uses UTF-8 and SHA-256.\n\n',
+    stderr: '',
+  });
+});
+
+test('it ignores a tracker ID when package.json configures no prefix', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', '# Guide\n\nThe queue fix (ABC-123) shipped.\n');
+
+  const result = await ctx.run('guide.md');
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
+});
+
+test('it fails on a working-record phrase in a doc under docs/, in any case', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText(
+    'docs/design/queue.md',
+    '# Queue\n\nAs You decided on Tuesday, the queue drains first.\n\nThe worker waits for you to approve.\n\n```text\nyou decided\n```\n',
+  );
+
+  const result = await ctx.run('docs/design/queue.md');
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout:
+      'Working-record phrases under docs/ (state the rule as it stands, for a reader who was not there):\n' +
+      'docs/design/queue.md:3:As You decided on Tuesday, the queue drains first.\n' +
+      'docs/design/queue.md:5:The worker waits for you to approve.\n\n',
+    stderr: '',
+  });
+});
+
+test('it passes a working-record phrase in a decision record or outside docs/', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('docs/decisions/0001-queue.md', '# Queue\n\nYou decided on the queue.\n');
+  await ctx.writeText('guide.md', '# Guide\n\nYou decided on the queue.\n');
+
+  const result = await ctx.run('docs/decisions/0001-queue.md', 'guide.md');
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
+});
