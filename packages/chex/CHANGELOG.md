@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.2...@zgeoff/chex@0.3.3) (2026-11-11)
+
+
+### Features
+
+* **chex:** treat atcx, pepys and boxxy packages as first party ([#615](https://github.com/zgeoff/tools/issues/615)) ([556b8b8](https://github.com/zgeoff/tools/commit/556b8b890a7406e7d9453eddf3f091ed7a073f45))
+
 ## [0.3.2](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.1...@zgeoff/chex@0.3.2) (2026-11-11)
 
 
