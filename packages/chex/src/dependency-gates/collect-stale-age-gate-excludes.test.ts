@@ -75,6 +75,15 @@ test('it never reports a heynixie exclude with no removal comment', () => {
   expect(collectStaleAgeGateExcludes(bunfig, '2026-03-01')).toStrictEqual([]);
 });
 
+test('it never reports an atcx, pepys or boxxy exclude with no removal comment', () => {
+  const bunfig = [
+    '[install]',
+    'minimumReleaseAgeExcludes = ["@atcx/contract", "@pepys/kit", "@boxxy/model"]',
+  ].join('\n');
+
+  expect(collectStaleAgeGateExcludes(bunfig, '2026-03-01')).toStrictEqual([]);
+});
+
 test('it takes the latest date when two comments name one exclude', () => {
   const bunfig = [
     '[install]',

@@ -32,6 +32,20 @@ test('it reports each first-party package with no exclude', () => {
   ]);
 });
 
+test('it reports an atcx, pepys or boxxy package with no exclude', () => {
+  const findings = collectMissingFirstPartyExcludes({ isOn: true, excludes: [] }, [
+    '@atcx/contract',
+    '@boxxy/model',
+    '@pepys/kit',
+  ]);
+
+  expect(findings.map((finding) => finding.entry)).toStrictEqual([
+    '@atcx/contract',
+    '@boxxy/model',
+    '@pepys/kit',
+  ]);
+});
+
 test('it reports a first-party package whose exclude names one version', () => {
   const findings = collectMissingFirstPartyExcludes(
     { isOn: true, excludes: ['@zgeoff/std@0.4.0'] },
