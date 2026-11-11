@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.2.3...@zgeoff/rig@0.2.4) (2026-11-11)
+
+
+### Features
+
+* **rig:** run a benchmark that sits beside its module ([#621](https://github.com/zgeoff/tools/issues/621)) ([51cd3ad](https://github.com/zgeoff/tools/commit/51cd3ada977cf371782c6d6e6bc1303431d60865))
+
 ## [0.2.3](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.2.2...@zgeoff/rig@0.2.3) (2026-11-09)
 
 

@@ -31,7 +31,7 @@
     },
     "packages/agent-hooks": {
       "name": "@zgeoff/agent-hooks",
-      "version": "0.2.11",
+      "version": "0.2.12",
       "bin": {
         "agent-hooks": "./dist/cli.js",
       },
@@ -95,7 +95,7 @@
     },
     "packages/chex": {
       "name": "@zgeoff/chex",
-      "version": "0.3.4",
+      "version": "0.3.5",
       "bin": {
         "chex": "./src/cli.ts",
       },
@@ -187,7 +187,7 @@
     },
     "packages/oxlint-config": {
       "name": "@zgeoff/oxlint-config",
-      "version": "0.10.6",
+      "version": "0.10.7",
       "dependencies": {
         "@stylistic/eslint-plugin": "catalog:",
       },
@@ -215,7 +215,7 @@
     },
     "packages/rig": {
       "name": "@zgeoff/rig",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "bin": {
         "rig": "./src/cli.ts",
       },
@@ -237,7 +237,7 @@
     },
     "packages/skill-gate": {
       "name": "@zgeoff/skill-gate",
-      "version": "0.2.27",
+      "version": "0.2.28",
       "dependencies": {
         "@zgeoff/agent-hooks": "workspace:*",
       },
