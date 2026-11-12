@@ -1,17 +1,24 @@
 # The test layout
 
-[`chex`](../../packages/chex/README.md) runs `chex test-layout` to check where a repo keeps its
-tests. It reads the files git tracks and the imports of each source file, and prints one fault per
-line, each with the fix. It reads the workspace packages from the `workspaces` field of the root
-`package.json`, and a repo without the field is one package. The lane suffixes come from the
-standard lanes, the lanes of `.oxlintrc.json` and the resolved lanes of `rig.config.ts`. A lane that
-`rig.config.ts` gives another suffix has only that suffix. It fails:
+Run `chex test-layout` from [`chex`](../../packages/chex/README.md) to check where a repo keeps its
+tests. It prints one fault per line, each with the fix, and exits 1 on a fault, 0 with none, and 2
+when it cannot run.
 
-- a root `e2e/` or `test-utils/` folder, a root `evals/` or `bench/` folder in a workspace repo, and
-  any folder named `test`, `tests`, `__tests__` or `integration`. A package keeps its helpers in
-  `src/test-utils/`, and a top-level folder outside the workspaces may keep its own `test-utils/`.
-- a subfolder in `e2e/` other than `e2e/fixtures/`, a subfolder in `bench/`, and a subfolder below
-  `evals/<name>/`.
+The check reads the files git tracks and the imports of each source file. It takes the workspace
+packages from the `workspaces` field of the root `package.json`, and treats a repo without the field
+as one package. The lane suffixes come from the standard lanes, the lanes of `.oxlintrc.json` and
+the resolved lanes of `rig.config.ts`. A lane that `rig.config.ts` gives another suffix has only
+that suffix.
+
+`chex test-layout` fails:
+
+- a root `test-utils/` folder, in any repo.
+- a root `e2e/`, `evals/` or `bench/` folder, in a repo with a `workspaces` field.
+- any folder named `test`, `tests`, `__tests__` or `integration`.
+- a package's `test-utils/` outside its `src/`.
+- a subfolder in a package's `e2e/` other than `e2e/fixtures/`, a subfolder in its `bench/`, and a
+  subfolder below its `evals/<name>/`. The package is a workspace, or the repo itself in a
+  single-package repo.
 - an `e2e/*.test.ts` file whose name does not start with `start-`, `stop-`, `recover-`, `cli-`,
   `build-`, `runtime-`, `enforce-`, `compat-` or `journey-`.
 - a `src/**/<base>.test.ts` file with no `<base>.<ext>` beside it. For `<base>.<word>.test.ts`, a
@@ -38,15 +45,16 @@ When a repo keeps a test folder outside the layout on purpose, declare the folde
 }
 ```
 
-A departure drops the fault of where that one folder sits: a root `e2e/`, `evals/`, `bench/` or
-`test-utils/` folder, a `test`, `tests`, `__tests__` or `integration` folder, a package's
-`test-utils/` outside `src/`, or a subfolder of `e2e/`, `bench/` or `evals/<name>/`. Every other
-fault still applies to the files in the folder, such as a test helper imported by a relative path, a
-test helper imported from production code, a subfolder of the declared folder, and a test file name.
+For that one folder, `chex test-layout` then skips the fault of where the folder sits: a root
+folder, a folder named `test`, `tests`, `__tests__` or `integration`, a package's `test-utils/`
+outside `src/`, or a subfolder of a package's `e2e/`, `bench/` or `evals/<name>/`. It still reports
+every other fault for the files in the folder, such as a relative import of another workspace's test
+helper.
 
 - Write `path` relative to the repo root, ending in `/`, with no `./`, `../` or leading `/`.
-- `reason` can't be blank.
-- Remove a departure when you remove its folder. `chex test-layout` fails a departure whose folder
-  holds no file that git tracks.
-- `chex test-layout` exits 2 and prints the field when the `chex` field does not parse, such as for
-  a misspelt key.
+- Write a `reason` that is not blank.
+- Remove a departure when you remove its folder. When git tracks no file in a departure's folder,
+  `chex test-layout` reports the departure as a fault.
+- `chex test-layout` exits 2 and prints the path of the bad field, such as
+  `chex.testLayout.departures.0.path`, when the `chex` field breaks these rules or holds a misspelt
+  key.
