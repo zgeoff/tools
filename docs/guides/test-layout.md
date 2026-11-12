@@ -20,3 +20,33 @@ standard lanes, the lanes of `.oxlintrc.json` and the resolved lanes of `rig.con
   suffix that is neither a lane's nor a module's is a fault too.
 - a relative import of another workspace's test helper, and a test helper imported from production
   code.
+
+## Keep a folder outside the layout
+
+When a repo keeps a test folder outside the layout on purpose, declare the folder in the root
+`package.json`, with the reason:
+
+```json
+{
+  "chex": {
+    "testLayout": {
+      "departures": [
+        { "path": "e2e/", "reason": "one e2e lane spans the server and the CLI packages" }
+      ]
+    }
+  }
+}
+```
+
+A departure drops the fault of where that one folder sits: a root `e2e/`, `evals/`, `bench/` or
+`test-utils/` folder, a `test`, `tests`, `__tests__` or `integration` folder, a package's
+`test-utils/` outside `src/`, or a subfolder of `e2e/`, `bench/` or `evals/<name>/`. Every other
+fault still applies to the files in the folder, such as a test helper imported by a relative path, a
+test helper imported from production code, a subfolder of the declared folder, and a test file name.
+
+- Write `path` relative to the repo root, ending in `/`, with no `./`, `../` or leading `/`.
+- `reason` can't be blank.
+- Remove a departure when you remove its folder. `chex test-layout` fails a departure whose folder
+  holds no file that git tracks.
+- `chex test-layout` exits 2 and prints the field when the `chex` field does not parse, such as for
+  a misspelt key.
