@@ -132,15 +132,15 @@ function collectSubfolderFaults(layout: TestLayout): FolderFault[] {
 
       if (name === 'e2e' && second !== undefined && first !== 'fixtures') {
         faults.set(
-          `${folder}/${first}`,
           `${folder}/${first}/ is a subfolder of ${folder}/; keep the tests flat in ${folder}/, with fixtures in ${folder}/fixtures/ and helpers in src/test-utils/`,
+          `${folder}/${first}`,
         );
       }
 
       if (name === 'bench' && second !== undefined) {
         faults.set(
-          `${folder}/${first}`,
           `${folder}/${first}/ is a subfolder of ${folder}/; keep the bench files flat in ${folder}/, with helpers in src/test-utils/`,
+          `${folder}/${first}`,
         );
       }
 
@@ -148,16 +148,16 @@ function collectSubfolderFaults(layout: TestLayout): FolderFault[] {
 
       if (name === 'evals' && suite !== undefined && inner !== undefined) {
         faults.set(
-          `${folder}/${suite}/${subfolder}`,
           `${folder}/${suite}/${subfolder}/ is a subfolder of ${folder}/${suite}/; keep that suite's files flat in ${folder}/${suite}/, with helpers in src/test-utils/`,
+          `${folder}/${suite}/${subfolder}`,
         );
       }
     }
   }
 
   return [...faults]
-    .map(([folder, message]) => ({ folder, message }))
-    .toSorted((left, right) => (left.message < right.message ? -1 : 1));
+    .toSorted(([left], [right]) => (left < right ? -1 : 1))
+    .map(([message, folder]) => ({ folder, message }));
 }
 
 function collectStaleDepartureFaults(layout: TestLayout): string[] {

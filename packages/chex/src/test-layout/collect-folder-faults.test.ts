@@ -191,6 +191,30 @@ test.each([
     faults: [],
   },
   {
+    label: 'a declared root test-utils/ folder',
+    trackedPaths: ['test-utils/build-water.ts'],
+    departures: ['test-utils'],
+    faults: [],
+  },
+  {
+    label: 'a declared tests/ folder',
+    trackedPaths: ['packages/kettle/tests/boil.test.ts'],
+    departures: ['packages/kettle/tests'],
+    faults: [],
+  },
+  {
+    label: 'a declared package test-utils/ folder outside src/',
+    trackedPaths: ['packages/kettle/test-utils/build-water.ts'],
+    departures: ['packages/kettle/test-utils'],
+    faults: [],
+  },
+  {
+    label: 'a declared subfolder of e2e/',
+    trackedPaths: ['packages/kettle/package.json', 'packages/kettle/e2e/helpers/pour.ts'],
+    departures: ['packages/kettle/e2e/helpers'],
+    faults: [],
+  },
+  {
     label: 'a root e2e/ folder that the repo declares nothing for',
     trackedPaths: ['e2e/journey-boil.test.ts'],
     departures: [],
