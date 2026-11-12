@@ -16,4 +16,8 @@ export interface TestLayout {
 
   // The suffixes that lanes use, each with its dot, such as `.browser`.
   readonly laneSuffixes: readonly string[];
+
+  // The folders that the root package.json declares as test-layout departures, each without its
+  // trailing slash, such as `e2e`.
+  readonly departures: readonly string[];
 }

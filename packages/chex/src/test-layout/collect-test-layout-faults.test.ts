@@ -10,6 +10,7 @@ test('it reports the faults of the folders, the names and the imports together',
       workspaces: ['packages/kettle'],
       isWorkspaceRepo: true,
       laneSuffixes: [],
+      departures: [],
     },
     [
       {
@@ -34,6 +35,7 @@ test('it passes a tree with no fault', () => {
       workspaces: ['packages/kettle'],
       isWorkspaceRepo: true,
       laneSuffixes: [],
+      departures: [],
     },
     [],
   );

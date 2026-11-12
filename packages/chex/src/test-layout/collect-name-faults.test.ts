@@ -10,6 +10,7 @@ function setupTest() {
         workspaces: ['packages/kettle'],
         isWorkspaceRepo: true,
         laneSuffixes: ['.browser', '.host'],
+        departures: [],
         ...override,
       }),
   };

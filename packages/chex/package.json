@@ -37,7 +37,8 @@
   "dependencies": {
     "@zgeoff/std": "workspace:*",
     "oxc-parser": "catalog:",
-    "ts-pattern": "catalog:"
+    "ts-pattern": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/bun": "catalog:",

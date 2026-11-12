@@ -10,6 +10,7 @@ function setupTest() {
         workspaces: ['packages/kettle', 'packages/teapot'],
         isWorkspaceRepo: true,
         laneSuffixes: [],
+        departures: [],
         ...override,
       }),
   };
@@ -174,4 +175,73 @@ test('it leaves out an e2e/ folder in a folder with no package.json', () => {
   const ctx = setupTest();
 
   expect(ctx.collect(['packages/kettle/src/legacy/e2e/helpers/pour.ts'])).toStrictEqual([]);
+});
+
+test.each([
+  {
+    label: 'a declared root e2e/ folder',
+    trackedPaths: ['e2e/journey-boil.test.ts'],
+    departures: ['e2e'],
+    faults: [],
+  },
+  {
+    label: 'a declared integration folder',
+    trackedPaths: ['packages/kettle/integration/pour.test.ts'],
+    departures: ['packages/kettle/integration'],
+    faults: [],
+  },
+  {
+    label: 'a root e2e/ folder that the repo declares nothing for',
+    trackedPaths: ['e2e/journey-boil.test.ts'],
+    departures: [],
+    faults: [
+      'e2e/ sits at the repo root; move each file into the workspace it tests, such as packages/<name>/e2e/',
+    ],
+  },
+  {
+    label: 'a declared folder that git tracks no file in',
+    trackedPaths: ['packages/kettle/src/boil.ts'],
+    departures: ['e2e'],
+    faults: [
+      'e2e/ is a test-layout departure in package.json, and git tracks no file in it; remove the departure',
+    ],
+  },
+  {
+    label: 'a fault of another folder beside a declared one',
+    trackedPaths: ['e2e/journey-boil.test.ts', 'bench/boil.bench.ts'],
+    departures: ['e2e'],
+    faults: [
+      'bench/ sits at the repo root; move each file into the workspace it tests, such as packages/<name>/bench/',
+    ],
+  },
+  {
+    label: 'a subfolder fault inside a declared folder',
+    trackedPaths: [
+      'packages/kettle/package.json',
+      'packages/kettle/e2e/helpers/pour.ts',
+      'packages/kettle/e2e/cli-boil.test.ts',
+    ],
+    departures: ['packages/kettle/e2e'],
+    faults: [
+      'packages/kettle/e2e/helpers/ is a subfolder of packages/kettle/e2e/; keep the tests flat in packages/kettle/e2e/, with fixtures in packages/kettle/e2e/fixtures/ and helpers in src/test-utils/',
+    ],
+  },
+])('it reports the folder faults of a tree with $label', (row) => {
+  const ctx = setupTest();
+
+  expect(ctx.collect(row.trackedPaths, { departures: row.departures })).toStrictEqual([
+    ...row.faults,
+  ]);
+});
+
+test('it takes the example from a workspace outside the folder it reports', () => {
+  const ctx = setupTest();
+
+  const faults = ctx.collect(['e2e/journey-boil.test.ts', 'e2e/plugin/package.json'], {
+    workspaces: ['e2e/plugin', 'packages/kettle'],
+  });
+
+  expect(faults).toStrictEqual([
+    'e2e/ sits at the repo root; move each file into the workspace it tests, such as packages/<name>/e2e/',
+  ]);
 });

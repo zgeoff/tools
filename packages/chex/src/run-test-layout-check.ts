@@ -4,6 +4,7 @@ import { collectLaneSuffixes } from './test-layout/collect-lane-suffixes.ts';
 import { collectTestLayoutFaults } from './test-layout/collect-test-layout-faults.ts';
 import { collectWorkspaceRoots } from './test-layout/collect-workspace-roots.ts';
 import type { OxcParserModule } from './test-layout/oxc-parser-module.ts';
+import { parseTestLayoutDepartures } from './test-layout/parse-test-layout-departures.ts';
 import { parseWorkspacePatterns } from './test-layout/parse-workspace-patterns.ts';
 import { readOxcParser } from './test-layout/read-oxc-parser.ts';
 
@@ -41,6 +42,13 @@ export async function runTestLayoutCheck(options: TestLayoutCheckOptions): Promi
 
     const manifest: unknown = JSON.parse(manifestText);
     const workspaces = parseWorkspacePatterns(manifest);
+    const departures = parseTestLayoutDepartures(manifest);
+
+    if (departures.kind === 'refused') {
+      options.writeError(`test-layout: package.json ${departures.reason}\n`);
+
+      return 2;
+    }
 
     const oxlintConfigText = tracked.has('.oxlintrc.json')
       ? await options.readText('.oxlintrc.json')
@@ -66,6 +74,7 @@ export async function runTestLayoutCheck(options: TestLayoutCheckOptions): Promi
             : collectWorkspaceRoots(trackedPaths, workspaces.patterns),
         isWorkspaceRepo: workspaces.kind === 'workspaces',
         laneSuffixes: collectLaneSuffixes(oxlintConfigText, rigConfig),
+        departures: departures.folders,
       },
       sources,
     );

@@ -11,6 +11,7 @@ function setupTest() {
     workspaces: ['packages/kettle', 'packages/teapot'],
     isWorkspaceRepo: true,
     laneSuffixes: [],
+    departures: [],
   };
 
   return {

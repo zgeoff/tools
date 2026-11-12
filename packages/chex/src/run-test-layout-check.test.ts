@@ -90,6 +90,52 @@ test('it takes the lane suffixes from the rig config', async () => {
   expect({ exitCode, output: ctx.output }).toStrictEqual({ exitCode: 0, output: [] });
 });
 
+test('it keeps the import faults of a declared root e2e/ folder and drops its placement fault', async () => {
+  const ctx = setupTest();
+
+  const exitCode = await ctx.run({
+    'package.json': JSON.stringify({
+      workspaces: ['packages/*'],
+      chex: {
+        testLayout: {
+          departures: [{ path: 'e2e/', reason: 'one lane spans the kettle and the teapot' }],
+        },
+      },
+    }),
+    'packages/kettle/package.json': '{}',
+    'packages/kettle/src/test-utils/build-water.ts': 'export const buildWater = () => 1;\n',
+    'e2e/journey-boil.test.ts':
+      "import { buildWater } from '../packages/kettle/src/test-utils/build-water.ts';\n",
+  });
+
+  expect({ exitCode, output: ctx.output, errors: ctx.errors }).toStrictEqual({
+    exitCode: 1,
+    output: [
+      "e2e/journey-boil.test.ts imports packages/kettle/src/test-utils/build-water.ts, a test helper of packages/kettle; import it by the package's name, with the package as a workspace:* dev dependency\n",
+    ],
+    errors: [],
+  });
+});
+
+test('it exits 2 and names the field when the departures do not parse', async () => {
+  const ctx = setupTest();
+
+  const exitCode = await ctx.run({
+    'package.json': JSON.stringify({
+      workspaces: ['packages/*'],
+      chex: { testLayout: { departures: [{ path: 'e2e', reason: 'a shared lane' }] } },
+    }),
+  });
+
+  expect({ exitCode, output: ctx.output, errors: ctx.errors }).toStrictEqual({
+    exitCode: 2,
+    output: [],
+    errors: [
+      'test-layout: package.json chex.testLayout.departures.0.path: give a folder relative to the repo root, ending in /, such as e2e/\n',
+    ],
+  });
+});
+
 test('it exits 2 and prints the error when a tracked file cannot be read', async () => {
   const ctx = setupTest();
 
