@@ -1,12 +1,16 @@
-import type { Database } from 'bun:sqlite';
+import { sql } from 'kysely';
+import type { QueryExecutorProvider } from 'kysely';
 import { z } from 'zod';
 
 const ColumnRowSchema = z.object({ name: z.string() });
 
 // The columns a table holds, or an empty list when it does not exist. The
 // table name goes into the statement, so the caller has checked it.
-export function readTableColumns(sqlite: Database, table: string): string[] {
-  const rows = sqlite.query(`PRAGMA table_info("${table}")`).all();
+export async function readTableColumns(
+  db: QueryExecutorProvider,
+  table: string,
+): Promise<string[]> {
+  const result = await sql`PRAGMA table_info(${sql.raw(`"${table}"`)})`.execute(db);
 
-  return rows.map((row) => ColumnRowSchema.parse(row).name);
+  return result.rows.map((row) => ColumnRowSchema.parse(row).name);
 }

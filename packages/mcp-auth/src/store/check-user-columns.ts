@@ -1,11 +1,11 @@
-import type { Database } from 'bun:sqlite';
+import type { QueryExecutorProvider } from 'kysely';
 import { MCPAuthError } from '../mcp-auth-error.ts';
 import { readTableColumns } from './read-table-columns.ts';
 
 // A user table from before the grant columns cannot take them as new required
 // columns, so the app's migration comes first.
-export function checkUserColumns(sqlite: Database): void {
-  const columns = readTableColumns(sqlite, 'user');
+export async function checkUserColumns(db: QueryExecutorProvider): Promise<void> {
+  const columns = await readTableColumns(db, 'user');
 
   if (columns.length === 0) {
     return;

@@ -1,3 +1,4 @@
+import { Database } from 'bun:sqlite';
 import { buildSQLiteDialect } from '@zgeoff/kysely-bun-sqlite';
 import { getMigrations } from 'better-auth/db/migration';
 import { Kysely } from 'kysely';
@@ -15,7 +16,13 @@ export interface Store {
   readonly db: Kysely<StoreSchema>;
   readonly auth: AuthServer;
   readonly options: MCPAuthAdminOptions<string>;
+
+  // Ends the Kysely the store built, and leaves the app's own Kysely running.
+  readonly close: () => Promise<void>;
 }
+
+// A mapped type has the index signature that withTables asks for.
+type StoreTables = { [Table in keyof StoreSchema]: StoreSchema[Table] };
 
 interface StoreOptions {
   readonly origin: string | null;
@@ -29,12 +36,25 @@ export async function openStore(
   options: StoreOptions,
 ): Promise<Store> {
   checkTableNames(admin.tables);
-  checkForeignKeys(admin.database);
-  checkUserColumns(admin.database);
 
-  const db = new Kysely<StoreSchema>({ dialect: buildSQLiteDialect(admin.database) });
+  // A Kysely of the app is the app's driver and its one lock: a second Kysely
+  // over the same connection has a lock of its own, so a core statement could
+  // run inside an app transaction and an app rollback would undo it.
+  const db: Kysely<StoreSchema> =
+    admin.database instanceof Database
+      ? new Kysely<StoreSchema>({ dialect: buildSQLiteDialect(admin.database) })
+      : admin.database.$extendTables<StoreTables>();
+
+  const close = async () => {
+    if (admin.database instanceof Database) {
+      await db.destroy();
+    }
+  };
 
   try {
+    await checkForeignKeys(db);
+    await checkUserColumns(db);
+
     const auth = createAuthServer({
       db,
       origin: options.origin,
@@ -46,8 +66,8 @@ export async function openStore(
 
     await migrations.runMigrations();
 
-    createOwnedTables(admin.database, admin.tables);
-    checkCascadeKeys(admin.database);
+    await createOwnedTables(db, admin.tables);
+    await checkCascadeKeys(db);
 
     // better-auth starts its context when it is built, and that start queries
     // the database, so a close before it settles destroys the driver under it.
@@ -63,9 +83,9 @@ export async function openStore(
       onGrantRevoked: admin.onGrantRevoked,
     };
 
-    return { db, auth, options: kept };
+    return { db, auth, options: kept, close };
   } catch (error) {
-    await db.destroy();
+    await close();
 
     throw error;
   }

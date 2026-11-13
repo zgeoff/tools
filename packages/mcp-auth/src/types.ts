@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import type { Kysely } from 'kysely';
 import type { Tagged } from 'type-fest';
 
 export type GrantID = Tagged<string, 'GrantID'>;
@@ -79,7 +80,10 @@ export interface SecuritySink {
 }
 
 export interface MCPAuthAdminOptions<Scope extends string> {
-  readonly database: Database;
+  // The app's own Kysely when one runs on this connection, so the core shares
+  // its driver lock. A Database only when no other Kysely uses it.
+  // oxlint-disable-next-line typescript/no-explicit-any -- an app's Kysely is typed with its own tables, which only any accepts
+  readonly database: Database | Kysely<any>;
   readonly scopes: readonly Scope[];
   readonly tables: MCPAuthTables;
   readonly clock: Clock;
@@ -140,10 +144,17 @@ export interface MCPAuthAdmin {
   readonly clients: {
     readonly list: () => Promise<ClientView[]>;
     readonly add: (name: string, redirectURIs: readonly string[]) => Promise<ClientView>;
-    readonly update: (name: string, redirectURIs: readonly string[]) => Promise<ClientView>;
+
+    // The clients whose stored name cleans to the same text as `name`: more
+    // than one when an old database holds two names that clean alike.
+    readonly readByName: (name: string) => Promise<ClientView[]>;
+    readonly update: (
+      clientID: OAuthClientID,
+      redirectURIs: readonly string[],
+    ) => Promise<ClientView>;
 
     // The number of grants it revoked.
-    readonly remove: (name: string) => Promise<number>;
+    readonly remove: (clientID: OAuthClientID) => Promise<number>;
   };
   readonly grants: {
     // Grants with a live refresh token.
@@ -163,7 +174,7 @@ export interface MCPAuthAdmin {
   };
   readonly removeExpired: () => Promise<void>;
 
-  // Leaves the bun:sqlite connection open.
+  // Leaves the connection open, and the app's Kysely too.
   readonly close: () => Promise<void>;
 }
 

@@ -1,4 +1,5 @@
-import type { Database } from 'bun:sqlite';
+import { sql } from 'kysely';
+import type { QueryExecutorProvider } from 'kysely';
 import { z } from 'zod';
 import { MCPAuthError } from '../mcp-auth-error.ts';
 
@@ -6,10 +7,12 @@ const PragmaRowSchema = z.object({ foreign_keys: z.number() });
 
 // A pragma inside a transaction does nothing, so the core reads the setting
 // back instead of trusting the statement.
-export function checkForeignKeys(sqlite: Database): void {
-  sqlite.run('PRAGMA foreign_keys = ON');
+export async function checkForeignKeys(db: QueryExecutorProvider): Promise<void> {
+  await sql`PRAGMA foreign_keys = ON`.execute(db);
 
-  const row = PragmaRowSchema.parse(sqlite.query('PRAGMA foreign_keys').get());
+  const result = await sql`PRAGMA foreign_keys`.execute(db);
+
+  const row = PragmaRowSchema.parse(result.rows[0]);
 
   if (row.foreign_keys === 0) {
     throw new MCPAuthError(

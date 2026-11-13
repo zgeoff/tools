@@ -1,4 +1,5 @@
-import type { Database } from 'bun:sqlite';
+import { sql } from 'kysely';
+import type { QueryExecutorProvider } from 'kysely';
 import { z } from 'zod';
 import { MCPAuthError } from '../mcp-auth-error.ts';
 
@@ -11,12 +12,11 @@ const KeyRowSchema = z.object({
   on_delete: z.string(),
 });
 
-export function checkCascadeKeys(sqlite: Database): void {
+export async function checkCascadeKeys(db: QueryExecutorProvider): Promise<void> {
   for (const table of CASCADING_TABLES) {
-    const keys = sqlite
-      .query(`PRAGMA foreign_key_list("${table}")`)
-      .all()
-      .map((row) => KeyRowSchema.parse(row));
+    const result = await sql`PRAGMA foreign_key_list(${sql.raw(`"${table}"`)})`.execute(db);
+
+    const keys = result.rows.map((row) => KeyRowSchema.parse(row));
 
     const isCascading = keys.some(
       (key) =>

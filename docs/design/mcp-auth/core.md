@@ -3,8 +3,8 @@
 - **Status:** agreed
 
 `@zgeoff/mcp-auth` runs the OAuth server of one app on better-auth. The app opens it on its own
-SQLite connection and gets back a handle that holds the route functions, the token check and the
-admin calls. `@zgeoff/mcp-auth/testing` holds the helpers that each app's tests use. The
+SQLite database and gets back a handle that holds the route functions, the token check and the admin
+calls. `@zgeoff/mcp-auth/testing` holds the helpers that each app's tests use. The
 [README](./README.md#words) defines the words this doc uses, and [grants.md](./grants.md) covers how
 the core stores, limits and revokes a grant.
 
@@ -25,12 +25,13 @@ flowchart LR
 
 ### Opening the server
 
-The app opens the server once at start, on a `bun:sqlite` connection that the app owns. The examples
-in this doc show pepys, an app with read and write scopes.
+The app opens the server once at start, on a `bun:sqlite` connection that the app owns, or on the
+app's own Kysely over that connection. The examples in this doc show pepys, an app with read and
+write scopes.
 
 ```ts
 const auth = await openMCPAuth({
-  database: sqlite, // the app opens it, and closes it after auth.close()
+  database: sqlite, // the app opens it, and closes it after auth.close(); an app with its own Kysely passes that
   origin: 'https://pepys.example.com',
   productName: 'pepys', // shown on the login, enroll and consent pages
   scopes: ['read', 'write'],
@@ -54,7 +55,10 @@ const admin = await openMCPAuthAdmin({ database: sqlite, scopes, tables, clock, 
 ```ts
 // mcp-auth core
 interface MCPAuthAdminOptions<Scope extends string> {
-  readonly database: Database; // bun:sqlite; the core builds its Kysely over this one connection
+  // A bun:sqlite Database that no other Kysely uses: the core builds its own Kysely over it.
+  // The app's own Kysely when one runs on the connection: the core runs every statement and
+  // transaction through it, so they share its driver lock.
+  readonly database: Database | Kysely<any>;
   readonly scopes: readonly Scope[]; // the core adds offline_access
   readonly tables: MCPAuthTables;
   readonly clock: Clock;
@@ -143,8 +147,9 @@ interface MCPAuthAdmin {
   readonly clients: {
     list(): Promise<ClientView[]>;
     add(name: string, redirectURIs: readonly string[]): Promise<ClientView>;
-    update(name: string, redirectURIs: readonly string[]): Promise<ClientView>;
-    remove(name: string): Promise<number>; // the number of grants it revoked
+    readByName(name: string): Promise<ClientView[]>; // every client whose stored name cleans to `name`
+    update(clientID: OAuthClientID, redirectURIs: readonly string[]): Promise<ClientView>;
+    remove(clientID: OAuthClientID): Promise<number>; // the number of grants it revoked
   };
   readonly grants: {
     list(): Promise<GrantView[]>; // grants with a live refresh token
@@ -157,7 +162,7 @@ interface MCPAuthAdmin {
     reset(): Promise<void>; // removes every passkey, and the grant row of each sign-in in progress
   };
   readonly removeExpired: () => Promise<void>; // the app runs it on a timer
-  readonly close: () => Promise<void>; // leaves the bun:sqlite connection open
+  readonly close: () => Promise<void>; // leaves the connection open, and the app's Kysely running
 }
 
 interface MCPAuth<Scope extends string, Limits> extends MCPAuthAdmin {
@@ -233,7 +238,7 @@ interface PasskeyView {
 class MCPAuthError extends Error {
   readonly code:
     | 'conflict' // a client name already taken
-    | 'not-found' // update or remove of an unknown client name
+    | 'not-found' // update or remove of an unknown client ID
     | 'invalid-client-name' // empty after the core cleans it
     | 'invalid-redirect-uri'
     | 'invalid-setup'; // at open: foreign keys off, a missing column or key, a resource mismatch
@@ -303,7 +308,12 @@ steps past a token's life sets the system time with `bun:test`, since better-aut
 ### Storage
 
 - The core runs `PRAGMA foreign_keys = ON` on the connection, reads it back, and throws
-  `invalid-setup` when it reads 0.
+  `invalid-setup` when it reads 0. It does so through the app's Kysely when the app passes one.
+- An app whose own Kysely runs on the same connection passes that Kysely as `database`. A second
+  Kysely over one connection has a driver lock of its own, so a core statement can run inside an app
+  transaction, and the app's rollback undoes it, such as a revoke.
+  [0003](../../decisions/0003-the-core-shares-the-apps-kysely.md)
+- The core ends only a Kysely it built itself. `close` leaves the app's Kysely running.
 - `openMCPAuth` throws `invalid-setup` when a token or session table lacks its cascading `userId`
   key, or when the passkey table lacks a column the core needs.
 - At open, the core creates the tables it owns and adds their missing columns. It never adds a
@@ -333,8 +343,11 @@ steps past a token's life sets the system time with `bun:test`, since better-aut
   loopback host. They refuse a URI with a fragment or with user info.
 - Dynamic client registration is off, and every client must use PKCE.
 - `clients.add` cleans a name before it stores it: it turns each run of whitespace into one space,
-  removes control characters, trims the ends, and cuts the name to 100 code points. `update` and
-  `remove` clean the name the same way before they look it up.
+  removes control characters, trims the ends, and cuts the name to 100 code points.
+- `clients.update` and `clients.remove` take a client ID, the `clientID` of a `ClientView`. An old
+  database can hold two names that clean alike, so a name does not pick one client. `readByName`
+  cleans the name it gets, and returns each client whose stored name cleans to the same text.
+  `normalizeClientName` is exported for an app that cleans a name itself.
 - `openMCPAuth` throws `invalid-setup` when the `resource` of the service token file is not
   `auth.resource`.
 - The core compares the SHA-256 digest of a presented service token with every stored digest using

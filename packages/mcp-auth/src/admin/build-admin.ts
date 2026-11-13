@@ -16,7 +16,7 @@ export function buildAdmin(
     passkeys: buildPasskeyAdmin(store),
     removeExpired: () => removeExpired(store),
     close: async () => {
-      await store.db.destroy();
+      await store.close();
     },
   };
 }

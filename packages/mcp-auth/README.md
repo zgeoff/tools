@@ -19,8 +19,10 @@ Kysely is a peer dependency. Elysia 2 is an optional peer dependency, needed onl
 
 ## Usage
 
-The app opens the server once at start, on a `bun:sqlite` connection that it owns. Each route is a
-function from `Request` to `Response`, and `verify` turns a bearer token into an `Access` or `null`.
+The app opens the server once at start, on a `bun:sqlite` connection that it owns. An app whose own
+Kysely runs on that connection passes the Kysely as `database` instead, so both share one driver
+lock. Each route is a function from `Request` to `Response`, and `verify` turns a bearer token into
+an `Access` or `null`.
 
 ```ts
 import { DEFAULT_PATHS, openMCPAuth } from '@zgeoff/mcp-auth';
