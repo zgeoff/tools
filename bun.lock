@@ -175,7 +175,7 @@
     },
     "packages/mcp-auth": {
       "name": "@zgeoff/mcp-auth",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "dependencies": {
         "@better-auth/mcp": "catalog:",
         "@better-auth/oauth-provider": "catalog:",

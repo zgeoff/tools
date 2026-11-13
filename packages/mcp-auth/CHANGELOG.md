@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/zgeoff/tools/compare/@zgeoff/mcp-auth@0.2.0...@zgeoff/mcp-auth@0.2.1) (2026-11-13)
+
+
+### Bug Fixes
+
+* **mcp-auth:** load the reflect polyfill before simplewebauthn ([#638](https://github.com/zgeoff/tools/issues/638)) ([ad8e291](https://github.com/zgeoff/tools/commit/ad8e291f4e75ff4d8ddfdc4f8918e2db89d2bd50))
+
 ## [0.2.0](https://github.com/zgeoff/tools/compare/@zgeoff/mcp-auth@0.1.0...@zgeoff/mcp-auth@0.2.0) (2026-11-13)
 
 
