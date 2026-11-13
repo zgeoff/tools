@@ -43,7 +43,7 @@ export async function openStore(
   const db: Kysely<StoreSchema> =
     admin.database instanceof Database
       ? new Kysely<StoreSchema>({ dialect: buildSQLiteDialect(admin.database) })
-      : admin.database.withTables<StoreTables>();
+      : admin.database.$extendTables<StoreTables>();
 
   const close = async () => {
     if (admin.database instanceof Database) {

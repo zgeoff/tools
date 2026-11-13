@@ -306,5 +306,7 @@ test('#openMCPAuth with the app Kysely refuses a connection in a transaction, wh
 
   const opened = openTestAuth({ database, appKysely: app });
 
-  await expect(opened).rejects.toMatchObject({ code: 'invalid-setup' });
+  const failure = await opened.catch((error: unknown) => error);
+
+  expect(failure).toMatchObject({ code: 'invalid-setup' });
 });

@@ -18,6 +18,14 @@ export default defineRig({
       build: 'true',
       artifact: 'src/cli/index.ts',
     },
+
+    // mcp-auth ships its source, and its e2e test compiles the entry it builds from that source.
+    'mcp-auth': {
+      package: 'packages/mcp-auth',
+      source: 'src/index.ts',
+      build: 'true',
+      artifact: 'src/index.ts',
+    },
     rig: { package: 'packages/rig', source: 'src/cli.ts', build: 'true', artifact: 'src/cli.ts' },
   },
   lanes: {
