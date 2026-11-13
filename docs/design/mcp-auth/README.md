@@ -78,6 +78,7 @@ The adapter serves those functions at the app's paths, checks the Host and Origi
   `onGrantRevoked` fires only in the process that revokes, such as an admin command. An access token
   lives 15 minutes, and each open stream calls `verify` again within that time.
 - **The adapter targets Elysia 2.** An app on Elysia 1 moves to Elysia 2 before it uses the adapter.
+- **`@zgeoff/mcp-auth` is public on npm,** like the other `@zgeoff/*` packages.
 
 ## Out of scope
 
@@ -86,8 +87,3 @@ The adapter serves those functions at the app's paths, checks the Host and Origi
 - boxxy's public listener, which decides which paths reach the routes. It stays in boxxy.
 - The admin CLI commands. Each app keeps its own commands, which use `openMCPAuthAdmin`.
 - A second resource per server. Each server serves one `/mcp` resource.
-
-## Open questions
-
-- **Is `@zgeoff/mcp-auth` public on npm?** The owner settles it. Until then, the package is built as
-  a public package, and its first publish waits.
