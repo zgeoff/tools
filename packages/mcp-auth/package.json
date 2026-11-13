@@ -1,0 +1,64 @@
+{
+  "name": "@zgeoff/mcp-auth",
+  "version": "0.0.0",
+  "description": "A shared OAuth server for the MCP route of an app, built on better-auth, with passkey sign-in for the owner",
+  "keywords": [
+    "better-auth",
+    "mcp",
+    "oauth",
+    "passkey"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zgeoff/tools.git",
+    "directory": "packages/mcp-auth"
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.ts",
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./dist/test-utils/index.d.ts",
+      "default": "./src/test-utils/index.ts"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "typecheck": "tsrs"
+  },
+  "dependencies": {
+    "@better-auth/mcp": "catalog:",
+    "@better-auth/oauth-provider": "catalog:",
+    "@simplewebauthn/server": "catalog:",
+    "@zgeoff/kysely-bun-sqlite": "workspace:*",
+    "@zgeoff/std": "workspace:*",
+    "better-auth": "catalog:",
+    "ts-pattern": "catalog:",
+    "type-fest": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "kysely": "catalog:",
+    "tiny-invariant": "catalog:",
+    "tsrs": "catalog:",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "kysely": ">=0.29.5 <0.30.0"
+  },
+  "engines": {
+    "bun": ">=1.3"
+  }
+}
