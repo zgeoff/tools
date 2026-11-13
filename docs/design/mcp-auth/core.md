@@ -1,6 +1,6 @@
 # The mcp-auth core
 
-- **Status:** draft
+- **Status:** agreed
 
 `@zgeoff/mcp-auth` runs the OAuth server of one app on better-auth. The app opens it on its own
 SQLite connection and gets back a handle that holds the route functions, the token check and the

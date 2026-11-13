@@ -1,6 +1,6 @@
 # The Elysia adapter
 
-- **Status:** draft
+- **Status:** agreed
 
 `@zgeoff/mcp-auth/elysia` serves the core's routes in the app's Elysia app. It refuses a request
 with the wrong Host or Origin header, and checks the bearer token of each MCP request before it

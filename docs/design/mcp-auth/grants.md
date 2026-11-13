@@ -1,6 +1,6 @@
 # Grants
 
-- **Status:** draft
+- **Status:** agreed
 
 The core stores each grant as one row of better-auth's `user` table. Every token and session of the
 grant references that row, so one delete revokes the grant. An app can narrow a grant past its

@@ -1,6 +1,8 @@
 # Shared MCP OAuth server
 
-- **Status:** draft
+- **Status:** agreed
+- **Decision records:** [0001](../../decisions/0001-a-grant-is-a-user-row.md),
+  [0002](../../decisions/0002-bearer-tokens-only.md)
 
 Four apps, atc, boxxy, pepys and impz, each run their own copy of an OAuth server that lets a hosted
 MCP client, such as a Claude.ai connector, reach the app's `/mcp` route. `@zgeoff/mcp-auth` replaces
@@ -70,7 +72,7 @@ The adapter serves those functions at the app's paths, checks the Host and Origi
   from atc.
 - **The core issues bearer tokens only.** The token route drops a `DPoP` header, so a client that
   sends DPoP still gets a token, as RFC 9449 allows. The core never checks a DPoP proof, so `verify`
-  refuses any token with a `cnf` claim.
+  refuses any token with a `cnf` claim. [0002](../../decisions/0002-bearer-tokens-only.md)
 - **The owner approves each new impz grant with a passkey,** on the same login and consent pages as
   the other apps. On the consent page, the owner picks the scopes and the imps. A grant that an imp
   token approved before impz moved keeps its check against that token until the grant ends.

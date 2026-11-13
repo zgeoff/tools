@@ -1,6 +1,6 @@
 # Moving each app to the package
 
-- **Status:** draft
+- **Status:** agreed
 
 Each of atc, boxxy, pepys and impz runs one database migration, in its own transaction, when it
 starts to use `@zgeoff/mcp-auth`. The migration gives each grant its own row in better-auth's `user`
