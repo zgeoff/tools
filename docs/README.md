@@ -63,3 +63,6 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 
 - [Spike: one skills folder for Claude Code and Codex](./design/agents-skills-folder/spikes/skill-discovery/README.md):
   which skills folder layouts each agent loads, and the layout every repo moves to.
+- [Shared MCP OAuth server](./design/mcp-auth/README.md): `@zgeoff/mcp-auth`, the OAuth server that
+  atc, boxxy, pepys and impz share for their `/mcp` routes, and the migration each app runs to take
+  it.
