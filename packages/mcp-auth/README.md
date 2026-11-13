@@ -5,8 +5,9 @@ route. It is built on better-auth and `bun:sqlite`, and holds the OAuth routes a
 login for the owner, pre-registered clients, service tokens and grant revoke. Each app passes in its
 own scopes, paths, table names and grant limits.
 
-The package exports the core from `@zgeoff/mcp-auth` and the test helpers from
-`@zgeoff/mcp-auth/testing`. The package needs Bun.
+The package exports the core from `@zgeoff/mcp-auth`, an Elysia 2 adapter from
+`@zgeoff/mcp-auth/elysia` and the test helpers from `@zgeoff/mcp-auth/testing`. The package needs
+Bun.
 
 ## Install
 
@@ -14,7 +15,7 @@ The package exports the core from `@zgeoff/mcp-auth` and the test helpers from
 bun add @zgeoff/mcp-auth kysely
 ```
 
-Kysely is a peer dependency.
+Kysely is a peer dependency. Elysia 2 is an optional peer dependency, needed only for the adapter.
 
 ## Usage
 
@@ -39,6 +40,25 @@ const auth = await openMCPAuth({
 const access = await auth.verify(bearerToken);
 ```
 
+`createMCPHTTPApp` from `@zgeoff/mcp-auth/elysia` serves the routes in an Elysia app. It refuses a
+wrong Host or Origin header, and checks the bearer token before it hands a request to `mcp.fetch`.
+
+```ts
+import { createMCPHTTPApp } from '@zgeoff/mcp-auth/elysia';
+
+app.use(
+  createMCPHTTPApp({
+    auth,
+    hosts: new Set(['app.example.com']),
+    origins: new Set(['https://app.example.com']),
+    readRequester,
+    security: { record: (event) => console.log(event) },
+    mcp: { fetch: (request, access) => mcpHandler.fetch(request, access) },
+    besidePrefix: '/api',
+  }),
+);
+```
+
 A command that only manages clients, grants and passkeys calls `openMCPAuthAdmin`, with no origin.
 
 ## Features
@@ -49,6 +69,7 @@ A command that only manages clients, grants and passkeys calls `openMCPAuthAdmin
 - A revoke that ends every token of a grant with one delete, even in the middle of a refresh.
 - Bearer tokens only: the token route drops DPoP, and `verify` refuses a token bound to a key.
 - Service tokens for clients that cannot run the browser flow.
+- An Elysia adapter that checks Host, Origin and the bearer token of each MCP request.
 - Test helpers: `openTestAuth`, `authorizeTestClient`, and seeds for clients and passkeys.
 
 ## Documentation

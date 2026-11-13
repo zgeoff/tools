@@ -25,6 +25,10 @@
       "component": "@zgeoff/std",
       "initial-version": "0.1.0"
     },
+    "packages/mcp-auth": {
+      "component": "@zgeoff/mcp-auth",
+      "initial-version": "0.1.0"
+    },
     "packages/kysely-bun-sqlite": {
       "component": "@zgeoff/kysely-bun-sqlite",
       "initial-version": "0.1.0"
