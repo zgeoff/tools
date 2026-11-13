@@ -6,7 +6,7 @@ import { openTestAuth } from '../test-utils/open-test-auth.ts';
 import type { Access, ServiceTokenFile } from '../types.ts';
 import { createMCPHTTPApp } from './create-mcp-http-app.ts';
 
-async function setupTest() {
+async function setupTest(besidePrefix = '/api') {
   const serviceToken = `svc_${'a'.repeat(40)}`;
 
   const file: ServiceTokenFile<'read' | 'write'> = {
@@ -29,10 +29,12 @@ async function setupTest() {
     readRequester: () => buildTestRequester(),
     security: { record: (event) => server.events.push(event) },
     mcp: { fetch: fetchMCP },
-    besidePrefix: '/api',
+    besidePrefix,
   });
 
+  // The app's own route goes first, so an adapter route on the same path would replace it.
   const app = new Elysia()
+    .all(besidePrefix, () => 'app answer')
     .use(adapter)
     .get('/api/ping', () => 'pong')
     .get('/other', () => 'other');
@@ -252,4 +254,30 @@ test('it answers no unknown path, so the app gives its own 404', async () => {
   const answered = await ctx.sendRequest('/nowhere');
 
   expect(answered.status).toBe(404);
+});
+
+test('it serves no MCP request under besidePrefix, so a rebound Host never reaches MCP', async () => {
+  const ctx = await setupTest('/mcp');
+
+  const answered = await ctx.sendRequest('/mcp', {
+    method: 'POST',
+    headers: { host: 'rebound.example', authorization: `Bearer ${ctx.serviceToken}` },
+  });
+
+  const body = await answered.text();
+
+  expect(body).toBe('app answer');
+  expect(ctx.fetchMCP).not.toHaveBeenCalled();
+});
+
+test('it serves no resource metadata path under besidePrefix', async () => {
+  const ctx = await setupTest('/.well-known/oauth-protected-resource/mcp');
+
+  const answered = await ctx.sendRequest('/.well-known/oauth-protected-resource/mcp', {
+    headers: { host: 'rebound.example' },
+  });
+
+  const body = await answered.text();
+
+  expect(body).toBe('app answer');
 });

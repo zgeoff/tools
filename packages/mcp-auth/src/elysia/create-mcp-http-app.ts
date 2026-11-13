@@ -201,12 +201,16 @@ export function createMCPHTTPApp<Scope extends string, Limits>(
   };
 
   for (const path of [auth.paths.machine.mcp, auth.paths.machine.root]) {
-    app.all(path, (context: RouteContext) => answerMCP(context.request));
+    if (!isBesidePrefix(path, options.besidePrefix)) {
+      app.all(path, (context: RouteContext) => answerMCP(context.request));
+    }
   }
 
-  app.get(auth.paths.machine.mcpResourceMetadata, (context: RouteContext) =>
-    auth.routes.resourceMetadata(context.request, options.readRequester(context.request)),
-  );
+  if (!isBesidePrefix(auth.paths.machine.mcpResourceMetadata, options.besidePrefix)) {
+    app.get(auth.paths.machine.mcpResourceMetadata, (context: RouteContext) =>
+      auth.routes.resourceMetadata(context.request, options.readRequester(context.request)),
+    );
+  }
 
   return app;
 }
