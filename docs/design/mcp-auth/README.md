@@ -64,7 +64,7 @@ The adapter serves those functions at the app's paths, checks the Host and Origi
   tokens. A revoke that deletes the grant's token rows can commit between those statements, and the
   new tokens survive it. When every token references the grant's `user` row with
   `on delete cascade`, the delete of that row removes the tokens that exist, and the foreign key
-  refuses the tokens that come after.
+  refuses the tokens that come after. [0001](../../decisions/0001-a-grant-is-a-user-row.md)
 - **The app passes the full name of each table.** Apps use passkeys for more than MCP, so the core
   can work on a passkey table that the app already has, under the app's own name for it.
 - **The core keeps every check of the four copies.** It has the refusal of DPoP-bound tokens from

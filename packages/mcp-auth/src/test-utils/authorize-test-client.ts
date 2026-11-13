@@ -4,14 +4,14 @@ import { buildTestRequester } from './build-test-requester.ts';
 import { readJSONRecord } from './read-json-record.ts';
 import { TEST_REDIRECT_URI, runSignInToConsent } from './run-sign-in-to-consent.ts';
 
-interface TestClientInput {
+export interface TestClientInput {
   readonly scopes: readonly string[];
 
   // The form fields that the app's grant limits read on the consent page.
   readonly consentFields?: URLSearchParams;
 }
 
-interface TestClientAuthorization {
+export interface TestClientAuthorization {
   readonly accessToken: string;
   readonly refreshToken: string;
   readonly grantID: GrantID;
