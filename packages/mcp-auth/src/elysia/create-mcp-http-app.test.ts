@@ -27,7 +27,11 @@ async function setupTest(besidePrefix = '/api') {
     hosts: new Set(['app.example']),
     origins: new Set(['https://app.example']),
     readRequester: () => buildTestRequester(),
-    security: { record: (event) => server.events.push(event) },
+    security: {
+      record: (event) => {
+        server.events.push(event);
+      },
+    },
     mcp: { fetch: fetchMCP },
     besidePrefix,
   });
@@ -43,13 +47,15 @@ async function setupTest(besidePrefix = '/api') {
     serviceToken,
     server,
     fetchMCP,
-    sendRequest: (path: string, init: RequestInit = {}) =>
-      app.handle(
-        new Request(`https://app.example${path}`, {
-          ...init,
-          headers: { host: 'app.example', ...init.headers },
-        }),
-      ),
+    sendRequest: (path: string, init: RequestInit = {}) => {
+      const headers = new Headers(init.headers);
+
+      if (!headers.has('host')) {
+        headers.set('host', 'app.example');
+      }
+
+      return app.handle(new Request(`https://app.example${path}`, { ...init, headers }));
+    },
   };
 }
 

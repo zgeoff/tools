@@ -120,7 +120,7 @@ export function createMCPHTTPApp<Scope extends string, Limits>(
     return null;
   };
 
-  app.onRequest((context: RouteContext) => {
+  app.onRequest((context: RouteContext): Response | undefined => {
     const path = new URL(context.request.url).pathname;
 
     const host = context.request.headers.get('host');
@@ -129,7 +129,7 @@ export function createMCPHTTPApp<Scope extends string, Limits>(
       !isBesidePrefix(path, options.besidePrefix) && (host === null || !options.hosts.has(host));
 
     if (!isRefused) {
-      return;
+      return undefined;
     }
 
     recordRefusal(context.request, 'bad_host', 'host_not_allowed');
