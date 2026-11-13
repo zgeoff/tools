@@ -45,8 +45,14 @@ export async function openTestAuth<Limits = null>(
     paths: DEFAULT_PATHS,
     tables: { passkey: 'app_passkey', enrollmentToken: 'app_enrollment_token' },
     clock,
-    security: { record: (event) => events.push(event) },
-    onGrantRevoked: (grantID) => revoked.push(grantID),
+    security: {
+      record: (event) => {
+        events.push(event);
+      },
+    },
+    onGrantRevoked: (grantID) => {
+      revoked.push(grantID);
+    },
     ...(input.grantLimits === undefined ? {} : { grantLimits: input.grantLimits }),
     ...(input.serviceTokens === undefined ? {} : { serviceTokens: input.serviceTokens }),
   });

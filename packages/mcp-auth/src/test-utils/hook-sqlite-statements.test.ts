@@ -11,7 +11,9 @@ function setupTest() {
 
   const statements: string[] = [];
 
-  hookSQLiteStatements(database, (statement) => statements.push(statement));
+  hookSQLiteStatements(database, (statement) => {
+    statements.push(statement);
+  });
 
   return { database, statements };
 }
