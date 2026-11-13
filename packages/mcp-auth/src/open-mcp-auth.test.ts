@@ -8,6 +8,7 @@ import { buildFormRequest } from './test-utils/build-form-request.ts';
 import { buildStubClock } from './test-utils/build-stub-clock.ts';
 import { buildTestRequester } from './test-utils/build-test-requester.ts';
 import { createTestDatabase } from './test-utils/create-test-database.ts';
+import { hookSQLiteStatements } from './test-utils/hook-sqlite-statements.ts';
 import { openTestAuth } from './test-utils/open-test-auth.ts';
 
 // What an app's own Kysely holds: a typed database of its own tables.
@@ -32,7 +33,36 @@ async function setupTest() {
 
   const database = createTestDatabase();
 
-  const app = new Kysely<AppSchema>({ dialect: buildSQLiteDialect(database) });
+  // Armed once the app transaction is open: from then on, a write that reaches
+  // sqlite or a query the app Kysely compiles is the core attempting its change.
+  const attempt = Promise.withResolvers<void>();
+  let armed = false;
+
+  const signalAttempt = () => {
+    if (armed) {
+      attempt.resolve();
+    }
+  };
+
+  hookSQLiteStatements(database, (statement) => {
+    if (/^\s*(?:insert|update|delete)\b/iu.test(statement)) {
+      signalAttempt();
+    }
+  });
+
+  const app = new Kysely<AppSchema>({
+    dialect: buildSQLiteDialect(database),
+    plugins: [
+      {
+        transformQuery: (args) => {
+          signalAttempt();
+
+          return args.node;
+        },
+        transformResult: (args) => Promise.resolve(args.result),
+      },
+    ],
+  });
 
   onTestFinished(() => app.destroy());
 
@@ -88,8 +118,14 @@ async function setupTest() {
 
     await inside.promise;
 
+    armed = true;
+
     return {
-      rollBack: () => {
+      // Rolls back only after the core has attempted its write, so a core
+      // that does not wait for the app transaction loses the write.
+      rollBack: async () => {
+        await attempt.promise;
+
         release.resolve();
 
         return settled;
