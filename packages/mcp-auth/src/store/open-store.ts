@@ -53,7 +53,17 @@ export async function openStore(
     // the database, so a close before it settles destroys the driver under it.
     await auth.$context;
 
-    return { db, auth, options: admin };
+    // Only the admin fields stay: a full options object may hold the
+    // plaintext service tokens, and the handle keeps digests only.
+    const kept: MCPAuthAdminOptions<string> = {
+      database: admin.database,
+      scopes: admin.scopes,
+      tables: admin.tables,
+      clock: admin.clock,
+      onGrantRevoked: admin.onGrantRevoked,
+    };
+
+    return { db, auth, options: kept };
   } catch (error) {
     await db.destroy();
 

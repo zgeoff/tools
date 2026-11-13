@@ -195,6 +195,34 @@ test('#answerTokenRequest ends the grant of a client that presents a refresh tok
   expect(ctx.revoked).toStrictEqual([tokens.grantID]);
 });
 
+test('#answerTokenRequest ends the grant when two refreshes of one token run together', async () => {
+  const ctx = await setupTest();
+  const tokens = await authorizeTestClient(ctx.auth, { scopes: ['read'] });
+
+  const answers = await Promise.all([
+    ctx.refresh(tokens.clientID, tokens.refreshToken),
+    ctx.refresh(tokens.clientID, tokens.refreshToken),
+  ]);
+
+  const bodies: unknown[] = await Promise.all(answers.map((answer) => answer.json()));
+
+  const issued = bodies.flatMap(
+    (body) => z.object({ access_token: z.string() }).safeParse(body).data?.access_token ?? [],
+  );
+
+  const verified = await Promise.all(issued.map((token) => ctx.auth.verify(token)));
+
+  expect(ctx.countRows(tokens.grantID)).toStrictEqual({
+    grants: 0,
+    accessTokens: 0,
+    refreshTokens: 0,
+    sessions: 0,
+  });
+
+  expect(verified.every((access) => access === null)).toBeTrue();
+  expect(ctx.revoked).toStrictEqual([tokens.grantID]);
+});
+
 test('#answerTokenRequest revokes nothing when another client presents a replaced refresh token', async () => {
   const ctx = await setupTest();
   const tokens = await authorizeTestClient(ctx.auth, { scopes: ['read'] });

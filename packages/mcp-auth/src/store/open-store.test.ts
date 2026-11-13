@@ -147,3 +147,51 @@ test('#openStore adds a missing column to an enrollment table of the core', asyn
     'expires_at',
   ]);
 });
+
+test.each([['oauthAccessToken'], ['oauthRefreshToken'], ['session']])(
+  '#openStore refuses a %s table whose cascading key references user(email)',
+  (table) => {
+    const ctx = setupTest();
+
+    ctx.database.run(
+      'create table "user" (id text primary key, name text, email text unique, clientId text, approvedBy text)',
+    );
+
+    ctx.database.run(
+      `create table "${table}" (id text primary key, userId text references "user"(email) on delete cascade)`,
+    );
+
+    const opened = ctx.open({ passkey: 'app_passkey', enrollmentToken: 'app_enrollment_token' });
+
+    expect(opened).rejects.toMatchObject({ code: 'invalid-setup' });
+  },
+);
+
+test('#openStore keeps no service token file from the options it was given', async () => {
+  const ctx = setupTest();
+
+  // A caller passes the full options of openMCPAuth, which extend the admin ones.
+  const options = {
+    database: ctx.database,
+    scopes: ['read'],
+    tables: { passkey: 'app_passkey', enrollmentToken: 'app_enrollment_token' },
+    clock: buildStubClock(),
+    onGrantRevoked: () => {},
+    serviceTokens: {
+      prefix: 'svc_',
+      file: { resource: 'https://app.example/mcp', clients: [] },
+    },
+  };
+
+  const store = await openStore(options, { origin: 'https://app.example', paths: DEFAULT_PATHS });
+
+  onTestFinished(() => store.db.destroy());
+
+  expect(Object.keys(store.options).toSorted()).toStrictEqual([
+    'clock',
+    'database',
+    'onGrantRevoked',
+    'scopes',
+    'tables',
+  ]);
+});

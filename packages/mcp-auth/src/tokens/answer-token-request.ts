@@ -6,6 +6,7 @@ import { readBodyText } from '../utils/read-body-text.ts';
 import { MAX_FORM_BYTES } from '../utils/read-form.ts';
 import { buildBetterAuthRequest } from './build-better-auth-request.ts';
 import { buildOAuthError } from './build-oauth-error.ts';
+import { readErrorCode } from './read-error-code.ts';
 import { recordTokenExchange } from './record-token-exchange.ts';
 import { removeTokenSessions } from './remove-token-sessions.ts';
 
@@ -40,9 +41,7 @@ export async function answerTokenRequest(
     await removeTokenSessions(ctx.store);
   }
 
-  const answer = response.ok
-    ? response
-    : await readRefusal(ctx, { response, grantID: refreshing?.grantID ?? null });
+  const answer = response.ok ? response : await readRefusal(ctx, { response, form, refreshing });
 
   await recordTokenExchange(ctx, {
     form,
@@ -90,21 +89,43 @@ async function readRefreshToken(
 
 interface Refusal {
   readonly response: Response;
-  readonly grantID: GrantID | null;
+  readonly form: Readonly<URLSearchParams>;
+  readonly refreshing: RefreshToken | null;
 }
 
-// A refresh that loses a race with a revoke fails inside better-auth, on the
-// foreign key of its new tokens or as `user not found`. The grant is gone then.
+// A refresh that loses a race with a revoke fails on the foreign key of its
+// new tokens or as `user not found`, and the grant is gone. One that loses to
+// another refresh of the token gets `invalid_grant` once the winner spent it.
 async function readRefusal(ctx: RouteContext, refusal: Refusal): Promise<Response> {
-  if (refusal.grantID !== null) {
-    const grant = await ctx.store.db
-      .selectFrom('user')
-      .select('id')
-      .where('id', '=', refusal.grantID)
-      .executeTakeFirst();
+  const refreshing = refusal.refreshing;
 
-    if (grant === undefined) {
-      return buildOAuthError(400, 'invalid_grant', 'the grant was revoked');
+  if (refreshing === null) {
+    return refusal.response;
+  }
+
+  const grant = await ctx.store.db
+    .selectFrom('user')
+    .select('id')
+    .where('id', '=', refreshing.grantID)
+    .executeTakeFirst();
+
+  if (grant === undefined) {
+    return buildOAuthError(400, 'invalid_grant', 'the grant was revoked');
+  }
+
+  const isOwnClient = refreshing.clientID === refusal.form.get('client_id');
+
+  if (
+    !refreshing.isSpent &&
+    isOwnClient &&
+    (await readErrorCode(refusal.response)) === 'invalid_grant'
+  ) {
+    const now = await readRefreshToken(ctx, refusal.form);
+
+    if (now?.isSpent === true) {
+      await removeGrantRows(ctx.store, [refreshing.grantID]);
+
+      return buildOAuthError(400, 'invalid_grant', 'the refresh token was already used');
     }
   }
 

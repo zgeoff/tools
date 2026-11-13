@@ -51,6 +51,8 @@ export async function openMCPAuth<Scope extends string, Limits = null>(
       : buildServiceTokenVerifier(options.serviceTokens.file);
 
   const prefix = options.serviceTokens?.prefix ?? null;
+  const scopes = options.scopes;
+  const grantLimits = options.grantLimits ?? null;
 
   return {
     ...buildAdmin(store, signIns),
@@ -68,8 +70,8 @@ export async function openMCPAuth<Scope extends string, Limits = null>(
         {
           store,
           resource,
-          scopes: options.scopes,
-          grantLimits: options.grantLimits ?? null,
+          scopes,
+          grantLimits,
         },
         bearer,
       );
@@ -80,7 +82,7 @@ export async function openMCPAuth<Scope extends string, Limits = null>(
       const service = serviceTokens?.findScopes(clientID) ?? null;
 
       return service === null
-        ? readClientScopes(store, options.scopes, clientID)
+        ? readClientScopes(store, scopes, clientID)
         : Promise.resolve(service);
     },
   };
