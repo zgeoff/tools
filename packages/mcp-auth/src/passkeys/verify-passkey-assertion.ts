@@ -1,6 +1,6 @@
 // The certificate code of simplewebauthn needs the polyfill loaded first, and a compiled binary does not load it.
 // oxlint-disable-next-line import/no-unassigned-import -- the polyfill is a side effect
-import 'reflect-metadata';
+import './load-reflect-polyfill.ts';
 import { verifyAuthenticationResponse } from '@simplewebauthn/server';
 import type {
   AuthenticationResponseJSON,

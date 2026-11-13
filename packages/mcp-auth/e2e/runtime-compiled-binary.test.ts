@@ -42,3 +42,22 @@ test('it starts a compiled binary that imports the package, without the polyfill
   expect(result.exitCode).toBe(0);
   expect(result.stdout.toString().trim()).toBe('function object');
 });
+
+// An app that loads its commands lazily makes Bun wrap each module in a lazy
+// init, which runs a module's ESM imports before its CommonJS ones.
+test('it starts a compiled binary that loads the package through a dynamic import, without the polyfill', async () => {
+  const ctx = await setupTest();
+
+  const index = join(import.meta.dir, '..', 'src', 'index.ts');
+
+  const result = await ctx.compileEntry(
+    `const auth = await import(${JSON.stringify(index)});
+     console.log(typeof auth.openMCPAuth);`,
+  );
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString().trim(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({ exitCode: 0, stdout: 'function', stderr: '' });
+});
