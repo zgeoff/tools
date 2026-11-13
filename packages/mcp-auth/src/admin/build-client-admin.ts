@@ -5,6 +5,7 @@ import type { SignInState } from '../sign-in/create-sign-in-state.ts';
 import type { Store } from '../store/open-store.ts';
 import { removeGrantRows } from '../store/remove-grant-rows.ts';
 import type { GrantID, MCPAuthAdmin, OAuthClientID } from '../types.ts';
+import { normalizeClientName } from '../utils/normalize-client-name.ts';
 import { checkRedirectURIs } from './check-redirect-uris.ts';
 import { readClientName } from './read-client-name.ts';
 import { toClientView } from './to-client-view.ts';
@@ -16,11 +17,15 @@ export function buildClientAdmin(
   const readClient = (name: string) =>
     store.db.selectFrom('oauthClient').selectAll().where('name', '=', name).executeTakeFirst();
 
-  const requireClient = async (name: string) => {
-    const client = await readClient(name);
+  const requireClient = async (clientID: OAuthClientID) => {
+    const client = await store.db
+      .selectFrom('oauthClient')
+      .selectAll()
+      .where('clientId', '=', clientID)
+      .executeTakeFirst();
 
     if (client === undefined) {
-      throw new MCPAuthError('not-found', 'no client has that name');
+      throw new MCPAuthError('not-found', 'no client has that ID');
     }
 
     return client;
@@ -31,6 +36,18 @@ export function buildClientAdmin(
       const rows = await store.db.selectFrom('oauthClient').selectAll().orderBy('name').execute();
 
       return rows.map((row) => toClientView(row));
+    },
+
+    // A database from the old apps can hold names that clean alike, so the
+    // match is on the cleaned stored name.
+    readByName: async (name) => {
+      const cleaned = readClientName(name);
+
+      const rows = await store.db.selectFrom('oauthClient').selectAll().orderBy('name').execute();
+
+      return rows
+        .filter((row) => normalizeClientName(row.name, '') === cleaned)
+        .map((row) => toClientView(row));
     },
 
     add: async (name, redirectURIs) => {
@@ -70,8 +87,8 @@ export function buildClientAdmin(
       return toClientView(row);
     },
 
-    update: async (name, redirectURIs) => {
-      const client = await requireClient(readClientName(name));
+    update: async (clientID, redirectURIs) => {
+      const client = await requireClient(clientID);
 
       checkRedirectURIs(redirectURIs);
 
@@ -88,8 +105,8 @@ export function buildClientAdmin(
       return toClientView(row);
     },
 
-    remove: async (name) => {
-      const client = await requireClient(readClientName(name));
+    remove: async (clientID) => {
+      const client = await requireClient(clientID);
 
       const grants = await store.db
         .selectFrom('user')

@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import type { Kysely } from 'kysely';
 import { DEFAULT_PATHS } from '../default-paths.ts';
 import { openMCPAuth } from '../open-mcp-auth.ts';
 import type { GrantID, GrantLimits, MCPAuth, SecurityEvent, ServiceTokenFile } from '../types.ts';
@@ -7,6 +8,10 @@ import { createTestDatabase } from './create-test-database.ts';
 
 interface TestAuthInput<Limits> {
   readonly database?: Database;
+
+  // The app's Kysely over the database, which the core then shares.
+  // oxlint-disable-next-line typescript/no-explicit-any -- an app's Kysely is typed with its own tables
+  readonly appKysely?: Kysely<any> | undefined;
   readonly grantLimits?: GrantLimits<Limits>;
   readonly serviceTokens?: {
     readonly prefix: string;
@@ -38,7 +43,7 @@ export async function openTestAuth<Limits = null>(
   const revoked: GrantID[] = [];
 
   const auth = await openMCPAuth({
-    database,
+    database: input.appKysely ?? database,
     origin: 'https://app.example',
     productName: 'app',
     scopes: ['read', 'write'],

@@ -1,6 +1,8 @@
 import { expect, onTestFinished, test } from 'bun:test';
+import { toTagged } from '@zgeoff/std';
 import { authorizeTestClient } from '../test-utils/authorize-test-client.ts';
 import { openTestAuth } from '../test-utils/open-test-auth.ts';
+import type { OAuthClientID } from '../types.ts';
 
 async function setupTest() {
   const server = await openTestAuth();
@@ -81,32 +83,31 @@ test('#clients.add accepts an http redirect URI on a loopback host', async () =>
   expect(added.redirectURIs).toStrictEqual(['http://127.0.0.1:33418/callback']);
 });
 
-test('#clients.update replaces the redirect URIs of the client with that name', async () => {
+test('#clients.update replaces the redirect URIs of the client with that ID', async () => {
   const ctx = await setupTest();
-
-  await ctx.auth.clients.add('Claude', ['https://assistant.example/callback']);
-
-  const updated = await ctx.auth.clients.update('  Claude', ['https://assistant.example/v2']);
+  const added = await ctx.auth.clients.add('Claude', ['https://assistant.example/callback']);
+  const updated = await ctx.auth.clients.update(added.clientID, ['https://assistant.example/v2']);
   const listed = await ctx.auth.clients.list();
 
   expect(updated.redirectURIs).toStrictEqual(['https://assistant.example/v2']);
   expect(listed).toStrictEqual([updated]);
 });
 
-test('#clients.update refuses a name no client has', async () => {
+test('#clients.update refuses an ID no client has', async () => {
   const ctx = await setupTest();
 
-  const updated = ctx.auth.clients.update('Nobody', ['https://assistant.example/callback']);
+  const updated = ctx.auth.clients.update(toTagged<OAuthClientID>('nobody'), [
+    'https://assistant.example/callback',
+  ]);
 
   expect(updated).rejects.toMatchObject({ code: 'not-found' });
 });
 
 test('#clients.update refuses a redirect URI that is not allowed', async () => {
   const ctx = await setupTest();
+  const added = await ctx.auth.clients.add('Claude', ['https://assistant.example/callback']);
 
-  await ctx.auth.clients.add('Claude', ['https://assistant.example/callback']);
-
-  const updated = ctx.auth.clients.update('Claude', ['http://assistant.example/callback']);
+  const updated = ctx.auth.clients.update(added.clientID, ['http://assistant.example/callback']);
 
   expect(updated).rejects.toMatchObject({ code: 'invalid-redirect-uri' });
 });
@@ -115,15 +116,7 @@ test('#clients.remove revokes each grant of the client and reports how many', as
   const ctx = await setupTest();
   const first = await authorizeTestClient(ctx.auth, { scopes: ['read'] });
   const second = await authorizeTestClient(ctx.auth, { scopes: ['read'] });
-  const clients = await ctx.auth.clients.list();
-
-  const firstClient = clients.find((client) => client.clientID === first.clientID);
-
-  if (firstClient === undefined) {
-    throw new Error('the client is missing');
-  }
-
-  const revoked = await ctx.auth.clients.remove(firstClient.name);
+  const revoked = await ctx.auth.clients.remove(first.clientID);
   const grants = await ctx.auth.grants.list();
   const access = await ctx.auth.verify(first.accessToken);
 
@@ -133,22 +126,53 @@ test('#clients.remove revokes each grant of the client and reports how many', as
   expect(access).toBeNull();
 });
 
-test('#clients.remove refuses a name no client has', async () => {
+test('#clients.remove refuses an ID no client has', async () => {
   const ctx = await setupTest();
 
-  const removed = ctx.auth.clients.remove('Nobody');
+  const removed = ctx.auth.clients.remove(toTagged<OAuthClientID>('nobody'));
 
   expect(removed).rejects.toMatchObject({ code: 'not-found' });
 });
 
-test('#clients.remove cleans the name the same way as add', async () => {
+test('#clients.remove leaves a client whose name cleans to the same text', async () => {
   const ctx = await setupTest();
 
-  await ctx.auth.clients.add('Claude', ['https://assistant.example/callback']);
+  ctx.database.run(
+    `insert into oauthClient (id, clientId, name, redirectUris, scopes, clientCredentialsScopes, tokenEndpointAuthMethod, grantTypes, responseTypes, applicationType, requirePKCE, disabled, createdAt, updatedAt)
+     values ('row-1', 'client-one', '  Spaced' || char(9) || 'Orchard  ', '["https://one.example/callback"]', '[]', '[]', 'none', '[]', '[]', 'web', 1, 0, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
+            ('row-2', 'client-two', 'Spaced Orchard', '["https://two.example/callback"]', '[]', '[]', 'none', '[]', '[]', 'web', 1, 0, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`,
+  );
 
-  const revoked = await ctx.auth.clients.remove('  Claude\u0007 ');
+  await ctx.auth.clients.remove(toTagged<OAuthClientID>('client-one'));
+
   const listed = await ctx.auth.clients.list();
 
-  expect(revoked).toBe(0);
-  expect(listed).toStrictEqual([]);
+  expect(listed.map((client) => client.clientID)).toStrictEqual([
+    toTagged<OAuthClientID>('client-two'),
+  ]);
+});
+
+test('#clients.readByName returns each client whose name cleans to the given name', async () => {
+  const ctx = await setupTest();
+
+  ctx.database.run(
+    `insert into oauthClient (id, clientId, name, redirectUris, scopes, clientCredentialsScopes, tokenEndpointAuthMethod, grantTypes, responseTypes, applicationType, requirePKCE, disabled, createdAt, updatedAt)
+     values ('row-1', 'client-one', '  Spaced' || char(9) || 'Orchard  ', '[]', '[]', '[]', 'none', '[]', '[]', 'web', 1, 0, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
+            ('row-2', 'client-two', 'Spaced Orchard', '[]', '[]', '[]', 'none', '[]', '[]', 'web', 1, 0, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
+            ('row-3', 'client-three', 'Other', '[]', '[]', '[]', 'none', '[]', '[]', 'web', 1, 0, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`,
+  );
+
+  const found = await ctx.auth.clients.readByName(' Spaced Orchard ');
+
+  expect(found.map((client) => client.clientID).toSorted()).toStrictEqual([
+    toTagged<OAuthClientID>('client-one'),
+    toTagged<OAuthClientID>('client-two'),
+  ]);
+});
+
+test('#clients.readByName returns an empty list for a name no client has', async () => {
+  const ctx = await setupTest();
+  const found = await ctx.auth.clients.readByName('Nobody');
+
+  expect(found).toStrictEqual([]);
 });

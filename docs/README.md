@@ -73,3 +73,5 @@ The docs of tools: how its shared files and packages work, and the steps a contr
   stores each grant as one better-auth `user` row, with cascading deletes.
 - [0002: Bearer tokens only](./decisions/0002-bearer-tokens-only.md): why `@zgeoff/mcp-auth` drops
   DPoP and refuses DPoP-bound tokens.
+- [0003: The core shares the app's Kysely](./decisions/0003-the-core-shares-the-apps-kysely.md): why
+  `@zgeoff/mcp-auth` runs on the app's own Kysely when the app has one.

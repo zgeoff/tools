@@ -48,6 +48,7 @@
     "@zgeoff/kysely-bun-sqlite": "workspace:*",
     "@zgeoff/std": "workspace:*",
     "better-auth": "catalog:",
+    "reflect-metadata": "catalog:",
     "ts-pattern": "catalog:",
     "type-fest": "catalog:",
     "zod": "catalog:"
