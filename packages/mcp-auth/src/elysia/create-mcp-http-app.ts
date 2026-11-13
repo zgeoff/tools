@@ -170,11 +170,9 @@ export function createMCPHTTPApp<Scope extends string, Limits>(
     const token = findBearerToken(authorization);
 
     if (token === null) {
-      // A request with no header is a client that is discovering the
-      // authorization server, so only a header with no bearer token is recorded.
-      if (authorization !== null) {
-        recordBearerRefusal(request, 'malformed');
-      }
+      const reason = authorization === null ? 'missing' : 'malformed';
+
+      recordBearerRefusal(request, reason);
 
       return buildChallenge(`Bearer resource_metadata="${metadataURL}"`);
     }

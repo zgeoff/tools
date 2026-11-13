@@ -119,7 +119,7 @@ test('it lets a GET through with no Origin header', async () => {
   expect(ctx.server.events).toStrictEqual([]);
 });
 
-test('it answers 401 with a resource metadata challenge when the request has no Authorization header', async () => {
+test('it answers 401 with a resource metadata challenge and records a bearer event when the request has no Authorization header', async () => {
   const ctx = await setupTest();
   const answered = await ctx.sendRequest('/mcp', { method: 'POST' });
 
@@ -128,7 +128,14 @@ test('it answers 401 with a resource metadata challenge when the request has no 
     'Bearer resource_metadata="https://app.example/.well-known/oauth-protected-resource/mcp"',
   ]);
 
-  expect(ctx.server.events).toStrictEqual([]);
+  expect(ctx.server.events).toStrictEqual([
+    expect.objectContaining({
+      kind: 'bearer',
+      outcome: 'rejected',
+      reason: 'missing',
+      path: '/mcp',
+    }),
+  ]);
 });
 
 test('it records a bearer event for an Authorization header that holds no bearer token', async () => {
