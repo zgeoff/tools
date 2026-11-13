@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/zgeoff/tools/compare/@zgeoff/mcp-auth@0.1.0...@zgeoff/mcp-auth@0.2.0) (2026-11-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* **mcp-auth:** admin.clients.remove and admin.clients.update take a client ID instead of a name. admin.clients.readByName finds clients by name.
+
+### Features
+
+* **mcp-auth:** share the app's kysely and address clients by id ([#636](https://github.com/zgeoff/tools/issues/636)) ([d392ca7](https://github.com/zgeoff/tools/commit/d392ca77af378acd353a197b4d6268d661c6641a))
+
 ## 0.1.0 (2026-11-13)
 
 

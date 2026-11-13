@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/mcp-auth",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A shared OAuth server for the MCP route of an app, built on better-auth, with passkey sign-in for the owner",
   "keywords": [
     "better-auth",
