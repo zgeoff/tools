@@ -270,6 +270,33 @@ The file keys its clients by name. The parsed result lists them, each with its n
 }
 ```
 
+A client may hold secret digests instead of tokens, or beside them, to use the `client_credentials`
+grant. `mintServiceSecret()` returns `{ secret, digest }`: the secret is `svcs_` and 32 random bytes
+in base64url, shown once, and the file holds only its sha256 hex digest. A client holds 1 or 2
+digests, so a rotation has no gap, and no two clients share a digest.
+
+```json
+{ "ci": { "scopes": ["read"], "secretDigests": ["<64 lowercase hex characters>"] } }
+```
+
+A client trades its ID, `service:<name>`, and secret at the token route with `client_secret_basic`
+for an access token that starts with `svca_`. `verify` maps that token to the same `service` access
+a static token gives. `auth.replaceServiceTokens(file)` swaps the file that the token route and
+`verify` read. An app reloads the file on `SIGHUP`, and keeps the old file when the new one fails to
+parse:
+
+```ts
+process.on('SIGHUP', async () => {
+  const parsed = parseServiceTokenFile(await Bun.file(path).text(), rules);
+
+  if (parsed.ok) {
+    auth.replaceServiceTokens(parsed.file);
+  } else {
+    console.error(`service token file not reloaded: ${parsed.reason}`);
+  }
+});
+```
+
 ### Passkey table
 
 The app owns the passkey table. It may keep more columns in the table, each nullable or with a
@@ -353,6 +380,19 @@ steps past a token's life sets the system time with `bun:test`, since better-aut
 - The core compares the SHA-256 digest of a presented service token with every stored digest using
   `timingSafeEqual`, and keeps only digests in memory. Each service client holds 1 or 2 tokens.
 - `grants.list` never lists a service client.
+- The token route answers `grant_type=client_credentials` itself and never passes it to better-auth,
+  whose own grant keeps one secret per client in its tables. The route takes only Basic client
+  authentication, form-encoded or raw, and refuses a `client_secret` or `client_assertion` in the
+  body with `invalid_client`. It compares the secret's digest with every stored digest using
+  `timingSafeEqual`.
+- An access token lives 600 seconds, comes with no refresh token, and has its digest stored in
+  memory with the client name, the scopes and the expiry. At 1,000 live tokens the route answers 503
+  `temporarily_unavailable`. A restart empties the map.
+- `verify` cuts an access token's scopes to the client's current scopes, and answers null when none
+  remain or the client left the file.
+- `replaceServiceTokens` throws `invalid-setup` and keeps the old file when `openMCPAuth` got no
+  `serviceTokens` or the file names another resource. A static token prefix that starts with
+  `svca_`, or that `svca_` starts with, makes `openMCPAuth` throw `invalid-setup`.
 
 ### Boundaries
 
