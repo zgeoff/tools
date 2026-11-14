@@ -36,9 +36,10 @@ export async function answerMetadataRequest(
   }
 
   const hasSecrets = (ctx.services.findSnapshot()?.secrets.length ?? 0) > 0;
+  const advertisedGrants: unknown = advertised['grant_types_supported'];
 
-  const grantTypes = Array.isArray(advertised['grant_types_supported'])
-    ? advertised['grant_types_supported']
+  const grantTypes = Array.isArray(advertisedGrants)
+    ? advertisedGrants.filter((grant): grant is string => typeof grant === 'string')
     : [];
 
   // better-auth serves its endpoints at fixed paths, and an app may serve
