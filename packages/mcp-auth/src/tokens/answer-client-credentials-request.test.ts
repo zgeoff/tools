@@ -10,6 +10,7 @@ import type { OAuthClientID } from '../types.ts';
 async function setupTest() {
   const first = mintServiceSecret();
   const second = mintServiceSecret();
+  const third = mintServiceSecret();
   const staticToken = `svc_${'a'.repeat(32)}`;
 
   const server = await openTestAuth({
@@ -25,6 +26,7 @@ async function setupTest() {
             secretDigests: [first.digest, second.digest],
           },
           { name: 'ci', scopes: ['read'], tokens: [staticToken] },
+          { name: 'other', scopes: ['read'], tokens: [], secretDigests: [third.digest] },
         ],
       },
     },
@@ -42,7 +44,11 @@ async function setupTest() {
     ...server,
     first,
     second,
+    third,
     send,
+    basicHeader: (clientID: string, secret: string): Record<string, string> => ({
+      authorization: `Basic ${btoa(`${clientID}:${secret}`)}`,
+    }),
     sendBasic: (clientID: string, secret: string, fields = new URLSearchParams()) =>
       server.auth.routes.token(
         buildFormRequest(
@@ -97,45 +103,86 @@ test('#answerClientCredentialsRequest accepts either secret during a rotation', 
   expect(answer.status).toBe(200);
 });
 
-test.each([
-  ['a request with no client authentication', {}, {}],
-  ['a malformed header', { authorization: 'Basic' }, {}],
-  ['a header with no colon', { authorization: `Basic ${btoa('service:wringer-ro')}` }, {}],
-  ['a header with an empty secret', { authorization: `Basic ${btoa('service:wringer-ro:')}` }, {}],
-  ['a bearer header', { authorization: 'Bearer abc' }, {}],
-  ['an unknown client', { authorization: `Basic ${btoa('service:nobody:svcs_x')}` }, {}],
-  ['a client with no secret digest', { authorization: `Basic ${btoa('service:ci:svcs_x')}` }, {}],
-  ['a wrong secret', { authorization: `Basic ${btoa('service:wringer-ro:svcs_wrong')}` }, {}],
-  ['a client_secret in the body', {}, { client_secret: 'svcs_x' }],
-  ['a client_assertion in the body', {}, { client_assertion: 'x' }],
-  ['a body client_id other than the header ID', {}, { client_id: 'service:ci' }],
-])(
-  '#answerClientCredentialsRequest answers 401 invalid_client to %s',
-  async (_title, headers, fields) => {
-    const ctx = await setupTest();
-    const answer = await ctx.send({ grant_type: 'client_credentials', ...fields }, headers);
-    const body = await readJSONRecord(answer);
+type TestContext = Awaited<ReturnType<typeof setupTest>>;
 
-    expect(answer.status).toBe(401);
-    expect(body['error']).toBe('invalid_client');
-    expect(answer.headers.get('www-authenticate')).toBe('Basic realm="https://app.example"');
-    expect(answer.headers.get('cache-control')).toBe('no-store');
-  },
-);
+interface Rejection {
+  headers: Record<string, string>;
+  fields: Record<string, string>;
+}
+
+test.each<[string, (ctx: TestContext) => Rejection]>([
+  ['a request with no client authentication', () => ({ headers: {}, fields: {} })],
+  ['a malformed header', () => ({ headers: { authorization: 'Basic' }, fields: {} })],
+  [
+    'a header with no colon',
+    () => ({ headers: { authorization: `Basic ${btoa('service:wringer-ro')}` }, fields: {} }),
+  ],
+  [
+    'a header with an empty secret',
+    (ctx) => ({ headers: ctx.basicHeader('service:wringer-ro', ''), fields: {} }),
+  ],
+  [
+    'a bearer header',
+    (ctx) => ({ headers: { authorization: `Bearer ${ctx.first.secret}` }, fields: {} }),
+  ],
+  [
+    'an unknown client that presents a real secret',
+    (ctx) => ({ headers: ctx.basicHeader('service:nobody', ctx.first.secret), fields: {} }),
+  ],
+  [
+    'a client with no secret digest that presents a real secret',
+    (ctx) => ({ headers: ctx.basicHeader('service:ci', ctx.first.secret), fields: {} }),
+  ],
+  [
+    'a wrong secret',
+    (ctx) => ({ headers: ctx.basicHeader('service:wringer-ro', 'svcs_wrong'), fields: {} }),
+  ],
+  [
+    "another client's secret presented with this client's ID",
+    (ctx) => ({ headers: ctx.basicHeader('service:wringer-ro', ctx.third.secret), fields: {} }),
+  ],
+  [
+    'a client_secret in the body beside a valid header',
+    (ctx) => ({
+      headers: ctx.basicHeader('service:wringer-ro', ctx.first.secret),
+      fields: { client_secret: ctx.first.secret },
+    }),
+  ],
+  [
+    'a client_assertion in the body beside a valid header',
+    (ctx) => ({
+      headers: ctx.basicHeader('service:wringer-ro', ctx.first.secret),
+      fields: { client_assertion: 'x' },
+    }),
+  ],
+  [
+    'a body client_id other than the header ID',
+    (ctx) => ({
+      headers: ctx.basicHeader('service:wringer-ro', ctx.first.secret),
+      fields: { client_id: 'service:other' },
+    }),
+  ],
+])('#answerClientCredentialsRequest answers 401 invalid_client to %s', async (_title, build) => {
+  const ctx = await setupTest();
+
+  const rejection = build(ctx);
+
+  const answer = await ctx.send(
+    { grant_type: 'client_credentials', ...rejection.fields },
+    rejection.headers,
+  );
+
+  const body = await readJSONRecord(answer);
+
+  expect(answer.status).toBe(401);
+  expect(body['error']).toBe('invalid_client');
+  expect(answer.headers.get('www-authenticate')).toBe('Basic realm="https://app.example"');
+  expect(answer.headers.get('cache-control')).toBe('no-store');
+});
 
 test('#answerClientCredentialsRequest refuses both client_secret_post and a header together', async () => {
   const ctx = await setupTest();
   const answer = await ctx.sendGrant({ client_secret: ctx.first.secret });
-
-  expect(answer.status).toBe(401);
-});
-
-test('#answerClientCredentialsRequest refuses a secret that belongs to another client', async () => {
-  const ctx = await setupTest();
-
-  const other = mintServiceSecret();
-
-  const answer = await ctx.sendBasic('service:ci', other.secret);
 
   expect(answer.status).toBe(401);
 });
