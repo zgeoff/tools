@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/zgeoff/tools/compare/@zgeoff/mcp-auth@0.2.1...@zgeoff/mcp-auth@0.2.2) (2026-11-14)
+
+
+### Features
+
+* **mcp-auth:** add the client_credentials grant for service clients ([#643](https://github.com/zgeoff/tools/issues/643)) ([d943e84](https://github.com/zgeoff/tools/commit/d943e84e9effb0eacdd60801621d5ee0abf2f154))
+
 ## [0.2.1](https://github.com/zgeoff/tools/compare/@zgeoff/mcp-auth@0.2.0...@zgeoff/mcp-auth@0.2.1) (2026-11-13)
 
 
