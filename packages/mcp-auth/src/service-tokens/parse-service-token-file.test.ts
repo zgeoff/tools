@@ -91,3 +91,68 @@ test('it never repeats a token in the reason it gives', () => {
 
   expect(JSON.stringify(parsed)).not.toInclude(secret);
 });
+
+test('it parses a client that holds only secret digests', () => {
+  const ctx = setupTest();
+  const digest = 'a'.repeat(64);
+
+  expect(ctx.parse({ ci: { scopes: ['read'], secretDigests: [digest] } })).toStrictEqual({
+    ok: true,
+    file: {
+      resource: 'https://app.example/mcp',
+      clients: [{ name: 'ci', scopes: ['read'], tokens: [], secretDigests: [digest] }],
+    },
+  });
+});
+
+test('it parses a client that holds a token and two secret digests', () => {
+  const ctx = setupTest();
+  const digests = ['a'.repeat(64), 'b'.repeat(64)];
+
+  expect(
+    ctx.parse({ ci: { scopes: ['read'], tokens: [ctx.token], secretDigests: digests } }),
+  ).toStrictEqual({
+    ok: true,
+    file: {
+      resource: 'https://app.example/mcp',
+      clients: [{ name: 'ci', scopes: ['read'], tokens: [ctx.token], secretDigests: digests }],
+    },
+  });
+});
+
+test.each([
+  ['an empty digest list and no token', { scopes: ['read'], secretDigests: [] }],
+  ['an uppercase digest', { scopes: ['read'], secretDigests: ['A'.repeat(64)] }],
+  ['a short digest', { scopes: ['read'], secretDigests: ['a'.repeat(63)] }],
+  ['three digests', { scopes: ['read'], secretDigests: ['a', 'b', 'c'].map((x) => x.repeat(64)) }],
+  ['a repeated digest', { scopes: ['read'], secretDigests: ['a'.repeat(64), 'a'.repeat(64)] }],
+])('it refuses %s', (_title, client) => {
+  const ctx = setupTest();
+
+  expect(ctx.parse({ ci: client }).ok).toBeFalse();
+});
+
+test('it refuses a digest that two clients share', () => {
+  const ctx = setupTest();
+  const digest = 'a'.repeat(64);
+
+  expect(
+    ctx.parse({
+      ci: { scopes: ['read'], secretDigests: [digest] },
+      deploy: { scopes: ['read'], secretDigests: [digest] },
+    }).ok,
+  ).toBeFalse();
+});
+
+test('it never repeats a digest in the reason it gives', () => {
+  const ctx = setupTest();
+  const digest = 'a'.repeat(64);
+
+  const parsed = ctx.parse({
+    ci: { scopes: ['read'], secretDigests: [digest, digest] },
+    deploy: { scopes: ['read'], secretDigests: [`${'A'.repeat(63)}z`] },
+  });
+
+  expect(JSON.stringify(parsed)).not.toInclude(digest);
+  expect(JSON.stringify(parsed)).not.toInclude('A'.repeat(63));
+});

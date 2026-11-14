@@ -47,7 +47,7 @@ export function buildServiceTokenVerifier<Scope extends string>(
       return match;
     },
     findScopes: (clientID) =>
-      stored.find((entry) => entry.access.clientID === clientID)?.access.scopes ?? null,
+      file.clients.find((client) => `service:${client.name}` === clientID)?.scopes ?? null,
   };
 }
 

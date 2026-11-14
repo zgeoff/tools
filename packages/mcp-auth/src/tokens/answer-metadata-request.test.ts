@@ -1,5 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { openMCPAuth } from '../open-mcp-auth.ts';
+import { mintServiceSecret } from '../service-tokens/mint-service-secret.ts';
 import { buildStubClock } from '../test-utils/build-stub-clock.ts';
 import { buildTestRequester } from '../test-utils/build-test-requester.ts';
 import { createTestDatabase } from '../test-utils/create-test-database.ts';
@@ -113,4 +114,69 @@ test('#answerMetadataRequest names the product on the resource metadata', async 
   const body = await readJSONRecord(answer);
 
   expect(body).toMatchObject({ resource_name: 'app' });
+});
+
+test('#answerMetadataRequest advertises client_credentials and client_secret_basic when a client holds a secret', async () => {
+  const server = await openTestAuth({
+    serviceTokens: {
+      prefix: 'svc_',
+      file: {
+        resource: 'https://app.example/mcp',
+        clients: [
+          {
+            name: 'bot',
+            scopes: ['read'],
+            tokens: [],
+            secretDigests: [mintServiceSecret().digest],
+          },
+        ],
+      },
+    },
+  });
+
+  onTestFinished(() => server.close());
+
+  const answer = await server.auth.routes.authorizationServerMetadata(
+    new Request('https://app.example/.well-known/oauth-authorization-server'),
+    buildTestRequester(),
+  );
+
+  const body = await readJSONRecord(answer);
+
+  expect(body['grant_types_supported']).toStrictEqual([
+    'authorization_code',
+    'refresh_token',
+    'client_credentials',
+  ]);
+
+  expect(body['token_endpoint_auth_methods_supported']).toStrictEqual([
+    'none',
+    'client_secret_basic',
+  ]);
+
+  expect(body['revocation_endpoint_auth_methods_supported']).toStrictEqual(['none']);
+});
+
+test('#answerMetadataRequest leaves out client_credentials when only static tokens exist', async () => {
+  const server = await openTestAuth({
+    serviceTokens: {
+      prefix: 'svc_',
+      file: {
+        resource: 'https://app.example/mcp',
+        clients: [{ name: 'ci', scopes: ['read'], tokens: [`svc_${'a'.repeat(32)}`] }],
+      },
+    },
+  });
+
+  onTestFinished(() => server.close());
+
+  const answer = await server.auth.routes.authorizationServerMetadata(
+    new Request('https://app.example/.well-known/oauth-authorization-server'),
+    buildTestRequester(),
+  );
+
+  const body = await readJSONRecord(answer);
+
+  expect(body['grant_types_supported']).toStrictEqual(['authorization_code', 'refresh_token']);
+  expect(body['token_endpoint_auth_methods_supported']).toStrictEqual(['none']);
 });

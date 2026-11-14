@@ -1,4 +1,5 @@
 import type { EnrollmentState } from '../passkeys/create-enrollment-state.ts';
+import type { ServiceState } from '../service-tokens/create-service-state.ts';
 import type { Store } from '../store/open-store.ts';
 import type { Clock, GrantLimits, MCPAuthPaths, SecuritySink } from '../types.ts';
 import type { SignInState } from './create-sign-in-state.ts';
@@ -16,6 +17,7 @@ export interface RouteContext {
   readonly scopes: readonly string[];
   readonly clock: Clock;
   readonly security: SecuritySink;
+  readonly services: ServiceState<string>;
   readonly signIns: SignInState;
   readonly enrollments: EnrollmentState;
   readonly consentFields: Pick<

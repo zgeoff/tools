@@ -4,6 +4,7 @@ import type { GrantID, Requester } from '../types.ts';
 import { deriveTokenHash } from '../utils/derive-token-hash.ts';
 import { readBodyText } from '../utils/read-body-text.ts';
 import { MAX_FORM_BYTES } from '../utils/read-form.ts';
+import { answerClientCredentialsRequest } from './answer-client-credentials-request.ts';
 import { buildBetterAuthRequest } from './build-better-auth-request.ts';
 import { buildOAuthError } from './build-oauth-error.ts';
 import { readErrorCode } from './read-error-code.ts';
@@ -22,6 +23,10 @@ export async function answerTokenRequest(
   }
 
   const form = new URLSearchParams(body);
+
+  if (form.get('grant_type') === 'client_credentials') {
+    return answerClientCredentialsRequest(ctx, request, form, requester);
+  }
 
   const refreshing = await readRefreshToken(ctx, form);
 

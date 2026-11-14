@@ -3,9 +3,9 @@ import type { RouteContext } from '../sign-in/route-context.ts';
 
 const METADATA_HEADERS = { 'cache-control': 'no-store' };
 
-// The metadata advertises only what the core's clients can use: public clients
-// with no client authentication, no introspection endpoint, and bearer tokens
-// alone, so nothing about DPoP.
+// The metadata advertises only what the core's clients can use: public clients,
+// client_secret_basic and client_credentials only while a service client holds
+// a secret, no introspection endpoint, and no DPoP.
 export async function answerMetadataRequest(
   ctx: RouteContext,
   kind: 'authorization-server' | 'resource',
@@ -35,15 +35,26 @@ export async function answerMetadataRequest(
     );
   }
 
+  const hasSecrets = (ctx.services.findSnapshot()?.secrets.length ?? 0) > 0;
+
+  const grantTypes = Array.isArray(advertised['grant_types_supported'])
+    ? advertised['grant_types_supported']
+    : [];
+
   // better-auth serves its endpoints at fixed paths, and an app may serve
   // them at others.
   return Response.json(
     {
       ...advertised,
+      ...(hasSecrets
+        ? { grant_types_supported: [...new Set([...grantTypes, 'client_credentials'])] }
+        : {}),
       authorization_endpoint: `${ctx.origin}${ctx.paths.browser.authorize}`,
       token_endpoint: `${ctx.origin}${ctx.paths.machine.token}`,
       revocation_endpoint: `${ctx.origin}${ctx.paths.machine.revoke}`,
-      token_endpoint_auth_methods_supported: ['none'],
+      token_endpoint_auth_methods_supported: hasSecrets
+        ? ['none', 'client_secret_basic']
+        : ['none'],
       revocation_endpoint_auth_methods_supported: ['none'],
     },
     { headers: METADATA_HEADERS },

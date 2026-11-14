@@ -12,6 +12,8 @@ interface ServiceTokenRules<Scope extends string> {
 // file may be a token.
 const NAME_MESSAGE = 'a client name must match [a-z][a-z0-9-]{0,31}';
 const NameSchema = z.string().regex(/^[a-z][a-z0-9-]{0,31}$/u, NAME_MESSAGE);
+const DIGEST_PATTERN = /^[0-9a-f]{64}$/u;
+const DIGEST_MESSAGE = 'a secret digest must be 64 lowercase hex characters';
 
 export function parseServiceTokenFile<Scope extends string>(
   text: string,
@@ -30,21 +32,31 @@ export function parseServiceTokenFile<Scope extends string>(
 
   const tokenPattern = new RegExp(`^${escapePattern(rules.prefix)}[A-Za-z0-9_-]{32,}$`, 'u');
 
-  const ClientSchema = z.strictObject({
-    scopes: z
-      .array(
-        z
-          .string()
-          .refine((scope): scope is Scope => rules.scopes.some((known) => known === scope), {
-            message: 'a scope must be one the server knows',
-          }),
-      )
-      .min(1, 'must name at least one scope'),
-    tokens: z
-      .array(z.string().regex(tokenPattern, tokenMessage))
-      .min(1, 'must hold 1 or 2 tokens')
-      .max(2, 'must hold 1 or 2 tokens'),
-  });
+  const ClientSchema = z
+    .strictObject({
+      scopes: z
+        .array(
+          z
+            .string()
+            .refine((scope): scope is Scope => rules.scopes.some((known) => known === scope), {
+              message: 'a scope must be one the server knows',
+            }),
+        )
+        .min(1, 'must name at least one scope'),
+      tokens: z
+        .array(z.string().regex(tokenPattern, tokenMessage))
+        .max(2, 'must hold 1 or 2 tokens')
+        .default([]),
+      secretDigests: z
+        .array(z.string().regex(DIGEST_PATTERN, DIGEST_MESSAGE))
+        .min(1, 'must hold 1 or 2 secret digests')
+        .max(2, 'must hold 1 or 2 secret digests')
+        .optional(),
+    })
+    .refine(
+      (client) => client.tokens.length > 0 || client.secretDigests !== undefined,
+      'must hold 1 or 2 tokens, or 1 or 2 secret digests',
+    );
 
   const FileSchema = z.strictObject({
     resource: z.string().min(1, 'must be the resource URL the server serves'),
@@ -59,16 +71,24 @@ export function parseServiceTokenFile<Scope extends string>(
     return { ok: false, reason: parsed.error.issues.map((issue) => formatIssue(issue)).join('; ') };
   }
 
-  const clients = Object.entries(parsed.data.clients).map(([name, client]) => ({
-    name,
-    scopes: [...new Set(client.scopes)],
-    tokens: client.tokens,
-  }));
+  const clients = Object.entries(parsed.data.clients).map(([name, client]) => {
+    const scopes = [...new Set(client.scopes)];
+
+    return client.secretDigests === undefined
+      ? { name, scopes, tokens: client.tokens }
+      : { name, scopes, tokens: client.tokens, secretDigests: client.secretDigests };
+  });
 
   const tokens = clients.flatMap((client) => client.tokens);
 
   if (new Set(tokens).size !== tokens.length) {
     return { ok: false, reason: 'the same token appears more than once' };
+  }
+
+  const digests = clients.flatMap((client) => client.secretDigests ?? []);
+
+  if (new Set(digests).size !== digests.length) {
+    return { ok: false, reason: 'the same secret digest appears more than once' };
   }
 
   return { ok: true, file: { resource: parsed.data.resource, clients } };

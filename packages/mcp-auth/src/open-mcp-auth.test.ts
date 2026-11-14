@@ -2,7 +2,9 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { buildSQLiteDialect } from '@zgeoff/kysely-bun-sqlite';
 import { Kysely, sql } from 'kysely';
 import { DEFAULT_PATHS } from './default-paths.ts';
+import { MCPAuthError } from './mcp-auth-error.ts';
 import { openMCPAuth } from './open-mcp-auth.ts';
+import { mintServiceSecret } from './service-tokens/mint-service-secret.ts';
 import { authorizeTestClient } from './test-utils/authorize-test-client.ts';
 import { buildFormRequest } from './test-utils/build-form-request.ts';
 import { buildStubClock } from './test-utils/build-stub-clock.ts';
@@ -10,6 +12,7 @@ import { buildTestRequester } from './test-utils/build-test-requester.ts';
 import { createTestDatabase } from './test-utils/create-test-database.ts';
 import { hookSQLiteStatements } from './test-utils/hook-sqlite-statements.ts';
 import { openTestAuth } from './test-utils/open-test-auth.ts';
+import { readJSONRecord } from './test-utils/read-json-record.ts';
 
 // What an app's own Kysely holds: a typed database of its own tables.
 interface AppSchema {
@@ -18,18 +21,39 @@ interface AppSchema {
 
 async function setupTest() {
   const serviceToken = `svc_${'a'.repeat(32)}`;
+  const first = mintServiceSecret();
+  const second = mintServiceSecret();
 
   const server = await openTestAuth({
     serviceTokens: {
       prefix: 'svc_',
       file: {
         resource: 'https://app.example/mcp',
-        clients: [{ name: 'ci', scopes: ['read'], tokens: [serviceToken] }],
+        clients: [
+          { name: 'ci', scopes: ['read'], tokens: [serviceToken] },
+          { name: 'bot', scopes: ['read', 'write'], tokens: [], secretDigests: [first.digest] },
+          { name: 'other', scopes: ['read'], tokens: [], secretDigests: [second.digest] },
+        ],
       },
     },
   });
 
   onTestFinished(() => server.close());
+
+  const issue = async (clientName: string, secret: string) => {
+    const answer = await server.auth.routes.token(
+      buildFormRequest(
+        'https://app.example/oauth2/token',
+        new URLSearchParams({ grant_type: 'client_credentials' }),
+        { authorization: `Basic ${btoa(`service:${clientName}:${secret}`)}` },
+      ),
+      buildTestRequester(),
+    );
+
+    const body = await readJSONRecord(answer);
+
+    return { status: answer.status, token: String(body['access_token']) };
+  };
 
   const database = createTestDatabase();
 
@@ -133,7 +157,17 @@ async function setupTest() {
     };
   };
 
-  return { ...server, serviceToken, database, app, openGranted, openFailingTransaction };
+  return {
+    ...server,
+    serviceToken,
+    first,
+    second,
+    issue,
+    database,
+    app,
+    openGranted,
+    openFailingTransaction,
+  };
 }
 
 test('#openMCPAuth refuses a service token file that names another resource', () => {
@@ -309,4 +343,124 @@ test('#openMCPAuth with the app Kysely refuses a connection in a transaction, wh
   const failure = await opened.catch((error: unknown) => error);
 
   expect(failure).toMatchObject({ code: 'invalid-setup' });
+});
+
+test('#replaceServiceTokens makes a dropped client fail its next verify', async () => {
+  const ctx = await setupTest();
+  const issued = await ctx.issue('other', ctx.second.secret);
+
+  ctx.auth.replaceServiceTokens({
+    resource: 'https://app.example/mcp',
+    clients: [
+      { name: 'bot', scopes: ['read', 'write'], tokens: [], secretDigests: [ctx.first.digest] },
+    ],
+  });
+
+  const access = await ctx.auth.verify(issued.token);
+
+  expect(access).toBeNull();
+});
+
+test('#replaceServiceTokens makes a token lose a dropped scope at its next verify', async () => {
+  const ctx = await setupTest();
+  const issued = await ctx.issue('bot', ctx.first.secret);
+
+  ctx.auth.replaceServiceTokens({
+    resource: 'https://app.example/mcp',
+    clients: [{ name: 'bot', scopes: ['read'], tokens: [], secretDigests: [ctx.first.digest] }],
+  });
+
+  const access = await ctx.auth.verify(issued.token);
+
+  expect(access).toStrictEqual({
+    kind: 'service',
+    clientID: 'service:bot',
+    clientName: 'service:bot',
+    scopes: ['read'],
+  });
+});
+
+test('#replaceServiceTokens fails the next token request of a dropped digest and keeps the issued token', async () => {
+  const ctx = await setupTest();
+  const issued = await ctx.issue('bot', ctx.first.secret);
+
+  const replacement = mintServiceSecret();
+
+  ctx.auth.replaceServiceTokens({
+    resource: 'https://app.example/mcp',
+    clients: [
+      { name: 'bot', scopes: ['read', 'write'], tokens: [], secretDigests: [replacement.digest] },
+    ],
+  });
+
+  const dropped = await ctx.issue('bot', ctx.first.secret);
+  const added = await ctx.issue('bot', replacement.secret);
+  const access = await ctx.auth.verify(issued.token);
+
+  expect(dropped.status).toBe(401);
+  expect(added.status).toBe(200);
+  expect(access).toMatchObject({ kind: 'service' });
+});
+
+test('#replaceServiceTokens drops a static token that the new file lacks', async () => {
+  const ctx = await setupTest();
+
+  const newToken = `svc_${'b'.repeat(32)}`;
+
+  ctx.auth.replaceServiceTokens({
+    resource: 'https://app.example/mcp',
+    clients: [{ name: 'ci', scopes: ['read'], tokens: [newToken] }],
+  });
+
+  const dropped = await ctx.auth.verify(ctx.serviceToken);
+  const added = await ctx.auth.verify(newToken);
+
+  expect(dropped).toBeNull();
+  expect(added).toMatchObject({ kind: 'service' });
+});
+
+test('#replaceServiceTokens throws and keeps the old clients for a file that names another resource', async () => {
+  const ctx = await setupTest();
+
+  expect(() => {
+    ctx.auth.replaceServiceTokens({
+      resource: 'https://other.example/mcp',
+      clients: [{ name: 'new', scopes: ['read'], tokens: [`svc_${'c'.repeat(32)}`] }],
+    });
+  }).toThrowWithMessage(MCPAuthError, /another resource/u);
+
+  const access = await ctx.auth.verify(ctx.serviceToken);
+
+  expect(access).toMatchObject({ kind: 'service' });
+});
+
+test('#replaceServiceTokens throws when the server opened with no service tokens', async () => {
+  const server = await openTestAuth();
+
+  onTestFinished(() => server.close());
+
+  expect(() => {
+    server.auth.replaceServiceTokens({
+      resource: 'https://app.example/mcp',
+      clients: [{ name: 'ci', scopes: ['read'], tokens: [`svc_${'a'.repeat(32)}`] }],
+    });
+  }).toThrowWithMessage(MCPAuthError, /no service tokens/u);
+});
+
+test.each([['svca_'], ['svca_x'], ['sv']])(
+  '#openMCPAuth refuses the static prefix %p, which starts with the issued prefix or begins it',
+  (prefix) => {
+    const opened = openTestAuth({
+      serviceTokens: { prefix, file: { resource: 'https://app.example/mcp', clients: [] } },
+    });
+
+    expect(opened).rejects.toMatchObject({ code: 'invalid-setup' });
+  },
+);
+
+test('#verify returns null for an issued-prefix token that was never issued', async () => {
+  const ctx = await setupTest();
+  const access = await ctx.auth.verify(`svca_${'z'.repeat(43)}`);
+
+  expect(access).toBeNull();
 });
