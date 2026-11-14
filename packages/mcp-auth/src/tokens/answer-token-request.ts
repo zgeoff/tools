@@ -19,7 +19,20 @@ export async function answerTokenRequest(
   const body = await readBodyText(request, MAX_FORM_BYTES);
 
   if (body === null) {
-    return buildOAuthError(400, 'invalid_request', 'the request body is missing or too large');
+    const refused = buildOAuthError(
+      400,
+      'invalid_request',
+      'the request body is missing or too large',
+    );
+
+    await recordTokenExchange(ctx, {
+      form: new URLSearchParams(),
+      response: refused,
+      path: new URL(request.url).pathname,
+      requester,
+    });
+
+    return refused;
   }
 
   const form = new URLSearchParams(body);
