@@ -48,3 +48,12 @@ test('#findScopes returns null for a client the file does not list', () => {
   expect(ctx.verifier.findScopes('service:other')).toBeNull();
   expect(ctx.verifier.findScopes('deploy')).toBeNull();
 });
+
+test('#findScopes returns the scopes of a client that holds only secret digests', () => {
+  const verifier = buildServiceTokenVerifier({
+    resource: 'https://app.example/mcp',
+    clients: [{ name: 'bot', scopes: ['read'], tokens: [], secretDigests: ['a'.repeat(64)] }],
+  });
+
+  expect(verifier.findScopes('service:bot')).toStrictEqual(['read']);
+});

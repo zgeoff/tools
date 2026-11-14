@@ -22,6 +22,7 @@ const TOKEN_EXCHANGE_ERRORS: ReadonlySet<string> = new Set([
   'unsupported_grant_type',
   'invalid_scope',
   'invalid_target',
+  'temporarily_unavailable',
 ]);
 
 // The event holds an error code from the fixed list, and the client's id and

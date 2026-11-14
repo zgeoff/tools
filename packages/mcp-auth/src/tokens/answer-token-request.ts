@@ -4,6 +4,7 @@ import type { GrantID, Requester } from '../types.ts';
 import { deriveTokenHash } from '../utils/derive-token-hash.ts';
 import { readBodyText } from '../utils/read-body-text.ts';
 import { MAX_FORM_BYTES } from '../utils/read-form.ts';
+import { answerClientCredentialsRequest } from './answer-client-credentials-request.ts';
 import { buildBetterAuthRequest } from './build-better-auth-request.ts';
 import { buildOAuthError } from './build-oauth-error.ts';
 import { readErrorCode } from './read-error-code.ts';
@@ -18,10 +19,27 @@ export async function answerTokenRequest(
   const body = await readBodyText(request, MAX_FORM_BYTES);
 
   if (body === null) {
-    return buildOAuthError(400, 'invalid_request', 'the request body is missing or too large');
+    const refused = buildOAuthError(
+      400,
+      'invalid_request',
+      'the request body is missing or too large',
+    );
+
+    await recordTokenExchange(ctx, {
+      form: new URLSearchParams(),
+      response: refused,
+      path: new URL(request.url).pathname,
+      requester,
+    });
+
+    return refused;
   }
 
   const form = new URLSearchParams(body);
+
+  if (form.get('grant_type') === 'client_credentials') {
+    return answerClientCredentialsRequest(ctx, request, form, requester);
+  }
 
   const refreshing = await readRefreshToken(ctx, form);
 

@@ -90,10 +90,16 @@ export interface MCPAuthAdminOptions<Scope extends string> {
   readonly onGrantRevoked: (grantID: GrantID) => void;
 }
 
+// A client holds static tokens, secret digests, or both.
 export interface ServiceClient<Scope extends string> {
+  // The client ID is `service:${name}`.
   readonly name: string;
   readonly scopes: readonly Scope[];
   readonly tokens: readonly string[];
+
+  // sha256 hex digests of the client's secrets. Two entries allow a rotation
+  // with no gap.
+  readonly secretDigests?: readonly string[];
 }
 
 export interface ServiceTokenFile<Scope extends string> {
@@ -223,6 +229,12 @@ export interface MCPAuth<Scope extends string, Limits = null> extends MCPAuthAdm
 
   // The scopes a client holds now, or null when it holds none.
   readonly findClientScopes: (clientID: string) => Promise<readonly Scope[] | null>;
+
+  // Swaps the service clients that the token route and `verify` read. Throws,
+  // and keeps the old ones, when `serviceTokens` was not passed or the file
+  // names another resource.
+  // oxlint-disable-next-line typescript/method-signature-style -- a method is bivariant, so an MCPAuth of known scopes still passes where any scope goes
+  replaceServiceTokens(file: ServiceTokenFile<Scope>): void;
 }
 
 export interface ConsentRequest {

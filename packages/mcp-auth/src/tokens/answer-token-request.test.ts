@@ -305,6 +305,28 @@ test('#answerTokenRequest refuses a request with no body', async () => {
   expect(body).toMatchObject({ error: 'invalid_request' });
 });
 
+test('#answerTokenRequest records a refused exchange for a body over the size limit', async () => {
+  const ctx = await setupTest();
+
+  const secret = `svcs_${'q'.repeat(43)}`;
+
+  await ctx.sendToken({
+    grant_type: 'client_credentials',
+    client_secret: secret,
+    padding: 'p'.repeat(100_000),
+  });
+
+  expect(ctx.events.at(-1)).toStrictEqual({
+    kind: 'token_exchange',
+    outcome: 'rejected',
+    reason: 'invalid_request',
+    path: '/oauth2/token',
+    requester: buildTestRequester(),
+  });
+
+  expect(JSON.stringify(ctx.events)).not.toInclude(secret);
+});
+
 test('#answerTokenRequest ends the sessions of a grant once its tokens exist', async () => {
   const ctx = await setupTest();
   const tokens = await authorizeTestClient(ctx.auth, { scopes: ['read'] });
