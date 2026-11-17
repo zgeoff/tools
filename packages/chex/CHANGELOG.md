@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.6](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.5...@zgeoff/chex@0.3.6) (2026-11-17)
+
+
+### Bug Fixes
+
+* **chex:** pass a deleted path under a folder link ([#659](https://github.com/zgeoff/tools/issues/659)) ([c847aa4](https://github.com/zgeoff/tools/commit/c847aa402649f46d6b7d44f3e36ca4cae484c93e))
+
 ## [0.3.5](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.4...@zgeoff/chex@0.3.5) (2026-11-11)
 
 
