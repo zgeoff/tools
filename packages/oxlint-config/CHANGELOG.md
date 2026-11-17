@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.8](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.10.7...@zgeoff/oxlint-config@0.10.8) (2026-11-17)
+
+
+### Bug Fixes
+
+* **oxlint-config:** flag integration/ tests and accept repo-root tests ([#657](https://github.com/zgeoff/tools/issues/657)) ([081d584](https://github.com/zgeoff/tools/commit/081d5846ff2a6991eb12ac3fa3add0d936b54400))
+
 ## [0.10.7](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.10.6...@zgeoff/oxlint-config@0.10.7) (2026-11-11)
 
 
