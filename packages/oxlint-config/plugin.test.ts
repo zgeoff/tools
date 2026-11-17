@@ -413,7 +413,7 @@ test('it sends a test with no module beside it to the e2e/ and evals/ of its pac
       filename: 'src/parse-entry.test.ts',
       line: 1,
       message:
-        'Move this test beside the module it tests: no `parse-entry.<ext>` sits in this directory. A test that runs the built program belongs in `e2e/` of the package that builds it, and an evaluation in `evals/` of the package whose code it scores.',
+        'Move this test beside the module it tests: no `parse-entry.<ext>` sits in this directory. A test that runs the built program belongs in `e2e/` of the package that builds it, an evaluation in `evals/` of the package whose code it scores, and a test of the repo config files at the repo root.',
     },
   ]);
 });
@@ -463,10 +463,10 @@ test('it accepts a .test.tsx file beside its module', async () => {
 test('it counts neither another test nor a declaration file as the module', async () => {
   const declaration = await runLintTree(
     {
-      'egress.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
-      'egress.d.ts': '',
+      'src/egress.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+      'src/egress.d.ts': '',
     },
-    'egress.test.ts',
+    'src/egress.test.ts',
     { 'zgeoff/test-beside-module': 'error' },
   );
 
@@ -517,10 +517,11 @@ test('it accepts a browser suite beside its module', async () => {
 test('it flags a browser suite with no module beside it', async () => {
   const result = await runLintTree(
     {
-      'view.browser.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
-      'other.ts': '',
+      'src/view.browser.test.ts':
+        "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+      'src/other.ts': '',
     },
-    'view.browser.test.ts',
+    'src/view.browser.test.ts',
     { 'zgeoff/test-beside-module': 'error' },
   );
 
@@ -544,10 +545,10 @@ test('it accepts a suite in a configured lane beside its module', async () => {
 test('it flags a suite in a configured lane with no module beside it', async () => {
   const result = await runLintTree(
     {
-      'session.sdk.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
-      'other.ts': '',
+      'src/session.sdk.test.ts': "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+      'src/other.ts': '',
     },
-    'session.sdk.test.ts',
+    'src/session.sdk.test.ts',
     { 'zgeoff/test-beside-module': ['error', { lanes: ['sdk'] }] },
   );
 
@@ -648,9 +649,7 @@ test('it exempts tests under a root e2e/ or evals/ directory', async () => {
 });
 
 test.each([
-  ['a root integration/ directory', 'integration/checkout.test.ts'],
   ['an app root e2e/ directory', 'packages/cli/e2e/run.test.ts'],
-  ['an app root integration/ directory', 'packages/cli/integration/run.test.ts'],
   ['an app root evals/ directory', 'packages/cli/evals/run.test.ts'],
   ['a package whose directory ends in -e2e', 'apps/cli-e2e/src/run.test.ts'],
 ])('it exempts a test under %s', async (_, path) => {
@@ -665,6 +664,70 @@ test.each([
   );
 
   expect(result.exitCode).toBe(0);
+});
+
+test.each([
+  ['a root integration/ directory', 'integration/checkout.test.ts'],
+  ['an app root integration/ directory', 'packages/cli/integration/run.test.ts'],
+])('it flags a test under %s', async (_, path) => {
+  const result = await runLintTree(
+    {
+      'packages/cli/package.json': '{}',
+      [path]: "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
+    path,
+    { 'zgeoff/test-beside-module': 'error' },
+  );
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('test-beside-module');
+});
+
+test('it accepts a test at the repo root with no module beside it', async () => {
+  const result = await runLintTree(
+    {
+      'agent-hook-entries.test.ts':
+        "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
+    'agent-hook-entries.test.ts',
+    { 'zgeoff/test-beside-module': 'error' },
+  );
+
+  expect(result.exitCode).toBe(0);
+});
+
+test('it flags a test with no module beside it one folder below the repo root', async () => {
+  const result = await runLintTree(
+    {
+      'scripts/agent-hook-entries.test.ts':
+        "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
+    'scripts/agent-hook-entries.test.ts',
+    { 'zgeoff/test-beside-module': 'error' },
+  );
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('agent-hook-entries.<ext>');
+});
+
+test('it flags a test at a package root linted from that package', async () => {
+  const directory = await createLintTree(
+    {
+      'packages/cli/package.json': '{}',
+      'packages/cli/agent-hook-entries.test.ts':
+        "import { test } from 'bun:test';\n\ntest('it runs', () => {});\n",
+    },
+    { 'zgeoff/test-beside-module': 'error' },
+  );
+
+  const result = await runLintIn(
+    directory,
+    join(directory, 'packages', 'cli'),
+    'agent-hook-entries.test.ts',
+  );
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('agent-hook-entries.<ext>');
 });
 
 test('it flags tests under test-utils/ or an e2e/ directory outside an app root', async () => {
@@ -716,7 +779,7 @@ test('it anchors the e2e/ exemption on the repo root, not the working directory'
 test('it honours a file-level disable comment with a reason', async () => {
   const source = `// oxlint-disable zgeoff/test-beside-module -- tests two configs at once\nimport { test } from 'bun:test';\n\ntest('it runs', () => {});\n`;
 
-  const result = await runLintTree({ 'configs.test.ts': source }, 'configs.test.ts', {
+  const result = await runLintTree({ 'src/configs.test.ts': source }, 'src/configs.test.ts', {
     'zgeoff/test-beside-module': 'error',
   });
 
