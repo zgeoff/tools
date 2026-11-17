@@ -196,7 +196,6 @@ test.each([
   ['an e2e/ directory outside an app root', 'packages/kettle/src/e2e/kettle.test.ts'],
   ['an evals/ directory, which runs in the unit run', 'evals/kettle.test.ts'],
   ['an app root evals/ directory', 'packages/kettle/evals/kettle.test.ts'],
-  ['an integration/ directory, which runs in the unit run', 'integration/kettle.test.ts'],
 ])('it reads %s against the unit limit', async (_, path) => {
   const source = "import { test } from 'bun:test';\n\ntest('it brews', () => {}, 6000);\n";
 

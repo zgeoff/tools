@@ -11,10 +11,7 @@ export default function resolveSuiteDirectory(root, filename) {
   for (const [index, name] of directories.entries()) {
     const parent = join(root, ...directories.slice(0, index));
 
-    if (
-      (name === 'e2e' || name === 'integration' || name === 'evals') &&
-      probeAppRoot(root, parent)
-    ) {
+    if ((name === 'e2e' || name === 'evals') && probeAppRoot(root, parent)) {
       return name;
     }
 

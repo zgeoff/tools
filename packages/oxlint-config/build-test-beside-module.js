@@ -12,7 +12,7 @@ export default function buildTestBesideModule(rigLanes) {
       type: 'problem',
       messages: {
         missing:
-          'Move this test beside the module it tests: no `{{name}}.<ext>` sits in this directory. A test that runs the built program belongs in `e2e/` of the package that builds it, and an evaluation in `evals/` of the package whose code it scores.',
+          'Move this test beside the module it tests: no `{{name}}.<ext>` sits in this directory. A test that runs the built program belongs in `e2e/` of the package that builds it, an evaluation in `evals/` of the package whose code it scores, and a test of the repo config files at the repo root.',
         rigLanes:
           'Declare lanes in rig.config.ts only: this repo has one, and the `lanes` option here would give the lanes a second source.',
       },
@@ -45,16 +45,19 @@ export default function buildTestBesideModule(rigLanes) {
           const filename = context.physicalFilename;
           const match = testFilePattern.exec(basename(filename));
 
-          if (
-            match === null ||
-            resolveSuiteDirectory(resolveRepoRoot(filename) ?? context.cwd, filename) !== null
-          ) {
+          if (match === null) {
+            return;
+          }
+
+          const root = resolveRepoRoot(filename) ?? context.cwd;
+
+          if (resolveSuiteDirectory(root, filename) !== null) {
             return;
           }
 
           const name = toModuleName(match.groups.base, lanes);
 
-          if (probeModuleSibling(dirname(filename), name)) {
+          if (probeModuleSibling(dirname(filename), name) || isRepoFactTest(root, filename, name)) {
             return;
           }
 
@@ -93,4 +96,10 @@ function probeModuleSibling(directory, name) {
 // follows a symlink, so a linked module counts as the file it points at
 function probeFile(path) {
   return statSync(path, { throwIfNoEntry: false })?.isFile() ?? false;
+}
+
+// a test at the repo root checks the repo's own config files, which no module beside it holds; a
+// name with a dot left in it still needs its module, as chex test-layout says
+function isRepoFactTest(root, filename, name) {
+  return dirname(filename) === root && !name.includes('.');
 }

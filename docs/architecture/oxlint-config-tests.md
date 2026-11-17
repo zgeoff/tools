@@ -15,11 +15,14 @@ a ticket or a floor, `zgeoff/no-test-sleep` bans a fixed delay in a test file, a
 
 A `<name>.test.ts` or `<name>.test.tsx` file needs a non-test file `<name>.<ext>` in the same
 directory — `.ts`, `.tsx`, `.sh`, `.json`, or any other single extension, so `install.test.ts` may
-test `install.sh`. The suite directories are exempt, and no other directory is: `e2e/`,
-`integration/` and `evals/` at the repo root (the nearest ancestor holding `.git`, else oxlint's
-working directory) or in an app root (a directory that holds a `package.json`), and every package
-whose directory name ends in `-e2e`. Exempt any other test with a file-level disable comment that
-states the reason. The rule reports at the first statement, so put the comment above it:
+test `install.sh`. The suite directories are exempt, and no other directory is: `e2e/` and `evals/`
+at the repo root (the nearest ancestor holding `.git`, else oxlint's working directory) or in an app
+root (a directory that holds a `package.json`), and every package whose directory name ends in
+`-e2e`. An `integration/` directory gets no exemption, because `chex test-layout` fails it. A test
+that sits in the repo root itself needs no module, because it checks the repo's config files, such
+as `agent-hook-entries.test.ts`; a name with a suffix that is not a lane still needs its module
+there. Exempt any other test with a file-level disable comment that states the reason. The rule
+reports at the first statement, so put the comment above it:
 
 ```ts
 // oxlint-disable zgeoff/test-beside-module -- tests base.json and react.json together
@@ -119,8 +122,7 @@ suffixed file out wherever it sits. A `<name>.<lane>.test.ts` or `.test.tsx` fil
 when the lane is a standard one or one that the `lanes` option declares, except `e2e`, whose
 directory alone selects it. Any other file under an `e2e/` directory or a `-e2e` package that
 `zgeoff/test-beside-module` exempts is in the `e2e` lane, and every other file is in the unit run,
-`integration/` and `evals/` included. The standard lanes and their limits are the ones in the
-skill's
+`evals/` included. The standard lanes and their limits are the ones in the skill's
 [Where each test runs](https://github.com/zgeoff/skills/blob/main/skills/testing/references/slow-tests.md#where-each-test-runs)
 table, which a test of the rule pins. A repo with a `rig.config.ts` gets every lane and limit from
 the table that file resolves, and the rule reports a `lanes` option there as
