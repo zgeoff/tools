@@ -51,7 +51,8 @@ The uncommitted check runs first. It fails the push when a file the branch chang
 differs from the pushed commit on disk or in the index, such as a staged change or a deleted file
 back on disk, and it names each such file. The checks after it read the files on disk, so a fixed
 copy on disk would hide a fault in the commit that the push sends. A change to a file the branch
-leaves unchanged passes.
+leaves unchanged passes. A deleted path that a folder link on disk reaches, such as a skill under a
+`.claude/skills` link to `.agents/skills`, passes: git tracks no file beyond a link.
 
 A check whose program the machine lacks, such as `shfmt` or `actionlint`, prints a notice and
 passes, because CI installs the program and runs the check. The commits and local-paths checks read

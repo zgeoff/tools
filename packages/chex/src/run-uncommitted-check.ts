@@ -1,5 +1,5 @@
-import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { makeFileProbe } from './make-file-probe.ts';
 import { readBranchFiles } from './read-branch-files.ts';
 import type { RunProgram } from './run-program.ts';
 import { runProgram } from './run-program.ts';
@@ -58,7 +58,7 @@ export function runUncommittedCommand(): number {
       env: process.env,
       files,
       runProgram,
-      probeFile: existsSync,
+      probeFile: makeFileProbe(cwd),
     });
 
     if (changed.length > 0) {

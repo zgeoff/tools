@@ -1,8 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createGitCommit, readGitEnv, readRunFolderPrefix, runGit } from '@zgeoff/testing/helpers';
+import { makeFileProbe } from './make-file-probe.ts';
 import { runProgram } from './run-program.ts';
 import { runUncommittedCheck } from './run-uncommitted-check.ts';
 
@@ -215,4 +216,29 @@ test('it throws the git error when the folder is not a repository', async () => 
       probeFile: () => false,
     }),
   ).toThrow(/^git status failed: /u);
+});
+
+test('it skips a deleted file that resolves on disk only through a folder the branch made a link', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createCommit({ '.claude/skills/testing/SKILL.md': '# Testing\n' });
+
+  await mkdir(join(ctx.repo, '.agents'));
+
+  await ctx.runGit('mv', '.claude/skills', '.agents/skills');
+
+  await symlink('../.agents/skills', join(ctx.repo, '.claude/skills'));
+
+  await ctx.runGit('add', '.claude/skills');
+  await ctx.runGit('commit', '--quiet', '-m', 'move the skills behind a link');
+
+  const changed = runUncommittedCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    files: ['.agents/skills/testing/SKILL.md', '.claude/skills', '.claude/skills/testing/SKILL.md'],
+    runProgram,
+    probeFile: makeFileProbe(ctx.repo),
+  });
+
+  expect(changed).toStrictEqual([]);
 });
