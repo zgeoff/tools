@@ -79,16 +79,16 @@ test("it fails the plugin load with rig's parser reason for a lane whose limit i
 test('it keeps a lane test beside its module under the suffix that rig.config.ts declares', async () => {
   const files = {
     'rig.config.ts': buildRigConfigSource("{ lanes: { kiln: { limit: '15s' } } }"),
-    'oven.ts': 'export const heat = 1;\n',
-    'oven.kiln.test.ts': buildTimeoutSource(1000),
-    'stove.kiln.test.ts': buildTimeoutSource(1000),
+    'src/oven.ts': 'export const heat = 1;\n',
+    'src/oven.kiln.test.ts': buildTimeoutSource(1000),
+    'src/stove.kiln.test.ts': buildTimeoutSource(1000),
   };
 
-  const beside = await runLintTree(files, 'oven.kiln.test.ts', {
+  const beside = await runLintTree(files, 'src/oven.kiln.test.ts', {
     'zgeoff/test-beside-module': 'error',
   });
 
-  const missing = await runLintTree(files, 'stove.kiln.test.ts', {
+  const missing = await runLintTree(files, 'src/stove.kiln.test.ts', {
     'zgeoff/test-beside-module': 'error',
   });
 
