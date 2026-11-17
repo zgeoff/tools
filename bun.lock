@@ -218,7 +218,7 @@
     },
     "packages/oxlint-config": {
       "name": "@zgeoff/oxlint-config",
-      "version": "0.10.7",
+      "version": "0.10.8",
       "dependencies": {
         "@stylistic/eslint-plugin": "catalog:",
       },
