@@ -524,6 +524,10 @@
         "target": "scripts/run-uncommitted-check.ts"
       },
       {
+        "source": "packages/chex/src/make-file-probe.ts",
+        "target": "scripts/make-file-probe.ts"
+      },
+      {
         "source": "packages/chex/src/parse-shell-words.ts",
         "target": "scripts/parse-shell-words.ts"
       },
