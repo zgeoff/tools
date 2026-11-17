@@ -30,8 +30,8 @@ Skill text lives in zgeoff/skills, so edit a skill in a checkout of that repo an
 Then:
 
 1. Load the `skill-writing`, `cold-read` and `deslop` skills from that checkout.
-2. Do every step in the "Check it" section of its skill-writing. In its last step, you give the PR
-   description three headings: "Skill checks", "Cold read" and "Deslop".
+2. Do every step in the "Check it" section of its skill-writing. In its last step, you fill in the
+   `## Checks` section of the PR template.
 
 ## Repo structure
 
