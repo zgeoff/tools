@@ -9,9 +9,11 @@ export interface DependencyGatesCheck extends DependencyGateSources {
   readonly writeError: (text: string) => void;
 }
 
-export function runDependencyGatesCheck(check: Readonly<DependencyGatesCheck>): number {
+export async function runDependencyGatesCheck(
+  check: Readonly<DependencyGatesCheck>,
+): Promise<number> {
   try {
-    const findings = readDependencyGateFindings(check);
+    const findings = await readDependencyGateFindings(check);
 
     for (const finding of findings) {
       check.writeOutput(`${finding.path}: ${finding.entry}: ${finding.problem}\n`);
@@ -27,13 +29,14 @@ export function runDependencyGatesCheck(check: Readonly<DependencyGatesCheck>): 
   }
 }
 
-export function runDependencyGatesCommand(): number {
+export function runDependencyGatesCommand(): Promise<number> {
   const cwd = process.cwd();
 
   return runDependencyGatesCheck({
     cwd,
     env: process.env,
     today: new Date().toISOString().slice(0, 10),
+    nowMs: Date.now(),
     runProgram,
     readRepoFile: (path) => {
       const fullPath = join(cwd, path);
@@ -50,5 +53,5 @@ export function runDependencyGatesCommand(): number {
 }
 
 if (import.meta.main) {
-  process.exitCode = runDependencyGatesCommand();
+  process.exitCode = await runDependencyGatesCommand();
 }

@@ -1,15 +1,16 @@
 import { expect, mock, test } from 'bun:test';
 import { runDependencyGatesCheck } from './run-dependency-gates-check.ts';
 
-test('it exits 0 and writes nothing for a repo with no override, exclude or audit ignore', () => {
+test('it exits 0 and writes nothing for a repo with no override, exclude or audit ignore', async () => {
   const output: string[] = [];
   const errors: string[] = [];
   const files: Record<string, string> = { 'package.json': JSON.stringify({ name: 'kettle' }) };
 
-  const exitCode = runDependencyGatesCheck({
+  const exitCode = await runDependencyGatesCheck({
     cwd: '/repo',
     env: {},
     today: '2026-03-09',
+    nowMs: Date.parse('2026-03-09T12:00:00Z'),
     runProgram: mock(() => ({ exitCode: 0, stdout: '{}', stderr: '' })),
     readRepoFile: (path) => files[path] ?? null,
     writeOutput: (text) => {
@@ -25,7 +26,7 @@ test('it exits 0 and writes nothing for a repo with no override, exclude or audi
   expect(errors).toStrictEqual([]);
 });
 
-test('it exits 1 and writes each finding with its file for a repo with a stale exclude', () => {
+test('it exits 1 and writes each finding with its file for a repo with a stale exclude', async () => {
   const output: string[] = [];
   const errors: string[] = [];
 
@@ -38,10 +39,11 @@ test('it exits 1 and writes each finding with its file for a repo with a stale e
     ].join('\n'),
   };
 
-  const exitCode = runDependencyGatesCheck({
+  const exitCode = await runDependencyGatesCheck({
     cwd: '/repo',
     env: {},
     today: '2026-03-09',
+    nowMs: Date.parse('2026-03-09T12:00:00Z'),
     runProgram: mock(() => ({ exitCode: 0, stdout: '{}', stderr: '' })),
     readRepoFile: (path) => files[path] ?? null,
     writeOutput: (text) => {
@@ -61,15 +63,16 @@ test('it exits 1 and writes each finding with its file for a repo with a stale e
   expect(errors).toStrictEqual([]);
 });
 
-test('it exits 2 and writes the reason for a repo whose package.json holds no object', () => {
+test('it exits 2 and writes the reason for a repo whose package.json holds no object', async () => {
   const output: string[] = [];
   const errors: string[] = [];
   const files: Record<string, string> = { 'package.json': '[]' };
 
-  const exitCode = runDependencyGatesCheck({
+  const exitCode = await runDependencyGatesCheck({
     cwd: '/repo',
     env: {},
     today: '2026-03-09',
+    nowMs: Date.parse('2026-03-09T12:00:00Z'),
     runProgram: mock(() => ({ exitCode: 0, stdout: '{}', stderr: '' })),
     readRepoFile: (path) => files[path] ?? null,
     writeOutput: (text) => {

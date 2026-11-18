@@ -2,13 +2,10 @@ import { expect, test } from 'bun:test';
 import { collectMissingFirstPartyExcludes } from './collect-missing-first-party-excludes.ts';
 
 test('it reports each first-party package with no exclude', () => {
-  const findings = collectMissingFirstPartyExcludes({ isOn: true, excludes: ['@zgeoff/std'] }, [
-    '@heynixie/lantern',
-    '@impz/client',
-    '@wringer/core',
-    '@zgeoff/std',
-    'left-pad',
-  ]);
+  const findings = collectMissingFirstPartyExcludes(
+    { isOn: true, seconds: 604_800, excludes: ['@zgeoff/std'] },
+    ['@heynixie/lantern', '@impz/client', '@wringer/core', '@zgeoff/std', 'left-pad'],
+  );
 
   expect(findings).toStrictEqual([
     {
@@ -33,11 +30,10 @@ test('it reports each first-party package with no exclude', () => {
 });
 
 test('it reports an atcx, pepys or boxxy package with no exclude', () => {
-  const findings = collectMissingFirstPartyExcludes({ isOn: true, excludes: [] }, [
-    '@atcx/contract',
-    '@boxxy/model',
-    '@pepys/kit',
-  ]);
+  const findings = collectMissingFirstPartyExcludes(
+    { isOn: true, seconds: 604_800, excludes: [] },
+    ['@atcx/contract', '@boxxy/model', '@pepys/kit'],
+  );
 
   expect(findings.map((finding) => finding.entry)).toStrictEqual([
     '@atcx/contract',
@@ -48,7 +44,7 @@ test('it reports an atcx, pepys or boxxy package with no exclude', () => {
 
 test('it reports a first-party package whose exclude names one version', () => {
   const findings = collectMissingFirstPartyExcludes(
-    { isOn: true, excludes: ['@zgeoff/std@0.4.0'] },
+    { isOn: true, seconds: 604_800, excludes: ['@zgeoff/std@0.4.0'] },
     ['@zgeoff/std'],
   );
 
@@ -64,6 +60,6 @@ test('it reports a first-party package whose exclude names one version', () => {
 
 test('it reports nothing when the repo sets no age gate', () => {
   expect(
-    collectMissingFirstPartyExcludes({ isOn: false, excludes: [] }, ['@zgeoff/std']),
+    collectMissingFirstPartyExcludes({ isOn: false, seconds: 0, excludes: [] }, ['@zgeoff/std']),
   ).toStrictEqual([]);
 });

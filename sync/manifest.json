@@ -609,6 +609,14 @@
         "target": "scripts/dependency-gates/read-dependency-gate-findings.ts"
       },
       {
+        "source": "packages/chex/src/dependency-gates/read-publish-times.ts",
+        "target": "scripts/dependency-gates/read-publish-times.ts"
+      },
+      {
+        "source": "packages/chex/src/dependency-gates/read-young-locked-releases.ts",
+        "target": "scripts/dependency-gates/read-young-locked-releases.ts"
+      },
+      {
         "source": "packages/chex/src/dependency-gates/run-dependency-gates-check.ts",
         "target": "scripts/dependency-gates/run-dependency-gates-check.ts"
       },

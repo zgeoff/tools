@@ -1,19 +1,22 @@
 import { expect, mock, test } from 'bun:test';
+import { server } from '@zgeoff/tools-scripts/test-utils/mocks/node';
+import { HttpResponse, http } from 'msw';
 import type { ProgramResult } from '../run-program.ts';
 import { buildStubProgramRunner } from '../test-utils/build-stub-program-runner.ts';
 import { readDependencyGateFindings } from './read-dependency-gate-findings.ts';
 
-test('it passes a repo with no override, exclude or audit ignore, and runs no audit', () => {
+test('it passes a repo with no override, exclude or audit ignore, and runs no audit', async () => {
   const runProgram = mock(() => ({ exitCode: 0, stdout: '{}', stderr: '' }));
 
   const files: Record<string, string> = {
     'package.json': JSON.stringify({ name: 'kettle', scripts: { test: 'bun test' } }),
   };
 
-  const findings = readDependencyGateFindings({
+  const findings = await readDependencyGateFindings({
     cwd: '/repo',
     env: {},
     today: '2026-03-09',
+    nowMs: Date.parse('2026-03-09T12:00:00Z'),
     runProgram,
     readRepoFile: (path) => files[path] ?? null,
   });
@@ -22,7 +25,7 @@ test('it passes a repo with no override, exclude or audit ignore, and runs no au
   expect(runProgram).not.toHaveBeenCalled();
 });
 
-test('it reports a stale exclude, an unneeded override and an unneeded audit ignore, each with its file', () => {
+test('it reports a stale exclude, an unneeded override and an unneeded audit ignore, each with its file', async () => {
   const answers: Record<string, ProgramResult> = {
     'bun audit --json': {
       exitCode: 1,
@@ -58,10 +61,11 @@ test('it reports a stale exclude, an unneeded override and an unneeded audit ign
     }`,
   };
 
-  const findings = readDependencyGateFindings({
+  const findings = await readDependencyGateFindings({
     cwd: '/repo',
     env: {},
     today: '2026-03-09',
+    nowMs: Date.parse('2026-03-09T12:00:00Z'),
     runProgram: buildStubProgramRunner(answers),
     readRepoFile: (path) => files[path] ?? null,
   });
@@ -85,7 +89,7 @@ test('it reports a stale exclude, an unneeded override and an unneeded audit ign
   ]);
 });
 
-test("it keeps an override of a workspace's own dependency that the workspace's range excludes", () => {
+test("it keeps an override of a workspace's own dependency that the workspace's range excludes", async () => {
   const runProgram = mock(() => ({ exitCode: 0, stdout: '{}', stderr: '' }));
 
   const files: Record<string, string> = {
@@ -102,10 +106,11 @@ test("it keeps an override of a workspace's own dependency that the workspace's 
     }`,
   };
 
-  const findings = readDependencyGateFindings({
+  const findings = await readDependencyGateFindings({
     cwd: '/repo',
     env: {},
     today: '2026-03-09',
+    nowMs: Date.parse('2026-03-09T12:00:00Z'),
     runProgram,
     readRepoFile: (path) => files[path] ?? null,
   });
@@ -113,7 +118,7 @@ test("it keeps an override of a workspace's own dependency that the workspace's 
   expect(findings).toStrictEqual([]);
 });
 
-test('it keeps a nested override whose parent is a workspace that the range excludes', () => {
+test('it keeps a nested override whose parent is a workspace that the range excludes', async () => {
   const runProgram = mock(() => ({ exitCode: 0, stdout: '{}', stderr: '' }));
 
   const files: Record<string, string> = {
@@ -133,10 +138,11 @@ test('it keeps a nested override whose parent is a workspace that the range excl
     }`,
   };
 
-  const findings = readDependencyGateFindings({
+  const findings = await readDependencyGateFindings({
     cwd: '/repo',
     env: {},
     today: '2026-03-09',
+    nowMs: Date.parse('2026-03-09T12:00:00Z'),
     runProgram,
     readRepoFile: (path) => files[path] ?? null,
   });
@@ -144,7 +150,7 @@ test('it keeps a nested override whose parent is a workspace that the range excl
   expect(findings).toStrictEqual([]);
 });
 
-test('it reports a first-party package in bun.lock that bunfig.toml does not exclude', () => {
+test('it reports a first-party package in bun.lock that bunfig.toml does not exclude', async () => {
   const files: Record<string, string> = {
     'package.json': JSON.stringify({ name: 'kettle', dependencies: { '@zgeoff/chex': '0.0.5' } }),
     'bunfig.toml': [
@@ -162,10 +168,11 @@ test('it reports a first-party package in bun.lock that bunfig.toml does not exc
     }`,
   };
 
-  const findings = readDependencyGateFindings({
+  const findings = await readDependencyGateFindings({
     cwd: '/repo',
     env: {},
     today: '2026-03-09',
+    nowMs: Date.parse('2026-03-09T12:00:00Z'),
     runProgram: mock(() => ({ exitCode: 0, stdout: '{}', stderr: '' })),
     readRepoFile: (path) => files[path] ?? null,
   });
@@ -183,15 +190,16 @@ test('it reports a first-party package in bun.lock that bunfig.toml does not exc
 test('it fails a repo with no package.json', () => {
   const runProgram = mock(() => ({ exitCode: 0, stdout: '{}', stderr: '' }));
 
-  expect(() =>
+  expect(
     readDependencyGateFindings({
       cwd: '/repo',
       env: {},
       today: '2026-03-09',
+      nowMs: Date.parse('2026-03-09T12:00:00Z'),
       runProgram,
       readRepoFile: () => null,
     }),
-  ).toThrowWithMessage(Error, 'the repo has no package.json');
+  ).rejects.toThrowWithMessage(Error, 'the repo has no package.json');
 });
 
 test('it fails a repo that overrides a package and has no bun.lock', () => {
@@ -201,15 +209,16 @@ test('it fails a repo that overrides a package and has no bun.lock', () => {
     'package.json': JSON.stringify({ overrides: { 'left-pad': '1.3.1' } }),
   };
 
-  expect(() =>
+  expect(
     readDependencyGateFindings({
       cwd: '/repo',
       env: {},
       today: '2026-03-09',
+      nowMs: Date.parse('2026-03-09T12:00:00Z'),
       runProgram,
       readRepoFile: (path) => files[path] ?? null,
     }),
-  ).toThrowWithMessage(Error, 'package.json sets overrides, and the repo has no bun.lock');
+  ).rejects.toThrowWithMessage(Error, 'package.json sets overrides, and the repo has no bun.lock');
 });
 
 test('it fails when bun audit prints nothing', () => {
@@ -225,16 +234,50 @@ test('it fails when bun audit prints nothing', () => {
     }),
   };
 
-  expect(() =>
+  expect(
     readDependencyGateFindings({
       cwd: '/repo',
       env: {},
       today: '2026-03-09',
+      nowMs: Date.parse('2026-03-09T12:00:00Z'),
       runProgram,
       readRepoFile: (path) => files[path] ?? null,
     }),
-  ).toThrowWithMessage(
+  ).rejects.toThrowWithMessage(
     Error,
     'bun audit --json printed nothing and exited 1: error: could not reach the registry',
   );
+});
+
+test('it reports a young release that bun.lock pins under an age gate, with the file bun.lock', async () => {
+  const files: Record<string, string> = {
+    'package.json': JSON.stringify({ name: 'kettle', dependencies: { 'left-pad': '1.3.1' } }),
+    'bunfig.toml': ['[install]', 'minimumReleaseAge = 604800'].join('\n'),
+    'bun.lock': `{
+      "lockfileVersion": 1,
+      "workspaces": { "": { "name": "kettle", "dependencies": { "left-pad": "1.3.1" } } },
+      "packages": {
+        "left-pad": ["left-pad@1.3.1", "", {}, "sha512-x"],
+      },
+    }`,
+  };
+
+  server.use(
+    http.get('https://registry.npmjs.org/left-pad', () =>
+      HttpResponse.json({ time: { '1.3.1': '2026-03-08T20:00:00.000Z' } }),
+    ),
+  );
+
+  const findings = await readDependencyGateFindings({
+    cwd: '/repo',
+    env: {},
+    today: '2026-03-09',
+    nowMs: Date.parse('2026-03-09T12:00:00Z'),
+    runProgram: mock(() => ({ exitCode: 0, stdout: '{}', stderr: '' })),
+    readRepoFile: (path) => files[path] ?? null,
+  });
+
+  expect(findings.map((finding) => ({ path: finding.path, entry: finding.entry }))).toStrictEqual([
+    { path: 'bun.lock', entry: 'left-pad@1.3.1' },
+  ]);
 });

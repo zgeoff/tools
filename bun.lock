@@ -109,6 +109,8 @@
         "@zgeoff/rig": "workspace:*",
         "@zgeoff/std": "workspace:*",
         "@zgeoff/testing": "workspace:*",
+        "@zgeoff/tools-scripts": "workspace:*",
+        "msw": "catalog:",
         "tiny-invariant": "catalog:",
         "tsrs": "catalog:",
         "typescript": "catalog:",
@@ -316,6 +318,7 @@
     },
     "scripts": {
       "name": "@zgeoff/tools-scripts",
+      "version": "0.0.0",
       "dependencies": {
         "@actions/expressions": "catalog:",
         "oxc-parser": "catalog:",
