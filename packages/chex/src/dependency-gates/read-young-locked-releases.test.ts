@@ -108,8 +108,8 @@ test('it asks once for a package that the lockfile pins at two versions, and enc
   expect(setup.requested).toStrictEqual(['https://registry.npmjs.org/@acme%2fpad']);
 });
 
-test('it fails with the package and URL when the registry cannot be reached', async () => {
-  await expect(
+test('it fails with the package and URL when the registry cannot be reached', () => {
+  expect(
     readYoungLockedReleases({
       ageGate: { isOn: true, seconds: 604_800, excludes: [] },
       packages: [{ name: 'left-pad', version: '1.3.1' }],
@@ -122,10 +122,10 @@ test('it fails with the package and URL when the registry cannot be reached', as
   );
 });
 
-test('it fails when the registry answers an error status', async () => {
+test('it fails when the registry answers an error status', () => {
   const setup = setupTest({ times: {}, packages: [{ name: 'left-pad', version: '1.3.1' }] });
 
-  await expect(setup.read()).rejects.toThrowWithMessage(
+  expect(setup.read()).rejects.toThrowWithMessage(
     Error,
     'could not read the publish times of left-pad from https://registry.npmjs.org/left-pad: answered 404',
   );

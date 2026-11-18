@@ -191,10 +191,10 @@ test('it reports a first-party package in bun.lock that bunfig.toml does not exc
   ]);
 });
 
-test('it fails a repo with no package.json', async () => {
+test('it fails a repo with no package.json', () => {
   const runProgram = mock(() => ({ exitCode: 0, stdout: '{}', stderr: '' }));
 
-  await expect(
+  expect(
     readDependencyGateFindings({
       cwd: '/repo',
       env: {},
@@ -207,14 +207,14 @@ test('it fails a repo with no package.json', async () => {
   ).rejects.toThrowWithMessage(Error, 'the repo has no package.json');
 });
 
-test('it fails a repo that overrides a package and has no bun.lock', async () => {
+test('it fails a repo that overrides a package and has no bun.lock', () => {
   const runProgram = mock(() => ({ exitCode: 0, stdout: '{}', stderr: '' }));
 
   const files: Record<string, string> = {
     'package.json': JSON.stringify({ overrides: { 'left-pad': '1.3.1' } }),
   };
 
-  await expect(
+  expect(
     readDependencyGateFindings({
       cwd: '/repo',
       env: {},
@@ -227,7 +227,7 @@ test('it fails a repo that overrides a package and has no bun.lock', async () =>
   ).rejects.toThrowWithMessage(Error, 'package.json sets overrides, and the repo has no bun.lock');
 });
 
-test('it fails when bun audit prints nothing', async () => {
+test('it fails when bun audit prints nothing', () => {
   const runProgram = mock(() => ({
     exitCode: 1,
     stdout: '',
@@ -240,7 +240,7 @@ test('it fails when bun audit prints nothing', async () => {
     }),
   };
 
-  await expect(
+  expect(
     readDependencyGateFindings({
       cwd: '/repo',
       env: {},
