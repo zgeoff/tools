@@ -124,7 +124,7 @@ test('it asks once for a package that the lockfile pins at two versions, and enc
   expect(ctx.requested).toStrictEqual(['https://registry.npmjs.org/@acme%2fpad']);
 });
 
-test('it fails with the package and URL when the registry cannot be reached', async () => {
+test('it fails with the package and URL when the registry cannot be reached', () => {
   const ctx = setupTest();
 
   server.use(http.get('https://registry.npmjs.org/left-pad', () => HttpResponse.error()));
@@ -135,12 +135,12 @@ test('it fails with the package and URL when the registry cannot be reached', as
     nowMs: Date.parse('2026-03-09T12:00:00Z'),
   });
 
-  await expect(reading).rejects.toThrow(
+  expect(reading).rejects.toThrow(
     'could not read the publish times of left-pad from https://registry.npmjs.org/left-pad:',
   );
 });
 
-test('it fails when the registry answers an error status', async () => {
+test('it fails when the registry answers an error status', () => {
   const ctx = setupTest();
 
   const reading = ctx.readYoungLockedReleases({
@@ -149,7 +149,7 @@ test('it fails when the registry answers an error status', async () => {
     nowMs: Date.parse('2026-03-09T12:00:00Z'),
   });
 
-  await expect(reading).rejects.toThrowWithMessage(
+  expect(reading).rejects.toThrowWithMessage(
     Error,
     'could not read the publish times of left-pad from https://registry.npmjs.org/left-pad: answered 404',
   );
