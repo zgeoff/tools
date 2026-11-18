@@ -1,5 +1,5 @@
-import type { Clock } from '../system-clock.ts';
-import { systemClock } from '../system-clock.ts';
+import type { Clock } from '../command/system-clock.ts';
+import { systemClock } from '../command/system-clock.ts';
 
 export interface SpawnedProcess {
   readonly pid: number;

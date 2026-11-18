@@ -1,6 +1,6 @@
 import { join } from 'node:path';
-import type { LaneHooks, LaneStartOutcome } from '../lane-hooks.ts';
-import { testRunArgs } from '../test-run-args.ts';
+import type { LaneHooks, LaneStartOutcome } from '../lanes/lane-hooks.ts';
+import { testRunArgs } from '../unit/test-run-args.ts';
 import type { BrowserRun } from './build-browser-run.ts';
 import type { LaneEnvironments } from './build-lane-environments.ts';
 import { buildLaneEnvironments } from './build-lane-environments.ts';

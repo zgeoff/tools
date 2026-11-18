@@ -1,4 +1,4 @@
-import { parseDuration } from '../parse-duration.ts';
+import { parseDuration } from '../config/parse-duration.ts';
 import { isConcurrencyList } from './is-concurrency-list.ts';
 
 interface BenchBaseOptions {

@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
-import { readTrackedFiles } from '../../../packages/rig/src/read-tracked-files.ts';
+import { readTrackedFiles } from '../../../packages/rig/src/workspace/read-tracked-files.ts';
 import { createTrackedRepo } from './create-tracked-repo.ts';
 
 async function setupTest() {

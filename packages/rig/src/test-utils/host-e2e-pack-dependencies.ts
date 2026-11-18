@@ -1,7 +1,7 @@
 import { hostname, tmpdir, userInfo } from 'node:os';
 import { $ } from 'bun';
 import { laneFiles } from '../browser/lane-files.ts';
-import { initFiles } from '../init-files.ts';
+import { initFiles } from '../init/init-files.ts';
 import type { E2EPackDependencies } from './e2e-pack-dependencies.ts';
 import { probeProcess } from './probe-process.ts';
 

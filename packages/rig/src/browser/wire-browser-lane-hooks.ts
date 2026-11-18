@@ -1,7 +1,7 @@
 import { hostname, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
-import { buildDietCommand } from '../build-diet-command.ts';
-import type { LaneHooks } from '../lane-hooks.ts';
+import type { LaneHooks } from '../lanes/lane-hooks.ts';
+import { buildDietCommand } from '../unit/build-diet-command.ts';
 import { buildBrowserRun } from './build-browser-run.ts';
 import { buildRecordedCommand } from './build-recorded-command.ts';
 import { hasBrowserBuildScript } from './has-browser-build-script.ts';

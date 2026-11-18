@@ -61,7 +61,7 @@ test('it passes a repo whose scripts and bunfig keep the default timeout', async
 test('it holds each test lane script to the limit that rig.config.ts gives its lane', async () => {
   const ctx = await setupTest();
 
-  const defineRigPath = join(import.meta.dir, '..', '..', 'rig', 'src', 'define-rig.ts');
+  const defineRigPath = join(import.meta.dir, '..', '..', 'rig', 'src', 'config', 'define-rig.ts');
 
   await writeFile(
     join(ctx.directory, 'rig.config.ts'),
@@ -95,7 +95,7 @@ test('it holds each test lane script to the limit that rig.config.ts gives its l
 test('it ignores the lanes option of the oxlint config in a repo with a rig.config.ts', async () => {
   const ctx = await setupTest();
 
-  const defineRigPath = join(import.meta.dir, '..', '..', 'rig', 'src', 'define-rig.ts');
+  const defineRigPath = join(import.meta.dir, '..', '..', 'rig', 'src', 'config', 'define-rig.ts');
 
   await writeFile(
     join(ctx.directory, 'rig.config.ts'),
@@ -129,7 +129,7 @@ test('it ignores the lanes option of the oxlint config in a repo with a rig.conf
 test('it holds a bunfig.toml in an e2e/ directory to the e2e limit that rig.config.ts gives', async () => {
   const ctx = await setupTest();
 
-  const defineRigPath = join(import.meta.dir, '..', '..', 'rig', 'src', 'define-rig.ts');
+  const defineRigPath = join(import.meta.dir, '..', '..', 'rig', 'src', 'config', 'define-rig.ts');
 
   await writeFile(
     join(ctx.directory, 'rig.config.ts'),
@@ -156,7 +156,7 @@ test('it holds a bunfig.toml in an e2e/ directory to the e2e limit that rig.conf
 test('it throws when the working tree changes the rig.config.ts that HEAD holds', async () => {
   const ctx = await setupTest();
 
-  const defineRigPath = join(import.meta.dir, '..', '..', 'rig', 'src', 'define-rig.ts');
+  const defineRigPath = join(import.meta.dir, '..', '..', 'rig', 'src', 'config', 'define-rig.ts');
 
   await writeFile(
     join(ctx.directory, 'rig.config.ts'),

@@ -1,7 +1,7 @@
 import { mock } from 'bun:test';
 import { P, match } from 'ts-pattern';
-import type { CommandOutput, ReadCommandOutput } from '../read-command-output.ts';
-import type { CommandOptions } from '../run-command.ts';
+import type { CommandOutput, ReadCommandOutput } from '../command/read-command-output.ts';
+import type { CommandOptions } from '../command/run-command.ts';
 
 // An exit code, or an exit code that the run gives after it aborts the controller, so the abort
 // arrives while the command runs.

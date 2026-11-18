@@ -1,5 +1,5 @@
 import { defineBench } from '@zgeoff/rig/bench';
-import { collectBenchFiles } from '../src/collect-bench-files.ts';
+import { collectBenchFiles } from '../src/bench/collect-bench-files.ts';
 
 export default defineBench({
   name: 'collect bench files',
