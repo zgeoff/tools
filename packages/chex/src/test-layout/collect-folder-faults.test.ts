@@ -120,6 +120,33 @@ test.each(['test', 'tests', '__tests__'])('it reports a folder named %s', (name)
   ]);
 });
 
+test.each([
+  ['a crate in a folder', 'crates/schema'],
+  ['the repo root', ''],
+])('it passes a tests folder beside the Cargo.toml of %s', (_label, root) => {
+  const ctx = setupTest();
+  const prefix = root === '' ? '' : `${root}/`;
+  const faults = ctx.collect([`${prefix}Cargo.toml`, `${prefix}tests/operations.rs`]);
+
+  expect(faults).toStrictEqual([]);
+});
+
+test('it reports a tests folder with no Cargo.toml beside it', () => {
+  const ctx = setupTest();
+  const faults = ctx.collect(['crates/schema/Cargo.toml', 'crates/schema/src/tests/operations.rs']);
+
+  expect(faults).toStrictEqual([
+    "crates/schema/src/tests/ is a test folder; move its tests beside the modules they test, its end-to-end tests into the package's e2e/, and its helpers into src/test-utils/",
+  ]);
+});
+
+test('it reports a test folder beside a Cargo.toml', () => {
+  const ctx = setupTest();
+  const faults = ctx.collect(['crates/schema/Cargo.toml', 'crates/schema/test/operations.rs']);
+
+  expect(faults).toHaveLength(1);
+});
+
 test('it passes a folder whose name only contains test', () => {
   const ctx = setupTest();
 
