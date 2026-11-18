@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.9](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.8...@zgeoff/chex@0.3.9) (2026-11-18)
+
+
+### Features
+
+* **chex:** fail dependency-gates on a young release that bun.lock pins ([#674](https://github.com/zgeoff/tools/issues/674)) ([cccb49f](https://github.com/zgeoff/tools/commit/cccb49f6f4e70f2c626e39a65f0e74789bf5123e))
+
 ## [0.3.8](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.7...@zgeoff/chex@0.3.8) (2026-11-18)
 
 
