@@ -52,20 +52,15 @@ The docs checks read the repo's READMEs, its `docs/` tree and its skills:
 
 The repo checks read the branch, the pushed commits and the repo's config:
 
-| Check              | Fails on                                                                                                                                                                                                         | Arguments       |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| `commits`          | a pushed commit whose message fails `@zgeoff/commitlint-config`                                                                                                                                                  | `--pushed-refs` |
-| `local-paths`      | a line a pushed commit adds that holds the home folder or the host name                                                                                                                                          | `--pushed-refs` |
-| `test-timeouts`    | a `bun test` timeout above its lane's limit, in a script or a `bunfig.toml`                                                                                                                                      | none            |
-| `test-layout`      | a test folder, file name or import outside [the test layout](../../docs/guides/test-layout.md)                                                                                                                   | none            |
-| `workflows`        | nothing: it warns on each fault of the shared workflow lint, and passes                                                                                                                                          | the paths       |
-| `dependency-gates` | a stale age-gate exclude, an override or an audit ignore that nothing needs, a first-party package with no age-gate exclude, or a release that `bun.lock` pins that is younger than the age gate with no exclude | none            |
-| `uncommitted`      | a file the branch changes that holds a change the push does not send                                                                                                                                             | none            |
-
-`dependency-gates` asks registry.npmjs.org for the publish time of each package that `bun.lock`
-pins, one request per package name, skips the first-party scopes, and fails when the registry cannot
-be reached. It reads npmjs.org only, and it needs network in any repo that has an age gate and a
-`bun.lock`.
+| Check              | Fails on                                                                                                                                                                                                                                                           | Arguments       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------- |
+| `commits`          | a pushed commit whose message fails `@zgeoff/commitlint-config`                                                                                                                                                                                                    | `--pushed-refs` |
+| `local-paths`      | a line a pushed commit adds that holds the home folder or the host name                                                                                                                                                                                            | `--pushed-refs` |
+| `test-timeouts`    | a `bun test` timeout above its lane's limit, in a script or a `bunfig.toml`                                                                                                                                                                                        | none            |
+| `test-layout`      | a test folder, file name or import outside [the test layout](../../docs/guides/test-layout.md)                                                                                                                                                                     | none            |
+| `workflows`        | nothing: it warns on each fault of the shared workflow lint, and passes                                                                                                                                                                                            | the paths       |
+| `dependency-gates` | a stale age-gate exclude, an override or an audit ignore that nothing needs, a first-party package with no age-gate exclude, or a release that `bun.lock` pins that is younger than the age gate with no exclude, by npmjs.org's publish time, so it needs network | none            |
+| `uncommitted`      | a file the branch changes that holds a change the push does not send                                                                                                                                                                                               | none            |
 
 With no path, `prose` and `links` read every README outside `.claude/` and `.agents/`, every file
 under `docs/`, each spike's `results.md`, and the Markdown under `.agents/skills/`,

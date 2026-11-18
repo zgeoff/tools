@@ -221,8 +221,10 @@ working tree, and fails on each entry the repo can remove:
   package `bun audit fix` can move to a patched release in range.
 
 The check runs `bun audit` only when the `audit` script ignores an advisory, and reads the registry
-only in a repo with an age gate, so a repo with neither needs no network. A repo with no override,
-exclude or ignore passes. The `Check dependency gates` step of
+only in a repo with an age gate, so a repo with neither needs no network. The registry read asks
+registry.npmjs.org once for each package name in `bun.lock`, skips the first-party scopes, and fails
+when the registry cannot be reached. It reads npmjs.org only. A repo with no override, exclude or
+ignore passes. The `Check dependency gates` step of
 [`bun-checks.yml`](../../.github/workflows/bun-checks.yml) runs it on every pull request, and the
 [pre-push baseline](./pre-push-baseline.md) runs it before a push. Its scripts live in
 [`packages/chex/src/dependency-gates/`](../../packages/chex/src/dependency-gates/).
