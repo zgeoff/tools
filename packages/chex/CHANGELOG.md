@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.10](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.9...@zgeoff/chex@0.3.10) (2026-11-18)
+
+
+### Bug Fixes
+
+* **chex:** accept a cargo crate's tests folder in test-layout ([#676](https://github.com/zgeoff/tools/issues/676)) ([3088421](https://github.com/zgeoff/tools/commit/3088421038118959ef8d34bd1aff1dbe50251dba))
+
 ## [0.3.9](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.8...@zgeoff/chex@0.3.9) (2026-11-18)
 
 
