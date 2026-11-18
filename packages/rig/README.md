@@ -41,7 +41,7 @@ so a run that outgrows its memory budget fails alone when `diet` finds a
   lane the repo declares.
 - `rig bench [name]` and `rig eval [name]` run the benchmarks and the evaluation suites, or the one
   named `name`.
-- `rig init` sets `test` to `rig unit`, adds each missing `test:related`, `test:<lane>`, `bench` and
+- `rig init` adds each missing `test` (as `rig unit`), `test:related`, `test:<lane>`, `bench` and
   `eval` script the repo has files for, keeps its other scripts, and writes a starter config.
 
 `rig unit` and the lane commands pass every argument after the command on to `bun test`, so

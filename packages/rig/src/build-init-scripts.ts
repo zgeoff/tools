@@ -24,6 +24,7 @@ export function buildInitScripts(
   const evalScripts = collectEvalFiles(trackedFiles).length > 0 ? { eval: 'rig eval' } : {};
 
   const rigScripts: PackageScripts = {
+    test: 'rig unit',
     'test:related': 'rig related',
     ...Object.fromEntries(laneScripts),
     ...benchScripts,
@@ -35,7 +36,7 @@ export function buildInitScripts(
     ([name]) => !Object.hasOwn(oldScripts, name),
   );
 
-  return { ...oldScripts, test: 'rig unit', ...Object.fromEntries(missingScripts) };
+  return { ...oldScripts, ...Object.fromEntries(missingScripts) };
 }
 
 function isLaneWanted(
