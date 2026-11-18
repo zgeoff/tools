@@ -5,7 +5,7 @@ interface BunfigWithoutExpiredExcludes {
 }
 
 const excludeComment =
-  /^# (?<name>\S+) \S+ \(published [^)]*\) ages past the gate ~(?<date>\d{4}-\d{2}-\d{2}) — remove then \(audit-fix\)\n/gmu;
+  /^[ \t]*# (?<name>\S+) \S+ \(published [^)]*\) ages past the gate ~(?<date>\d{4}-\d{2}-\d{2}) — remove then \(audit-fix\)\n/gmu;
 
 export function buildBunfigWithoutExpiredExcludes(
   bunfig: string,
