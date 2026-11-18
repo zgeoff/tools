@@ -74,12 +74,23 @@ function collectFolderPaths(trackedPaths: readonly string[]): string[] {
 const testFolderNames = new Set(['test', 'tests', '__tests__']);
 
 function collectTestFolderFaults(trackedPaths: readonly string[]): string[] {
+  const tracked = new Set(trackedPaths);
+
   return collectFolderPaths(trackedPaths)
     .filter((folder) => testFolderNames.has(posix.basename(folder)))
+    .filter((folder) => !isCargoTestsFolder(folder, tracked))
     .map(
       (folder) =>
         `${folder}/ is a test folder; move its tests beside the modules they test, its end-to-end tests into the package's e2e/, and its helpers into src/test-utils/`,
     );
+}
+
+// Cargo runs a crate's integration tests only from the tests/ folder beside its Cargo.toml.
+function isCargoTestsFolder(folder: string, tracked: ReadonlySet<string>): boolean {
+  return (
+    posix.basename(folder) === 'tests' &&
+    tracked.has(posix.join(posix.dirname(folder), 'Cargo.toml'))
+  );
 }
 
 function collectHelperFolderFaults(layout: TestLayout): string[] {
