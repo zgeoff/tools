@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.7](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.6...@zgeoff/chex@0.3.7) (2026-11-18)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/rig bumped to 0.2.5
+
 ## [0.3.6](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.5...@zgeoff/chex@0.3.6) (2026-11-17)
 
 
