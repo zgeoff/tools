@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.11](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.10...@zgeoff/chex@0.3.11) (2026-11-18)
+
+
+### Features
+
+* **chex:** fail the workflows check on a rule break ([#678](https://github.com/zgeoff/tools/issues/678)) ([1261927](https://github.com/zgeoff/tools/commit/12619271a364eae804b55ddfe1e9fd1651a9c80d))
+
 ## [0.3.10](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.9...@zgeoff/chex@0.3.10) (2026-11-18)
 
 
