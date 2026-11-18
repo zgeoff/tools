@@ -2,14 +2,20 @@ import { expect, test } from 'bun:test';
 import { buildInitScripts } from './build-init-scripts.ts';
 import { defineRig } from './define-rig.ts';
 
-test('it writes the test and related scripts and keeps the scripts it does not own', () => {
-  const scripts = buildInitScripts({ lint: 'oxlint', test: 'bun test' }, defineRig({}), [], false);
+test('it adds the test and related scripts and keeps the scripts it does not own', () => {
+  const scripts = buildInitScripts({ lint: 'oxlint' }, defineRig({}), [], false);
 
   expect(scripts).toStrictEqual({
     lint: 'oxlint',
     test: 'rig unit',
     'test:related': 'rig related',
   });
+});
+
+test('it keeps a test script that the repo already defines', () => {
+  const scripts = buildInitScripts({ test: 'bun test' }, defineRig({}), [], false);
+
+  expect(scripts['test']).toBe('bun test');
 });
 
 test('it adds a script for a built-in lane that has a tracked test file', () => {
