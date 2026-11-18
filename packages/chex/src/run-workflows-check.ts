@@ -341,8 +341,7 @@ function collectWorkflowRunFindings(context: WorkflowContext): WorkflowFinding[]
       ];
 }
 
-// Returns the exit code: 0 when clean or with a warning, since the lint only warns, and 2 when the
-// check cannot run.
+// Returns the exit code: 0 when clean, 1 when any fault exists, and 2 when the check cannot run.
 export function runWorkflowsCommand(args: readonly string[]): number {
   const paths = parseCLIPaths(args);
 
@@ -376,8 +375,10 @@ export function runWorkflowsCommand(args: readonly string[]): number {
 
     if (findings.length > 0) {
       process.stdout.write(
-        `workflows: ${findings.length} ${findings.length === 1 ? 'warning' : 'warnings'}; the workflow lint warns and does not fail yet\n`,
+        `workflows: ${findings.length} ${findings.length === 1 ? 'fault' : 'faults'}\n`,
       );
+
+      return 1;
     }
 
     return 0;
@@ -402,7 +403,7 @@ function parseCLIPaths(args: readonly string[]): string[] | Error {
 function formatAnnotation(finding: WorkflowFinding): string {
   const file = escapeAnnotationData(finding.path).replaceAll(':', '%3A').replaceAll(',', '%2C');
 
-  return `::warning file=${file},line=${finding.line}::${escapeAnnotationData(finding.message)}`;
+  return `::error file=${file},line=${finding.line}::${escapeAnnotationData(finding.message)}`;
 }
 
 function escapeAnnotationData(text: string): string {
