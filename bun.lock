@@ -318,6 +318,7 @@
     },
     "scripts": {
       "name": "@zgeoff/tools-scripts",
+      "version": "0.0.0",
       "dependencies": {
         "@actions/expressions": "catalog:",
         "oxc-parser": "catalog:",
