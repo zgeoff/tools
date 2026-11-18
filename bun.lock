@@ -109,6 +109,8 @@
         "@zgeoff/rig": "workspace:*",
         "@zgeoff/std": "workspace:*",
         "@zgeoff/testing": "workspace:*",
+        "@zgeoff/tools-scripts": "workspace:*",
+        "msw": "catalog:",
         "tiny-invariant": "catalog:",
         "tsrs": "catalog:",
         "typescript": "catalog:",

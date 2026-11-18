@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
-import { buildStubRegistry } from '../test-utils/build-stub-registry.ts';
+import { server } from '@zgeoff/tools-scripts/test-utils/mocks/node';
+import { HttpResponse, http } from 'msw';
 import type { LockfileRegistryPackage } from './parse-lockfile-registry-names.ts';
 import { readYoungLockedReleases } from './read-young-locked-releases.ts';
 
@@ -11,17 +12,32 @@ interface TestSetup {
 }
 
 function setupTest(options: Readonly<TestSetup>) {
-  const registry = buildStubRegistry(options.times);
+  const requested: string[] = [];
+
+  // The registry answers a package URL with a packument that holds its publish times, and a 404
+  // for a package it holds none of.
+  server.use(
+    http.get('https://registry.npmjs.org/*', (info) => {
+      requested.push(info.request.url);
+
+      const name = decodeURIComponent(new URL(info.request.url).pathname.slice(1));
+      const time = options.times[name];
+
+      return time === undefined
+        ? HttpResponse.json({ error: 'Not found' }, { status: 404 })
+        : HttpResponse.json({ name, time });
+    }),
+  );
+
   const seconds = options.gateSeconds ?? 604_800;
 
   return {
-    requested: registry.requested,
+    requested,
     read: () =>
       readYoungLockedReleases({
         ageGate: { isOn: seconds > 0, seconds, excludes: options.excludes ?? [] },
         packages: options.packages,
         nowMs: Date.parse('2026-03-09T12:00:00Z'),
-        readRegistry: registry.readRegistry,
       }),
   };
 }
@@ -109,16 +125,12 @@ test('it asks once for a package that the lockfile pins at two versions, and enc
 });
 
 test('it fails with the package and URL when the registry cannot be reached', () => {
-  expect(
-    readYoungLockedReleases({
-      ageGate: { isOn: true, seconds: 604_800, excludes: [] },
-      packages: [{ name: 'left-pad', version: '1.3.1' }],
-      nowMs: Date.parse('2026-03-09T12:00:00Z'),
-      readRegistry: () => Promise.reject(new Error('connect ECONNREFUSED')),
-    }),
-  ).rejects.toThrowWithMessage(
-    Error,
-    'could not read the publish times of left-pad from https://registry.npmjs.org/left-pad: connect ECONNREFUSED',
+  const setup = setupTest({ times: {}, packages: [{ name: 'left-pad', version: '1.3.1' }] });
+
+  server.use(http.get('https://registry.npmjs.org/left-pad', () => HttpResponse.error()));
+
+  expect(setup.read()).rejects.toThrow(
+    'could not read the publish times of left-pad from https://registry.npmjs.org/left-pad:',
   );
 });
 

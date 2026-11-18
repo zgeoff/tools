@@ -14,7 +14,6 @@ import {
 } from './parse-lockfile-registry-names.ts';
 import type { RootManifest } from './parse-root-manifest.ts';
 import { parseRootManifest } from './parse-root-manifest.ts';
-import type { ReadRegistry } from './read-publish-times.ts';
 import { readYoungLockedReleases } from './read-young-locked-releases.ts';
 import type { DependencyGateFinding } from './types.ts';
 
@@ -29,9 +28,6 @@ export interface DependencyGateSources {
   readonly nowMs: number;
 
   readonly runProgram: RunProgram;
-
-  // Reads the npm registry, for the publish time of each version the lockfile pins.
-  readonly readRegistry: ReadRegistry;
 
   // The path is relative to the repo root.
   readonly readRepoFile: (path: string) => string | null;
@@ -67,7 +63,6 @@ export async function readDependencyGateFindings(
           ageGate: parseAgeGate(bunfig),
           packages: parseLockfileRegistryPackages(lockfile),
           nowMs: sources.nowMs,
-          readRegistry: sources.readRegistry,
         })),
     ...collectOverrideFindings(manifest, lockfile),
     ...(ignoreIDs.length === 0 ? [] : readIgnoreFindings(sources, ignoreIDs)),

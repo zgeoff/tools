@@ -3,6 +3,9 @@
   "private": true,
   "description": "The step scripts of this repo's workflows, and the shell scripts that repo-sync and the release job run",
   "type": "module",
+  "exports": {
+    "./test-utils/*": "./src/test-utils/*.ts"
+  },
   "scripts": {
     "typecheck": "tsrs"
   },

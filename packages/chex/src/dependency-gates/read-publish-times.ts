@@ -1,20 +1,11 @@
 import { isRecord } from './is-record.ts';
 
-export interface RegistryResponse {
-  readonly ok: boolean;
-  readonly status: number;
-  readonly json: () => Promise<unknown>;
-}
-
-export type ReadRegistry = (url: string) => Promise<RegistryResponse>;
-
 const concurrency = 8;
 
 // One request per package name: the packument holds the publish time of every version. The map
 // goes from a package name to its versions' publish times, as epoch milliseconds.
 export async function readPublishTimes(
   names: readonly string[],
-  readRegistry: ReadRegistry,
 ): Promise<Map<string, Map<string, number>>> {
   const times = new Map<string, Map<string, number>>();
 
@@ -22,7 +13,7 @@ export async function readPublishTimes(
 
   const work = async (): Promise<void> => {
     for (let name = queue.shift(); name !== undefined; name = queue.shift()) {
-      const packageTimes = await readPackageTimes(name, readRegistry);
+      const packageTimes = await readPackageTimes(name);
 
       times.set(name, packageTimes);
     }
@@ -35,15 +26,12 @@ export async function readPublishTimes(
 
 const registryURL = 'https://registry.npmjs.org/';
 
-async function readPackageTimes(
-  name: string,
-  readRegistry: ReadRegistry,
-): Promise<Map<string, number>> {
+async function readPackageTimes(name: string): Promise<Map<string, number>> {
   const url = `${registryURL}${name.replace('/', '%2f')}`;
   let body: unknown;
 
   try {
-    const response = await readRegistry(url);
+    const response = await fetch(url);
 
     if (!response.ok) {
       throw new Error(`answered ${response.status}`);

@@ -62,6 +62,11 @@ The repo checks read the branch, the pushed commits and the repo's config:
 | `dependency-gates` | a stale age-gate exclude, an override or an audit ignore that nothing needs, a first-party package with no age-gate exclude, or a release that `bun.lock` pins that is younger than the age gate with no exclude | none            |
 | `uncommitted`      | a file the branch changes that holds a change the push does not send                                                                                                                                             | none            |
 
+`dependency-gates` asks registry.npmjs.org for the publish time of each package that `bun.lock`
+pins, one request per package name, skips the first-party scopes, and fails when the registry cannot
+be reached. It reads npmjs.org only, and it needs network in any repo that has an age gate and a
+`bun.lock`.
+
 With no path, `prose` and `links` read every README outside `.claude/` and `.agents/`, every file
 under `docs/`, each spike's `results.md`, and the Markdown under `.agents/skills/`,
 `.claude/skills/`, `skills/` and `sync/skills/`. `--pushed-refs` reads the refs a push sends from

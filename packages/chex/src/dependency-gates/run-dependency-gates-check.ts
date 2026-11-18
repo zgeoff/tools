@@ -38,7 +38,6 @@ export function runDependencyGatesCommand(): Promise<number> {
     today: new Date().toISOString().slice(0, 10),
     nowMs: Date.now(),
     runProgram,
-    readRegistry: (url) => fetch(url),
     readRepoFile: (path) => {
       const fullPath = join(cwd, path);
 

@@ -1,7 +1,6 @@
 import { firstPartyScopes } from './first-party-scopes.ts';
 import type { AgeGate } from './parse-age-gate.ts';
 import type { LockfileRegistryPackage } from './parse-lockfile-registry-names.ts';
-import type { ReadRegistry } from './read-publish-times.ts';
 import { readPublishTimes } from './read-publish-times.ts';
 import type { DependencyGateFinding } from './types.ts';
 
@@ -11,7 +10,6 @@ export interface YoungLockedReleaseSources {
   readonly ageGate: AgeGate;
   readonly packages: readonly LockfileRegistryPackage[];
   readonly nowMs: number;
-  readonly readRegistry: ReadRegistry;
 }
 
 export async function readYoungLockedReleases(
@@ -28,10 +26,7 @@ export async function readYoungLockedReleases(
       !options.ageGate.excludes.includes(`${entry.name}@${entry.version}`),
   );
 
-  const times = await readPublishTimes(
-    [...new Set(checked.map((entry) => entry.name))],
-    options.readRegistry,
-  );
+  const times = await readPublishTimes([...new Set(checked.map((entry) => entry.name))]);
 
   return checked.flatMap((entry) => {
     const name = entry.name;

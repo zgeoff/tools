@@ -1,5 +1,4 @@
 import { expect, mock, test } from 'bun:test';
-import { buildStubRegistry } from '../test-utils/build-stub-registry.ts';
 import { runDependencyGatesCheck } from './run-dependency-gates-check.ts';
 
 test('it exits 0 and writes nothing for a repo with no override, exclude or audit ignore', async () => {
@@ -12,7 +11,6 @@ test('it exits 0 and writes nothing for a repo with no override, exclude or audi
     env: {},
     today: '2026-03-09',
     nowMs: Date.parse('2026-03-09T12:00:00Z'),
-    readRegistry: buildStubRegistry({}).readRegistry,
     runProgram: mock(() => ({ exitCode: 0, stdout: '{}', stderr: '' })),
     readRepoFile: (path) => files[path] ?? null,
     writeOutput: (text) => {
@@ -46,7 +44,6 @@ test('it exits 1 and writes each finding with its file for a repo with a stale e
     env: {},
     today: '2026-03-09',
     nowMs: Date.parse('2026-03-09T12:00:00Z'),
-    readRegistry: buildStubRegistry({}).readRegistry,
     runProgram: mock(() => ({ exitCode: 0, stdout: '{}', stderr: '' })),
     readRepoFile: (path) => files[path] ?? null,
     writeOutput: (text) => {
@@ -76,7 +73,6 @@ test('it exits 2 and writes the reason for a repo whose package.json holds no ob
     env: {},
     today: '2026-03-09',
     nowMs: Date.parse('2026-03-09T12:00:00Z'),
-    readRegistry: buildStubRegistry({}).readRegistry,
     runProgram: mock(() => ({ exitCode: 0, stdout: '{}', stderr: '' })),
     readRepoFile: (path) => files[path] ?? null,
     writeOutput: (text) => {
