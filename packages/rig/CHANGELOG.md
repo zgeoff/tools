@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.2.4...@zgeoff/rig@0.2.5) (2026-11-18)
+
+
+### Bug Fixes
+
+* **rig:** keep a repo's own test script on init ([#669](https://github.com/zgeoff/tools/issues/669)) ([c0a8ccf](https://github.com/zgeoff/tools/commit/c0a8ccf532761c70fed321881d5bc5e3e9d5ae0f))
+
 ## [0.2.4](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.2.3...@zgeoff/rig@0.2.4) (2026-11-11)
 
 
