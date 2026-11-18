@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import type { CommandOutput } from '../read-command-output.ts';
+import type { CommandOutput } from '../command/read-command-output.ts';
 import type { CheckoutState } from './types.ts';
 
 // Takes what `git worktree list --porcelain -z` gave after a failed removal. A listing that failed

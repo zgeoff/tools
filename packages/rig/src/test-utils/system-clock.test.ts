@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { systemClock as laneClock } from '../system-clock.ts';
+import { systemClock as laneClock } from '../command/system-clock.ts';
 import { systemClock } from './system-clock.ts';
 
 test("it is the lane's clock, so a test and the lane read one clock", () => {

@@ -3,7 +3,16 @@ import { join } from 'node:path';
 // Reads a lane's limit through rig's own config reader in a fresh process, because a process
 // imports a rig.config.ts once and keeps the first answer after the file changes.
 export async function readRigLaneLimit(repoRoot: string, laneName: string): Promise<number> {
-  const readerPath = join(import.meta.dir, '..', '..', '..', 'rig', 'src', 'read-rig-config.ts');
+  const readerPath = join(
+    import.meta.dir,
+    '..',
+    '..',
+    '..',
+    'rig',
+    'src',
+    'config',
+    'read-rig-config.ts',
+  );
 
   const script = [
     "import { existsSync } from 'node:fs';",

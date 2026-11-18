@@ -4,21 +4,21 @@ import { mkdir, mkdtemp } from 'node:fs/promises';
 import { availableParallelism, totalmem } from 'node:os';
 import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
+import { createBenchWorkFolder } from './bench/create-bench-work-folder.ts';
 import { processRuntime } from './browser/process-runtime.ts';
 import { removePath } from './browser/remove-path.ts';
 import { wireBrowserLaneHooks } from './browser/wire-browser-lane-hooks.ts';
-import { createBenchWorkFolder } from './create-bench-work-folder.ts';
-import { initFiles } from './init-files.ts';
-import { probeWorkspaceRepo } from './probe-workspace-repo.ts';
-import { readCommandOutput } from './read-command-output.ts';
-import type { CommandOutput, ReadCommandOptions } from './read-command-output.ts';
-import { readGitCommonDir } from './read-git-common-dir.ts';
-import { readRigConfig } from './read-rig-config.ts';
-import { readTrackedFiles } from './read-tracked-files.ts';
-import { readWorkerCount } from './read-worker-count.ts';
-import { resolveDietScript } from './resolve-diet-script.ts';
-import { runCLI } from './run-cli.ts';
-import { runCommand } from './run-command.ts';
+import { runCLI } from './cli/run-cli.ts';
+import { readCommandOutput } from './command/read-command-output.ts';
+import type { CommandOutput, ReadCommandOptions } from './command/read-command-output.ts';
+import { runCommand } from './command/run-command.ts';
+import { readRigConfig } from './config/read-rig-config.ts';
+import { initFiles } from './init/init-files.ts';
+import { readWorkerCount } from './unit/read-worker-count.ts';
+import { resolveDietScript } from './unit/resolve-diet-script.ts';
+import { probeWorkspaceRepo } from './workspace/probe-workspace-repo.ts';
+import { readGitCommonDir } from './workspace/read-git-common-dir.ts';
+import { readTrackedFiles } from './workspace/read-tracked-files.ts';
 
 // A signal stops the run's processes through the abort, and the run waits for them to exit before
 // it returns, so a lane's stop hook and folder cleanup still run.
@@ -62,7 +62,7 @@ try {
     },
     {
       dietScript: resolveDietScript(),
-      benchScript: join(import.meta.dir, 'run-bench-file.ts'),
+      benchScript: join(import.meta.dir, 'bench', 'run-bench-file.ts'),
       output,
       sources: { cwd: repoRoot, probeFile: existsSync },
       readConfig: (root) =>

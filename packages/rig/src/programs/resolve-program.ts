@@ -1,9 +1,9 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { isRecord } from '@zgeoff/std';
-import { buildProgramVariable } from '../build-program-environment.ts';
-import { parseRigConfig } from '../parse-rig-config.ts';
+import { parseRigConfig } from '../config/parse-rig-config.ts';
 import type { ProgramDeclaration } from '../types.ts';
+import { buildProgramVariable } from './build-program-environment.ts';
 import { resolveRepoRoot } from './resolve-repo-root.ts';
 
 export interface ProgramLaunch {

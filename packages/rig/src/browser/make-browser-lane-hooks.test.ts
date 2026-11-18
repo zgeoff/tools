@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises';
 import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { makeRejectingStub, makeResolvingStub, readRunFolderPrefix } from '@zgeoff/testing/helpers';
-import { runLaneHooks } from '../run-lane-hooks.ts';
+import { runLaneHooks } from '../lanes/run-lane-hooks.ts';
 import { buildStubProcessProbe } from '../test-utils/build-stub-process-probe.ts';
 import { createListingStubKit } from '../test-utils/create-listing-stub-kit.ts';
 import { createStubBuild } from '../test-utils/create-stub-build.ts';

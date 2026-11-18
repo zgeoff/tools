@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/helpers';
-import { initFiles } from '../init-files.ts';
+import { initFiles } from '../init/init-files.ts';
 import { readPackedBin } from './read-packed-bin.ts';
 
 async function setupTest() {

@@ -1,6 +1,6 @@
 import { cli } from 'gunshi/bone';
 import { define } from 'gunshi/definition';
-import { formatParseError } from '../format-parse-error.ts';
+import { formatParseError } from '../config/format-parse-error.ts';
 
 export type BenchArgs =
   | { readonly kind: 'parsed'; readonly name: string | null; readonly baseRef: string | null }

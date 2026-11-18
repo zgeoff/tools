@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import type { CommandOutput } from '../read-command-output.ts';
+import type { CommandOutput } from '../command/read-command-output.ts';
 import { pickUnremovedCheckoutState } from './pick-unremoved-checkout-state.ts';
 import type { CheckoutState } from './types.ts';
 

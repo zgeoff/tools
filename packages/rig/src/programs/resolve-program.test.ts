@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { defineRig } from '../define-rig.ts';
+import { defineRig } from '../config/define-rig.ts';
 import { resolveProgram } from './resolve-program.ts';
 
 function setupTest(environment: Readonly<Record<string, string | undefined>>) {
