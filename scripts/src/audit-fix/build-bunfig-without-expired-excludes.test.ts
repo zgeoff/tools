@@ -54,3 +54,18 @@ test("it keeps a person's entry that shares a row with an aged exclude", () => {
     minimumReleaseAgeExcludes: ['qs', 'nanoid'],
   });
 });
+
+test('it drops an aged exclude whose comment oxfmt indented inside the array', () => {
+  const bunfig = `minimumReleaseAge = 604800\nminimumReleaseAgeExcludes = [\n  "qs",\n  # hono 4.13.0 (published 2026-10-08, patches GHSA-8j4g-w8fx-2239) ages past the gate ~2026-10-15 — remove then (audit-fix)\n  "hono",\n]\n`;
+  const result = buildBunfigWithoutExpiredExcludes(bunfig, '2026-10-17');
+
+  expect(result).toStrictEqual({
+    bunfig: 'minimumReleaseAge = 604800\nminimumReleaseAgeExcludes = [\n  "qs",\n]\n',
+    removed: ['hono'],
+  });
+
+  expect(Bun.TOML.parse(result.bunfig)).toStrictEqual({
+    minimumReleaseAge: 604_800,
+    minimumReleaseAgeExcludes: ['qs'],
+  });
+});

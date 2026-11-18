@@ -41,9 +41,9 @@ export function collectStaleAgeGateExcludes(
 }
 
 // The shared audit-fix workflow writes this comment for each exclude it adds, and removes the
-// exclude once the date passes.
+// exclude once the date passes. oxfmt indents the comment inside the array, so it may follow spaces or tabs.
 const removalCommentPattern =
-  /^# (?<name>\S+) \S+ \(published [^)]*\) ages past the gate ~(?<date>\d{4}-\d{2}-\d{2}) — remove then/gmu;
+  /^[ \t]*# (?<name>\S+) \S+ \(published [^)]*\) ages past the gate ~(?<date>\d{4}-\d{2}-\d{2}) — remove then/gmu;
 
 function collectRemovalDates(bunfig: string): Map<string, string> {
   const removalDates = new Map<string, string>();

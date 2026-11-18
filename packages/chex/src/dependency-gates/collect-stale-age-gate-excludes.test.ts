@@ -111,3 +111,33 @@ test('it rejects an exclude list that holds a value other than a name', () => {
     'bunfig.toml sets a minimumReleaseAgeExcludes that is not a list of names',
   );
 });
+
+test('it reads a removal comment that oxfmt indents inside the array', () => {
+  const bunfig = [
+    '[install]',
+    'minimumReleaseAgeExcludes = [',
+    '  # left-pad 1.3.1 (published 2026-03-01, patches GHSA-aaaa-bbbb-cccc) ages past the gate ~2026-03-08 — remove then (audit-fix)',
+    '  "left-pad",',
+    ']',
+  ].join('\n');
+
+  expect(collectStaleAgeGateExcludes(bunfig, '2026-03-08')).toStrictEqual([]);
+});
+
+test('it reports an exclude whose indented removal comment is past its date', () => {
+  const bunfig = [
+    '[install]',
+    'minimumReleaseAgeExcludes = [',
+    '\t# left-pad 1.3.1 (published 2026-03-01, patches GHSA-aaaa-bbbb-cccc) ages past the gate ~2026-03-08 — remove then (audit-fix)',
+    '\t"left-pad",',
+    ']',
+  ].join('\n');
+
+  expect(collectStaleAgeGateExcludes(bunfig, '2026-03-09')).toStrictEqual([
+    {
+      path: 'bunfig.toml',
+      entry: 'left-pad',
+      problem: 'the age-gate exclude was due for removal on 2026-03-08',
+    },
+  ]);
+});
