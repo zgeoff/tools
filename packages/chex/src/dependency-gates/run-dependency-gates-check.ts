@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { runProgram } from '../run-program.ts';
+import { runProgram } from '../program/run-program.ts';
 import type { DependencyGateSources } from './read-dependency-gate-findings.ts';
 import { readDependencyGateFindings } from './read-dependency-gate-findings.ts';
 

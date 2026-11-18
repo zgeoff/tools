@@ -1,5 +1,5 @@
-import type { ProgramResult, RunProgram } from '../run-program.ts';
-import { runProgram } from '../run-program.ts';
+import type { ProgramResult, RunProgram } from '../program/run-program.ts';
+import { runProgram } from '../program/run-program.ts';
 
 export interface StubCommitlint {
   readonly runProgram: RunProgram;

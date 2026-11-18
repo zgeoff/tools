@@ -1,4 +1,4 @@
-import type { RunProgram } from '../run-program.ts';
+import type { RunProgram } from '../program/run-program.ts';
 import { collectMissingFirstPartyExcludes } from './collect-missing-first-party-excludes.ts';
 import { collectStaleAgeGateExcludes } from './collect-stale-age-gate-excludes.ts';
 import { collectUnneededAuditIgnores } from './collect-unneeded-audit-ignores.ts';

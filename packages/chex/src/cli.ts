@@ -3,17 +3,17 @@ import { rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { readOptionalText } from '@zgeoff/std';
 import { runCIPlanCommand } from './ci-plan/write-check-plan.ts';
+import { makeCheckRunner } from './cli/make-check-runner.ts';
+import { runChex } from './cli/run-chex.ts';
+import { runCommitsCommand } from './commits/run-commits-check.ts';
 import { runDependencyGatesCommand } from './dependency-gates/run-dependency-gates-check.ts';
-import { makeCheckRunner } from './make-check-runner.ts';
-import { runChex } from './run-chex.ts';
-import { runCommitsCommand } from './run-commits-check.ts';
-import { runInit } from './run-init.ts';
-import { runLocalPathsCommand } from './run-local-paths-check.ts';
-import { runTestLayoutCommand } from './run-test-layout-check.ts';
-import { runTestTimeoutsCommand } from './run-test-timeouts-check.ts';
-import { runUncommittedCommand } from './run-uncommitted-check.ts';
-import { runWorkflowsCommand } from './run-workflows-check.ts';
-import { writeTextFile } from './write-text-file.ts';
+import { runInit } from './init/run-init.ts';
+import { runLocalPathsCommand } from './local-paths/run-local-paths-check.ts';
+import { writeTextFile } from './output/write-text-file.ts';
+import { runTestLayoutCommand } from './test-layout/run-test-layout-check.ts';
+import { runTestTimeoutsCommand } from './test-timeouts/run-test-timeouts-check.ts';
+import { runUncommittedCommand } from './uncommitted/run-uncommitted-check.ts';
+import { runWorkflowsCommand } from './workflows/run-workflows-check.ts';
 
 process.exitCode = await runChex(process.argv.slice(2), {
   runCheck: makeCheckRunner({

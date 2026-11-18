@@ -3,10 +3,10 @@ import { availableParallelism, totalmem } from 'node:os';
 import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { buildRelatedTestCommand } from './build-related-test-command.ts';
-import { parseLaneLimits } from './parse-lane-limits.ts';
 import { readOptionalText } from './read-optional-text.ts';
 import { readWorkerCount } from './read-worker-count.ts';
 import type { WorkerCountSources } from './read-worker-count.ts';
+import { parseLaneLimits } from './test-timeouts/parse-lane-limits.ts';
 
 const maxTestFiles = 50;
 

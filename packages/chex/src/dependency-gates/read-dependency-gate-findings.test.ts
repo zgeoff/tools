@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'bun:test';
 import { server } from '@zgeoff/tools-scripts/test-utils/mocks/node';
 import { HttpResponse, http } from 'msw';
-import type { ProgramResult } from '../run-program.ts';
+import type { ProgramResult } from '../program/run-program.ts';
 import { buildStubProgramRunner } from '../test-utils/build-stub-program-runner.ts';
 import { readDependencyGateFindings } from './read-dependency-gate-findings.ts';
 

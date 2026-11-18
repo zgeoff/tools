@@ -1,5 +1,5 @@
 import invariant from 'tiny-invariant';
-import type { ProgramResult, RunProgram } from '../run-program.ts';
+import type { ProgramResult, RunProgram } from '../program/run-program.ts';
 
 // Stands in for the synchronous program runner of the chex checks: it answers each command by its
 // argv joined with spaces, and fails a test on a command the test gave no answer for.
