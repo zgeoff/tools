@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.8](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.7...@zgeoff/chex@0.3.8) (2026-11-18)
+
+
+### Bug Fixes
+
+* **chex:** accept an indented age-gate removal comment ([#671](https://github.com/zgeoff/tools/issues/671)) ([3e33eaf](https://github.com/zgeoff/tools/commit/3e33eaf7f813130450c62b46048b9962b43b1729))
+
 ## [0.3.7](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.6...@zgeoff/chex@0.3.7) (2026-11-18)
 
 
