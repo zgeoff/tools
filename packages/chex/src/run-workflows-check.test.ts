@@ -1290,7 +1290,7 @@ test('it reports a workflow it cannot parse', async () => {
   ]);
 });
 
-test('it prints each finding as a warning annotation in Actions, and exits 0', async () => {
+test('it prints each finding as an error annotation in Actions, and exits 1', async () => {
   const ctx = await setupTest();
 
   await ctx.commitFiles({
@@ -1312,10 +1312,10 @@ test('it prints each finding as a warning annotation in Actions, and exits 0', a
     .quiet();
 
   expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
-    exitCode: 0,
+    exitCode: 1,
     stdout: [
-      '::warning file=.github/workflows/tidy.yml,line=3::job tidy sets no timeout-minutes',
-      'workflows: 1 warning; the workflow lint warns and does not fail yet',
+      '::error file=.github/workflows/tidy.yml,line=3::job tidy sets no timeout-minutes',
+      'workflows: 1 fault',
       '',
     ].join('\n'),
   });
@@ -1343,7 +1343,7 @@ test('it escapes the characters a workflow command reads as syntax in its file a
     .quiet();
 
   expect(result.stdout.toString().split('\n')[0]).toBe(
-    '::warning file=.github/workflows/tidy%2Cdaily%251%3Aa.yml,line=3::job tidy%251 sets no timeout-minutes',
+    '::error file=.github/workflows/tidy%2Cdaily%251%3Aa.yml,line=3::job tidy%251 sets no timeout-minutes',
   );
 });
 
@@ -1397,7 +1397,7 @@ test.each([
     'private',
     [
       '.github/workflows/checks.yml:6: job macos is a heavy check, because it runs on macos-latest, in a workflow that runs on pull_request; a private repo runs a heavy check nightly or on dispatch, never on each pull request',
-      'workflows: 1 warning; the workflow lint warns and does not fail yet',
+      'workflows: 1 fault',
       '',
     ].join('\n'),
   ],
@@ -1440,7 +1440,7 @@ test.each([
         .quiet();
 
     expect({ exitCode: result.exitCode, stdout: result.stdout.toString() }).toStrictEqual({
-      exitCode: 0,
+      exitCode: stdout === '' ? 0 : 1,
       stdout,
     });
   },
@@ -1451,7 +1451,7 @@ test.each([
     'true',
     [
       '.github/workflows/checks.yml:6: job macos is a heavy check, because it runs on macos-latest, in a workflow that runs on pull_request; a private repo runs a heavy check nightly or on dispatch, never on each pull request',
-      'workflows: 1 warning; the workflow lint warns and does not fail yet',
+      'workflows: 1 fault',
       '',
     ].join('\n'),
   ],
@@ -1492,7 +1492,7 @@ test.each([
       exitCode: result.exitCode,
       stdout: result.stdout.toString(),
       stderr: result.stderr.toString(),
-    }).toStrictEqual({ exitCode: 0, stdout, stderr: '' });
+    }).toStrictEqual({ exitCode: stdout === '' ? 0 : 1, stdout, stderr: '' });
 
     expect(calls).toBe('gh repo view --json isPrivate --jq .isPrivate\n');
   },
@@ -1534,13 +1534,42 @@ test('it applies every rule and says why when CHECKS_PROFILE is unset and gh is 
     stdout: result.stdout.toString(),
     stderr: result.stderr.toString(),
   }).toStrictEqual({
-    exitCode: 0,
+    exitCode: 1,
     stdout: [
       '.github/workflows/checks.yml:6: job macos is a heavy check, because it runs on macos-latest, in a workflow that runs on pull_request; a private repo runs a heavy check nightly or on dispatch, never on each pull request',
-      'workflows: 1 warning; the workflow lint warns and does not fail yet',
+      'workflows: 1 fault',
       '',
     ].join('\n'),
     stderr:
       'workflows: the repo\'s visibility is unknown, so every rule applies: Executable not found in $PATH: "gh"\n',
   });
+});
+
+test('it exits 0 and prints nothing for a workflow that follows every rule', async () => {
+  const ctx = await setupTest();
+
+  await ctx.commitFiles({
+    '.github/workflows/tidy.yml': [
+      'on: workflow_dispatch',
+      'jobs:',
+      '  tidy:',
+      '    runs-on: ubuntu-latest',
+      '    timeout-minutes: 5',
+      '    steps:',
+      '      - run: bun run tidy',
+      '',
+    ].join('\n'),
+  });
+
+  const result = await $`bun ${join(import.meta.dir, 'run-workflows-check.ts')}`
+    .cwd(ctx.directory)
+    .env({ ...ctx.env, CHECKS_PROFILE: 'private', GITHUB_ACTIONS: '' })
+    .nothrow()
+    .quiet();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({ exitCode: 0, stdout: '', stderr: '' });
 });

@@ -70,7 +70,7 @@ The workflow lint checks the rules that the ci-design skill's
 [Step scripts](https://github.com/zgeoff/skills/blob/main/skills/ci-design/SKILL.md#step-scripts)
 section lists, over the changed files under `.github/workflows/` and `sync/src/workflow-callers/`,
 where tools keeps the callers it delivers. It runs when the machine lacks actionlint or actionlint
-fails, and it prints each fault as a warning and passes the push. The delivered baseline reads
+fails, and it prints each fault and fails the push. The delivered baseline reads
 `sync/workflow-callers/` instead, as [The delivered baseline](#the-delivered-baseline) lists.
 
 Each job runs its command under [`diet`](./memory-caps.md), so in a
@@ -147,8 +147,7 @@ the same names in `scripts/`, so a delivered check runs the code that `chex <che
 related-tests runner, `scripts/build-related-test-command.ts`, `scripts/read-worker-count.ts` and
 `scripts/read-memory-budget.ts` come from [`sync/src/pre-push/`](../../sync/src/pre-push/). The
 check scripts exit 0 when clean or skipped, 1 with a problem, and 2 when they cannot run, such as in
-a clone without origin's default branch. One exception: the workflow lint exits 0 with a problem,
-because it only warns. A repo opts in with three changes, which
+a clone without origin's default branch. A repo opts in with three changes, which
 [Opting in to the pre-push baseline](../runbooks/downstream-repo-setup.md#opting-in-to-the-pre-push-baseline)
 lists.
 
