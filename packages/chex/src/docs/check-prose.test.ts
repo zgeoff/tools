@@ -49,6 +49,20 @@ async function setupTest() {
   const run = (...args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`.cwd(directory).env(env).nothrow().quiet();
 
+  const runWithStub = async (name: string, script: string, ...args: readonly string[]) => {
+    const stubDirectory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-prose-stub-')));
+
+    onTestFinished(() => rm(stubDirectory, { recursive: true, force: true }));
+
+    await writeFile(join(stubDirectory, name), `#!/bin/sh\n${script}\n`, { mode: 0o755 });
+
+    return $`bash ${scriptPath} ${args}`
+      .cwd(directory)
+      .env({ ...env, PATH: `${stubDirectory}:${process.env['PATH']}` })
+      .nothrow()
+      .quiet();
+  };
+
   const runInPullRequest = (cwd: string, baseRef: string, args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`
       .cwd(cwd)
@@ -88,6 +102,7 @@ async function setupTest() {
     writeText,
     runCommit,
     run,
+    runWithStub,
     runInPullRequest,
     createOrigin,
     createShallowClone,
@@ -1540,4 +1555,61 @@ test('it exits 2 and asks for a git work tree when run outside one', async () =>
     exitCode: 2,
     stderr: 'check-prose: run it inside a git work tree, because it lists the files with git\n',
   });
+});
+
+test('it fails without printing clean when perl is missing', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', '# Guide\n\nThe seams show.\n');
+
+  const result = await ctx.runWithStub('perl', 'exit 127', 'guide.md');
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr: 'check-prose: perl is required and was not found on the PATH, so no doc was checked\n',
+  });
+});
+
+test('it fails without printing clean when the Perl matcher breaks mid-run', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', '# Guide\n\nThe seams show.\n');
+
+  const result = await ctx.runWithStub(
+    'perl',
+    '[ "$1" = -e ] && exit 0; cat > /dev/null; exit 2',
+    'guide.md',
+  );
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString().includes('clean'),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: false,
+    stderr: 'check-prose: a check failed to run, so the result above is incomplete\n',
+  });
+});
+
+test('it fails without printing clean when git grep errors', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', '# Guide\n\nThe seams show.\n');
+
+  const result = await ctx.runWithStub(
+    'git',
+    `if [ "$1" = grep ] && [ "$2" = --untracked ]; then exit 128; fi; PATH='${process.env['PATH']}' exec git "$@"`,
+    'guide.md',
+  );
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString().includes('clean'),
+  }).toStrictEqual({ exitCode: 2, stdout: false });
 });

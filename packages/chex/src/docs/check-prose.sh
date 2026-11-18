@@ -45,6 +45,22 @@ for root in .agents/skills .claude/skills skills sync/skills; do
 done
 set -- "$@" ':(exclude,attr:linguist-vendored)' ':(exclude,attr:linguist-vendored=true)'
 
+if ! perl -e 1 > /dev/null 2>&1; then
+  echo "check-prose: perl is required and was not found on the PATH, so no doc was checked" >&2
+  exit 2
+fi
+
+failure_marker=$(mktemp) || exit 2
+rm -f "$failure_marker"
+trap 'rm -f "$failure_marker"' EXIT
+
+probe_status=0
+git grep -P -e x -- ':(exclude)*' > /dev/null 2>&1 || probe_status=$?
+if [ "$probe_status" -gt 1 ]; then
+  echo "check-prose: git was built without PCRE support, so no doc was checked" >&2
+  exit 2
+fi
+
 # The greps below read git's file list in pipelines, which drop git's exit status, so a git that
 # cannot list the files fails here once.
 if ! git ls-files --cached --others --exclude-standard -- "$@" > /dev/null; then
@@ -54,8 +70,24 @@ fi
 
 # Every grep reads untracked files too, so a new doc is checked before it is staged, and skips
 # binary files.
+# A git grep that fails for any reason but "no match" (status 1) writes the marker file, because the
+# greps run in command substitutions that drop their status. The script then fails instead of
+# printing "clean".
 grep_docs() {
-  git grep --untracked -I "$@"
+  local status=0
+  git grep --untracked -I "$@" || status=$?
+  if [ "$status" -gt 1 ]; then
+    echo "check-prose: git grep failed with status $status, so a check did not run" >&2
+    : > "$failure_marker"
+  fi
+  return 0
+}
+
+# Prints the lines of stdin that match the Perl pattern $1 before the unit separator, ignoring case.
+# perl stands in for grep -P, which BSD grep lacks.
+grep_before_separator() {
+  CHECK_PROSE_PATTERN=$1 perl -ne 'BEGIN { $p = qr/^[^\x1f]*(?:$ENV{CHECK_PROSE_PATTERN})/i } print if $_ =~ $p' ||
+    : > "$failure_marker"
 }
 
 # Prints the Markdown files the paths name, under the directory in $markdown_dir when it is set.
@@ -171,7 +203,7 @@ report 'Banned words:' \
       gsub(/\037/, "", text)
       text = strip_spans(text)
       print text "\037" file_name()":"FNR":"$0
-    }' | grep -aPi "^[^\\x1f]*(?:$banned_words)" | cut -d $'\037' -f 2-
+    }' | grep_before_separator "$banned_words" | cut -d $'\037' -f 2-
   )"
 
 report 'Filler with no term-of-art use:' \
@@ -649,6 +681,11 @@ candidate 'Candidates — sentence-initial "A x is a" definitions; keep one only
 
 candidate 'Candidates — contrast frames, counted lists and stock openers; state the move, name the items, open with the job:' \
   "$(grep_docs -nPi ', not (a|an|the|its|their|from|for|to|in|on|by|only|just)\b|\brather than\b|\bis not the (job|point)\b|\b(two|three|four|five) (ways|traps|mistakes|things|rules)\b|^(This|The) skill (is|helps|lets|explains|finds|builds|shows)\b' -- "$@")"
+
+if [ -e "$failure_marker" ]; then
+  echo "check-prose: a check failed to run, so the result above is incomplete" >&2
+  exit 2
+fi
 
 if [ "$fail" -eq 0 ]; then
   echo 'check-prose: clean (candidates above, if any, need judgment only)'
