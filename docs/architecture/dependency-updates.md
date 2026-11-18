@@ -205,6 +205,12 @@ working tree, and fails on each entry the repo can remove:
 - A first-party package that `bun.lock` installs from the registry, with no exclude of its full name
   in `bunfig.toml`. An exclude that names a version, such as `@zgeoff/std@0.4.0`, lets only that
   release through, so it does not count. A repo that sets no `minimumReleaseAge` passes.
+- A release that `bun.lock` pins from the registry, that is younger than `minimumReleaseAge`, and
+  that no exclude covers: an exclude of its name, or of `name@version`. Bun applies the gate when it
+  resolves a version and not to one the lockfile already pins, so a lockfile written under an
+  exclude keeps a young release after the exclude goes. The check reads each package's publish times
+  from the npm registry, one request per package name, and skips first-party packages. It fails when
+  the registry cannot be reached. A repo that sets no `minimumReleaseAge` passes.
 - A root override that every range in `bun.lock` admits, or one of a package that nothing in
   `bun.lock` depends on. For a nested override, such as `parent@1.2.0>child` or a `parent` object
   that names `child`, the check reads only the child ranges of each `parent` in `bun.lock` whose
@@ -214,9 +220,9 @@ working tree, and fails on each entry the repo can remove:
 - An `--ignore` flag in the `audit` script whose advisory `bun audit` no longer reports, or whose
   package `bun audit fix` can move to a patched release in range.
 
-The check runs `bun audit` only when the `audit` script ignores an advisory, so it needs no network
-in a repo with no ignore. A repo with no override, exclude or ignore passes. The
-`Check dependency gates` step of [`bun-checks.yml`](../../.github/workflows/bun-checks.yml) runs it
-on every pull request, and the [pre-push baseline](./pre-push-baseline.md) runs it before a push.
-Its scripts live in
+The check runs `bun audit` only when the `audit` script ignores an advisory, and reads the registry
+only in a repo with an age gate, so a repo with neither needs no network. A repo with no override,
+exclude or ignore passes. The `Check dependency gates` step of
+[`bun-checks.yml`](../../.github/workflows/bun-checks.yml) runs it on every pull request, and the
+[pre-push baseline](./pre-push-baseline.md) runs it before a push. Its scripts live in
 [`packages/chex/src/dependency-gates/`](../../packages/chex/src/dependency-gates/).

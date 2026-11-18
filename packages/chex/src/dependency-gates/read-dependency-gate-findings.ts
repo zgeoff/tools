@@ -8,9 +8,14 @@ import { parseAuditAdvisories } from './parse-audit-advisories.ts';
 import { parseAuditIgnoreIDs } from './parse-audit-ignore-ids.ts';
 import { parseFixablePackages } from './parse-fixable-packages.ts';
 import { parseLockfileDependents } from './parse-lockfile-dependents.ts';
-import { parseLockfileRegistryNames } from './parse-lockfile-registry-names.ts';
+import {
+  parseLockfileRegistryNames,
+  parseLockfileRegistryPackages,
+} from './parse-lockfile-registry-names.ts';
 import type { RootManifest } from './parse-root-manifest.ts';
 import { parseRootManifest } from './parse-root-manifest.ts';
+import type { ReadRegistry } from './read-publish-times.ts';
+import { readYoungLockedReleases } from './read-young-locked-releases.ts';
 import type { DependencyGateFinding } from './types.ts';
 
 export interface DependencyGateSources {
@@ -20,17 +25,23 @@ export interface DependencyGateSources {
   // An ISO date, such as 2026-03-08.
   readonly today: string;
 
+  // The time now, as epoch milliseconds.
+  readonly nowMs: number;
+
   readonly runProgram: RunProgram;
+
+  // Reads the npm registry, for the publish time of each version the lockfile pins.
+  readonly readRegistry: ReadRegistry;
 
   // The path is relative to the repo root.
   readonly readRepoFile: (path: string) => string | null;
 }
 
-// The audit runs only for a repo that ignores an advisory, so a repo with no ignore needs no
-// network.
-export function readDependencyGateFindings(
+// The audit runs only for a repo that ignores an advisory, and the registry only for a repo with an
+// age gate, so a repo with neither needs no network.
+export async function readDependencyGateFindings(
   sources: Readonly<DependencyGateSources>,
-): DependencyGateFinding[] {
+): Promise<DependencyGateFinding[]> {
   const manifestText = sources.readRepoFile('package.json');
 
   if (manifestText === null) {
@@ -50,6 +61,14 @@ export function readDependencyGateFindings(
           parseAgeGate(bunfig),
           parseLockfileRegistryNames(lockfile),
         )),
+    ...(lockfile === null
+      ? []
+      : await readYoungLockedReleases({
+          ageGate: parseAgeGate(bunfig),
+          packages: parseLockfileRegistryPackages(lockfile),
+          nowMs: sources.nowMs,
+          readRegistry: sources.readRegistry,
+        })),
     ...collectOverrideFindings(manifest, lockfile),
     ...(ignoreIDs.length === 0 ? [] : readIgnoreFindings(sources, ignoreIDs)),
   ];

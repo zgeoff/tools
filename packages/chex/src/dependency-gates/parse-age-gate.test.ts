@@ -10,6 +10,7 @@ test('it reads the gate and its excludes', () => {
 
   expect(parseAgeGate(bunfig)).toStrictEqual({
     isOn: true,
+    seconds: 604_800,
     excludes: ['@zgeoff/std', 'left-pad@1.3.1'],
   });
 });
@@ -17,6 +18,7 @@ test('it reads the gate and its excludes', () => {
 test('it reads a gate written with a unit', () => {
   expect(parseAgeGate(['[install]', 'minimumReleaseAge = "3d"'].join('\n'))).toStrictEqual({
     isOn: true,
+    seconds: 259_200,
     excludes: [],
   });
 });
@@ -24,12 +26,13 @@ test('it reads a gate written with a unit', () => {
 test('it reads a gate of 0 as off', () => {
   expect(parseAgeGate(['[install]', 'minimumReleaseAge = 0'].join('\n'))).toStrictEqual({
     isOn: false,
+    seconds: 0,
     excludes: [],
   });
 });
 
 test('it reads a bunfig with no install section as no gate', () => {
-  expect(parseAgeGate('')).toStrictEqual({ isOn: false, excludes: [] });
+  expect(parseAgeGate('')).toStrictEqual({ isOn: false, seconds: 0, excludes: [] });
 });
 
 test('it fails an exclude list that is not a list of names', () => {
