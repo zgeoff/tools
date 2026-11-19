@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/tsconfig",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Shared strict TypeScript configs for Bun repos: a bundler-mode base and a React variant",
   "license": "MIT",
   "repository": {

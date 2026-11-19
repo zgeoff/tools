@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3](https://github.com/zgeoff/tools/compare/@zgeoff/kysely-bun-sqlite@0.3.2...@zgeoff/kysely-bun-sqlite@0.3.3) (2026-11-19)
+
+
+### Bug Fixes
+
+* run type-aware lint and typecheck on tsrs 0.25 fast mode ([#682](https://github.com/zgeoff/tools/issues/682)) ([cbdb98c](https://github.com/zgeoff/tools/commit/cbdb98c015528632b10456a5fdad787cef38e850))
+
 ## [0.3.2](https://github.com/zgeoff/tools/compare/@zgeoff/kysely-bun-sqlite@0.3.1...@zgeoff/kysely-bun-sqlite@0.3.2) (2026-11-07)
 
 

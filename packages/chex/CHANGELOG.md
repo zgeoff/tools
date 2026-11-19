@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.3.12](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.11...@zgeoff/chex@0.3.12) (2026-11-19)
+
+
+### Bug Fixes
+
+* run type-aware lint and typecheck on tsrs 0.25 fast mode ([#682](https://github.com/zgeoff/tools/issues/682)) ([cbdb98c](https://github.com/zgeoff/tools/commit/cbdb98c015528632b10456a5fdad787cef38e850))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zgeoff/std bumped to 0.4.4
+  * devDependencies
+    * @zgeoff/rig bumped to 0.2.6
+    * @zgeoff/std bumped to 0.4.4
+    * @zgeoff/testing bumped to 0.3.1
+
 ## [0.3.11](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.10...@zgeoff/chex@0.3.11) (2026-11-18)
 
 
