@@ -147,5 +147,9 @@ its jobs one at a time, so a push fits a 2 GiB host:
 5. Move every whole-tree check the baseline drops, such as type-aware lint, dead code and the full
    suite, into CI as a required check, if CI does not run it already.
 6. If the repo lists `pre-push-baseline` in `include` or `skip` in
-   `.github/workflows/repo-sync.yml`, delete the name, and delete `.lefthook/pre-push-baseline.yml`
-   from `extends` in `lefthook.yml`, so the push runs one baseline.
+   `.github/workflows/repo-sync.yml`, keep it in `skip` while `git grep` finds a caller of a
+   delivered script, such as `scripts/read-worker-count.ts` in a `test:e2e` script. The
+   [retired-files step](../architecture/repo-sync.md#retired-files) deletes a copy that matches a
+   delivered version, and it does not check for callers. Once `git grep` finds none, delete the name
+   from `include` or `skip`, and delete `.lefthook/pre-push-baseline.yml` from `extends` in
+   `lefthook.yml`, so the push runs one baseline.
