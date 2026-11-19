@@ -19,7 +19,7 @@
     "access": "public"
   },
   "scripts": {
-    "typecheck": "tsrs"
+    "typecheck": "tsrs --fast"
   },
   "devDependencies": {
     "@commitlint/cli": "catalog:",
