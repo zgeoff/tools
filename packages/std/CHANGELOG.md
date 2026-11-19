@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.4](https://github.com/zgeoff/tools/compare/@zgeoff/std@0.4.3...@zgeoff/std@0.4.4) (2026-11-19)
+
+
+### Bug Fixes
+
+* run type-aware lint and typecheck on tsrs 0.25 fast mode ([#682](https://github.com/zgeoff/tools/issues/682)) ([cbdb98c](https://github.com/zgeoff/tools/commit/cbdb98c015528632b10456a5fdad787cef38e850))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/testing bumped to 0.3.1
+
 ## [0.4.3](https://github.com/zgeoff/tools/compare/@zgeoff/std@0.4.2...@zgeoff/std@0.4.3) (2026-11-07)
 
 

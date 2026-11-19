@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.6](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.2.5...@zgeoff/rig@0.2.6) (2026-11-19)
+
+
+### Bug Fixes
+
+* run type-aware lint and typecheck on tsrs 0.25 fast mode ([#682](https://github.com/zgeoff/tools/issues/682)) ([cbdb98c](https://github.com/zgeoff/tools/commit/cbdb98c015528632b10456a5fdad787cef38e850))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zgeoff/diet bumped to 0.2.3
+    * @zgeoff/std bumped to 0.4.4
+  * devDependencies
+    * @zgeoff/std bumped to 0.4.4
+    * @zgeoff/testing bumped to 0.3.1
+
 ## [0.2.5](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.2.4...@zgeoff/rig@0.2.5) (2026-11-18)
 
 

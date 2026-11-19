@@ -1,6 +1,6 @@
 {
   "name": "@zgeoff/release-manifest",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "JSON Schema for the release.json that a release publishes, so a deployment reads every release manifest in one known shape",
   "license": "MIT",
   "repository": {

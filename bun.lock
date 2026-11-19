@@ -30,7 +30,7 @@
     },
     "packages/agent-hooks": {
       "name": "@zgeoff/agent-hooks",
-      "version": "0.2.13",
+      "version": "0.2.14",
       "bin": {
         "agent-hooks": "./dist/cli.js",
       },
@@ -52,7 +52,7 @@
     },
     "packages/bun-test-extended": {
       "name": "@zgeoff/bun-test-extended",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dependencies": {
         "jest-extended": "catalog:",
         "jest-matcher-utils": "catalog:",
@@ -65,7 +65,7 @@
     },
     "packages/bun-test-react": {
       "name": "@zgeoff/bun-test-react",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dependencies": {
         "@happy-dom/global-registrator": "catalog:",
         "@testing-library/jest-dom": "catalog:",
@@ -94,7 +94,7 @@
     },
     "packages/chex": {
       "name": "@zgeoff/chex",
-      "version": "0.3.11",
+      "version": "0.3.12",
       "bin": {
         "chex": "./src/cli.ts",
       },
@@ -117,7 +117,7 @@
     },
     "packages/commitlint-config": {
       "name": "@zgeoff/commitlint-config",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "devDependencies": {
         "@commitlint/cli": "catalog:",
         "@commitlint/lint": "catalog:",
@@ -133,7 +133,7 @@
     },
     "packages/diet": {
       "name": "@zgeoff/diet",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "bin": {
         "diet": "./diet.sh",
       },
@@ -147,7 +147,7 @@
     },
     "packages/format-codemod": {
       "name": "@zgeoff/format-codemod",
-      "version": "0.3.5",
+      "version": "0.3.6",
       "bin": {
         "format-codemod": "./dist/cli.js",
       },
@@ -163,7 +163,7 @@
     },
     "packages/kysely-bun-sqlite": {
       "name": "@zgeoff/kysely-bun-sqlite",
-      "version": "0.3.2",
+      "version": "0.3.3",
       "devDependencies": {
         "@types/bun": "catalog:",
         "kysely": "catalog:",
@@ -176,7 +176,7 @@
     },
     "packages/mcp-auth": {
       "name": "@zgeoff/mcp-auth",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "dependencies": {
         "@better-auth/mcp": "catalog:",
         "@better-auth/oauth-provider": "catalog:",
@@ -207,7 +207,7 @@
     },
     "packages/oxfmt-config": {
       "name": "@zgeoff/oxfmt-config",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "devDependencies": {
         "@types/bun": "catalog:",
         "tsrs": "catalog:",
@@ -219,7 +219,7 @@
     },
     "packages/oxlint-config": {
       "name": "@zgeoff/oxlint-config",
-      "version": "0.10.9",
+      "version": "0.10.10",
       "dependencies": {
         "@stylistic/eslint-plugin": "catalog:",
       },
@@ -237,7 +237,7 @@
     },
     "packages/release-manifest": {
       "name": "@zgeoff/release-manifest",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "devDependencies": {
         "@types/bun": "catalog:",
         "ajv": "catalog:",
@@ -247,7 +247,7 @@
     },
     "packages/rig": {
       "name": "@zgeoff/rig",
-      "version": "0.2.5",
+      "version": "0.2.6",
       "bin": {
         "rig": "./src/cli.ts",
       },
@@ -269,7 +269,7 @@
     },
     "packages/skill-gate": {
       "name": "@zgeoff/skill-gate",
-      "version": "0.2.29",
+      "version": "0.2.30",
       "dependencies": {
         "@zgeoff/agent-hooks": "workspace:*",
       },
@@ -281,7 +281,7 @@
     },
     "packages/std": {
       "name": "@zgeoff/std",
-      "version": "0.4.3",
+      "version": "0.4.4",
       "devDependencies": {
         "@types/bun": "catalog:",
         "@zgeoff/testing": "workspace:*",
@@ -293,7 +293,7 @@
     },
     "packages/testing": {
       "name": "@zgeoff/testing",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "bun-pty": "catalog:",
       },
@@ -305,7 +305,7 @@
     },
     "packages/tsconfig": {
       "name": "@zgeoff/tsconfig",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "dependencies": {
         "@tsconfig/strictest": "catalog:",
       },

@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.10.10](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.10.9...@zgeoff/oxlint-config@0.10.10) (2026-11-19)
+
+
+### Bug Fixes
+
+* run type-aware lint and typecheck on tsrs 0.25 fast mode ([#682](https://github.com/zgeoff/tools/issues/682)) ([cbdb98c](https://github.com/zgeoff/tools/commit/cbdb98c015528632b10456a5fdad787cef38e850))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/rig bumped to 0.2.6
+    * @zgeoff/std bumped to 0.4.4
+    * @zgeoff/testing bumped to 0.3.1
+
 ## [0.10.9](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.10.8...@zgeoff/oxlint-config@0.10.9) (2026-11-18)
 
 
