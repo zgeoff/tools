@@ -1,0 +1,64 @@
+name: npm publish
+
+# Publishes the packages a release shipped, through npm trusted publishing (OIDC): no npm token.
+# The trusted publisher of each package names the CALLER's workflow file, so the caller keeps its
+# name, and both the caller's job and this one hold id-token: write. The provenance names the
+# caller run's commit, so the caller runs at the release tag.
+#
+# npm publishes, not bun: bun publish cannot generate provenance statements (oven-sh/bun#15601,
+# open; bun 1.4.4 refuses the flags). bun packs, because it turns catalog: and workspace: ranges
+# into exact versions, which npm publish ships unchanged. Trusted publishing needs npm 11.5.1 or
+# newer, and Node 26 bundles at least 11.12. Never upgrade the bundled npm in place: a
+# cross-major overlay prunes transitive deps that libnpmpublish needs at publish time (sigstore).
+on:
+  workflow_call:
+    inputs:
+      paths:
+        description: 'JSON array of the package folders to publish, e.g. ["packages/std"]'
+        type: string
+        required: true
+
+jobs:
+  publish:
+    name: Publish the packages to npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+      - run: bun install --frozen-lockfile
+      # A rerun skips the versions npm holds already. One failed package must not keep the rest
+      # from npm, so the loop keeps going and fails at the end.
+      - name: Pack and publish each package
+        env:
+          PATHS: ${{ inputs.paths }}
+        shell: bash
+        run: |
+          failed=0
+          for dir in $(jq -r '.[]' <<<"$PATHS"); do
+            name=$(jq -r .name "$dir/package.json")
+            version=$(jq -r .version "$dir/package.json")
+            if [ "$(jq -r '.private // false' "$dir/package.json")" = true ]; then
+              echo "skipping $name: private"
+            elif [ "$(npm view "$name@$version" version 2>/dev/null)" = "$version" ]; then
+              echo "skipping $name@$version: already published"
+            else
+              out=$(mktemp -d)
+              (cd "$dir" && bun run --if-present build && bun pm pack --destination "$out" &&
+                npm publish "$out"/*.tgz --provenance --access public) || {
+                echo "::error::$name@$version failed to publish"
+                failed=1
+              }
+            fi
+          done
+          exit "$failed"
