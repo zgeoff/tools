@@ -1,4 +1,4 @@
-import { isRecord } from '../../../packages/std/src/is-record.ts';
+import { isRecord } from '../../../packages/std/src/guards/is-record.ts';
 import type { BlockedPackage, FixPlan, FixedPackage, UnfixablePackage } from './types.ts';
 
 export function parseFixPlan(value: unknown): FixPlan {

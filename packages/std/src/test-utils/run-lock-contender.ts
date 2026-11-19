@@ -11,7 +11,7 @@ export interface LockContenderOptions {
   readonly waitMs: number;
 }
 
-const withFileLockPath = join(import.meta.dir, '..', 'with-file-lock.ts');
+const withFileLockPath = join(import.meta.dir, '..', 'file-lock', 'with-file-lock.ts');
 
 // Runs withFileLock in another process, and resolves with the kind of its result.
 export async function runLockContender(options: LockContenderOptions): Promise<string> {

@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { writeStdout } from '../../../packages/std/src/write-stdout.ts';
+import { writeStdout } from '../../../packages/std/src/io/write-stdout.ts';
 import type { FileSystem } from '../ci/file-system.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import type { UndeliveredLink } from './collect-undelivered-links.ts';

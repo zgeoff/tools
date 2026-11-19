@@ -3,7 +3,7 @@ import { FFIType, dlopen, read } from 'bun:ffi';
 import { randomUUID } from 'node:crypto';
 import { closeSync, ftruncateSync, openSync, readFileSync, writeSync } from 'node:fs';
 import { hostname } from 'node:os';
-import { isRecord } from './is-record.ts';
+import { isRecord } from '../guards/is-record.ts';
 
 export interface FileLockOwner {
   readonly pid: number;

@@ -1,4 +1,4 @@
-import { isRecord } from '../../../packages/std/src/is-record.ts';
+import { isRecord } from '../../../packages/std/src/guards/is-record.ts';
 
 export interface BaselineJobEntry {
   readonly hook: 'pre-commit' | 'pre-push';

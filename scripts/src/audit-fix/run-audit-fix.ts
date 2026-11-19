@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
-import { isRecord } from '../../../packages/std/src/is-record.ts';
+import { isRecord } from '../../../packages/std/src/guards/is-record.ts';
 import { buildAuditScript } from './build-audit-script.ts';
 import { buildBunfigWithExcludes } from './build-bunfig-with-excludes.ts';
 import type { ReleaseAgeExclude } from './build-bunfig-with-excludes.ts';

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import { writeStdout } from '../../packages/std/src/write-stdout.ts';
+import { writeStdout } from '../../packages/std/src/io/write-stdout.ts';
 import { collectImportSpecifiers } from './collect-import-specifiers.ts';
 
 export function collectPackageImports(source: string, filename: string): string[] | null {

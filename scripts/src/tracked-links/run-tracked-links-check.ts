@@ -1,5 +1,5 @@
 import { match } from 'ts-pattern';
-import { writeStdout } from '../../../packages/std/src/write-stdout.ts';
+import { writeStdout } from '../../../packages/std/src/io/write-stdout.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';

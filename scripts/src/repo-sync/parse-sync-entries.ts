@@ -1,4 +1,4 @@
-import { isRecord } from '../../../packages/std/src/is-record.ts';
+import { isRecord } from '../../../packages/std/src/guards/is-record.ts';
 import type { SyncFile } from './select-sync-files.ts';
 import type { SyncSourceRepo } from './sync-source-checkouts.ts';
 import { syncSourceCheckouts } from './sync-source-checkouts.ts';

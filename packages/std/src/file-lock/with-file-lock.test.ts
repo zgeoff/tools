@@ -3,8 +3,8 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
-import { createLockHolder } from './test-utils/create-lock-holder.ts';
-import { runLockContender } from './test-utils/run-lock-contender.ts';
+import { createLockHolder } from '../test-utils/create-lock-holder.ts';
+import { runLockContender } from '../test-utils/run-lock-contender.ts';
 import { withFileLock } from './with-file-lock.ts';
 
 async function setupTest() {

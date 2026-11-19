@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { isRecord } from '../../../packages/std/src/is-record.ts';
-import { writeStdout } from '../../../packages/std/src/write-stdout.ts';
+import { isRecord } from '../../../packages/std/src/guards/is-record.ts';
+import { writeStdout } from '../../../packages/std/src/io/write-stdout.ts';
 
 // A run syncs a tools commit that can be newer than its own pinned scripts, so its manifest can hold
 // a key these scripts skip, and a skipped key such as a file's source repo copies the wrong file.

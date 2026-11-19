@@ -1,4 +1,4 @@
-import { isRecord } from '../../../packages/std/src/is-record.ts';
+import { isRecord } from '../../../packages/std/src/guards/is-record.ts';
 
 // Returns the pinned commit of zgeoff/skills, or null when the value is no pin with a full commit ID.
 export function parseSkillsPin(value: unknown): string | null {

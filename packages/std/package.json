@@ -10,7 +10,7 @@
   },
   "files": [
     "src",
-    "!src/*.test.ts",
+    "!src/**/*.test.ts",
     "!src/test-utils",
     "dist"
   ],
@@ -21,8 +21,8 @@
       "default": "./src/index.ts"
     },
     "./with-file-lock": {
-      "types": "./dist/with-file-lock.d.ts",
-      "default": "./src/with-file-lock.ts"
+      "types": "./dist/file-lock/with-file-lock.d.ts",
+      "default": "./src/file-lock/with-file-lock.ts"
     }
   },
   "publishConfig": {
