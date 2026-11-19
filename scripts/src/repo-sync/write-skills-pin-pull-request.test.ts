@@ -451,7 +451,7 @@ test('it adds a new file of a skill folder the manifest ships, and the manifest 
     'PUT',
     'repos/example/tools/contents/sync/manifest.json',
     '-f',
-    'message=chore(skills): list the new skill files in the sync manifest',
+    'message=chore(skills): list and drop skill files in the sync manifest',
     '-f',
     `content=${Buffer.from(expectedManifest).toString('base64')}`,
     '-f',
