@@ -274,18 +274,6 @@
     ]
   },
   {
-    "name": "docs-vision-check",
-    "description": "The vision doc check, which fails a repo whose docs/vision.md is missing or over one page",
-    "optIn": true,
-    "files": [
-      {
-        "source": "packages/chex/src/docs/check-vision.sh",
-        "target": ".claude/skills/docs-writing/scripts/check-vision.sh",
-        "mode": "0755"
-      }
-    ]
-  },
-  {
     "name": "skill-ci-design",
     "description": "The shared ci-design skill, which holds the patterns for a GitHub Actions pipeline; a repo keeps its own pipeline in a project-ci-design skill",
     "optIn": true,
@@ -381,17 +369,6 @@
           "zgeoff/vers",
           "zgeoff/wringer"
         ]
-      }
-    ]
-  },
-  {
-    "name": "memory-cap",
-    "description": "The script that runs a command inside a cgroup memory cap with no swap, and prints the run's peak memory and OOM kills; every repo takes it, because the pre-push baseline runs its jobs under it",
-    "files": [
-      {
-        "source": "sync/src/pre-push/run-memory-capped.sh",
-        "target": "scripts/run-memory-capped.sh",
-        "mode": "0755"
       }
     ]
   },

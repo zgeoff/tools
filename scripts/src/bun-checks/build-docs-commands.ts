@@ -34,8 +34,8 @@ export interface DocsCommand {
   readonly args: readonly string[];
 }
 
-// The docs-vision-check entry puts the vision check beside the docs scripts, and a repo that takes
-// the skill-writing skill has the skill check, so each runs only where its entry delivered it.
+// A repo that holds the vision check beside the docs scripts runs it, and a repo that takes the
+// skill-writing skill has the skill check, so each runs only where it is present.
 export function buildDocsCommands(input: Readonly<DocsCommandsInput>): DocsCommand[] {
   return [
     {
