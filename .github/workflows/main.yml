@@ -14,13 +14,6 @@ on:
         description: 'JSON array of package dirs to republish, e.g. ["packages/format-codemod"]'
         required: true
         type: string
-      released_versions:
-        description:
-          'JSON object of the version the release tagged for each dir, e.g.
-          {"packages/std":"0.4.0"}; empty skips the check'
-        required: false
-        type: string
-        default: ''
 
 jobs:
   # Each push's checks run to the end, so every merged commit is tested. Two
@@ -129,18 +122,17 @@ jobs:
       cancel-in-progress: false
       queue: max
     permissions:
-      contents: read
       actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version-file: .bun-version
+          persist-credentials: false
+          sparse-checkout: scripts/src/release
       - name: Dispatch publish at the release tag
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_OUTPUTS: ${{ needs.release.outputs.release-outputs }}
-        run: bun run --silent ci:dispatch-publish
+        run: bash scripts/src/release/dispatch-tag-publish.sh
 
   # queue: max keeps every waiting run; the default replaces a waiting run,
   # which would cancel a pending publish dispatch.
@@ -148,8 +140,6 @@ jobs:
     name: Publish the release
     needs: release-checks
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
     concurrency:
       group: publish
       cancel-in-progress: false
@@ -157,22 +147,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: .bun-version
-      # npm does the publishing, not bun: trusted publishing (OIDC) needs
-      # npm >= 11.5.1 — node 26 bundles at least 11.12 — and bun publish has
-      # no OIDC support (oven-sh/bun#15601). Never upgrade the bundled npm in
-      # place: a cross-major overlay prunes transitive deps that
-      # libnpmpublish needs at publish time (sigstore).
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 26
-      - run: bun install --frozen-lockfile
-      - name: Publish released packages
-        env:
-          PATHS_RELEASED: ${{ inputs.republish_paths }}
-          RELEASED_VERSIONS: ${{ inputs.released_versions }}
-        run: bun run --silent ci:publish-packages
+    uses: ./.github/workflows/npm-publish.yml
+    with:
+      paths: ${{ inputs.republish_paths }}

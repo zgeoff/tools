@@ -1,0 +1,61 @@
+name: npm publish
+
+# Publishes the packages a release shipped, through npm trusted publishing (OIDC): no npm token.
+# The trusted publisher of each package names the CALLER's workflow file, so the caller keeps its
+# name, and both the caller's job and this one hold id-token: write. The provenance names the
+# caller run's commit, so the caller runs at the release tag.
+#
+# npm publishes, not bun: bun publish cannot generate provenance statements (oven-sh/bun#15601,
+# open; bun 1.4.4 refuses the flags). bun packs, because it turns catalog: and workspace: ranges
+# into exact versions, which npm publish ships unchanged. Trusted publishing needs npm 11.5.1 or
+# newer, and Node 26 bundles at least 11.12. Never upgrade the bundled npm in place: a
+# cross-major overlay prunes transitive deps that libnpmpublish needs at publish time (sigstore).
+on:
+  workflow_call:
+    inputs:
+      paths:
+        description: 'JSON array of the package folders to publish, e.g. ["packages/std"]'
+        type: string
+        required: true
+
+jobs:
+  publish:
+    name: Publish the packages to npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+      - run: bun install --frozen-lockfile
+      # The script lives in tools, not in the caller's checkout, so the job downloads it from the
+      # commit that defines this workflow: a caller at a pinned ref runs that ref's script.
+      # actionlint does not know job.workflow_repository or job.workflow_sha, so the steps read
+      # them through toJSON.
+      - name: Download the step script downloader
+        env: &tools-url
+          TOOLS_URL:
+            https://raw.githubusercontent.com/${{ fromJSON(toJSON(job)).workflow_repository }}/${{
+            fromJSON(toJSON(job)).workflow_sha }}
+        run:
+          curl -fsSL --retry 3 --retry-all-errors --create-dirs -o
+          "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/src/ci/download-step-scripts.ts"
+      - name: Download the publish script
+        env: *tools-url
+        run: bun "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts" npm-publish
+      # A rerun skips the versions npm holds already. One failed package must not keep the rest
+      # from npm, so the script keeps going and fails at the end.
+      - name: Pack and publish each package
+        env:
+          PATHS: ${{ inputs.paths }}
+        run: bash "$RUNNER_TEMP/tools/scripts/src/release/publish-npm-tarballs.sh"

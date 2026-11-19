@@ -7,6 +7,9 @@ export interface BashScriptRun {
   // Stand-ins in this folder come first on PATH.
   readonly stubDirectory: string;
   readonly env: Readonly<Record<string, string>>;
+
+  // The script's working directory; unset: this process's.
+  readonly cwd?: string;
 }
 
 export interface BashScriptResult {
@@ -19,6 +22,7 @@ export interface BashScriptResult {
 // never throws on a failed exit.
 export async function runBashScript(run: BashScriptRun): Promise<BashScriptResult> {
   const result = await $`bash ${run.script} ${run.args}`
+    .cwd(run.cwd ?? process.cwd())
     .env({ ...process.env, PATH: `${run.stubDirectory}:${process.env['PATH']}`, ...run.env })
     .nothrow()
     .quiet();
