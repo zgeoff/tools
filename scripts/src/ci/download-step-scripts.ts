@@ -28,6 +28,7 @@ export const stepScriptSets = {
     'scripts/src/audit-fix/commit-audit-fix.ts',
     'scripts/src/audit-fix/open-audit-fix-pull-request.ts',
   ],
+  'npm-publish': ['scripts/src/release/publish-npm-tarballs.sh'],
   release: [
     'scripts/src/check-release-head.sh',
     'scripts/src/merge-release-prs.sh',
