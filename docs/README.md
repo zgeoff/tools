@@ -6,8 +6,7 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 
 - [Repo sync](./architecture/repo-sync.md): how a merge to `main` reaches each repo, manifest
   entries, each kind of entry, retired files, and the sync branch.
-- [The pre-push baseline](./architecture/pre-push-baseline.md): what the baseline runs and the files
-  it delivers.
+- [The pre-push baseline](./architecture/pre-push-baseline.md): what the baseline runs.
 - [Memory caps](./architecture/memory-caps.md): `@zgeoff/diet`, which runs a command inside a cgroup
   memory cap, and its modes.
 - [rig](./architecture/rig.md): `@zgeoff/rig`, the lane table, a lane's run, the browser lane, and

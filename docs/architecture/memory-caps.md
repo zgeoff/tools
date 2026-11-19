@@ -4,9 +4,7 @@ A test run or a type check that outgrows its host takes the host down with it: o
 shared by parallel agents, the kernel's OOM killer then picks a process from any session. The
 [`@zgeoff/diet`](../../packages/diet/README.md) runs a command inside a cgroup with a memory cap and
 no swap, so the kernel kills that command first, and it reports how close the run came. tools runs
-its pre-push jobs under `diet`. repo-sync no longer delivers `scripts/run-memory-capped.sh`: each
-repo runs `diet` in its place. The script stays in `sync/src/pre-push/` for the pre-push baseline's
-own tests.
+its pre-push jobs under `diet`.
 
 ## Why a cgroup and not ulimit
 
@@ -51,14 +49,12 @@ the command starts, and exits with the command's status.
 ## The worker count
 
 A test run's memory grows in a straight line with its workers, and `bun test --parallel` with no
-count starts one worker per core, so the worker count follows the host's memory. The worker-count
-helper, delivered by the `pre-push-baseline` entry as `scripts/read-worker-count.ts` to every repo
-but one on rig whose tracked files name neither the helper nor the
-[related-tests runner](./pre-push-baseline.md#the-delivered-baseline), prints `TEST_WORKERS` when it
-is set. Otherwise a host whose memory budget is under the small-host budget gets one worker, and any
-other host gets one per core, up to a cap. The memory budget is the host's total memory, or the
-tightest cgroup cap on the process and its ancestors when that is lower, and
-`scripts/read-memory-budget.ts` prints it in MiB.
+count starts one worker per core, so the worker count follows the host's memory. `rig` reads the
+count with [`read-worker-count.ts`](../../packages/rig/src/unit/read-worker-count.ts), which uses
+`TEST_WORKERS` when it is set. Otherwise a host whose memory budget is under the small-host budget
+gets one worker, and any other host gets one per core, up to a cap. The memory budget is the host's
+total memory, or the tightest cgroup cap on the process and its ancestors when that is lower, and
+[`read-memory-budget.ts`](../../packages/rig/src/unit/read-memory-budget.ts) reads it.
 
 A repo passes the count to each tool that starts workers:
 

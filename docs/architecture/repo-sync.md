@@ -26,14 +26,10 @@ its step scripts:
 - [`sync/skills-pin.json`](../../sync/skills-pin.json): the commit of zgeoff/skills that each skill
   entry copies its text from, as [Skills](#skills) describes.
 - [`sync/src/hooks/`](../../sync/src/hooks/): the agent hooks' start-up stub.
-- [`sync/src/pre-push/`](../../sync/src/pre-push/): the [pre-push baseline](./pre-push-baseline.md)
-  that the `pre-push-baseline` entry delivers, and the [memory-cap script](./memory-caps.md) that
-  its tests run.
 - [`sync/src/deadcode/`](../../sync/src/deadcode/): the
   [knip runner](../runbooks/downstream-repo-setup.md#opting-in-to-the-knip-runner).
 - [`packages/chex/src/`](../../packages/chex/src/): the docs check scripts that the skill entries
-  deliver, and the check scripts of the `pre-push-baseline` entry.
-  [`@zgeoff/chex`](../../packages/chex/README.md) runs the same scripts as `chex <check>`.
+  deliver. [`@zgeoff/chex`](../../packages/chex/README.md) runs the same scripts as `chex <check>`.
 
 ## Delivery
 
@@ -233,9 +229,6 @@ lists, which repo-sync never touches.
 The `skill-gate-rules` entry delivers the gate's rules to `.claude/skill-gate.json` in each repo
 that its `except` list leaves out, as
 [The shared rules](../guides/skill-gate-rules.md#the-shared-rules) describes.
-
-The pre-push baseline is an entry of its own kind, which
-[The pre-push baseline](./pre-push-baseline.md) describes.
 
 ## Retired files
 
