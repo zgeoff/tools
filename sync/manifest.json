@@ -193,6 +193,11 @@
       },
       {
         "repo": "zgeoff/skills",
+        "source": "skills/code-style/references/state-and-processes.md",
+        "target": ".claude/skills/code-style/references/state-and-processes.md"
+      },
+      {
+        "repo": "zgeoff/skills",
         "source": "skills/code-style/references/state-and-waiting.md",
         "target": ".claude/skills/code-style/references/state-and-waiting.md"
       }
