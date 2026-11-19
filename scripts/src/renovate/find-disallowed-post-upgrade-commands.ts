@@ -1,4 +1,4 @@
-import { isRecord } from '../../../packages/std/src/is-record.ts';
+import { isRecord } from '../../../packages/std/src/guards/is-record.ts';
 
 // Renovate refuses a post-upgrade command that no allowedCommands pattern matches, and marks the
 // branch's artifacts as failed, so every bump that runs the command waits on a person.

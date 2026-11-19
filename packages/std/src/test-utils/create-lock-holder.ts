@@ -11,7 +11,7 @@ export interface LockHolder {
   readonly kill: () => Promise<void>;
 }
 
-const withFileLockPath = join(import.meta.dir, '..', 'with-file-lock.ts');
+const withFileLockPath = join(import.meta.dir, '..', 'file-lock', 'with-file-lock.ts');
 
 // Another process that holds the lock through withFileLock until its stdin closes or it dies.
 export async function createLockHolder(lockPath: string): Promise<LockHolder> {

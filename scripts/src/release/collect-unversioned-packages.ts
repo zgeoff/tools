@@ -1,4 +1,4 @@
-import { isRecord } from '../../../packages/std/src/is-record.ts';
+import { isRecord } from '../../../packages/std/src/guards/is-record.ts';
 
 // release-please gives a package with no manifest version its initial-version, which is the version
 // a first publish by hand already took, so its first CI release would collide with it.

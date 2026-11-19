@@ -1,6 +1,6 @@
 // oxlint-disable max-classes-per-file -- setup-test-only bans a module-level class, so each class-instance test declares its own
 import { expect, test } from 'bun:test';
-import { isRecord } from './is-record.ts';
+import { isRecord } from '../guards/is-record.ts';
 import { mergeDeep } from './merge-deep.ts';
 
 interface Settings {

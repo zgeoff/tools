@@ -1,1 +1,1 @@
-../../../packages/std/src/read-optional-text.ts
+../../../packages/std/src/io/read-optional-text.ts

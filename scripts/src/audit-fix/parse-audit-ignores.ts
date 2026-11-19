@@ -1,4 +1,4 @@
-import { isRecord } from '../../../packages/std/src/is-record.ts';
+import { isRecord } from '../../../packages/std/src/guards/is-record.ts';
 import type { AuditIgnores } from './types.ts';
 
 export function parseAuditIgnores(value: unknown): AuditIgnores {

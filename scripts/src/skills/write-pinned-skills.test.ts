@@ -14,7 +14,7 @@ import {
 import { join } from 'node:path';
 import { readRunFolderPrefix, waitFor, writeTreeFiles } from '@zgeoff/testing/helpers';
 import invariant from 'tiny-invariant';
-import { withFileLock } from '../../../packages/std/src/with-file-lock.ts';
+import { withFileLock } from '../../../packages/std/src/file-lock/with-file-lock.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { writeSkillsArchive } from '../test-utils/write-skills-archive.ts';

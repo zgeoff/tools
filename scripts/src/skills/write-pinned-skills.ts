@@ -1,7 +1,7 @@
 import { rename } from 'node:fs/promises';
 import { join } from 'node:path';
-import { withFileLock } from '../../../packages/std/src/with-file-lock.ts';
-import { writeStdout } from '../../../packages/std/src/write-stdout.ts';
+import { withFileLock } from '../../../packages/std/src/file-lock/with-file-lock.ts';
+import { writeStdout } from '../../../packages/std/src/io/write-stdout.ts';
 import type { FileSystem } from '../ci/file-system.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
