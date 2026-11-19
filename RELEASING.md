@@ -32,11 +32,15 @@ The shared files under `sync/` reach each repo on every green `main` instead, as
    `scripts/src/check-release-head.sh`: when `main` moved past the merge commit with a workflow
    change, it fails with both commits named, and the release needs the steps in
    [Recover an untagged release PR](#recover-an-untagged-release-pr).
-4. `main.yml`'s dispatch job starts `main.yml` again at the tag, with the released package folders.
-   The publish job of that run calls `npm-publish.yml`. For each folder it skips a private package
-   and a version npm holds already, then runs the package's `build` script when it has one,
-   `bun pm pack` (resolves `catalog:`/`workspace:` to exact versions — never pack with npm) and
-   `npm publish <tarball> --provenance --access public` under OIDC, from Node 24. The run is at the
+4. `main.yml`'s dispatch job runs
+   [`dispatch-tag-publish.sh`](./scripts/src/release/dispatch-tag-publish.sh), which checks that
+   every released package shares one release commit and starts `main.yml` again at the tag, with the
+   released package folders. The publish job of that run calls `npm-publish.yml`, which downloads
+   [`publish-npm-tarballs.sh`](./scripts/src/release/publish-npm-tarballs.sh) from the commit that
+   defines the workflow. For each folder the script skips a private package and a version npm holds
+   already, then runs the package's `build` script when it has one, `bun pm pack` (resolves
+   `catalog:`/`workspace:` to exact versions — never pack with npm) and
+   `npm publish <tarball> --provenance --access public` under OIDC, from Node 26. The run is at the
    tag so that the provenance names the tagged commit. A package that fails to publish does not keep
    the others from npm; the job fails at the end.
 
