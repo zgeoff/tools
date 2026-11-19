@@ -33,7 +33,7 @@
   "scripts": {
     "build": "rm -rf dist && bun run build:outdir dist",
     "build:outdir": "sh -c 'bun build src/index.ts src/cli.ts --target bun --outdir \"$0\" && tsc -p tsconfig.build.json --outDir \"$0\"'",
-    "typecheck": "tsrs"
+    "typecheck": "tsrs --fast"
   },
   "devDependencies": {
     "@types/bun": "catalog:",
