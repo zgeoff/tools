@@ -118,10 +118,11 @@ match the table above, with these differences:
 - The workflow lint job reads changed files under `sync/workflow-callers/` in place of
   `sync/src/workflow-callers/`, a folder that only tools holds.
 - Each job runs through the `memory-capped` script, which the build points at the
-  [memory-cap script](./memory-caps.md) with the host's memory budget as the cap.
+  [memory-cap script](./memory-caps.md) with the host's memory budget as the cap. repo-sync no
+  longer delivers that script, so a repo that takes the baseline again adds it or runs `diet`.
 - The docs job runs the docs-writing skill's `check-prose.sh`, `check-length.sh` and
-  `check-links.sh`, then `check-vision.sh` when the `docs-vision-check` entry put it beside them and
-  the skill-writing skill's `check-skill.sh` when the repo takes that skill. In a repo without
+  `check-links.sh`, then `check-vision.sh` when the repo has it beside them and the skill-writing
+  skill's `check-skill.sh` when the repo takes that skill. In a repo without
   `.claude/skills/docs-writing/scripts/` it prints a notice and passes.
 - The test job runs the repo's `test:related` script. The script that the build adds runs
   `scripts/run-related-tests.ts`, which takes the lane suffixes from the `lanes` option of

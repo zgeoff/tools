@@ -4,10 +4,9 @@ A test run or a type check that outgrows its host takes the host down with it: o
 shared by parallel agents, the kernel's OOM killer then picks a process from any session. The
 [`@zgeoff/diet`](../../packages/diet/README.md) runs a command inside a cgroup with a memory cap and
 no swap, so the kernel kills that command first, and it reports how close the run came. tools runs
-its pre-push jobs under `diet`. The `memory-cap` entry delivers a script with the same modes to
-every repo, as `scripts/run-memory-capped.sh`. The script takes its cap in MiB as its first
-argument, and the baseline's `memory-capped` package script passes it the memory budget that
-`scripts/read-memory-budget.ts` prints.
+its pre-push jobs under `diet`. repo-sync no longer delivers `scripts/run-memory-capped.sh`: each
+repo runs `diet` in its place. The script stays in `sync/src/pre-push/` for the pre-push baseline's
+own tests.
 
 ## Why a cgroup and not ulimit
 
