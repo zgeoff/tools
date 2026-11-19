@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.13](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.12...@zgeoff/chex@0.3.13) (2026-11-19)
+
+
+### Bug Fixes
+
+* **chex:** fail the docs checks when they can't run on macOS ([#690](https://github.com/zgeoff/tools/issues/690)) ([5ac165f](https://github.com/zgeoff/tools/commit/5ac165f77432e98e9fb28e8936752cebad79c0ef))
+
 ## [0.3.12](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.11...@zgeoff/chex@0.3.12) (2026-11-19)
 
 
