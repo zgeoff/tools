@@ -21,7 +21,7 @@
     "access": "public"
   },
   "scripts": {
-    "typecheck": "tsrs"
+    "typecheck": "tsrs --fast"
   },
   "dependencies": {
     "@tsconfig/strictest": "catalog:"
