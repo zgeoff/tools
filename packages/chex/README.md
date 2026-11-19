@@ -71,6 +71,7 @@ commits since its base.
 Some docs checks skip files whether or not you name paths, and a path you name never brings a
 skipped file back:
 
+- `prose` needs `perl` and a `git` with PCRE, and fails with exit 2 when it lacks one.
 - `prose` skips the `docs-writing`, `project-docs-writing`, `skill-writing` and `deslop` skills
   under `.agents/skills/`, `.claude/skills/`, `skills/` and `sync/skills/`, which hold the banned
   patterns as examples.

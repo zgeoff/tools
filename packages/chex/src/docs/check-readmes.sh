@@ -38,10 +38,15 @@ while IFS= read -r file; do
   [ -f "$file" ] && readmes+=("$file")
 done < <(sort -u <<< "$listing")
 
-declare -A listed=()
-for readme in "${readmes[@]}"; do
-  listed[$readme]=1
-done
+# bash 3.2 has no associative arrays, so membership scans the list. An empty array is unbound under
+# set -u in bash 3.2, so each expansion of it is guarded.
+is_listed() {
+  local readme
+  for readme in ${readmes[@]+"${readmes[@]}"}; do
+    [ "$readme" = "$1" ] && return 0
+  done
+  return 1
+}
 
 # Holds when the first H1 outside a code block starts "Spike: ".
 is_spike() {
@@ -63,7 +68,7 @@ is_spike() {
 # Holds when a README in one of the folder's direct subfolders is a spike README.
 indexes_spikes() {
   local dir=$1 readme
-  for readme in "${readmes[@]}"; do
+  for readme in ${readmes[@]+"${readmes[@]}"}; do
     if [[ $readme == "$dir"/*/README.md && $readme != "$dir"/*/*/README.md ]] && is_spike "$readme"; then
       return 0
     fi
@@ -76,7 +81,7 @@ is_design() {
   [[ $readme == docs/design/*/README.md && /$readme/ != */spikes/* ]] || return 1
   [[ $readme != docs/design/*/*/README.md ]] && return 0
   parent=$(dirname "$(dirname "$readme")")/README.md
-  [ -n "${listed[$parent]:-}" ] && is_design "$parent"
+  is_listed "$parent" && is_design "$parent"
 }
 
 manifests=(package.json go.mod Cargo.toml build.gradle.kts build.gradle settings.gradle.kts settings.gradle)
@@ -96,7 +101,7 @@ is_known() {
 }
 
 unknown=0
-for readme in "${readmes[@]}"; do
+for readme in ${readmes[@]+"${readmes[@]}"}; do
   if ! is_known "$readme"; then
     unknown=$((unknown + 1))
     echo "$readme: not one of the five kinds of README; move its content into docs/, or into a code comment beside the code it explains"

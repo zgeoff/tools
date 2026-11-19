@@ -49,6 +49,27 @@ async function setupTest() {
   const run = (...args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`.cwd(directory).env(env).nothrow().quiet();
 
+  const runInUtf8Locale = (...args: readonly string[]) =>
+    $`bash ${scriptPath} ${args}`
+      .cwd(directory)
+      .env({ ...env, LC_ALL: 'en_US.UTF-8' })
+      .nothrow()
+      .quiet();
+
+  const runWithStub = async (name: string, script: string, ...args: readonly string[]) => {
+    const stubDirectory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-prose-stub-')));
+
+    onTestFinished(() => rm(stubDirectory, { recursive: true, force: true }));
+
+    await writeFile(join(stubDirectory, name), `#!/bin/sh\n${script}\n`, { mode: 0o755 });
+
+    return $`bash ${scriptPath} ${args}`
+      .cwd(directory)
+      .env({ ...env, PATH: `${stubDirectory}:${process.env['PATH']}` })
+      .nothrow()
+      .quiet();
+  };
+
   const runInPullRequest = (cwd: string, baseRef: string, args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`
       .cwd(cwd)
@@ -88,6 +109,8 @@ async function setupTest() {
     writeText,
     runCommit,
     run,
+    runInUtf8Locale,
+    runWithStub,
     runInPullRequest,
     createOrigin,
     createShallowClone,
@@ -1539,5 +1562,175 @@ test('it exits 2 and asks for a git work tree when run outside one', async () =>
   expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
     exitCode: 2,
     stderr: 'check-prose: run it inside a git work tree, because it lists the files with git\n',
+  });
+});
+
+test('it fails without printing clean when perl is missing', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', '# Guide\n\nThe seams show.\n');
+
+  const result = await ctx.runWithStub('perl', 'exit 127', 'guide.md');
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: '',
+    stderr: 'check-prose: perl is required and was not found on the PATH, so no doc was checked\n',
+  });
+});
+
+test('it fails without printing clean when the Perl matcher breaks mid-run', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', '# Guide\n\nThe seams show.\n');
+
+  const result = await ctx.runWithStub(
+    'perl',
+    '[ "$1" = -e ] && exit 0; cat > /dev/null; exit 2',
+    'guide.md',
+  );
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString().includes('clean'),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: false,
+    stderr: 'check-prose: a check failed to run, so the result above is incomplete\n',
+  });
+});
+
+test('it fails without printing clean when git grep errors', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', '# Guide\n\nThe seams show.\n');
+
+  const result = await ctx.runWithStub(
+    'git',
+    `if [ "$1" = grep ] && [ "$2" = --untracked ]; then exit 128; fi; PATH='${process.env['PATH']}' exec git "$@"`,
+    'guide.md',
+  );
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString().includes('clean'),
+  }).toStrictEqual({ exitCode: 2, stdout: false });
+});
+
+test('it reports a banned word that a letter folding to s starts, as grep does under UTF-8', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', 'The ſeams are tight.\n');
+
+  const result = await ctx.run('guide.md');
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: 'Banned words:\nguide.md:1:The ſeams are tight.\n\n',
+    stderr: '',
+  });
+});
+
+test('it passes a banned word that a non-ASCII letter follows', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', 'The seamsé are tight.\n');
+
+  const result = await ctx.run('guide.md');
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
+});
+
+test('it reports a banned word on a line that holds invalid UTF-8', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'guide.md'),
+    Buffer.concat([Buffer.from('The seams '), Buffer.from([0xff]), Buffer.from(' are tight.\n')]),
+  );
+
+  const result = await ctx.run('guide.md');
+
+  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
+    exitCode: 1,
+    stderr: '',
+  });
+});
+
+test('it reports a non-ASCII banned word on a line that also holds invalid UTF-8', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'guide.md'),
+    Buffer.concat([Buffer.from('The ſeams '), Buffer.from([0xff]), Buffer.from(' are tight.\n')]),
+  );
+
+  const result = await ctx.run('guide.md');
+
+  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
+    exitCode: 1,
+    stderr: '',
+  });
+});
+
+test('it reports a banned word beside a line with invalid UTF-8 under a UTF-8 locale', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'mixed.md'),
+    Buffer.concat([
+      Buffer.from('A plain line.\nThe ſeams '),
+      Buffer.from([0xff]),
+      Buffer.from(' are tight.\n'),
+    ]),
+  );
+
+  await ctx.runGit('add', '-A');
+
+  const result = await ctx.runInUtf8Locale('mixed.md');
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: 'Banned words:\nmixed.md:2:The ſeams \uFFFD are tight.\n\n',
+    stderr: '',
+  });
+});
+
+test('it fails without printing clean when awk fails', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', '# Guide\n\nThe seams show.\n');
+
+  const result = await ctx.runWithStub('awk', 'exit 2', 'guide.md');
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString().includes('clean'),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: false,
+    stderr: 'check-prose: a check failed to run, so the result above is incomplete\n',
   });
 });

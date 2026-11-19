@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,6 +7,12 @@ import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 import { buildSkillPageLines } from '../test-utils/build-skill-page-lines.ts';
+
+// bash 3.2 is what macOS ships as /bin/bash. A host whose /bin/bash is newer cannot show a failure
+// that only bash 3.2 has, so the test that needs it skips there.
+const hasBash32 = Bun.spawnSync(['/bin/bash', '-c', 'echo "$BASH_VERSION"'])
+  .stdout.toString()
+  .startsWith('3.');
 
 async function setupTest() {
   const outsideDirectory = await mkdtemp(
@@ -60,7 +66,7 @@ async function setupTest() {
       .nothrow()
       .quiet();
 
-  return { outsideDirectory, writePage, run, runWithoutBun };
+  return { outsideDirectory, directory, env, scriptPath, writePage, run, runWithoutBun };
 }
 
 test('it passes a skill with a name, a description, and short files', async () => {
@@ -1645,3 +1651,58 @@ test('it exits 2 and asks for a git work tree when run outside one', async () =>
     stderr: 'check-skill: run it inside a git work tree, because it lists the files with git\n',
   });
 });
+
+test('it uses no construct that bash 3.2 lacks', async () => {
+  const ctx = await setupTest();
+  const source = await readFile(ctx.scriptPath, 'utf8');
+
+  const code = source
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('#'))
+    .join('\n');
+
+  expect({
+    associative: /\b(?:declare|local|typeset)\s+-[a-zA-Z]*A/u.test(code),
+    mapfile: /\b(?:mapfile|readarray)\b/u.test(code),
+    caseChange: /\$\{\w+(?:,,|\^\^)/u.test(code),
+    nameReference: /\b(?:declare|local)\s+-[a-zA-Z]*n\b/u.test(code),
+    pipeStderr: /\|&|&>>/u.test(code),
+  }).toStrictEqual({
+    associative: false,
+    mapfile: false,
+    caseChange: false,
+    nameReference: false,
+    pipeStderr: false,
+  });
+});
+
+test('it expands no array that can be empty without a guard', async () => {
+  const ctx = await setupTest();
+  const source = await readFile(ctx.scriptPath, 'utf8');
+
+  const code = source
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('#'))
+    .join('\n');
+
+  expect(code.match(/(?<!\+)"\$\{dirs\[@\]\}"/gu)).toBeNull();
+});
+
+test.skipIf(!hasBash32)(
+  'it runs under bash 3.2 when no input leaves anything to check',
+  async () => {
+    const ctx = await setupTest();
+
+    const result = await $`/bin/bash ${ctx.scriptPath}`
+      .cwd(ctx.directory)
+      .env(ctx.env)
+      .nothrow()
+      .quiet();
+
+    expect({
+      exitCode: result.exitCode,
+      stdout: result.stdout.toString(),
+      stderr: result.stderr.toString(),
+    }).toStrictEqual({ exitCode: 0, stdout: 'check-skill: no skills to check\n', stderr: '' });
+  },
+);
