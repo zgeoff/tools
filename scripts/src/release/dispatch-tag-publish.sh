@@ -10,7 +10,8 @@
 #      GH_TOKEN, a token that may dispatch workflows.
 set -euo pipefail
 
-paths=$(jq -c '.paths_released' <<< "$RELEASE_OUTPUTS")
+# release-please emits paths_released as a JSON-encoded string; accept a plain array too.
+paths=$(jq -c '.paths_released | if type == "string" then fromjson else . end' <<< "$RELEASE_OUTPUTS")
 shas=$(jq -r --argjson paths "$paths" \
   '[$paths[] as $p | .[$p + "--sha"] // "null"] | unique | join(" ")' <<< "$RELEASE_OUTPUTS")
 

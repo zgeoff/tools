@@ -36,7 +36,7 @@ test('it dispatches main.yml at the tag of the first released path with every pa
   const ctx = await setupTest();
 
   const result = await ctx.runScript({
-    paths_released: ['packages/std', 'packages/chex'],
+    paths_released: JSON.stringify(['packages/std', 'packages/chex']),
     'packages/std--sha': 'abc123',
     'packages/std--tag_name': '@zgeoff/std@1.2.0',
     'packages/chex--sha': 'abc123',
@@ -56,7 +56,7 @@ test('it refuses packages released from different commits and dispatches nothing
   const ctx = await setupTest();
 
   const result = await ctx.runScript({
-    paths_released: ['packages/std', 'packages/chex'],
+    paths_released: JSON.stringify(['packages/std', 'packages/chex']),
     'packages/std--sha': 'abc123',
     'packages/std--tag_name': '@zgeoff/std@1.2.0',
     'packages/chex--sha': 'def456',
@@ -78,7 +78,7 @@ test('it refuses a release that names no commit', async () => {
   const ctx = await setupTest();
 
   const result = await ctx.runScript({
-    paths_released: ['packages/std'],
+    paths_released: JSON.stringify(['packages/std']),
     'packages/std--tag_name': '@zgeoff/std@1.2.0',
   });
 
@@ -91,4 +91,22 @@ test('it refuses a release that names no commit', async () => {
   const calls = await ctx.readCalls();
 
   expect(calls).toStrictEqual([]);
+});
+
+test('it accepts paths_released as a plain array', async () => {
+  const ctx = await setupTest();
+
+  const result = await ctx.runScript({
+    paths_released: ['packages/std'],
+    'packages/std--sha': 'abc123',
+    'packages/std--tag_name': '@zgeoff/std@1.2.0',
+  });
+
+  expect(result.exitCode).toBe(0);
+
+  const calls = await ctx.readCalls();
+
+  expect(calls).toStrictEqual([
+    'workflow run main.yml --repo zgeoff/tools --ref @zgeoff/std@1.2.0 -f republish_paths=["packages/std"]',
+  ]);
 });

@@ -18,7 +18,7 @@ interface MockPackage {
   readonly failsToPublish?: boolean;
 }
 
-async function setupTest(packages: readonly MockPackage[]) {
+async function setupTest(packages: readonly MockPackage[], pathsInput?: string) {
   // The stand-in npm answers `view` from the published map and fails `publish` for a failing name;
   // the stand-in bun lists its calls and writes an empty tarball for `pm pack`.
   const npmStub = `#!/usr/bin/env bash
@@ -75,7 +75,11 @@ fi
 
     await writeFile(
       join(root, pkg.folder, 'package.json'),
-      JSON.stringify({ name: pkg.name, version: pkg.version, private: pkg.private }),
+      JSON.stringify({
+        name: pkg.name,
+        version: pkg.version,
+        private: pkg.private,
+      }),
     );
   }
 
@@ -84,7 +88,10 @@ fi
       script: fileURLToPath(new URL('publish-npm-tarballs.sh', import.meta.url)),
       args: [],
       stubDirectory: stubs,
-      env: { PATHS: JSON.stringify(packages.map((pkg) => pkg.folder)), TMPDIR: directory },
+      env: {
+        PATHS: pathsInput ?? JSON.stringify(packages.map((pkg) => pkg.folder)),
+        TMPDIR: directory,
+      },
       cwd: root,
     });
 
@@ -115,8 +122,18 @@ test('it packs a package and publishes its tarball with provenance', async () =>
 
 test('it skips a private package and a version npm holds already', async () => {
   const ctx = await setupTest([
-    { folder: 'packages/hidden', name: '@zgeoff/hidden', version: '0.1.0', private: true },
-    { folder: 'packages/std', name: '@zgeoff/std', version: '1.2.0', published: '1.2.0' },
+    {
+      folder: 'packages/hidden',
+      name: '@zgeoff/hidden',
+      version: '0.1.0',
+      private: true,
+    },
+    {
+      folder: 'packages/std',
+      name: '@zgeoff/std',
+      version: '1.2.0',
+      published: '1.2.0',
+    },
   ]);
 
   const result = await ctx.run();
@@ -134,7 +151,12 @@ test('it skips a private package and a version npm holds already', async () => {
 
 test('it publishes the rest after one package fails, then fails', async () => {
   const ctx = await setupTest([
-    { folder: 'packages/bad', name: '@zgeoff/bad', version: '1.0.0', failsToPublish: true },
+    {
+      folder: 'packages/bad',
+      name: '@zgeoff/bad',
+      version: '1.0.0',
+      failsToPublish: true,
+    },
     { folder: 'packages/good', name: '@zgeoff/good', version: '2.0.0' },
   ]);
 
@@ -144,4 +166,17 @@ test('it publishes the rest after one package fails, then fails', async () => {
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toBe('::error::@zgeoff/bad@1.0.0 failed to publish\n');
   expect(calls.filter((call) => call.startsWith('npm publish'))).toHaveLength(2);
+});
+
+test('it fails and publishes nothing when the paths are not JSON', async () => {
+  const ctx = await setupTest(
+    [{ folder: 'packages/std', name: '@zgeoff/std', version: '1.2.0' }],
+    'not-json',
+  );
+
+  const result = await ctx.run();
+  const calls = await ctx.readCalls();
+
+  expect(result.exitCode).not.toBe(0);
+  expect(calls).toStrictEqual([]);
 });

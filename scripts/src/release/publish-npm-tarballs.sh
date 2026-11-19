@@ -8,9 +8,11 @@
 # Env: PATHS, a JSON array of the package folders, e.g. ["packages/std"].
 set -euo pipefail
 
+# Parse first: a malformed PATHS must fail the script, not publish nothing.
+dirs=$(jq -r '.[]' <<< "$PATHS")
 failed=0
 
-for dir in $(jq -r '.[]' <<< "$PATHS"); do
+for dir in $dirs; do
   name=$(jq -r .name "$dir/package.json")
   version=$(jq -r .version "$dir/package.json")
 
