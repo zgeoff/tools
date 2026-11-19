@@ -3,11 +3,10 @@
 The pre-push baseline is the set of lefthook jobs that a repo runs before a push.
 [`@zgeoff/chex`](../../packages/chex/README.md) ships it as
 [`lefthook.yml`](../../packages/chex/lefthook.yml), which a repo's own `lefthook.yml` extends from
-`node_modules/@zgeoff/chex/lefthook.yml`, and this repo's `lefthook.yml` extends it too. The opt-in
-`pre-push-baseline` entry of repo-sync delivers the same jobs in a form that calls package scripts,
-to the repos that do not install chex, as [The delivered baseline](#the-delivered-baseline)
-describes. The baseline runs its jobs one at a time, so a push fits a host with little memory or a
-machine shared by parallel agents. CI keeps every whole-tree check required.
+`node_modules/@zgeoff/chex/lefthook.yml`, and this repo's `lefthook.yml` extends it too. repo-sync
+no longer delivers a baseline: a repo takes it from chex. The baseline runs its jobs one at a time,
+so a push fits a host with little memory or a machine shared by parallel agents. CI keeps every
+whole-tree check required.
 
 ## A checkout without the baseline
 
@@ -70,8 +69,7 @@ The workflow lint checks the rules that the ci-design skill's
 [Step scripts](https://github.com/zgeoff/skills/blob/main/skills/ci-design/SKILL.md#step-scripts)
 section lists, over the changed files under `.github/workflows/` and `sync/src/workflow-callers/`,
 where tools keeps the callers it delivers. It runs when the machine lacks actionlint or actionlint
-fails, and it prints each fault and fails the push. The delivered baseline reads
-`sync/workflow-callers/` instead, as [The delivered baseline](#the-delivered-baseline) lists.
+fails, and it prints each fault and fails the push.
 
 Each job runs its command under [`diet`](./memory-caps.md), so in a
 [mode](./memory-caps.md#the-modes) that caps, a job that outgrows the host fails alone, and every
@@ -100,59 +98,8 @@ the repo root otherwise, as [The bunfig of each test](./rig.md#the-bunfig-of-eac
 The job passes `bun test` the [worker count](./memory-caps.md#the-worker-count) as `--parallel`,
 with `--no-isolate`, so the files of a worker share one global, as they do in the repo's own test
 run. With one worker it also raises the per-test timeout, because a host with one worker runs each
-file slower than CI does. `scripts/build-related-test-command.ts`, which builds the runner's
-command, holds that timeout as one constant, the only place a run may raise the timeout.
-
-## The delivered baseline
-
-The `pre-push-baseline` entry delivers the baseline to a repo that does not install chex, as
-`.lefthook/pre-push-baseline.yml`, from
-[`sync/src/pre-push/lefthook-pre-push.yml`](../../sync/src/pre-push/lefthook-pre-push.yml). Its jobs
-match the table above, with these differences:
-
-- Each job calls a package script that the entry's build adds to `package.json` when the repo lacks
-  it: `files:branch`, `lint:files`, `test:related`, `check:commits`, `check:local-paths`,
-  `check:test-timeouts`, `check:dependency-gates`, `check:workflows`, `check:uncommitted` and
-  `memory-capped`. The build also moves a script that runs the old `scripts/collect-branch-files.ts`
-  or a check script from its old flat path, such as `scripts/read-branch-files.ts`, to the same
-  script in its feature folder, such as `scripts/branch/read-branch-files.ts`.
-- The workflow lint job reads changed files under `sync/workflow-callers/` in place of
-  `sync/src/workflow-callers/`, a folder that only tools holds.
-- Each job runs through the `memory-capped` script, which the build points at the
-  [memory-cap script](./memory-caps.md) with the host's memory budget as the cap. repo-sync no
-  longer delivers that script, so a repo that takes the baseline again adds it or runs `diet`.
-- The docs job runs the docs-writing skill's `check-prose.sh`, `check-length.sh` and
-  `check-links.sh`, then `check-vision.sh` when the repo has it beside them and the skill-writing
-  skill's `check-skill.sh` when the repo takes that skill. In a repo without
-  `.claude/skills/docs-writing/scripts/` it prints a notice and passes.
-- The test job runs the repo's `test:related` script. The script that the build adds runs
-  `scripts/run-related-tests.ts`, which takes the lane suffixes from the `lanes` option of
-  `zgeoff/max-test-timeout` in the root `.oxlintrc.json`, as
-  [the test timeout check](./oxlint-config-tests.md#the-test-timeout-check) reads it. It also drops
-  each test that the `[test]` `pathIgnorePatterns` of the root `bunfig.toml` cover, because
-  `bun test` exits 1 when every path it is given is ignored.
-- In a repo whose root `package.json` lists `@zgeoff/rig` in `dependencies` or `devDependencies`,
-  and has its own `test:related`, such as `rig related`, the build deletes
-  `scripts/run-related-tests.ts` when `git grep` finds that path in no tracked file but the runner's
-  own scripts. A caller can sit in any tracked file, such as a workspace package's `package.json` or
-  a workflow. With the runner, the build deletes `scripts/build-related-test-command.ts`, because
-  that script imports `./read-worker-count.ts` and has no other caller. The entry never delivers a
-  test of that script, and the build deletes `scripts/build-related-test-command.test.ts` too when
-  the repo holds one. Then the build deletes `scripts/read-worker-count.ts` by the same `git grep`
-  test. The build deletes the scripts that the entry just wrote, so the sync pull request deletes
-  any copy that an earlier sync left in the repo. A repo on rig whose `test:related` is missing or
-  still runs the runner keeps all three scripts, so its pre-push test job still finds the script it
-  calls.
-
-The entry delivers the check scripts from [`packages/chex/src/`](../../packages/chex/src/), under
-the same folders and names in `scripts/`, so a delivered check runs the code that `chex <check>`
-runs. The related-tests runner, `scripts/build-related-test-command.ts`,
-`scripts/read-worker-count.ts` and `scripts/read-memory-budget.ts` come from
-[`sync/src/pre-push/`](../../sync/src/pre-push/). The check scripts exit 0 when clean or skipped, 1
-with a problem, and 2 when they cannot run, such as in a clone without origin's default branch. A
-repo opts in with three changes, which
-[Opting in to the pre-push baseline](../runbooks/downstream-repo-setup.md#opting-in-to-the-pre-push-baseline)
-lists.
+file slower than CI does. The runner's command builder holds that timeout as one constant, the only
+place a run may raise the timeout.
 
 ## Limits of the baseline
 
@@ -166,10 +113,10 @@ A repo changes what the `format:check`, `typecheck` and docs jobs run through th
 that each job calls. The other jobs call their programs directly, so a repo cannot change them.
 
 lefthook 2.2.2 lets a job of an extended file replace the job of the same name in the repo's
-`lefthook.yml`. So each baseline job has a name that starts with `chex-`, in both the chex baseline
-and the delivered one, and a repo's own job of any other name runs beside the baseline's. To run its
-own job in place of a baseline job, such as a typecheck under a lower memory cap, a repo lists the
-baseline job's name under the hook's `exclude_tags`, which lefthook matches against job names too:
+`lefthook.yml`. So each baseline job has a name that starts with `chex-`, and a repo's own job of
+any other name runs beside the baseline's. To run its own job in place of a baseline job, such as a
+typecheck under a lower memory cap, a repo lists the baseline job's name under the hook's
+`exclude_tags`, which lefthook matches against job names too:
 
 ```yaml
 pre-push:

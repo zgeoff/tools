@@ -1,9 +1,8 @@
 # Setting up a downstream repo
 
 A downstream repo takes the files tools shares through [repo sync](../architecture/repo-sync.md).
-Wire the repo up once, then opt in to each opt-in entry it runs. The agent hooks, the pre-push
-baseline and the knip runner need changes in the repo beyond the `include` line, which repo-sync
-never makes.
+Wire the repo up once, then opt in to each opt-in entry it runs. The agent hooks and the knip runner
+need changes in the repo beyond the `include` line, which repo-sync never makes.
 
 ## Wiring up a downstream repo
 
@@ -91,19 +90,6 @@ A repo opts in to the `hook-start` entry in five steps, plus a sixth for a repo 
    `agent-hooks init wrote .claude/settings.json and .codex/hooks.json`.
 6. For a repo that also uses Codex, trust the hook definitions in the Codex CLI with `/hooks`.
 
-## Opting in to the pre-push baseline
-
-The [pre-push baseline](../architecture/pre-push-baseline.md) runs its jobs one at a time, so a push
-fits a 2 GiB host. A repo opts in with three changes:
-
-1. Add `pre-push-baseline` to `include` in `.github/workflows/repo-sync.yml`.
-2. In `lefthook.yml`, add `extends: [.lefthook/pre-push-baseline.yml]`, and delete `parallel` and
-   the baseline's jobs from `pre-push` and `pre-commit`. lefthook refuses to run a hook that sets
-   both `parallel` and the baseline's `piped`. A job the repo keeps under `pre-push.jobs` runs
-   before the baseline's, so keep only cheap repo-specific gates there.
-3. Move every whole-tree check the baseline drops, such as type-aware lint, dead code and the full
-   suite, into CI as a required check, if CI does not run it already.
-
 ## Opting in to the knip runner
 
 knip run in a worktree inside another checkout, such as `<clone>/.worktrees/<branch>`, where
@@ -133,8 +119,9 @@ that commit's file in content and mode, so the run commits nothing for the entry
 
 ## Taking the baseline from chex
 
-A repo that installs [`@zgeoff/chex`](../../packages/chex/README.md) takes the same baseline with
-one `extends` line in place of the repo-sync entry:
+A repo that installs [`@zgeoff/chex`](../../packages/chex/README.md) takes the
+[pre-push baseline](../architecture/pre-push-baseline.md) with one `extends` line. The baseline runs
+its jobs one at a time, so a push fits a 2 GiB host:
 
 1. Run `bun add -d @zgeoff/chex @zgeoff/rig @zgeoff/diet @commitlint/cli @zgeoff/commitlint-config`
    at the repo root. Expect `bun.lock` to list the five packages.
@@ -143,19 +130,26 @@ one `extends` line in place of the repo-sync entry:
    `chex init: lefthook.yml runs chex-baseline first in pre-commit and pre-push, which fails when node_modules/@zgeoff/chex/lefthook.yml is missing`,
    and, for a repo with no `check:docs` script,
    `chex init: package.json runs "chex prose length links readmes skill" as check:docs`. `chex init`
-   adds the chex baseline to an `extends` list in block form or in one-line brackets, such as the
-   `extends: [.lefthook/pre-push-baseline.yml]` that the repo-sync entry asks for. It refuses
-   `extends` written as a single path with no brackets, such as `extends: local.yml`, and a bracket
-   list across lines; for these, add the chex baseline to the list by hand. It also refuses a
-   `pre-commit` or `pre-push` hook whose jobs are not a block list; for these, write the jobs as a
-   block list, then run `chex init` again.
+   adds the chex baseline to an `extends` list in block form or in one-line brackets, such as
+   `extends: [.lefthook/local.yml]`. It refuses `extends` written as a single path with no brackets,
+   such as `extends: local.yml`, and a bracket list across lines; for these, add the chex baseline
+   to the list by hand. It also refuses a `pre-commit` or `pre-push` hook whose jobs are not a block
+   list; for these, write the jobs as a block list, then run `chex init` again.
 3. Edit `check:docs` to name the docs checks the repo takes, such as
    `chex prose length links vision`. CI runs each check that it names as its own step.
-4. In `lefthook.yml`, delete `parallel` and the baseline's jobs from `pre-push` and `pre-commit`, as
-   step 2 of [Opting in to the pre-push baseline](#opting-in-to-the-pre-push-baseline) describes. To
-   keep a job of the repo's own in place of a baseline job, such as a typecheck under a lower memory
-   cap, list the baseline job's name, such as `chex-typecheck`, under the hook's `exclude_tags`, as
+4. In `lefthook.yml`, delete `parallel` and the baseline's jobs from `pre-push` and `pre-commit`,
+   because lefthook refuses to run a hook that sets both `parallel` and the baseline's `piped`. A
+   job the repo keeps under `pre-push.jobs` runs before the baseline's, so keep only cheap
+   repo-specific gates there. To keep a job of the repo's own in place of a baseline job, such as a
+   typecheck under a lower memory cap, list the baseline job's name, such as `chex-typecheck`, under
+   the hook's `exclude_tags`, as
    [Limits of the baseline](../architecture/pre-push-baseline.md#limits-of-the-baseline) shows.
-5. If the repo takes the `pre-push-baseline` entry, delete it from `include` in
-   `.github/workflows/repo-sync.yml`, and delete `.lefthook/pre-push-baseline.yml` from `extends` in
+5. Move every whole-tree check the baseline drops, such as type-aware lint, dead code and the full
+   suite, into CI as a required check, if CI does not run it already.
+6. If the repo lists `pre-push-baseline` in `include` or `skip` in
+   `.github/workflows/repo-sync.yml`, keep it in `skip` while `git grep` finds a caller of a
+   delivered script, such as `scripts/read-worker-count.ts` in a `test:e2e` script. The
+   [retired-files step](../architecture/repo-sync.md#retired-files) deletes a copy that matches a
+   delivered version, and it does not check for callers. Once `git grep` finds none, delete the name
+   from `include` or `skip`, and delete `.lefthook/pre-push-baseline.yml` from `extends` in
    `lefthook.yml`, so the push runs one baseline.

@@ -44,9 +44,6 @@ sync/               a private workspace; its src/ holds the sources that repo-sy
                     in sync/manifest.json; an edit there reaches every repo that takes the entry,
                     as docs/architecture/repo-sync.md describes; skills-pin.json pins the
                     zgeoff/skills commit of the skill text; the folders below sit in its src/
-  pre-push/         the pre-push baseline that the pre-push-baseline entry delivers; its check
-                    scripts come from packages/chex, whose own baseline this repo's lefthook.yml
-                    extends
   workflow-callers/ workflow stubs that call this repo's reusable workflows, all opt-in but the
                     repo-sync guard
   hooks/            the agent hooks' start-up stub that the hook-start entry delivers
