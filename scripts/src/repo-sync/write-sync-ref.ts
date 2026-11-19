@@ -1,4 +1,4 @@
-import { writeStepOutputs } from '../../../packages/chex/src/write-step-outputs.ts';
+import { writeStepOutputs } from '../../../packages/chex/src/output/write-step-outputs.ts';
 import type { FileSystem } from '../ci/file-system.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import type { RunCommand } from '../ci/run-command.ts';

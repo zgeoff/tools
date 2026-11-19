@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readGitEnv, readRunFolderPrefix } from '@zgeoff/testing/helpers';
-import { runProgram } from '../run-program.ts';
+import { runProgram } from '../program/run-program.ts';
 import { buildStubCommitlint } from './build-stub-commitlint.ts';
 
 async function setupTest() {

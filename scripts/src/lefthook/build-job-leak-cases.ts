@@ -59,7 +59,7 @@ export function buildJobLeakCases(configText: string): BaselineJobCase[] {
       .map((job): BaselineJobCase => ({
         title: `the ${job.hook} job ${job.name} lists its files without git's repository variables`,
         check: async (sandbox) => {
-          const chexSource = join(sandbox.repo, 'node_modules/@zgeoff/chex/src');
+          const chexSource = join(sandbox.repo, 'node_modules/@zgeoff/chex/src/branch');
 
           await mkdir(chexSource, { recursive: true });
 

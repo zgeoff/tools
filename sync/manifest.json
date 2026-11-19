@@ -386,7 +386,7 @@
   },
   {
     "name": "pre-push-baseline",
-    "description": "The light pre-push baseline: lefthook jobs that check only what the branch changes and run one at a time under a memory cap, a pre-commit typecheck, the scripts they call, the package scripts files:branch, lint:files, test:related, check:commits, check:local-paths, check:test-timeouts, check:dependency-gates, check:workflows, check:uncommitted and memory-capped where the repo lacks them, and a move of a files:branch script left on the old script path; in a repo whose package.json lists @zgeoff/rig and has a test:related script, and whose tracked files never name the related-tests runner, the build removes the runner with its command builder and any test of that builder the repo holds, and its worker-count helper when no tracked file names that either",
+    "description": "The light pre-push baseline: lefthook jobs that check only what the branch changes and run one at a time under a memory cap, a pre-commit typecheck, the scripts they call, the package scripts files:branch, lint:files, test:related, check:commits, check:local-paths, check:test-timeouts, check:dependency-gates, check:workflows, check:uncommitted and memory-capped where the repo lacks them, and a move of a script left on an old script path; in a repo whose package.json lists @zgeoff/rig and has a test:related script, and whose tracked files never name the related-tests runner, the build removes the runner with its command builder and any test of that builder the repo holds, and its worker-count helper when no tracked file names that either",
     "optIn": true,
     "files": [
       {
@@ -394,8 +394,8 @@
         "target": ".lefthook/pre-push-baseline.yml"
       },
       {
-        "source": "packages/chex/src/read-branch-files.ts",
-        "target": "scripts/read-branch-files.ts"
+        "source": "packages/chex/src/branch/read-branch-files.ts",
+        "target": "scripts/branch/read-branch-files.ts"
       },
       {
         "source": "sync/src/pre-push/run-related-tests.ts",
@@ -406,48 +406,48 @@
         "target": "scripts/build-related-test-command.ts"
       },
       {
-        "source": "packages/chex/src/read-branch-base.ts",
-        "target": "scripts/read-branch-base.ts"
+        "source": "packages/chex/src/branch/read-branch-base.ts",
+        "target": "scripts/branch/read-branch-base.ts"
       },
       {
-        "source": "packages/chex/src/read-pushed-ranges.ts",
-        "target": "scripts/read-pushed-ranges.ts"
+        "source": "packages/chex/src/push/read-pushed-ranges.ts",
+        "target": "scripts/push/read-pushed-ranges.ts"
       },
       {
-        "source": "packages/chex/src/parse-pushed-refs.ts",
-        "target": "scripts/parse-pushed-refs.ts"
+        "source": "packages/chex/src/push/parse-pushed-refs.ts",
+        "target": "scripts/push/parse-pushed-refs.ts"
       },
       {
-        "source": "packages/chex/src/read-range-commits.ts",
-        "target": "scripts/read-range-commits.ts"
+        "source": "packages/chex/src/commits/read-range-commits.ts",
+        "target": "scripts/commits/read-range-commits.ts"
       },
       {
-        "source": "packages/chex/src/format-commit-lines.ts",
-        "target": "scripts/format-commit-lines.ts"
+        "source": "packages/chex/src/commits/format-commit-lines.ts",
+        "target": "scripts/commits/format-commit-lines.ts"
       },
       {
-        "source": "packages/chex/src/read-pushed-refs-input.ts",
-        "target": "scripts/read-pushed-refs-input.ts"
+        "source": "packages/chex/src/push/read-pushed-refs-input.ts",
+        "target": "scripts/push/read-pushed-refs-input.ts"
       },
       {
-        "source": "packages/chex/src/parse-added-lines.ts",
-        "target": "scripts/parse-added-lines.ts"
+        "source": "packages/chex/src/local-paths/parse-added-lines.ts",
+        "target": "scripts/local-paths/parse-added-lines.ts"
       },
       {
-        "source": "packages/chex/src/pick-merge-blobs-command.ts",
-        "target": "scripts/pick-merge-blobs-command.ts"
+        "source": "packages/chex/src/local-paths/pick-merge-blobs-command.ts",
+        "target": "scripts/local-paths/pick-merge-blobs-command.ts"
       },
       {
-        "source": "packages/chex/src/run-program.ts",
-        "target": "scripts/run-program.ts"
+        "source": "packages/chex/src/program/run-program.ts",
+        "target": "scripts/program/run-program.ts"
       },
       {
-        "source": "packages/chex/src/parse-lane-limits.ts",
-        "target": "scripts/parse-lane-limits.ts"
+        "source": "packages/chex/src/test-timeouts/parse-lane-limits.ts",
+        "target": "scripts/test-timeouts/parse-lane-limits.ts"
       },
       {
-        "source": "packages/chex/src/parse-rig-lane-limits.ts",
-        "target": "scripts/parse-rig-lane-limits.ts"
+        "source": "packages/chex/src/test-timeouts/parse-rig-lane-limits.ts",
+        "target": "scripts/test-timeouts/parse-rig-lane-limits.ts"
       },
       {
         "source": "sync/src/pre-push/read-memory-budget.ts",
@@ -462,72 +462,72 @@
         "target": "scripts/read-worker-count.ts"
       },
       {
-        "source": "packages/chex/src/run-commits-check.ts",
-        "target": "scripts/run-commits-check.ts"
+        "source": "packages/chex/src/commits/run-commits-check.ts",
+        "target": "scripts/commits/run-commits-check.ts"
       },
       {
-        "source": "packages/chex/src/run-local-paths-check.ts",
-        "target": "scripts/run-local-paths-check.ts"
+        "source": "packages/chex/src/local-paths/run-local-paths-check.ts",
+        "target": "scripts/local-paths/run-local-paths-check.ts"
       },
       {
-        "source": "packages/chex/src/run-test-timeouts-check.ts",
-        "target": "scripts/run-test-timeouts-check.ts"
+        "source": "packages/chex/src/test-timeouts/run-test-timeouts-check.ts",
+        "target": "scripts/test-timeouts/run-test-timeouts-check.ts"
       },
       {
-        "source": "packages/chex/src/run-workflows-check.ts",
-        "target": "scripts/run-workflows-check.ts"
+        "source": "packages/chex/src/workflows/run-workflows-check.ts",
+        "target": "scripts/workflows/run-workflows-check.ts"
       },
       {
-        "source": "packages/chex/src/collect-concurrency-findings.ts",
-        "target": "scripts/collect-concurrency-findings.ts"
+        "source": "packages/chex/src/workflows/collect-concurrency-findings.ts",
+        "target": "scripts/workflows/collect-concurrency-findings.ts"
       },
       {
-        "source": "packages/chex/src/find-member.ts",
-        "target": "scripts/find-member.ts"
+        "source": "packages/chex/src/workflows/find-member.ts",
+        "target": "scripts/workflows/find-member.ts"
       },
       {
-        "source": "packages/chex/src/get-top-level-line.ts",
-        "target": "scripts/get-top-level-line.ts"
+        "source": "packages/chex/src/workflows/get-top-level-line.ts",
+        "target": "scripts/workflows/get-top-level-line.ts"
       },
       {
-        "source": "packages/chex/src/pull-request-triggers.ts",
-        "target": "scripts/pull-request-triggers.ts"
+        "source": "packages/chex/src/workflows/pull-request-triggers.ts",
+        "target": "scripts/workflows/pull-request-triggers.ts"
       },
       {
-        "source": "packages/chex/src/workflow-context.ts",
-        "target": "scripts/workflow-context.ts"
+        "source": "packages/chex/src/workflows/workflow-context.ts",
+        "target": "scripts/workflows/workflow-context.ts"
       },
       {
-        "source": "packages/chex/src/read-checks-profile.ts",
-        "target": "scripts/read-checks-profile.ts"
+        "source": "packages/chex/src/workflows/read-checks-profile.ts",
+        "target": "scripts/workflows/read-checks-profile.ts"
       },
       {
-        "source": "packages/chex/src/run-uncommitted-check.ts",
-        "target": "scripts/run-uncommitted-check.ts"
+        "source": "packages/chex/src/uncommitted/run-uncommitted-check.ts",
+        "target": "scripts/uncommitted/run-uncommitted-check.ts"
       },
       {
-        "source": "packages/chex/src/make-file-probe.ts",
-        "target": "scripts/make-file-probe.ts"
+        "source": "packages/chex/src/uncommitted/make-file-probe.ts",
+        "target": "scripts/uncommitted/make-file-probe.ts"
       },
       {
-        "source": "packages/chex/src/parse-shell-words.ts",
-        "target": "scripts/parse-shell-words.ts"
+        "source": "packages/chex/src/shell/parse-shell-words.ts",
+        "target": "scripts/shell/parse-shell-words.ts"
       },
       {
-        "source": "packages/chex/src/shell-escape-parsers.ts",
-        "target": "scripts/shell-escape-parsers.ts"
+        "source": "packages/chex/src/shell/shell-escape-parsers.ts",
+        "target": "scripts/shell/shell-escape-parsers.ts"
       },
       {
-        "source": "packages/chex/src/collect-command-names.ts",
-        "target": "scripts/collect-command-names.ts"
+        "source": "packages/chex/src/workflows/collect-command-names.ts",
+        "target": "scripts/workflows/collect-command-names.ts"
       },
       {
-        "source": "packages/chex/src/collect-expression-references.ts",
-        "target": "scripts/collect-expression-references.ts"
+        "source": "packages/chex/src/workflows/collect-expression-references.ts",
+        "target": "scripts/workflows/collect-expression-references.ts"
       },
       {
-        "source": "packages/chex/src/find-install-cache-path.ts",
-        "target": "scripts/find-install-cache-path.ts"
+        "source": "packages/chex/src/workflows/find-install-cache-path.ts",
+        "target": "scripts/workflows/find-install-cache-path.ts"
       },
       {
         "source": "packages/chex/src/dependency-gates/collect-missing-first-party-excludes.ts",
@@ -603,17 +603,17 @@
       }
     ],
     "scripts": {
-      "files:branch": "bun scripts/read-branch-files.ts",
+      "files:branch": "bun scripts/branch/read-branch-files.ts",
       "lint:files": "oxlint --no-error-on-unmatched-pattern",
       "test:related": "bun scripts/run-related-tests.ts",
-      "check:commits": "bun scripts/run-commits-check.ts",
-      "check:local-paths": "bun scripts/run-local-paths-check.ts",
-      "check:test-timeouts": "bun scripts/run-test-timeouts-check.ts",
+      "check:commits": "bun scripts/commits/run-commits-check.ts",
+      "check:local-paths": "bun scripts/local-paths/run-local-paths-check.ts",
+      "check:test-timeouts": "bun scripts/test-timeouts/run-test-timeouts-check.ts",
       "check:dependency-gates": "bun scripts/dependency-gates/run-dependency-gates-check.ts",
-      "check:workflows": "bun scripts/run-workflows-check.ts",
-      "check:uncommitted": "bun scripts/run-uncommitted-check.ts",
+      "check:workflows": "bun scripts/workflows/run-workflows-check.ts",
+      "check:uncommitted": "bun scripts/uncommitted/run-uncommitted-check.ts",
       "memory-capped": "bash scripts/run-memory-capped.sh \"$(bun scripts/read-memory-budget.ts)\""
     },
-    "build": "if jq -e '((.dependencies // {}) + (.devDependencies // {}) | has(\"@zgeoff/rig\")) and ((.scripts // {}) | has(\"test:related\"))' package.json > /dev/null; then delivered=(':(exclude)scripts/run-related-tests.ts' ':(exclude)scripts/build-related-test-command.ts' ':(exclude)scripts/build-related-test-command.test.ts' ':(exclude)scripts/read-worker-count.ts'); runner=0; git grep -q -F -e scripts/run-related-tests.ts -- . \"${delivered[@]}\" || runner=$?; if [ \"$runner\" -eq 1 ]; then rm -f scripts/run-related-tests.ts scripts/build-related-test-command.ts scripts/build-related-test-command.test.ts; helper=0; git grep -q -F -e scripts/read-worker-count.ts -- . \"${delivered[@]}\" || helper=$?; if [ \"$helper\" -eq 1 ]; then rm -f scripts/read-worker-count.ts; fi; fi; fi; old='bun scripts/collect-branch-files.ts'; new='bun scripts/read-branch-files.ts'; if [ \"$(jq -r '.scripts[\"files:branch\"] // empty' package.json)\" = \"$old\" ]; then jq --arg new \"$new\" '.scripts[\"files:branch\"] = $new' package.json > package.json.tmp; mv package.json.tmp package.json; fi; add=$(jq -cn --arg new \"$new\" --arg capped 'bash scripts/run-memory-capped.sh \"$(bun scripts/read-memory-budget.ts)\"' '{\"files:branch\":$new,\"lint:files\":\"oxlint --no-error-on-unmatched-pattern\",\"test:related\":\"bun scripts/run-related-tests.ts\",\"check:commits\":\"bun scripts/run-commits-check.ts\",\"check:local-paths\":\"bun scripts/run-local-paths-check.ts\",\"check:test-timeouts\":\"bun scripts/run-test-timeouts-check.ts\",\"check:dependency-gates\":\"bun scripts/dependency-gates/run-dependency-gates-check.ts\",\"check:workflows\":\"bun scripts/run-workflows-check.ts\",\"check:uncommitted\":\"bun scripts/run-uncommitted-check.ts\",\"memory-capped\":$capped}'); missing=$(jq -c --argjson add \"$add\" '(.scripts // {}) as $s | $add | with_entries(select(.key as $k | $s | has($k) | not))' package.json); if [ \"$missing\" != '{}' ]; then jq --argjson missing \"$missing\" '.scripts = (.scripts // {}) + $missing' package.json > package.json.tmp; mv package.json.tmp package.json; fi"
+    "build": "if jq -e '((.dependencies // {}) + (.devDependencies // {}) | has(\"@zgeoff/rig\")) and ((.scripts // {}) | has(\"test:related\"))' package.json > /dev/null; then delivered=(':(exclude)scripts/run-related-tests.ts' ':(exclude)scripts/build-related-test-command.ts' ':(exclude)scripts/build-related-test-command.test.ts' ':(exclude)scripts/read-worker-count.ts'); runner=0; git grep -q -F -e scripts/run-related-tests.ts -- . \"${delivered[@]}\" || runner=$?; if [ \"$runner\" -eq 1 ]; then rm -f scripts/run-related-tests.ts scripts/build-related-test-command.ts scripts/build-related-test-command.test.ts; helper=0; git grep -q -F -e scripts/read-worker-count.ts -- . \"${delivered[@]}\" || helper=$?; if [ \"$helper\" -eq 1 ]; then rm -f scripts/read-worker-count.ts; fi; fi; fi; new='bun scripts/branch/read-branch-files.ts'; if jq -e '.scripts' package.json > /dev/null; then jq --argjson moves '{\"bun scripts/collect-branch-files.ts\":\"bun scripts/branch/read-branch-files.ts\",\"bun scripts/read-branch-files.ts\":\"bun scripts/branch/read-branch-files.ts\",\"bun scripts/run-commits-check.ts\":\"bun scripts/commits/run-commits-check.ts\",\"bun scripts/run-local-paths-check.ts\":\"bun scripts/local-paths/run-local-paths-check.ts\",\"bun scripts/run-test-timeouts-check.ts\":\"bun scripts/test-timeouts/run-test-timeouts-check.ts\",\"bun scripts/run-workflows-check.ts\":\"bun scripts/workflows/run-workflows-check.ts\",\"bun scripts/run-uncommitted-check.ts\":\"bun scripts/uncommitted/run-uncommitted-check.ts\"}' '.scripts |= (. // {} | with_entries(.value |= (. as $v | ($moves[$v] // $v))))' package.json > package.json.tmp; mv package.json.tmp package.json; fi; add=$(jq -cn --arg new \"$new\" --arg capped 'bash scripts/run-memory-capped.sh \"$(bun scripts/read-memory-budget.ts)\"' '{\"files:branch\":$new,\"lint:files\":\"oxlint --no-error-on-unmatched-pattern\",\"test:related\":\"bun scripts/run-related-tests.ts\",\"check:commits\":\"bun scripts/commits/run-commits-check.ts\",\"check:local-paths\":\"bun scripts/local-paths/run-local-paths-check.ts\",\"check:test-timeouts\":\"bun scripts/test-timeouts/run-test-timeouts-check.ts\",\"check:dependency-gates\":\"bun scripts/dependency-gates/run-dependency-gates-check.ts\",\"check:workflows\":\"bun scripts/workflows/run-workflows-check.ts\",\"check:uncommitted\":\"bun scripts/uncommitted/run-uncommitted-check.ts\",\"memory-capped\":$capped}'); missing=$(jq -c --argjson add \"$add\" '(.scripts // {}) as $s | $add | with_entries(select(.key as $k | $s | has($k) | not))' package.json); if [ \"$missing\" != '{}' ]; then jq --argjson missing \"$missing\" '.scripts = (.scripts // {}) + $missing' package.json > package.json.tmp; mv package.json.tmp package.json; fi"
   }
 ]

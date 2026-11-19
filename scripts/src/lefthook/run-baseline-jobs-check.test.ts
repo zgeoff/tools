@@ -49,7 +49,7 @@ test("it fails a files command that keeps git's repository variables", async () 
   const ctx = setupTest();
 
   const exitCode = await ctx.run(
-    `${ctx.templates}pre-push:\n  jobs:\n    - name: kettle\n      files: bun node_modules/@zgeoff/chex/src/read-branch-files.ts\n      run: '{clear-git-env} bun x --no-install diet -- true'\n`,
+    `${ctx.templates}pre-push:\n  jobs:\n    - name: kettle\n      files: bun node_modules/@zgeoff/chex/src/branch/read-branch-files.ts\n      run: '{clear-git-env} bun x --no-install diet -- true'\n`,
   );
 
   expect(exitCode).toBe(1);

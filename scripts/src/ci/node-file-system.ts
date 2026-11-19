@@ -1,5 +1,5 @@
 import { appendFile, mkdir, readFile, readdir, realpath, stat } from 'node:fs/promises';
-import { writeTextFile } from '../../../packages/chex/src/write-text-file.ts';
+import { writeTextFile } from '../../../packages/chex/src/output/write-text-file.ts';
 import { removePath } from '../../../packages/rig/src/browser/remove-path.ts';
 import type { FileSystem } from './file-system.ts';
 

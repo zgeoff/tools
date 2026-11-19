@@ -400,7 +400,7 @@ test('it downloads the set from the tools commit into the runner folder', async 
   expect(downloaded).toIncludeAllMembers([
     'scripts/src/paths-changed/run-changed-files-step.ts',
     'scripts/src/paths-changed/match-changed-files.ts',
-    'packages/chex/src/write-step-outputs.ts',
+    'packages/chex/src/output/write-step-outputs.ts',
   ]);
 
   expect(contents).toStrictEqual(repoContents);

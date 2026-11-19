@@ -1,7 +1,7 @@
 import { match } from 'ts-pattern';
-import { docsCheckNames } from '../check-names.ts';
-import type { ChexRequest } from '../parse-chex-args.ts';
-import { parseChexArgs } from '../parse-chex-args.ts';
+import { docsCheckNames } from '../cli/check-names.ts';
+import type { ChexRequest } from '../cli/parse-chex-args.ts';
+import { parseChexArgs } from '../cli/parse-chex-args.ts';
 
 export type DocsChecks =
   | { readonly kind: 'none' }

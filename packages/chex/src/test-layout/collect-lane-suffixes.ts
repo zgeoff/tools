@@ -1,4 +1,4 @@
-import { parseLaneLimits } from '../parse-lane-limits.ts';
+import { parseLaneLimits } from '../test-timeouts/parse-lane-limits.ts';
 
 // The suffixes that a test file name may carry before `.test.ts`. A lane of the resolved
 // rig.config.ts has exactly the suffix it gives, and a lane only the oxlint config names has

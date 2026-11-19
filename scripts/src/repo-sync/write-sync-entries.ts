@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { writeStepOutputs } from '../../../packages/chex/src/write-step-outputs.ts';
+import { writeStepOutputs } from '../../../packages/chex/src/output/write-step-outputs.ts';
 import { isRecord } from '../../../packages/std/src/is-record.ts';
 import type { FileSystem } from '../ci/file-system.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';

@@ -1,8 +1,8 @@
 import { appendFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { match } from 'ts-pattern';
-import type { StepOutputFile } from '../write-step-outputs.ts';
-import { writeStepOutputs } from '../write-step-outputs.ts';
+import type { StepOutputFile } from '../output/write-step-outputs.ts';
+import { writeStepOutputs } from '../output/write-step-outputs.ts';
 import { parseDocsChecks } from './parse-docs-checks.ts';
 import type { CheckPart, CheckPlan } from './plan-check-scripts.ts';
 import { planCheckScripts } from './plan-check-scripts.ts';

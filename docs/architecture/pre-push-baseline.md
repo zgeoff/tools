@@ -113,8 +113,9 @@ match the table above, with these differences:
 - Each job calls a package script that the entry's build adds to `package.json` when the repo lacks
   it: `files:branch`, `lint:files`, `test:related`, `check:commits`, `check:local-paths`,
   `check:test-timeouts`, `check:dependency-gates`, `check:workflows`, `check:uncommitted` and
-  `memory-capped`. The build also moves a `files:branch` that runs the old
-  `scripts/collect-branch-files.ts` to `scripts/read-branch-files.ts`.
+  `memory-capped`. The build also moves a script that runs the old `scripts/collect-branch-files.ts`
+  or a check script from its old flat path, such as `scripts/read-branch-files.ts`, to the same
+  script in its feature folder, such as `scripts/branch/read-branch-files.ts`.
 - The workflow lint job reads changed files under `sync/workflow-callers/` in place of
   `sync/src/workflow-callers/`, a folder that only tools holds.
 - Each job runs through the `memory-capped` script, which the build points at the
@@ -144,11 +145,12 @@ match the table above, with these differences:
   calls.
 
 The entry delivers the check scripts from [`packages/chex/src/`](../../packages/chex/src/), under
-the same names in `scripts/`, so a delivered check runs the code that `chex <check>` runs. The
-related-tests runner, `scripts/build-related-test-command.ts`, `scripts/read-worker-count.ts` and
-`scripts/read-memory-budget.ts` come from [`sync/src/pre-push/`](../../sync/src/pre-push/). The
-check scripts exit 0 when clean or skipped, 1 with a problem, and 2 when they cannot run, such as in
-a clone without origin's default branch. A repo opts in with three changes, which
+the same folders and names in `scripts/`, so a delivered check runs the code that `chex <check>`
+runs. The related-tests runner, `scripts/build-related-test-command.ts`,
+`scripts/read-worker-count.ts` and `scripts/read-memory-budget.ts` come from
+[`sync/src/pre-push/`](../../sync/src/pre-push/). The check scripts exit 0 when clean or skipped, 1
+with a problem, and 2 when they cannot run, such as in a clone without origin's default branch. A
+repo opts in with three changes, which
 [Opting in to the pre-push baseline](../runbooks/downstream-repo-setup.md#opting-in-to-the-pre-push-baseline)
 lists.
 

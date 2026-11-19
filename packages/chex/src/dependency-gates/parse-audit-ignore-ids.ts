@@ -1,4 +1,4 @@
-import { parseShellWords } from '../parse-shell-words.ts';
+import { parseShellWords } from '../shell/parse-shell-words.ts';
 
 export function parseAuditIgnoreIDs(auditScript: string): string[] {
   const words = parseShellWords(auditScript).map((word) => word.text);

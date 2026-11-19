@@ -1,6 +1,6 @@
 import { match } from 'ts-pattern';
-import type { LefthookOutcome } from '../../../packages/chex/src/build-lefthook-extends.ts';
-import { buildLefthookGuard } from '../../../packages/chex/src/build-lefthook-guard.ts';
+import type { LefthookOutcome } from '../../../packages/chex/src/lefthook/build-lefthook-extends.ts';
+import { buildLefthookGuard } from '../../../packages/chex/src/lefthook/build-lefthook-guard.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 
 export interface LefthookGuardCheckOptions {

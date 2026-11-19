@@ -1,0 +1,244 @@
+import { expect, onTestFinished, test } from 'bun:test';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createGitCommit, readGitEnv, readRunFolderPrefix, runGit } from '@zgeoff/testing/helpers';
+import { runProgram } from '../program/run-program.ts';
+import { makeFileProbe } from './make-file-probe.ts';
+import { runUncommittedCheck } from './run-uncommitted-check.ts';
+
+async function setupTest() {
+  const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('run-uncommitted-check-')));
+
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+
+  const env = readGitEnv(directory);
+  const repo = join(directory, 'work');
+
+  await runGit(directory, env, ['init', '--quiet', '--initial-branch=main', repo]);
+
+  return {
+    directory,
+    repo,
+    env,
+    runGit: (...args: readonly string[]) => runGit(repo, env, args),
+    createCommit: (files: Readonly<Record<string, string>>) => createGitCommit(repo, env, files),
+  };
+}
+
+test('it returns a file the push sends that holds an unstaged change', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createCommit({ 'guide.md': '# Guide\n' });
+
+  await writeFile(join(ctx.repo, 'guide.md'), '# Guide\n\nA new line.\n');
+
+  const changed = runUncommittedCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    files: ['guide.md'],
+    runProgram,
+    probeFile: () => false,
+  });
+
+  expect(changed).toStrictEqual(['guide.md']);
+});
+
+test('it returns a file the push sends that holds a staged change', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createCommit({ 'guide.md': '# Guide\n' });
+
+  await writeFile(join(ctx.repo, 'guide.md'), '# Guide\n\nA new line.\n');
+
+  await ctx.runGit('add', 'guide.md');
+
+  const changed = runUncommittedCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    files: ['guide.md'],
+    runProgram,
+    probeFile: () => false,
+  });
+
+  expect(changed).toStrictEqual(['guide.md']);
+});
+
+test('it returns a file the push deletes that is restored on disk', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createCommit({ 'helper.ts': 'export {};\n' });
+  await ctx.runGit('rm', '--quiet', 'helper.ts');
+  await ctx.runGit('commit', '--quiet', '-m', 'remove the helper');
+  await ctx.runGit('checkout', 'HEAD~1', '--', 'helper.ts');
+
+  const changed = runUncommittedCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    files: ['helper.ts'],
+    runProgram,
+    probeFile: () => false,
+  });
+
+  expect(changed).toStrictEqual(['helper.ts']);
+});
+
+test('it returns a file the push deletes that is restored on disk and left untracked', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createCommit({ 'helper.ts': 'export {};\n' });
+  await ctx.runGit('rm', '--quiet', 'helper.ts');
+  await ctx.runGit('commit', '--quiet', '-m', 'remove the helper');
+
+  const onDisk = new Set([join(ctx.repo, 'helper.ts')]);
+
+  const changed = runUncommittedCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    files: ['helper.ts'],
+    runProgram,
+    probeFile: (path) => onDisk.has(path),
+  });
+
+  expect(changed).toStrictEqual(['helper.ts']);
+});
+
+test('it returns a file the push deletes that is restored on disk under an ignore rule', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createCommit({ '.gitignore': '*.log\n' });
+
+  await writeFile(join(ctx.repo, 'build.log'), 'done\n');
+
+  await ctx.runGit('add', '--force', 'build.log');
+  await ctx.runGit('commit', '--quiet', '-m', 'add the log');
+  await ctx.runGit('rm', '--quiet', 'build.log');
+  await ctx.runGit('commit', '--quiet', '-m', 'remove the log');
+
+  const onDisk = new Set([join(ctx.repo, 'build.log')]);
+
+  const changed = runUncommittedCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    files: ['build.log'],
+    runProgram,
+    probeFile: (path) => onDisk.has(path),
+  });
+
+  expect(changed).toStrictEqual(['build.log']);
+});
+
+test('it returns nothing for a file the push deletes that stays off the disk', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createCommit({ 'helper.ts': 'export {};\n' });
+  await ctx.runGit('rm', '--quiet', 'helper.ts');
+  await ctx.runGit('commit', '--quiet', '-m', 'remove the helper');
+
+  const changed = runUncommittedCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    files: ['helper.ts'],
+    runProgram,
+    probeFile: () => false,
+  });
+
+  expect(changed).toStrictEqual([]);
+});
+
+test('it returns a file whose staged change the disk undoes', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createCommit({ 'guide.md': '# Guide\n' });
+
+  await writeFile(join(ctx.repo, 'guide.md'), '# Guide\n\nA new line.\n');
+
+  await ctx.runGit('add', 'guide.md');
+
+  await writeFile(join(ctx.repo, 'guide.md'), '# Guide\n');
+
+  const changed = runUncommittedCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    files: ['guide.md'],
+    runProgram,
+    probeFile: () => false,
+  });
+
+  expect(changed).toStrictEqual(['guide.md']);
+});
+
+test('it returns a file whose name holds a byte past ASCII', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createCommit({ 'café.md': '# Menu\n' });
+
+  await writeFile(join(ctx.repo, 'café.md'), '# Menu\n\nA new dish.\n');
+
+  const changed = runUncommittedCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    files: ['café.md'],
+    runProgram,
+    probeFile: () => false,
+  });
+
+  expect(changed).toStrictEqual(['café.md']);
+});
+
+test('it returns nothing when only a file outside the push holds a change', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createCommit({ 'guide.md': '# Guide\n', 'notes.md': '# Notes\n' });
+
+  await writeFile(join(ctx.repo, 'notes.md'), '# Notes\n\nA line in progress.\n');
+
+  const changed = runUncommittedCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    files: ['guide.md'],
+    runProgram,
+    probeFile: () => false,
+  });
+
+  expect(changed).toStrictEqual([]);
+});
+
+test('it throws the git error when the folder is not a repository', async () => {
+  const ctx = await setupTest();
+
+  expect(() =>
+    runUncommittedCheck({
+      cwd: ctx.directory,
+      env: ctx.env,
+      files: ['guide.md'],
+      runProgram,
+      probeFile: () => false,
+    }),
+  ).toThrow(/^git status failed: /u);
+});
+
+test('it skips a deleted file that resolves on disk only through a folder the branch made a link', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createCommit({ '.claude/skills/testing/SKILL.md': '# Testing\n' });
+
+  await mkdir(join(ctx.repo, '.agents'));
+
+  await ctx.runGit('mv', '.claude/skills', '.agents/skills');
+
+  await symlink('../.agents/skills', join(ctx.repo, '.claude/skills'));
+
+  await ctx.runGit('add', '.claude/skills');
+  await ctx.runGit('commit', '--quiet', '-m', 'move the skills behind a link');
+
+  const changed = runUncommittedCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    files: ['.agents/skills/testing/SKILL.md', '.claude/skills', '.claude/skills/testing/SKILL.md'],
+    runProgram,
+    probeFile: makeFileProbe(ctx.repo),
+  });
+
+  expect(changed).toStrictEqual([]);
+});

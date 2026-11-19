@@ -50,7 +50,7 @@ pre-push:
     - name: chex-lint
       files:
         unset $(git rev-parse --local-env-vars); bun
-        node_modules/@zgeoff/chex/src/read-branch-files.ts
+        node_modules/@zgeoff/chex/src/branch/read-branch-files.ts
       glob: '*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}'
       run:
         '{clear-git-env} bun x --no-install diet -- bun x --no-install oxlint
@@ -62,7 +62,7 @@ pre-push:
     - name: chex-shell
       files:
         unset $(git rev-parse --local-env-vars); bun
-        node_modules/@zgeoff/chex/src/read-branch-files.ts
+        node_modules/@zgeoff/chex/src/branch/read-branch-files.ts
       glob: '*.sh'
       run: |
         {clear-git-env}
@@ -82,7 +82,7 @@ pre-push:
     - name: chex-docs
       files:
         unset $(git rev-parse --local-env-vars); bun
-        node_modules/@zgeoff/chex/src/read-branch-files.ts
+        node_modules/@zgeoff/chex/src/branch/read-branch-files.ts
       glob: '*.md'
       run: '{clear-git-env} bun x --no-install diet -- bun run --silent check:docs'
     # GitHub runs no workflow from a subfolder of .github/workflows, and
@@ -94,7 +94,7 @@ pre-push:
     - name: chex-workflows
       files:
         unset $(git rev-parse --local-env-vars); bun
-        node_modules/@zgeoff/chex/src/read-branch-files.ts
+        node_modules/@zgeoff/chex/src/branch/read-branch-files.ts
       glob:
         - '.github/workflows/*.{yml,yaml}'
         - 'sync/src/workflow-callers/*.{yml,yaml}'
@@ -142,6 +142,6 @@ pre-push:
     - name: chex-test
       files:
         unset $(git rev-parse --local-env-vars); bun
-        node_modules/@zgeoff/chex/src/read-branch-files.ts
+        node_modules/@zgeoff/chex/src/branch/read-branch-files.ts
       glob: '*.{ts,tsx,toml}'
       run: '{clear-git-env} bun x --no-install diet -- bun x --no-install rig related {files}'

@@ -14,7 +14,7 @@ test('it parses each job of each hook in the config', () => {
 
 test('it marks a job whose files command lists the files the branch changes', () => {
   const jobs = parseBaselineJobs(
-    'pre-push:\n  jobs:\n    - name: test\n      files: bun node_modules/@zgeoff/chex/src/read-branch-files.ts\n      run: rig related {files}\n    - name: commits\n      files: echo package.json\n      run: chex commits\n',
+    'pre-push:\n  jobs:\n    - name: test\n      files: bun node_modules/@zgeoff/chex/src/branch/read-branch-files.ts\n      run: rig related {files}\n    - name: commits\n      files: echo package.json\n      run: chex commits\n',
   );
 
   expect(jobs).toStrictEqual([
