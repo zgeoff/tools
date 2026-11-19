@@ -103,7 +103,7 @@
     "access": "public"
   },
   "scripts": {
-    "typecheck": "tsrs"
+    "typecheck": "tsrs --fast"
   },
   "dependencies": {
     "@stylistic/eslint-plugin": "catalog:"
