@@ -71,8 +71,30 @@ export async function publishPackages(options: PackagesPublishOptions): Promise<
     return 1;
   }
 
+  // One failed package must not keep the rest from npm: each failure is kept and reported at the end.
+  const failures: string[] = [];
+
   for (const manifest of manifests) {
-    await publishManifest(manifest, options);
+    try {
+      await publishManifest(manifest, options);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      const label =
+        manifest.kind === 'public' ? `${manifest.name}@${manifest.version}` : manifest.name;
+
+      failures.push(`${label}: ${readNPMErrorCode(message)}`);
+    }
+  }
+
+  if (failures.length > 0) {
+    options.writeError(`::error::${failures.length} package(s) failed to publish\n`);
+
+    for (const failure of failures) {
+      options.writeError(`::error::${failure}\n`);
+    }
+
+    return 1;
   }
 
   return 0;
@@ -171,6 +193,13 @@ async function publishPackage(
   }
 
   await run(['npm', 'publish', `./${tarball}`, '--provenance', '--access', 'public']);
+}
+
+// npm prints "npm error code ENEEDAUTH" and similar; the failure line names the code when it has one.
+function readNPMErrorCode(message: string): string {
+  const match = /npm error code (?<code>\S+)/u.exec(message);
+
+  return match?.groups?.['code'] ?? `no npm error code (${message.split('\n')[0]})`;
 }
 
 if (import.meta.main) {

@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/helpers';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
+import type { RunCommand } from '../ci/run-command.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { createStubCommand } from '../test-utils/create-stub-command.ts';
 import { publishPackages } from './publish-packages.ts';
@@ -28,6 +29,23 @@ async function setupTest() {
   const errors: string[] = [];
   const loggedCalls: string[][] = [];
 
+  const runPublishWith = (paths: readonly string[], runLoggedCommand: RunCommand) =>
+    publishPackages({
+      cwd: repo,
+      env: { PATH: `${bin}:${process.env['PATH']}`, HOME: directory },
+      pathsText: JSON.stringify(paths),
+      releasedVersionsText: '',
+      fileSystem: nodeFileSystem,
+      runCommand,
+      runLoggedCommand,
+      writeOutput: (text) => {
+        output.push(text);
+      },
+      writeError: (text) => {
+        errors.push(text);
+      },
+    });
+
   const runPublish = (paths: readonly string[], releasedVersions: string) =>
     publishPackages({
       cwd: repo,
@@ -51,7 +69,7 @@ async function setupTest() {
 
   const readNPMCalls = () => readFile(npmLog, 'utf8');
 
-  return { repo, output, errors, loggedCalls, createNPM, runPublish, readNPMCalls };
+  return { repo, output, errors, loggedCalls, createNPM, runPublish, runPublishWith, readNPMCalls };
 }
 
 test('it packs and publishes each released package with provenance', async () => {
@@ -316,7 +334,7 @@ test('it refuses a package.json with no version and runs no npm command', async 
   expect(calls).toBe('');
 });
 
-test('it refuses to publish when the pack leaves more than one tarball', async () => {
+test('it reports a package whose pack leaves more than one tarball, without publishing it', async () => {
   const ctx = await setupTest();
 
   await ctx.createNPM('');
@@ -326,11 +344,79 @@ test('it refuses to publish when the pack leaves more than one tarball', async (
     'packages/std/zgeoff-std-0.3.9.tgz': 'an older pack',
   });
 
-  expect(ctx.runPublish(['packages/std'], '')).rejects.toThrow(
-    `bun pm pack left 2 tarballs in ${join(ctx.repo, 'packages/std')}`,
-  );
-
+  const exitCode = await ctx.runPublish(['packages/std'], '');
   const calls = await ctx.readNPMCalls();
 
+  expect(exitCode).toBe(1);
+
+  expect(ctx.errors).toStrictEqual([
+    '::error::1 package(s) failed to publish\n',
+    `::error::@zgeoff/std@0.4.0: no npm error code (bun pm pack left 2 tarballs in ${join(ctx.repo, 'packages/std')})\n`,
+  ]);
+
   expect(calls).toBe('npm view @zgeoff/std@0.4.0 version\n');
+});
+
+test('it publishes every package when one fails, and reports each failure at the end', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createNPM('');
+
+  await writeTreeFiles(ctx.repo, {
+    'packages/a/package.json': JSON.stringify({ name: '@zgeoff/a', version: '1.0.0' }),
+    'packages/b/package.json': JSON.stringify({ name: '@zgeoff/b', version: '2.0.0' }),
+    'packages/c/package.json': JSON.stringify({ name: '@zgeoff/c', version: '3.0.0' }),
+  });
+
+  const published: string[] = [];
+
+  const exitCode = await ctx.runPublishWith(
+    ['packages/a', 'packages/b', 'packages/c'],
+    (argv, options) => {
+      const [command, subcommand, tarball] = argv;
+
+      if (command !== 'npm' || subcommand !== 'publish') {
+        return runCommand(argv, options);
+      }
+
+      if (tarball === './zgeoff-b-2.0.0.tgz') {
+        return Promise.resolve({
+          exitCode: 1,
+          stdout: '',
+          stderr: 'npm error code ENEEDAUTH\nnpm error need auth\n',
+        });
+      }
+
+      published.push(String(tarball));
+
+      return Promise.resolve({ exitCode: 0, stdout: '', stderr: '' });
+    },
+  );
+
+  expect(exitCode).toBe(1);
+  expect(published).toStrictEqual(['./zgeoff-a-1.0.0.tgz', './zgeoff-c-3.0.0.tgz']);
+
+  expect(ctx.errors).toStrictEqual([
+    '::error::1 package(s) failed to publish\n',
+    '::error::@zgeoff/b@2.0.0: ENEEDAUTH\n',
+  ]);
+});
+
+test('it exits 0 and reports no failure when every package publishes', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createNPM('');
+
+  await writeTreeFiles(ctx.repo, {
+    'packages/a/package.json': JSON.stringify({ name: '@zgeoff/a', version: '1.0.0' }),
+    'packages/b/package.json': JSON.stringify({ name: '@zgeoff/b', version: '2.0.0' }),
+  });
+
+  const exitCode = await ctx.runPublish(['packages/a', 'packages/b'], '');
+  const calls = await ctx.readNPMCalls();
+
+  expect(exitCode).toBe(0);
+  expect(ctx.errors).toStrictEqual([]);
+  expect(calls).toContain('npm publish ./zgeoff-a-1.0.0.tgz');
+  expect(calls).toContain('npm publish ./zgeoff-b-2.0.0.tgz');
 });
