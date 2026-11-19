@@ -83,6 +83,23 @@ grep_docs() {
   return 0
 }
 
+# macOS awk dies on a line that is not valid UTF-8 under a UTF-8 locale, so awk runs byte-wise.
+# A failed awk marks the run as incomplete, because the callers read it in command substitutions
+# that drop its status.
+run_awk() {
+  LC_ALL=C awk "$@" || : > "$failure_marker"
+}
+
+# Cuts byte-wise, for the same reason.
+run_cut() {
+  LC_ALL=C cut "$@" || : > "$failure_marker"
+}
+
+# Runs awk over the NUL-separated paths on stdin.
+xargs_awk() {
+  xargs -0 -r env LC_ALL=C awk "$@" || : > "$failure_marker"
+}
+
 # Prints the lines of stdin that match the Perl pattern $1 before the unit separator, ignoring case.
 # perl stands in for grep -P, which BSD grep lacks. It matches the line and the pattern decoded as
 # UTF-8, so word boundaries and case folding follow Unicode as GNU grep's do under a UTF-8 locale,
@@ -168,7 +185,7 @@ banned_words='\bsurfaces?\b|load-bearing|\bseams?\b|\bceilings?\b|(?<!code )\bfe
 report 'Banned words:' \
   "$(
     grep_docs -nPi "$banned_words" -- "$@" ':(exclude)*.md' ':(exclude)AGENTS.md' ':(exclude)agents'
-    list_markdown "$@" ':(exclude)AGENTS.md' ':(exclude)agents' | xargs -0 -r awk "$fence_awk"'
+    list_markdown "$@" ':(exclude)AGENTS.md' ':(exclude)agents' | xargs_awk "$fence_awk"'
     # Replaces each code span with a space. As in CommonMark, a span closes at the next backtick run
     # as long as the one that opens it, and a run that nothing closes stays as text.
     function strip_spans(s, out, start, n, rest, r, off, closed) {
@@ -213,7 +230,7 @@ report 'Banned words:' \
       gsub(/\037/, "", text)
       text = strip_spans(text)
       print text "\037" file_name()":"FNR":"$0
-    }' | grep_before_separator "$banned_words" | cut -d $'\037' -f 2-
+    }' | grep_before_separator "$banned_words" | run_cut -d $'\037' -f 2-
   )"
 
 report 'Filler with no term-of-art use:' \
@@ -231,7 +248,7 @@ report '"Should succeed" in a procedure — state the expected outcome instead:'
 report 'Number joined to its unit ("64KB"; write "64 KB"; code blocks are exempt):' \
   "$(
     grep_docs -nP '\b[0-9]+(KB|MB|GB|TB|KiB|MiB|GiB|ms)\b' -- "$@" ':(exclude)*.md'
-    list_markdown "$@" | xargs -0 -r awk "$fence_awk"'
+    list_markdown "$@" | xargs_awk "$fence_awk"'
     {
       m = fence_marker($0)
       if (m != "") {
@@ -248,7 +265,7 @@ report 'Number joined to its unit ("64KB"; write "64 KB"; code blocks are exempt
 # reader types may hold a value. A bare s, d or h joined to its number is no unit here ("1990s",
 # "2d"); its spaced form is.
 report 'Values with units under docs/architecture (the code owns its values; code blocks are exempt):' \
-  "$(markdown_dir=docs/architecture/ list_markdown "$@" | xargs -0 -r awk "$fence_awk"'
+  "$(markdown_dir=docs/architecture/ list_markdown "$@" | xargs_awk "$fence_awk"'
     {
       m = fence_marker($0)
       if (m != "") {
@@ -266,11 +283,11 @@ report 'Values with units under docs/architecture (the code owns its values; cod
     }')"
 
 report 'Horizontal rules outside YAML frontmatter:' \
-  "$(list_markdown "$@" | xargs -0 -r awk \
+  "$(list_markdown "$@" | xargs_awk \
     'FNR==1{fm=($0=="---")} fm&&FNR>1&&$0=="---"{fm=0;next} !fm&&$0=="---"{print substr(FILENAME, 3)": "FNR}')"
 
 report 'Untagged code fences:' \
-  "$(list_markdown "$@" | xargs -0 -r awk "$fence_awk"'
+  "$(list_markdown "$@" | xargs_awk "$fence_awk"'
     {
       m = fence_marker($0)
       if (m == "") next
@@ -665,14 +682,14 @@ done < <(list_markdown "$@")
 
 paragraphs=
 if [ "${#paragraph_files[@]}" -gt 0 ]; then
-  paragraphs=$(awk -v warn="$paragraph_warn" "$fence_awk$paragraph_awk" "${paragraph_files[@]}")
+  paragraphs=$(run_awk -v warn="$paragraph_warn" "$fence_awk$paragraph_awk" "${paragraph_files[@]}")
 fi
 
 report "Paragraphs over $paragraph_fail words in a changed file (split each one; lists, tables and code blocks are exempt):" \
-  "$(awk -F: -v limit="$paragraph_fail" '$NF > limit { print $0" words" }' <<< "$paragraphs")"
+  "$(run_awk -F: -v limit="$paragraph_fail" '$NF > limit { print $0" words" }' <<< "$paragraphs")"
 
 candidate "Paragraphs over $paragraph_warn words in a changed file (warning; reread each one and split it where it defends a decision):" \
-  "$(awk -F: -v limit="$paragraph_fail" '$NF != "" && $NF <= limit { print $0" words" }' <<< "$paragraphs")"
+  "$(run_awk -F: -v limit="$paragraph_fail" '$NF != "" && $NF <= limit { print $0" words" }' <<< "$paragraphs")"
 
 candidate 'Candidates — filler words with term-of-art uses; cull the filler, keep the terms:' \
   "$(grep_docs -nPi '\b(naturally|cleanly|trivially|easy|simple|quick)\b' -- "$@")"

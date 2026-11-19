@@ -49,6 +49,13 @@ async function setupTest() {
   const run = (...args: readonly string[]) =>
     $`bash ${scriptPath} ${args}`.cwd(directory).env(env).nothrow().quiet();
 
+  const runInUtf8Locale = (...args: readonly string[]) =>
+    $`bash ${scriptPath} ${args}`
+      .cwd(directory)
+      .env({ ...env, LC_ALL: 'en_US.UTF-8' })
+      .nothrow()
+      .quiet();
+
   const runWithStub = async (name: string, script: string, ...args: readonly string[]) => {
     const stubDirectory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('check-prose-stub-')));
 
@@ -102,6 +109,7 @@ async function setupTest() {
     writeText,
     runCommit,
     run,
+    runInUtf8Locale,
     runWithStub,
     runInPullRequest,
     createOrigin,
@@ -1679,5 +1687,50 @@ test('it reports a non-ASCII banned word on a line that also holds invalid UTF-8
   expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
     exitCode: 1,
     stderr: '',
+  });
+});
+
+test('it reports a banned word beside a line with invalid UTF-8 under a UTF-8 locale', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'mixed.md'),
+    Buffer.concat([
+      Buffer.from('A plain line.\nThe ſeams '),
+      Buffer.from([0xff]),
+      Buffer.from(' are tight.\n'),
+    ]),
+  );
+
+  await ctx.runGit('add', '-A');
+
+  const result = await ctx.runInUtf8Locale('mixed.md');
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: 'Banned words:\nmixed.md:2:The ſeams \uFFFD are tight.\n\n',
+    stderr: '',
+  });
+});
+
+test('it fails without printing clean when awk fails', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', '# Guide\n\nThe seams show.\n');
+
+  const result = await ctx.runWithStub('awk', 'exit 2', 'guide.md');
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString().includes('clean'),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 2,
+    stdout: false,
+    stderr: 'check-prose: a check failed to run, so the result above is incomplete\n',
   });
 });
