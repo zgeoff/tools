@@ -86,16 +86,16 @@ grep_docs() {
 # Prints the lines of stdin that match the Perl pattern $1 before the unit separator, ignoring case.
 # perl stands in for grep -P, which BSD grep lacks. It matches the line and the pattern decoded as
 # UTF-8, so word boundaries and case folding follow Unicode as GNU grep's do under a UTF-8 locale,
-# and it prints the original bytes, so a line that is not valid UTF-8 is matched as bytes.
+# and an invalid byte becomes U+FFFD, so the rest of the line still matches. It prints the original bytes.
 grep_before_separator() {
-  CHECK_PROSE_PATTERN=$1 perl -ne '
+  CHECK_PROSE_PATTERN=$1 perl -MEncode -ne '
     BEGIN {
       my $pattern = $ENV{CHECK_PROSE_PATTERN};
       utf8::decode($pattern);
       $p = qr/^[^\x1f]*(?:$pattern)/iu;
     }
     my $line = $_;
-    utf8::decode($line);
+    $line = Encode::decode("UTF-8", $line, Encode::FB_DEFAULT);
     print if $line =~ $p' ||
     : > "$failure_marker"
 }

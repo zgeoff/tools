@@ -1665,3 +1665,19 @@ test('it reports a banned word on a line that holds invalid UTF-8', async () => 
     stderr: '',
   });
 });
+
+test('it reports a non-ASCII banned word on a line that also holds invalid UTF-8', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'guide.md'),
+    Buffer.concat([Buffer.from('The ſeams '), Buffer.from([0xff]), Buffer.from(' are tight.\n')]),
+  );
+
+  const result = await ctx.run('guide.md');
+
+  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
+    exitCode: 1,
+    stderr: '',
+  });
+});
