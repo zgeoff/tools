@@ -65,7 +65,7 @@ fi
   await writeFile(
     join(stubs, 'failing'),
     packages
-      .filter((pkg) => pkg.failsToPublish)
+      .filter((pkg) => pkg.failsToPublish === true)
       .map((pkg) => `${pkg.folder.split('/').pop()}\n`)
       .join(''),
   );
