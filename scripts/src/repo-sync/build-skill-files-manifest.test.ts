@@ -355,3 +355,27 @@ test('it drops a file that a rename left behind from each entry that lists it', 
     dropped: ['skills/kettle/references/whistling.md'],
   });
 });
+
+test('it keeps an entry with no files when the tree no longer holds its only file', () => {
+  const result = buildSkillFilesManifest(
+    [
+      {
+        name: 'skill-kettle',
+        files: [
+          {
+            repo: 'zgeoff/skills',
+            source: 'skills/kettle/SKILL.md',
+            target: '.claude/skills/kettle/SKILL.md',
+          },
+        ],
+      },
+    ],
+    [{ path: 'skills/teapot/SKILL.md', mode: '100644' }],
+  );
+
+  expect(result).toStrictEqual({
+    manifest: [{ name: 'skill-kettle', files: [] }],
+    added: [],
+    dropped: ['skills/kettle/SKILL.md'],
+  });
+});
