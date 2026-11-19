@@ -8,6 +8,12 @@ import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 import { buildSkillPageLines } from '../test-utils/build-skill-page-lines.ts';
 
+// bash 3.2 is what macOS ships as /bin/bash. A host whose /bin/bash is newer cannot show a failure
+// that only bash 3.2 has, so the test that needs it skips there.
+const hasBash32 = Bun.spawnSync(['/bin/bash', '-c', 'echo "$BASH_VERSION"'])
+  .stdout.toString()
+  .startsWith('3.');
+
 async function setupTest() {
   const outsideDirectory = await mkdtemp(
     join(tmpdir(), readRunFolderPrefix('check-skill-outside-')),
@@ -60,7 +66,7 @@ async function setupTest() {
       .nothrow()
       .quiet();
 
-  return { outsideDirectory, scriptPath, writePage, run, runWithoutBun };
+  return { outsideDirectory, directory, env, scriptPath, writePage, run, runWithoutBun };
 }
 
 test('it passes a skill with a name, a description, and short files', async () => {
@@ -1669,3 +1675,34 @@ test('it uses no construct that bash 3.2 lacks', async () => {
     pipeStderr: false,
   });
 });
+
+test('it expands no array that can be empty without a guard', async () => {
+  const ctx = await setupTest();
+  const source = await readFile(ctx.scriptPath, 'utf8');
+
+  const code = source
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('#'))
+    .join('\n');
+
+  expect(code.match(/(?<!\+)"\$\{dirs\[@\]\}"/gu)).toBeNull();
+});
+
+test.skipIf(!hasBash32)(
+  'it runs under bash 3.2 when no input leaves anything to check',
+  async () => {
+    const ctx = await setupTest();
+
+    const result = await $`/bin/bash ${ctx.scriptPath}`
+      .cwd(ctx.directory)
+      .env(ctx.env)
+      .nothrow()
+      .quiet();
+
+    expect({
+      exitCode: result.exitCode,
+      stdout: result.stdout.toString(),
+      stderr: result.stderr.toString(),
+    }).toStrictEqual({ exitCode: 0, stdout: 'check-skill: no skills to check\n', stderr: '' });
+  },
+);

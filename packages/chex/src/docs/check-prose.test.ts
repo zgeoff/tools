@@ -1613,3 +1613,55 @@ test('it fails without printing clean when git grep errors', async () => {
     stdout: result.stdout.toString().includes('clean'),
   }).toStrictEqual({ exitCode: 2, stdout: false });
 });
+
+test('it reports a banned word that a letter folding to s starts, as grep does under UTF-8', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', 'The ſeams are tight.\n');
+
+  const result = await ctx.run('guide.md');
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: 'Banned words:\nguide.md:1:The ſeams are tight.\n\n',
+    stderr: '',
+  });
+});
+
+test('it passes a banned word that a non-ASCII letter follows', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('guide.md', 'The seamsé are tight.\n');
+
+  const result = await ctx.run('guide.md');
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout: 'check-prose: clean (candidates above, if any, need judgment only)\n',
+    stderr: '',
+  });
+});
+
+test('it reports a banned word on a line that holds invalid UTF-8', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'guide.md'),
+    Buffer.concat([Buffer.from('The seams '), Buffer.from([0xff]), Buffer.from(' are tight.\n')]),
+  );
+
+  const result = await ctx.run('guide.md');
+
+  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
+    exitCode: 1,
+    stderr: '',
+  });
+});
