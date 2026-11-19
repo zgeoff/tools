@@ -451,7 +451,7 @@ test('it adds a new file of a skill folder the manifest ships, and the manifest 
     'PUT',
     'repos/example/tools/contents/sync/manifest.json',
     '-f',
-    'message=chore(skills): list the new skill files in the sync manifest',
+    'message=chore(skills): list and drop skill files in the sync manifest',
     '-f',
     `content=${Buffer.from(expectedManifest).toString('base64')}`,
     '-f',
@@ -553,6 +553,250 @@ test('it adds a new file of a skill folder the manifest ships, and the manifest 
     exitCode: 0,
     stderr: '',
   });
+});
+
+test('it drops a file that zgeoff/skills no longer holds when the pin adds none, and lists it in the pull request', async () => {
+  const ctx = await setupTest();
+
+  const pinned = '0123456789abcdef0123456789abcdef01234567';
+  const commit = '89abcdef0123456789abcdef0123456789abcdef';
+
+  const manifestText = JSON.stringify([
+    {
+      name: 'skill-kettle',
+      files: [
+        {
+          repo: 'zgeoff/skills',
+          source: 'skills/kettle/SKILL.md',
+          target: '.claude/skills/kettle/SKILL.md',
+        },
+        {
+          repo: 'zgeoff/skills',
+          source: 'skills/kettle/references/whistling.md',
+          target: '.claude/skills/kettle/references/whistling.md',
+        },
+      ],
+    },
+  ]);
+
+  const expectedManifest = `[
+  {
+    "name": "skill-kettle",
+    "files": [
+      {
+        "repo": "zgeoff/skills",
+        "source": "skills/kettle/SKILL.md",
+        "target": ".claude/skills/kettle/SKILL.md"
+      }
+    ]
+  }
+]
+`;
+
+  await ctx.writePin(pinned);
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'pr',
+      'list',
+      '--repo',
+      'example/tools',
+      '--head',
+      'skills-pin',
+      '--state',
+      'open',
+      '--json',
+      'number,isCrossRepository',
+    ],
+    { exitCode: 0, stdout: '[]', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', `repos/zgeoff/skills/compare/${pinned}...${commit}`, '--jq', '.status'],
+    { exitCode: 0, stdout: 'ahead\n', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', `repos/zgeoff/skills/compare/${commit}...main`, '--jq', '.status'],
+    { exitCode: 0, stdout: 'identical\n', stderr: '' },
+  );
+
+  ctx.commands.answer(['git', 'rev-parse', 'HEAD'], {
+    exitCode: 0,
+    stdout: 'fedcba9876543210fedcba9876543210fedcba98\n',
+    stderr: '',
+  });
+
+  ctx.commands.answer(['gh', 'api', `repos/zgeoff/skills/git/trees/${commit}?recursive=1`], {
+    exitCode: 0,
+    stdout: JSON.stringify({
+      truncated: false,
+      tree: [{ path: 'skills/kettle/SKILL.md', mode: '100644', type: 'blob' }],
+    }),
+    stderr: '',
+  });
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      'repos/example/tools/contents/sync/manifest.json?ref=fedcba9876543210fedcba9876543210fedcba98',
+    ],
+    {
+      exitCode: 0,
+      stdout: JSON.stringify({
+        sha: '0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
+        content: Buffer.from(manifestText).toString('base64'),
+        encoding: 'base64',
+      }),
+      stderr: '',
+    },
+  );
+
+  ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin-next'], {
+    exitCode: 1,
+    stdout: '',
+    stderr: 'gh: Not Found (HTTP 404)',
+  });
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      '--silent',
+      'repos/example/tools/git/refs',
+      '-f',
+      'ref=refs/heads/skills-pin-next',
+      '-f',
+      'sha=fedcba9876543210fedcba9876543210fedcba98',
+    ],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      'repos/example/tools/contents/sync/skills-pin.json?ref=skills-pin-next',
+      '--jq',
+      '.sha',
+    ],
+    { exitCode: 0, stdout: '5d41402abc4b2a76b9719d911017c592ae0f2f0a\n', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      '-X',
+      'PUT',
+      'repos/example/tools/contents/sync/skills-pin.json',
+      '-f',
+      'message=chore(skills): pin zgeoff/skills at 89abcdef0123',
+      '-f',
+      `content=${Buffer.from(`{\n  "commit": "${commit}"\n}\n`).toString('base64')}`,
+      '-f',
+      'sha=5d41402abc4b2a76b9719d911017c592ae0f2f0a',
+      '-f',
+      'branch=skills-pin-next',
+      '--jq',
+      '.commit.sha',
+    ],
+    { exitCode: 0, stdout: 'c0ffee0123456789abcdef0123456789abcdef01\n', stderr: '' },
+  );
+
+  const writeManifest = [
+    'gh',
+    'api',
+    '-X',
+    'PUT',
+    'repos/example/tools/contents/sync/manifest.json',
+    '-f',
+    'message=chore(skills): list and drop skill files in the sync manifest',
+    '-f',
+    `content=${Buffer.from(expectedManifest).toString('base64')}`,
+    '-f',
+    'sha=0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
+    '-f',
+    'branch=skills-pin-next',
+    '--jq',
+    '.commit.sha',
+  ];
+
+  ctx.commands.answer(writeManifest, {
+    exitCode: 0,
+    stdout: 'beefcafe0123456789abcdef0123456789abcdef\n',
+    stderr: '',
+  });
+
+  ctx.commands.answer(['gh', 'api', 'repos/example/tools/git/ref/heads/skills-pin'], {
+    exitCode: 1,
+    stdout: '',
+    stderr: 'gh: Not Found (HTTP 404)',
+  });
+
+  ctx.commands.answer(
+    [
+      'gh',
+      'api',
+      '--silent',
+      'repos/example/tools/git/refs',
+      '-f',
+      'ref=refs/heads/skills-pin',
+      '-f',
+      'sha=beefcafe0123456789abcdef0123456789abcdef',
+    ],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  ctx.commands.answer(
+    ['gh', 'api', '--silent', '-X', 'DELETE', 'repos/example/tools/git/refs/heads/skills-pin-next'],
+    { exitCode: 0, stdout: '', stderr: '' },
+  );
+
+  const createPull = [
+    'gh',
+    'pr',
+    'create',
+    '--repo',
+    'example/tools',
+    '--base',
+    'main',
+    '--head',
+    'skills-pin',
+    '--title',
+    'chore(skills): pin zgeoff/skills at 89abcdef0123',
+    '--body',
+    `Moves \`sync/skills-pin.json\` to zgeoff/skills ${commit}, which zgeoff/skills sent from its green main. Once this merges and main is green, the sync dispatch sends the new skill text to every repo that takes it.\n\nDrops the files that zgeoff/skills no longer holds from \`sync/manifest.json\`:\n\n- \`skills/kettle/references/whistling.md\`\n\nChanges: https://github.com/zgeoff/skills/compare/${pinned}...${commit}`,
+  ];
+
+  ctx.commands.answer(createPull, {
+    exitCode: 0,
+    stdout: 'https://github.com/example/tools/pull/41\n',
+    stderr: '',
+  });
+
+  const merge = [
+    'gh',
+    'pr',
+    'merge',
+    '41',
+    '--repo',
+    'example/tools',
+    '--auto',
+    '--squash',
+    '--match-head-commit',
+    'beefcafe0123456789abcdef0123456789abcdef',
+  ];
+
+  ctx.commands.answer(merge, { exitCode: 0, stdout: '', stderr: '' });
+
+  const exitCode = await ctx.pin(commit);
+
+  expect(exitCode).toBe(0);
+  expect(ctx.commands.calls).toIncludeAllMembers([writeManifest, createPull]);
+  expect(ctx.commands.calls.at(-1)).toStrictEqual(merge);
 });
 
 test('it leaves the manifest alone when only a skill folder no entry ships gains a file', async () => {

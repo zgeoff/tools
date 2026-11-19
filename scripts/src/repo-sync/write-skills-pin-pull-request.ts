@@ -124,7 +124,12 @@ export async function writeSkillsPinPullRequest(
   }
 
   if (openNumber === '') {
-    const number = await writePinPullRequest(options, { pinned, number: '', added: branch.added });
+    const number = await writePinPullRequest(options, {
+      pinned,
+      number: '',
+      added: branch.added,
+      dropped: branch.dropped,
+    });
 
     await writePinAutoMerge(options, number, branch.head);
 
@@ -302,8 +307,9 @@ interface PinBranch {
   // The last commit the run wrote.
   readonly head: string;
 
-  // The zgeoff/skills sources the run added to the manifest.
+  // The zgeoff/skills sources the run added to the manifest, and the ones it dropped.
   readonly added: readonly string[];
+  readonly dropped: readonly string[];
 }
 
 // The contents API writes each commit as the App on a staging branch, so GitHub signs it. The pin
@@ -352,7 +358,7 @@ async function writePinBranch(
   ]);
 
   const head =
-    update.added.length === 0
+    update.added.length === 0 && update.dropped.length === 0
       ? written.stdout.trim()
       : await writeStagedManifest(options, update, stagingBranch);
 
@@ -366,7 +372,7 @@ async function writePinBranch(
     `repos/${options.repo}/git/refs/heads/${stagingBranch}`,
   ]);
 
-  return { head, added: update.added };
+  return { head, added: update.added, dropped: update.dropped };
 }
 
 // Points the branch at the commit, and creates the branch when it does not exist.
@@ -411,8 +417,9 @@ interface PinPullRequest {
   // The pull request to edit, or empty to open one.
   readonly number: string;
 
-  // The zgeoff/skills sources the branch adds to the manifest.
+  // The zgeoff/skills sources the branch adds to the manifest, and the ones it drops.
   readonly added: readonly string[];
+  readonly dropped: readonly string[];
 }
 
 async function writePinPullRequest(
@@ -420,7 +427,7 @@ async function writePinPullRequest(
   pull: Readonly<PinPullRequest>,
 ): Promise<string> {
   const title = renderPinTitle(options.commit);
-  const body = `Moves \`${skillsPinPath}\` to zgeoff/skills ${options.commit}, which zgeoff/skills sent from its green main. Once this merges and main is green, the sync dispatch sends the new skill text to every repo that takes it.${renderAddedFiles(pull.added)}\n\nChanges: https://github.com/zgeoff/skills/compare/${pull.pinned}...${options.commit}`;
+  const body = `Moves \`${skillsPinPath}\` to zgeoff/skills ${options.commit}, which zgeoff/skills sent from its green main. Once this merges and main is green, the sync dispatch sends the new skill text to every repo that takes it.${renderChangedFiles(pull.added, 'Adds the new files of the skill folders it syncs to')}${renderChangedFiles(pull.dropped, 'Drops the files that zgeoff/skills no longer holds from')}\n\nChanges: https://github.com/zgeoff/skills/compare/${pull.pinned}...${options.commit}`;
 
   if (pull.number !== '') {
     await runCheckedGH(options, [
@@ -463,14 +470,14 @@ async function writePinPullRequest(
   return url.slice(url.lastIndexOf('/') + 1);
 }
 
-function renderAddedFiles(added: readonly string[]): string {
-  if (added.length === 0) {
+function renderChangedFiles(sources: readonly string[], change: string): string {
+  if (sources.length === 0) {
     return '';
   }
 
-  const lines = added.map((source) => `- \`${source}\``);
+  const lines = sources.map((source) => `- \`${source}\``);
 
-  return `\n\nAdds the new files of the skill folders it syncs to \`${syncManifestPath}\`:\n\n${lines.join('\n')}`;
+  return `\n\n${change} \`${syncManifestPath}\`:\n\n${lines.join('\n')}`;
 }
 
 interface ReusedPinPullRequest {
@@ -510,6 +517,7 @@ async function writeReusedPinPullRequest(
       pinned: reused.pinned,
       number: reused.number,
       added: reused.branch.added,
+      dropped: reused.branch.dropped,
     });
 
     await writePinAutoMerge(options, number, reused.branch.head);
@@ -526,6 +534,7 @@ async function writeReusedPinPullRequest(
       pinned: reused.pinned,
       number: '',
       added: reused.branch.added,
+      dropped: reused.branch.dropped,
     });
 
     await writePinAutoMerge(options, number, reused.branch.head);
@@ -580,6 +589,7 @@ async function writeReusedPinPullRequest(
     pinned: mainPin,
     number: '',
     added: branch.added,
+    dropped: branch.dropped,
   });
 
   await writePinAutoMerge(options, number, branch.head);

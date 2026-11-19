@@ -32,7 +32,7 @@ export function isCoveredPinHead(head: Readonly<CoveredPinHead>): boolean {
   return (
     head.paths.length === 2 &&
     expected !== null &&
-    expected.added.length > 0 &&
+    (expected.added.length > 0 || expected.dropped.length > 0) &&
     head.manifest?.headText === expected.text
   );
 }

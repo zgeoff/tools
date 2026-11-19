@@ -25,6 +25,25 @@ test.each([
           sha: '0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
           text: '[{"name":"skill-kettle"}]\n',
           added: ['skills/kettle/references/descaling.md'],
+          dropped: [],
+        },
+      },
+    },
+  ],
+  [
+    true,
+    'a head that changes the pin and drops a deleted file from the manifest',
+    {
+      paths: ['sync/manifest.json', 'sync/skills-pin.json'],
+      headPin: '89abcdef0123456789abcdef0123456789abcdef',
+      proposed: '89abcdef0123456789abcdef0123456789abcdef',
+      manifest: {
+        headText: '[{"name":"skill-kettle"}]\n',
+        expected: {
+          sha: '0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
+          text: '[{"name":"skill-kettle"}]\n',
+          added: [],
+          dropped: ['skills/kettle/references/whistling.md'],
         },
       },
     },
@@ -42,6 +61,7 @@ test.each([
           sha: '0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
           text: '[{"name":"skill-kettle"}]\n',
           added: ['skills/kettle/references/descaling.md'],
+          dropped: [],
         },
       },
     },
@@ -55,7 +75,12 @@ test.each([
       proposed: '89abcdef0123456789abcdef0123456789abcdef',
       manifest: {
         headText: '[]\n',
-        expected: { sha: '0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33', text: '[]\n', added: [] },
+        expected: {
+          sha: '0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
+          text: '[]\n',
+          added: [],
+          dropped: [],
+        },
       },
     },
   ],

@@ -21,7 +21,7 @@ export async function writeStagedManifest(
       'PUT',
       `repos/${options.repo}/contents/${syncManifestPath}`,
       '-f',
-      'message=chore(skills): list the new skill files in the sync manifest',
+      'message=chore(skills): list and drop skill files in the sync manifest',
       '-f',
       `content=${Buffer.from(update.text).toString('base64')}`,
       '-f',

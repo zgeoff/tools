@@ -24,6 +24,7 @@ export interface SkillFilesManifestText {
 
   readonly text: string;
   readonly added: readonly string[];
+  readonly dropped: readonly string[];
 }
 
 export async function readSkillFilesManifest(
@@ -55,5 +56,10 @@ export async function readSkillFilesManifest(
   const manifestValue: unknown = JSON.parse(contents.text);
   const built = buildSkillFilesManifest(manifestValue, files);
 
-  return { sha: contents.sha, text: renderManifestText(built.manifest), added: built.added };
+  return {
+    sha: contents.sha,
+    text: renderManifestText(built.manifest),
+    added: built.added,
+    dropped: built.dropped,
+  };
 }

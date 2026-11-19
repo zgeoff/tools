@@ -5,6 +5,9 @@ export interface SkillFilesManifest {
 
   // The zgeoff/skills sources the manifest gained, each once, however many entries gained it.
   readonly added: readonly string[];
+
+  // The zgeoff/skills sources the manifest lost because the tree no longer holds them, each once.
+  readonly dropped: readonly string[];
 }
 
 export interface SkillsTreeFile {
@@ -16,27 +19,43 @@ export interface SkillsTreeFile {
 
 const skillsRepo = 'zgeoff/skills';
 
-// Adds to each entry the files of the zgeoff/skills tree that sit in a skill folder it ships and
-// that it lacks. A folder no entry ships stays out, as syncing a new skill is a choice made by hand,
+// Drops from each entry the zgeoff/skills files that the tree no longer holds, and adds the files
+// of a skill folder it ships that it lacks. Files of other repos stay. A folder no entry ships stays out, as syncing a new skill is a choice made by hand,
 // and tests and links stay out, as the sync check skips them.
 export function buildSkillFilesManifest(
   manifest: unknown,
   treeFiles: readonly SkillsTreeFile[],
 ): SkillFilesManifest {
   if (!Array.isArray(manifest)) {
-    return { manifest, added: [] };
+    return { manifest, added: [], dropped: [] };
   }
 
   const added: string[] = [];
+  const dropped: string[] = [];
+
+  const treePaths = new Set(treeFiles.map((treeFile) => treeFile.path));
 
   const entries = manifest.map((entry: unknown) => {
     if (!isRecord(entry) || !Array.isArray(entry['files'])) {
       return entry;
     }
 
-    const files = entry['files'].map((file: unknown): unknown => file);
+    const listed = entry['files'].map((file: unknown): unknown => file);
+    const folders = collectSkillFolders(listed);
 
-    for (const folder of collectSkillFolders(files)) {
+    const files = listed.filter((file) => {
+      if (!isSkillsFile(file) || treePaths.has(file.source)) {
+        return true;
+      }
+
+      if (!dropped.includes(file.source)) {
+        dropped.push(file.source);
+      }
+
+      return false;
+    });
+
+    for (const folder of folders) {
       for (const treeFile of treeFiles) {
         const path = treeFile.path;
 
@@ -71,7 +90,7 @@ export function buildSkillFilesManifest(
     return { ...entry, files };
   });
 
-  return { manifest: entries, added };
+  return { manifest: entries, added, dropped };
 }
 
 interface SkillFolder {
@@ -132,5 +151,5 @@ function getInsertIndex(files: readonly unknown[], folder: string, path: string)
     }
   }
 
-  return index;
+  return index === -1 ? files.length : index;
 }
