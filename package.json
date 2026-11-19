@@ -82,11 +82,9 @@
     "check:test-layout": "chex test-layout",
     "check:tracked-links": "bun scripts/src/tracked-links/run-tracked-links-check.ts",
     "ci:install-tool": "bun scripts/src/ci/run-pinned-tool-step.ts",
-    "ci:dispatch-publish": "bun scripts/src/publish/dispatch-release-publish.ts",
     "ci:plan-sync-dispatch": "bun scripts/src/repo-sync/write-sync-dispatch-plan.ts",
     "ci:send-sync-dispatches": "bun scripts/src/repo-sync/write-sync-dispatches.ts",
-    "ci:write-skills-pin-pull-request": "bun scripts/src/repo-sync/write-skills-pin-pull-request.ts",
-    "ci:publish-packages": "bun scripts/src/publish/publish-packages.ts"
+    "ci:write-skills-pin-pull-request": "bun scripts/src/repo-sync/write-skills-pin-pull-request.ts"
   },
   "devDependencies": {
     "@commitlint/cli": "catalog:",

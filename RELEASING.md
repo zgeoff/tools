@@ -2,7 +2,8 @@
 
 Releases are fully automated off `main` via
 [release-please](https://github.com/googleapis/release-please) (manifest mode) plus an OIDC npm
-publish step in `.github/workflows/main.yml`. No npm tokens live in CI. Decision record:
+publish through the reusable [`npm-publish.yml`](./.github/workflows/npm-publish.yml), which
+`.github/workflows/main.yml` calls. No npm tokens live in CI. Decision record:
 [#8](https://github.com/zgeoff/tools/issues/8).
 
 The shared files under `sync/` reach each repo on every green `main` instead, as
@@ -31,9 +32,17 @@ The shared files under `sync/` reach each repo on every green `main` instead, as
    `scripts/src/check-release-head.sh`: when `main` moved past the merge commit with a workflow
    change, it fails with both commits named, and the release needs the steps in
    [Recover an untagged release PR](#recover-an-untagged-release-pr).
-4. `main.yml`'s publish job dispatches `main.yml` at the tag. The publish job of that run runs
-   `bun pm pack` (resolves `catalog:`/`workspace:` to exact versions — never pack with npm) then
-   `npm publish <tarball> --provenance` under OIDC.
+4. `main.yml`'s dispatch job starts `main.yml` again at the tag, with the released package folders.
+   The publish job of that run calls `npm-publish.yml`. For each folder it skips a private package
+   and a version npm holds already, then runs the package's `build` script when it has one,
+   `bun pm pack` (resolves `catalog:`/`workspace:` to exact versions — never pack with npm) and
+   `npm publish <tarball> --provenance --access public` under OIDC, from Node 24. The run is at the
+   tag so that the provenance names the tagged commit. A package that fails to publish does not keep
+   the others from npm; the job fails at the end.
+
+   npm publishes, not bun: `bun publish` cannot generate provenance statements yet
+   ([oven-sh/bun#15601](https://github.com/oven-sh/bun/issues/15601), open; its
+   [docs](https://bun.com/docs/pm/cli/publish) say so, and Bun 1.4.4 refuses the flags).
 
 Packages with `"private": true` are versioned but skipped by the publish step. Internal `workspace:`
 dependents of a released package get a patch bump automatically (`node-workspace` plugin).
@@ -117,23 +126,16 @@ From then on, CI publishes every version with no tokens.
   [Recover an untagged release PR](#recover-an-untagged-release-pr).
 - `npm publish` 404/403 on a package's first CI release: trusted publisher not configured for that
   package, or the first manual publish never happened.
-- Publish fails with `the release tagged <x> but <path>/package.json holds <y>`: the publish step
-  checked out a commit other than the one release-please tagged. Republish from the tag, so the
-  dispatch checks out the tagged commit, then find out why the checkout differed:
-
-  ```sh
-  gh workflow run main.yml --ref '<tag>' -f republish_paths='["<path>"]'
-  ```
-
 - Tagged and GitHub-released but the npm publish failed: re-run just the publish via
 
   ```sh
-  gh workflow run main.yml -f republish_paths='["packages/<pkg>"]'
+  gh workflow run main.yml --ref '<tag>' -f republish_paths='["packages/<pkg>"]'
   ```
 
-  Versions already on the registry are skipped, so listing extra paths is safe. Re-running the
-  failed job instead won't help when the failure is deterministic — a re-run uses the workflow file
-  as of the original commit.
+  Versions already on the registry are skipped, so listing extra paths is safe. Dispatch at the
+  release tag, so the provenance names the tagged commit. Re-running the failed job instead won't
+  help when the failure is deterministic — a re-run uses the workflow file as of the original
+  commit.
 
 - Version bumps feel off pre-1.0: intentional — `feat:` bumps patch and breaking changes bump minor
   until 1.0 (`bump-patch-for-minor-pre-major`, `bump-minor-pre-major`).
