@@ -26,7 +26,7 @@
   },
   "scripts": {
     "build": "rm -rf dist && bun build src/index.ts src/cli.ts --outdir dist --target node --packages external && tsc -p tsconfig.build.json",
-    "typecheck": "tsrs"
+    "typecheck": "tsrs --fast"
   },
   "dependencies": {
     "gunshi": "catalog:",

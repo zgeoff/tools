@@ -29,7 +29,7 @@
   },
   "scripts": {
     "build": "rm -rf dist && bun build src/index.ts --target bun --outdir dist --packages external && tsc -p tsconfig.build.json",
-    "typecheck": "tsrs"
+    "typecheck": "tsrs --fast"
   },
   "dependencies": {
     "@zgeoff/agent-hooks": "workspace:*"

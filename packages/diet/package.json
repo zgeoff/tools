@@ -24,7 +24,7 @@
     "provenance": true
   },
   "scripts": {
-    "typecheck": "tsrs"
+    "typecheck": "tsrs --fast"
   },
   "devDependencies": {
     "@types/bun": "catalog:",

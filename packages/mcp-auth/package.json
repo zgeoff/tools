@@ -39,7 +39,7 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
-    "typecheck": "tsrs"
+    "typecheck": "tsrs --fast"
   },
   "dependencies": {
     "@better-auth/mcp": "catalog:",

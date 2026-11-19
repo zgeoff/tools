@@ -8,7 +8,7 @@
     "./test-utils/*": "./src/test-utils/*.ts"
   },
   "scripts": {
-    "typecheck": "tsrs"
+    "typecheck": "tsrs --fast"
   },
   "dependencies": {
     "@actions/expressions": "catalog:",

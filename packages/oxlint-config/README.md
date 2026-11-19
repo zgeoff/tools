@@ -59,8 +59,8 @@ The plugin is addressable on its own at `@zgeoff/oxlint-config/plugin` for confi
   resolve it transitively anyway, but isolated layouts (pnpm, `bun install --linker isolated`) fail
   with `Cannot find module '@stylistic/eslint-plugin'` unless it's installed directly.
 - Type-aware rules activate under `oxlint --type-aware`, which needs a type-aware backend: install
-  `oxlint-tsgolint`, or install `@maschwenk/tsrslint` and set `OXLINT_TSGOLINT_PATH` to the path
-  that its `tsrslint-path` command prints. The config works without a backend.
+  `oxlint-tsgolint`, or install `tsrs`, whose `tsrs-lint` binary oxlint 1.92.0 and later finds on
+  its own. Set `TSRS_FAST=1` to run it in tsrs's fast mode. The config works without a backend.
 
 ## Rules
 
