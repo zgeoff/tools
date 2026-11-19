@@ -32,7 +32,7 @@
     "access": "public"
   },
   "scripts": {
-    "typecheck": "tsrs"
+    "typecheck": "tsrs --fast"
   },
   "dependencies": {
     "@zgeoff/std": "workspace:*",
