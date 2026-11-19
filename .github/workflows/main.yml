@@ -124,21 +124,15 @@ jobs:
     permissions:
       actions: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/src/release
       - name: Dispatch publish at the release tag
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_OUTPUTS: ${{ needs.release.outputs.release-outputs }}
-        run: |
-          paths=$(jq -r '.paths_released' <<<"$RELEASE_OUTPUTS")
-          # Every package of one dispatch must share one release commit, or the run at the
-          # first tag would publish the others from the wrong commit.
-          shas=$(jq -r --argjson paths "$paths" '[$paths[] as $p | .[$p + "--sha"] // "null"] | unique | join(" ")' <<<"$RELEASE_OUTPUTS")
-          if [ -z "$shas" ] || [ "$shas" = null ] || [ "${shas#* }" != "$shas" ]; then
-            echo "::error::expected one release commit, got: $shas"
-            exit 1
-          fi
-          tag=$(jq -r --argjson paths "$paths" '.[$paths[0] + "--tag_name"]' <<<"$RELEASE_OUTPUTS")
-          gh workflow run main.yml --repo "$GITHUB_REPOSITORY" --ref "$tag" -f republish_paths="$paths"
+        run: bash scripts/src/release/dispatch-tag-publish.sh
 
   # queue: max keeps every waiting run; the default replaces a waiting run,
   # which would cancel a pending publish dispatch.
