@@ -23,14 +23,15 @@ on:
         default: ''
 
 jobs:
-  # A newer push cancels the checks of an older one.
+  # Each push's checks run to the end, so every merged commit is tested. Two
+  # runs of one commit, such as a rerun, wait for each other.
   checks:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
-      group: main-checks-${{ github.ref }}
-      cancel-in-progress: true
+      group: main-checks-${{ github.sha }}
+      cancel-in-progress: false
     env:
       PART: all
     steps: &check-steps
