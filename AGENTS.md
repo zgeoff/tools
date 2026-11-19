@@ -89,10 +89,10 @@ says.
 - `bun run format` fixes formatting. lefthook runs the light checks before a commit and a push, and
   CI runs the rest.
 - `bun run lint` is plain oxlint. `bun run lint:full` adds the type-aware pass and its type check.
-  oxlint runs both through tsrslint (`@maschwenk/tsrslint`), a Rust port of tsgolint, in tsgolint's
-  place, because stock tsgolint runs out of memory under 2 GiB on impz. `lint:full` is CI-only:
-  never run it locally.
-- `bun run typecheck` runs `tsrs` per workspace and over the root `rig.config.ts` and
+  oxlint runs both through `tsrs-lint`, which the `tsrs` package ships and oxlint finds on its own,
+  in tsgolint's place, because stock tsgolint runs out of memory under 2 GiB on impz. The script
+  sets `TSRS_FAST=1`, tsrs's fast mode. `lint:full` is CI-only: never run it locally.
+- `bun run typecheck` runs `tsrs --fast` per workspace and over the root `rig.config.ts` and
   `.claude/hooks/`. CI runs it beside `lint:full`, and when the two type checks disagree, `tsrs` is
   right.
 - `bun run check:sync` checks `sync/manifest.json` against the rules repo-sync assumes. Run it after

@@ -91,7 +91,6 @@
       "description": "Dev-tool minor bumps go in one weekly PR. Their patch bumps go in the patch group.",
       "matchPackageNames": [
         "@commitlint/**",
-        "@maschwenk/tsrslint",
         "@tsconfig/**",
         "@types/**",
         "knip",

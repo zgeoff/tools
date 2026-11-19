@@ -4,7 +4,7 @@
   "description": "The sources that repo-sync delivers to each repo, with their manifest and tests",
   "type": "module",
   "scripts": {
-    "typecheck": "tsrs"
+    "typecheck": "tsrs --fast"
   },
   "devDependencies": {
     "@actions/expressions": "catalog:",
