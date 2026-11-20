@@ -10,6 +10,8 @@ function setupTest() {
         workspaces: ['packages/kettle', 'packages/teapot'],
         isWorkspaceRepo: true,
         laneSuffixes: [],
+        testPreloads: [],
+        workspacePackages: [],
         ...override,
       }),
   };
@@ -201,4 +203,14 @@ test('it leaves out an e2e/ folder in a folder with no package.json', () => {
   const ctx = setupTest();
 
   expect(ctx.collect(['packages/kettle/src/legacy/e2e/helpers/pour.ts'])).toStrictEqual([]);
+});
+
+test('it passes a tests folder of only nix files and reports one with another file', () => {
+  const ctx = setupTest();
+
+  expect(ctx.collect(['deploy/tests/eval.nix', 'deploy/tests/vm.nix'])).toStrictEqual([]);
+
+  expect(ctx.collect(['deploy/tests/eval.nix', 'deploy/tests/run.sh'])).toStrictEqual([
+    "deploy/tests/ is a test folder; move its tests beside the modules they test, its end-to-end tests into the package's e2e/, and its helpers into src/test-utils/",
+  ]);
 });
