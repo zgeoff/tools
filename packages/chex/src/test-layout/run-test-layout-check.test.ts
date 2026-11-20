@@ -142,3 +142,32 @@ test('it reports a root test-utils file of the git repo it runs in when run as a
     stdout: 'test-utils/ sits at the repo root; move each file into src/test-utils/\n',
   });
 });
+
+test('it counts a relative test preload and a nix tests folder as test code', async () => {
+  const ctx = setupTest();
+
+  const exitCode = await ctx.run({
+    'package.json': ctx.workspaceManifest,
+    'packages/kettle/package.json': '{}',
+    'packages/kettle/bunfig.toml': '[test]\npreload = ["./test-setup.ts", "@acme/extended"]\n',
+    'packages/kettle/test-setup.ts':
+      "import { buildWater } from './src/test-utils/build-water.ts';\n",
+    'packages/kettle/src/test-utils/build-water.ts': 'export const buildWater = () => 1;\n',
+    'deploy/tests/eval.nix': '{ }\n',
+  });
+
+  expect({ exitCode, output: ctx.output, errors: ctx.errors }).toStrictEqual({
+    exitCode: 0,
+    output: [],
+    errors: [],
+  });
+});
+
+test('it reports a bunfig.toml that does not parse and exits 1', async () => {
+  const ctx = setupTest();
+
+  const exitCode = await ctx.run({ 'bunfig.toml': '[test\n' });
+
+  expect(exitCode).toBe(1);
+  expect(ctx.output.join('')).toStartWith('bunfig.toml does not parse');
+});

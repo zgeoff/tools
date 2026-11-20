@@ -11,7 +11,8 @@ standard lanes, the lanes of `.oxlintrc.json` and the resolved lanes of `rig.con
   any folder named `test`, `tests`, `__tests__` or `integration`. A package keeps its helpers in
   `src/test-utils/`, and a top-level folder outside the workspaces may keep its own `test-utils/`. A
   `tests/` folder passes when a `Cargo.toml` sits in its parent folder, because Cargo runs a crate's
-  integration tests from there.
+  integration tests from there, and when every tracked file in it ends in `.nix`, because a flake
+  imports those files as NixOS checks.
 - a subfolder in `e2e/` other than `e2e/fixtures/`, a subfolder in `bench/`, and a subfolder below
   `evals/<name>/`.
 - an `e2e/*.test.ts` file whose name does not start with `start-`, `stop-`, `recover-`, `cli-`,
@@ -21,4 +22,5 @@ standard lanes, the lanes of `.oxlintrc.json` and the resolved lanes of `rig.con
   `<base>.<word>.<ext>` beside it, as the test of a module whose name holds a dot. Outside `src/`, a
   suffix that is neither a lane's nor a module's is a fault too.
 - a relative import of another workspace's test helper, and a test helper imported from production
-  code.
+  code. A file that a relative `[test] preload` entry of a `bunfig.toml` lists counts as test code,
+  and so does every file of a private workspace that no production file imports.

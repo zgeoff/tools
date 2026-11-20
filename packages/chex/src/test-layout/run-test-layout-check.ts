@@ -1,11 +1,13 @@
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import { runProgram } from '../program/run-program.ts';
 import { collectLaneSuffixes } from './collect-lane-suffixes.ts';
 import { collectTestLayoutFaults } from './collect-test-layout-faults.ts';
+import { collectTestPreloads } from './collect-test-preloads.ts';
 import { collectWorkspaceRoots } from './collect-workspace-roots.ts';
 import type { OxcParserModule } from './oxc-parser-module.ts';
 import { parseWorkspacePatterns } from './parse-workspace-patterns.ts';
 import { readOxcParser } from './read-oxc-parser.ts';
+import { readWorkspacePackages } from './read-workspace-packages.ts';
 
 export interface TestLayoutCheckOptions {
   readonly readTrackedPaths: () => Promise<readonly string[]>;
@@ -54,21 +56,35 @@ export async function runTestLayoutCheck(options: TestLayoutCheckOptions): Promi
         .map(async (path) => ({ path, text: await options.readText(path) })),
     );
 
+    const workspaceRoots =
+      workspaces.kind === 'single' ? [] : collectWorkspaceRoots(trackedPaths, workspaces.patterns);
+
+    const bunfigs = await Promise.all(
+      trackedPaths
+        .filter((path) => posix.basename(path) === 'bunfig.toml')
+        .map(async (path) => ({ path, text: await options.readText(path) })),
+    );
+
+    const testPreloads = collectTestPreloads(bunfigs);
+
+    const workspacePackages = await readWorkspacePackages(workspaceRoots, options.readText);
     const parser = await options.readParser();
 
-    faults = collectTestLayoutFaults(
-      parser,
-      {
-        trackedPaths,
-        workspaces:
-          workspaces.kind === 'single'
-            ? []
-            : collectWorkspaceRoots(trackedPaths, workspaces.patterns),
-        isWorkspaceRepo: workspaces.kind === 'workspaces',
-        laneSuffixes: collectLaneSuffixes(oxlintConfigText, rigConfig),
-      },
-      sources,
-    );
+    faults = [
+      ...testPreloads.faults,
+      ...collectTestLayoutFaults(
+        parser,
+        {
+          trackedPaths,
+          workspaces: workspaceRoots,
+          isWorkspaceRepo: workspaces.kind === 'workspaces',
+          laneSuffixes: collectLaneSuffixes(oxlintConfigText, rigConfig),
+          testPreloads: testPreloads.preloads,
+          workspacePackages,
+        },
+        sources,
+      ),
+    ];
   } catch (error) {
     options.writeError(`test-layout: ${error instanceof Error ? error.message : String(error)}\n`);
 

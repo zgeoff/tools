@@ -11,10 +11,25 @@ function setupTest() {
     workspaces: ['packages/kettle', 'packages/teapot'],
     isWorkspaceRepo: true,
     laneSuffixes: [],
+    testPreloads: [],
+    workspacePackages: [],
+  };
+
+  const harnessSource = {
+    path: 'packages/harness/src/start-harness.ts',
+    text: "import { buildWater } from './test-utils/build-water.ts';\n",
   };
 
   return {
     layout,
+    harnessSource,
+    helperImport: "import { buildWater } from './src/test-utils/build-water.ts';\n",
+    harnessTrackedHelper: 'packages/harness/src/test-utils/build-water.ts',
+    buildPackages: (harnessIsPrivate = true) => [
+      { root: 'packages/kettle', name: '@acme/kettle', isPrivate: false },
+      { root: 'packages/harness', name: '@acme/harness', isPrivate: harnessIsPrivate },
+      { root: 'packages/rig', name: '@acme/rig', isPrivate: true },
+    ],
     collect: (sources: readonly SourceFile[], override: Partial<TestLayout> = {}) =>
       collectImportFaults(oxc, { ...layout, ...override }, sources),
   };
@@ -336,4 +351,170 @@ test('it passes a test that imports a helper of a single-package repo', () => {
   );
 
   expect(faults).toStrictEqual([]);
+});
+
+test('it lets a test preload import a helper and still reports the same file without the entry', () => {
+  const ctx = setupTest();
+  const source = { path: 'packages/kettle/preload.ts', text: ctx.helperImport };
+
+  expect(ctx.collect([source], { testPreloads: ['packages/kettle/preload.ts'] })).toStrictEqual([]);
+
+  expect(ctx.collect([source])).toStrictEqual([
+    'packages/kettle/preload.ts imports packages/kettle/src/test-utils/build-water.ts, a test helper, from production code; import test helpers only from tests and other test helpers',
+  ]);
+});
+
+test('it lets a private workspace that only tests and e2e files import use helpers', () => {
+  const ctx = setupTest();
+
+  const faults = ctx.collect(
+    [
+      ctx.harnessSource,
+      {
+        path: 'packages/kettle/e2e/boil.ts',
+        text: "import '@acme/harness';\n",
+      },
+      {
+        path: 'packages/kettle/src/boil.test.ts',
+        text: "import '@acme/harness/start';\n",
+      },
+    ],
+    {
+      workspaces: ['packages/kettle', 'packages/harness', 'packages/rig'],
+      workspacePackages: ctx.buildPackages(),
+      trackedPaths: [ctx.harnessTrackedHelper],
+    },
+  );
+
+  expect(faults).toStrictEqual([]);
+});
+
+test('it reports a helper import in a private workspace that a production file imports', () => {
+  const ctx = setupTest();
+
+  const faults = ctx.collect(
+    [
+      ctx.harnessSource,
+      {
+        path: 'packages/kettle/src/boil.ts',
+        text: "import '@acme/harness';\n",
+      },
+      {
+        path: 'packages/kettle/src/boil.test.ts',
+        text: "import '@acme/harness';\n",
+      },
+    ],
+    {
+      workspacePackages: ctx.buildPackages(),
+      workspaces: ['packages/kettle', 'packages/harness'],
+    },
+  );
+
+  expect(faults).toStrictEqual([
+    'packages/harness/src/start-harness.ts imports packages/harness/src/test-utils/build-water.ts, a test helper, from production code; import test helpers only from tests and other test helpers',
+  ]);
+});
+
+test('it reports a helper import in a published workspace that only tests import', () => {
+  const ctx = setupTest();
+
+  const faults = ctx.collect(
+    [
+      ctx.harnessSource,
+      {
+        path: 'packages/kettle/src/boil.test.ts',
+        text: "import '@acme/harness';\n",
+      },
+    ],
+    {
+      workspacePackages: ctx.buildPackages(false),
+      workspaces: ['packages/kettle', 'packages/harness'],
+    },
+  );
+
+  expect(faults).toHaveLength(1);
+});
+
+test('it allows a helper import in a private workspace that nothing imports', () => {
+  const ctx = setupTest();
+
+  const faults = ctx.collect([ctx.harnessSource], {
+    workspacePackages: ctx.buildPackages(),
+    workspaces: ['packages/kettle', 'packages/harness'],
+  });
+
+  expect(faults).toStrictEqual([]);
+});
+
+test('it reports a helper import in a private workspace that a root-level source imports', () => {
+  const ctx = setupTest();
+
+  const faults = ctx.collect(
+    [
+      ctx.harnessSource,
+      { path: 'cli.ts', text: "import '@acme/harness';\n" },
+      { path: 'packages/kettle/e2e/boil.ts', text: "import '@acme/harness';\n" },
+    ],
+    {
+      workspacePackages: ctx.buildPackages(),
+      workspaces: ['packages/kettle', 'packages/harness'],
+    },
+  );
+
+  expect(faults).toHaveLength(1);
+});
+
+test('it follows a chain of two test-only workspaces', () => {
+  const ctx = setupTest();
+
+  const faults = ctx.collect(
+    [
+      {
+        path: 'packages/rig/src/start-rig.ts',
+        text: "import { buildWater } from './test-utils/build-water.ts';\nimport '@acme/harness';\n",
+      },
+      {
+        path: 'packages/harness/src/start-harness.ts',
+        text: "import '@acme/rig';\n",
+      },
+      {
+        path: 'packages/kettle/e2e/boil.ts',
+        text: "import '@acme/harness';\n",
+      },
+    ],
+    {
+      workspaces: ['packages/kettle', 'packages/harness', 'packages/rig'],
+      workspacePackages: ctx.buildPackages(),
+    },
+  );
+
+  expect(faults).toStrictEqual([]);
+});
+
+test('it reports a chain whose far end a production file imports', () => {
+  const ctx = setupTest();
+
+  const faults = ctx.collect(
+    [
+      {
+        path: 'packages/rig/src/start-rig.ts',
+        text: "import { buildWater } from './test-utils/build-water.ts';\n",
+      },
+      {
+        path: 'packages/harness/src/start-harness.ts',
+        text: "import '@acme/rig';\n",
+      },
+      {
+        path: 'packages/kettle/e2e/boil.ts',
+        text: "import '@acme/harness';\n",
+      },
+      { path: 'packages/kettle/src/boil.ts', text: "import '@acme/rig';\n" },
+    ],
+    {
+      workspaces: ['packages/kettle', 'packages/harness', 'packages/rig'],
+      workspacePackages: ctx.buildPackages(),
+    },
+  );
+
+  expect(faults).toHaveLength(1);
 });
