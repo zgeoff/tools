@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.14](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.13...@zgeoff/chex@0.3.14) (2026-11-20)
+
+
+### Features
+
+* **chex:** count preloads, nix folders and test-only workspaces as test ([#700](https://github.com/zgeoff/tools/issues/700)) ([12d16d0](https://github.com/zgeoff/tools/commit/12d16d0177962fd20931d214e865d7f63d9d12ac))
+
 ## [0.3.13](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.12...@zgeoff/chex@0.3.13) (2026-11-19)
 
 
