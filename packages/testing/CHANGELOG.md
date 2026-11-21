@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/zgeoff/tools/compare/@zgeoff/testing@0.4.1...@zgeoff/testing@0.4.2) (2026-11-21)
+
+
+### Features
+
+* **testing:** add a step size option to the clock runner ([#738](https://github.com/zgeoff/tools/issues/738)) ([f4ba87b](https://github.com/zgeoff/tools/commit/f4ba87b57776756120b82acd4e52c1b2d2309ae4))
+
 ## [0.4.1](https://github.com/zgeoff/tools/compare/@zgeoff/testing@0.4.0...@zgeoff/testing@0.4.1) (2026-11-21)
 
 
