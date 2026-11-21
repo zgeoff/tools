@@ -65,7 +65,7 @@ clock.delays; // → [500, 1000], every delay asked for, in order
 
 ```ts
 await runClockUntil(clock, () => job.state === 'done', { maxMs: 60_000 });
-// advances to each next due time, and lets promises settle between steps
+// advances to each next due time, with one setImmediate turn between steps
 // or throws: Error('the condition stayed false for 60000 ms of clock time')
 ```
 
@@ -100,10 +100,11 @@ function runClockUntil(
   time.
 - `advance` never fires a timer cancelled earlier in the same `advance`.
 - `runClockUntil` checks `isMet` after each step and stops once it returns true. Between steps it
-  yields one macrotask, so pending promises settle.
+  waits for one `setImmediate` turn, so the promises that the fired timers resolved settle.
 - When nothing is pending, `runClockUntil` yields a macrotask without moving time, and throws after
   100 such rounds in a row.
-- `runClockUntil` throws once the clock has moved `maxMs` past where it started.
+- `runClockUntil` throws once the clock has moved `maxMs` past where it started. When the next due
+  time falls past that limit, it advances to the limit, checks `isMet` once more, and then throws.
 - `@zgeoff/std` never depends on `@zgeoff/testing` in any dependency field. `check:release-workflow`
   fails on a dependency cycle, and the fake clock makes `testing` depend on `std`.
 

@@ -26,9 +26,16 @@ release that publishes the kit.
 1. **tools: the clock.** Add `Clock` and `systemClock` to `@zgeoff/std`. Give `std`'s tests their
    own copies of `readRunFolderPrefix` and `readStreamUntil`, and remove `std`'s dependency on
    `@zgeoff/testing`.
-2. **tools: the kit.** Build the subpaths, remove `./helpers`, and move every tools package that
-   imports `./helpers` to the new subpaths. The tools packages that take a clock, `rig` and
-   `mcp-auth`, move to `Clock` in the same PR.
+2. **tools: the kit,** after step 1 merges. Build the subpaths, remove `./helpers`, and move tools
+   itself onto the kit in the same PR:
+   - every tools package that imports `./helpers` moves to the new subpaths, and replaces its own
+     copies of kit helpers, such as chex's stub commands and agent-hooks' per-run template;
+   - the catalog moves `msw` to 3, the root preload's `setupServer` moves to `createTestNetwork`,
+     and the root `bunfig.toml` adds `@zgeoff/testing/preload`;
+   - `rig` moves to `Clock`, and its stepping and signalling clock fakes give way to
+     `createFakeClock`;
+   - `mcp-auth` keeps exporting its `Clock` type, as `Pick<Clock, 'now'>` of std's, so its public
+     API doesn't break.
 3. **tools: the lint rule,** in `@zgeoff/oxlint-config`.
 4. **The release** of `std`, `testing` and `oxlint-config`, through release-please.
 5. **One PR per repo,** in any order, each after the release. Each PR bumps the three packages, adds

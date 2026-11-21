@@ -2,9 +2,9 @@
 
 - **Status:** draft
 
-The root export holds the three helpers almost every test file needs: `waitFor`, `updateEnv` and
-`registerTestCleanup`. `./preload` wires their global hooks. `./process` runs programs and claims
-ports, and `./mocks` holds the stub functions for `mock()`.
+The root export holds the helpers almost every test file needs: `waitFor`, `updateEnv`,
+`removeEnvOverrides` and `registerTestCleanup`. `./preload` wires their global hook. `./process`
+runs programs and claims ports, and `./mocks` holds the stub functions for `mock()`.
 
 ## Shape
 
@@ -32,13 +32,17 @@ const line = await waitFor(() => readLogLine(logPath, 'ready'), {
 ```
 
 ```ts
-// root export. Extends the existing WaitForOptions.
+// root export
+function waitFor<T>(attempt: () => T | Promise<T>, options?: WaitForOptions): Promise<T>; // existing signature
+
 interface WaitForOptions {
-  // …existing fields: intervalMs (default 20), timeoutMs (default 5000), label
+  readonly intervalMs?: number; // existing; default 20
+  readonly timeoutMs?: number; // existing; default 5000
+  readonly label?: string; // existing; names what the test waits for, in the timeout message
   readonly signal?: AbortSignal; // an abort stops the wait and rejects with signal.reason
-  readonly progress?: () => unknown; // when its value changes between attempts, the deadline starts again
-  readonly now?: () => number; // default performance.now; a test of waitFor passes a fake
-  readonly sleep?: (delayMs: number) => Promise<void>; // default Bun.sleep
+  readonly progress?: () => unknown; // when its value changes between attempts (Object.is), the deadline starts again
+  readonly now?: () => number; // default performance.now
+  readonly sleep?: (delayMs: number) => Promise<void>; // default Bun.sleep; also times a hung attempt
 }
 ```
 
@@ -49,8 +53,11 @@ updateEnv('GH_TOKEN', 'test-token'); // sets it until the test ends
 updateEnv('HOME', undefined); // deletes it until the test ends
 ```
 
-`updateEnv(name, value)` keeps its existing signature. `removeEnvOverrides` stays exported for a
-repo that wires its own preload.
+```ts
+// root export, both existing signatures
+function updateEnv(name: string, value: string | undefined): void;
+function removeEnvOverrides(): void; // puts back every value updateEnv changed; for a repo that wires its own preload
+```
 
 ### Cleanup
 
@@ -61,7 +68,7 @@ await release(); // early release; the after-test run then skips it
 
 ```ts
 // root export
-function registerTestCleanup<T>(release: () => T): () => T;
+function registerTestCleanup<T>(release: () => T): () => T; // a second call returns the first call's result
 ```
 
 ### The preload
@@ -86,8 +93,35 @@ await using server = await start([process.execPath, 'serve.ts'], {
 });
 ```
 
-`run` and `start` keep the signatures and options of `RunOptions`, `RunResult`, `StartOptions` and
-`ProcessHandle`.
+```ts
+// ./process. Every type keeps its existing fields; only StartOptions gains one.
+function run(command: readonly string[], options?: RunOptions): Promise<RunResult>;
+function start(command: readonly string[], options?: StartOptions): Promise<ProcessHandle>;
+function readStreamUntil(stream: ReadableStream<Uint8Array>, text: string): Promise<string>; // existing, moved from ./helpers
+
+interface RunOptions {
+  readonly args?;
+  readonly env?;
+  readonly cwd?;
+  readonly input?;
+  readonly timeoutMs?;
+}
+interface RunResult {
+  readonly exitCode: number;
+  readonly stdout: string;
+  readonly stderr: string;
+}
+
+interface StartOptions {
+  // …existing fields: args, env, cwd, port, ready, readyTimeoutMs
+  readonly cleanup?: 'test' | 'manual'; // default 'test'
+}
+
+interface ProcessHandle extends AsyncDisposable {
+  // …existing fields: url, port, pid, readyLine, write, waitForLine, output
+  readonly stop: (signal?: Signal) => Promise<number>; // existing; also releases the port claim
+}
+```
 
 ### Ports
 
@@ -96,11 +130,15 @@ const ports = claimFreePorts(2);
 const apiPort = ports.take(); // → 61234
 const adminPort = ports.take(); // → 59877
 ports.take(); // throws: only 2 free ports were asked for
+ports.release(); // early release; otherwise after the test
 ```
 
 ```ts
 // ./process
-function claimFreePorts(count: number): { take(): number };
+function claimFreePorts(
+  count: number,
+  options?: { readonly cleanup?: 'test' | 'manual' },
+): { take(): number; release(): void };
 ```
 
 `readFreePort` is removed: `claimFreePorts(1).take()` replaces it.
@@ -112,17 +150,18 @@ function claimFreePorts(count: number): { take(): number };
 
 ## Constraints
 
-- `waitFor` measures its deadline with `performance.now`, so a change of the wall clock never ends a
-  wait early.
-- `waitFor` starts no attempt after the deadline, and a hung attempt still ends the wait at the
-  deadline.
+- `waitFor` measures its deadline with `now`, which defaults to `performance.now`, so a change of
+  the wall clock never ends a wait early.
+- `waitFor` starts no attempt after the deadline. A hung attempt races `sleep` for the time left,
+  and still ends the wait at the deadline.
 - When `progress` is set, `waitFor` reads it after each attempt. A wait whose progress value keeps
   changing runs past `timeoutMs`.
 - `registerTestCleanup` runs its releases after the test in reverse order of registration. It runs
   every release, even after one throws, and then throws an `AggregateError` of every failure.
 - A release runs at most once, whether the test calls it early or the after-test run calls it.
 - `registerTestCleanup` adds one `onTestFinished` hook per test, however many releases the test
-  registers.
+  registers. Call it inside a test or a `beforeEach`. The README's [Cleanup](./README.md#cleanup)
+  section says what a `beforeAll` fixture does.
 - `run` and `start` pass the child an explicit env: `process.env` merged with `options.env`. A Bun
   child started with no `env` gets the env the process started with and misses each `updateEnv`
   change.
@@ -130,13 +169,14 @@ function claimFreePorts(count: number): { take(): number };
   whole group.
 - When a signal to a process group fails with `ESRCH` or `EPERM`, the kit treats the group as gone.
   macOS returns `EPERM` for a group whose leader has exited.
-- `start` registers its `stop` with `registerTestCleanup`, so a test that forgets `await using`
-  still leaves no process behind.
+- With `cleanup: 'test'`, `start` registers its `stop` with `registerTestCleanup`, so a test that
+  forgets `await using` still leaves no process behind.
+- When `port` is not set, `start` takes its port from `claimFreePorts(1)` and holds the claim until
+  `stop`.
 - On Linux, `claimFreePorts` picks each port below the start of the kernel's ephemeral range, which
   it reads from `ip_local_port_range`. It holds each port by binding an abstract unix socket named
   after the port, and skips a port that `/proc/net/tcp` or `/proc/net/tcp6` lists as busy.
-- `claimFreePorts` releases its claims after the test. A process that binds a claimed port without a
-  claim can still race for it.
+- A process that binds a claimed port without a claim can still race for it.
 
 ## Decisions
 

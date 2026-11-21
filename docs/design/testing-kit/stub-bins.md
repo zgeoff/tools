@@ -29,6 +29,7 @@ const gh = createStubBin(bin, 'gh', {
     { args: ['pr', 'merge'], stdout: '' }, // the second `gh pr merge` call succeeds
   ],
   recordEnv: ['GH_TOKEN'],
+  recordStdin: true,
 });
 updateEnv('PATH', `${bin}:${process.env.PATH}`);
 
@@ -55,8 +56,13 @@ type StubBinOptions =
   | {
       readonly answers?: readonly StubAnswer[]; // no answers: every call exits 0 with no output
       readonly recordEnv?: readonly string[]; // env names to copy into each call's record
+      readonly recordStdin?: boolean; // default false: the stand-in never reads stdin
     }
-  | { readonly script: string; readonly recordEnv?: readonly string[] }; // a script with its own shebang
+  | {
+      readonly script: string; // a script with its own shebang
+      readonly recordEnv?: readonly string[];
+      readonly recordStdin?: boolean;
+    };
 
 interface StubAnswer {
   readonly args: readonly string[]; // matches a call whose argv starts with these
@@ -75,7 +81,7 @@ interface StubCall {
   readonly argv: readonly string[]; // exactly as the stand-in received them
   readonly cwd: string;
   readonly env: Readonly<Record<string, string>>; // only the recordEnv names that were set
-  readonly stdin: string; // empty when stdin was a terminal or closed
+  readonly stdin: string; // '' unless recordStdin; with it, all of stdin up to EOF, or '' when stdin is a terminal
 }
 ```
 
@@ -90,6 +96,12 @@ interface StubCall {
   JSON file beside it. It needs no shell and quotes nothing.
 - The stand-in picks the first answer whose `args` prefix matches and that has not answered yet.
   When every matching answer has answered, the last matching one answers again.
+- The stand-in keeps which answers have answered in a state file beside its answers file, and
+  updates it under a lock, so stand-ins that run at the same time never give one answer twice.
+- Calling `createStubBin` again for the same name replaces its answers and resets that state. It
+  keeps the call log.
+- With `recordStdin`, a caller that keeps stdin open without writing EOF makes the stand-in wait.
+  Without it, the stand-in never reads stdin.
 - A call that matches no answer writes `unexpected: <name> <argv…>` to stderr, records the call, and
   exits 97.
 - Every stand-in in one folder appends to one `calls.jsonl` in that folder, one JSON object per
@@ -108,4 +120,5 @@ interface StubCall {
 
 - The names of the staged file, the answers file and the wrapper.
 - How the wrapper of a `script` stand-in records the call.
+- The lock the state file uses.
 - Whether `readCalls` reads the log once per call or caches it.
