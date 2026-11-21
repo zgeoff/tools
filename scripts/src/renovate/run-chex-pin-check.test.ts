@@ -34,12 +34,13 @@ test('it exits 0 when renovate.json captures the chex pin of the workflow', asyn
       customManagers: [
         {
           customType: 'regex',
-          managerFilePatterns: [String.raw`/^\.github/workflows/bun-checks\.yml$/`],
+          managerFilePatterns: [String.raw`/^\.github/workflows/(bun-checks|pr-body-check)\.yml$/`],
           matchStrings: ["CHEX: '(?<depName>@zgeoff/chex)@(?<currentValue>[^']+)'"],
         },
       ],
     }),
     '.github/workflows/bun-checks.yml': "env:\n  CHEX: '@zgeoff/chex@0.3.1'\n",
+    '.github/workflows/pr-body-check.yml': "env:\n  CHEX: '@zgeoff/chex@0.4.2'\n",
   });
 
   const exitCode = await ctx.runCheck();
@@ -53,6 +54,7 @@ test('it exits 1 on stderr when renovate.json has no manager for the chex pin', 
   await writeTreeFiles(ctx.directory, {
     'renovate.json': JSON.stringify({ extends: ['github>zgeoff/tools'] }),
     '.github/workflows/bun-checks.yml': "env:\n  CHEX: '@zgeoff/chex@0.3.1'\n",
+    '.github/workflows/pr-body-check.yml': "env:\n  CHEX: '@zgeoff/chex@0.4.2'\n",
   });
 
   const exitCode = await ctx.runCheck();
@@ -61,6 +63,34 @@ test('it exits 1 on stderr when renovate.json has no manager for the chex pin', 
     exitCode: 1,
     errors: [
       'renovate.json: no custom manager captures the @zgeoff/chex pin in .github/workflows/bun-checks.yml, so Renovate never bumps it\n',
+      'renovate.json: no custom manager captures the @zgeoff/chex pin in .github/workflows/pr-body-check.yml, so Renovate never bumps it\n',
+    ],
+  });
+});
+
+test('it exits 1 when only the pr-body workflow pin is unmanaged', async () => {
+  const ctx = await setupTest();
+
+  await writeTreeFiles(ctx.directory, {
+    'renovate.json': JSON.stringify({
+      customManagers: [
+        {
+          customType: 'regex',
+          managerFilePatterns: [String.raw`/^\.github/workflows/bun-checks\.yml$/`],
+          matchStrings: ["CHEX: '(?<depName>@zgeoff/chex)@(?<currentValue>[^']+)'"],
+        },
+      ],
+    }),
+    '.github/workflows/bun-checks.yml': "env:\n  CHEX: '@zgeoff/chex@0.3.1'\n",
+    '.github/workflows/pr-body-check.yml': "env:\n  CHEX: '@zgeoff/chex@0.4.2'\n",
+  });
+
+  const exitCode = await ctx.runCheck();
+
+  expect({ exitCode, errors: ctx.errors }).toStrictEqual({
+    exitCode: 1,
+    errors: [
+      'renovate.json: no custom manager captures the @zgeoff/chex pin in .github/workflows/pr-body-check.yml, so Renovate never bumps it\n',
     ],
   });
 });

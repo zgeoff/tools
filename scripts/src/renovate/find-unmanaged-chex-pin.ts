@@ -1,12 +1,17 @@
 import { isRecord } from '../../../packages/std/src/guards/is-record.ts';
 
-export const chexPinPath = '.github/workflows/bun-checks.yml';
+// The workflows that pin the chex release, each with one pin.
+export const chexPinPaths = [
+  '.github/workflows/bun-checks.yml',
+  '.github/workflows/pr-body-check.yml',
+] as const;
 
-// Returns the fault when no custom manager of renovate.json captures the chex pin, so Renovate
-// would never bump it.
+// Returns the fault when no custom manager of renovate.json captures the chex pin of the workflow
+// at `path`, so Renovate would never bump it.
 export function findUnmanagedChexPin(
   renovateText: string,
   workflowText: string,
+  path: string,
 ): string | undefined {
   const config = parseConfig(renovateText);
 
@@ -17,12 +22,12 @@ export function findUnmanagedChexPin(
   const managers = isRecord(config) ? config['customManagers'] : undefined;
 
   const pins = Array.isArray(managers)
-    ? managers.flatMap((manager: unknown) => collectChexPins(manager, workflowText))
+    ? managers.flatMap((manager: unknown) => collectChexPins(manager, workflowText, path))
     : [];
 
   return pins.length > 0
     ? undefined
-    : `renovate.json: no custom manager captures the @zgeoff/chex pin in ${chexPinPath}, so Renovate never bumps it`;
+    : `renovate.json: no custom manager captures the @zgeoff/chex pin in ${path}, so Renovate never bumps it`;
 }
 
 function parseConfig(text: string): unknown {
@@ -35,14 +40,14 @@ function parseConfig(text: string): unknown {
   }
 }
 
-function collectChexPins(manager: unknown, workflowText: string): string[] {
+function collectChexPins(manager: unknown, workflowText: string, path: string): string[] {
   if (!isRecord(manager) || manager['customType'] !== 'regex') {
     return [];
   }
 
   const filePatterns = collectStrings(manager['managerFilePatterns']);
 
-  if (!filePatterns.some((pattern) => isPathMatch(pattern, chexPinPath))) {
+  if (!filePatterns.some((pattern) => isPathMatch(pattern, path))) {
     return [];
   }
 

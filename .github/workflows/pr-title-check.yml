@@ -1,0 +1,40 @@
+# Reusable workflow: lints a pull request's title with commitlint and the
+# shared rules of @zgeoff/commitlint-config. A squash merge makes the title the
+# commit subject, so the rules are the ones that chex commits applies to each
+# commit. It installs commitlint into the runner's temp folder, so the caller
+# needs no workspace install, and it reads the title through env: alone.
+#
+# Callers install sync/src/workflow-callers/pr-title.yml.
+name: PR title check (reusable)
+
+on:
+  workflow_call:
+
+env:
+  COMMITLINT_CLI: '@commitlint/cli@21.2.4'
+  COMMITLINT_CONFIG: '@zgeoff/commitlint-config@0.1.2'
+
+jobs:
+  pr-title:
+    # A bot's PR title comes from its own template.
+    if: github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Install commitlint
+        run: |
+          mkdir -p "$RUNNER_TEMP/commitlint"
+          cd "$RUNNER_TEMP/commitlint"
+          npm install --no-save --ignore-scripts --no-audit --no-fund "$COMMITLINT_CLI" "$COMMITLINT_CONFIG"
+          echo "export default { extends: ['@zgeoff/commitlint-config'] };" > commitlint.config.mjs
+
+      - name: Lint the PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if ! printf '%s' "$PR_TITLE" | "$RUNNER_TEMP/commitlint/node_modules/.bin/commitlint" --config "$RUNNER_TEMP/commitlint/commitlint.config.mjs" --color=false; then
+            echo 'Rename the PR title to a Conventional Commit in the imperative mood, such as "fix(api): retry a refused upload".' >&2
+            exit 1
+          fi
