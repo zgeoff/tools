@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { makeAnswerQueue, readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/helpers';
 import { HttpResponse, http } from 'msw';
 import { makeStubToolsURLReader } from '../test-utils/make-stub-tools-url-reader.ts';
-import { server } from '../test-utils/mocks/node.ts';
+import { network } from '../test-utils/mocks/network.ts';
 import {
   downloadStepScripts,
   isToolsURL,
@@ -216,7 +216,7 @@ test.each([
   [429, { kind: 'failed', reason: 'HTTP 429' }],
   [503, { kind: 'failed', reason: 'HTTP 503' }],
 ])('it reads an HTTP %p answer as %p', async (status, expected) => {
-  server.use(
+  network.use(
     http.get('https://raw.example/acme/tools/cafe12/boil.ts', () =>
       HttpResponse.text('served', { status }),
     ),
@@ -228,7 +228,9 @@ test.each([
 });
 
 test('it reads a failed connection as a passing fault', async () => {
-  server.use(http.get('https://raw.example/acme/tools/cafe12/boil.ts', () => HttpResponse.error()));
+  network.use(
+    http.get('https://raw.example/acme/tools/cafe12/boil.ts', () => HttpResponse.error()),
+  );
 
   const outcome = await readURL('https://raw.example/acme/tools/cafe12/boil.ts');
 

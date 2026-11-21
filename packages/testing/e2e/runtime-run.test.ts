@@ -1,4 +1,4 @@
-import { expect, onTestFinished, test } from 'bun:test';
+import { expect, onTestFinished, spyOn, test } from 'bun:test';
 import { removeEnvOverrides } from '../src/core/remove-env-overrides.ts';
 import { updateEnv } from '../src/core/update-env.ts';
 import { run } from '../src/process/index.ts';
@@ -109,4 +109,17 @@ test('it passes the program the env that updateEnv changed after this process st
   const result = await run(ctx.command, { args: ['env', 'KIT_RUN_PROBE'] });
 
   expect(result.stdout).toBe('set-late\n');
+});
+
+test('it cancels the time limit when the program exits in time', async () => {
+  const ctx = setupTest();
+  const clearTimeoutSpy = spyOn(globalThis, 'clearTimeout');
+
+  onTestFinished(() => {
+    clearTimeoutSpy.mockRestore();
+  });
+
+  await run(ctx.command, { args: ['echo', 'boil'], timeoutMs: 60_000 });
+
+  expect(clearTimeoutSpy).toHaveBeenCalled();
 });
