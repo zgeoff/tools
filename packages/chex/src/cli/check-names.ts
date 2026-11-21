@@ -10,6 +10,7 @@ export const checkNames = [
   'workflows',
   'dependency-gates',
   'uncommitted',
+  'pr-body',
 ] as const;
 
 export type CheckName = (typeof checkNames)[number];

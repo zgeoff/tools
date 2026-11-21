@@ -61,12 +61,21 @@ The repo checks read the branch, the pushed commits and the repo's config:
 | `workflows`        | nothing: it prints each fault of the shared workflow lint, and fails when there is one                                                                                                                                                                           | the paths       |
 | `dependency-gates` | a stale age-gate exclude, an override or an audit ignore that nothing needs, a first-party package with no age-gate exclude, or a pinned release younger than the age gate ([details](../../docs/architecture/dependency-updates.md#the-dependency-gates-check)) | none            |
 | `uncommitted`      | a file the branch changes that holds a change the push does not send                                                                                                                                                                                             | none            |
+| `pr-body`          | a PR body that breaks the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md): a heading, label, empty section, code block or Checks line the template does not allow                                                                                          | `--body-file`   |
 
 With no path, `prose` and `links` read every README outside `.claude/` and `.agents/`, every file
 under `docs/`, each spike's `results.md`, and the Markdown under `.agents/skills/`,
 `.claude/skills/`, `skills/` and `sync/skills/`. `--pushed-refs` reads the refs a push sends from
 stdin, as a pre-push hook gets them; without it, `commits` and `local-paths` read the branch's
 commits since its base.
+
+`pr-body` lints a PR body that `--body-file` names, and prints one line per error with the section
+and the fix. It strips HTML comments and the `wringer:report` span first, so the template's own
+examples never count. With `--base` and `--head`, it also fails a Deslop or Cold read hash that is
+not in the branch or is older than the newest commit between them that changes a doc or skill file,
+and a PR that changes such a file with no Checks section. Those are the files `prose` reads with no
+path. `chex pr-body tick-chex --body-file <path> --passed` prints the body with only the chex
+checkbox ticked, and `--failed` unticks it.
 
 Some docs checks skip files whether or not you name paths, and a path you name never brings a
 skipped file back:

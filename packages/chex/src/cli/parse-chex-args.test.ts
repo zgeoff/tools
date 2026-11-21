@@ -43,6 +43,16 @@ test('it hands the words after one check name to that check', () => {
   });
 });
 
+test('it hands the pr-body subcommand and its options to the check', () => {
+  expect(
+    parseChexArgs(['pr-body', 'tick-chex', '--body-file', 'body.md', '--passed']),
+  ).toStrictEqual({
+    kind: 'checks',
+    names: ['pr-body'],
+    args: ['tick-chex', '--body-file', 'body.md', '--passed'],
+  });
+});
+
 test('it hands an option to the check that reads it', () => {
   expect(parseChexArgs(['commits', '--pushed-refs'])).toStrictEqual({
     kind: 'checks',
