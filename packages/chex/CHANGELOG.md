@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.15](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.14...@zgeoff/chex@0.3.15) (2026-11-21)
+
+
+### Features
+
+* **chex:** warn on a front page readme over 100 lines, fail over 150 ([#704](https://github.com/zgeoff/tools/issues/704)) ([ac79c12](https://github.com/zgeoff/tools/commit/ac79c12c3cafd2e5d84aaca54df8fd724c0865f6))
+
 ## [0.3.14](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.13...@zgeoff/chex@0.3.14) (2026-11-20)
 
 
