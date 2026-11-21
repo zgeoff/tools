@@ -4,8 +4,9 @@
 
 `@zgeoff/testing/bin`, a subpath of the [testing kit](./README.md), writes a stand-in for a command,
 such as `gh` or `op`, into a folder that a test puts first on `PATH`. The stand-in answers each call
-from a list that the test gives, and records every call to a log in that folder. A call that matches
-nothing in the list exits 97 with its argv on stderr.
+from a list of answers that the test gives, or runs a script that the test gives, and records every
+call to a log in that folder. When the test gives answers, a call that matches none of them exits 97
+with its argv on stderr.
 
 ## Shape
 
@@ -21,6 +22,7 @@ flowchart LR
 ## Contracts
 
 ```ts
+// createTempDir is from @zgeoff/testing/fs; updateEnv is from @zgeoff/testing and restores PATH after the test
 const bin = createTempDir('stub-bin').path;
 
 const gh = createStubBin(bin, 'gh', {
@@ -42,9 +44,9 @@ gh.readCalls();
 ```
 
 ```ts
-const sudo = createStubBin(bin, 'sudo', { script: '#!/bin/sh\nexec "$@"\n' }); // runs the caller's script
+const sudo = createStubBin(bin, 'sudo', { script: '#!/bin/sh\nexec "$@"\n' }); // runs the command it is given, as sudo would
 const silent = createStubBin(bin, 'notify-send'); // every call exits 0 with no output
-linkCommands(bin, ['git', 'jq']); // symlinks the real git and jq from PATH into bin
+linkCommands(bin, ['git', 'jq']); // symlinks the real git and jq into bin, for a test that sets PATH to bin alone
 readStubCalls(bin); // → every call to every stand-in in bin, in call order
 ```
 
@@ -54,7 +56,7 @@ function createStubBin(directory: string, name: string, options?: StubBinOptions
 function readStubCalls(directory: string): readonly StubCall[]; // a folder with no log reads as []
 function linkCommands(directory: string, names: readonly string[]): void; // throws on a name PATH lacks
 
-// existing, and async: writes a sudo stand-in that answers `sudo -n true` and records each other call to `record`
+// existing, and async: writes a sudo stand-in that exits 0 for `sudo -n true`, and appends each other call to the file at `record`
 function createStubSudo(directory: string, record: string): Promise<void>;
 
 type StubBinOptions =
@@ -64,7 +66,7 @@ type StubBinOptions =
       readonly recordStdin?: boolean; // default false
     }
   | {
-      readonly script: string; // a script with its own shebang, run in place of answers
+      readonly script: string; // the test's script, with its own shebang, run in place of answers
       readonly recordEnv?: readonly string[];
       readonly recordStdin?: boolean;
     };
@@ -100,22 +102,25 @@ interface StubCall {
 - The stand-in picks the first answer whose `args` prefix matches and that has not answered yet.
   When every matching answer has answered, the last matching one answers again.
 - The stand-in keeps which answers have answered in a state file beside its answers file, and
-  updates it under a lock, so stand-ins that run at the same time never give one answer twice.
+  updates it under a lock, so two calls that run at the same time never both take the same unused
+  answer.
 - An unmatched call writes `unexpected: <name> <argv…>` to stderr, and exits 97 after the stand-in
   records it.
 - Every stand-in in one folder appends to one `calls.jsonl` in that folder, one JSON object per
   call, so `readStubCalls` gives the order across commands.
-- A `script` stand-in runs the caller's script behind a wrapper that records the call first. With
+- A `script` stand-in runs the test's script behind a wrapper that records the call first. With
   `recordStdin`, the wrapper reads stdin to EOF, records it, and passes the same bytes to the
   script.
-- With `recordStdin`, a caller that keeps stdin open without an EOF makes the stand-in wait.
+- With `recordStdin`, the stand-in waits for EOF on stdin. Code under test that keeps stdin open
+  makes the call hang until the test's own timeout ends the test.
 - Calling `createStubBin` again for a name replaces that stand-in whole, answers or script, and
   resets its answer state. It keeps the call log.
 
 ## Decisions
 
-- **An unmatched call fails with its own exit code, 97, and its argv on stderr.** A test whose code
-  swallows the failure still sees the call in the log.
+- **An unmatched call fails with its own exit code, 97, and its argv on stderr.** A real command
+  rarely exits 97, so a test's failure output shows that a stand-in refused the call, and which call
+  it was.
 - **Answers match by argv prefix.** A test names the subcommand it scripts and ignores flags it does
   not care about.
 - **The functions are synchronous, apart from `createStubSudo`.** A test sets up its stand-ins

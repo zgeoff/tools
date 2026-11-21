@@ -61,7 +61,7 @@ clock.readNextDueMs(); // → null
 const nap = clock.sleep(1000);
 clock.countPending(); // → 1
 clock.advance(1000); // nap resolves
-clock.delays; // → [500, 1000], every delay asked for, in order
+clock.delays; // → [500, 1000], every delay as the caller passed it, before a negative one becomes 0
 ```
 
 ```ts
@@ -92,7 +92,8 @@ function runClockUntil(
 - `schedule` and `sleep` treat a negative delay as 0.
 - `cancel` is idempotent, and a cancel after the timer fired does nothing.
 - An aborted `sleep` resolves at once and removes its abort listener. A `sleep` given a signal that
-  is already aborted resolves without waiting. `systemClock` and the fake both behave this way.
+  is already aborted resolves without waiting. Every rule in this list binds `systemClock` and the
+  fake alike, apart from the rules that name `advance` or `runClockUntil`.
 - `advance(durationMs)` moves the clock to a target time, `now()` plus `durationMs`. On the way, it
   fires each timer and resolves each sleep that is due at or before the target, in due order, and
   sets `now()` to each one's due time before it fires that one.
@@ -105,11 +106,12 @@ function runClockUntil(
   woken by the step can run, and checks `isMet` again.
 - When nothing is pending, a step waits for one `setImmediate` turn without moving the clock. After
   100 such steps in a row, `runClockUntil` throws
-  `Error('nothing is scheduled and the condition is still false')`. Async code that wakes no timer
-  needs a few turns to settle, and 100 bounds a test that waits on nothing.
+  `Error('nothing is scheduled and the condition is still false')`. Async code that wakes no timer,
+  such as a chain of awaited promises, settles within a few turns, so 100 turns leave room for it,
+  and the limit stops a test that waits on nothing from hanging.
 - `runClockUntil` stops at `maxMs` past the time it started. When the next due time falls past that
-  limit, it moves the clock to the limit and checks `isMet` once more. It resolves when that check
-  is true, and throws otherwise.
+  limit, it moves the clock to the limit, waits one `setImmediate` turn, and checks `isMet` once
+  more. It resolves when that check is true, and throws otherwise.
 - `@zgeoff/std` never depends on `@zgeoff/testing` in any dependency field. The fake clock makes
   `@zgeoff/testing` depend on `@zgeoff/std`, so a dependency back would make a cycle, and the tools
   repo's `check:release-workflow` fails on a cycle.
@@ -118,17 +120,18 @@ function runClockUntil(
 
 - **A consumer takes a `Pick` of `Clock`.** A component that only reads time takes
   `Pick<Clock, 'now'>`, so its tests pass `{ now: () => fixedMs }` with no fake.
-- **`sleep` resolves on abort.** A cancel is something the caller asked for, so the caller checks
-  `signal.aborted` after the sleep and has no error to catch.
+- **`sleep` resolves on abort.** The caller aborts its own signal on purpose, so an abort is no
+  error. The caller checks `signal.aborted` after the sleep and has nothing to catch.
 - **`schedule(fire, delayMs)` takes the callback first,** as `setTimeout` does.
 
 ## Builder decides
 
-- How `systemClock.schedule` cancels: `clearTimeout`, or a flag that a `Bun.sleep` callback checks.
+- How `systemClock.schedule` cancels: `clearTimeout`, or a flag that the code after an awaited
+  `Bun.sleep` checks.
 - The fake clock's internal timer queue.
 
 ## Out of scope
 
-- Temporal values. A function that takes a `Temporal.Instant` argument keeps that argument, and
-  `Clock.now()` returns epoch milliseconds.
+- Temporal values. `Clock.now()` returns epoch milliseconds, and no `Clock` method returns a
+  Temporal value. A function that takes a `Temporal.Instant` argument keeps it.
 - Faking `Date` or the global timers. The fake replaces only what code receives as a `Clock`.

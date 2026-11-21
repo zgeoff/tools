@@ -8,7 +8,7 @@ Two subpaths of the [testing kit](./README.md), `@zgeoff/testing`, stand in for 
 `@zgeoff/testing/fetch` answers the `fetch` calls of the code under test from msw handlers, and
 fails the test on a request that no handler matches, even when the code under test catches the
 failed fetch. `@zgeoff/testing/server` starts a real stub HTTP server on the loopback interface, for
-code that msw can't reach, such as a child process. It needs no msw.
+code that msw can't reach, such as a child process. `@zgeoff/testing/server` needs no msw.
 
 ## Shape
 
@@ -17,9 +17,7 @@ flowchart LR
   code[code under test] -->|"fetch"| routed[the kit's fetch wrapper]
   routed -->|"unix or tls option"| native[Bun's fetch]
   routed -->|"other"| msw[msw 3 network]
-  msw -->|"matched"| handlers
-  msw -->|"loopback host"| native
-  msw -->|"no match"| record[unhandled list]
+  msw -->|"matched"| handlers  msw -->|"passthroughHosts"| native  msw -->|"unmatched"| record[unmatched list]
   record -->|"afterEach"| fail[test fails]
 ```
 
@@ -56,8 +54,7 @@ error: the test sent requests that no handler matches:
 ```ts
 // @zgeoff/testing/fetch
 function createTestNetwork(options: {
-  readonly handlers: readonly RequestHandler[]; // the defaults, kept after each test's reset
-  readonly passthroughHosts?: readonly string[]; // default ['127.0.0.1', '[::1]', 'localhost']
+  readonly handlers: readonly RequestHandler[]; // the defaults, kept after each test's reset  readonly passthroughHosts?: readonly string[]; // default ['127.0.0.1', '[::1]', 'localhost'], so code under test reaches a stub server
 }): TestNetwork;
 
 interface TestNetwork {
@@ -65,8 +62,8 @@ interface TestNetwork {
 }
 ```
 
-`TestNetwork` has no reset or close method: the network resets its handlers after each test and
-closes after the last file. To test a failed request, a test adds a handler that returns
+`TestNetwork` has no reset or close method: the network resets its handlers after each test, and
+disables itself after each test file. To test a failed request, a test adds a handler that returns
 `HttpResponse.error()`.
 
 ### Stub servers
@@ -87,7 +84,7 @@ const silent = startStubServer(() => new Promise<Response>(() => {})); // never 
 // @zgeoff/testing/server
 function startStubServer(
   handle: (request: Request) => Response | Promise<Response>,
-  options?: { readonly cleanup?: 'test' | 'manual' }, // default 'test'; see the README's Cleanup section
+  options?: { readonly cleanup?: 'test' | 'manual' }, // default 'test'; with 'manual', the caller calls stop()
 ): StubServer;
 
 interface StubServer {
@@ -115,14 +112,16 @@ interface RecordedRequest {
 - `createTestNetwork` throws when a network already exists in the process. Two networks patch the
   same `fetch`, so one network's handlers would answer the other's requests.
 - `createTestNetwork` registers `beforeAll` to enable the network, `afterEach` to reset its handlers
-  and check for unmatched requests, and `afterAll` to disable it. It never enables the network when
-  its module loads.
+  and check for unmatched requests, and `afterAll` to disable it. Calling `createTestNetwork` only
+  registers those hooks, so importing the network module never patches `fetch`.
 - A repo calls `createTestNetwork` only from a module that its test preload lists, so the hooks
-  apply to every test file. The kit can't detect a call from elsewhere. Under `bun test --parallel`,
-  a preload's `afterAll` runs once per file, and the `beforeAll` enables the network again for the
-  next file.
-- A request with no matching handler rejects with msw's error, and the network adds it to a list.
-  The `afterEach` fails the test with every request on that list, then empties the list.
+  apply to every test file. The kit can't detect a call from elsewhere. A call from one test file
+  registers hooks for that file only, and every other file's requests reach the real network. Under
+  `bun test --parallel`, a preload's `afterAll` runs once per file, and the `beforeAll` enables the
+  network again for the next file.
+- When no handler matches a request, the network adds the request to a list, and the `fetch` call
+  rejects with msw's error. The `afterEach` fails the test with every request on that list, then
+  empties the list.
 - A request to a `passthroughHosts` host passes through to the real network.
 - Enabling the network patches `fetch` through msw first, and then wraps the patched
   `globalThis.fetch`. Disabling it removes the wrapper, then msw's patch.

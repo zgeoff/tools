@@ -44,7 +44,7 @@ function createTempDir(
   options?: { readonly cleanup?: 'test' | 'manual' }, // default 'test'; see the README's Cleanup section
 ): { readonly path: string; readonly remove: () => void };
 
-// existing: the folder-name prefix `<name>pid<pid>-ns<pid namespace>-`; `source` lets a test fake the platform
+// existing: the folder-name prefix `<name>pid<pid>-ns<pid namespace>-`; `source` stands in for the platform and readlink, for this function's own tests
 function readRunFolderPrefix(name: string, source?: PIDNamespaceSource): string;
 
 function writeTreeFiles(
@@ -73,8 +73,7 @@ cpSync(template, dir.path, { recursive: true }); // the test copies it, and neve
 // @zgeoff/testing/fs
 interface ReadTemplateOptions {
   readonly name: string;
-  readonly root: string; // the inputs' globs resolve under this folder
-  readonly inputs: readonly string[]; // the key hashes the name, and each matched file's relative path and contents
+  readonly root: string; // the inputs' globs resolve under this folder  readonly inputs: readonly string[]; // globs; a template is reused while the name and each matched file's relative path and contents stay the same
   readonly write: (directory: string) => Promise<void>; // builds the template into an empty folder
   readonly staleLockMs?: number; // default 120_000; a lock older than this belongs to a dead build
 }
@@ -138,15 +137,17 @@ interface TestRepo {
 ## Constraints
 
 - `createTempDir` is synchronous. It makes the folder under `os.tmpdir()` with `mkdtemp` and the
-  prefix `readRunFolderPrefix(name)`. A stale-folder sweep, such as the one that the tools repo's
-  `bun run test` runs first, then finds the folder after a crashed run.
+  prefix `readRunFolderPrefix(name)`. The prefix holds the process ID and the PID namespace, so a
+  stale-folder sweep, such as the one that the tools repo's `bun run test` runs first, can tell a
+  crashed run's folder from a live run's.
 - Every removal in these two subpaths, early or after the test, runs `rm` up to 10 times while the
   folder still exists, then throws. Bun's recursive `rm` can return without an error and leave the
   folder when another process deletes an entry during its walk.
 - `writeTreeFiles` makes each parent folder it needs. A `null` entry deletes the file, and a missing
   file is no error. A symlink entry replaces a file or link already at its path.
-- `readTemplate` keeps every template in one folder under `os.tmpdir()`, with the same name in every
-  run. A later run whose inputs have the same hash uses the template again with no build.
+- `readTemplate` keeps every template in one folder under `os.tmpdir()`, and that folder's name
+  stays the same across runs. A later run with the same name and the same input files uses the
+  template again with no build.
 - `readTemplate` builds each template once, however many workers ask for it. The first caller takes
   a lock folder and builds into a staging folder, which it renames into place. Every other caller
   waits for the rename.
@@ -154,8 +155,9 @@ interface TestRepo {
   caller that waits then takes the lock and builds.
 - A running build refreshes its lock at least every `staleLockMs / 4`. When a lock is older than
   `staleLockMs`, the next caller to find it takes it over and starts the build from the start.
-- After a build, `readTemplate` deletes each template of the same name with another hash that was
-  last used more than 1 hour ago. A run that still copies an older template keeps it.
+- Each `readTemplate` call marks its template as used. After a build, `readTemplate` deletes each
+  other template of the same name that no call has marked for 1 hour. A test that copies its
+  template within an hour of its `readTemplate` call never loses it mid-copy.
 - `createGitRepo` and `createGitOrigin` make their folders with `createTempDir`, and pass `cleanup`
   on to it.
 - `createGitRepo` builds each commit with `git commit-tree`, from the first parent's tree with the
@@ -163,10 +165,12 @@ interface TestRepo {
   exactly that tree.
 - After `createGitRepo`, `main` and `HEAD` point at the last commit, and the work tree and index
   match it.
-- `createGitOrigin` makes an empty bare repo, so a test's first push to it succeeds.
-- `readGitEnv` passes `PATH` and mise's data and state folders on from `outerEnv`, sets `HOME` to
-  `home`, turns off the global and system config, and sets a fixed author and committer. A tool on
-  `PATH` can be a mise shim, and mise refuses to run from a `HOME` that lacks its installs.
+- `createGitOrigin` makes an empty bare repo. Git refuses a push to the checked-out branch of a repo
+  with a work tree, and an empty repo accepts any history as the first push.
+- `readGitEnv` passes `PATH` on from `outerEnv`, sets `MISE_DATA_DIR` and `MISE_STATE_DIR` to the
+  real user's mise folders, sets `HOME` to `home`, turns off the global and system config, and sets
+  a fixed author and committer. A tool on `PATH` can be a shim of mise, the tool-version manager,
+  and a shim refuses to run from a `HOME` that lacks mise's installs.
 - `readGitEnv` sets, through `GIT_CONFIG_COUNT`: `commit.gpgsign=false`, `tag.gpgsign=false`,
   `maintenance.auto=false` and `init.defaultBranch=main`. It replaces any `GIT_CONFIG_COUNT` in
   `outerEnv`.

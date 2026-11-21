@@ -2,10 +2,11 @@
 
 - **Status:** draft
 
-The root export of the [testing kit](./README.md), `@zgeoff/testing`, holds the helpers that almost
-every test file needs: `waitFor`, `updateEnv`, `removeEnvOverrides` and `registerTestCleanup`.
-`@zgeoff/testing/preload` restores the env after each test. `@zgeoff/testing/process` runs programs
-and claims free ports, and `@zgeoff/testing/mocks` holds stub functions to pass to Bun's `mock()`.
+The root export of the [testing kit](./README.md), `@zgeoff/testing`, holds `waitFor`, `updateEnv`
+and `registerTestCleanup`, which most test files use, and `removeEnvOverrides`, for a repo that
+wires its own preload. `@zgeoff/testing/preload` restores the env after each test.
+`@zgeoff/testing/process` runs programs and claims free ports, and `@zgeoff/testing/mocks` holds
+stub functions to pass to Bun's `mock()`.
 
 ## Shape
 
@@ -82,8 +83,9 @@ preload = ["@zgeoff/testing/preload", "./test-utils/network.ts"]
 ```
 
 `@zgeoff/testing/preload` registers one `afterEach` that calls `removeEnvOverrides`. A repo that
-mocks fetch lists its network module beside it, and `createTestNetwork` registers that module's
-hooks, as [fetch.md](./fetch.md) says.
+mocks fetch lists its network module beside it. The `createTestNetwork` call in that module
+registers a `beforeAll`, an `afterEach` and an `afterAll` of its own, as [fetch.md](./fetch.md)
+says, and they run beside the env restore.
 
 ### Processes
 
@@ -100,7 +102,7 @@ await using server = await start([process.execPath, 'serve.ts'], {
 // @zgeoff/testing/process. Only the fields shown change; every other field stays as the code has it.
 function run(command: readonly string[], options?: RunOptions): Promise<RunResult>;
 function start(command: readonly string[], options?: StartOptions): Promise<ProcessHandle>;
-// resolves with everything read from the stream once the text appears
+// resolves with everything read once the text appears, or with everything read when the stream ends first
 function readStreamUntil(stream: ReadableStream<Uint8Array>, text: string): Promise<string>;
 
 interface StartOptions {
@@ -134,15 +136,16 @@ function claimFreePorts(
 
 ### Stub functions
 
-`@zgeoff/testing/mocks` keeps the five helpers it takes from `./helpers`, with their signatures:
+`@zgeoff/testing/mocks` holds five stub helpers:
 
 - `makeAnswerQueue(answers)` returns a function that gives the next answer on each call, and throws
   once they run out;
 - `makeRepeatingAnswerQueue(answers)` gives the next answer on each call, and repeats the last one;
 - `makeResolvingStub(value)` and `makeRejectingStub(error)` return a `mock()` that resolves with the
   value or rejects with the error;
-- `createBlockingStubKit(value)` returns a `mock()` that reports its first call and waits for the
-  test to release it.
+- `createBlockingStubKit(value)` returns `{ stub, firstCall, release }`: `stub` is a `mock()` whose
+  calls wait until the test calls `release()`, and `firstCall` resolves with the arguments of its
+  first call.
 
 ## Constraints
 
@@ -158,9 +161,9 @@ function claimFreePorts(
   every release, even after one throws, and then throws an `AggregateError` of every failure.
 - A release runs at most once, whether the test calls it early or the after-test run calls it.
 - `registerTestCleanup` adds one `onTestFinished` hook per test, however many releases the test
-  registers. A test calls it inside a test or a `beforeEach`. In a `beforeAll`, Bun runs the hook at
-  once, so a fixture made there passes `cleanup: 'manual'`, as the README's
-  [Cleanup](./README.md#cleanup) section shows.
+  registers. Call `registerTestCleanup` inside a test or a `beforeEach`. For a fixture made in a
+  `beforeAll`, pass `cleanup: 'manual'`, as the README's [Cleanup](./README.md#cleanup) section
+  explains.
 - `run` and `start` pass the child an explicit env: `process.env`, with `options.env` on top. A Bun
   child started with no `env` gets the env the process started with, and misses each `updateEnv`
   change.
@@ -182,8 +185,8 @@ function claimFreePorts(
 
 ## Decisions
 
-- **`waitFor` retries on a throw.** The attempt returns the value the test wants, or throws to ask
-  for another try, so the attempt's last error becomes the timeout's cause.
+- **`waitFor` retries on a throw.** An attempt's error says why the attempt failed, so the timeout
+  error can carry the last one as its cause and show the reason the wait never succeeded.
 - **A repo lists the preload in `bunfig.toml`.** A test file never imports it, so every file gets
   the env restore, including a file whose author forgot it.
 
