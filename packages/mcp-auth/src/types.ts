@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import type { Clock as StdClock } from '@zgeoff/std';
 import type { Kysely } from 'kysely';
 import type { Tagged } from 'type-fest';
 
@@ -44,9 +45,7 @@ export interface MCPAuthTables {
 // The clock for the times the core stamps itself: sign-ins in progress,
 // enrollments, lastUsedAt and removeExpired. better-auth stamps token, code
 // and session expiries from Date.now().
-export interface Clock {
-  readonly now: () => number;
-}
+export type Clock = Pick<StdClock, 'now'>;
 
 export interface Requester {
   readonly socketAddress: string | null;
