@@ -26,4 +26,7 @@ export interface RunClockUntilOptions {
 
   // The real milliseconds that nothing may be pending in a row before it throws; 2000 when unset.
   readonly idleMs?: number;
+
+  // The most fake time one step advances; unset means each step jumps to the next due time.
+  readonly stepMs?: number;
 }
