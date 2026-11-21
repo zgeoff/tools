@@ -4,8 +4,13 @@ on:
   pull_request:
     types: [opened, edited, reopened, synchronize]
 
+# An edit cancels only an older edit's run, and a push only an older push's run. An edit right
+# after a push, such as the verify report landing, must not cancel the push's run, because only
+# that run ticks the chex box.
 concurrency:
-  group: pr-body-${{ github.event.pull_request.number }}
+  group:
+    pr-body-${{ github.event.pull_request.number }}-${{ github.event.action == 'edited' && 'edit' ||
+    'push' }}
   cancel-in-progress: true
 
 jobs:
