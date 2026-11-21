@@ -35,7 +35,10 @@ async function runChecks(
   for (const name of names) {
     const checkExitCode = await runOneCheck(name, args, deps);
 
-    deps.writeOutput(`${checkExitCode === 0 ? 'cleared' : 'bounced'}: ${name}\n`);
+    // tick-chex prints the PR body for a caller to capture, so a verdict line would corrupt it.
+    if (args[0] !== 'tick-chex') {
+      deps.writeOutput(`${checkExitCode === 0 ? 'cleared' : 'bounced'}: ${name}\n`);
+    }
 
     exitCode = Math.max(exitCode, checkExitCode);
   }

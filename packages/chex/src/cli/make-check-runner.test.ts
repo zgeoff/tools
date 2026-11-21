@@ -22,6 +22,7 @@ test.each([
       workflows: mock(() => 0),
       'dependency-gates': mock(() => 0),
       uncommitted: mock(() => 0),
+      'pr-body': mock(() => 0),
     },
   });
 
@@ -42,6 +43,7 @@ test.each([
   ['workflows'],
   ['dependency-gates'],
   ['uncommitted'],
+  ['pr-body'],
 ] as const)('it runs the %s check through the repo check it is given', async (name) => {
   const repoChecks = {
     commits: mock(() => 1),
@@ -51,6 +53,7 @@ test.each([
     workflows: mock(() => 1),
     'dependency-gates': mock(() => 1),
     uncommitted: mock(() => 1),
+    'pr-body': mock(() => 1),
   };
 
   const runScript = mock(() => Promise.resolve(0));

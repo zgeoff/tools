@@ -46,6 +46,19 @@ test('it prints bounced for a failed check, runs the checks after it, and exits 
   expect(stub.calls).toStrictEqual(['prose', 'vision']);
 });
 
+test('it prints no verdict line for pr-body tick-chex, whose output is the body', async () => {
+  const ctx = setupTest();
+  const stub = buildStubCheckRunner({ 'pr-body': 0 });
+
+  const exitCode = await runChex(['pr-body', 'tick-chex', '--body-file', 'body.md', '--passed'], {
+    ...ctx,
+    runCheck: stub.runCheck,
+  });
+
+  expect({ exitCode, lines: ctx.lines }).toStrictEqual({ exitCode: 0, lines: [] });
+  expect(stub.calls).toStrictEqual(['pr-body tick-chex --body-file body.md --passed']);
+});
+
 test('it exits 2 when a check cannot run, and prints bounced', async () => {
   const ctx = setupTest();
   const stub = buildStubCheckRunner({ commits: 2, 'local-paths': 1 });
@@ -138,7 +151,7 @@ test('it exits 2 with the usage and runs nothing for an unknown check', async ()
     lines: [
       'err chex: unknown check "spelling"\n' +
         'usage: chex <check>... | chex <check> [args...] | chex init | chex ci-plan\n' +
-        'checks: prose, length, links, readmes, vision, skill, commits, local-paths, test-timeouts, test-layout, workflows, dependency-gates, uncommitted\n',
+        'checks: prose, length, links, readmes, vision, skill, commits, local-paths, test-timeouts, test-layout, workflows, dependency-gates, uncommitted, pr-body\n',
     ],
   });
 

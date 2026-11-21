@@ -61,6 +61,7 @@ The repo checks read the branch, the pushed commits and the repo's config:
 | `workflows`        | nothing: it prints each fault of the shared workflow lint, and fails when there is one                                                                                                                                                                           | the paths       |
 | `dependency-gates` | a stale age-gate exclude, an override or an audit ignore that nothing needs, a first-party package with no age-gate exclude, or a pinned release younger than the age gate ([details](../../docs/architecture/dependency-updates.md#the-dependency-gates-check)) | none            |
 | `uncommitted`      | a file the branch changes that holds a change the push does not send                                                                                                                                                                                             | none            |
+| `pr-body`          | a PR body that breaks the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) ([details](../../docs/architecture/pr-body-check.md))                                                                                                                            | `--body-file`   |
 
 With no path, `prose` and `links` read every README outside `.claude/` and `.agents/`, every file
 under `docs/`, each spike's `results.md`, and the Markdown under `.agents/skills/`,
@@ -83,8 +84,8 @@ skipped file back:
 
 `chex init` writes the `extends` line and a
 [`chex-baseline` job](../../docs/architecture/pre-push-baseline.md#a-checkout-without-the-baseline)
-into `lefthook.yml`, and adds a `check:docs` script of `chex prose length links readmes skill` when
-the repo has none, and changes nothing on a second run. `chex ci-plan` plans a run of `bun-checks`.
+into `lefthook.yml`, adds a `check:docs` script of `chex prose length links readmes skill` when the
+repo has none, and changes nothing on a second run. `chex ci-plan` plans a run of `bun-checks`.
 
 ## The pre-push baseline
 
@@ -97,4 +98,3 @@ extends:
 
 The baseline's jobs call `chex <check>`, `bun run check:docs`, `rig related` and the repo's own
 `format:check` and `typecheck` scripts. Each job's name starts with `chex-`.
-[The pre-push baseline](../../docs/architecture/pre-push-baseline.md) describes each job.
