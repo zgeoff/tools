@@ -1,0 +1,85 @@
+{
+  "name": "@zgeoff/storyboard",
+  "version": "0.0.0",
+  "description": "Build the animated SVG images at the top of a README from one JSX scene, and check them",
+  "keywords": [
+    "animation",
+    "readme",
+    "smil",
+    "svg"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zgeoff/tools.git",
+    "directory": "packages/storyboard"
+  },
+  "bin": {
+    "storyboard": "./src/cli.ts"
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx",
+    "dist",
+    "!src/test-utils"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "bun": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./jsx-runtime": {
+      "types": "./dist/jsx-runtime.d.ts",
+      "bun": "./src/jsx-runtime.ts",
+      "default": "./dist/jsx-runtime.js"
+    },
+    "./jsx-dev-runtime": {
+      "types": "./dist/jsx-dev-runtime.d.ts",
+      "bun": "./src/jsx-dev-runtime.ts",
+      "default": "./dist/jsx-dev-runtime.js"
+    },
+    "./checks": {
+      "types": "./dist/checks/index.d.ts",
+      "bun": "./src/checks/index.ts"
+    },
+    "./browser": {
+      "types": "./dist/browser/index.d.ts",
+      "bun": "./src/browser/index.ts"
+    },
+    "./test-utils/*": "./src/test-utils/*.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && bun build src/index.ts src/jsx-runtime.ts src/jsx-dev-runtime.ts --root src --outdir dist --target node --packages external && tsc -p tsconfig.build.json",
+    "typecheck": "tsrs --fast"
+  },
+  "dependencies": {
+    "tiny-invariant": "catalog:",
+    "ts-pattern": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@zgeoff/rig": "workspace:*",
+    "@zgeoff/std": "workspace:*",
+    "@zgeoff/testing": "workspace:*",
+    "tsrs": "catalog:",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "@zgeoff/rig": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@zgeoff/rig": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "bun": ">=1.3"
+  }
+}

@@ -27,6 +27,14 @@ export default defineRig({
       artifact: 'src/index.ts',
     },
     rig: { package: 'packages/rig', source: 'src/cli.ts', build: 'true', artifact: 'src/cli.ts' },
+
+    // storyboard ships its source, so its e2e test runs the bin as it stands.
+    storyboard: {
+      package: 'packages/storyboard',
+      source: 'src/cli.ts',
+      build: 'true',
+      artifact: 'src/cli.ts',
+    },
   },
   lanes: {
     e2e: {

@@ -73,6 +73,10 @@
     "packages/testing": {
       "component": "@zgeoff/testing",
       "initial-version": "0.1.0"
+    },
+    "packages/storyboard": {
+      "component": "@zgeoff/storyboard",
+      "initial-version": "0.1.0"
     }
   }
 }
