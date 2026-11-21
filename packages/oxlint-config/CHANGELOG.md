@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.11.0...@zgeoff/oxlint-config@0.11.1) (2026-11-21)
+
+
+### Features
+
+* **oxlint-config:** add the use-testing-kit rule ([#723](https://github.com/zgeoff/tools/issues/723)) ([b3a2ff8](https://github.com/zgeoff/tools/commit/b3a2ff8e0612547bdee0ce3213f7cc51313726f6))
+
 ## [0.11.0](https://github.com/zgeoff/tools/compare/@zgeoff/oxlint-config@0.10.13...@zgeoff/oxlint-config@0.11.0) (2026-11-21)
 
 
