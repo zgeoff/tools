@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.4.2...@zgeoff/chex@0.4.3) (2026-11-21)
+
+
+### Features
+
+* **chex:** accept a pull-request and push split concurrency group ([#732](https://github.com/zgeoff/tools/issues/732)) ([b390de4](https://github.com/zgeoff/tools/commit/b390de4cb3082f41200e154870c7afa1ed09202f))
+
 ## [0.4.2](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.4.1...@zgeoff/chex@0.4.2) (2026-11-21)
 
 
