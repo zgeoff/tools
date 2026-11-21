@@ -23,15 +23,45 @@
   ],
   "type": "module",
   "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "bun": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./bin": {
+      "types": "./dist/bin/index.d.ts",
+      "bun": "./src/bin/index.ts",
+      "default": "./src/bin/index.ts"
+    },
     "./cli": {
       "types": "./dist/cli/index.d.ts",
       "bun": "./src/cli/index.ts",
       "default": "./src/cli/index.ts"
     },
+    "./fs": {
+      "types": "./dist/fs/index.d.ts",
+      "bun": "./src/fs/index.ts",
+      "default": "./src/fs/index.ts"
+    },
+    "./git": {
+      "types": "./dist/git/index.d.ts",
+      "bun": "./src/git/index.ts",
+      "default": "./src/git/index.ts"
+    },
     "./helpers": {
-      "types": "./dist/utils/index.d.ts",
-      "bun": "./src/utils/index.ts",
-      "default": "./src/utils/index.ts"
+      "types": "./dist/legacy-helpers/index.d.ts",
+      "bun": "./src/legacy-helpers/index.ts",
+      "default": "./src/legacy-helpers/index.ts"
+    },
+    "./mocks": {
+      "types": "./dist/mocks/index.d.ts",
+      "bun": "./src/mocks/index.ts",
+      "default": "./src/mocks/index.ts"
+    },
+    "./preload": {
+      "types": "./dist/preload/index.d.ts",
+      "bun": "./src/preload/index.ts",
+      "default": "./src/preload/index.ts"
     },
     "./process": {
       "types": "./dist/process/index.d.ts",
@@ -55,6 +85,6 @@
     "typescript": "catalog:"
   },
   "engines": {
-    "bun": ">=1.3"
+    "bun": ">=1.4.3"
   }
 }

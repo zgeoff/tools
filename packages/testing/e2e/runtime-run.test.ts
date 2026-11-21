@@ -1,4 +1,6 @@
-import { expect, test } from 'bun:test';
+import { expect, onTestFinished, test } from 'bun:test';
+import { removeEnvOverrides } from '../src/core/remove-env-overrides.ts';
+import { updateEnv } from '../src/core/update-env.ts';
 import { run } from '../src/process/index.ts';
 import { buildProcessFixtureCommand } from '../src/test-utils/build-process-fixture-command.ts';
 import { probeProcess } from '../src/test-utils/probe-process.ts';
@@ -96,4 +98,15 @@ test('it fails at the time limit when a descendant holds the output pipes after 
 
   expect(String(failure)).toMatch(/did not exit in 300 ms; its output:\nparent-exited\n$/u);
   expect(Date.now() - startedAt).toBeLessThan(2000);
+});
+
+test('it passes the program the env that updateEnv changed after this process started', async () => {
+  const ctx = setupTest();
+
+  onTestFinished(removeEnvOverrides);
+  updateEnv('KIT_RUN_PROBE', 'set-late');
+
+  const result = await run(ctx.command, { args: ['env', 'KIT_RUN_PROBE'] });
+
+  expect(result.stdout).toBe('set-late\n');
 });

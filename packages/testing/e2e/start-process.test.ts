@@ -1,8 +1,11 @@
-import { expect, test } from 'bun:test';
+import { expect, onTestFinished, test } from 'bun:test';
 import { realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { removeEnvOverrides } from '../src/core/remove-env-overrides.ts';
+import { updateEnv } from '../src/core/update-env.ts';
 import { start } from '../src/process/index.ts';
 import { buildProcessFixtureCommand } from '../src/test-utils/build-process-fixture-command.ts';
+import { probePortHeld } from '../src/test-utils/probe-port-held.ts';
 import { probeProcess } from '../src/test-utils/probe-process.ts';
 
 function setupTest() {
@@ -323,4 +326,100 @@ test('it throws when a slow ready.check answers true after the time limit', asyn
   );
 
   expect(String(failure)).toMatch(/was not ready after 50 ms/u);
+});
+
+test('it passes the program the env that updateEnv changed after this process started', async () => {
+  const ctx = setupTest();
+
+  onTestFinished(removeEnvOverrides);
+  updateEnv('KIT_START_PROBE', 'set-late');
+
+  await using program = await start(ctx.command, {
+    args: ['env', 'KIT_START_PROBE'],
+    ready: { stdout: 'set-late' },
+  });
+
+  expect(program.readyLine).toBe('set-late');
+});
+
+test('it stops the program after the test when the test never stops it', async () => {
+  const ctx = setupTest();
+
+  const program = await start(ctx.command, { args: ['mute'] });
+
+  onTestFinished(() => {
+    expect(probeProcess(program.pid)).toBeFalse();
+  });
+});
+
+test('it leaves the program running after the test with cleanup manual', async () => {
+  const ctx = setupTest();
+
+  const program = await start(ctx.command, { args: ['mute'], cleanup: 'manual' });
+
+  onTestFinished(async () => {
+    const isRunning = probeProcess(program.pid);
+
+    await program.stop();
+
+    expect(isRunning).toBeTrue();
+  });
+});
+
+test('it holds the port that it picks until the program stops', async () => {
+  const ctx = setupTest();
+
+  const program = await start(ctx.command, { args: ['mute'] });
+  const heldWhileRunning = await probePortHeld(program.port);
+
+  await program.stop();
+
+  const heldAfterStop = await probePortHeld(program.port);
+
+  expect({ heldWhileRunning, heldAfterStop }).toStrictEqual({
+    heldWhileRunning: true,
+    heldAfterStop: false,
+  });
+});
+
+test('it releases the port that it picks when the test ends without a stop', async () => {
+  const ctx = setupTest();
+
+  const program = await start(ctx.command, { args: ['mute'] });
+
+  onTestFinished(async () => {
+    const isHeld = await probePortHeld(program.port);
+
+    expect(isHeld).toBeFalse();
+  });
+});
+
+test('it claims no port when the caller names one', async () => {
+  const ctx = setupTest();
+
+  await using program = await start(ctx.command, { args: ['mute'], port: 45_901 });
+
+  const isHeld = await probePortHeld(program.port);
+
+  expect(isHeld).toBeFalse();
+});
+
+test('it releases the port that it picks when the program fails to be ready', async () => {
+  const ctx = setupTest();
+  const picked: number[] = [];
+
+  const failure = start(ctx.command, {
+    args: (port) => {
+      picked.push(port);
+
+      return ['exit', '3'];
+    },
+    ready: { stdout: 'never' },
+  });
+
+  expect(failure).rejects.toThrow('exited before it was ready');
+
+  const isHeld = await probePortHeld(picked[0] ?? 0);
+
+  expect(isHeld).toBeFalse();
 });
