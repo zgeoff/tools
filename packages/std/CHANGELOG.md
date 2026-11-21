@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.5](https://github.com/zgeoff/tools/compare/@zgeoff/std@0.4.4...@zgeoff/std@0.4.5) (2026-11-21)
+
+
+### Features
+
+* **std:** export the clock interface and its system implementation ([#713](https://github.com/zgeoff/tools/issues/713)) ([05437c7](https://github.com/zgeoff/tools/commit/05437c75663b1506afd00666ef9b79f55ffd14c7))
+
 ## [0.4.4](https://github.com/zgeoff/tools/compare/@zgeoff/std@0.4.3...@zgeoff/std@0.4.4) (2026-11-19)
 
 
