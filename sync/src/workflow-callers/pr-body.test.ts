@@ -59,7 +59,7 @@ test('it calls the reusable PR-body workflow at main with the permissions its jo
       pull_request: { types: ['opened', 'edited', 'reopened', 'synchronize'] },
     },
     concurrency: {
-      group: `pr-body-\${{ github.event.pull_request.number }}`,
+      group: `pr-body-\${{ github.event.pull_request.number }}-\${{ github.event.action == 'edited' && 'edit' || 'push' }}`,
       'cancel-in-progress': true,
     },
     jobs: {
