@@ -17,7 +17,10 @@ test('it fires a timer when advance reaches its due time, and not before', () =>
   const ctx = setupTest();
   const fired: number[] = [];
 
-  ctx.clock.schedule(() => fired.push(ctx.clock.now()), 500);
+  ctx.clock.schedule(() => {
+    fired.push(ctx.clock.now());
+  }, 500);
+
   ctx.clock.advance(499);
 
   expect(fired).toStrictEqual([]);
@@ -195,9 +198,18 @@ test('it sets now to each due time as it fires, in due order, and to the target 
   const ctx = setupTest();
   const log: string[] = [];
 
-  ctx.clock.schedule(() => log.push(`late@${ctx.clock.now()}`), 300);
-  ctx.clock.schedule(() => log.push(`early@${ctx.clock.now()}`), 100);
-  ctx.clock.schedule(() => log.push('beyond'), 900);
+  ctx.clock.schedule(() => {
+    log.push(`late@${ctx.clock.now()}`);
+  }, 300);
+
+  ctx.clock.schedule(() => {
+    log.push(`early@${ctx.clock.now()}`);
+  }, 100);
+
+  ctx.clock.schedule(() => {
+    log.push('beyond');
+  }, 900);
+
   ctx.clock.advance(400);
 
   expect(log).toStrictEqual(['early@1100', 'late@1300']);
@@ -215,7 +227,10 @@ test('it resolves a sleep and fires a timer in due order together', async () => 
     log.push('sleep');
   })();
 
-  ctx.clock.schedule(() => log.push('timer'), 100);
+  ctx.clock.schedule(() => {
+    log.push('timer');
+  }, 100);
+
   ctx.clock.advance(300);
 
   await nap;
@@ -227,9 +242,18 @@ test('it fires two timers due at the same time in the order they were scheduled'
   const ctx = setupTest();
   const log: string[] = [];
 
-  ctx.clock.schedule(() => log.push('first'), 100);
-  ctx.clock.schedule(() => log.push('second'), 100);
-  ctx.clock.schedule(() => log.push('third'), 100);
+  ctx.clock.schedule(() => {
+    log.push('first');
+  }, 100);
+
+  ctx.clock.schedule(() => {
+    log.push('second');
+  }, 100);
+
+  ctx.clock.schedule(() => {
+    log.push('third');
+  }, 100);
+
   ctx.clock.advance(100);
 
   expect(log).toStrictEqual(['first', 'second', 'third']);
@@ -241,8 +265,14 @@ test('it fires, in the same advance, a timer that a firing timer scheduled withi
 
   ctx.clock.schedule(() => {
     log.push(`outer@${ctx.clock.now()}`);
-    ctx.clock.schedule(() => log.push(`inner@${ctx.clock.now()}`), 50);
-    ctx.clock.schedule(() => log.push('past the target'), 500);
+
+    ctx.clock.schedule(() => {
+      log.push(`inner@${ctx.clock.now()}`);
+    }, 50);
+
+    ctx.clock.schedule(() => {
+      log.push('past the target');
+    }, 500);
   }, 100);
 
   ctx.clock.advance(200);
@@ -253,7 +283,10 @@ test('it fires, in the same advance, a timer that a firing timer scheduled withi
 test('it never fires a timer that an earlier timer in the same advance cancelled', () => {
   const ctx = setupTest();
   const log: string[] = [];
-  const cancelLater = ctx.clock.schedule(() => log.push('later'), 200);
+
+  const cancelLater = ctx.clock.schedule(() => {
+    log.push('later');
+  }, 200);
 
   ctx.clock.schedule(() => {
     log.push('earlier');

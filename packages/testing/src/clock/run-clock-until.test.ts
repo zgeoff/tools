@@ -69,7 +69,7 @@ test('it waits for turns without moving the clock while nothing is pending', asy
   expect(ctx.clock.now()).toBe(1000);
 });
 
-test('it throws after 100 steps in a row with nothing scheduled', async () => {
+test('it throws after 100 steps in a row with nothing scheduled', () => {
   const ctx = setupTest();
   let checks = 0;
 
@@ -83,12 +83,11 @@ test('it throws after 100 steps in a row with nothing scheduled', async () => {
     { maxMs: 10_000 },
   );
 
-  await expect(outcome).rejects.toThrow('nothing is scheduled and the condition is still false');
-
+  expect(outcome).rejects.toThrow('nothing is scheduled and the condition is still false');
   expect(checks).toBe(101);
 });
 
-test('it counts only steps in a row, so a step that moves the clock resets the count', async () => {
+test('it counts only steps in a row, so a step that moves the clock resets the count', () => {
   const ctx = setupTest();
   let turns = 0;
 
@@ -106,10 +105,10 @@ test('it counts only steps in a row, so a step that moves the clock resets the c
     { maxMs: 10_000 },
   );
 
-  await expect(outcome).rejects.toThrow('nothing is scheduled and the condition is still false');
+  expect(outcome).rejects.toThrow('nothing is scheduled and the condition is still false');
 });
 
-test('it moves the clock to the limit, checks once more, and throws when the condition is false', async () => {
+test('it moves the clock to the limit, checks once more, and throws when the condition is false', () => {
   const ctx = setupTest();
   let fired = 0;
 
@@ -119,8 +118,7 @@ test('it moves the clock to the limit, checks once more, and throws when the con
 
   const outcome = runClockUntil(ctx.clock, () => false, { maxMs: 2000 });
 
-  await expect(outcome).rejects.toThrow('the condition stayed false for 2000 ms of clock time');
-
+  expect(outcome).rejects.toThrow('the condition stayed false for 2000 ms of clock time');
   expect(ctx.clock.now()).toBe(3000);
   expect(fired).toBe(0);
 });

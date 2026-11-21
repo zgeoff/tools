@@ -66,21 +66,21 @@ test('it records a request before it calls handle', async () => {
   expect(seen).toStrictEqual([1]);
 });
 
-test('it stops the server after the test', async () => {
+test('it stops the server after the test', () => {
   const api = startStubServer(() => new Response('ok'));
 
-  onTestFinished(async () => {
-    await expect(fetch(`${api.url}/`)).rejects.toThrow();
+  onTestFinished(() => {
+    expect(fetch(`${api.url}/`)).rejects.toThrow();
   });
 
-  await expect(fetch(`${api.url}/`)).resolves.toBeInstanceOf(Response);
+  expect(fetch(`${api.url}/`)).resolves.toBeInstanceOf(Response);
 });
 
 test('it leaves a manual server running after the test, until the caller stops it', () => {
   const api = startStubServer(() => new Response('ok'), { cleanup: 'manual' });
 
   onTestFinished(async () => {
-    await expect(fetch(`${api.url}/`)).resolves.toBeInstanceOf(Response);
+    expect(fetch(`${api.url}/`)).resolves.toBeInstanceOf(Response);
 
     await api.stop();
   });
@@ -91,7 +91,7 @@ test('it stops a manual server when the caller calls stop', async () => {
 
   await api.stop();
 
-  await expect(fetch(`${api.url}/`)).rejects.toThrow();
+  expect(fetch(`${api.url}/`)).rejects.toThrow();
 });
 
 test('it stops a server that never answers, and fails the request that waits on it', async () => {

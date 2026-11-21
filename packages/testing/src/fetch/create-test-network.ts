@@ -43,10 +43,10 @@ export function createTestNetwork(options: TestNetworkOptions): TestNetwork {
 
   let patchedFetch: typeof fetch | null = null;
 
-  beforeAll(async () => {
+  beforeAll(() => {
     const nativeFetch = globalThis.fetch;
 
-    await network.enable();
+    network.enable();
 
     patchedFetch = globalThis.fetch;
 
@@ -70,12 +70,12 @@ export function createTestNetwork(options: TestNetworkOptions): TestNetwork {
     throw new Error(`the test sent requests that no handler matches:\n${requests}`);
   });
 
-  afterAll(async () => {
+  afterAll(() => {
     if (patchedFetch !== null) {
       globalThis.fetch = patchedFetch;
     }
 
-    await network.disable();
+    network.disable();
   });
 
   return { use: network.use };
