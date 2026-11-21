@@ -46,6 +46,11 @@ export function createTestNetwork(options: TestNetworkOptions): TestNetwork {
   beforeAll(() => {
     const nativeFetch = globalThis.fetch;
 
+    // The interceptor sends a passthrough() or bypass() request to the fetch it patched. Patch
+    // over a fetch that rejects, so no such request reaches a real server. The routed fetch keeps
+    // the native one for the passthrough hosts.
+    globalThis.fetch = Object.assign(rejectPassthrough, { preconnect: nativeFetch.preconnect });
+
     network.enable();
 
     patchedFetch = globalThis.fetch;
@@ -79,4 +84,12 @@ export function createTestNetwork(options: TestNetworkOptions): TestNetwork {
   });
 
   return { use: network.use };
+}
+
+function rejectPassthrough(input: string | URL | Request): Promise<Response> {
+  const url = input instanceof Request ? input.url : input.toString();
+
+  return Promise.reject(
+    new Error(`the test network never passes a request through to a real server: ${url}`),
+  );
 }
