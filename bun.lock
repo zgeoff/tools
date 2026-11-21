@@ -94,7 +94,7 @@
     },
     "packages/chex": {
       "name": "@zgeoff/chex",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "bin": {
         "chex": "./src/cli.ts",
       },
@@ -219,7 +219,7 @@
     },
     "packages/oxlint-config": {
       "name": "@zgeoff/oxlint-config",
-      "version": "0.11.0",
+      "version": "0.11.1",
       "dependencies": {
         "@stylistic/eslint-plugin": "catalog:",
       },
