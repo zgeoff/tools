@@ -1,0 +1,158 @@
+# Fetch mocking and stub servers
+
+- **Status:** draft
+- **Decision records:**
+  [0005, fetch mocking uses msw 3](../../decisions/0005-fetch-mocking-uses-msw-3.md)
+
+Two subpaths of the [testing kit](./README.md), `@zgeoff/testing`, stand in for HTTP services.
+`@zgeoff/testing/fetch` answers the `fetch` calls of the code under test from msw handlers, and
+fails the test on a request that no handler matches, even when the code under test catches the
+failed fetch. `@zgeoff/testing/server` starts a real stub HTTP server on the loopback interface, for
+code that msw can't reach, such as a child process. `@zgeoff/testing/server` needs no msw.
+
+## Shape
+
+```mermaid
+flowchart LR
+  code[code under test] -->|"fetch"| routed[the kit's fetch wrapper]
+  routed -->|"unix option or passthroughHosts host"| native[Bun's fetch]
+  routed -->|"other"| msw[msw 3 network]
+  msw -->|"matched"| handlers
+  msw -->|"unmatched"| record[unmatched list]
+  record -->|"afterEach"| fail[test fails]
+```
+
+msw drops Bun's `unix` and `tls` options from a request that it passes through to a real server. So
+the kit wraps `fetch`, and sends each call with the `unix` option, and each call to a
+`passthroughHosts` host, straight to Bun's own `fetch`. Every other call goes through msw, which
+keeps a handler's answer and the unmatched-request check for it, `tls` option or not.
+
+## Contracts
+
+### The test network
+
+A repo writes one network module, such as `test-utils/network.ts`, and lists it in its test preload.
+Tests import `network` from it.
+
+```ts
+// test-utils/network.ts
+import { billingHandlers } from '@acme/billing/mocks';
+import { createTestNetwork } from '@zgeoff/testing/fetch';
+
+export const network = createTestNetwork({ handlers: [...billingHandlers] });
+```
+
+```ts
+// a test
+network.use(http.get('https://api.example.com/v1/invoices/7', () => HttpResponse.json({ id: 7 })));
+network.use(http.get('https://api.example.com/v1/invoices/8', () => HttpResponse.error())); // a network failure, on purpose
+```
+
+```text
+# a test whose code fetched an unmocked URL, and caught the error
+error: the test sent requests that no handler matches:
+  GET https://api.example.com/v1/invoices/9
+```
+
+```ts
+// @zgeoff/testing/fetch
+function createTestNetwork(options: {
+  readonly handlers: readonly RequestHandler[]; // the defaults, kept after each test's reset
+  readonly passthroughHosts?: readonly string[]; // default ['127.0.0.1', '[::1]', 'localhost'], so code under test reaches a stub server
+}): TestNetwork;
+
+interface TestNetwork {
+  use(...handlers: readonly RequestHandler[]): void; // until the test ends
+}
+```
+
+`TestNetwork` has no reset or close method: the network resets its handlers after each test, and
+disables itself after each test file. To test a failed request, a test adds a handler that returns
+`HttpResponse.error()`.
+
+### Stub servers
+
+```ts
+const api = startStubServer(async (request) =>
+  Response.json({ ok: true, path: new URL(request.url).pathname }),
+);
+// → { url: 'http://127.0.0.1:43121', requests: [], stop: [Function] }, stopped after the test
+
+await run(['./bin/sync'], { env: { API_URL: api.url } });
+api.requests; // → [{ method: 'POST', path: '/v1/sync', headers: { … }, body: '{"since":0}' }]
+
+const silent = startStubServer(() => new Promise<Response>(() => {})); // never answers
+```
+
+```ts
+// @zgeoff/testing/server
+function startStubServer(
+  handle: (request: Request) => Response | Promise<Response>,
+  options?: { readonly cleanup?: 'test' | 'manual' }, // default 'test'; with 'manual', the caller calls stop()
+): StubServer;
+
+interface StubServer {
+  readonly url: string; // http://127.0.0.1:<port>, no trailing slash
+  readonly requests: readonly RecordedRequest[]; // in arrival order
+  stop(): Promise<void>; // closes open connections too
+}
+
+interface RecordedRequest {
+  readonly method: string;
+  readonly path: string; // pathname and search
+  readonly headers: Readonly<Record<string, string>>;
+  readonly body: string;
+}
+```
+
+## Constraints
+
+- `createTestNetwork` builds the network with msw's `defineNetwork` and one `FetchInterceptor` from
+  `@mswjs/interceptors/fetch/web`. Under Bun, the interceptor from `@mswjs/interceptors/fetch`
+  answers no request and lets unmatched requests reach the real network.
+- The optional peer ranges, `msw` `>=3.0.4 <4` and `@mswjs/interceptors` `>=0.45.11 <0.46`, start at
+  the versions where a test under Bun 1.4.3 showed the `fetch/web` interceptor answering matched
+  requests and rejecting unmatched ones.
+- `createTestNetwork` throws when a network already exists in the process. Two networks patch the
+  same `fetch`, so one network's handlers would answer the other's requests.
+- `createTestNetwork` registers `beforeAll` to enable the network, `afterEach` to reset its handlers
+  and check for unmatched requests, and `afterAll` to disable it. Calling `createTestNetwork` only
+  registers those hooks, so importing the network module never patches `fetch`.
+- A repo calls `createTestNetwork` only from a module that its test preload lists, so the hooks
+  apply to every test file. The kit can't detect a call from elsewhere. A call from one test file
+  registers hooks for that file only, and every other file's requests reach the real network. Under
+  `bun test --parallel`, a preload's `afterAll` runs once per file, and the `beforeAll` enables the
+  network again for the next file.
+- When no handler matches a request, the network adds the request to a list, and the `fetch` call
+  rejects with msw's error. The `afterEach` fails the test with every request on that list, then
+  empties the list.
+- msw never passes a request through to a real server. A call that the wrapper sends to msw gets a
+  handler's answer, or counts as unmatched.
+- Enabling the network patches `fetch` through msw first, and then wraps the patched
+  `globalThis.fetch`. Disabling it removes the wrapper, then msw's patch.
+- The network never intercepts `WebSocket`.
+- `startStubServer` listens on `127.0.0.1`, port 0, through `Bun.serve`. With `cleanup: 'test'`, it
+  releases the server after the test through `registerTestCleanup`, from the kit's root export.
+- `stop` closes open connections, so a server that never answers still stops.
+- `startStubServer` records each request before it calls `handle`.
+
+## Decisions
+
+- **The kit owns the msw setup.** A repo passes only its handlers. The kit chooses the interceptor,
+  routes `unix` calls and calls to loopback hosts to Bun's `fetch`, and checks for unmatched
+  requests.
+- **Unmatched requests fail the test in `afterEach`.** Code under test can catch a rejected fetch,
+  so a test that relied on the rejection alone could pass.
+- **Stub servers have their own subpath,** so a repo that tests a child process installs no msw.
+
+## Builder decides
+
+- The wording of the unmatched-request error, apart from listing each method and URL.
+- Which types `@zgeoff/testing/fetch` and `@zgeoff/testing/server` export beside the ones above.
+- How the kit tests `./fetch` itself, given that a second `createTestNetwork` call in one process
+  throws, such as in a `bun test` subprocess with a preload of its own.
+
+## Out of scope
+
+- WebSocket mocking.
+- `@msw/data` collections. A repo builds its own stateful handlers on top of `createTestNetwork`.
