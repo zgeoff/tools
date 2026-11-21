@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.4](https://github.com/zgeoff/tools/compare/@zgeoff/mcp-auth@0.2.3...@zgeoff/mcp-auth@0.2.4) (2026-11-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zgeoff/std bumped to 0.4.5
+
 ## [0.2.3](https://github.com/zgeoff/tools/compare/@zgeoff/mcp-auth@0.2.2...@zgeoff/mcp-auth@0.2.3) (2026-11-19)
 
 
