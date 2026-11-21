@@ -18,10 +18,9 @@ which patches `fetch` and answers requests from handlers, with the `FetchInterce
 - Under Bun 1.4.3, the interceptor choice decides whether mocking works at all. With the `fetch/web`
   interceptor, msw 3 answers a request that a handler matches, and the `fetch` call rejects for a
   request that no handler matches. The other interceptor, below, does neither.
-- Every repo needs two fixes under Bun, and one setup holds both in one place. msw drops Bun's
-  `unix` and `tls` fetch options, so the kit sends a request with either option to Bun's own
-  `fetch`. Code under test can catch a rejected `fetch`, so the kit fails the test on any unmatched
-  request.
+- One setup keeps in one place the fixes that every repo needs under Bun. msw drops Bun's `unix` and
+  `tls` fetch options, so the kit sends a request with either option to Bun's own `fetch`. Code
+  under test can catch a rejected `fetch`, so the kit fails the test on any unmatched request.
 
 ## Rejected alternatives
 

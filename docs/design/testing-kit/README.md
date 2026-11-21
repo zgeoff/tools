@@ -98,8 +98,8 @@ afterAll(() => server.stop());
 ## Platforms
 
 Every subpath runs under Bun 1.4.3 or later, and the package's `engines.bun` says `>=1.4.3`. The
-tools repo's CI runs the kit's tests on Linux only. The kit also runs on macOS, where three things
-differ:
+tools repo's CI runs the kit's tests on Linux only. On macOS, the kit behaves differently in these
+ways:
 
 - A signal to a process group whose leader has exited fails with `EPERM`, and the kit treats the
   group as gone, as [process.md](./process.md) says.
