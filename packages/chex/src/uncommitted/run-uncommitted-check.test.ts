@@ -242,3 +242,32 @@ test('it skips a deleted file that resolves on disk only through a folder the br
 
   expect(changed).toStrictEqual([]);
 });
+
+test('it skips a deleted link that the branch replaced with a folder of tracked files', async () => {
+  const ctx = await setupTest();
+
+  await ctx.createCommit({ 'store/testing/SKILL.md': '# Testing\n' });
+
+  await mkdir(join(ctx.repo, '.agents'));
+  await symlink('../store', join(ctx.repo, '.agents/skills'));
+
+  await ctx.runGit('add', '.agents/skills');
+  await ctx.runGit('commit', '--quiet', '-m', 'link the skills');
+  await ctx.runGit('rm', '--quiet', '.agents/skills');
+
+  await mkdir(join(ctx.repo, '.agents/skills/testing'), { recursive: true });
+  await writeFile(join(ctx.repo, '.agents/skills/testing/SKILL.md'), '# Testing\n');
+
+  await ctx.runGit('add', '.agents/skills');
+  await ctx.runGit('commit', '--quiet', '-m', 'replace the link with a folder');
+
+  const changed = runUncommittedCheck({
+    cwd: ctx.repo,
+    env: ctx.env,
+    files: ['.agents/skills', '.agents/skills/testing/SKILL.md'],
+    runProgram,
+    probeFile: makeFileProbe(ctx.repo),
+  });
+
+  expect(changed).toStrictEqual([]);
+});
