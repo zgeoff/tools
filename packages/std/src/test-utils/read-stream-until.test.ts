@@ -27,11 +27,12 @@ test('it returns the output as soon as it holds the text, with the stream still 
 });
 
 test('it returns the whole output when the stream ends without the text', async () => {
-  const stream = new Response('$ bun build.ts\nerror: build failed\n').body;
-
-  if (stream === null) {
-    throw new Error('the response has no body');
-  }
+  const stream = new ReadableStream<Uint8Array>({
+    start: (controller) => {
+      controller.enqueue(new TextEncoder().encode('$ bun build.ts\nerror: build failed\n'));
+      controller.close();
+    },
+  });
 
   const output = await readStreamUntil(stream, 'build started');
 

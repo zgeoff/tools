@@ -17,39 +17,44 @@ test('it reads the current time in epoch milliseconds', () => {
 });
 
 test('it fires a scheduled callback after the delay', async () => {
-  let fired = 0;
+  const fired = Promise.withResolvers<void>();
 
   systemClock.schedule(() => {
-    fired += 1;
+    fired.resolve();
   }, 5);
 
-  await systemClock.sleep(30);
-
-  expect(fired).toBe(1);
+  await expect(fired.promise).toResolve();
 });
 
-test('it treats a negative delay as 0 when it schedules', async () => {
-  let fired = 0;
+test('it treats a negative delay as 0 when it schedules', () => {
+  const setTimeoutSpy = spyOn(globalThis, 'setTimeout');
 
-  systemClock.schedule(() => {
-    fired += 1;
-  }, -1000);
+  onTestFinished(() => {
+    setTimeoutSpy.mockRestore();
+  });
 
-  await systemClock.sleep(30);
+  const cancel = systemClock.schedule(() => {}, -1000);
 
-  expect(fired).toBe(1);
+  cancel();
+
+  expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 0);
 });
 
 test('it treats a negative delay as 0 when it sleeps', async () => {
-  const startedAt = performance.now();
+  const setTimeoutSpy = spyOn(globalThis, 'setTimeout');
+
+  onTestFinished(() => {
+    setTimeoutSpy.mockRestore();
+  });
 
   await systemClock.sleep(-5000);
 
-  expect(performance.now() - startedAt).toBeLessThan(1000);
+  expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 0);
 });
 
 test('it does not fire a cancelled callback, and a second cancel does nothing', async () => {
   let fired = 0;
+  const control = Promise.withResolvers<void>();
 
   const cancel = systemClock.schedule(() => {
     fired += 1;
@@ -57,24 +62,25 @@ test('it does not fire a cancelled callback, and a second cancel does nothing', 
 
   cancel();
   cancel();
+  setTimeout(control.resolve, 30);
 
-  await systemClock.sleep(30);
+  await control.promise;
 
   expect(fired).toBe(0);
 });
 
 test('it ignores a cancel after the callback fired', async () => {
-  let fired = 0;
+  const fired = Promise.withResolvers<void>();
 
   const cancel = systemClock.schedule(() => {
-    fired += 1;
+    fired.resolve();
   }, 1);
 
-  await systemClock.sleep(30);
+  await fired.promise;
 
-  cancel();
-
-  expect(fired).toBe(1);
+  expect(() => {
+    cancel();
+  }).not.toThrow();
 });
 
 test('it resolves a sleep early when the signal aborts during it', async () => {
