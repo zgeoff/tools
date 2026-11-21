@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.4.1...@zgeoff/chex@0.4.2) (2026-11-21)
+
+
+### Features
+
+* **chex:** lint the pull request body against the template ([#725](https://github.com/zgeoff/tools/issues/725)) ([6376469](https://github.com/zgeoff/tools/commit/6376469851b52802942c9a70a32602d80caca6d1))
+
 ## [0.4.1](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.4.0...@zgeoff/chex@0.4.1) (2026-11-21)
 
 
