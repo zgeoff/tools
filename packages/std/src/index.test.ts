@@ -17,6 +17,7 @@ function setupTest() {
       'mergeDeep',
       'pick',
       'readOptionalText',
+      'systemClock',
       'toExactOptional',
       'toReadonlyDeep',
       'toTagged',
