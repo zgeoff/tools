@@ -145,7 +145,7 @@ test('it throws with the descendants that are no zombie and still run at the dea
 
   await runClockUntil(ctx.clock, trackSettled(run).isSettled, { maxMs: 60_000 });
 
-  await expect(run).rejects.toThrowWithMessage(
+  expect(run).rejects.toThrowWithMessage(
     Error,
     'the processes 4120, 4130 still run 5000 ms after SIGKILL',
   );
@@ -199,7 +199,7 @@ test('it throws and kills nothing when the listing fails until the deadline', as
 
   await runClockUntil(ctx.clock, trackSettled(run).isSettled, { maxMs: 60_000 });
 
-  await expect(run).rejects.toThrowWithMessage(
+  expect(run).rejects.toThrowWithMessage(
     Error,
     'the process listing failed for 5000 ms, so no process stopped',
   );
@@ -232,7 +232,7 @@ test('it counts every descendant as running while a later listing fails', async 
 
   await runClockUntil(ctx.clock, trackSettled(run).isSettled, { maxMs: 60_000 });
 
-  await expect(run).rejects.toThrowWithMessage(
+  expect(run).rejects.toThrowWithMessage(
     Error,
     'the processes 4120, 4130 still run 5000 ms after SIGKILL',
   );

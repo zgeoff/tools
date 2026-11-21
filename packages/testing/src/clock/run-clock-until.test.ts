@@ -77,8 +77,9 @@ test('it throws after idleMs of real time with nothing scheduled', async () => {
   const startedAtMs = performance.now();
   const outcome = runClockUntil(ctx.clock, () => false, { maxMs: 10_000, idleMs: 50 });
 
-  await expect(outcome).rejects.toThrow('nothing is scheduled and the condition is still false');
+  const failure = await outcome.catch((error: unknown) => error);
 
+  expect(String(failure)).toContain('nothing is scheduled and the condition is still false');
   expect(performance.now() - startedAtMs).toBeGreaterThanOrEqual(50);
   expect(ctx.clock.now()).toBe(1000);
 });

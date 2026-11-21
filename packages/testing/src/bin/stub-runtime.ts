@@ -32,7 +32,9 @@ let scriptProcess: { readonly kill: (signal: NodeJS.Signals) => void } | null = 
 // A script stand-in passes these signals on to the script. One that arrives before the script
 // starts waits and goes out right after the spawn.
 if (config.hasScript) {
-  forwardedSignals.forEach((signal) => forwardSignal(signal));
+  forwardedSignals.forEach((signal) => {
+    forwardSignal(signal);
+  });
 }
 
 const stdin = config.recordStdin ? await readStdin() : null;
