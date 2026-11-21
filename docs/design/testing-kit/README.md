@@ -97,12 +97,11 @@ afterAll(() => server.stop());
 
 ## Platforms
 
-Every subpath runs under Bun 1.4.3 or later, and the package's `engines.bun` says `>=1.4.3`. The
-tools repo's CI runs the kit's tests on Linux only. On macOS, the kit behaves differently in these
-ways:
+Every subpath runs under Bun 1.4.3 or later, and the package's `engines.bun` is `>=1.4.3`. The tools
+repo's CI runs the kit's tests on Linux only. On macOS, the kit behaves differently in these ways:
 
 - A signal to a process group whose leader has exited fails with `EPERM`, and the kit treats the
-  group as gone, as [process.md](./process.md) says.
+  group as gone ([process.md](./process.md)).
 - `claimFreePorts` picks a port that the OS reports free and holds nothing, so a parallel test can
   race for it. On Linux, it holds each port until the test ends.
 - `readRunFolderPrefix` builds each temp folder's name from the process ID and the PID namespace, so

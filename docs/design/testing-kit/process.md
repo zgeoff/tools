@@ -84,8 +84,8 @@ preload = ["@zgeoff/testing/preload", "./test-utils/network.ts"]
 
 `@zgeoff/testing/preload` registers one `afterEach` that calls `removeEnvOverrides`. A repo that
 mocks fetch lists its network module beside it. The `createTestNetwork` call in that module
-registers a `beforeAll`, an `afterEach` and an `afterAll` of its own, as [fetch.md](./fetch.md)
-says, and they run beside the env restore.
+registers a `beforeAll`, an `afterEach` and an `afterAll` of its own ([fetch.md](./fetch.md)), and
+they run beside the env restore.
 
 ### Processes
 
@@ -185,7 +185,7 @@ function claimFreePorts(
 
 ## Decisions
 
-- **`waitFor` retries on a throw.** An attempt's error says why the attempt failed, so the timeout
+- **`waitFor` retries on a throw.** An attempt's error holds the reason it failed, so the timeout
   error can carry the last one as its cause and show the reason the wait never succeeded.
 - **A repo lists the preload in `bunfig.toml`.** A test file never imports it, so every file gets
   the env restore, including a file whose author forgot it.

@@ -96,9 +96,9 @@ interface StubCall {
 
 - `createStubBin` writes each stand-in to a staged name in the same folder and renames it into
   place, so rewriting a stand-in that a process still runs never fails with `ETXTBSY`.
-- A stand-in with answers is a Bun script whose shebang names `process.execPath`, with its answers
-  in a JSON file beside it. It runs no shell, so the answer text reaches stdout and stderr byte for
-  byte.
+- A stand-in with answers is a Bun script whose shebang is the path in `process.execPath`, with its
+  answers in a JSON file beside it. It runs no shell, so the answer text reaches stdout and stderr
+  byte for byte.
 - The stand-in picks the first answer whose `args` prefix matches and that has not answered yet.
   When every matching answer has answered, the last matching one answers again.
 - The stand-in keeps which answers have answered in a state file beside its answers file, and

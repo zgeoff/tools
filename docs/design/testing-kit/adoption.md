@@ -10,7 +10,7 @@ from `@zgeoff/std`, as [clock.md](./clock.md) describes, and its tests mock fetc
 
 ## Shape
 
-Each arrow points from a step to a step that waits for it. The prefix names the repo of each PR:
+Each arrow points from a step to a step that waits for it. Each prefix is the repo of the PR:
 `tools` is zgeoff/tools, and `skills` is zgeoff/skills.
 
 ```mermaid
@@ -66,7 +66,7 @@ private repos get the same move, through their own work items. Each repo PR firs
 repo's test files and `test-utils/` folders for every name the kit exports, and replaces what it
 finds too. "Clock" lists the methods of the clock object that the repo's production code passes
 around, and "none" means the repo has none. "msw" gives the major version the repo installs. In the
-last column, each description names the kit export that replaces it.
+last column, the kit export that replaces a described helper is in brackets after it.
 
 | Repo      | Clock                                 | msw  | Local copies the kit replaces                                                                                                                        |
 | --------- | ------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -113,7 +113,8 @@ export function waitFor() {}
 - The rule skips a name with no capital letter, such as `run` or `start`, which a repo may use for
   something else. It checks `waitFor` and every other camelCase name.
 - The rule also fails an import of `setupServer` from `msw/node`, and an import of
-  `@mswjs/interceptors/fetch`. Its error message tells the author to use `createTestNetwork`.
+  `@mswjs/interceptors/fetch`. Its error message reads: use `createTestNetwork` from
+  `@zgeoff/testing/fetch`.
 
 ## Builder decides
 
