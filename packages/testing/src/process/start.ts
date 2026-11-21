@@ -1,9 +1,10 @@
+import { registerTestCleanup } from '../core/register-test-cleanup.ts';
 import { toExitCode } from '../to-exit-code.ts';
+import { claimFreePorts } from './claim-free-ports.ts';
 import { defaultWaitMs, drainGraceMs, groupDeadlineMs } from './constants.ts';
 import { drainStream } from './drain-stream.ts';
 import { isLineMatch } from './is-line-match.ts';
 import { probeGroup } from './probe-group.ts';
-import { readFreePort } from './read-free-port.ts';
 import { readReadyLine } from './read-ready-line.ts';
 import { signalGroup } from './signal-group.ts';
 import type { ProcessHandle, Signal, StartOptions, WaitForLineOptions } from './types.ts';
@@ -12,25 +13,35 @@ import { waitForOutcome } from './wait-for-outcome.ts';
 
 // Starts a program on a free port, passed as `PORT`, and waits for it to be ready. The program
 // leads a process group of its own, so a signal from `stop` or the disposal reaches every process
-// it forks too.
+// it forks too. Unless cleanup is 'manual', the program also stops after the test.
 export async function start(
   command: readonly string[],
   options: StartOptions = {},
 ): Promise<ProcessHandle> {
-  const port = await (options.port === undefined ? readFreePort() : Promise.resolve(options.port));
-
+  const cleanup = options.cleanup ?? 'test';
+  const claim = options.port === undefined ? claimFreePorts(1, { cleanup }) : null;
+  const port = claim === null ? (options.port ?? 0) : claim.take();
   const name = command.join(' ');
   const args = typeof options.args === 'function' ? options.args(port) : (options.args ?? []);
   const env = typeof options.env === 'function' ? options.env(port) : options.env;
 
-  const child = Bun.spawn([...command, ...args], {
-    ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
-    env: { ...process.env, ...env, PORT: String(port) },
-    stdin: 'pipe',
-    stdout: 'pipe',
-    stderr: 'pipe',
-    detached: true,
-  });
+  // A child that Bun starts with no env gets the env this process started with, so each change
+  // that updateEnv made is passed on here.
+  let child: ReturnType<typeof Bun.spawn<'pipe', 'pipe', 'pipe'>>;
+
+  try {
+    child = Bun.spawn([...command, ...args], {
+      ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+      env: { ...process.env, ...env, PORT: String(port) },
+      stdin: 'pipe',
+      stdout: 'pipe',
+      stderr: 'pipe',
+      detached: true,
+    });
+  } catch (error) {
+    claim?.release();
+    throw error;
+  }
 
   const isRunning = () => child.exitCode === null && child.signalCode === null;
   const log = { all: '', stdout: '', matchedLines: 0 };
@@ -64,6 +75,7 @@ export async function start(
       await waitForGroupExit(child.pid);
     } finally {
       clearTimeout(escalation);
+      claim?.release();
     }
 
     await settleOutput();
@@ -127,8 +139,14 @@ export async function start(
       if (isRunning() || probeGroup(child.pid)) {
         await stop('SIGKILL');
       }
+
+      claim?.release();
     },
   };
+
+  if (cleanup === 'test') {
+    registerTestCleanup(() => handle[Symbol.asyncDispose]());
+  }
 
   const ready = options.ready;
 

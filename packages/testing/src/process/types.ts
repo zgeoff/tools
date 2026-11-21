@@ -48,6 +48,10 @@ export interface StartOptions {
 
   // How long to wait for the program to be ready; 10 s when it is unset.
   readonly readyTimeoutMs?: number;
+
+  // 'test' stops the program after the test, as registerTestCleanup does. 'manual' leaves that to
+  // the caller. 'test' when it is unset.
+  readonly cleanup?: 'test' | 'manual';
 }
 
 export interface WaitForLineOptions {
@@ -78,7 +82,13 @@ export interface ProcessHandle extends AsyncDisposable {
   readonly output: () => string;
 
   // Sends the signal, SIGTERM when it is unset, to the program's process group. Waits for the
-  // program to exit and the group to empty, with SIGKILL for what is left after 5 s. Returns the
-  // exit code, which is 128 plus the signal's number when a signal killed the program.
+  // program to exit and the group to empty, with SIGKILL for what is left after 5 s. Gives up the
+  // port claim, and returns the exit code: 128 plus the signal's number after a signal.
   readonly stop: (signal?: Signal) => Promise<number>;
+}
+
+// A port that a claim holds, and the way to give it up.
+export interface PortHold {
+  readonly port: number;
+  readonly release: () => void;
 }

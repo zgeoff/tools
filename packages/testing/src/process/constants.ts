@@ -1,5 +1,8 @@
 export const pollIntervalMs = 50;
 
+// The lowest port that claimFreePorts hands out, above the registered ports.
+export const lowestClaimedPort = 10_000;
+
 // A process outside the group, such as one the program started in a group of its own, can hold the
 // output pipes open, so a stop waits only this long for the rest of the output.
 export const drainGraceMs = 200;
