@@ -1,13 +1,13 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createStubBin } from '@zgeoff/testing/bin';
 import { readRunFolderPrefix } from '@zgeoff/testing/fs';
 import { createGitCommit, readGitEnv } from '@zgeoff/testing/git';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 import { runProgram } from '../program/run-program.ts';
-import { createStubCommand } from '../test-utils/create-stub-command.ts';
 import { runWorkflowsCheck } from './run-workflows-check.ts';
 
 async function setupTest() {
@@ -1462,8 +1462,7 @@ test.each([
   async (isPrivate, stdout) => {
     const ctx = await setupTest();
 
-    await writeFile(join(ctx.bin, 'calls.log'), '');
-    await createStubCommand(ctx.bin, 'gh', join(ctx.bin, 'calls.log'), `${isPrivate}\n`);
+    const gh = createStubBin(ctx.bin, 'gh', { answers: [{ args: [], stdout: `${isPrivate}\n` }] });
 
     await ctx.commitFiles({
       '.github/workflows/checks.yml': [
@@ -1487,15 +1486,15 @@ test.each([
       .nothrow()
       .quiet();
 
-    const calls = await readFile(join(ctx.bin, 'calls.log'), 'utf8');
-
     expect({
       exitCode: result.exitCode,
       stdout: result.stdout.toString(),
       stderr: result.stderr.toString(),
     }).toStrictEqual({ exitCode: stdout === '' ? 0 : 1, stdout, stderr: '' });
 
-    expect(calls).toBe('gh repo view --json isPrivate --jq .isPrivate\n');
+    expect(gh.readCalls().map((call) => call.argv)).toStrictEqual([
+      ['repo', 'view', '--json', 'isPrivate', '--jq', '.isPrivate'],
+    ]);
   },
 );
 

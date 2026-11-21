@@ -10,4 +10,8 @@ minimumReleaseAge = 604800
 
 [test]
 # register jest-extended matchers, and start the one msw network, in every test file
-preload = ["@zgeoff/bun-test-extended", "./scripts/src/test-utils/mocks/network.ts"]
+preload = [
+  "@zgeoff/bun-test-extended",
+  "@zgeoff/testing/preload",
+  "./scripts/src/test-utils/mocks/network.ts",
+]

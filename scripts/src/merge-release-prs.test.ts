@@ -2,9 +2,9 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createStubBin } from '@zgeoff/testing/bin';
 import { readRunFolderPrefix } from '@zgeoff/testing/fs';
 import { buildMockHeadResponse } from './test-utils/build-mock-head-response.ts';
-import { createStubClock } from './test-utils/create-stub-clock.ts';
 import { createStubGH } from './test-utils/create-stub-gh.ts';
 import { runBashScript } from './test-utils/run-bash-script.ts';
 
@@ -664,7 +664,9 @@ test("it waits exactly the caller's minutes, in seconds, before it leaves the re
 
   // The wait starts at 1000. Two minutes as 120 seconds polls again at 1119
   // and stops at 1120; any other conversion polls once or more than twice.
-  await createStubClock(ctx.stubDirectory, [1000, 1119, 1120, 1121]);
+  createStubBin(ctx.stubDirectory, 'date', {
+    answers: [1000, 1119, 1120, 1121].map((time) => ({ args: ['+%s'], stdout: `${time}\n` })),
+  });
 
   await ctx.writeResponses('prs', [[{ number: 212 }]]);
   await ctx.writeResponses('mergeable', [{ isDraft: false, labels: [], baseRefName: 'main' }]);

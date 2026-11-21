@@ -17,7 +17,7 @@ async function setupTest() {
 test('it writes each program as an executable script that runs its body', async () => {
   const ctx = await setupTest();
 
-  await writeStubPrograms(ctx.folder, { kettle: 'echo "boils $1"', lid: 'exit 3' });
+  writeStubPrograms(ctx.folder, { kettle: 'echo "boils $1"', lid: 'exit 3' });
 
   const kettle = await $`${join(ctx.folder, 'kettle')} water`.nothrow().quiet();
   const lid = await $`${join(ctx.folder, 'lid')}`.nothrow().quiet();

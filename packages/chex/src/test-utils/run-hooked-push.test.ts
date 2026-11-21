@@ -2,11 +2,11 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createStubBin } from '@zgeoff/testing/bin';
 import { readRunFolderPrefix } from '@zgeoff/testing/fs';
 import { readGitEnv } from '@zgeoff/testing/git';
 import { $ } from 'bun';
 import { runHookedPush } from './run-hooked-push.ts';
-import { writeStubPrograms } from './write-stub-programs.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('run-hooked-push-')));
@@ -28,7 +28,9 @@ async function setupTest() {
 test('it pushes the ref and returns the hook output with no failed job', async () => {
   const ctx = await setupTest();
 
-  await writeStubPrograms(join(ctx.repo, '.git/hooks'), { 'pre-push': 'echo "✔️ lint"' });
+  createStubBin(join(ctx.repo, '.git/hooks'), 'pre-push', {
+    script: '#!/bin/sh\necho "✔️ lint"\n',
+  });
 
   const push = await runHookedPush(ctx.repo, 'main', ctx.env);
 
@@ -43,8 +45,8 @@ test('it pushes the ref and returns the hook output with no failed job', async (
 test('it fails the push and names each job the hook marks as failed', async () => {
   const ctx = await setupTest();
 
-  await writeStubPrograms(join(ctx.repo, '.git/hooks'), {
-    'pre-push': 'echo "🥊 commits (0.40 seconds)"\nexit 1',
+  createStubBin(join(ctx.repo, '.git/hooks'), 'pre-push', {
+    script: '#!/bin/sh\necho "🥊 commits (0.40 seconds)"\nexit 1\n',
   });
 
   const push = await runHookedPush(ctx.repo, 'main', ctx.env);

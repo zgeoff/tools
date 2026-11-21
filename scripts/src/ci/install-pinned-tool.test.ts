@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { readRunFolderPrefix } from '@zgeoff/testing/fs';
-import { createStubFileServer } from '../test-utils/create-stub-file-server.ts';
+import { startStubServer } from '@zgeoff/testing/server';
 import { createTarArchive } from '../test-utils/create-tar-archive.ts';
 import { installPinnedTool } from './install-pinned-tool.ts';
 import { nodeFileSystem } from './node-file-system.ts';
@@ -29,7 +29,7 @@ test('it installs a binary release into a runner folder on the PATH when the che
   await installPinnedTool({
     name: 'shfmt',
     pin: {
-      url: `${createStubFileServer({ '/shfmt': [{ status: 200, body: 'fake shfmt\n' }] }).url}/shfmt`,
+      url: `${startStubServer(() => new Response('fake shfmt\n')).url}/shfmt`,
       sha256: new Bun.CryptoHasher('sha256').update('fake shfmt\n').digest('hex'),
       packaging: 'binary',
       neededBy: 'shell check',
@@ -56,7 +56,7 @@ test('it installs nothing when the download fails its checksum', async () => {
   const installing = installPinnedTool({
     name: 'shfmt',
     pin: {
-      url: `${createStubFileServer({ '/shfmt': [{ status: 200, body: 'fake shfmt\n' }] }).url}/shfmt`,
+      url: `${startStubServer(() => new Response('fake shfmt\n')).url}/shfmt`,
       sha256: '0'.repeat(64),
       packaging: 'binary',
       neededBy: 'shell check',
@@ -90,7 +90,7 @@ test('it installs only the tool from a release archive into a runner folder on t
   await installPinnedTool({
     name: 'actionlint',
     pin: {
-      url: `${createStubFileServer({ '/actionlint.tar.gz': [{ status: 200, body: archive }] }).url}/actionlint.tar.gz`,
+      url: `${startStubServer(() => new Response(archive)).url}/actionlint.tar.gz`,
       sha256: new Bun.CryptoHasher('sha256').update(archive).digest('hex'),
       packaging: 'tar.gz',
       neededBy: 'workflows check',
@@ -123,7 +123,7 @@ test('it extracts nothing from a release archive that fails its checksum', async
   const installing = installPinnedTool({
     name: 'actionlint',
     pin: {
-      url: `${createStubFileServer({ '/actionlint.tar.gz': [{ status: 200, body: archive }] }).url}/actionlint.tar.gz`,
+      url: `${startStubServer(() => new Response(archive)).url}/actionlint.tar.gz`,
       sha256: '0'.repeat(64),
       packaging: 'tar.gz',
       neededBy: 'workflows check',

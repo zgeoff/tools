@@ -3,15 +3,15 @@ import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createStubBin } from '@zgeoff/testing/bin';
 import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/fs';
 import { $ } from 'bun';
 import { commitAllFiles } from '../src/test-utils/commit-all-files.ts';
 import { createChexBaselineRepo } from '../src/test-utils/create-chex-baseline-repo.ts';
-import { readCallLog } from '../src/test-utils/read-call-log.ts';
 import { readChexInstall } from '../src/test-utils/read-chex-install.ts';
+import { readRigCalls } from '../src/test-utils/read-rig-calls.ts';
 import { runChexCLI } from '../src/test-utils/run-chex-cli.ts';
 import { runHookedPush } from '../src/test-utils/run-hooked-push.ts';
-import { writeStubPrograms } from '../src/test-utils/write-stub-programs.ts';
 
 // Every git call gets a clean environment, so a GIT_DIR this test inherits from a real hook cannot
 // reach the repo it runs in.
@@ -51,7 +51,6 @@ async function setupTest() {
 
   const main = join(directory, 'main');
   const worktree = join(directory, 'worktree');
-  const rigCalls = join(directory, 'rig-calls');
 
   await $`git init --quiet --bare --initial-branch=main ${join(directory, 'upstream.git')}`
     .cwd(directory)
@@ -65,20 +64,19 @@ async function setupTest() {
 
   const lefthook = join(repoRoot, 'node_modules/.bin/lefthook');
 
-  await writeStubPrograms(join(main, '.git/hooks'), {
-    'pre-push': `exec ${process.execPath} ${lefthook} run pre-push "$@"`,
-    'pre-commit': `exec ${process.execPath} ${lefthook} run pre-commit "$@"`,
-  });
+  for (const hook of ['pre-push', 'pre-commit']) {
+    createStubBin(join(main, '.git/hooks'), hook, {
+      script: `#!/bin/sh\nexec ${process.execPath} ${lefthook} run ${hook} "$@"\n`,
+    });
+  }
 
-  const install = { toolsRoot: repoRoot, chex: await readChexInstall(), rigLog: rigCalls };
-  const readRigCalls = () => readCallLog(rigCalls);
+  const install = { toolsRoot: repoRoot, chex: await readChexInstall() };
 
   return {
     env,
     main,
     worktree,
     install,
-    readRigCalls,
   };
 }
 
@@ -98,7 +96,8 @@ test('it passes a push that clears every job, runs each repo check through chex 
 
   const result = await runHookedPush(ctx.worktree, 'feature', ctx.env);
   const bare = await $`git config --get core.bare`.cwd(ctx.main).env(ctx.env).text();
-  const rigCalls = await ctx.readRigCalls();
+
+  const rigCalls = readRigCalls(join(ctx.worktree, 'node_modules/.bin'));
 
   expect(result.exitCode).toBe(0);
 
@@ -112,7 +111,7 @@ test('it passes a push that clears every job, runs each repo check through chex 
     'cleared: dependency-gates',
   ]);
 
-  expect(rigCalls).toStrictEqual(['under diet: related fixture.ts']);
+  expect(rigCalls).toStrictEqual([{ argv: ['related', 'fixture.ts'], isUnderDiet: true }]);
   expect(bare).toBe('false\n');
   expect(existsSync(join(ctx.worktree, 'sandbox/.git'))).toBeTrue();
 });

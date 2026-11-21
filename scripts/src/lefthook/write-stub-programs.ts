@@ -1,17 +1,11 @@
-import { chmod, mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdirSync } from 'node:fs';
+import { createStubBin } from '@zgeoff/testing/bin';
 
-// Writes each program as an executable sh script with the given body, in a folder it creates.
-export async function writeStubPrograms(
-  folder: string,
-  bodies: Readonly<Record<string, string>>,
-): Promise<void> {
-  await mkdir(folder, { recursive: true });
+// Writes each program as a stand-in that runs the sh body, in a folder it creates.
+export function writeStubPrograms(folder: string, bodies: Readonly<Record<string, string>>): void {
+  mkdirSync(folder, { recursive: true });
 
-  await Promise.all(
-    Object.entries(bodies).map(async ([name, body]: readonly [string, string]) => {
-      await writeFile(join(folder, name), `#!/bin/sh\n${body}\n`);
-      await chmod(join(folder, name), 0o755);
-    }),
-  );
+  for (const [name, body] of Object.entries(bodies)) {
+    createStubBin(folder, name, { script: `#!/bin/sh\n${body}\n` });
+  }
 }

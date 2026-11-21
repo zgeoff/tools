@@ -25,11 +25,11 @@ export function buildJobLeakCases(configText: string): BaselineJobCase[] {
     ...jobs.map((job): BaselineJobCase => ({
       title: `the ${job.hook} job ${job.name} runs without git's repository variables`,
       check: async (sandbox) => {
-        await writeStubPrograms(join(sandbox.repo, 'node_modules/.bin'), {
+        writeStubPrograms(join(sandbox.repo, 'node_modules/.bin'), {
           diet: 'env >> diet-env\necho --- >> diet-env',
         });
 
-        await writeStubPrograms(sandbox.bin, {
+        writeStubPrograms(sandbox.bin, {
           shellcheck: 'exit 0',
           shfmt: 'exit 0',
           actionlint: 'exit 0',

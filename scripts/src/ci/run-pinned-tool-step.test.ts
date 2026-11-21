@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { readRunFolderPrefix } from '@zgeoff/testing/fs';
-import { createStubFileServer } from '../test-utils/create-stub-file-server.ts';
+import { startStubServer } from '@zgeoff/testing/server';
 import { nodeFileSystem } from './node-file-system.ts';
 import { runCommand } from './run-command.ts';
 import { runPinnedToolStep } from './run-pinned-tool-step.ts';
@@ -30,7 +30,7 @@ test.each([
   async (_label, part, requested) => {
     const ctx = await setupTest();
 
-    const server = createStubFileServer({ '/shfmt': [{ status: 200, body: 'fake shfmt\n' }] });
+    const server = startStubServer(() => new Response('fake shfmt\n'));
 
     const result = await runPinnedToolStep({
       args: ['shfmt'],
@@ -68,7 +68,7 @@ test.each([
 ])('it installs the tool from the step for %s', async (_label, part, requested) => {
   const ctx = await setupTest();
 
-  const server = createStubFileServer({ '/shfmt': [{ status: 200, body: 'fake shfmt\n' }] });
+  const server = startStubServer(() => new Response('fake shfmt\n'));
 
   const result = await runPinnedToolStep({
     args: ['shfmt'],
@@ -126,7 +126,7 @@ test.each([
   async (_label, part) => {
     const ctx = await setupTest();
 
-    const server = createStubFileServer({ '/scanner': [{ status: 200, body: 'fake scanner\n' }] });
+    const server = startStubServer(() => new Response('fake scanner\n'));
 
     const result = await runPinnedToolStep({
       args: ['scanner'],

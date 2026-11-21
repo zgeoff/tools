@@ -27,11 +27,12 @@ export async function createJobSandbox(configText: string): Promise<JobSandbox> 
   try {
     const bin = join(repo, '.bin');
 
-    await writeStubPrograms(join(repo, 'node_modules/.bin'), {
+    writeStubPrograms(join(repo, 'node_modules/.bin'), {
       diet: '[ "$1" = -- ] && shift\nexec "$@"',
     });
 
-    await writeStubPrograms(bin, {});
+    writeStubPrograms(bin, {});
+
     await symlink(process.execPath, join(bin, 'bun'));
 
     for (const program of ['env', 'date', 'git']) {

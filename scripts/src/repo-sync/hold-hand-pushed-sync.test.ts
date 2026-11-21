@@ -1,9 +1,9 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { createStubBin } from '@zgeoff/testing/bin';
 import { readRunFolderPrefix } from '@zgeoff/testing/fs';
 import { runCommand } from '../ci/run-command.ts';
-import { createStubCommand } from '../test-utils/create-stub-command.ts';
 import { holdHandPushedSync } from './hold-hand-pushed-sync.ts';
 
 async function setupTest() {
@@ -17,7 +17,6 @@ async function setupTest() {
 
   return {
     directory,
-    log: join(directory, 'calls.log'),
     env: {
       PATH: `${directory}:${process.env['PATH']}`,
       REPO: 'example/app',
@@ -34,14 +33,16 @@ async function setupTest() {
 test('it turns auto-merge off when someone other than the author pushes', async () => {
   const ctx = await setupTest();
 
-  await createStubCommand(
-    ctx.directory,
-    'gh',
-    ctx.log,
-    JSON.stringify([
-      { number: 7, user: { login: 'sync-app[bot]' }, auto_merge: { merge_method: 'squash' } },
-    ]),
-  );
+  const gh = createStubBin(ctx.directory, 'gh', {
+    answers: [
+      {
+        args: [],
+        stdout: JSON.stringify([
+          { number: 7, user: { login: 'sync-app[bot]' }, auto_merge: { merge_method: 'squash' } },
+        ]),
+      },
+    ],
+  });
 
   const exitCode = await holdHandPushedSync({
     cwd: ctx.directory,
@@ -50,14 +51,21 @@ test('it turns auto-merge off when someone other than the author pushes', async 
     writeOutput: ctx.writeOutput,
   });
 
-  const calls = await readFile(ctx.log, 'utf8');
-
   expect(exitCode).toBe(0);
 
-  expect(calls).toBe(
-    'gh api -X GET repos/example/app/pulls -f state=open -f head=example:repo-sync/zgeoff-tools\n' +
-      'gh pr merge 7 --disable-auto --repo example/app\n',
-  );
+  expect(gh.readCalls().map((call) => call.argv)).toStrictEqual([
+    [
+      'api',
+      '-X',
+      'GET',
+      'repos/example/app/pulls',
+      '-f',
+      'state=open',
+      '-f',
+      'head=example:repo-sync/zgeoff-tools',
+    ],
+    ['pr', 'merge', '7', '--disable-auto', '--repo', 'example/app'],
+  ]);
 
   expect(ctx.output).toStrictEqual([
     '::warning::octo-dev pushed to repo-sync/zgeoff-tools, so auto-merge of pull request #7 is off and it waits for review.\n',
@@ -67,14 +75,16 @@ test('it turns auto-merge off when someone other than the author pushes', async 
 test('it leaves auto-merge on when the author pushes', async () => {
   const ctx = await setupTest();
 
-  await createStubCommand(
-    ctx.directory,
-    'gh',
-    ctx.log,
-    JSON.stringify([
-      { number: 7, user: { login: 'octo-dev' }, auto_merge: { merge_method: 'squash' } },
-    ]),
-  );
+  const gh = createStubBin(ctx.directory, 'gh', {
+    answers: [
+      {
+        args: [],
+        stdout: JSON.stringify([
+          { number: 7, user: { login: 'octo-dev' }, auto_merge: { merge_method: 'squash' } },
+        ]),
+      },
+    ],
+  });
 
   const exitCode = await holdHandPushedSync({
     cwd: ctx.directory,
@@ -83,13 +93,20 @@ test('it leaves auto-merge on when the author pushes', async () => {
     writeOutput: ctx.writeOutput,
   });
 
-  const calls = await readFile(ctx.log, 'utf8');
-
   expect(exitCode).toBe(0);
 
-  expect(calls).toBe(
-    'gh api -X GET repos/example/app/pulls -f state=open -f head=example:repo-sync/zgeoff-tools\n',
-  );
+  expect(gh.readCalls().map((call) => call.argv)).toStrictEqual([
+    [
+      'api',
+      '-X',
+      'GET',
+      'repos/example/app/pulls',
+      '-f',
+      'state=open',
+      '-f',
+      'head=example:repo-sync/zgeoff-tools',
+    ],
+  ]);
 
   expect(ctx.output).toStrictEqual(['octo-dev opened pull request #7; nothing to hold.\n']);
 });
@@ -97,7 +114,9 @@ test('it leaves auto-merge on when the author pushes', async () => {
 test('it fails on a pull request with no author', async () => {
   const ctx = await setupTest();
 
-  await createStubCommand(ctx.directory, 'gh', ctx.log, JSON.stringify([{ number: 7 }]));
+  createStubBin(ctx.directory, 'gh', {
+    answers: [{ args: [], stdout: JSON.stringify([{ number: 7 }]) }],
+  });
 
   const holding = holdHandPushedSync({
     cwd: ctx.directory,
