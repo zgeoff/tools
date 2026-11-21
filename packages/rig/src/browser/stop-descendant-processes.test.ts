@@ -113,7 +113,7 @@ test('it resolves at the deadline when only zombies remain, which no process rea
   expect(ctx.clock.now()).toBe(5000);
 });
 
-test('it throws with the descendants that are no zombie and still run at the deadline', async () => {
+test('it throws with the descendants that are no zombie and still run at the deadline', () => {
   const ctx = setupTest();
 
   const readProcessTable = makeRepeatingAnswerQueue<readonly ProcessEntry[] | null>([
@@ -135,7 +135,7 @@ test('it throws with the descendants that are no zombie and still run at the dea
     ],
   ]);
 
-  await expect(
+  expect(
     runClockUntilSettled(
       ctx.clock,
       stopDescendantProcesses({
@@ -183,11 +183,11 @@ test('it reads a failed first listing again, and kills the descendants that the 
   ]);
 });
 
-test('it throws and kills nothing when the listing fails until the deadline', async () => {
+test('it throws and kills nothing when the listing fails until the deadline', () => {
   const ctx = setupTest();
   const readProcessTable = makeRepeatingAnswerQueue<readonly ProcessEntry[] | null>([null]);
 
-  await expect(
+  expect(
     runClockUntilSettled(
       ctx.clock,
       stopDescendantProcesses({
@@ -207,7 +207,7 @@ test('it throws and kills nothing when the listing fails until the deadline', as
   expect(ctx.clock.now()).toBe(5000);
 });
 
-test('it counts every descendant as running while a later listing fails', async () => {
+test('it counts every descendant as running while a later listing fails', () => {
   const ctx = setupTest();
 
   const readProcessTable = makeRepeatingAnswerQueue<readonly ProcessEntry[] | null>([
@@ -221,7 +221,7 @@ test('it counts every descendant as running while a later listing fails', async 
     null,
   ]);
 
-  await expect(
+  expect(
     runClockUntilSettled(
       ctx.clock,
       stopDescendantProcesses({

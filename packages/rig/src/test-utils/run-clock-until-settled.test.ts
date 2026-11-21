@@ -18,7 +18,7 @@ test('it steps the clock through each sleep until the promise resolves, and retu
   expect(clock.now()).toBe(350);
 });
 
-test('it rejects with the failure of a promise that rejects after a sleep', async () => {
+test('it rejects with the failure of a promise that rejects after a sleep', () => {
   const clock = createFakeClock();
 
   const failing = (async () => {
@@ -27,7 +27,7 @@ test('it rejects with the failure of a promise that rejects after a sleep', asyn
     throw new Error('the kettle broke');
   })();
 
-  await expect(runClockUntilSettled(clock, failing)).rejects.toThrowWithMessage(
+  expect(runClockUntilSettled(clock, failing)).rejects.toThrowWithMessage(
     Error,
     'the kettle broke',
   );
