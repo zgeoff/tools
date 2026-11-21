@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.3.0](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.2.9...@zgeoff/rig@0.3.0) (2026-11-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **testing:** @zgeoff/testing/helpers no longer exists. Import each helper from its subpath: fs, git, mocks, process, bin, or the package root for waitFor, updateEnv and removeEnvOverrides.
+
+### Code Refactoring
+
+* **testing:** move tools onto the kit's subpaths and remove helpers ([#720](https://github.com/zgeoff/tools/issues/720)) ([bd1dbd3](https://github.com/zgeoff/tools/commit/bd1dbd315d99fca612d167851bc48b7f6c60ff31))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zgeoff/diet bumped to 0.3.0
+  * devDependencies
+    * @zgeoff/testing bumped to 0.4.0
+
 ## [0.2.9](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.2.8...@zgeoff/rig@0.2.9) (2026-11-21)
 
 
