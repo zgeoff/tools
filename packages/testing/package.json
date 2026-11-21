@@ -38,6 +38,16 @@
       "bun": "./src/cli/index.ts",
       "default": "./src/cli/index.ts"
     },
+    "./clock": {
+      "types": "./dist/clock/index.d.ts",
+      "bun": "./src/clock/index.ts",
+      "default": "./src/clock/index.ts"
+    },
+    "./fetch": {
+      "types": "./dist/fetch/index.d.ts",
+      "bun": "./src/fetch/index.ts",
+      "default": "./src/fetch/index.ts"
+    },
     "./fs": {
       "types": "./dist/fs/index.d.ts",
       "bun": "./src/fs/index.ts",
@@ -67,6 +77,11 @@
       "types": "./dist/process/index.d.ts",
       "bun": "./src/process/index.ts",
       "default": "./src/process/index.ts"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "bun": "./src/server/index.ts",
+      "default": "./src/server/index.ts"
     }
   },
   "publishConfig": {
@@ -77,12 +92,27 @@
     "typecheck": "tsrs --fast"
   },
   "dependencies": {
+    "@zgeoff/std": "workspace:*",
     "bun-pty": "catalog:"
   },
   "devDependencies": {
+    "@mswjs/interceptors": "catalog:",
     "@types/bun": "catalog:",
+    "msw": "catalog:",
     "tsrs": "catalog:",
     "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "@mswjs/interceptors": ">=0.45.11 <0.46",
+    "msw": ">=3.0.4 <4"
+  },
+  "peerDependenciesMeta": {
+    "@mswjs/interceptors": {
+      "optional": true
+    },
+    "msw": {
+      "optional": true
+    }
   },
   "engines": {
     "bun": ">=1.4.3"

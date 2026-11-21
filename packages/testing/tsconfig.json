@@ -1,4 +1,8 @@
 {
   "extends": "../../tsconfig.base.json",
+  // msw types its interceptors from the root export of @mswjs/interceptors, which the browser
+  // condition and the default one declare as two unrelated classes; the fetch/web interceptor
+  // comes from the browser declarations
+  "compilerOptions": { "customConditions": ["browser"] },
   "include": ["src", "e2e"]
 }
