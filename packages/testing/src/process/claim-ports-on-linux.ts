@@ -27,7 +27,12 @@ export function claimPortsOnLinux(
       const listener = source.busyPorts.has(port) ? null : listenOnAbstractSocket(port);
 
       if (listener !== null) {
-        holds.push({ port, release: () => listener.stop(true) });
+        holds.push({
+          port,
+          release: () => {
+            listener.stop(true);
+          },
+        });
       }
     }
 
@@ -41,7 +46,7 @@ export function claimPortsOnLinux(
   }
 }
 
-function listenOnAbstractSocket(port: number): SocketListener<undefined> | null {
+function listenOnAbstractSocket(port: number): SocketListener | null {
   try {
     return Bun.listen({
       unix: `\0zgeoff-testing-port-${port}`,

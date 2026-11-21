@@ -190,7 +190,7 @@ function watchAbort(signal: AbortSignal | undefined): AbortWatch {
         throw signal.reason;
       }
     },
-    reason: () => signal?.reason,
+    reason: (): unknown => signal?.reason,
     stop: () => {
       signal?.removeEventListener('abort', onAbort);
     },

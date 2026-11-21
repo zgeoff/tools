@@ -204,7 +204,7 @@ test('it waits for EOF on stdin with recordStdin, and exits once stdin closes', 
 
   const exitCodeBefore = child.exitCode;
 
-  child.stdin.end();
+  await child.stdin.end();
 
   const exitCode = await child.exited;
 

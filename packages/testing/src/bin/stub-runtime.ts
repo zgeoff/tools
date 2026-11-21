@@ -122,7 +122,7 @@ function takeAnswer(answers: readonly RuntimeAnswer[]): RuntimeAnswer | null {
     answer.args.every((arg, position) => argv[position] === arg) ? [index] : [],
   );
 
-  const chosen = matches.find((index) => !answered[index]) ?? matches.at(-1);
+  const chosen = matches.find((index) => answered[index] !== true) ?? matches.at(-1);
 
   if (chosen === undefined) {
     return null;

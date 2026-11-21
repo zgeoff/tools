@@ -191,7 +191,9 @@ test('it removes the staging folder, releases the lock and rethrows when write t
     },
   });
 
-  await expect(failure).rejects.toThrow('the build broke');
+  const outcome = await Promise.allSettled([failure]);
+
+  expect(outcome[0]).toMatchObject({ status: 'rejected', reason: { message: 'the build broke' } });
 
   const lockFolder = readdirSync(ctx.templatesRoot).find((entry) => entry.endsWith('.lock'));
 
