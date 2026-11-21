@@ -1,7 +1,8 @@
 import { expect, mock, test } from 'bun:test';
+import { runClockUntil } from '@zgeoff/testing/clock';
 import { buildFakeProcessRuntime } from '../test-utils/build-fake-process-runtime.ts';
 import { buildStuckProcessGroups } from '../test-utils/build-stuck-process-groups.ts';
-import { runClockUntilSettled } from '../test-utils/run-clock-until-settled.ts';
+import { trackSettled } from '../test-utils/track-settled.ts';
 import { ProcessGroupStillRunningError } from './process-group-still-running-error.ts';
 import { ProcessGroupStopError } from './process-group-stop-error.ts';
 import type { ProcessGroups } from './process-groups.ts';
@@ -33,7 +34,11 @@ test('it rejects, after SIGTERM and SIGKILL, when the group still runs once its 
     runtime: fake.runtime,
   });
 
-  const failure = await runClockUntilSettled(fake.clock, group.exited).then(
+  const run = group.exited;
+
+  await runClockUntil(fake.clock, trackSettled(run).isSettled, { maxMs: 60_000 });
+
+  const failure = await run.then(
     () => null,
     (error: unknown) => error,
   );
@@ -65,7 +70,11 @@ test('it rejects on abort when the leader itself outlives SIGKILL and never exit
 
   ctx.controller.abort();
 
-  const failure = await runClockUntilSettled(fake.clock, group.exited).then(
+  const run = group.exited;
+
+  await runClockUntil(fake.clock, trackSettled(run).isSettled, { maxMs: 60_000 });
+
+  const failure = await run.then(
     () => null,
     (error: unknown) => error,
   );
@@ -99,7 +108,11 @@ test('it rejects with the cause when a signal to the group fails', async () => {
     runtime: fake.runtime,
   });
 
-  const failure = await runClockUntilSettled(fake.clock, group.exited).then(
+  const run = group.exited;
+
+  await runClockUntil(fake.clock, trackSettled(run).isSettled, { maxMs: 60_000 });
+
+  const failure = await run.then(
     () => null,
     (error: unknown) => error,
   );
