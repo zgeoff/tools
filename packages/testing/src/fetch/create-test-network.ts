@@ -41,22 +41,25 @@ export function createTestNetwork(options: TestNetworkOptions): TestNetwork {
     onUnhandledFrame: 'error',
   });
 
+  let nativeFetch: typeof fetch | null = null;
   let patchedFetch: typeof fetch | null = null;
 
   beforeAll(() => {
-    const nativeFetch = globalThis.fetch;
+    nativeFetch = globalThis.fetch;
+
+    const native = nativeFetch;
 
     // The interceptor sends a passthrough() or bypass() request to the fetch it patched. Patch
     // over a fetch that rejects, so no such request reaches a real server. The routed fetch keeps
     // the native one for the passthrough hosts.
-    globalThis.fetch = Object.assign(rejectPassthrough, { preconnect: nativeFetch.preconnect });
+    globalThis.fetch = Object.assign(rejectPassthrough, { preconnect: native.preconnect });
 
     network.enable();
 
     patchedFetch = globalThis.fetch;
 
     globalThis.fetch = makeRoutedFetch({
-      native: nativeFetch,
+      native,
       mocked: patchedFetch,
       passthroughHosts: options.passthroughHosts ?? defaultPassthroughHosts,
     });
@@ -81,6 +84,11 @@ export function createTestNetwork(options: TestNetworkOptions): TestNetwork {
     }
 
     network.disable();
+
+    // The disable put the rejecting fetch back, so put the real one back for the next file.
+    if (nativeFetch !== null) {
+      globalThis.fetch = nativeFetch;
+    }
   });
 
   return { use: network.use };
