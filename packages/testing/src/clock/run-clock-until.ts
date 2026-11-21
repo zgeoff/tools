@@ -9,6 +9,10 @@ export async function runClockUntil(
   isMet: () => boolean,
   options: RunClockUntilOptions,
 ): Promise<void> {
+  if (options.stepMs !== undefined && !(Number.isFinite(options.stepMs) && options.stepMs > 0)) {
+    throw new Error(`stepMs must be a finite number above 0, got ${options.stepMs}`);
+  }
+
   if (isMet()) {
     return;
   }
@@ -69,7 +73,9 @@ interface SteppedLimits {
   readonly maxMs: number;
 }
 
-// Advances the clock by stepMs a step, whatever is pending, and lets two turns pass before each
+const steppedTurnsPerStep = 4;
+
+// Advances the clock by stepMs a step, whatever is pending, and lets several turns pass before each
 // check, so work that needs a few turns to arm the next sleep keeps up.
 async function runSteppedClock(
   clock: FakeClock,
@@ -81,8 +87,9 @@ async function runSteppedClock(
   for (;;) {
     clock.advance(Math.min(limits.stepMs, limits.limitMs - clock.now()));
 
-    await waitOneTurn();
-    await waitOneTurn();
+    for (let turn = 0; turn < steppedTurnsPerStep; turn += 1) {
+      await waitOneTurn();
+    }
 
     if (isMet()) {
       return;
