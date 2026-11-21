@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.1](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.3.0...@zgeoff/rig@0.3.1) (2026-11-21)
+
+
+### Features
+
+* **testing:** wait out real io in the clock and forward stub signals ([#736](https://github.com/zgeoff/tools/issues/736)) ([acfb92c](https://github.com/zgeoff/tools/commit/acfb92ca3acdb33cfe0f850e1522319dcca68a4f))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @zgeoff/diet bumped to 0.3.1
+  * devDependencies
+    * @zgeoff/testing bumped to 0.4.1
+
 ## [0.3.0](https://github.com/zgeoff/tools/compare/@zgeoff/rig@0.2.9...@zgeoff/rig@0.3.0) (2026-11-21)
 
 
