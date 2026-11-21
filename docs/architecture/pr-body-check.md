@@ -30,26 +30,28 @@ written by `bun verify publish`.
   GitHub without a scroll bar.
 - **Placeholders:** a `<word>` left from the template fails, outside code.
 - **Checks:** only the lines `- [ ] chex`, `- [x] Deslop (<commit>)` and
-  `- [x] Cold read (<commit>)`. The chex line passes ticked or unticked, because the tick job sets
-  it. The commit is the one the agent ran that check on.
+  `- [x] Cold read (<commit>)`. The chex line passes ticked or unticked, because the `tick-chex` job
+  sets it. Each commit is the one the deslop or cold read ran on.
 
 With `--base` and `--head`, it also reads the branch's commits. The commit on a Deslop or Cold read
 line fails when it isn't on the branch, or when a commit after it on the branch changes a doc or
 skill file, because the check then ran on text that has since changed. A PR whose branch changes a
-doc or skill file needs a Checks section. Doc and skill files are the files that `chex prose` reads
-when it gets no path, as the [chex README](../../packages/chex/README.md) lists.
+doc or skill file needs a Checks section with all three lines. A later doc fix makes the Deslop and
+Cold read commits stale: run both again, and put the new commits on their lines. Doc and skill files
+are the files that `chex prose` reads when it gets no path, as the
+[chex README](../../packages/chex/README.md) lists.
 
 `tick-chex` changes nothing on disk: it prints the body with only the chex line set to `[x]`, or to
 `[ ]` with `--failed`.
 
-## The tick job
+## The tick-chex job
 
-The workflow's second job runs `chex prose links skill` on the PR's head. It ticks the chex line
-when those checks clear and unticks it when they fail, and writes the body back only when the text
-changed. A body with no chex line stays as it is. A failed docs check fails the job too, so the run
-shows why the box is unticked. The job runs on `opened`, `reopened` and `synchronize`, and never on
-`edited`, because its own edit of the body would start it again. It skips a PR from a fork, whose
-token cannot write, and a bot's PR.
+The workflow's second job, `tick-chex`, runs `chex prose links skill` on the PR's head. It ticks the
+chex line when those checks clear and unticks it when they fail, and writes the body back only when
+the text changed. A body with no chex line stays as it is. A failed docs check fails the job too, so
+the run shows why the box is unticked. The job runs on `opened`, `reopened` and `synchronize`, and
+never on `edited`, because its own edit of the body would start it again. It skips a PR from a fork,
+whose token cannot write, and a bot's PR. To tick a chex line you added by hand, push a commit.
 
 The workflow pins one chex release in its `CHEX` value. In tools, `bun run check:chex-pin` fails
 when no custom manager in `renovate.json` captures that pin or the one in `bun-checks.yml`, so
@@ -65,7 +67,8 @@ its stub, `.github/workflows/pr-title.yml`, into every repo.
 
 ## When a check fails
 
-Open the failed run from the PR's checks list. Each line of its log names the section and the fix.
+Open the failed job from the PR's checks list. Its log gives one line per error, with the section
+and the fix.
 
 - **pr-body:** edit the PR description. The edit runs the check again.
 - **tick-chex:** fix what `chex prose links skill` reports, and push. The push runs the docs checks
