@@ -13,7 +13,11 @@ test('it finds no fault when a regex manager of the workflow captures the chex p
   });
 
   expect(
-    findUnmanagedChexPin(renovateText, "env:\n  CHEX: '@zgeoff/chex@0.3.1'\n"),
+    findUnmanagedChexPin(
+      renovateText,
+      "env:\n  CHEX: '@zgeoff/chex@0.3.1'\n",
+      '.github/workflows/bun-checks.yml',
+    ),
   ).toBeUndefined();
 });
 
@@ -29,7 +33,11 @@ test('it finds no fault when a glob file pattern names the workflow', () => {
   });
 
   expect(
-    findUnmanagedChexPin(renovateText, "env:\n  CHEX: '@zgeoff/chex@0.3.1'\n"),
+    findUnmanagedChexPin(
+      renovateText,
+      "env:\n  CHEX: '@zgeoff/chex@0.3.1'\n",
+      '.github/workflows/bun-checks.yml',
+    ),
   ).toBeUndefined();
 });
 
@@ -74,13 +82,41 @@ test.each([
 ])('it reports the pin as unmanaged for %s', (_, config) => {
   const workflowText = "env:\n  CHEX: '@zgeoff/chex@0.3.1'\n  RIG: '@zgeoff/rig@1.0.0'\n";
 
-  expect(findUnmanagedChexPin(JSON.stringify(config), workflowText)).toBe(
+  expect(
+    findUnmanagedChexPin(JSON.stringify(config), workflowText, '.github/workflows/bun-checks.yml'),
+  ).toBe(
     'renovate.json: no custom manager captures the @zgeoff/chex pin in .github/workflows/bun-checks.yml, so Renovate never bumps it',
   );
 });
 
 test('it reports a renovate.json that is not JSON', () => {
-  expect(findUnmanagedChexPin('{ "customManagers": [', "CHEX: '@zgeoff/chex@0.3.1'\n")).toBe(
-    'renovate.json is not valid JSON',
+  expect(
+    findUnmanagedChexPin(
+      '{ "customManagers": [',
+      "CHEX: '@zgeoff/chex@0.3.1'\n",
+      '.github/workflows/bun-checks.yml',
+    ),
+  ).toBe('renovate.json is not valid JSON');
+});
+
+test('it checks the pin of the workflow it is given', () => {
+  const renovateText = JSON.stringify({
+    customManagers: [
+      {
+        customType: 'regex',
+        managerFilePatterns: [String.raw`/^\.github/workflows/bun-checks\.yml$/`],
+        matchStrings: ["CHEX: '(?<depName>@zgeoff/chex)@(?<currentValue>[^']+)'"],
+      },
+    ],
+  });
+
+  expect(
+    findUnmanagedChexPin(
+      renovateText,
+      "env:\n  CHEX: '@zgeoff/chex@0.4.2'\n",
+      '.github/workflows/pr-body-check.yml',
+    ),
+  ).toBe(
+    'renovate.json: no custom manager captures the @zgeoff/chex pin in .github/workflows/pr-body-check.yml, so Renovate never bumps it',
   );
 });

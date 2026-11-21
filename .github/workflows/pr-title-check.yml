@@ -1,0 +1,50 @@
+# Reusable workflow: lints a pull request's title with commitlint and the
+# shared rules of @zgeoff/commitlint-config. A squash merge makes the title the
+# commit subject, so the rules are the ones that chex commits applies to each
+# commit. The step script installs commitlint into the runner's temp folder, so
+# the caller needs no workspace install, and reads the title through env: alone.
+#
+# Callers install sync/src/workflow-callers/pr-title.yml.
+name: PR title check (reusable)
+
+on:
+  workflow_call:
+
+env:
+  COMMITLINT_CLI: '@commitlint/cli@21.2.4'
+  COMMITLINT_CONFIG: '@zgeoff/commitlint-config@0.1.2'
+
+jobs:
+  pr-title:
+    # A bot's PR title comes from its own template.
+    if: github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      # actionlint does not know job.workflow_repository or job.workflow_sha,
+      # so the step reads them through toJSON.
+      - name: Download the step script downloader
+        env: &tools-url
+          TOOLS_URL:
+            https://raw.githubusercontent.com/${{ fromJSON(toJSON(job)).workflow_repository }}/${{
+            fromJSON(toJSON(job)).workflow_sha }}
+        run:
+          curl -fsSL --retry 3 --retry-all-errors --create-dirs -o "$RUNNER_TEMP/tools/.bun-version"
+          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/src/ci/download-step-scripts.ts"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: ${{ runner.temp }}/tools/.bun-version
+
+      - name: Download the step scripts
+        env: *tools-url
+        run: bun "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts" pr-title-check
+
+      - name: Lint the PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: bash "$RUNNER_TEMP/tools/scripts/src/pr-checks/lint-pr-title.sh"

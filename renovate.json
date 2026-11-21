@@ -3,9 +3,9 @@
   "extends": ["github>zgeoff/tools"],
   "customManagers": [
     {
-      "description": "The chex release whose subcommands the bun-checks workflow runs from npm. The preset's chex rule runs chex init on each bump, which finds this repo already set up.",
+      "description": "The chex release whose subcommands the bun-checks and pr-body-check workflows run from npm. The preset's chex rule runs chex init on each bump, which finds this repo already set up.",
       "customType": "regex",
-      "managerFilePatterns": ["/^\\.github/workflows/bun-checks\\.yml$/"],
+      "managerFilePatterns": ["/^\\.github/workflows/(bun-checks|pr-body-check)\\.yml$/"],
       "matchStrings": ["CHEX: '(?<depName>@zgeoff/chex)@(?<currentValue>[^']+)'"],
       "datasourceTemplate": "npm",
       "versioningTemplate": "npm"

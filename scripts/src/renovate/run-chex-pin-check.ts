@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import type { FileSystem } from '../ci/file-system.ts';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
-import { chexPinPath, findUnmanagedChexPin } from './find-unmanaged-chex-pin.ts';
+import { chexPinPaths, findUnmanagedChexPin } from './find-unmanaged-chex-pin.ts';
 
 export interface ChexPinCheck {
   readonly cwd: string;
@@ -13,17 +13,22 @@ export interface ChexPinCheck {
 
 export async function runChexPinCheck(check: Readonly<ChexPinCheck>): Promise<number> {
   const renovateText = await check.fileSystem.readText(join(check.cwd, 'renovate.json'));
-  const workflowText = await check.fileSystem.readText(join(check.cwd, chexPinPath));
 
-  const fault = findUnmanagedChexPin(renovateText, workflowText);
+  const faults = await Promise.all(
+    chexPinPaths.map(async (path) => {
+      const workflowText = await check.fileSystem.readText(join(check.cwd, path));
 
-  if (fault !== undefined) {
+      return findUnmanagedChexPin(renovateText, workflowText, path);
+    }),
+  );
+
+  const found = faults.filter((fault) => fault !== undefined);
+
+  for (const fault of found) {
     check.writeError(`${fault}\n`);
-
-    return 1;
   }
 
-  return 0;
+  return found.length > 0 ? 1 : 0;
 }
 
 if (import.meta.main) {

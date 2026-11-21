@@ -80,6 +80,26 @@
     ]
   },
   {
+    "name": "workflow-pr-body",
+    "description": "The workflow that checks a pull request's description against the PR template and ticks its chex box",
+    "files": [
+      {
+        "source": "sync/src/workflow-callers/pr-body.yml",
+        "target": ".github/workflows/pr-body.yml"
+      }
+    ]
+  },
+  {
+    "name": "workflow-pr-title",
+    "description": "The workflow that lints a pull request's title as a Conventional Commit",
+    "files": [
+      {
+        "source": "sync/src/workflow-callers/pr-title.yml",
+        "target": ".github/workflows/pr-title.yml"
+      }
+    ]
+  },
+  {
     "name": "skill-testing",
     "description": "The shared testing skill and its references; a repo keeps its own rules in a project-testing skill",
     "optIn": true,

@@ -28,6 +28,11 @@ export const stepScriptSets = {
     'scripts/src/audit-fix/commit-audit-fix.ts',
     'scripts/src/audit-fix/open-audit-fix-pull-request.ts',
   ],
+  'pr-body-check': [
+    'scripts/src/pr-checks/check-pr-body.sh',
+    'scripts/src/pr-checks/tick-chex-box.sh',
+  ],
+  'pr-title-check': ['scripts/src/pr-checks/lint-pr-title.sh'],
   'npm-publish': ['scripts/src/release/publish-npm-tarballs.sh'],
   release: [
     'scripts/src/check-release-head.sh',
