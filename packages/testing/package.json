@@ -58,11 +58,6 @@
       "bun": "./src/git/index.ts",
       "default": "./src/git/index.ts"
     },
-    "./helpers": {
-      "types": "./dist/legacy-helpers/index.d.ts",
-      "bun": "./src/legacy-helpers/index.ts",
-      "default": "./src/legacy-helpers/index.ts"
-    },
     "./mocks": {
       "types": "./dist/mocks/index.d.ts",
       "bun": "./src/mocks/index.ts",
