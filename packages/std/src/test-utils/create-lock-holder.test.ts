@@ -2,9 +2,9 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { withFileLock } from '../file-lock/with-file-lock.ts';
 import { createLockHolder } from './create-lock-holder.ts';
+import { readRunFolderPrefix } from './read-run-folder-prefix.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('lock-holder-')));
