@@ -60,8 +60,6 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 
 ## Designs
 
-- [Spike: one skills folder for Claude Code and Codex](./design/agents-skills-folder/spikes/skill-discovery/README.md):
-  which skills folder layouts each agent loads, and the layout every repo moves to.
 - [Shared MCP OAuth server](./design/mcp-auth/README.md): `@zgeoff/mcp-auth`, the OAuth server that
   atc, boxxy, pepys and impz share for their `/mcp` routes, and the migration each app runs to take
   it.
@@ -74,3 +72,5 @@ The docs of tools: how its shared files and packages work, and the steps a contr
   DPoP and refuses DPoP-bound tokens.
 - [0003: The core shares the app's Kysely](./decisions/0003-the-core-shares-the-apps-kysely.md): why
   `@zgeoff/mcp-auth` runs on the app's own Kysely when the app has one.
+- [0006: Skills live in .agents/skills](./decisions/0006-skills-live-in-agents-skills.md): why every
+  repo keeps its skills in `.agents/skills/` and links `.claude/skills` to it.
