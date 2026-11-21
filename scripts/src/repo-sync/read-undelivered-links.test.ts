@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/helpers';
+import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/fs';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { readUndeliveredLinks } from './read-undelivered-links.ts';
 

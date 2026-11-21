@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { mkdtemp, readlink, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/helpers';
+import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/fs';
 import { chexPackDir, runChexPack } from './run-chex-pack.ts';
 
 async function setupTest() {

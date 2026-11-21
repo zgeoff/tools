@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'bun:test';
-import { makeResolvingStub } from '@zgeoff/testing/helpers';
+import { makeResolvingStub } from '@zgeoff/testing/mocks';
 import invariant from 'tiny-invariant';
 import type { CommandOptions } from '../command/run-command.ts';
 import { defineRig } from '../config/define-rig.ts';

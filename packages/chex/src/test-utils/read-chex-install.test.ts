@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { join } from 'node:path';
-import { removeEnvOverrides, updateEnv } from '@zgeoff/testing/helpers';
+import { removeEnvOverrides, updateEnv } from '@zgeoff/testing';
 import { readChexInstall } from './read-chex-install.ts';
 
 // updateEnv records each original, and removeEnvOverrides puts it back after the test

@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { hostname, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
-import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
+import { readRunFolderPrefix } from '@zgeoff/testing/fs';
 import { buildBrowserRun } from '../src/browser/build-browser-run.ts';
 import { pickChromeDirs } from '../src/browser/pick-chrome-dirs.ts';
 import { resolveProgram } from '../src/programs/index.ts';

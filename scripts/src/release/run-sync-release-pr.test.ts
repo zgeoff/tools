@@ -1,7 +1,8 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createGitCommit, readGitEnv, readRunFolderPrefix, runGit } from '@zgeoff/testing/helpers';
+import { readRunFolderPrefix } from '@zgeoff/testing/fs';
+import { createGitCommit, readGitEnv, runGit } from '@zgeoff/testing/git';
 import { $ } from 'bun';
 import { runCommand } from '../ci/run-command.ts';
 import { runSyncReleasePR } from './run-sync-release-pr.ts';

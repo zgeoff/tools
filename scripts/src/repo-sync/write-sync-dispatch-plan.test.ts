@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
+import { readRunFolderPrefix } from '@zgeoff/testing/fs';
 import { $ } from 'bun';
 import { nodeFileSystem } from '../ci/node-file-system.ts';
 import { runCommand } from '../ci/run-command.ts';

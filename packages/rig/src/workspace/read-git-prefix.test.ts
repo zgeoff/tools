@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
+import { readRunFolderPrefix } from '@zgeoff/testing/fs';
 import { processRuntime } from '../browser/process-runtime.ts';
 import { readCommandOutput } from '../command/read-command-output.ts';
 import { createTrackedRepo } from '../test-utils/create-tracked-repo.ts';

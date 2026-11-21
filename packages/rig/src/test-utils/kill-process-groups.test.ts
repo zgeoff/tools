@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'bun:test';
-import { makeAnswerQueue } from '@zgeoff/testing/helpers';
+import { makeAnswerQueue } from '@zgeoff/testing/mocks';
 import { buildSteppingClock } from './build-stepping-clock.ts';
 import { buildStuckProcessGroups } from './build-stuck-process-groups.ts';
 import { killProcessGroups } from './kill-process-groups.ts';

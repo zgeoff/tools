@@ -1,7 +1,8 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createGitCommit, readGitEnv, readRunFolderPrefix, runGit } from '@zgeoff/testing/helpers';
+import { readRunFolderPrefix } from '@zgeoff/testing/fs';
+import { createGitCommit, readGitEnv, runGit } from '@zgeoff/testing/git';
 import { createSideGitCommit } from './create-side-git-commit.ts';
 
 async function setupTest() {

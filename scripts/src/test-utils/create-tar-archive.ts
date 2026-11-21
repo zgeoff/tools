@@ -1,6 +1,6 @@
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
+import { readRunFolderPrefix } from '@zgeoff/testing/fs';
 import { $ } from 'bun';
 
 export interface ArchiveFile {

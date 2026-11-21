@@ -1,6 +1,6 @@
 import { mkdir, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { writeTreeFiles } from '@zgeoff/testing/helpers';
+import { writeTreeFiles } from '@zgeoff/testing/fs';
 import { buildInitGuardHooks } from './build-init-guard-hooks.ts';
 import { linkCommitlint } from './link-commitlint.ts';
 import type { ChexInstall } from './read-chex-install.ts';

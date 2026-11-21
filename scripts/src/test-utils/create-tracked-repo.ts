@@ -1,4 +1,5 @@
-import { readGitEnv, runGit, writeTreeFiles } from '@zgeoff/testing/helpers';
+import { writeTreeFiles } from '@zgeoff/testing/fs';
+import { readGitEnv, runGit } from '@zgeoff/testing/git';
 
 // `git ls-files` lists a staged file, so the repo needs no commit for rig to see its files.
 export async function createTrackedRepo(

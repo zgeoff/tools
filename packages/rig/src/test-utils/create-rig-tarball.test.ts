@@ -2,11 +2,8 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  createBlockingStubKit,
-  makeResolvingStub,
-  readRunFolderPrefix,
-} from '@zgeoff/testing/helpers';
+import { readRunFolderPrefix } from '@zgeoff/testing/fs';
+import { createBlockingStubKit, makeResolvingStub } from '@zgeoff/testing/mocks';
 import { buildSignallingClock } from './build-signalling-clock.ts';
 import { createRigTarball } from './create-rig-tarball.ts';
 import { fileLocks } from './file-locks.ts';

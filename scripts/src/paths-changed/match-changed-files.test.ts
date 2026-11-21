@@ -1,7 +1,8 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { readGitEnv, readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/helpers';
+import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/fs';
+import { readGitEnv } from '@zgeoff/testing/git';
 import { $ } from 'bun';
 import { runCommand } from '../ci/run-command.ts';
 import { matchChangedFiles } from './match-changed-files.ts';

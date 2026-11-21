@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
+import { readRunFolderPrefix } from '@zgeoff/testing/fs';
 import { createStubFileServer } from '../test-utils/create-stub-file-server.ts';
 import { createTarArchive } from '../test-utils/create-tar-archive.ts';
 import { installPinnedTool } from './install-pinned-tool.ts';

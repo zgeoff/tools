@@ -2,7 +2,8 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readGitEnv, readRunFolderPrefix, runGit, writeTreeFiles } from '@zgeoff/testing/helpers';
+import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/fs';
+import { readGitEnv, runGit } from '@zgeoff/testing/git';
 import { run } from '@zgeoff/testing/process';
 import { resolveProgram } from '../src/programs/index.ts';
 

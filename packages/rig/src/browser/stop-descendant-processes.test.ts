@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'bun:test';
-import { makeRepeatingAnswerQueue } from '@zgeoff/testing/helpers';
+import { makeRepeatingAnswerQueue } from '@zgeoff/testing/mocks';
 import { buildProcessEntry } from '../test-utils/build-process-entry.ts';
 import { buildSteppingClock } from '../test-utils/build-stepping-clock.ts';
 import type { ProcessEntry } from './read-process-table.ts';

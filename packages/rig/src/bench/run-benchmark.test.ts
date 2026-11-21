@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { setImmediate } from 'node:timers/promises';
-import { makeAnswerQueue } from '@zgeoff/testing/helpers';
+import { makeAnswerQueue } from '@zgeoff/testing/mocks';
 import { buildInFlightRun } from '../test-utils/build-in-flight-run.ts';
 import { buildSteppingClock } from '../test-utils/build-stepping-clock.ts';
 import { buildTickingClock } from '../test-utils/build-ticking-clock.ts';

@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { readStreamUntil } from '@zgeoff/testing/helpers';
+import { readStreamUntil } from '@zgeoff/testing/process';
 
 export interface LockHolder {
   // Kills the holder with SIGKILL and waits for its exit, which frees its lock.

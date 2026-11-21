@@ -3,12 +3,10 @@ import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
-import {
-  createStubSudo,
-  readRunFolderPrefix,
-  readStreamUntil,
-  waitFor,
-} from '@zgeoff/testing/helpers';
+import { waitFor } from '@zgeoff/testing';
+import { createStubSudo } from '@zgeoff/testing/bin';
+import { readRunFolderPrefix } from '@zgeoff/testing/fs';
+import { readStreamUntil } from '@zgeoff/testing/process';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
 

@@ -13,7 +13,8 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { makeRepeatingAnswerQueue, waitFor } from '@zgeoff/testing/helpers';
+import { waitFor } from '@zgeoff/testing';
+import { makeRepeatingAnswerQueue } from '@zgeoff/testing/mocks';
 import { buildPreToolUsePayload } from '../test-utils/build-pre-tool-use-payload.ts';
 import { createStubInstall } from '../test-utils/create-stub-install.ts';
 import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';

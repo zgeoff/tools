@@ -2,12 +2,8 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  makeRejectingStub,
-  makeResolvingStub,
-  readRunFolderPrefix,
-  writeTreeFiles,
-} from '@zgeoff/testing/helpers';
+import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/fs';
+import { makeRejectingStub, makeResolvingStub } from '@zgeoff/testing/mocks';
 import { bunFileSystem } from './bun-file-system.ts';
 import { runInit } from './run-init.ts';
 

@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { readStreamUntil } from '@zgeoff/testing/helpers';
+import { readStreamUntil } from '@zgeoff/testing/process';
 import { hasErrorCode } from '../browser/has-error-code.ts';
 import { createTrackedRepo } from './create-tracked-repo.ts';
 import { killProcessGroups } from './kill-process-groups.ts';

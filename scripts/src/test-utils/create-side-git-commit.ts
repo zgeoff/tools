@@ -1,5 +1,5 @@
-import { createGitCommit, runGit } from '@zgeoff/testing/helpers';
-import type { GitEnv } from '@zgeoff/testing/helpers';
+import { createGitCommit, runGit } from '@zgeoff/testing/git';
+import type { GitEnv } from '@zgeoff/testing/git';
 
 export interface SideGitCommit {
   readonly branch: string;
