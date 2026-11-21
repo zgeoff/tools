@@ -1,6 +1,6 @@
 # Storyboard
 
-- **Status:** draft
+- **Status:** agreed
 
 `@zgeoff/storyboard` is a package that builds the animated SVG images at the top of zgeoff READMEs,
 and checks them. A repo writes each image as a [scene](#words): one JSX tree that holds the image's

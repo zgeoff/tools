@@ -1,6 +1,6 @@
 # Building and checking scenes
 
-- **Status:** draft
+- **Status:** agreed
 
 The [README's words](./README.md#words) define scene, lane, hard cut, ambient loop and the other
 terms this doc uses. A developer in a repo whose README shows a scene runs `storyboard build` to

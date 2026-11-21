@@ -1,6 +1,6 @@
 # Writing a scene
 
-- **Status:** draft
+- **Status:** agreed
 
 The [README's words](./README.md#words) define scene, stage, part, change, grid, reading time, host,
 token and kit, and its Shape section says what a drawing is. The card is the image's rectangle,
