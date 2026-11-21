@@ -41,7 +41,7 @@ async function setupTest() {
   return { outsideDirectory, directory, writeText, run };
 }
 
-test('it passes the root README at the front page warning line', async () => {
+test('it passes a 100-line root README with the target warning', async () => {
   const ctx = await setupTest();
 
   await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(100));
@@ -62,7 +62,7 @@ test('it passes the root README at the front page warning line', async () => {
   });
 });
 
-test('it warns and passes when the root README is over the warning line but within the front page limit', async () => {
+test('it passes a 101-line root README with the threshold warning', async () => {
   const ctx = await setupTest();
 
   await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(101));
@@ -76,7 +76,7 @@ test('it warns and passes when the root README is over the warning line but with
   }).toStrictEqual({
     exitCode: 0,
     stdout:
-      'README.md: 101 lines, over the front page README warning line of 100 (target 80, limit 150; warning)\n' +
+      'README.md: 101 lines, over the front page README warning threshold of 100 (target 80, limit 150; warning)\n' +
       '\n' +
       'check-length: 1 READMEs, 0 over the line limit\n',
     stderr: '',
@@ -104,7 +104,7 @@ test('it fails when the root README is over the front page limit', async () => {
   });
 });
 
-test('it still only warns on the root README at the front page limit', async () => {
+test('it passes a 150-line root README with the threshold warning', async () => {
   const ctx = await setupTest();
 
   await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(150));
@@ -118,7 +118,7 @@ test('it still only warns on the root README at the front page limit', async () 
   }).toStrictEqual({
     exitCode: 0,
     stdout:
-      'README.md: 150 lines, over the front page README warning line of 100 (target 80, limit 150; warning)\n' +
+      'README.md: 150 lines, over the front page README warning threshold of 100 (target 80, limit 150; warning)\n' +
       '\n' +
       'check-length: 1 READMEs, 0 over the line limit\n',
     stderr: '',
