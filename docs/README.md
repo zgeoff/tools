@@ -63,8 +63,6 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 
 ## Designs
 
-- [Spike: one skills folder for Claude Code and Codex](./design/agents-skills-folder/spikes/skill-discovery/README.md):
-  which skills folder layouts each agent loads, and the layout every repo moves to.
 - [Shared testing kit](./design/testing-kit/README.md): `@zgeoff/testing` grown into one kit of test
   helpers with a subpath per area, and each repo's move onto it.
 
@@ -80,3 +78,5 @@ The docs of tools: how its shared files and packages work, and the steps a contr
   why production code takes its clock from `@zgeoff/std`, and why `sleep` resolves on abort.
 - [0005: Fetch mocking uses msw 3](./decisions/0005-fetch-mocking-uses-msw-3.md): why every repo
   mocks `fetch` through one msw 3 network with the `fetch/web` interceptor.
+- [0006: Skills live in .agents/skills](./decisions/0006-skills-live-in-agents-skills.md): why every
+  repo keeps its skills in `.agents/skills/` and links `.claude/skills` to it.
