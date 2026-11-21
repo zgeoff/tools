@@ -1,8 +1,8 @@
 # Reusable workflow: lints a pull request's title with commitlint and the
 # shared rules of @zgeoff/commitlint-config. A squash merge makes the title the
 # commit subject, so the rules are the ones that chex commits applies to each
-# commit. It installs commitlint into the runner's temp folder, so the caller
-# needs no workspace install, and it reads the title through env: alone.
+# commit. The step script installs commitlint into the runner's temp folder, so
+# the caller needs no workspace install, and reads the title through env: alone.
 #
 # Callers install sync/src/workflow-callers/pr-title.yml.
 name: PR title check (reusable)
@@ -23,18 +23,28 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Install commitlint
-        run: |
-          mkdir -p "$RUNNER_TEMP/commitlint"
-          cd "$RUNNER_TEMP/commitlint"
-          npm install --no-save --ignore-scripts --no-audit --no-fund "$COMMITLINT_CLI" "$COMMITLINT_CONFIG"
-          echo "export default { extends: ['@zgeoff/commitlint-config'] };" > commitlint.config.mjs
+      # actionlint does not know job.workflow_repository or job.workflow_sha,
+      # so the step reads them through toJSON.
+      - name: Download the step script downloader
+        env: &tools-url
+          TOOLS_URL:
+            https://raw.githubusercontent.com/${{ fromJSON(toJSON(job)).workflow_repository }}/${{
+            fromJSON(toJSON(job)).workflow_sha }}
+        run:
+          curl -fsSL --retry 3 --retry-all-errors --create-dirs -o "$RUNNER_TEMP/tools/.bun-version"
+          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/src/ci/download-step-scripts.ts"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: ${{ runner.temp }}/tools/.bun-version
+
+      - name: Download the step scripts
+        env: *tools-url
+        run: bun "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts" pr-title-check
 
       - name: Lint the PR title
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-        run: |
-          if ! printf '%s' "$PR_TITLE" | "$RUNNER_TEMP/commitlint/node_modules/.bin/commitlint" --config "$RUNNER_TEMP/commitlint/commitlint.config.mjs" --color=false; then
-            echo 'Rename the PR title to a Conventional Commit in the imperative mood, such as "fix(api): retry a refused upload".' >&2
-            exit 1
-          fi
+        run: bash "$RUNNER_TEMP/tools/scripts/src/pr-checks/lint-pr-title.sh"

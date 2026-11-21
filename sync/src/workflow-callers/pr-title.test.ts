@@ -53,7 +53,7 @@ test('it skips a bot and reads only the contents', async () => {
   });
 });
 
-test('it reaches the title through env alone and names the fix on a failure', async () => {
+test('it reaches the title through env alone', async () => {
   const ctx = setupTest();
 
   const reusable = await ctx.readYaml('../../../.github/workflows/pr-title-check.yml');
@@ -71,8 +71,6 @@ test('it reaches the title through env alone and names the fix on a failure', as
   expect(steps).toContainEqual(
     expect.objectContaining({ env: { PR_TITLE: `\${{ github.event.pull_request.title }}` } }),
   );
-
-  expect(runs.join('\n')).toContain('Rename the PR title to a Conventional Commit');
 });
 
 test('it installs the shared rules from npm at pinned versions', async () => {

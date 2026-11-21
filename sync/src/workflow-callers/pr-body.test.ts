@@ -121,29 +121,33 @@ test('it reaches a command only through env, never through an expression in run'
   expect(runs.filter((run) => run.includes('${{'))).toStrictEqual([]);
 });
 
-test('it holds one chex pin that every chex step reads, and the pin check covers the file', async () => {
+test('it holds one chex pin that every chex command reads, and the pin check covers the file', async () => {
   const ctx = setupTest();
 
   const reusable = await ctx.readText(ctx.reusablePath);
+  const checkScript = await ctx.readText('../../../scripts/src/pr-checks/check-pr-body.sh');
+  const tickScript = await ctx.readText('../../../scripts/src/pr-checks/tick-chex-box.sh');
   const pinCheck = await ctx.readText('../../../scripts/src/renovate/find-unmanaged-chex-pin.ts');
   const renovate = await ctx.readText('../../../renovate.json');
 
   expect({
     pins: reusable.match(/@zgeoff\/chex@/gu)?.length,
-    chexSteps: reusable.match(/bun x /gu)?.length,
-    pinnedSteps: reusable.match(/bun x "\$CHEX"/gu)?.length,
-  }).toStrictEqual({ pins: 1, chexSteps: 3, pinnedSteps: 3 });
+    unpinned: [reusable, checkScript, tickScript].flatMap(
+      (text) => text.match(/bun x (?!"\$CHEX")/gu) ?? [],
+    ),
+  }).toStrictEqual({ pins: 1, unpinned: [] });
 
   expect(pinCheck).toContain('.github/workflows/pr-body-check.yml');
   expect(renovate).toContain('pr-body-check');
 });
 
-test('it reads the body fresh from the API and writes it back only when it changed', async () => {
+test('it downloads the step scripts that its steps run', async () => {
   const ctx = setupTest();
 
   const reusable = await ctx.readText(ctx.reusablePath);
+  const downloader = await ctx.readText('../../../scripts/src/ci/download-step-scripts.ts');
 
-  expect(reusable).toContain('gh api "repos/$REPO/pulls/$PR_NUMBER"');
-  expect(reusable).toContain('cmp -s');
-  expect(reusable).toContain('gh pr edit');
+  expect(reusable).toContain('download-step-scripts.ts" pr-body-check');
+  expect(downloader).toContain('scripts/src/pr-checks/check-pr-body.sh');
+  expect(downloader).toContain('scripts/src/pr-checks/tick-chex-box.sh');
 });

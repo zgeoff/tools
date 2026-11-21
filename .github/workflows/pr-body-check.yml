@@ -9,8 +9,9 @@
 # own edit of the body cannot start it again, and never on a fork, whose token
 # cannot write, nor on a bot's pull request.
 #
-# The body, the title and the commits reach a step through env: alone, never
-# through an expression in run:, so a crafted body cannot inject a command.
+# Each step script downloads from the commit of this workflow, and reads the
+# body through env: alone, never through an expression in run:, so a crafted
+# body cannot inject a command.
 #
 # Callers install sync/src/workflow-callers/pr-body.yml, which grants
 # contents: read and pull-requests: write.
@@ -42,25 +43,35 @@ jobs:
           filter: blob:none
           persist-credentials: false
 
+      # actionlint does not know job.workflow_repository or job.workflow_sha,
+      # so the step reads them through toJSON.
+      - name: Download the step script downloader
+        env: &tools-url
+          TOOLS_URL:
+            https://raw.githubusercontent.com/${{ fromJSON(toJSON(job)).workflow_repository }}/${{
+            fromJSON(toJSON(job)).workflow_sha }}
+        run:
+          curl -fsSL --retry 3 --retry-all-errors --create-dirs -o "$RUNNER_TEMP/tools/.bun-version"
+          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/src/ci/download-step-scripts.ts"
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version-file: .bun-version
+          bun-version-file: ${{ runner.temp }}/tools/.bun-version
 
-      - name: Read the PR body
+      - name: Download the step scripts
+        env: *tools-url
+        run: bun "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts" pr-body-check
+
+      - name: Check the PR body
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: gh api "repos/$REPO/pulls/$PR_NUMBER" | jq -j '.body // ""' > "$RUNNER_TEMP/pr-body.md"
-
-      - name: Check the PR body
-        env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run:
-          bun x "$CHEX" pr-body --body-file "$RUNNER_TEMP/pr-body.md" --base "$BASE_SHA" --head
-          "$HEAD_SHA"
+        run: bash "$RUNNER_TEMP/tools/scripts/src/pr-checks/check-pr-body.sh"
 
   tick-chex:
     if:
@@ -79,36 +90,34 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
+      - name: Download the step script downloader
+        env: *tools-url
+        run:
+          curl -fsSL --retry 3 --retry-all-errors --create-dirs -o "$RUNNER_TEMP/tools/.bun-version"
+          "$TOOLS_URL/.bun-version" -o "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts"
+          "$TOOLS_URL/scripts/src/ci/download-step-scripts.ts"
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version-file: .bun-version
+          bun-version-file: ${{ runner.temp }}/tools/.bun-version
+
+      - name: Download the step scripts
+        env: *tools-url
+        run: bun "$RUNNER_TEMP/tools/scripts/src/ci/download-step-scripts.ts" pr-body-check
 
       # The result decides the box, so a failure here still reaches the tick
-      # step. The last step fails the job again.
+      # step, which fails the job again.
       - name: Check docs
         id: docs
         continue-on-error: true
         run: bun x "$CHEX" prose links skill
 
-      # The body is read again here, because the first job and the author may
-      # have changed it since the event. The write happens only on a change.
       - name: Tick the chex box
         if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          TICK_FLAG: ${{ steps.docs.outcome == 'success' && '--passed' || '--failed' }}
-        run: |
-          gh api "repos/$REPO/pulls/$PR_NUMBER" | jq -j '.body // ""' > "$RUNNER_TEMP/body-before.md"
-          bun x "$CHEX" pr-body tick-chex --body-file "$RUNNER_TEMP/body-before.md" "$TICK_FLAG" > "$RUNNER_TEMP/body-after.md"
-          if ! cmp -s "$RUNNER_TEMP/body-before.md" "$RUNNER_TEMP/body-after.md"; then
-            gh pr edit "$PR_NUMBER" --repo "$REPO" --body-file "$RUNNER_TEMP/body-after.md"
-          fi
-
-      - name: Fail on a docs check
-        if: ${{ steps.docs.outcome == 'failure' }}
-        run: |
-          echo "The docs checks failed, so the chex box is unticked. Fix what the Check docs step lists." >&2
-          exit 1
+          DOCS_OUTCOME: ${{ steps.docs.outcome }}
+        run: bash "$RUNNER_TEMP/tools/scripts/src/pr-checks/tick-chex-box.sh"
