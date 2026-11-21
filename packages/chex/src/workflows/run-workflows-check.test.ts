@@ -737,7 +737,7 @@ test.each([
   },
   {
     name: `reports a per-run value in the pull-request group`,
-    pullRequest: `github.sha`,
+    pullRequest: `format('{0}-{1}', github.ref, github.sha)`,
     push: `format('{0}-push-{1}', github.workflow, github.sha)`,
     cancel: `\${{ github.event_name == 'pull_request' }}`,
     pushLines: [`  push:`, `    branches: [main]`],
@@ -794,10 +794,54 @@ test.each([
   },
   {
     name: `reports a || inside the pull-request group`,
-    pullRequest: `(github.ref || github.sha)`,
+    pullRequest: `github.ref || github.sha`,
     push: `format('{0}-push-{1}', github.workflow, github.sha)`,
     cancel: `\${{ github.event_name == 'pull_request' }}`,
     pushLines: [`  push:`, `    branches: [main]`],
+    messages: [
+      `a checks workflow, which runs on pull_request or push, sets concurrency with cancel-in-progress: true; a gate that runs only on a push to main may instead group by github.sha and never cancel`,
+      `the concurrency group holds github.sha, so no newer run cancels this one`,
+    ],
+  },
+  {
+    name: `reports a workflow_dispatch trigger beside the split group`,
+    pullRequest: `format('{0}-{1}', github.workflow, github.ref)`,
+    push: `format('{0}-push-{1}', github.workflow, github.sha)`,
+    cancel: `\${{ github.event_name == 'pull_request' }}`,
+    pushLines: ['  push:', '    branches: [main]', '  workflow_dispatch:'],
+    messages: [
+      `a checks workflow, which runs on pull_request or push, sets concurrency with cancel-in-progress: true; a gate that runs only on a push to main may instead group by github.sha and never cancel`,
+      `the concurrency group holds github.sha, so no newer run cancels this one`,
+    ],
+  },
+  {
+    name: `reports a pull_request_target trigger beside the split group`,
+    pullRequest: `format('{0}-{1}', github.workflow, github.ref)`,
+    push: `format('{0}-push-{1}', github.workflow, github.sha)`,
+    cancel: `\${{ github.event_name == 'pull_request' }}`,
+    pushLines: ['  push:', '    branches: [main]', '  pull_request_target:'],
+    messages: [
+      `a checks workflow, which runs on pull_request or push, sets concurrency with cancel-in-progress: true; a gate that runs only on a push to main may instead group by github.sha and never cancel`,
+      `the concurrency group holds github.sha, so no newer run cancels this one`,
+    ],
+  },
+  {
+    name: `reports a pull-request group that can be empty`,
+    pullRequest: `''`,
+    push: `format('{0}-push-{1}', github.workflow, github.sha)`,
+    cancel: `\${{ github.event_name == 'pull_request' }}`,
+    pushLines: ['  push:', '    branches: [main]'],
+    messages: [
+      `a checks workflow, which runs on pull_request or push, sets concurrency with cancel-in-progress: true; a gate that runs only on a push to main may instead group by github.sha and never cancel`,
+      `the concurrency group holds github.sha, so no newer run cancels this one`,
+    ],
+  },
+  {
+    name: `reports a || inside a string in the pull-request group`,
+    pullRequest: `'ci||checks' && github.sha`,
+    push: `format('{0}-push-{1}', github.workflow, github.sha)`,
+    cancel: `\${{ github.event_name == 'pull_request' }}`,
+    pushLines: ['  push:', '    branches: [main]'],
     messages: [
       `a checks workflow, which runs on pull_request or push, sets concurrency with cancel-in-progress: true; a gate that runs only on a push to main may instead group by github.sha and never cancel`,
       `the concurrency group holds github.sha, so no newer run cancels this one`,
