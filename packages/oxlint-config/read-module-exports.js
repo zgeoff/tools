@@ -1,8 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import buildCodeWithoutComments from './build-code-without-comments.js';
 
-const blockComment = /\/\*[\s\S]*?\*\//gu;
-const lineComment = /\/\/[^\n]*/gu;
 const namedExport =
   /\bexport\s+(?<type>type\s+)?\{(?<names>[^}]*)\}(?:\s*from\s*['"](?<source>[^'"]+)['"])?/gu;
 const declaredExport =
@@ -20,7 +19,7 @@ export default function readModuleExports(file, visited = new Set()) {
 
   visited.add(file);
 
-  const text = readFileSync(file, 'utf8').replaceAll(blockComment, '').replaceAll(lineComment, '');
+  const text = buildCodeWithoutComments(readFileSync(file, 'utf8'));
   const names = new Set();
 
   for (const match of text.matchAll(namedExport)) {
@@ -67,7 +66,7 @@ function readNamespaceNames(file, groups, visited) {
   return target === null ? [] : readModuleExports(target, visited);
 }
 
-const extensions = ['', '.ts', '.tsx', '.js', '.mjs', '/index.ts', '/index.js'];
+const extensions = ['.ts', '.tsx', '.js', '.mjs', '/index.ts', '/index.js'];
 
 function resolveRelative(file, source) {
   if (!source.startsWith('.')) {
@@ -75,6 +74,11 @@ function resolveRelative(file, source) {
   }
 
   const base = join(dirname(file), source);
+
+  // a bare path counts only when it is a file, since `./fs` may name a folder with an index
+  if (existsSync(base) && statSync(base).isFile()) {
+    return base;
+  }
 
   return (
     extensions.map((extension) => `${base}${extension}`).find((path) => existsSync(path)) ?? null

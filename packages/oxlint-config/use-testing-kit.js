@@ -43,7 +43,7 @@ const useTestingKit = {
             if (
               specifier.type === 'ImportSpecifier' &&
               specifier.importKind !== 'type' &&
-              specifier.imported.name === 'setupServer'
+              (specifier.imported.name ?? specifier.imported.value) === 'setupServer'
             ) {
               context.report({ node: specifier, messageId: 'setupServer' });
             }

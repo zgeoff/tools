@@ -241,3 +241,60 @@ test('it accepts an import of the interceptors package root', async () => {
 
   expect(result.exitCode).toBe(0);
 });
+
+test('it follows a kit barrel that re-exports a folder', async () => {
+  const ctx = setupTest();
+
+  const result = await runLintTree(
+    {
+      ...ctx.stubKit,
+      'node_modules/@zgeoff/testing/package.json': JSON.stringify({
+        name: '@zgeoff/testing',
+        exports: { './fs': { default: './src/barrel.ts' } },
+      }),
+      'node_modules/@zgeoff/testing/src/barrel.ts': "export * from './fs';\n",
+      'node_modules/@zgeoff/testing/src/fs/index.ts': 'export function CreateTempDir() {}\n',
+      'src/test-utils/create-temp-dir.ts': 'export function CreateTempDir() {}\n',
+    },
+    'src/test-utils/create-temp-dir.ts',
+    ctx.rules,
+  );
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('CreateTempDir is exported by @zgeoff/testing/fs');
+});
+
+test('it reads kit exports that follow a string holding comment markers', async () => {
+  const ctx = setupTest();
+
+  const result = await runLintTree(
+    {
+      ...ctx.stubKit,
+      'node_modules/@zgeoff/testing/src/core/wait-for.ts':
+        'const marker = "//";\nconst opener = "/*";\n\nexport function waitFor() {\n  return marker + opener;\n}\n',
+      'src/test-utils/wait-for.ts': 'export function waitFor() {}\n',
+    },
+    'src/test-utils/wait-for.ts',
+    ctx.rules,
+  );
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('waitFor is exported by @zgeoff/testing');
+});
+
+test('it reports a string-named import of setupServer', async () => {
+  const ctx = setupTest();
+
+  const result = await runLintTree(
+    {
+      ...ctx.stubKit,
+      'src/server.ts':
+        'import { "setupServer" as start } from \'msw/node\';\n\nexport const server = start;\n',
+    },
+    'src/server.ts',
+    ctx.rules,
+  );
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toInclude('use `createTestNetwork` from `@zgeoff/testing/fetch`');
+});
