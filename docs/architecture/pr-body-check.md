@@ -3,9 +3,10 @@
 `chex pr-body` checks that a pull request's description follows the
 [PR template](../../.github/PULL_REQUEST_TEMPLATE.md), so every PR has the same sections and labels.
 The [reusable pr-body workflow](../../.github/workflows/pr-body-check.yml) runs it on each push and
-each edit of a PR, and every repo takes its caller through the `workflow-pr-body` repo-sync entry.
-The workflow reads the body from the API when it runs, so a body that another job edited since the
-event is the one it checks, and it skips a bot's PR.
+each edit of a PR. repo-sync writes the stub that calls it, `.github/workflows/pr-body.yml`, into
+every repo, so a repo adds nothing to its `include` list. The workflow reads the body from the API
+when it runs, so a body that another job edited since the event is the one it checks, and it skips a
+bot's PR.
 
 ```sh
 chex pr-body --body-file body.md                                # the shape of the body
@@ -29,7 +30,8 @@ written by `bun verify publish`.
   GitHub without a scroll bar.
 - **Placeholders:** a `<word>` left from the template fails, outside code.
 - **Checks:** only the lines `- [ ] chex`, `- [x] Deslop (<commit>)` and
-  `- [x] Cold read (<commit>)`. The commit is the one the agent ran that check on.
+  `- [x] Cold read (<commit>)`. The chex line passes ticked or unticked, because the tick job sets
+  it. The commit is the one the agent ran that check on.
 
 With `--base` and `--head`, it also reads the branch's commits. The commit on a Deslop or Cold read
 line fails when it isn't on the branch, or when a commit after it on the branch changes a doc or
@@ -42,19 +44,30 @@ when it gets no path, as the [chex README](../../packages/chex/README.md) lists.
 
 ## The tick job
 
-The workflow's second job runs `chex prose links skill` on the PR's head, then ticks or unticks the
-chex line with `tick-chex` and writes the body back only when the text changed. A failed docs check
-fails the job too, so the run shows why the box is unticked. The job runs on `opened`, `reopened`
-and `synchronize`, and never on `edited`, because its own edit of the body would start it again. It
-skips a PR from a fork, whose token cannot write, and a bot's PR.
+The workflow's second job runs `chex prose links skill` on the PR's head. It ticks the chex line
+when those checks clear and unticks it when they fail, and writes the body back only when the text
+changed. A body with no chex line stays as it is. A failed docs check fails the job too, so the run
+shows why the box is unticked. The job runs on `opened`, `reopened` and `synchronize`, and never on
+`edited`, because its own edit of the body would start it again. It skips a PR from a fork, whose
+token cannot write, and a bot's PR.
 
-The workflow pins one chex release in its `CHEX` value. `bun run check:chex-pin` fails when
-`renovate.json` has no custom manager that captures that pin, as it does for the pin in
-`bun-checks.yml`.
+The workflow pins one chex release in its `CHEX` value. In tools, `bun run check:chex-pin` fails
+when no custom manager in `renovate.json` captures that pin or the one in `bun-checks.yml`, so
+Renovate bumps both.
 
 ## The title check
 
 The [reusable pr-title workflow](../../.github/workflows/pr-title-check.yml) lints the PR title with
 commitlint and `@zgeoff/commitlint-config`, the rules that `chex commits` applies to each commit,
-and prints the fix when it fails. A squash merge makes the title the commit subject. Every repo
-takes its caller through the `workflow-pr-title` entry.
+and prints the fix when it fails. A squash merge makes the title the commit subject. It runs on
+`opened`, `edited`, `reopened` and `synchronize`, so renaming the PR runs it again. repo-sync writes
+its stub, `.github/workflows/pr-title.yml`, into every repo.
+
+## When a check fails
+
+Open the failed run from the PR's checks list. Each line of its log names the section and the fix.
+
+- **pr-body:** edit the PR description. The edit runs the check again.
+- **tick-chex:** fix what `chex prose links skill` reports, and push. The push runs the docs checks
+  again and ticks the box when they clear.
+- **pr-title:** rename the PR. The rename runs the check again.
