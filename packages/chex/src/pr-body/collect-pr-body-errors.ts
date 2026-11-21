@@ -79,7 +79,7 @@ function collectCodeBlockErrors(
       );
     }
 
-    const widest = Math.max(0, ...block.lines.map((line) => [...line].length));
+    const widest = Math.max(0, ...block.lines.map((line) => (line.match(/./gsu) ?? []).length));
 
     if (widest > maxCodeWidth) {
       errors.push(
@@ -181,7 +181,7 @@ function collectNextStepsErrors(section: BodySection): string[] {
       } else {
         group.items.push(line);
       }
-    } else if (/^\s/u.test(line) && group?.items.length) {
+    } else if (/^\s/u.test(line) && group !== undefined && group.items.length > 0) {
       group.items[group.items.length - 1] += ` ${line.trim()}`;
     } else {
       errors.push(

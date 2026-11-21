@@ -49,7 +49,7 @@ export function parsePrBody(text: string): ParsedBody {
     if (open !== undefined) {
       if (
         fence !== undefined &&
-        fence[0] === open.marker[0] &&
+        fence.startsWith(open.marker.charAt(0)) &&
         fence.length >= open.marker.length &&
         line.trim() === fence
       ) {
