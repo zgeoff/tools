@@ -173,7 +173,9 @@ export async function showFrame(argument: ShowArgument): Promise<number> {
   // The screenshot needs a painted frame, and a paused animation paints one only after a tick.
   await new Promise<void>((resolve) => {
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => resolve());
+      requestAnimationFrame(() => {
+        resolve();
+      });
     });
   });
 
@@ -185,8 +187,13 @@ export async function compareFrames(argument: CompareArgument): Promise<CompareR
     new Promise((resolve, reject) => {
       const image = new Image();
 
-      image.addEventListener('load', () => resolve(image));
-      image.addEventListener('error', () => reject(new Error('a frame did not decode')));
+      image.addEventListener('load', () => {
+        resolve(image);
+      });
+
+      image.addEventListener('error', () => {
+        reject(new Error('a frame did not decode'));
+      });
 
       image.src = `data:image/png;base64,${base64}`;
     });

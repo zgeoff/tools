@@ -45,7 +45,7 @@ export async function runNewCommand(repoRoot: string, sceneName: string): Promis
 
   await Bun.write(join(repoRoot, 'package.json'), `${JSON.stringify(updated, null, 2)}\n`);
 
-  return await readRemainingSteps(repoRoot, packageJSON.scripts ?? {});
+  return readRemainingSteps(repoRoot, packageJSON.scripts ?? {});
 }
 
 const PackageJSON = z.looseObject({ scripts: z.record(z.string(), z.string()).optional() });

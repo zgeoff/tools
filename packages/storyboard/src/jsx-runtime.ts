@@ -44,14 +44,12 @@ export interface FragmentProps {
 }
 
 // A function component runs here, once, so the tree that comes back holds no function.
-export function jsx(type: string | ((props: never) => StoryNode), props: JSXProps): StoryNode {
+export function jsx(type: string | ((props: JSXProps) => StoryNode), props: JSXProps): StoryNode {
   if (typeof type === 'string') {
     return toElement(type, props);
   }
 
-  const result: StoryNode = Reflect.apply(type, undefined, [props]);
-
-  return result;
+  return type(props);
 }
 
 export const jsxs = jsx;
