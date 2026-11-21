@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/zgeoff/tools/compare/@zgeoff/testing@0.3.1...@zgeoff/testing@0.3.2) (2026-11-21)
+
+
+### Features
+
+* **testing:** add the kit's core subpaths ([#716](https://github.com/zgeoff/tools/issues/716)) ([3155e30](https://github.com/zgeoff/tools/commit/3155e305969adb921bbe7fde2b6e2b72e154b865))
+
 ## [0.3.1](https://github.com/zgeoff/tools/compare/@zgeoff/testing@0.3.0...@zgeoff/testing@0.3.1) (2026-11-19)
 
 

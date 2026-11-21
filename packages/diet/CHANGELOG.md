@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.4](https://github.com/zgeoff/tools/compare/@zgeoff/diet@0.2.3...@zgeoff/diet@0.2.4) (2026-11-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/testing bumped to 0.3.2
+
 ## [0.2.3](https://github.com/zgeoff/tools/compare/@zgeoff/diet@0.2.2...@zgeoff/diet@0.2.3) (2026-11-19)
 
 
