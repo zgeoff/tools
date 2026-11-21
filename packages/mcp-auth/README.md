@@ -91,4 +91,6 @@ parse leaves the old one in place.
 
 ## Documentation
 
-The [design](../../docs/design/mcp-auth/README.md) holds the contracts and constraints.
+The [architecture doc](../../docs/architecture/mcp-auth.md) explains how grants, tokens, service
+clients and sign-ins work, and the decision records 0001 to 0003 in `docs/decisions/` give the
+reasons for its main choices.
