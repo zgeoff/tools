@@ -5,8 +5,8 @@ person who runs the app, the owner, lets it in. The owner adds each client by na
 runs the OAuth browser flow, in which the owner logs in with a passkey and allows a set of scopes,
 and the client gets tokens. Each MCP request carries a token, and the core's `verify` function turns
 it into the access that the app's MCP handler acts on. One package, `@zgeoff/mcp-auth`, serves this
-flow for four apps: atc, boxxy, pepys and impz. Each app passes in its own scopes, paths, table
-names and grant limits. The [package README](../../packages/mcp-auth/README.md) gives the API.
+flow for atc, boxxy, pepys and impz. Each app passes in its own scopes, paths, table names and grant
+limits. The [package README](../../packages/mcp-auth/README.md) gives the API.
 
 ```mermaid
 flowchart LR
@@ -18,12 +18,12 @@ flowchart LR
   core -->|"onGrantRevoked"| streams[the app's open MCP streams]
 ```
 
-The core is built on better-auth and two of better-auth's plugins, OAuth provider and MCP. It
-exports one handler for each OAuth route and browser page, each a function from `Request` to
-`Response`, and never imports Elysia or an MCP SDK. The Elysia adapter serves those functions at the
-app's paths. It refuses a request with a wrong Host header, and a POST to an MCP path with a wrong
-Origin header, then calls `verify` before it hands the request to the app. An app on another
-framework can serve the functions itself.
+The core is built on better-auth and its OAuth provider and MCP plugins. It exports one handler for
+each OAuth route and browser page, each a function from `Request` to `Response`, and never imports
+Elysia or an MCP SDK. The Elysia adapter serves those functions at the app's paths. It refuses a
+request with a wrong Host header, and a POST to an MCP path with a wrong Origin header, then calls
+`verify` before it hands the request to the app. An app on another framework can serve the functions
+itself.
 
 ## Grants
 
