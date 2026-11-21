@@ -41,7 +41,28 @@ async function setupTest() {
   return { outsideDirectory, directory, writeText, run };
 }
 
-test('it fails when the root README is over the front page limit', async () => {
+test('it passes a 100-line root README with the target warning', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(100));
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'README.md: 100 lines, over the front page README target of 80 (limit 150; warning)\n' +
+      '\n' +
+      'check-length: 1 READMEs, 0 over the line limit\n',
+    stderr: '',
+  });
+});
+
+test('it passes a 101-line root README with the threshold warning', async () => {
   const ctx = await setupTest();
 
   await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(101));
@@ -53,11 +74,53 @@ test('it fails when the root README is over the front page limit', async () => {
     stdout: result.stdout.toString(),
     stderr: result.stderr.toString(),
   }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'README.md: 101 lines, over the front page README warning threshold of 100 (target 80, limit 150; warning)\n' +
+      '\n' +
+      'check-length: 1 READMEs, 0 over the line limit\n',
+    stderr: '',
+  });
+});
+
+test('it fails when the root README is over the front page limit', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(151));
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
     exitCode: 1,
     stdout:
-      'README.md: 101 lines, over the front page README limit of 100 (target 80; error)\n' +
+      'README.md: 151 lines, over the front page README limit of 150 (target 80; error)\n' +
       '\n' +
       'check-length: 1 READMEs, 1 over the line limit\n',
+    stderr: '',
+  });
+});
+
+test('it passes a 150-line root README with the threshold warning', async () => {
+  const ctx = await setupTest();
+
+  await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(150));
+
+  const result = await ctx.run();
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'README.md: 150 lines, over the front page README warning threshold of 100 (target 80, limit 150; warning)\n' +
+      '\n' +
+      'check-length: 1 READMEs, 0 over the line limit\n',
     stderr: '',
   });
 });
@@ -76,7 +139,7 @@ test('it warns and passes when a README is over its target but within its limit'
   }).toStrictEqual({
     exitCode: 0,
     stdout:
-      'README.md: 81 lines, over the front page README target of 80 (limit 100; warning)\n' +
+      'README.md: 81 lines, over the front page README target of 80 (limit 150; warning)\n' +
       '\n' +
       'check-length: 1 READMEs, 0 over the line limit\n',
     stderr: '',
@@ -121,7 +184,7 @@ test('it fails a folder README over 70 lines', async () => {
   }).toStrictEqual({
     exitCode: 1,
     stdout:
-      'README.md: 10 lines (front page README; target 80, limit 100)\n' +
+      'README.md: 10 lines (front page README; target 80, limit 150)\n' +
       'kernel/README.md: 71 lines, over the folder README limit of 70 (target 60; error)\n' +
       '\n' +
       'check-length: 2 READMEs, 1 over the line limit\n',
@@ -207,7 +270,7 @@ test('it holds a spike README under docs/design to the folder limit and its resu
 test('it accepts --package and ignores it', async () => {
   const ctx = await setupTest();
 
-  await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(101));
+  await ctx.writeText('README.md', '- The tool reads one file.\n'.repeat(151));
 
   const result = await ctx.run('--package', 'README.md', '--package', 'missing/README.md');
 
@@ -218,7 +281,7 @@ test('it accepts --package and ignores it', async () => {
   }).toStrictEqual({
     exitCode: 1,
     stdout:
-      'README.md: 101 lines, over the front page README limit of 100 (target 80; error)\n' +
+      'README.md: 151 lines, over the front page README limit of 150 (target 80; error)\n' +
       '\n' +
       'check-length: 1 READMEs, 1 over the line limit\n',
     stderr:
@@ -242,7 +305,7 @@ test('it warns and passes when a docs file is over its cap', async () => {
   }).toStrictEqual({
     exitCode: 0,
     stdout:
-      'README.md: 10 lines (front page README; target 80, limit 100)\n' +
+      'README.md: 10 lines (front page README; target 80, limit 150)\n' +
       'docs/architecture/overview.md: 251 lines, over the docs cap of 250 (warning: cut points, then split at a concept boundary)\n' +
       '\n' +
       'check-length: 1 READMEs, 0 over the line limit\n',
@@ -327,7 +390,7 @@ test('it passes when every README and doc is under its limit and cap', async () 
   }).toStrictEqual({
     exitCode: 0,
     stdout:
-      'README.md: 50 lines (front page README; target 80, limit 100)\n' +
+      'README.md: 50 lines (front page README; target 80, limit 150)\n' +
       '\n' +
       'check-length: 1 READMEs, 0 over the line limit\n',
     stderr: '',
@@ -349,7 +412,7 @@ test('it checks a README whose path is not ASCII', async () => {
   }).toStrictEqual({
     exitCode: 1,
     stdout:
-      'README.md: 10 lines (front page README; target 80, limit 100)\n' +
+      'README.md: 10 lines (front page README; target 80, limit 150)\n' +
       'café/README.md: 71 lines, over the folder README limit of 70 (target 60; error)\n' +
       '\n' +
       'check-length: 2 READMEs, 1 over the line limit\n',
@@ -373,7 +436,7 @@ test('it holds no README under a skills folder to a README limit', async () => {
   }).toStrictEqual({
     exitCode: 0,
     stdout:
-      'README.md: 10 lines (front page README; target 80, limit 100)\n' +
+      'README.md: 10 lines (front page README; target 80, limit 150)\n' +
       '\n' +
       'check-length: 1 READMEs, 0 over the line limit\n',
     stderr: '',
