@@ -10,6 +10,7 @@ import { runDependencyGatesCommand } from './dependency-gates/run-dependency-gat
 import { runInit } from './init/run-init.ts';
 import { runLocalPathsCommand } from './local-paths/run-local-paths-check.ts';
 import { writeTextFile } from './output/write-text-file.ts';
+import { runPrBodyCheck } from './pr-body/run-pr-body-check.ts';
 import { runTestLayoutCommand } from './test-layout/run-test-layout-check.ts';
 import { runTestTimeoutsCommand } from './test-timeouts/run-test-timeouts-check.ts';
 import { runUncommittedCommand } from './uncommitted/run-uncommitted-check.ts';
@@ -27,6 +28,7 @@ process.exitCode = await runChex(process.argv.slice(2), {
       workflows: runWorkflowsCommand,
       'dependency-gates': runDependencyGatesCommand,
       uncommitted: runUncommittedCommand,
+      'pr-body': runPrBodyCheck,
     },
   }),
   runInit: () =>

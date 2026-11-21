@@ -52,15 +52,16 @@ The docs checks read the repo's READMEs, its `docs/` tree and its skills:
 
 The repo checks read the branch, the pushed commits and the repo's config:
 
-| Check              | Fails on                                                                                                                                                                                                                                                         | Arguments       |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| `commits`          | a pushed commit whose message fails `@zgeoff/commitlint-config`                                                                                                                                                                                                  | `--pushed-refs` |
-| `local-paths`      | a line a pushed commit adds that holds the home folder or the host name                                                                                                                                                                                          | `--pushed-refs` |
-| `test-timeouts`    | a `bun test` timeout above its lane's limit, in a script or a `bunfig.toml`                                                                                                                                                                                      | none            |
-| `test-layout`      | a test folder, file name or import outside [the test layout](../../docs/guides/test-layout.md); test code includes a relative `[test] preload` file, a `.nix`-only `tests/` folder and a private workspace that only test code imports                           | none            |
-| `workflows`        | nothing: it prints each fault of the shared workflow lint, and fails when there is one                                                                                                                                                                           | the paths       |
-| `dependency-gates` | a stale age-gate exclude, an override or an audit ignore that nothing needs, a first-party package with no age-gate exclude, or a pinned release younger than the age gate ([details](../../docs/architecture/dependency-updates.md#the-dependency-gates-check)) | none            |
-| `uncommitted`      | a file the branch changes that holds a change the push does not send                                                                                                                                                                                             | none            |
+| Check              | Fails on                                                                                                                                                                                                                                                         | Arguments                                                       |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `commits`          | a pushed commit whose message fails `@zgeoff/commitlint-config`                                                                                                                                                                                                  | `--pushed-refs`                                                 |
+| `local-paths`      | a line a pushed commit adds that holds the home folder or the host name                                                                                                                                                                                          | `--pushed-refs`                                                 |
+| `test-timeouts`    | a `bun test` timeout above its lane's limit, in a script or a `bunfig.toml`                                                                                                                                                                                      | none                                                            |
+| `test-layout`      | a test folder, file name or import outside [the test layout](../../docs/guides/test-layout.md); test code includes a relative `[test] preload` file, a `.nix`-only `tests/` folder and a private workspace that only test code imports                           | none                                                            |
+| `workflows`        | nothing: it prints each fault of the shared workflow lint, and fails when there is one                                                                                                                                                                           | the paths                                                       |
+| `dependency-gates` | a stale age-gate exclude, an override or an audit ignore that nothing needs, a first-party package with no age-gate exclude, or a pinned release younger than the age gate ([details](../../docs/architecture/dependency-updates.md#the-dependency-gates-check)) | none                                                            |
+| `uncommitted`      | a file the branch changes that holds a change the push does not send                                                                                                                                                                                             | none                                                            |
+| `pr-body`          | a PR description with a heading, a label, a code block or a prose-check commit that the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) doesn't allow ([details](../../docs/architecture/pr-body-check.md))                                                | `--body-file`, then `--base` and `--head` for the commit checks |
 
 With no path, `prose` and `links` read every README outside `.claude/` and `.agents/`, every file
 under `docs/`, each spike's `results.md`, and the Markdown under `.agents/skills/`,
@@ -83,8 +84,8 @@ skipped file back:
 
 `chex init` writes the `extends` line and a
 [`chex-baseline` job](../../docs/architecture/pre-push-baseline.md#a-checkout-without-the-baseline)
-into `lefthook.yml`, and adds a `check:docs` script of `chex prose length links readmes skill` when
-the repo has none, and changes nothing on a second run. `chex ci-plan` plans a run of `bun-checks`.
+into `lefthook.yml`, adds a `check:docs` script of `chex prose length links readmes skill` when the
+repo has none, and changes nothing on a second run. `chex ci-plan` plans a run of `bun-checks`.
 
 ## The pre-push baseline
 
@@ -95,6 +96,5 @@ extends:
   - node_modules/@zgeoff/chex/lefthook.yml
 ```
 
-The baseline's jobs call `chex <check>`, `bun run check:docs`, `rig related` and the repo's own
-`format:check` and `typecheck` scripts. Each job's name starts with `chex-`.
-[The pre-push baseline](../../docs/architecture/pre-push-baseline.md) describes each job.
+Its jobs, [each described here](../../docs/architecture/pre-push-baseline.md), call `chex <check>`,
+`bun run check:docs`, `rig related` and the repo's own `format:check` and `typecheck` scripts.

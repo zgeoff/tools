@@ -19,6 +19,7 @@ const checksWithArgs: ReadonlySet<CheckName> = new Set([
   'commits',
   'local-paths',
   'workflows',
+  'pr-body',
 ]);
 
 export const chexUsage = `usage: chex <check>... | chex <check> [args...] | chex init | chex ci-plan

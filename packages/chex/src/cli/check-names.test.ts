@@ -17,6 +17,7 @@ test('it reads each docs check and each repo check as a check name', () => {
       'workflows',
       'dependency-gates',
       'uncommitted',
+      'pr-body',
     ].filter((name) => !isCheckName(name)),
   ).toStrictEqual([]);
 });
