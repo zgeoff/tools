@@ -34,7 +34,7 @@ function setupTest() {
     const job = await readJob(name);
 
     return Array.isArray(job['steps'])
-      ? job['steps'].flatMap((step: unknown) =>
+      ? job['steps'].flatMap((step) =>
           isRecord(step) && typeof step['run'] === 'string' ? [step['run']] : [],
         )
       : [];
@@ -152,10 +152,10 @@ test('it checks out the full history in both jobs, so the docs check finds a mer
     ['pr-body', 'tick-chex'].map(async (name) => {
       const job = await ctx.readJob(name);
 
-      const steps = Array.isArray(job['steps']) ? job['steps'] : [];
+      const steps: unknown[] = Array.isArray(job['steps']) ? job['steps'] : [];
 
       const checkout = steps.find(
-        (step: unknown) =>
+        (step) =>
           isRecord(step) &&
           typeof step['uses'] === 'string' &&
           step['uses'].startsWith('actions/checkout@'),
