@@ -93,7 +93,7 @@ test('it resets the idle count when a step finds something pending', async () =>
     const waitStartMs1 = performance.now();
 
     await waitFor(() => {
-      if (performance.now() - waitStartMs1 < 30) {
+      if (performance.now() - waitStartMs1 < 120) {
         throw new Error('not yet');
       }
     });
@@ -103,7 +103,7 @@ test('it resets the idle count when a step finds something pending', async () =>
     const waitStartMs2 = performance.now();
 
     await waitFor(() => {
-      if (performance.now() - waitStartMs2 < 30) {
+      if (performance.now() - waitStartMs2 < 120) {
         throw new Error('not yet');
       }
     });
@@ -111,9 +111,10 @@ test('it resets the idle count when a step finds something pending', async () =>
     fired = true;
   })();
 
-  await runClockUntil(ctx.clock, () => fired, { maxMs: 10_000, idleMs: 50 });
+  // Each wait stays under idleMs and both together pass it, so only a reset between them passes.
+  await runClockUntil(ctx.clock, () => fired, { maxMs: 10_000, idleMs: 200 });
 
-  expect(performance.now() - startedAtMs).toBeGreaterThanOrEqual(60);
+  expect(performance.now() - startedAtMs).toBeGreaterThanOrEqual(240);
   expect(ctx.clock.now()).toBe(1010);
 });
 

@@ -270,38 +270,42 @@ test('it records stdin and passes the same bytes to the script with recordStdin'
   });
 });
 
-test.each([false, true])(
-  'it passes SIGTERM on to the script, with recordStdin %p',
-  async (recordStdin) => {
-    const ctx = setupTest();
-    const marker = join(ctx.directory, 'trapped');
-    const ready = join(ctx.directory, 'ready');
+test.each([
+  ['SIGINT', false],
+  ['SIGINT', true],
+  ['SIGTERM', false],
+  ['SIGTERM', true],
+  ['SIGHUP', false],
+  ['SIGHUP', true],
+] as const)('it passes %s on to the script, with recordStdin %p', async (signal, recordStdin) => {
+  const ctx = setupTest();
+  const marker = join(ctx.directory, 'trapped');
+  const ready = join(ctx.directory, 'ready');
 
-    const waiter = createStubBin(ctx.directory, 'waiter', {
-      script: `#!/bin/sh\ntrap 'echo trapped > ${marker}; exit 0' TERM\necho up > ${ready}\nwhile true; do sleep 0.05; done\n`,
-      recordStdin,
-    });
+  const waiter = createStubBin(ctx.directory, 'waiter', {
+    script: `#!/bin/sh\ntrap 'echo trapped > ${marker}; exit 0' INT TERM HUP\necho up > ${ready}\nwhile true; do sleep 0.05; done\n`,
+    recordStdin,
+  });
 
-    const child = Bun.spawn([waiter.path], { stdin: 'pipe', stdout: 'ignore', stderr: 'ignore' });
+  const child = Bun.spawn([waiter.path], { stdin: 'pipe', stdout: 'ignore', stderr: 'ignore' });
 
-    onTestFinished(() => {
-      child.kill('SIGKILL');
-    });
+  onTestFinished(() => {
+    child.kill('SIGKILL');
+  });
 
-    await child.stdin.end();
+  await child.stdin.end();
 
-    await waitFor(() => readFileSync(ready, 'utf8'));
+  await waitFor(() => readFileSync(ready, 'utf8'));
 
-    child.kill('SIGTERM');
+  child.kill(signal);
 
-    const exitCode = await child.exited;
+  const exitCode = await child.exited;
 
-    expect({ exitCode, marker: readFileSync(marker, 'utf8') }).toStrictEqual({
-      exitCode: 0,
-      marker: 'trapped\n',
-    });
-  },
-);
+  expect({ exitCode, marker: readFileSync(marker, 'utf8') }).toStrictEqual({
+    exitCode: 0,
+    marker: 'trapped\n',
+  });
+});
 
 test('it exits 128 plus the signal number when a signal ends the script', async () => {
   const ctx = setupTest();
