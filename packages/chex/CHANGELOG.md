@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.4.0...@zgeoff/chex@0.4.1) (2026-11-21)
+
+
+### Features
+
+* **oxlint-config:** add the use-testing-kit rule ([#723](https://github.com/zgeoff/tools/issues/723)) ([b3a2ff8](https://github.com/zgeoff/tools/commit/b3a2ff8e0612547bdee0ce3213f7cc51313726f6))
+
 ## [0.4.0](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.19...@zgeoff/chex@0.4.0) (2026-11-21)
 
 
