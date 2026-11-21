@@ -11,8 +11,8 @@ subpath. It builds one msw network per test process with msw 3's `defineNetwork`
 
 ## Why
 
-- msw 3 is the major version that most of the repos run, so one major version and one setup serve
-  every repo.
+- msw 3 is msw's current major version. Moving every repo onto it at once leaves one setup to keep,
+  and no later move off msw 2.
 - Under Bun 1.4.3, msw 3 with the `fetch/web` interceptor answers a request that a handler matches,
   and makes the `fetch` promise reject for a request that none matches.
 - One setup means one place for the two fixes that every repo needs under Bun: sending a request
@@ -21,11 +21,11 @@ subpath. It builds one msw network per test process with msw 3's `defineNetwork`
 
 ## Rejected alternatives
 
-| Option                                      | Why not                                                                                     |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| msw 2.15 `setupServer`                      | it works under Bun 1.4.3, but most repos run msw 3, so they would move back a major version |
-| the `@mswjs/interceptors/fetch` interceptor | under Bun 1.4.3 it answers no request, and lets an unmatched request reach the network      |
-| support msw 2 and msw 3 in one subpath      | two setups to test, and the peer dependency range would span a major version                |
+| Option                                      | Why not                                                                                                                                   |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| msw 2.15 `setupServer`                      | it works under Bun 1.4.3, but the repos on msw 3 would move back a major version, and every repo would still face the move to msw 3 later |
+| the `@mswjs/interceptors/fetch` interceptor | under Bun 1.4.3 it answers no request, and lets an unmatched request reach the network                                                    |
+| support msw 2 and msw 3 in one subpath      | two setups to test, and the peer dependency range would span a major version                                                              |
 
 ## Consequences
 
