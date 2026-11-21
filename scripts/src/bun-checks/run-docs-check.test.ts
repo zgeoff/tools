@@ -104,10 +104,10 @@ test('it fails on a broken link even when every doc is within its length limit',
 test('it fails on a README over its line limit even when every link resolves', async () => {
   const ctx = await setupTest();
 
-  // The root README holds 100 lines at most, and this one has 101 and no link. Each line is a list
+  // The root README holds 150 lines at most, and this one has 151 and no link. Each line is a list
   // item, which the prose check's paragraph limit skips.
   const lines = Array.from(
-    { length: 100 },
+    { length: 150 },
     (_, index) => `- Step ${index + 1} greets the visitor.`,
   );
 
@@ -127,7 +127,7 @@ test('it fails on a README over its line limit even when every link resolves', a
 
   expect(ctx.logged).toStrictEqual([
     expect.any(String),
-    expect.stringContaining('README.md: 101 lines, over the front page README limit of 100'),
+    expect.stringContaining('README.md: 151 lines, over the front page README limit of 150'),
     expect.any(String),
   ]);
 
