@@ -84,10 +84,14 @@ jobs:
       contents: read
       pull-requests: write
     steps:
+      # The full history, so the docs check finds the merge base with the base
+      # branch and reads the paragraphs that the pull request changed.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          filter: blob:none
           persist-credentials: false
 
       - name: Download the step script downloader

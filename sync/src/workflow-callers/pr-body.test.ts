@@ -55,7 +55,9 @@ test('it calls the reusable PR-body workflow at main with the permissions its jo
   const caller = await ctx.readYaml('pr-body.yml');
 
   expect(caller).toMatchObject({
-    on: { pull_request: { types: ['opened', 'edited', 'reopened', 'synchronize'] } },
+    on: {
+      pull_request: { types: ['opened', 'edited', 'reopened', 'synchronize'] },
+    },
     concurrency: {
       group: `pr-body-\${{ github.event.pull_request.number }}`,
       'cancel-in-progress': true,
@@ -78,7 +80,9 @@ test('it asks for the permissions the caller grants and no more', async () => {
     on: { workflow_call: null },
     jobs: {
       'pr-body': { permissions: { contents: 'read', 'pull-requests': 'read' } },
-      'tick-chex': { permissions: { contents: 'read', 'pull-requests': 'write' } },
+      'tick-chex': {
+        permissions: { contents: 'read', 'pull-requests': 'write' },
+      },
     },
   });
 });
@@ -139,6 +143,32 @@ test('it holds one chex pin that every chex command reads, and the pin check cov
 
   expect(pinCheck).toContain('.github/workflows/pr-body-check.yml');
   expect(renovate).toContain('pr-body-check');
+});
+
+test('it checks out the full history in both jobs, so the docs check finds a merge base', async () => {
+  const ctx = setupTest();
+
+  const checkouts = await Promise.all(
+    ['pr-body', 'tick-chex'].map(async (name) => {
+      const job = await ctx.readJob(name);
+
+      const steps = Array.isArray(job['steps']) ? job['steps'] : [];
+
+      const checkout = steps.find(
+        (step: unknown) =>
+          isRecord(step) &&
+          typeof step['uses'] === 'string' &&
+          step['uses'].startsWith('actions/checkout@'),
+      );
+
+      return isRecord(checkout) ? checkout['with'] : undefined;
+    }),
+  );
+
+  expect(checkouts).toMatchObject([
+    { 'fetch-depth': 0, filter: 'blob:none' },
+    { 'fetch-depth': 0, filter: 'blob:none' },
+  ]);
 });
 
 test('it downloads the step scripts that its steps run', async () => {
