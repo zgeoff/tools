@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/zgeoff/tools/compare/@zgeoff/testing@0.4.0...@zgeoff/testing@0.4.1) (2026-11-21)
+
+
+### Features
+
+* **testing:** wait out real io in the clock and forward stub signals ([#736](https://github.com/zgeoff/tools/issues/736)) ([acfb92c](https://github.com/zgeoff/tools/commit/acfb92ca3acdb33cfe0f850e1522319dcca68a4f))
+
 ## [0.4.0](https://github.com/zgeoff/tools/compare/@zgeoff/testing@0.3.3...@zgeoff/testing@0.4.0) (2026-11-21)
 
 

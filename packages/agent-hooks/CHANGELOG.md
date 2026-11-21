@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.1](https://github.com/zgeoff/tools/compare/@zgeoff/agent-hooks@0.3.0...@zgeoff/agent-hooks@0.3.1) (2026-11-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/rig bumped to 0.3.1
+    * @zgeoff/testing bumped to 0.4.1
+
 ## [0.3.0](https://github.com/zgeoff/tools/compare/@zgeoff/agent-hooks@0.2.17...@zgeoff/agent-hooks@0.3.0) (2026-11-21)
 
 
