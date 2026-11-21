@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'bun:test';
-import { server } from '@zgeoff/tools-scripts/test-utils/mocks/node';
+import { network } from '@zgeoff/tools-scripts/test-utils/mocks/network';
 import { HttpResponse, http } from 'msw';
 import type { ProgramResult } from '../program/run-program.ts';
 import { buildStubProgramRunner } from '../test-utils/build-stub-program-runner.ts';
@@ -262,7 +262,7 @@ test('it reports a young release that bun.lock pins under an age gate, with the 
     }`,
   };
 
-  server.use(
+  network.use(
     http.get('https://registry.npmjs.org/left-pad', () =>
       HttpResponse.json({ time: { '1.3.1': '2026-03-08T20:00:00.000Z' } }),
     ),

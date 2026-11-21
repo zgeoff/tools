@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { server } from '@zgeoff/tools-scripts/test-utils/mocks/node';
+import { network } from '@zgeoff/tools-scripts/test-utils/mocks/network';
 import { HttpResponse, http } from 'msw';
 import { readYoungLockedReleases } from './read-young-locked-releases.ts';
 
@@ -10,7 +10,7 @@ function setupTest() {
 
   // The registry answers a package URL with a packument that holds its publish times, and a 404
   // for a package it holds none of.
-  server.use(
+  network.use(
     http.get('https://registry.npmjs.org/*', (info) => {
       requested.push(info.request.url);
 
@@ -127,7 +127,7 @@ test('it asks once for a package that the lockfile pins at two versions, and enc
 test('it fails with the package and URL when the registry cannot be reached', () => {
   const ctx = setupTest();
 
-  server.use(http.get('https://registry.npmjs.org/left-pad', () => HttpResponse.error()));
+  network.use(http.get('https://registry.npmjs.org/left-pad', () => HttpResponse.error()));
 
   const reading = ctx.readYoungLockedReleases({
     ageGate: { isOn: true, seconds: 604_800, excludes: [] },
