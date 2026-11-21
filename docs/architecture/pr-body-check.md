@@ -2,8 +2,10 @@
 
 `chex pr-body` checks that a pull request's description follows the
 [PR template](../../.github/PULL_REQUEST_TEMPLATE.md), so every PR has the same sections and labels.
-The [pr-body workflow](../../.github/workflows/pr-body.yml) runs it on each push and each edit of a
-PR.
+The [reusable pr-body workflow](../../.github/workflows/pr-body-check.yml) runs it on each push and
+each edit of a PR, and every repo takes its caller through the `workflow-pr-body` repo-sync entry.
+The workflow reads the body from the API when it runs, so a body that another job edited since the
+event is the one it checks, and it skips a bot's PR.
 
 ```sh
 chex pr-body --body-file body.md                                # the shape of the body
@@ -37,3 +39,22 @@ when it gets no path, as the [chex README](../../packages/chex/README.md) lists.
 
 `tick-chex` changes nothing on disk: it prints the body with only the chex line set to `[x]`, or to
 `[ ]` with `--failed`.
+
+## The tick job
+
+The workflow's second job runs `chex prose links skill` on the PR's head, then ticks or unticks the
+chex line with `tick-chex` and writes the body back only when the text changed. A failed docs check
+fails the job too, so the run shows why the box is unticked. The job runs on `opened`, `reopened`
+and `synchronize`, and never on `edited`, because its own edit of the body would start it again. It
+skips a PR from a fork, whose token cannot write, and a bot's PR.
+
+The workflow pins one chex release in its `CHEX` value. `bun run check:chex-pin` fails when
+`renovate.json` has no custom manager that captures that pin, as it does for the pin in
+`bun-checks.yml`.
+
+## The title check
+
+The [reusable pr-title workflow](../../.github/workflows/pr-title-check.yml) lints the PR title with
+commitlint and `@zgeoff/commitlint-config`, the rules that `chex commits` applies to each commit,
+and prints the fix when it fails. A squash merge makes the title the commit subject. Every repo
+takes its caller through the `workflow-pr-title` entry.

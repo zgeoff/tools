@@ -45,7 +45,7 @@ sync/               a private workspace; its src/ holds the sources that repo-sy
                     as docs/architecture/repo-sync.md describes; skills-pin.json pins the
                     zgeoff/skills commit of the skill text; the folders below sit in its src/
   workflow-callers/ workflow stubs that call this repo's reusable workflows, all opt-in but the
-                    repo-sync guard
+                    repo-sync guard, the PR-body check and the PR-title check
   hooks/            the agent hooks' start-up stub that the hook-start entry delivers
   deadcode/         the knip runner that the opt-in knip-runner entry delivers
   skill-gate/       the skill gate's rules, which repo-sync writes to .claude/skill-gate.json in
@@ -58,8 +58,8 @@ scripts/            a private workspace; its src/ holds the step scripts that th
                     as it is, so a step script imports no package, and a step that needs one runs a
                     chex subcommand from npm
 .github/workflows/  this repo's CI, release and sync dispatch, and the reusable workflows that other repos call:
-                    bun-checks, repo-sync and its guard, audit-fix, release-please and the
-                    paths-changed gate
+                    bun-checks, repo-sync and its guard, audit-fix, release-please, the
+                    paths-changed gate, and the PR-body and PR-title checks
 ```
 
 A manifest entry can name a source outside `sync/`. `.github/PULL_REQUEST_TEMPLATE.md`,
@@ -98,7 +98,8 @@ says.
   `.github/workflows/release-please.yml`, and fails on a dependency cycle between the workspace
   packages, in any dependency field, which stops release-please. CI and the pre-push hook run it.
 - `bun run check:chex-pin` fails when no custom manager in `renovate.json` captures the chex release
-  that `.github/workflows/bun-checks.yml` pins, which Renovate then never bumps. CI runs it.
+  that `.github/workflows/bun-checks.yml` or `.github/workflows/pr-body-check.yml` pins, which
+  Renovate then never bumps. CI runs it.
 - `bun run check:repo-sync-workflows` checks the stub `sync/src/repo-sync.yml` against
   `.github/workflows/repo-sync.yml`: two dispatches of different tools commits get two concurrency
   groups, the sync job queues every waiting run, the stub grants every permission a job asks for,

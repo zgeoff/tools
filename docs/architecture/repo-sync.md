@@ -22,7 +22,8 @@ its step scripts:
 - [`sync/src/repo-sync.yml`](../../sync/src/repo-sync.yml): the stub that calls the repo-sync
   workflow at a pinned commit.
 - [`sync/src/workflow-callers/`](../../sync/src/workflow-callers/): workflows that each call a
-  reusable workflow in this repo, all opt-in but the repo-sync guard.
+  reusable workflow in this repo, all opt-in but the repo-sync guard and the PR-body and PR-title
+  checks.
 - [`sync/skills-pin.json`](../../sync/skills-pin.json): the commit of zgeoff/skills that each skill
   entry copies its text from, as [Skills](#skills) describes.
 - [`sync/src/hooks/`](../../sync/src/hooks/): the agent hooks' start-up stub.
@@ -148,10 +149,11 @@ in its source. Without it, the workflow never overwrites a workflow file the rep
 
 Files under [`workflow-callers/`](../../sync/src/workflow-callers/) are short workflows that each
 call a reusable workflow in this repo. Each is an opt-in entry, which a repo lists in the stub's
-`include` input. One exception: `workflow-repo-sync-guard` reaches every repo, because every repo's
-sync pull request merges on its own, as [Auto-merge](#auto-merge) describes. A caller reads
-repo-specific values from repo variables, which its header comment names, since the copy is
-otherwise verbatim. `workflow-bun-pr` runs
+`include` input. Three exceptions reach every repo: `workflow-repo-sync-guard`, because every repo's
+sync pull request merges on its own, as [Auto-merge](#auto-merge) describes, and `workflow-pr-body`
+and `workflow-pr-title`, which run [the PR-body and PR-title checks](pr-body-check.md) on each pull
+request. A caller reads repo-specific values from repo variables, which its header comment names,
+since the copy is otherwise verbatim. `workflow-bun-pr` runs
 [`bun-checks.yml`](../../.github/workflows/bun-checks.yml), the standard Bun pull-request checks.
 
 ## Skills
