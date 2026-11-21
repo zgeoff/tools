@@ -2,8 +2,8 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
 import { withFileLock } from '../file-lock/with-file-lock.ts';
+import { readRunFolderPrefix } from './read-run-folder-prefix.ts';
 import { runLockContender } from './run-lock-contender.ts';
 
 async function setupTest() {

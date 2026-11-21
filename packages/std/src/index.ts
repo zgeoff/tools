@@ -1,3 +1,4 @@
+export { type Clock, systemClock } from './clock/system-clock.ts';
 export { isOneOf } from './guards/is-one-of.ts';
 export { isRecord } from './guards/is-record.ts';
 export { type MachineTypeKey, machineTypes } from './types/machine-types.ts';

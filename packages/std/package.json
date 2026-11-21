@@ -34,7 +34,6 @@
   },
   "devDependencies": {
     "@types/bun": "catalog:",
-    "@zgeoff/testing": "workspace:*",
     "tsrs": "catalog:",
     "type-fest": "catalog:",
     "typescript": "catalog:",

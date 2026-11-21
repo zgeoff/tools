@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { readStreamUntil } from '@zgeoff/testing/helpers';
+import { readStreamUntil } from './read-stream-until.ts';
 
 export interface LockHolder {
   readonly pid: number;

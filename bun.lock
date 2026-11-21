@@ -18,7 +18,6 @@
         "@zgeoff/oxfmt-config": "workspace:*",
         "@zgeoff/oxlint-config": "workspace:*",
         "@zgeoff/rig": "workspace:*",
-        "@zgeoff/testing": "workspace:*",
         "@zgeoff/tsconfig": "workspace:*",
         "knip": "catalog:",
         "lefthook": "catalog:",
