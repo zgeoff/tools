@@ -28,6 +28,7 @@ import setupTestOnly from './setup-test-only.js';
 import testBesideSeed from './test-beside-seed.js';
 import testShape from './test-shape.js';
 import testTimeoutExceptionTicket from './test-timeout-exception-ticket.js';
+import useTestingKit from './use-testing-kit.js';
 import verbContract from './verb-contract.js';
 
 // A repo with a rig.config.ts takes its lane limits from it, read once when oxlint loads the plugin.
@@ -134,6 +135,7 @@ const plugin = {
     'max-test-timeout': buildMaxTestTimeout(resolveRepoRoot, rigLanes),
     'test-timeout-exception-ticket': testTimeoutExceptionTicket,
     'no-test-sleep': noTestSleep,
+    'use-testing-kit': useTestingKit,
     'no-require': noRequire,
     'test-shape': testShape,
     'import-zones': importZones,
