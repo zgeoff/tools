@@ -111,6 +111,9 @@ interface StubCall {
 - A `script` stand-in runs the test's script behind a wrapper that records the call first. With
   `recordStdin`, the wrapper reads stdin to EOF, records it, and passes the same bytes to the
   script.
+- A `script` stand-in forwards SIGINT, SIGTERM and SIGHUP that it receives to the script's process,
+  and exits with the script's exit code, or with 128 plus the signal number when a signal ends the
+  script. An `answers` stand-in has no script to forward to.
 - With `recordStdin`, the stand-in waits for EOF on stdin. Code under test that keeps stdin open
   makes the call hang until the test's own timeout ends the test.
 - Calling `createStubBin` again for a name replaces that stand-in whole, answers or script, and
