@@ -12,7 +12,7 @@ files: a unit suite that reads their source text, and a browser suite that rende
 
 ```bash
 storyboard build         # renders every scene in scripts/storyboard/ and writes its two files
-storyboard new <scene>   # writes tokens.ts, story.ts, kit.ts and scene.tsx in scripts/storyboard/<scene>/
+storyboard new <scene>   # writes tokens.ts, kit.ts and scene.tsx in scripts/storyboard/<scene>/
 ```
 
 `storyboard build` runs from any folder in the repo. It takes the git root as the repo root, and
