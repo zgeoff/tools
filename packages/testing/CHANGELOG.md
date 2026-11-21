@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0](https://github.com/zgeoff/tools/compare/@zgeoff/testing@0.3.3...@zgeoff/testing@0.4.0) (2026-11-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **testing:** @zgeoff/testing/helpers no longer exists. Import each helper from its subpath: fs, git, mocks, process, bin, or the package root for waitFor, updateEnv and removeEnvOverrides.
+
+### Code Refactoring
+
+* **testing:** move tools onto the kit's subpaths and remove helpers ([#720](https://github.com/zgeoff/tools/issues/720)) ([bd1dbd3](https://github.com/zgeoff/tools/commit/bd1dbd315d99fca612d167851bc48b7f6c60ff31))
+
 ## [0.3.3](https://github.com/zgeoff/tools/compare/@zgeoff/testing@0.3.2...@zgeoff/testing@0.3.3) (2026-11-21)
 
 

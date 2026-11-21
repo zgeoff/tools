@@ -1,19 +1,19 @@
 {
   "packages/bun-test-extended": "0.2.4",
   "packages/format-codemod": "0.3.6",
-  "packages/oxlint-config": "0.10.13",
+  "packages/oxlint-config": "0.11.0",
   "packages/tsconfig": "2.0.1",
   "packages/commitlint-config": "0.1.2",
   "packages/oxfmt-config": "0.1.2",
   "packages/bun-test-react": "0.2.4",
   "packages/release-manifest": "0.1.1",
   "packages/std": "0.4.5",
-  "packages/mcp-auth": "0.2.4",
+  "packages/mcp-auth": "0.3.0",
   "packages/kysely-bun-sqlite": "0.3.3",
-  "packages/skill-gate": "0.2.33",
-  "packages/diet": "0.2.5",
-  "packages/agent-hooks": "0.2.17",
-  "packages/rig": "0.2.9",
-  "packages/chex": "0.3.19",
-  "packages/testing": "0.3.3"
+  "packages/skill-gate": "0.2.34",
+  "packages/diet": "0.3.0",
+  "packages/agent-hooks": "0.3.0",
+  "packages/rig": "0.3.0",
+  "packages/chex": "0.4.0",
+  "packages/testing": "0.4.0"
 }
