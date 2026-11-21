@@ -129,7 +129,8 @@ function isChecksGroup(context: WorkflowContext, concurrency: unknown): boolean 
   return (
     isCancelling(concurrency) ||
     isGateGroup(context, concurrency) ||
-    isDispatchGroup(context, concurrency)
+    isDispatchGroup(context, concurrency) ||
+    findPushSplitGroup(context, concurrency) !== undefined
   );
 }
 
@@ -147,13 +148,27 @@ function isGateGroup(context: WorkflowContext, concurrency: unknown): boolean {
 
 // A gate on main runs once for each commit, so a newer commit must not cancel the older run.
 function isMainGate(context: WorkflowContext): boolean {
+  return (
+    !pullRequestTriggers.some((name) => context.triggers.has(name)) &&
+    hasPushBranches(context) &&
+    isPushLimitedToMain(context)
+  );
+}
+
+function hasPushBranches(context: WorkflowContext): boolean {
+  const push = findMember(findMember(context.workflow, 'on'), 'push');
+
+  return [findMember(push, 'branches')].flat().length > 0;
+}
+
+// A workflow with no push trigger has no push run to limit.
+function isPushLimitedToMain(context: WorkflowContext): boolean {
   const push = findMember(findMember(context.workflow, 'on'), 'push');
   const branches = [findMember(push, 'branches')].flat();
 
   return (
-    !pullRequestTriggers.some((name) => context.triggers.has(name)) &&
-    branches.length > 0 &&
-    branches.every((branch) => branch === 'main')
+    !context.triggers.has('push') ||
+    (branches.length > 0 && branches.every((branch) => branch === 'main'))
   );
 }
 
@@ -217,6 +232,91 @@ function isEventExpressionTrue(text: string, event: string): boolean {
   );
 }
 
+// A pull-request run takes its group from the first value, so a newer run of its ref cancels it.
+// A push run to main takes the second, which may hold github.sha, so no push run cancels another.
+// Only those two events may trigger it, because any other event takes the second group.
+const pushSplitGroupPattern = /^(?<prefix>[^$]*)\$\{\{(?<body>.+)\}\}(?<suffix>[^$]*)$/su;
+const pullRequestTestPattern = /^github\.event_name\s*==\s*'pull_request'$/u;
+const pushSplitCancelPattern = /^\s*\$\{\{\s*github\.event_name\s*==\s*'pull_request'\s*\}\}\s*$/u;
+
+interface PushSplitGroup {
+  pullRequest: string;
+  push: string;
+}
+
+function findPushSplitGroup(
+  context: WorkflowContext,
+  concurrency: unknown,
+): PushSplitGroup | undefined {
+  const group = findMember(concurrency, 'group');
+  const cancel = findMember(concurrency, 'cancel-in-progress');
+  const parts = typeof group === 'string' ? pushSplitGroupPattern.exec(group)?.groups : undefined;
+  const split = splitTopLevel(parts?.['body'] ?? '');
+  const [test = '', pullRequest = '', push = ''] = split?.operands ?? [];
+  const prefix = parts?.['prefix'] ?? '';
+  const suffix = parts?.['suffix'] ?? '';
+
+  return typeof cancel === 'string' &&
+    pushSplitCancelPattern.test(cancel) &&
+    split?.operators.join('') === '&&||' &&
+    pullRequestTestPattern.test(test.trim()) &&
+    isPullRequestGroup(`\${{ ${pullRequest} }}`) &&
+    context.triggers.size === 2 &&
+    context.triggers.has('pull_request') &&
+    context.triggers.has('push') &&
+    isPushLimitedToMain(context)
+    ? {
+        pullRequest: `${prefix}\${{ ${pullRequest} }}${suffix}`,
+        push: `${prefix}\${{ ${push} }}${suffix}`,
+      }
+    : undefined;
+}
+
+interface TopLevelSplit {
+  operands: string[];
+  operators: string[];
+}
+
+// Splits an expression at the `&&` and `||` outside string literals and brackets; returns undefined
+// when a quote or bracket does not close.
+function splitTopLevel(body: string): TopLevelSplit | undefined {
+  const operands: string[] = [];
+  const operators: string[] = [];
+  let depth = 0;
+  let inString = false;
+  let start = 0;
+
+  for (let index = 0; index < body.length; index += 1) {
+    const char = body.charAt(index);
+    const pair = body.slice(index, index + 2);
+
+    if (char === "'") {
+      inString = !inString;
+    } else if (!inString && (char === '(' || char === '[')) {
+      depth += 1;
+    } else if (!inString && (char === ')' || char === ']')) {
+      depth -= 1;
+    } else if (!inString && depth === 0 && (pair === '&&' || pair === '||')) {
+      operands.push(body.slice(start, index));
+      operators.push(pair);
+
+      start = index + 2;
+      index += 1;
+    }
+  }
+
+  operands.push(body.slice(start));
+
+  return inString || depth !== 0 ? undefined : { operands, operators };
+}
+
+// A group that can be empty makes GitHub fall through to the push group, so it must name the ref.
+function isPullRequestGroup(expression: string): boolean {
+  const references = collectExpressionReferences(expression);
+
+  return references.includes('github.ref') || references.includes('github.head_ref');
+}
+
 // A value that differs between two runs on the same branch gives each run its own group, which no
 // later run cancels.
 const perRunValues = ['github.sha', 'github.run_id', 'github.run_number', 'github.run_attempt'];
@@ -227,10 +327,17 @@ function collectPerRunGroupFindings(
   line: number,
 ): WorkflowFinding[] {
   const group = findMember(concurrency, 'group');
+  const pushSplit = findPushSplitGroup(context, concurrency);
   const checked = typeof group === 'string' ? (findNonDispatchGroup(group) ?? group) : '';
-  const references = collectExpressionReferences(checked);
+  const references = collectExpressionReferences(pushSplit?.pullRequest ?? checked);
+  const pushReferences = collectExpressionReferences(pushSplit?.push ?? '');
   const allowed = isGateGroup(context, concurrency) ? 'github.sha' : undefined;
-  const perRun = perRunValues.find((value) => value !== allowed && references.includes(value));
+
+  const perRun = perRunValues.find(
+    (value) =>
+      (value !== allowed && references.includes(value)) ||
+      (value !== 'github.sha' && pushReferences.includes(value)),
+  );
 
   return perRun === undefined
     ? []
