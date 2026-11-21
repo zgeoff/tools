@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.16](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.15...@zgeoff/chex@0.3.16) (2026-11-21)
+
+
+### Bug Fixes
+
+* **chex:** skip a folder at a deleted link in the uncommitted check ([#710](https://github.com/zgeoff/tools/issues/710)) ([6198205](https://github.com/zgeoff/tools/commit/61982050d36e801e392b215e57f283319be8e7bf))
+
 ## [0.3.15](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.14...@zgeoff/chex@0.3.15) (2026-11-21)
 
 
