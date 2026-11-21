@@ -1,8 +1,9 @@
-import { existsSync, lstatSync } from 'node:fs';
+import { lstatSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
 
-// Returns a probe for a file under the repo root. A path whose folder below the root is a symbolic
-// link reads as absent: git tracks no file beyond a link, so a deleted path there is no restored copy.
+// Returns a probe for a file under the repo root. A path reads as absent when a folder below the root
+// is a link (git tracks no file beyond a link) or when it is a folder itself (a deleted path comes
+// back only as a file or a link). Neither is a restored copy.
 export function makeFileProbe(root: string): (path: string) => boolean {
   return (path) => {
     const folders = relative(root, dirname(path))
@@ -16,6 +17,12 @@ export function makeFileProbe(root: string): (path: string) => boolean {
         })?.isSymbolicLink() === true,
     );
 
-    return !linked && existsSync(path);
+    if (linked) {
+      return false;
+    }
+
+    const entry = lstatSync(path, { throwIfNoEntry: false });
+
+    return entry !== undefined && !entry.isDirectory();
   };
 }

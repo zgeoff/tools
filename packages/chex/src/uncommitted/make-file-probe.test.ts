@@ -26,6 +26,8 @@ test.each([
   ['top.md', true],
   ['top-link.md', true],
   ['linked/a.md', false],
+  ['real', false],
+  ['linked', true],
   ['real/missing.md', false],
 ])('it reads %p as present: %p', async (path, present) => {
   const ctx = await setupTest();
