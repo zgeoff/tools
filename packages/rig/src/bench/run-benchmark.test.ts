@@ -1,10 +1,11 @@
 import { expect, test } from 'bun:test';
 import { setImmediate } from 'node:timers/promises';
+import { createFakeClock } from '@zgeoff/testing/clock';
 import { makeAnswerQueue } from '@zgeoff/testing/mocks';
 import { buildInFlightRun } from '../test-utils/build-in-flight-run.ts';
-import { buildSteppingClock } from '../test-utils/build-stepping-clock.ts';
 import { buildTickingClock } from '../test-utils/build-ticking-clock.ts';
 import { createOtherRealmTimeout } from '../test-utils/create-other-realm-timeout.ts';
+import { runClockUntilSettled } from '../test-utils/run-clock-until-settled.ts';
 import { defineBench } from './define-bench.ts';
 import { runBenchmark } from './run-benchmark.ts';
 
@@ -51,16 +52,24 @@ test('it keeps as many calls in flight at once as the level names', async () => 
 });
 
 test('it times each call of a round on its own and gives the median and spread per level', async () => {
-  const clock = buildSteppingClock();
+  const clock = createFakeClock();
+  let inFlight = 0;
 
+  // Each call waits as long as the calls in flight with it, so a round of 2 times 2 ms and 4 ms.
   const definition = defineBench({
     name: 'pour',
     budget: '50ms',
     concurrency: [1, 2],
-    run: () => clock.sleep(2),
+    run: async () => {
+      inFlight += 1;
+
+      await clock.sleep(2 * inFlight);
+
+      inFlight -= 1;
+    },
   });
 
-  const result = await runBenchmark(definition, clock.now);
+  const result = await runClockUntilSettled(clock, runBenchmark(definition, clock.now));
 
   expect(result).toStrictEqual([
     { concurrency: 1, medianMs: 2, spreadMs: 0 },
@@ -82,7 +91,6 @@ test('it times each synchronous call of a round apart from the calls after it', 
 });
 
 test('it times a call and disposes of the setup result after a run whose promise comes from another realm settles', async () => {
-  const clock = buildSteppingClock();
   const events: string[] = [];
 
   const definition = defineBench({
@@ -100,11 +108,11 @@ test('it times a call and disposes of the setup result after a run whose promise
       createOtherRealmTimeout(1, () => {
         events.push('steeped');
 
-        return clock.sleep(2);
+        return Promise.resolve();
       }),
   });
 
-  const result = await runBenchmark(definition, clock.now);
+  const result = await runBenchmark(definition, buildTickingClock(2));
 
   expect({ result, lastEvents: events.slice(-2) }).toStrictEqual({
     result: [{ concurrency: 1, medianMs: 2, spreadMs: 0 }],

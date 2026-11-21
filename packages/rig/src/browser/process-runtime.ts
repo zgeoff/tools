@@ -1,5 +1,5 @@
-import type { Clock } from '../command/system-clock.ts';
-import { systemClock } from '../command/system-clock.ts';
+import { systemClock } from '@zgeoff/std';
+import type { Clock } from '@zgeoff/std';
 
 export interface SpawnedProcess {
   readonly pid: number;
@@ -17,7 +17,7 @@ export interface SpawnOptions {
   readonly stdout: 'inherit' | 'pipe';
 }
 
-export interface ProcessRuntime extends Clock {
+export interface ProcessRuntime extends Pick<Clock, 'now' | 'sleep'> {
   // Starts the command as the leader of a process group of its own.
   readonly spawn: (command: readonly string[], options: SpawnOptions) => SpawnedProcess;
 }

@@ -1,13 +1,13 @@
 import type { FileHandle } from 'node:fs/promises';
+import type { Clock } from '@zgeoff/std';
 import { match } from 'ts-pattern';
 import type { FileLocks } from './file-locks.ts';
 import { pickLockStep } from './pick-lock-step.ts';
-import type { Clock } from './system-clock.ts';
 
 export interface FileLockOptions {
   readonly locks: FileLocks;
 
-  readonly clock: Clock;
+  readonly clock: Pick<Clock, 'now' | 'sleep'>;
 
   readonly retryMs: number;
 

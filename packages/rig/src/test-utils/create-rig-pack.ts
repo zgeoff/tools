@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import type { LaneContext, LaneStart } from '@zgeoff/rig';
+import { systemClock } from '@zgeoff/std';
 import { buildBrowserRun } from '../browser/build-browser-run.ts';
 import { pickChromeDirs } from '../browser/pick-chrome-dirs.ts';
 import { buildRigPackRun } from './build-rig-pack-run.ts';
@@ -9,7 +10,6 @@ import { fileLocks } from './file-locks.ts';
 import { readPackedBin } from './read-packed-bin.ts';
 import { removeExitedRigPacks } from './remove-exited-rig-packs.ts';
 import { runBrowserWarmUp } from './run-browser-warm-up.ts';
-import { systemClock } from './system-clock.ts';
 
 // rig's bin runs from its source, so the tarball, shaped by the files list and the rewritten
 // dependency ranges, is the product a user installs. The Chrome warm-up runs its bin, so a broken

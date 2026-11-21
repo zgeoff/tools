@@ -1,11 +1,11 @@
+import type { Clock } from '@zgeoff/std';
 import type { FileLocks } from './file-locks.ts';
-import type { Clock } from './system-clock.ts';
 import { withFileLock } from './with-file-lock.ts';
 
 export interface RigTarballOptions {
   readonly locks: FileLocks;
 
-  readonly clock: Clock;
+  readonly clock: Pick<Clock, 'now' | 'sleep'>;
 
   readonly runBuild: () => Promise<void>;
 

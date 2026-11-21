@@ -2,7 +2,8 @@ import { expect, test } from 'bun:test';
 import { buildFakeProcessRuntime } from './build-fake-process-runtime.ts';
 
 test('it spawns a leader with the process ID that settles with the exit promise', async () => {
-  const runtime = buildFakeProcessRuntime(4417, Promise.resolve(3));
+  const fake = buildFakeProcessRuntime(4417, Promise.resolve(3));
+  const runtime = fake.runtime;
 
   const leader = runtime.spawn(['bun', 'test'], {
     cwd: '/work/notes-app',
@@ -22,13 +23,15 @@ test('it spawns a leader with the process ID that settles with the exit promise'
   });
 });
 
-test('it moves its clock by each sleep, and by nothing else', async () => {
-  const runtime = buildFakeProcessRuntime(4417, Promise.resolve(0));
-  const startMs = runtime.now();
+test('it gives the runtime a clock that moves only when the test advances its fake', async () => {
+  const fake = buildFakeProcessRuntime(4417, Promise.resolve(0));
+  const startMs = fake.runtime.now();
+  const slept = fake.runtime.sleep(50);
 
-  await runtime.sleep(50);
-  await runtime.sleep(300);
+  fake.clock.advance(50);
+
+  await slept;
 
   expect(startMs).toBe(0);
-  expect(runtime.now()).toBe(350);
+  expect(fake.runtime.now()).toBe(50);
 });

@@ -2,26 +2,15 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { cp, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileLocks } from '@zgeoff/rig/test-utils/file-locks';
-import { probeProcess } from '@zgeoff/rig/test-utils/probe-process';
-import { systemClock } from '@zgeoff/rig/test-utils/system-clock';
-import { templateFiles } from '@zgeoff/rig/test-utils/template-files';
-import { readRunFolderPrefix } from '@zgeoff/testing/fs';
+import { readRunFolderPrefix, readTemplate } from '@zgeoff/testing/fs';
 import { $ } from 'bun';
 import invariant from 'tiny-invariant';
-import { withPerRunTemplate } from './src/test-utils/with-per-run-template.ts';
 
 async function setupTest() {
   // The real HOME keeps bun install on the shared cache.
   const env = { PATH: process.env['PATH'], HOME: process.env['HOME'] };
   const repoRoot = join(import.meta.dir, '../..');
   const stubPath = join(repoRoot, 'sync/src/hooks/start.ts');
-
-  // The bundle takes in @zgeoff/std, the declaration build extends the base tsconfig, and this
-  // file holds the recipe that writes the template.
-  const sourcePaths = await Array.fromAsync(
-    new Bun.Glob('packages/{agent-hooks,std}/src/**').scan({ cwd: repoRoot, absolute: true }),
-  );
 
   const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('agent-hooks-package-')));
 
@@ -30,7 +19,7 @@ async function setupTest() {
   const project = join(directory, 'project');
   const packageManifestPath = join(directory, 'package.json');
 
-  const readTemplate = async (templateDirectory: string) => {
+  const copyTemplate = async (templateDirectory: string) => {
     await cp(join(templateDirectory, 'project'), project, {
       recursive: true,
       verbatimSymlinks: true,
@@ -41,86 +30,80 @@ async function setupTest() {
 
   // Packing, building and installing the package costs more than a test, so each run builds it
   // once and each test copies the installed project.
-  await withPerRunTemplate(
-    {
-      cacheDirectory: join(repoRoot, 'node_modules/.cache/test-templates'),
-      name: 'agent-hooks-package',
-      inputPaths: [
-        ...sourcePaths,
-        stubPath,
-        import.meta.path,
-        join(import.meta.dir, 'package.json'),
-        join(import.meta.dir, 'tsconfig.json'),
-        join(import.meta.dir, 'tsconfig.build.json'),
-        join(repoRoot, 'bun.lock'),
-        join(repoRoot, 'tsconfig.base.json'),
-      ],
-      files: templateFiles,
-      locks: fileLocks,
-      clock: systemClock,
-      probeProcess,
-      processID: process.pid,
-      writeTemplate: async (buildDirectory) => {
-        const unpacked = join(buildDirectory, 'unpacked');
-        const packed = join(buildDirectory, 'packed');
-        const templateProject = join(buildDirectory, 'project');
+  const template = await readTemplate({
+    name: 'agent-hooks-package',
+    root: repoRoot,
 
-        await Promise.all([
-          mkdir(unpacked),
-          mkdir(packed),
-          mkdir(join(templateProject, '.claude/hooks'), { recursive: true }),
-        ]);
+    // The bundle takes in @zgeoff/std, the declaration build extends the base tsconfig, and this
+    // file holds the recipe that writes the template.
+    inputs: [
+      'packages/{agent-hooks,std}/src/**',
+      'sync/src/hooks/start.ts',
+      'packages/agent-hooks/package.test.ts',
+      'packages/agent-hooks/package.json',
+      'packages/agent-hooks/tsconfig.json',
+      'packages/agent-hooks/tsconfig.build.json',
+      'bun.lock',
+      'tsconfig.base.json',
+    ],
+    write: async (buildDirectory) => {
+      const unpacked = join(buildDirectory, 'unpacked');
+      const packed = join(buildDirectory, 'packed');
+      const templateProject = join(buildDirectory, 'project');
 
-        // prepare's build writes the shared dist, which an overlapping run would race, so the pack
-        // skips it and the bundle builds into the unpacked copy instead.
-        await $`bun pm pack --ignore-scripts --destination ${buildDirectory}`
-          .cwd(import.meta.dir)
-          .env(env)
-          .quiet();
+      await Promise.all([
+        mkdir(unpacked),
+        mkdir(packed),
+        mkdir(join(templateProject, '.claude/hooks'), { recursive: true }),
+      ]);
 
-        const entries = await readdir(buildDirectory);
+      // prepare's build writes the shared dist, which an overlapping run would race, so the pack
+      // skips it and the bundle builds into the unpacked copy instead.
+      await $`bun pm pack --ignore-scripts --destination ${buildDirectory}`
+        .cwd(import.meta.dir)
+        .env(env)
+        .quiet();
 
-        const manifest = entries.find((name) => name.endsWith('.tgz'));
+      const entries = await readdir(buildDirectory);
 
-        invariant(manifest !== undefined, 'bun pm pack wrote no tarball');
+      const manifest = entries.find((name) => name.endsWith('.tgz'));
 
-        await $`tar -xzf ${join(buildDirectory, manifest)} -C ${unpacked}`.env(env).quiet();
+      invariant(manifest !== undefined, 'bun pm pack wrote no tarball');
 
-        await rm(join(unpacked, 'package/dist'), { recursive: true, force: true });
+      await $`tar -xzf ${join(buildDirectory, manifest)} -C ${unpacked}`.env(env).quiet();
 
-        await $`bun run build:outdir ${join(unpacked, 'package/dist')}`
-          .cwd(import.meta.dir)
-          .env(env)
-          .quiet();
+      await rm(join(unpacked, 'package/dist'), { recursive: true, force: true });
 
-        await $`bun pm pack --ignore-scripts --destination ${packed}`
-          .cwd(join(unpacked, 'package'))
-          .env(env)
-          .quiet();
+      await $`bun run build:outdir ${join(unpacked, 'package/dist')}`
+        .cwd(import.meta.dir)
+        .env(env)
+        .quiet();
 
-        const [tarball, ...extra] = await readdir(packed);
+      await $`bun pm pack --ignore-scripts --destination ${packed}`
+        .cwd(join(unpacked, 'package'))
+        .env(env)
+        .quiet();
 
-        invariant(
-          tarball !== undefined && extra.length === 0,
-          'bun pm pack must write one tarball',
-        );
+      const [tarball, ...extra] = await readdir(packed);
 
-        await writeFile(
-          join(templateProject, 'package.json'),
-          JSON.stringify({
-            name: 'project',
-            private: true,
-            devDependencies: { '@zgeoff/agent-hooks': `file:${join(packed, tarball)}` },
-          }),
-        );
+      invariant(tarball !== undefined && extra.length === 0, 'bun pm pack must write one tarball');
 
-        await cp(stubPath, join(templateProject, '.claude/hooks/start.ts'));
+      await writeFile(
+        join(templateProject, 'package.json'),
+        JSON.stringify({
+          name: 'project',
+          private: true,
+          devDependencies: { '@zgeoff/agent-hooks': `file:${join(packed, tarball)}` },
+        }),
+      );
 
-        await $`bun install`.cwd(templateProject).env(env).quiet();
-      },
+      await cp(stubPath, join(templateProject, '.claude/hooks/start.ts'));
+
+      await $`bun install`.cwd(templateProject).env(env).quiet();
     },
-    readTemplate,
-  );
+  });
+
+  await copyTemplate(template);
 
   return {
     project,

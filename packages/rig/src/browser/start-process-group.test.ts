@@ -1,6 +1,7 @@
 import { expect, mock, test } from 'bun:test';
 import { buildFakeProcessRuntime } from '../test-utils/build-fake-process-runtime.ts';
 import { buildStuckProcessGroups } from '../test-utils/build-stuck-process-groups.ts';
+import { runClockUntilSettled } from '../test-utils/run-clock-until-settled.ts';
 import { ProcessGroupStillRunningError } from './process-group-still-running-error.ts';
 import { ProcessGroupStopError } from './process-group-stop-error.ts';
 import type { ProcessGroups } from './process-groups.ts';
@@ -23,15 +24,16 @@ function setupTest() {
 test('it rejects, after SIGTERM and SIGKILL, when the group still runs once its command exits', async () => {
   const ctx = setupTest();
   const groups = buildStuckProcessGroups();
+  const fake = buildFakeProcessRuntime(4417, Promise.resolve(0));
 
   const group = startProcessGroup(['bun', 'test'], {
     ...ctx.options,
     stopDeadlineMs: 100,
     groups,
-    runtime: buildFakeProcessRuntime(4417, Promise.resolve(0)),
+    runtime: fake.runtime,
   });
 
-  const failure = await group.exited.then(
+  const failure = await runClockUntilSettled(fake.clock, group.exited).then(
     () => null,
     (error: unknown) => error,
   );
@@ -52,17 +54,18 @@ test('it rejects, after SIGTERM and SIGKILL, when the group still runs once its 
 test('it rejects on abort when the leader itself outlives SIGKILL and never exits', async () => {
   const ctx = setupTest();
   const groups = buildStuckProcessGroups();
+  const fake = buildFakeProcessRuntime(4417, Promise.withResolvers<number>().promise);
 
   const group = startProcessGroup(['bun', 'test'], {
     ...ctx.options,
     stopDeadlineMs: 100,
     groups,
-    runtime: buildFakeProcessRuntime(4417, Promise.withResolvers<number>().promise),
+    runtime: fake.runtime,
   });
 
   ctx.controller.abort();
 
-  const failure = await group.exited.then(
+  const failure = await runClockUntilSettled(fake.clock, group.exited).then(
     () => null,
     (error: unknown) => error,
   );
@@ -87,14 +90,16 @@ test('it rejects with the cause when a signal to the group fails', async () => {
     }),
   } satisfies ProcessGroups;
 
+  const fake = buildFakeProcessRuntime(4417, Promise.resolve(0));
+
   const group = startProcessGroup(['bun', 'test'], {
     ...ctx.options,
     stopDeadlineMs: 100,
     groups,
-    runtime: buildFakeProcessRuntime(4417, Promise.resolve(0)),
+    runtime: fake.runtime,
   });
 
-  const failure = await group.exited.then(
+  const failure = await runClockUntilSettled(fake.clock, group.exited).then(
     () => null,
     (error: unknown) => error,
   );

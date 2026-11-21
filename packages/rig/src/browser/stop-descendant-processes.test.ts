@@ -1,14 +1,15 @@
 import { expect, mock, test } from 'bun:test';
+import { createFakeClock } from '@zgeoff/testing/clock';
 import { makeRepeatingAnswerQueue } from '@zgeoff/testing/mocks';
 import { buildProcessEntry } from '../test-utils/build-process-entry.ts';
-import { buildSteppingClock } from '../test-utils/build-stepping-clock.ts';
+import { runClockUntilSettled } from '../test-utils/run-clock-until-settled.ts';
 import type { ProcessEntry } from './read-process-table.ts';
 import type { DescendantStop } from './stop-descendant-processes.ts';
 import { stopDescendantProcesses } from './stop-descendant-processes.ts';
 
 function setupTest() {
   const signalProcess = mock<DescendantStop['signalProcess']>(() => true);
-  const clock = buildSteppingClock();
+  const clock = createFakeClock();
 
   return {
     clock,
@@ -30,13 +31,16 @@ test("it kills every descendant of the root, and none of the root's ancestors or
     [buildProcessEntry(4000, 1), buildProcessEntry(4100, 4000)],
   ]);
 
-  await stopDescendantProcesses({
-    rootPID: 4100,
-    timeoutMs: 5000,
-    clock: ctx.clock,
-    signalProcess: ctx.signalProcess,
-    readProcessTable,
-  });
+  await runClockUntilSettled(
+    ctx.clock,
+    stopDescendantProcesses({
+      rootPID: 4100,
+      timeoutMs: 5000,
+      clock: ctx.clock,
+      signalProcess: ctx.signalProcess,
+      readProcessTable,
+    }),
+  );
 
   expect(ctx.signalProcess.mock.calls).toStrictEqual([
     [4120, 'SIGKILL'],
@@ -67,15 +71,18 @@ test('it waits until each descendant leaves the listing, zombies included', asyn
     [buildProcessEntry(4100, 4000)],
   ]);
 
-  await stopDescendantProcesses({
-    rootPID: 4100,
-    timeoutMs: 5000,
-    clock: ctx.clock,
-    signalProcess: ctx.signalProcess,
-    readProcessTable,
-  });
+  await runClockUntilSettled(
+    ctx.clock,
+    stopDescendantProcesses({
+      rootPID: 4100,
+      timeoutMs: 5000,
+      clock: ctx.clock,
+      signalProcess: ctx.signalProcess,
+      readProcessTable,
+    }),
+  );
 
-  expect(ctx.clock.sleep).toHaveBeenCalledTimes(3);
+  expect(ctx.clock.delays).toHaveLength(3);
 });
 
 test('it resolves at the deadline when only zombies remain, which no process reaps', async () => {
@@ -92,18 +99,21 @@ test('it resolves at the deadline when only zombies remain, which no process rea
     [buildProcessEntry(4100, 4000), buildProcessEntry(4130, 1, 'Z')],
   ]);
 
-  await stopDescendantProcesses({
-    rootPID: 4100,
-    timeoutMs: 5000,
-    clock: ctx.clock,
-    signalProcess: ctx.signalProcess,
-    readProcessTable,
-  });
+  await runClockUntilSettled(
+    ctx.clock,
+    stopDescendantProcesses({
+      rootPID: 4100,
+      timeoutMs: 5000,
+      clock: ctx.clock,
+      signalProcess: ctx.signalProcess,
+      readProcessTable,
+    }),
+  );
 
   expect(ctx.clock.now()).toBe(5000);
 });
 
-test('it throws with the descendants that are no zombie and still run at the deadline', () => {
+test('it throws with the descendants that are no zombie and still run at the deadline', async () => {
   const ctx = setupTest();
 
   const readProcessTable = makeRepeatingAnswerQueue<readonly ProcessEntry[] | null>([
@@ -125,14 +135,17 @@ test('it throws with the descendants that are no zombie and still run at the dea
     ],
   ]);
 
-  expect(
-    stopDescendantProcesses({
-      rootPID: 4100,
-      timeoutMs: 5000,
-      clock: ctx.clock,
-      signalProcess: ctx.signalProcess,
-      readProcessTable,
-    }),
+  await expect(
+    runClockUntilSettled(
+      ctx.clock,
+      stopDescendantProcesses({
+        rootPID: 4100,
+        timeoutMs: 5000,
+        clock: ctx.clock,
+        signalProcess: ctx.signalProcess,
+        readProcessTable,
+      }),
+    ),
   ).rejects.toThrowWithMessage(Error, 'the processes 4120, 4130 still run 5000 ms after SIGKILL');
 
   expect(ctx.clock.now()).toBe(5000);
@@ -153,25 +166,8 @@ test('it reads a failed first listing again, and kills the descendants that the 
     [buildProcessEntry(4000, 1), buildProcessEntry(4100, 4000)],
   ]);
 
-  await stopDescendantProcesses({
-    rootPID: 4100,
-    timeoutMs: 5000,
-    clock: ctx.clock,
-    signalProcess: ctx.signalProcess,
-    readProcessTable,
-  });
-
-  expect(ctx.signalProcess.mock.calls).toStrictEqual([
-    [4120, 'SIGKILL'],
-    [4130, 'SIGKILL'],
-  ]);
-});
-
-test('it throws and kills nothing when the listing fails until the deadline', () => {
-  const ctx = setupTest();
-  const readProcessTable = makeRepeatingAnswerQueue<readonly ProcessEntry[] | null>([null]);
-
-  expect(
+  await runClockUntilSettled(
+    ctx.clock,
     stopDescendantProcesses({
       rootPID: 4100,
       timeoutMs: 5000,
@@ -179,6 +175,29 @@ test('it throws and kills nothing when the listing fails until the deadline', ()
       signalProcess: ctx.signalProcess,
       readProcessTable,
     }),
+  );
+
+  expect(ctx.signalProcess.mock.calls).toStrictEqual([
+    [4120, 'SIGKILL'],
+    [4130, 'SIGKILL'],
+  ]);
+});
+
+test('it throws and kills nothing when the listing fails until the deadline', async () => {
+  const ctx = setupTest();
+  const readProcessTable = makeRepeatingAnswerQueue<readonly ProcessEntry[] | null>([null]);
+
+  await expect(
+    runClockUntilSettled(
+      ctx.clock,
+      stopDescendantProcesses({
+        rootPID: 4100,
+        timeoutMs: 5000,
+        clock: ctx.clock,
+        signalProcess: ctx.signalProcess,
+        readProcessTable,
+      }),
+    ),
   ).rejects.toThrowWithMessage(
     Error,
     'the process listing failed for 5000 ms, so no process stopped',
@@ -188,7 +207,7 @@ test('it throws and kills nothing when the listing fails until the deadline', ()
   expect(ctx.clock.now()).toBe(5000);
 });
 
-test('it counts every descendant as running while a later listing fails', () => {
+test('it counts every descendant as running while a later listing fails', async () => {
   const ctx = setupTest();
 
   const readProcessTable = makeRepeatingAnswerQueue<readonly ProcessEntry[] | null>([
@@ -202,13 +221,16 @@ test('it counts every descendant as running while a later listing fails', () => 
     null,
   ]);
 
-  expect(
-    stopDescendantProcesses({
-      rootPID: 4100,
-      timeoutMs: 5000,
-      clock: ctx.clock,
-      signalProcess: ctx.signalProcess,
-      readProcessTable,
-    }),
+  await expect(
+    runClockUntilSettled(
+      ctx.clock,
+      stopDescendantProcesses({
+        rootPID: 4100,
+        timeoutMs: 5000,
+        clock: ctx.clock,
+        signalProcess: ctx.signalProcess,
+        readProcessTable,
+      }),
+    ),
   ).rejects.toThrowWithMessage(Error, 'the processes 4120, 4130 still run 5000 ms after SIGKILL');
 });
