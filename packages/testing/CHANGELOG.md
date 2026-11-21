@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3](https://github.com/zgeoff/tools/compare/@zgeoff/testing@0.3.2...@zgeoff/testing@0.3.3) (2026-11-21)
+
+
+### Features
+
+* **testing:** add clock, server and fetch subpaths ([#718](https://github.com/zgeoff/tools/issues/718)) ([0a4f758](https://github.com/zgeoff/tools/commit/0a4f758f640778f3f848ca353df649b901e8f5ff))
+
 ## [0.3.2](https://github.com/zgeoff/tools/compare/@zgeoff/testing@0.3.1...@zgeoff/testing@0.3.2) (2026-11-21)
 
 
