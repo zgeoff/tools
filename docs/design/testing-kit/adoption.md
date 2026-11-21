@@ -39,10 +39,10 @@ release that publishes the kit.
    - the catalog pins `msw` 3.0.4 and `@mswjs/interceptors` 0.45.11, the root preload's
      `setupServer` is replaced by a network module, a file of the tools repo that calls
      `createTestNetwork` and that the root `bunfig.toml` lists as a preload, and the root
-     `bunfig.toml` lists `@zgeoff/testing/preload`; - each call of `start`, from
-     `@zgeoff/testing/process`, inside a `beforeAll` passes `cleanup: 'manual'`, and its `afterAll`
-     calls `stop`. With the default, the process would stop before the first test, as the README's
-     [Cleanup](./README.md#cleanup) section explains;
+     `bunfig.toml` lists `@zgeoff/testing/preload`;
+   - each call of `start`, from `@zgeoff/testing/process`, inside a `beforeAll` passes
+     `cleanup: 'manual'`, and its `afterAll` calls `stop`. With the default, the process would stop
+     before the first test, as the README's [Cleanup](./README.md#cleanup) section explains;
    - `rig`'s clock types take `Pick<Clock, 'now' | 'sleep'>`, and its stepping clock fake is
      replaced by `createFakeClock`. A rig test that needs a clock that moves on each read keeps a
      small local fake of that `Pick`;

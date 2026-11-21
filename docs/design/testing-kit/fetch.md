@@ -35,8 +35,8 @@ A repo writes one network module, such as `test-utils/network.ts`, and lists it 
 Tests import `network` from it.
 
 ```ts
-import { billingHandlers } from '@acme/billing/mocks';
 // test-utils/network.ts
+import { billingHandlers } from '@acme/billing/mocks';
 import { createTestNetwork } from '@zgeoff/testing/fetch';
 
 export const network = createTestNetwork({ handlers: [...billingHandlers] });
