@@ -129,7 +129,8 @@ function isChecksGroup(context: WorkflowContext, concurrency: unknown): boolean 
   return (
     isCancelling(concurrency) ||
     isGateGroup(context, concurrency) ||
-    isDispatchGroup(context, concurrency)
+    isDispatchGroup(context, concurrency) ||
+    findPushSplitGroup(context, concurrency) !== undefined
   );
 }
 
@@ -147,13 +148,27 @@ function isGateGroup(context: WorkflowContext, concurrency: unknown): boolean {
 
 // A gate on main runs once for each commit, so a newer commit must not cancel the older run.
 function isMainGate(context: WorkflowContext): boolean {
+  return (
+    !pullRequestTriggers.some((name) => context.triggers.has(name)) &&
+    hasPushBranches(context) &&
+    isPushLimitedToMain(context)
+  );
+}
+
+function hasPushBranches(context: WorkflowContext): boolean {
+  const push = findMember(findMember(context.workflow, 'on'), 'push');
+
+  return [findMember(push, 'branches')].flat().length > 0;
+}
+
+// A workflow with no push trigger has no push run to limit.
+function isPushLimitedToMain(context: WorkflowContext): boolean {
   const push = findMember(findMember(context.workflow, 'on'), 'push');
   const branches = [findMember(push, 'branches')].flat();
 
   return (
-    !pullRequestTriggers.some((name) => context.triggers.has(name)) &&
-    branches.length > 0 &&
-    branches.every((branch) => branch === 'main')
+    !context.triggers.has('push') ||
+    (branches.length > 0 && branches.every((branch) => branch === 'main'))
   );
 }
 
@@ -217,6 +232,42 @@ function isEventExpressionTrue(text: string, event: string): boolean {
   );
 }
 
+// A pull-request run takes its group from the first value, so a newer run of its ref cancels it.
+// A push run to main takes the second, which may hold github.sha, so no push run cancels another.
+// A `||` inside the first value ends it early, so it no longer reads as one value.
+const pushSplitGroupPattern =
+  /^(?<prefix>[^$]*)\$\{\{\s*github\.event_name\s*==\s*'pull_request'\s*&&(?<pullRequest>.+?)\|\|(?<push>.+)\}\}(?<suffix>[^$]*)$/su;
+
+const pushSplitCancelPattern = /^\s*\$\{\{\s*github\.event_name\s*==\s*'pull_request'\s*\}\}\s*$/u;
+
+interface PushSplitGroup {
+  pullRequest: string;
+  push: string;
+}
+
+function findPushSplitGroup(
+  context: WorkflowContext,
+  concurrency: unknown,
+): PushSplitGroup | undefined {
+  const group = findMember(concurrency, 'group');
+  const cancel = findMember(concurrency, 'cancel-in-progress');
+  const split = typeof group === 'string' ? pushSplitGroupPattern.exec(group)?.groups : undefined;
+  const pullRequest = split?.['pullRequest'] ?? '';
+
+  // An unbalanced `(` in b means a `||` sat inside a group of parentheses that b started.
+  return split !== undefined &&
+    typeof cancel === 'string' &&
+    pushSplitCancelPattern.test(cancel) &&
+    context.triggers.has('pull_request') &&
+    pullRequest.split('(').length === pullRequest.split(')').length &&
+    isPushLimitedToMain(context)
+    ? {
+        pullRequest: `${split['prefix'] ?? ''}\${{ ${pullRequest} }}${split['suffix'] ?? ''}`,
+        push: `${split['prefix'] ?? ''}\${{ ${split['push'] ?? ''} }}${split['suffix'] ?? ''}`,
+      }
+    : undefined;
+}
+
 // A value that differs between two runs on the same branch gives each run its own group, which no
 // later run cancels.
 const perRunValues = ['github.sha', 'github.run_id', 'github.run_number', 'github.run_attempt'];
@@ -227,10 +278,17 @@ function collectPerRunGroupFindings(
   line: number,
 ): WorkflowFinding[] {
   const group = findMember(concurrency, 'group');
+  const pushSplit = findPushSplitGroup(context, concurrency);
   const checked = typeof group === 'string' ? (findNonDispatchGroup(group) ?? group) : '';
-  const references = collectExpressionReferences(checked);
+  const references = collectExpressionReferences(pushSplit?.pullRequest ?? checked);
+  const pushReferences = collectExpressionReferences(pushSplit?.push ?? '');
   const allowed = isGateGroup(context, concurrency) ? 'github.sha' : undefined;
-  const perRun = perRunValues.find((value) => value !== allowed && references.includes(value));
+
+  const perRun = perRunValues.find(
+    (value) =>
+      (value !== allowed && references.includes(value)) ||
+      (value !== 'github.sha' && pushReferences.includes(value)),
+  );
 
   return perRun === undefined
     ? []
