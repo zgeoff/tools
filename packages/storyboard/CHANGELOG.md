@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.2](https://github.com/zgeoff/tools/compare/@zgeoff/storyboard@0.1.1...@zgeoff/storyboard@0.1.2) (2026-11-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/rig bumped to 0.3.2
+    * @zgeoff/testing bumped to 0.4.2
+  * peerDependencies
+    * @zgeoff/rig bumped to 0.3.2
+
 ## [0.1.1](https://github.com/zgeoff/tools/compare/@zgeoff/storyboard@0.1.0...@zgeoff/storyboard@0.1.1) (2026-11-21)
 
 
