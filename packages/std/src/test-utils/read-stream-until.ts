@@ -1,4 +1,3 @@
-// Reads the stream until its output holds the text, or until the stream ends. Leaves the stream open.
 export async function readStreamUntil(
   stream: ReadableStream<Uint8Array>,
   text: string,

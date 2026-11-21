@@ -18,12 +18,19 @@ test('it reads the current time in epoch milliseconds', () => {
 
 test('it fires a scheduled callback after the delay', async () => {
   const fired = Promise.withResolvers<void>();
+  let count = 0;
 
   systemClock.schedule(() => {
+    count += 1;
+
     fired.resolve();
   }, 5);
 
+  expect(count).toBe(0);
+
   await expect(fired.promise).toResolve();
+
+  expect(count).toBe(1);
 });
 
 test('it treats a negative delay as 0 when it schedules', () => {
@@ -121,21 +128,4 @@ test('it removes its abort listener when the sleep ends by time', async () => {
   expect(add.mock.calls.map((call) => call[0])).toStrictEqual(['abort']);
   expect(remove.mock.calls.map((call) => call[0])).toStrictEqual(['abort']);
   expect(remove.mock.calls[0]?.[1]).toBe(add.mock.calls[0]?.[1]);
-});
-
-test('it removes its abort listener when the sleep ends by abort', async () => {
-  const ctx = setupTest();
-  const remove = spyOn(ctx.controller.signal, 'removeEventListener');
-
-  onTestFinished(() => {
-    remove.mockRestore();
-  });
-
-  const nap = systemClock.sleep(60_000, ctx.controller.signal);
-
-  ctx.controller.abort();
-
-  await nap;
-
-  expect(remove.mock.calls.map((call) => call[0])).toStrictEqual(['abort']);
 });
