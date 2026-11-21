@@ -290,6 +290,32 @@
         "xstate": "catalog:",
       },
     },
+    "packages/storyboard": {
+      "name": "@zgeoff/storyboard",
+      "version": "0.0.0",
+      "bin": {
+        "storyboard": "./src/cli.ts",
+      },
+      "dependencies": {
+        "tiny-invariant": "catalog:",
+        "ts-pattern": "catalog:",
+        "zod": "catalog:",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "@zgeoff/rig": "workspace:*",
+        "@zgeoff/std": "workspace:*",
+        "@zgeoff/testing": "workspace:*",
+        "tsrs": "catalog:",
+        "typescript": "catalog:",
+      },
+      "peerDependencies": {
+        "@zgeoff/rig": "workspace:*",
+      },
+      "optionalPeers": [
+        "@zgeoff/rig",
+      ],
+    },
     "packages/testing": {
       "name": "@zgeoff/testing",
       "version": "0.4.0",
@@ -881,6 +907,8 @@
     "@zgeoff/skill-gate": ["@zgeoff/skill-gate@workspace:packages/skill-gate"],
 
     "@zgeoff/std": ["@zgeoff/std@workspace:packages/std"],
+
+    "@zgeoff/storyboard": ["@zgeoff/storyboard@workspace:packages/storyboard"],
 
     "@zgeoff/testing": ["@zgeoff/testing@workspace:packages/testing"],
 
