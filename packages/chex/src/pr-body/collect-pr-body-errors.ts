@@ -15,6 +15,7 @@ export function collectPrBodyErrors(body: string, facts?: BranchFacts): string[]
   return [
     ...collectHeadingErrors(named, stripped.hasReport),
     ...collectCodeBlockErrors(parsed.codeBlocks),
+    ...collectChecksFenceErrors(parsed.codeBlocks),
     ...collectPlaceholderErrors(parsed.sections),
     ...named.flatMap((section) =>
       section.heading === 'Next steps' ? collectNextStepsErrors(section) : [],
@@ -90,7 +91,14 @@ function collectCodeBlockErrors(
   });
 }
 
-const placeholder = /<(?<word>[A-Za-z][A-Za-z0-9_-]*)>/gu;
+function collectChecksFenceErrors(blocks: readonly { section: string }[]): string[] {
+  return blocks
+    .filter((block) => block.section === 'Checks')
+    .map(
+      () =>
+        'Checks: a code block sits under Checks; the section holds only the chex, Deslop and Cold read lines, so move the block to Verification or Description.',
+    );
+}
 
 const htmlTags = new Set([
   'details',
@@ -111,14 +119,14 @@ const htmlTags = new Set([
   'pre',
 ]);
 
+const placeholder = /<(?<word>[A-Za-z][A-Za-z0-9_-]*)?>/gu;
+
 function collectPlaceholderErrors(sections: readonly BodySection[]): string[] {
   return sections.flatMap((section) => {
     const found = new Set<string>();
 
     for (const line of section.lines) {
-      const withoutInlineCode = line.replaceAll(/`[^`]*`/gu, '');
-
-      for (const match of withoutInlineCode.matchAll(placeholder)) {
+      for (const match of line.matchAll(placeholder)) {
         const word = match.groups?.['word'] ?? '';
 
         if (!htmlTags.has(word.toLowerCase())) {
@@ -205,6 +213,7 @@ function collectNextStepsErrors(section: BodySection): string[] {
   return errors;
 }
 
+const placeholderOnly = /^<[A-Za-z0-9_-]*>$/u;
 const chexLine = /^- \[[ x]\] chex$/u;
 
 function collectChecksErrors(section: BodySection, facts: BranchFacts | undefined): string[] {
@@ -231,7 +240,7 @@ function collectChecksErrors(section: BodySection, facts: BranchFacts | undefine
       }
 
       // A placeholder sha is reported as a placeholder.
-      if (sha.includes('<')) {
+      if (placeholderOnly.test(sha)) {
         return [];
       }
 

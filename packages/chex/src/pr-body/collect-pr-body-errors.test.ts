@@ -187,6 +187,46 @@ test('it fails template placeholders left in the text', () => {
   expect(collectPrBodyErrors(body)).toStrictEqual([
     'Description: the placeholder <model> is still in the text; replace it with a real value or delete the line.',
     'Description: the placeholder <commit> is still in the text; replace it with a real value or delete the line.',
+    'Description: the placeholder <n> is still in the text; replace it with a real value or delete the line.',
+  ]);
+});
+
+test('it fails a placeholder wrapped in inline code', () => {
+  const ctx = setupTest();
+  const body = ctx.buildBody('Reviewed in `<commit>`.\n');
+
+  expect(collectPrBodyErrors(body)).toStrictEqual([
+    'Description: the placeholder <commit> is still in the text; replace it with a real value or delete the line.',
+  ]);
+});
+
+test('it fails an empty angle-bracket sha on a Checks line, with branch facts', () => {
+  const ctx = setupTest();
+  const body = ctx.buildBody('## Checks\n\n- [x] Deslop (<>)\n');
+
+  expect(collectPrBodyErrors(body, ctx.buildFacts())).toStrictEqual([
+    'Checks: the placeholder <> is still in the text; replace it with a real value or delete the line.',
+  ]);
+});
+
+test('it fails a malformed bracketed sha on a Checks line', () => {
+  const ctx = setupTest();
+  const body = ctx.buildBody('## Checks\n\n- [x] Cold read (<abc def>)\n');
+
+  expect(collectPrBodyErrors(body, ctx.buildFacts())).toStrictEqual([
+    'Checks: Cold read (<abc def>) is not a commit hash; write the short hash of the commit you checked.',
+  ]);
+});
+
+test('it fails a code block under Checks', () => {
+  const ctx = setupTest();
+
+  const body = ctx.buildBody(
+    '## Checks\n\n```\n| step | result |\n| --- | --- |\n| typecheck | pass |\n```\n',
+  );
+
+  expect(collectPrBodyErrors(body)).toStrictEqual([
+    'Checks: a code block sits under Checks; the section holds only the chex, Deslop and Cold read lines, so move the block to Verification or Description.',
   ]);
 });
 
