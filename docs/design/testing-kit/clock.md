@@ -105,8 +105,8 @@ function runClockUntil(
   step moves the clock to the next due time, waits for one `setImmediate` turn so that the code
   woken by the step can run, and checks `isMet` again.
 - When nothing is pending, a step waits for a real 1 ms timer, not one `setImmediate` turn, without
-  moving the clock, and checks `isMet` again. Real file, process or socket work that the code under
-  test does between two sleeps finishes in that time and schedules the next sleep.
+  moving the clock, and checks `isMet` again. The steps go on while real file, process or socket
+  work that the code under test does between two sleeps runs, until it schedules the next sleep.
 - `runClockUntil` throws `Error('nothing is scheduled and the condition is still false')` only after
   `idleMs` of real time passes with nothing pending in a row, 2000 ms by default. A step that finds
   something pending resets that count, and the limit stops a test that waits on nothing from
