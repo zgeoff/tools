@@ -42,9 +42,7 @@ export async function run(
   const timeoutMs = options.timeoutMs;
 
   const hasFinished =
-    timeoutMs === undefined
-      ? await finished
-      : await Promise.race([finished, Bun.sleep(timeoutMs).then(() => false)]);
+    timeoutMs === undefined ? await finished : await raceTimeout(finished, timeoutMs);
 
   if (!hasFinished) {
     // The leader may be gone while a descendant of its group still runs.
@@ -63,4 +61,22 @@ export async function run(
   const exitCode = await child.exited;
 
   return { exitCode: toExitCode(exitCode, child.signalCode), ...log };
+}
+
+// Resolves with the promise's value, or with false once timeoutMs passes. A timer that nothing
+// cancelled would keep the test process's event loop busy until it fired.
+async function raceTimeout(finished: Promise<boolean>, timeoutMs: number): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const timedOut = new Promise<false>((resolve) => {
+    timer = setTimeout(() => {
+      resolve(false);
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([finished, timedOut]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
