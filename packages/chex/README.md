@@ -98,3 +98,4 @@ extends:
 
 The baseline's jobs call `chex <check>`, `bun run check:docs`, `rig related` and the repo's own
 `format:check` and `typecheck` scripts. Each job's name starts with `chex-`.
+[The pre-push baseline](../../docs/architecture/pre-push-baseline.md) describes each job.
