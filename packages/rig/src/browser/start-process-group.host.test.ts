@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { readStreamUntil } from '@zgeoff/testing/helpers';
+import { readStreamUntil } from '@zgeoff/testing/process';
 import { trackSettled } from '../test-utils/track-settled.ts';
 import { processGroups } from './process-groups.ts';
 import { processRuntime } from './process-runtime.ts';

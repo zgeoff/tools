@@ -1,12 +1,13 @@
 import { expect, mock, test } from 'bun:test';
-import { makeAnswerQueue } from '@zgeoff/testing/helpers';
-import { buildSteppingClock } from './build-stepping-clock.ts';
+import { createFakeClock } from '@zgeoff/testing/clock';
+import { makeAnswerQueue } from '@zgeoff/testing/mocks';
 import { buildStuckProcessGroups } from './build-stuck-process-groups.ts';
 import { killProcessGroups } from './kill-process-groups.ts';
+import { runClockUntilSettled } from './run-clock-until-settled.ts';
 import type { TestProcesses } from './test-processes.ts';
 
 test('it sends SIGKILL to each group, and waits until none of them runs', async () => {
-  const clock = buildSteppingClock();
+  const clock = createFakeClock();
   const isRunning = makeAnswerQueue([true, false, false, false]);
 
   const processes = {
@@ -16,7 +17,7 @@ test('it sends SIGKILL to each group, and waits until none of them runs', async 
     sleep: clock.sleep,
   };
 
-  await killProcessGroups([5120, 6230], processes);
+  await runClockUntilSettled(clock, killProcessGroups([5120, 6230], processes));
 
   expect(processes.signalGroup.mock.calls).toStrictEqual([
     [5120, 'SIGKILL'],
@@ -24,14 +25,14 @@ test('it sends SIGKILL to each group, and waits until none of them runs', async 
   ]);
 
   expect(processes.probeGroup.mock.calls).toStrictEqual([[5120], [6230], [5120], [6230]]);
-  expect(clock.sleep).toHaveBeenCalledOnce();
+  expect(clock.delays).toStrictEqual([20]);
 });
 
 test('it fails, naming the groups, when a group still runs at the deadline', async () => {
-  const clock = buildSteppingClock();
+  const clock = createFakeClock();
   const processes = { ...buildStuckProcessGroups(), now: clock.now, sleep: clock.sleep };
 
-  const failure = await killProcessGroups([5120], processes).then(
+  const failure = await runClockUntilSettled(clock, killProcessGroups([5120], processes)).then(
     () => null,
     (error: unknown) => error,
   );

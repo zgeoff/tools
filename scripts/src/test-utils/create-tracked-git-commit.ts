@@ -1,5 +1,5 @@
-import { createGitCommit, runGit } from '@zgeoff/testing/helpers';
-import type { GitEnv } from '@zgeoff/testing/helpers';
+import { createGitCommit, runGit } from '@zgeoff/testing/git';
+import type { GitEnv } from '@zgeoff/testing/git';
 
 // Commits the files and points refs/remotes/origin/main at the commit, as a checkout that pushed it
 // to main would, with no remote; returns the commit.

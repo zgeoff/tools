@@ -246,6 +246,14 @@ test('it times out when the progress value stays the same', () => {
 
 test('it starts the deadline again each time the progress value changes', async () => {
   let calls = 0;
+  let nowMs = 0;
+
+  // A clock that moves only when waitFor sleeps, so a slow machine cannot use up the deadline.
+  const sleep = (delayMs: number): Promise<void> => {
+    nowMs += delayMs;
+
+    return Promise.resolve();
+  };
 
   const value = await waitFor(
     () => {
@@ -257,10 +265,10 @@ test('it starts the deadline again each time the progress value changes', async 
 
       return calls;
     },
-    { intervalMs: 5, timeoutMs: 30, progress: () => calls },
+    { intervalMs: 10, timeoutMs: 30, progress: () => calls, now: () => nowMs, sleep },
   );
 
-  expect(value).toBe(20);
+  expect([value, nowMs]).toStrictEqual([20, 190]);
 });
 
 test('it compares the progress value with Object.is', () => {

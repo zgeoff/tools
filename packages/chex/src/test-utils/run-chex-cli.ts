@@ -1,4 +1,4 @@
-import type { GitEnv } from '@zgeoff/testing/helpers';
+import type { GitEnv } from '@zgeoff/testing/git';
 import { $ } from 'bun';
 
 export interface ChexCLIRun {

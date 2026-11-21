@@ -1,7 +1,8 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { readGitEnv, readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/helpers';
+import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/fs';
+import { readGitEnv } from '@zgeoff/testing/git';
 import { runCheckedCommand } from '../ci/run-checked-command.ts';
 import { runCommand } from '../ci/run-command.ts';
 import { runTrackedLinksCheck } from './run-tracked-links-check.ts';

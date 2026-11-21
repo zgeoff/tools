@@ -1,11 +1,11 @@
-import type { Clock } from './system-clock.ts';
+import type { Clock } from '@zgeoff/std';
 
 // A real clock whose first sleep also resolves a promise, so a test learns that a waiter has
 // found the lock taken and started to wait.
 export function buildSignallingClock() {
   const firstSleep = Promise.withResolvers<void>();
 
-  const clock: Clock = {
+  const clock: Pick<Clock, 'now' | 'sleep'> = {
     now: () => Date.now(),
     sleep: (durationMs) => {
       firstSleep.resolve();

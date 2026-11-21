@@ -4,13 +4,8 @@ import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  createGitCommit,
-  readGitEnv,
-  readRunFolderPrefix,
-  runGit,
-  writeTreeFiles,
-} from '@zgeoff/testing/helpers';
+import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/fs';
+import { createGitCommit, readGitEnv, runGit } from '@zgeoff/testing/git';
 import { $ } from 'bun';
 
 async function setupTest() {

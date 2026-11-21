@@ -1,5 +1,5 @@
-import { runGit } from '@zgeoff/testing/helpers';
-import type { GitEnv } from '@zgeoff/testing/helpers';
+import { runGit } from '@zgeoff/testing/git';
+import type { GitEnv } from '@zgeoff/testing/git';
 
 export interface GitCommitMove {
   // The commit to move, the commit the checkout resets to, and the bare repo it creates as origin.

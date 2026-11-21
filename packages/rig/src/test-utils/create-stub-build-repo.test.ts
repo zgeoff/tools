@@ -2,9 +2,9 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
+import { createFakeClock } from '@zgeoff/testing/clock';
+import { readRunFolderPrefix } from '@zgeoff/testing/fs';
 import { readTrackedFiles } from '../workspace/read-tracked-files.ts';
-import { buildSteppingClock } from './build-stepping-clock.ts';
 import { createStubBuildRepo } from './create-stub-build-repo.ts';
 import { templateFiles } from './template-files.ts';
 import type { TestProcesses } from './test-processes.ts';
@@ -14,7 +14,7 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const clock = buildSteppingClock();
+  const clock = createFakeClock();
 
   return {
     repoRoot: join(directory, 'notes-app'),

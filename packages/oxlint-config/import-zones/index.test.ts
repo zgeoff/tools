@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ImportZonesOptions } from '@zgeoff/oxlint-config/import-zones';
 import { collectRefusingEdges, importZonesSchema } from '@zgeoff/oxlint-config/import-zones';
-import { readRunFolderPrefix } from '@zgeoff/testing/helpers';
+import { readRunFolderPrefix } from '@zgeoff/testing/fs';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), readRunFolderPrefix('import-zones-index-test-')));

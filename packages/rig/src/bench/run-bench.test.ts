@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'bun:test';
-import { makeRejectingStub } from '@zgeoff/testing/helpers';
+import { makeRejectingStub } from '@zgeoff/testing/mocks';
 import { defineRig } from '../config/define-rig.ts';
 import { buildStubCommandAnswers } from '../test-utils/build-stub-command-answers.ts';
 import { buildStubLookup } from '../test-utils/build-stub-lookup.ts';

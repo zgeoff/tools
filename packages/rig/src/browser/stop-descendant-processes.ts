@@ -1,5 +1,5 @@
+import type { Clock } from '@zgeoff/std';
 import { match } from 'ts-pattern';
-import type { Clock } from '../command/system-clock.ts';
 import { collectDescendantPIDs } from './collect-descendant-pids.ts';
 import { hasErrorCode } from './has-error-code.ts';
 import { pickDescendantStopStep } from './pick-descendant-stop-step.ts';
@@ -11,7 +11,7 @@ export interface DescendantStop {
 
   readonly timeoutMs: number;
 
-  readonly clock: Clock;
+  readonly clock: Pick<Clock, 'now' | 'sleep'>;
 
   readonly readProcessTable: () => readonly ProcessEntry[] | null;
 

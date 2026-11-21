@@ -1,6 +1,6 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
-import { makeRepeatingAnswerQueue } from '@zgeoff/testing/helpers';
-import { systemClock } from '../command/system-clock.ts';
+import { systemClock } from '@zgeoff/std';
+import { makeRepeatingAnswerQueue } from '@zgeoff/testing/mocks';
 import { buildProcessEntry } from '../test-utils/build-process-entry.ts';
 import { stopProcessGroups } from '../test-utils/stop-process-groups.ts';
 import { testProcesses } from '../test-utils/test-processes.ts';

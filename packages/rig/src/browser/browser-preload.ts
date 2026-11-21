@@ -4,7 +4,7 @@
 
 import { afterAll } from 'bun:test';
 import { hostname } from 'node:os';
-import { systemClock } from '../command/system-clock.ts';
+import { systemClock } from '@zgeoff/std';
 import { laneFiles } from './lane-files.ts';
 import { readProcessTable } from './read-process-table.ts';
 import { startBrowser } from './start-browser.ts';

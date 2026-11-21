@@ -1,5 +1,5 @@
-import { createGitCommit, runGit } from '@zgeoff/testing/helpers';
-import type { GitEnv } from '@zgeoff/testing/helpers';
+import { createGitCommit, runGit } from '@zgeoff/testing/git';
+import type { GitEnv } from '@zgeoff/testing/git';
 
 // Commits the files and pushes the commit to main of the origin remote, and returns the commit.
 export async function createPushedGitCommit(

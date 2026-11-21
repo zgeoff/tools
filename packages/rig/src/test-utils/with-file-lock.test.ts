@@ -2,17 +2,14 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  createBlockingStubKit,
-  makeRejectingStub,
-  makeResolvingStub,
-  readRunFolderPrefix,
-} from '@zgeoff/testing/helpers';
+import { systemClock } from '@zgeoff/std';
+import { createFakeClock } from '@zgeoff/testing/clock';
+import { readRunFolderPrefix } from '@zgeoff/testing/fs';
+import { createBlockingStubKit, makeRejectingStub, makeResolvingStub } from '@zgeoff/testing/mocks';
 import { buildSignallingClock } from './build-signalling-clock.ts';
-import { buildSteppingClock } from './build-stepping-clock.ts';
 import { createLockHolder } from './create-lock-holder.ts';
 import { fileLocks } from './file-locks.ts';
-import { systemClock } from './system-clock.ts';
+import { runClockUntilSettled } from './run-clock-until-settled.ts';
 import { withFileLock } from './with-file-lock.ts';
 
 async function setupTest() {
@@ -91,7 +88,7 @@ test('it fails, and runs nothing, when a live holder keeps the lock past the dea
   onTestFinished(holder.kill);
 
   const task = makeResolvingStub(undefined);
-  const clock = buildSteppingClock();
+  const clock = createFakeClock();
 
   const locked = withFileLock(
     ctx.lockPath,
@@ -99,14 +96,14 @@ test('it fails, and runs nothing, when a live holder keeps the lock past the dea
     task,
   );
 
-  const outcome = await locked.then(
+  const outcome = await runClockUntilSettled(clock, locked).then(
     () => null,
     (error: unknown) => error,
   );
 
   expect(outcome).toMatchObject({ message: `the lock ${ctx.lockPath} is still held after 50 ms` });
   expect(task).not.toHaveBeenCalled();
-  expect(clock.sleep).toHaveBeenCalledTimes(10);
+  expect(clock.delays).toHaveLength(10);
 });
 
 test('it frees the lock when the task fails', async () => {
@@ -137,7 +134,7 @@ test('it fails at once, and runs nothing, when flock fails', async () => {
   const ctx = await setupTest();
 
   const task = makeResolvingStub(undefined);
-  const clock = buildSteppingClock();
+  const clock = createFakeClock();
 
   // A closed file gives flock a real descriptor error.
   const closedLocks = {
@@ -164,5 +161,5 @@ test('it fails at once, and runs nothing, when flock fails', async () => {
 
   expect(outcome).toMatchObject({ message: 'flock on descriptor -1 failed with errno 9' });
   expect(task).not.toHaveBeenCalled();
-  expect(clock.sleep).not.toHaveBeenCalled();
+  expect(clock.delays).toBeEmpty();
 });

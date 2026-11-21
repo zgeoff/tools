@@ -1,5 +1,5 @@
-import { runGit } from '@zgeoff/testing/helpers';
-import type { GitEnv } from '@zgeoff/testing/helpers';
+import { runGit } from '@zgeoff/testing/git';
+import type { GitEnv } from '@zgeoff/testing/git';
 
 // Stages every change in the work tree and commits it with the message, which runs the repo's
 // commit hooks.

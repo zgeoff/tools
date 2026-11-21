@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { makeResolvingStub } from '@zgeoff/testing/helpers';
+import { makeResolvingStub } from '@zgeoff/testing/mocks';
 import { parseLaneHook } from './parse-lane-hook.ts';
 
 test('it returns the default export of a hook module', () => {

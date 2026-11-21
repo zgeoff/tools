@@ -108,3 +108,36 @@ test('it stops a server that never answers, and fails the request that waits on 
 
   expect(outcome?.status).toBe('rejected');
 });
+
+test('it keeps arrival order when an earlier request body finishes after a later request', async () => {
+  const api = startStubServer(() => new Response('ok'));
+
+  const encoder = new TextEncoder();
+
+  const slowBody = Promise.withResolvers<ReadableStreamDefaultController<Uint8Array>>();
+
+  const first = fetch(`${api.url}/v1/first`, {
+    method: 'POST',
+    body: new ReadableStream<Uint8Array>({
+      start: (controller) => {
+        slowBody.resolve(controller);
+      },
+    }),
+  });
+
+  const controller = await slowBody.promise;
+
+  controller.enqueue(encoder.encode('half'));
+
+  await waitFor(() => {
+    expect(api.requests).toHaveLength(1);
+  });
+
+  await fetch(`${api.url}/v1/second`);
+
+  controller.close();
+
+  await first;
+
+  expect(api.requests.map((request) => request.path)).toStrictEqual(['/v1/first', '/v1/second']);
+});

@@ -13,7 +13,7 @@ export const chexJobCases: readonly BaselineJobCase[] = [
   {
     title: 'the shell job passes with a notice when the machine lacks shfmt',
     check: async (sandbox) => {
-      await writeStubPrograms(sandbox.bin, { shellcheck: 'exit 1' });
+      writeStubPrograms(sandbox.bin, { shellcheck: 'exit 1' });
 
       const run = await sandbox.runJob(
         { hook: 'pre-push', name: 'chex-shell', files: ['brew.sh'] },
@@ -29,7 +29,7 @@ export const chexJobCases: readonly BaselineJobCase[] = [
   {
     title: 'the shell job fails when shellcheck fails a file that shfmt passes',
     check: async (sandbox) => {
-      await writeStubPrograms(sandbox.bin, {
+      writeStubPrograms(sandbox.bin, {
         shellcheck: 'echo "brew.sh:2: SC2086 double quote to prevent globbing"\nexit 1',
         shfmt: 'exit 0',
       });
@@ -49,7 +49,7 @@ export const chexJobCases: readonly BaselineJobCase[] = [
     title:
       'the workflows job runs the workflow lint with a notice when the machine lacks actionlint, and fails when the lint fails',
     check: async (sandbox) => {
-      await writeStubPrograms(join(sandbox.repo, 'node_modules/.bin'), {
+      writeStubPrograms(join(sandbox.repo, 'node_modules/.bin'), {
         chex: 'echo "$1: $2 runs no job"\necho "bounced: $1"\nexit 1',
       });
 
@@ -72,11 +72,11 @@ export const chexJobCases: readonly BaselineJobCase[] = [
   {
     title: 'the workflows job fails when actionlint fails a file that the workflow lint passes',
     check: async (sandbox) => {
-      await writeStubPrograms(sandbox.bin, {
+      writeStubPrograms(sandbox.bin, {
         actionlint: 'echo ".github/workflows/brew.yml:3:5: unknown key \\"stepz\\""\nexit 1',
       });
 
-      await writeStubPrograms(join(sandbox.repo, 'node_modules/.bin'), { chex: 'exit 0' });
+      writeStubPrograms(join(sandbox.repo, 'node_modules/.bin'), { chex: 'exit 0' });
 
       const run = await sandbox.runJob(
         { hook: 'pre-push', name: 'chex-workflows', files: ['.github/workflows/brew.yml'] },
@@ -125,7 +125,7 @@ export const chexJobCases: readonly BaselineJobCase[] = [
     title:
       "the test job runs the related tests through rig without git's repository variables that a pre-push in a worktree exports",
     check: async (sandbox) => {
-      await writeStubPrograms(join(sandbox.repo, 'node_modules/.bin'), {
+      writeStubPrograms(join(sandbox.repo, 'node_modules/.bin'), {
         rig: 'env > rig-env\necho "$*" > rig-call',
       });
 

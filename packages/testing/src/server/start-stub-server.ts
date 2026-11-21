@@ -13,12 +13,17 @@ export function startStubServer(
   const handleRequest = async (request: Request): Promise<Response> => {
     const url = new URL(request.url);
 
-    requests.push({
+    const arrived: RecordedRequest = {
       method: request.method,
       path: `${url.pathname}${url.search}`,
       headers: Object.fromEntries(request.headers),
-      body: await request.clone().text(),
-    });
+      body: '',
+    };
+
+    // The slot is taken on arrival, so a request whose body streams in slowly keeps its place.
+    const slot = requests.push(arrived) - 1;
+
+    requests[slot] = { ...arrived, body: await request.clone().text() };
 
     return handle(request);
   };

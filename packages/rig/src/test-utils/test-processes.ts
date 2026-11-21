@@ -1,9 +1,9 @@
+import { systemClock } from '@zgeoff/std';
+import type { Clock } from '@zgeoff/std';
 import type { ProcessGroups } from '../browser/process-groups.ts';
 import { processGroups } from '../browser/process-groups.ts';
-import type { Clock } from './system-clock.ts';
-import { systemClock } from './system-clock.ts';
 
-export interface TestProcesses extends Clock {
+export interface TestProcesses extends Pick<Clock, 'now' | 'sleep'> {
   readonly listChildPids: (pid: number) => readonly number[];
 
   // Null when no process runs with the ID.
