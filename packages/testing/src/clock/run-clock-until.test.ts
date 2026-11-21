@@ -1,4 +1,7 @@
 import { expect, test } from 'bun:test';
+import { join } from 'node:path';
+import { waitFor } from '../core/wait-for.ts';
+import { createTempDir } from '../fs/create-temp-dir.ts';
 import { createFakeClock } from './create-fake-clock.ts';
 import { runClockUntil } from './run-clock-until.ts';
 
@@ -69,43 +72,74 @@ test('it waits for turns without moving the clock while nothing is pending', asy
   expect(ctx.clock.now()).toBe(1000);
 });
 
-test('it throws after 100 steps in a row with nothing scheduled', () => {
+test('it throws after idleMs of real time with nothing scheduled', async () => {
   const ctx = setupTest();
-  let checks = 0;
+  const startedAtMs = performance.now();
+  const outcome = runClockUntil(ctx.clock, () => false, { maxMs: 10_000, idleMs: 50 });
 
-  const outcome = runClockUntil(
-    ctx.clock,
-    () => {
-      checks += 1;
+  const failure = await outcome.catch((error: unknown) => error);
 
-      return false;
-    },
-    { maxMs: 10_000 },
-  );
-
-  expect(outcome).rejects.toThrow('nothing is scheduled and the condition is still false');
-  expect(checks).toBe(101);
+  expect(String(failure)).toContain('nothing is scheduled and the condition is still false');
+  expect(performance.now() - startedAtMs).toBeGreaterThanOrEqual(50);
+  expect(ctx.clock.now()).toBe(1000);
 });
 
-test('it counts only steps in a row, so a step that moves the clock resets the count', () => {
+test('it resets the idle count when a step finds something pending', async () => {
   const ctx = setupTest();
-  let turns = 0;
+  const startedAtMs = performance.now();
+  let fired = false;
 
-  ctx.clock.schedule(() => {
-    turns = 0;
-  }, 10);
+  void (async () => {
+    const waitStartMs1 = performance.now();
 
-  const outcome = runClockUntil(
-    ctx.clock,
-    () => {
-      turns += 1;
+    await waitFor(() => {
+      if (performance.now() - waitStartMs1 < 120) {
+        throw new Error('not yet');
+      }
+    });
 
-      return turns === 150;
-    },
-    { maxMs: 10_000 },
-  );
+    await ctx.clock.sleep(10);
 
-  expect(outcome).rejects.toThrow('nothing is scheduled and the condition is still false');
+    const waitStartMs2 = performance.now();
+
+    await waitFor(() => {
+      if (performance.now() - waitStartMs2 < 120) {
+        throw new Error('not yet');
+      }
+    });
+
+    fired = true;
+  })();
+
+  // Each wait stays under idleMs and both together pass it, so only a reset between them passes.
+  await runClockUntil(ctx.clock, () => fired, { maxMs: 10_000, idleMs: 200 });
+
+  expect(performance.now() - startedAtMs).toBeGreaterThanOrEqual(240);
+  expect(ctx.clock.now()).toBe(1010);
+});
+
+test('it waits out real file and process work between two sleeps', async () => {
+  const ctx = setupTest();
+  const file = join(createTempDir('clock-io').path, 'big.txt');
+  const seen: number[] = [];
+
+  void (async () => {
+    await ctx.clock.sleep(100);
+    await Bun.write(file, 'x'.repeat(4_000_000));
+
+    const text = await Bun.file(file).text();
+
+    seen.push(text.length);
+
+    await Bun.spawn(['true']).exited;
+    await ctx.clock.sleep(100);
+
+    seen.push(ctx.clock.now());
+  })();
+
+  await runClockUntil(ctx.clock, () => seen.length === 2, { maxMs: 10_000 });
+
+  expect(seen).toStrictEqual([4_000_000, 1200]);
 });
 
 test('it moves the clock to the limit, checks once more, and throws when the condition is false', () => {

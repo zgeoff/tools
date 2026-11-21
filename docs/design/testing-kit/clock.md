@@ -83,7 +83,7 @@ function createFakeClock(options?: { readonly startMs?: number }): FakeClock; //
 function runClockUntil(
   clock: FakeClock,
   isMet: () => boolean,
-  options: { readonly maxMs: number },
+  options: { readonly maxMs: number; readonly idleMs?: number }, // idleMs: real milliseconds, default 2000
 ): Promise<void>;
 ```
 
@@ -104,11 +104,13 @@ function runClockUntil(
 - `runClockUntil` checks `isMet` first, and returns at once when it is already true. Otherwise each
   step moves the clock to the next due time, waits for one `setImmediate` turn so that the code
   woken by the step can run, and checks `isMet` again.
-- When nothing is pending, a step waits for one `setImmediate` turn without moving the clock. After
-  100 such steps in a row, `runClockUntil` throws
-  `Error('nothing is scheduled and the condition is still false')`. Async code that wakes no timer,
-  such as a chain of awaited promises, settles within a few turns, so 100 turns leave room for it,
-  and the limit stops a test that waits on nothing from hanging.
+- When nothing is pending, a step waits for a real 1 ms timer, not one `setImmediate` turn, without
+  moving the clock, and checks `isMet` again. The steps go on while real file, process or socket
+  work that the code under test does between two sleeps runs, until it schedules the next sleep.
+- `runClockUntil` throws `Error('nothing is scheduled and the condition is still false')` only after
+  `idleMs` of real time passes with nothing pending in a row, 2000 ms by default. A step that finds
+  something pending resets that count, and the limit stops a test that waits on nothing from
+  hanging.
 - `runClockUntil` stops at `maxMs` past the time it started. When the next due time falls past that
   limit, it moves the clock to the limit, waits one `setImmediate` turn, and checks `isMet` once
   more. It resolves when that check is true, and throws otherwise.

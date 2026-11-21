@@ -3,13 +3,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { systemClock } from '@zgeoff/std';
-import { createFakeClock } from '@zgeoff/testing/clock';
+import { createFakeClock, runClockUntil } from '@zgeoff/testing/clock';
 import { readRunFolderPrefix } from '@zgeoff/testing/fs';
 import { createBlockingStubKit, makeRejectingStub, makeResolvingStub } from '@zgeoff/testing/mocks';
 import { buildSignallingClock } from './build-signalling-clock.ts';
 import { createLockHolder } from './create-lock-holder.ts';
 import { fileLocks } from './file-locks.ts';
-import { runClockUntilSettled } from './run-clock-until-settled.ts';
+import { trackSettled } from './track-settled.ts';
 import { withFileLock } from './with-file-lock.ts';
 
 async function setupTest() {
@@ -96,7 +96,11 @@ test('it fails, and runs nothing, when a live holder keeps the lock past the dea
     task,
   );
 
-  const outcome = await runClockUntilSettled(clock, locked).then(
+  const run = locked;
+
+  await runClockUntil(clock, trackSettled(run).isSettled, { maxMs: 60_000 });
+
+  const outcome = await run.then(
     () => null,
     (error: unknown) => error,
   );

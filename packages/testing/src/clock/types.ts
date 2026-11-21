@@ -21,5 +21,9 @@ export interface CreateFakeClockOptions {
 }
 
 export interface RunClockUntilOptions {
+  // The most fake time to step through.
   readonly maxMs: number;
+
+  // The real milliseconds that nothing may be pending in a row before it throws; 2000 when unset.
+  readonly idleMs?: number;
 }

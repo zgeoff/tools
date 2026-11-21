@@ -1,11 +1,11 @@
 import { expect, test } from 'bun:test';
 import { setImmediate } from 'node:timers/promises';
-import { createFakeClock } from '@zgeoff/testing/clock';
+import { createFakeClock, runClockUntil } from '@zgeoff/testing/clock';
 import { makeAnswerQueue } from '@zgeoff/testing/mocks';
 import { buildInFlightRun } from '../test-utils/build-in-flight-run.ts';
 import { buildTickingClock } from '../test-utils/build-ticking-clock.ts';
 import { createOtherRealmTimeout } from '../test-utils/create-other-realm-timeout.ts';
-import { runClockUntilSettled } from '../test-utils/run-clock-until-settled.ts';
+import { trackSettled } from '../test-utils/track-settled.ts';
 import { defineBench } from './define-bench.ts';
 import { runBenchmark } from './run-benchmark.ts';
 
@@ -69,7 +69,11 @@ test('it times each call of a round on its own and gives the median and spread p
     },
   });
 
-  const result = await runClockUntilSettled(clock, runBenchmark(definition, clock.now));
+  const run = runBenchmark(definition, clock.now);
+
+  await runClockUntil(clock, trackSettled(run).isSettled, { maxMs: 60_000 });
+
+  const result = await run;
 
   expect(result).toStrictEqual([
     { concurrency: 1, medianMs: 2, spreadMs: 0 },

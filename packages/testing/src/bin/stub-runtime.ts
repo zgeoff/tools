@@ -25,6 +25,18 @@ const directory = dirname(scriptPath);
 const name = basename(scriptPath);
 const argv = process.argv.slice(2);
 const config = readConfig();
+const forwardedSignals = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
+const pendingSignals: NodeJS.Signals[] = [];
+let scriptProcess: { readonly kill: (signal: NodeJS.Signals) => void } | null = null;
+
+// A script stand-in passes these signals on to the script. One that arrives before the script
+// starts waits and goes out right after the spawn.
+if (config.hasScript) {
+  forwardedSignals.forEach((signal) => {
+    forwardSignal(signal);
+  });
+}
+
 const stdin = config.recordStdin ? await readStdin() : null;
 
 recordCall(stdin);
@@ -33,6 +45,16 @@ if (config.hasScript) {
   process.exitCode = await runScript();
 } else if (config.answers !== null) {
   await answerCall(config.answers);
+}
+
+function forwardSignal(signal: NodeJS.Signals): void {
+  process.on(signal, () => {
+    if (scriptProcess === null) {
+      pendingSignals.push(signal);
+    } else {
+      scriptProcess.kill(signal);
+    }
+  });
 }
 
 function recordCall(input: Buffer | null): void {
@@ -85,6 +107,12 @@ async function runScript(): Promise<number> {
     stdout: 'inherit',
     stderr: 'inherit',
   });
+
+  scriptProcess = child;
+
+  for (const signal of pendingSignals) {
+    child.kill(signal);
+  }
 
   const exitCode = await child.exited;
 

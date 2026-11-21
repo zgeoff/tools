@@ -1,10 +1,9 @@
 import type { FakeClock, RunClockUntilOptions } from './types.ts';
 
-const maxIdleSteps = 100;
+const defaultIdleMs = 2000;
 
-// Steps the clock to each next due time, with one setImmediate turn after each step so the code
-// that the step woke can run, until the condition holds. Throws when the clock reaches maxMs past
-// its start with the condition false, or when nothing is scheduled for 100 turns in a row.
+// Steps the clock to each next due time until the condition holds. While nothing is pending, each
+// step waits for a real 1 ms timer, so real I/O can finish and schedule the next sleep.
 export async function runClockUntil(
   clock: FakeClock,
   isMet: () => boolean,
@@ -15,28 +14,29 @@ export async function runClockUntil(
   }
 
   const limitMs = clock.now() + options.maxMs;
-  let idleSteps = 0;
+  const idleMs = options.idleMs ?? defaultIdleMs;
+  let idleSinceMs: number | null = null;
 
   for (;;) {
     const nextDueMs = clock.readNextDueMs();
 
     if (nextDueMs === null) {
-      await waitOneTurn();
+      idleSinceMs ??= performance.now();
+
+      await waitOneMillisecond();
 
       if (isMet()) {
         return;
       }
 
-      idleSteps += 1;
-
-      if (idleSteps >= maxIdleSteps) {
+      if (clock.readNextDueMs() === null && performance.now() - idleSinceMs >= idleMs) {
         throw new Error('nothing is scheduled and the condition is still false');
       }
 
       continue;
     }
 
-    idleSteps = 0;
+    idleSinceMs = null;
 
     clock.advance(Math.min(nextDueMs, limitMs) - clock.now());
 
@@ -50,6 +50,12 @@ export async function runClockUntil(
       throw new Error(`the condition stayed false for ${options.maxMs} ms of clock time`);
     }
   }
+}
+
+function waitOneMillisecond(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, 1);
+  });
 }
 
 function waitOneTurn(): Promise<void> {
