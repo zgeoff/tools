@@ -2,8 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/fs';
-import { readGitEnv } from '@zgeoff/testing/git';
-import { runCheckedCommand } from '../ci/run-checked-command.ts';
+import { readGitEnv, runGit } from '@zgeoff/testing/git';
 import { runCommand } from '../ci/run-command.ts';
 import { runTrackedLinksCheck } from './run-tracked-links-check.ts';
 
@@ -16,10 +15,7 @@ async function setupTest() {
 
   const env = readGitEnv(directory);
 
-  const runGit = (argv: readonly string[]) =>
-    runCheckedCommand(runCommand, ['git', ...argv], { cwd: directory, env });
-
-  await runGit(['init', '--quiet']);
+  await runGit(directory, env, ['init', '--quiet']);
 
   const output: string[] = [];
 
@@ -33,7 +29,7 @@ async function setupTest() {
       },
     });
 
-  return { directory, env, output, runGit, runCheck };
+  return { directory, env, output, runCheck };
 }
 
 test('it exits 0 when a tracked link points at a folder that holds a tracked file', async () => {
@@ -45,8 +41,7 @@ test('it exits 0 when a tracked link points at a folder that holds a tracked fil
   });
 
   await symlink('../.agents/skills', join(ctx.directory, '.claude', 'skills'));
-
-  await ctx.runGit(['add', '.claude', '.agents/skills/.gitkeep']);
+  await runGit(ctx.directory, ctx.env, ['add', '.claude', '.agents/skills/.gitkeep']);
 
   const exitCode = await ctx.runCheck();
 
@@ -62,8 +57,7 @@ test('it exits 1 and names the link when its target folder holds only untracked 
   });
 
   await symlink('../.agents/skills', join(ctx.directory, '.claude', 'skills'));
-
-  await ctx.runGit(['add', '.claude']);
+  await runGit(ctx.directory, ctx.env, ['add', '.claude']);
 
   const exitCode = await ctx.runCheck();
 
@@ -86,9 +80,7 @@ test('it exits 0 when the staged link points at a tracked folder and the unstage
   const linkPath = join(ctx.directory, '.claude', 'skills');
 
   await symlink('../.agents/skills', linkPath);
-
-  await ctx.runGit(['add', '.claude', '.agents/skills/.gitkeep']);
-
+  await runGit(ctx.directory, ctx.env, ['add', '.claude', '.agents/skills/.gitkeep']);
   await rm(linkPath);
   await symlink('../.agents/missing', linkPath);
 
@@ -122,8 +114,7 @@ test.each([
 
   await writeTreeFiles(ctx.directory, { [row.file]: '' });
   await symlink(row.link.target, join(ctx.directory, row.link.path));
-
-  await ctx.runGit(['add', row.file, row.link.path]);
+  await runGit(ctx.directory, ctx.env, ['add', row.file, row.link.path]);
 
   const exitCode = await ctx.runCheck();
 
@@ -140,21 +131,29 @@ test('it skips a link that a merge leaves in conflict', async () => {
 
   await writeTreeFiles(ctx.directory, { 'docs/intro.md': '# Intro\n' });
   await symlink('intro.md', linkPath);
-
-  await ctx.runGit(['add', 'docs']);
-  await ctx.runGit(['commit', '--quiet', '-m', 'add the guide link']);
-  await ctx.runGit(['switch', '--quiet', '-c', 'side']);
-
+  await runGit(ctx.directory, ctx.env, ['add', 'docs']);
+  await runGit(ctx.directory, ctx.env, ['commit', '--quiet', '-m', 'add the guide link']);
+  await runGit(ctx.directory, ctx.env, ['switch', '--quiet', '-c', 'side']);
   await rm(linkPath);
   await symlink('missing-on-side.md', linkPath);
 
-  await ctx.runGit(['commit', '--quiet', '-am', 'point the guide link at the side page']);
-  await ctx.runGit(['switch', '--quiet', '-']);
+  await runGit(ctx.directory, ctx.env, [
+    'commit',
+    '--quiet',
+    '-am',
+    'point the guide link at the side page',
+  ]);
 
+  await runGit(ctx.directory, ctx.env, ['switch', '--quiet', '-']);
   await rm(linkPath);
   await symlink('missing-on-base.md', linkPath);
 
-  await ctx.runGit(['commit', '--quiet', '-am', 'point the guide link at the base page']);
+  await runGit(ctx.directory, ctx.env, [
+    'commit',
+    '--quiet',
+    '-am',
+    'point the guide link at the base page',
+  ]);
 
   await runCommand(['git', 'merge', '--quiet', 'side'], { cwd: ctx.directory, env: ctx.env });
 

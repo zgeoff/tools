@@ -40,6 +40,7 @@
     "zgeoff/max-test-timeout": "error",
     "zgeoff/test-timeout-exception-ticket": "error",
     "zgeoff/no-test-sleep": "error",
+    "zgeoff/use-testing-kit": "error",
     "zgeoff/no-require": "error",
     "zgeoff/test-shape": "error",
     "zgeoff/feature-folders": "error",

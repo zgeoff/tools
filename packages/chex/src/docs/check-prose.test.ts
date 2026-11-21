@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readRunFolderPrefix } from '@zgeoff/testing/fs';
+import { runGit } from '@zgeoff/testing/git';
 import { $ } from 'bun';
 
 async function setupTest() {
@@ -30,9 +31,7 @@ async function setupTest() {
     GIT_COMMITTER_EMAIL: 'author@example.com',
   };
 
-  const runGit = (...args: readonly string[]) => $`git ${args}`.cwd(directory).env(env).quiet();
-
-  await runGit('init', '-q');
+  await runGit(directory, env, ['init', '-q']);
 
   const scriptPath = fileURLToPath(new URL('check-prose.sh', import.meta.url));
 
@@ -42,8 +41,8 @@ async function setupTest() {
   };
 
   const runCommit = async (message: string) => {
-    await runGit('add', '-A');
-    await runGit('commit', '-q', '-m', message);
+    await runGit(directory, env, ['add', '-A']);
+    await runGit(directory, env, ['commit', '-q', '-m', message]);
   };
 
   const run = (...args: readonly string[]) =>
@@ -84,7 +83,7 @@ async function setupTest() {
 
     await $`git init -q --bare`.cwd(originDir).env(env).quiet();
 
-    await runGit('remote', 'add', 'origin', originDir);
+    await runGit(directory, env, ['remote', 'add', 'origin', originDir]);
 
     return originDir;
   };
@@ -105,7 +104,7 @@ async function setupTest() {
   return {
     outsideDirectory,
     directory,
-    runGit,
+    env,
     writeText,
     runCommit,
     run,
@@ -923,7 +922,9 @@ test('it skips a file the branch leaves unchanged since its base on origin', asy
 
   await ctx.writeText('old.md', `${'word '.repeat(300)}\n`);
   await ctx.runCommit('add the old doc');
-  await ctx.runGit('update-ref', 'refs/remotes/origin/main', 'HEAD');
+
+  await runGit(ctx.directory, ctx.env, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+
   await ctx.writeText('new.md', `${'word '.repeat(260)}\n`);
   await ctx.runCommit('add the new doc');
 
@@ -972,7 +973,8 @@ test('it checks a staged file before the first commit', async () => {
   const ctx = await setupTest();
 
   await ctx.writeText('guide.md', `${'word '.repeat(251)}\n`);
-  await ctx.runGit('add', 'guide.md');
+
+  await runGit(ctx.directory, ctx.env, ['add', 'guide.md']);
 
   const result = await ctx.run('guide.md');
 
@@ -996,8 +998,10 @@ test('it fetches the base branch in a pull-request run with no origin history', 
   await ctx.writeText('old.md', `${'word '.repeat(300)}\n`);
   await ctx.runCommit('add the old doc');
   await ctx.createOrigin();
-  await ctx.runGit('push', '-q', 'origin', 'HEAD:main');
-  await ctx.runGit('update-ref', '-d', 'refs/remotes/origin/main');
+
+  await runGit(ctx.directory, ctx.env, ['push', '-q', 'origin', 'HEAD:main']);
+  await runGit(ctx.directory, ctx.env, ['update-ref', '-d', 'refs/remotes/origin/main']);
+
   await ctx.writeText('new.md', `${'word '.repeat(260)}\n`);
   await ctx.runCommit('add the new doc');
 
@@ -1022,19 +1026,24 @@ test('it counts only the PR documents in a shallow pull-request merge checkout',
 
   await ctx.writeText('readme.md', 'A short doc.\n');
   await ctx.runCommit('add the readme');
-  await ctx.runGit('branch', '-M', 'main');
-  await ctx.runGit('branch', 'feature');
+
+  await runGit(ctx.directory, ctx.env, ['branch', '-M', 'main']);
+  await runGit(ctx.directory, ctx.env, ['branch', 'feature']);
+
   await ctx.writeText('base.md', `${'word '.repeat(260)}\n`);
   await ctx.runCommit('add a doc on the base');
-  await ctx.runGit('checkout', '-q', 'feature');
+
+  await runGit(ctx.directory, ctx.env, ['checkout', '-q', 'feature']);
+
   await ctx.writeText('pr.md', `${'word '.repeat(270)}\n`);
   await ctx.runCommit('add a doc on the PR');
-  await ctx.runGit('checkout', '-q', '-b', 'pull-merge', 'main');
-  await ctx.runGit('merge', '-q', '--no-edit', 'feature');
+
+  await runGit(ctx.directory, ctx.env, ['checkout', '-q', '-b', 'pull-merge', 'main']);
+  await runGit(ctx.directory, ctx.env, ['merge', '-q', '--no-edit', 'feature']);
 
   const originDir = await ctx.createOrigin();
 
-  await ctx.runGit('push', '-q', 'origin', 'main', 'pull-merge');
+  await runGit(ctx.directory, ctx.env, ['push', '-q', 'origin', 'main', 'pull-merge']);
 
   const cloneDir = await ctx.createShallowClone(originDir, 'pull-merge');
   const result = await ctx.runInPullRequest(cloneDir, 'main', ['base.md', 'pr.md']);
@@ -1311,8 +1320,15 @@ test('it reads the default branch from origin/HEAD', async () => {
 
   await ctx.writeText('old.md', `${'word '.repeat(300)}\n`);
   await ctx.runCommit('add the old doc');
-  await ctx.runGit('update-ref', 'refs/remotes/origin/trunk', 'HEAD');
-  await ctx.runGit('symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/trunk');
+
+  await runGit(ctx.directory, ctx.env, ['update-ref', 'refs/remotes/origin/trunk', 'HEAD']);
+
+  await runGit(ctx.directory, ctx.env, [
+    'symbolic-ref',
+    'refs/remotes/origin/HEAD',
+    'refs/remotes/origin/trunk',
+  ]);
+
   await ctx.writeText('new.md', `${'word '.repeat(251)}\n`);
   await ctx.runCommit('add the new doc');
 
@@ -1702,7 +1718,7 @@ test('it reports a banned word beside a line with invalid UTF-8 under a UTF-8 lo
     ]),
   );
 
-  await ctx.runGit('add', '-A');
+  await runGit(ctx.directory, ctx.env, ['add', '-A']);
 
   const result = await ctx.runInUtf8Locale('mixed.md');
 

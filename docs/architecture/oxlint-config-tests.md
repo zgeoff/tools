@@ -1,15 +1,16 @@
 # oxlint-config test-file rules
 
-Eight rules of the `zgeoff/*` plugin in `@zgeoff/oxlint-config` check test files and benchmark
-files. `zgeoff/test-beside-module` keeps each test file beside the module it tests,
+Nine rules of the `zgeoff/*` plugin in `@zgeoff/oxlint-config` check test files and benchmark files.
+`zgeoff/test-beside-module` keeps each test file beside the module it tests,
 `zgeoff/setup-test-only` keeps a test file's module level to `setupTest()` and its tests,
 `zgeoff/test-shape` keeps a `bun:test` file to flat `test()` calls with titled behaviour,
 `zgeoff/no-file-snapshot` bans file snapshots, `zgeoff/max-test-timeout` keeps each test within the
 time limit of its lane, `zgeoff/test-timeout-exception-ticket` makes each disable of that rule name
-a ticket or a floor, `zgeoff/no-test-sleep` bans a fixed delay in a test file, and
-`zgeoff/bench-shape` keeps a benchmark file to one `defineBench` benchmark. The
-[seeding rules](./oxlint-config-seeding.md) check where test code writes a database, and the
-[config overview](./oxlint-config.md) covers the rest of the config.
+a ticket or a floor, `zgeoff/no-test-sleep` bans a fixed delay in a test file,
+`zgeoff/use-testing-kit` keeps a test file or a `test-utils/` folder from copying a function that
+`@zgeoff/testing` exports, and `zgeoff/bench-shape` keeps a benchmark file to one `defineBench`
+benchmark. The [seeding rules](./oxlint-config-seeding.md) check where test code writes a database,
+and the [config overview](./oxlint-config.md) covers the rest of the config.
 
 ## `zgeoff/test-beside-module`
 
@@ -226,6 +227,25 @@ A sleep inside a wait helper passes. A wait helper is a function whose name star
 `waitUntilIdle`. Its name comes from its declaration, or from the variable, the object key or the
 method that holds it. A sleep inside a function that the helper holds passes too, so a helper may
 poll its condition in a loop with a short sleep between reads. `waitForward` is not a wait helper.
+
+## `zgeoff/use-testing-kit`
+
+A repo takes a test helper from `@zgeoff/testing` and does not write its own. The rule reads the
+kit's value exports from the installed package when it lints, so a new kit export needs no change to
+the rule: it resolves `@zgeoff/testing` from the linted file the way node does, reads the `exports`
+map, and collects the names each subpath exports from its source, with no TypeScript compiler. When
+the package is not installed, the rule reports nothing. The rule reports:
+
+- a function declared under a `test-utils/` folder, or in a `<name>.test.ts` or `<name>.test.tsx`
+  file, as a function declaration or as a variable that holds a function, when its name is a kit
+  export that holds a capital letter, such as `waitFor`. A name with no capital letter, such as
+  `run` or `start`, is skipped, since a repo may use it for something else;
+- an import of `setupServer` from `msw/node`, and any import from `@mswjs/interceptors/fetch`, in
+  any file. The message points at `createTestNetwork` from `@zgeoff/testing/fetch`.
+
+The kit's own package is exempt, since a kit file is where the export lives. `@zgeoff/std` cannot
+import the kit, because the kit depends on std, so this repo turns the rule off for
+`packages/std/src/test-utils/`.
 
 ## `zgeoff/bench-shape`
 

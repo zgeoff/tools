@@ -12,5 +12,13 @@
   ],
   "rules": {
     "zgeoff/feature-folders": "error"
-  }
+  },
+  "overrides": [
+    {
+      // @zgeoff/testing depends on @zgeoff/std, so std cannot import the kit without a cycle;
+      // its test helpers stay local copies of the kit's
+      "files": ["packages/std/src/test-utils/**"],
+      "rules": { "zgeoff/use-testing-kit": "off" }
+    }
+  ]
 }

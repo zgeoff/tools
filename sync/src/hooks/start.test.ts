@@ -14,13 +14,12 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { waitFor } from '@zgeoff/testing';
+import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/fs';
 import { makeRepeatingAnswerQueue } from '@zgeoff/testing/mocks';
+import { readStreamUntil } from '@zgeoff/testing/process';
 import { buildPreToolUsePayload } from '../test-utils/build-pre-tool-use-payload.ts';
 import { createStubInstall } from '../test-utils/create-stub-install.ts';
-import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
-import { readStreamUntil } from '../test-utils/read-stream-until.ts';
 import { readTextOrEmpty } from '../test-utils/read-text-or-empty.ts';
-import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 import type { InstallDependencies } from './start.ts';
 import {
   NODE_INSTALL_DEPENDENCIES,
