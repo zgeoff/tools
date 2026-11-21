@@ -118,7 +118,11 @@ test('it keeps arrival order when an earlier request body finishes after a later
 
   const first = fetch(`${api.url}/v1/first`, {
     method: 'POST',
-    body: new ReadableStream<Uint8Array>({ start: (controller) => slowBody.resolve(controller) }),
+    body: new ReadableStream<Uint8Array>({
+      start: (controller) => {
+        slowBody.resolve(controller);
+      },
+    }),
   });
 
   const controller = await slowBody.promise;
