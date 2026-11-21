@@ -83,7 +83,7 @@ function createFakeClock(options?: { readonly startMs?: number }): FakeClock; //
 function runClockUntil(
   clock: FakeClock,
   isMet: () => boolean,
-  options: { readonly maxMs: number; readonly idleMs?: number }, // idleMs: real milliseconds, default 2000
+  options: { readonly maxMs: number; readonly idleMs?: number; readonly stepMs?: number }, // idleMs: real milliseconds, default 2000
 ): Promise<void>;
 ```
 
@@ -111,6 +111,10 @@ function runClockUntil(
   `idleMs` of real time passes with nothing pending in a row, 2000 ms by default. A step that finds
   something pending resets that count, and the limit stops a test that waits on nothing from
   hanging.
+- `runClockUntil` with `stepMs` set waits one `setImmediate` turn, then each step advances the clock
+  by `stepMs`, or by what is left to the limit if that is less, whatever is pending, and waits
+  several turns before it checks `isMet`; a `stepMs` that is not finite and above 0 throws at once;
+  `idleMs` does not apply, and `maxMs` still ends it.
 - `runClockUntil` stops at `maxMs` past the time it started. When the next due time falls past that
   limit, it moves the clock to the limit, waits one `setImmediate` turn, and checks `isMet` once
   more. It resolves when that check is true, and throws otherwise.

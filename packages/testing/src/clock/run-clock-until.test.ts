@@ -6,7 +6,13 @@ import { createFakeClock } from './create-fake-clock.ts';
 import { runClockUntil } from './run-clock-until.ts';
 
 function setupTest() {
-  return { clock: createFakeClock({ startMs: 1000 }) };
+  return {
+    clock: createFakeClock({ startMs: 1000 }),
+    waitOneTurn: (): Promise<void> =>
+      new Promise<void>((resolve) => {
+        setImmediate(resolve);
+      }),
+  };
 }
 
 test('it returns at once when the condition already holds', async () => {
@@ -75,7 +81,11 @@ test('it waits for turns without moving the clock while nothing is pending', asy
 test('it throws after idleMs of real time with nothing scheduled', async () => {
   const ctx = setupTest();
   const startedAtMs = performance.now();
-  const outcome = runClockUntil(ctx.clock, () => false, { maxMs: 10_000, idleMs: 50 });
+
+  const outcome = runClockUntil(ctx.clock, () => false, {
+    maxMs: 10_000,
+    idleMs: 50,
+  });
 
   const failure = await outcome.catch((error: unknown) => error);
 
@@ -177,3 +187,80 @@ test('it resolves when the condition holds at the limit check', async () => {
 
   expect(ctx.clock.now()).toBe(3000);
 });
+
+test('it keeps up with work that needs two turns after each wake before it arms the next sleep when stepMs is set', async () => {
+  const ctx = setupTest();
+  let wakes = 0;
+
+  // A timer due every 1 ms keeps the unstepped runner jumping 1 ms a turn, too fast for
+  // work that needs two turns.
+  const tick = (): void => {
+    ctx.clock.schedule(tick, 1);
+  };
+
+  tick();
+
+  void (async () => {
+    for (let index = 0; index < 10; index += 1) {
+      await ctx.clock.sleep(100);
+      await ctx.waitOneTurn();
+      await ctx.waitOneTurn();
+
+      wakes += 1;
+    }
+  })();
+
+  await runClockUntil(ctx.clock, () => wakes === 10, {
+    maxMs: 1000,
+    stepMs: 100,
+  });
+
+  expect(wakes).toBe(10);
+});
+
+test('it advances the clock in multiples of stepMs when stepMs is set', async () => {
+  const ctx = setupTest();
+  const seen: number[] = [];
+
+  void (async () => {
+    for (let index = 0; index < 3; index += 1) {
+      await ctx.clock.sleep(100);
+      await ctx.waitOneTurn();
+
+      seen.push(ctx.clock.now() - 1000);
+    }
+  })();
+
+  await runClockUntil(ctx.clock, () => seen.length === 3, {
+    maxMs: 10_000,
+    stepMs: 300,
+  });
+
+  expect(seen).toStrictEqual([300, 600, 900]);
+});
+
+test('it throws at maxMs when stepMs is set and the condition stays false', async () => {
+  const ctx = setupTest();
+
+  const failure = await runClockUntil(ctx.clock, () => false, {
+    maxMs: 1000,
+    stepMs: 300,
+  }).catch((error: unknown) => error);
+
+  expect(String(failure)).toContain('the condition stayed false for 1000 ms of clock time');
+  expect(ctx.clock.now()).toBe(2000);
+});
+
+test.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
+  'it rejects stepMs %p, which would not move the clock',
+  async (stepMs) => {
+    const ctx = setupTest();
+
+    const failure = await runClockUntil(ctx.clock, () => false, { maxMs: 1000, stepMs }).catch(
+      (error: unknown) => error,
+    );
+
+    expect(String(failure)).toContain('stepMs must be a finite number above 0');
+    expect(ctx.clock.now()).toBe(1000);
+  },
+);
