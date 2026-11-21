@@ -29,6 +29,9 @@ The docs of tools: how its shared files and packages work, and the steps a contr
   hold the one type assertion their job needs.
 - [std file lock](./architecture/std-file-lock.md): `withFileLock`, the cross-process lock in
   `@zgeoff/std`, and how a crashed holder frees it.
+- [MCP OAuth server](./architecture/mcp-auth.md): `@zgeoff/mcp-auth`, the OAuth server that atc,
+  boxxy, pepys and impz share for their `/mcp` routes, how a grant is stored and revoked, and its
+  tokens and limits.
 - [format-codemod rules](./architecture/format-codemod-rules.md): the blank lines the codemod adds
   and removes between statements.
 - [format-codemod inputs](./architecture/format-codemod-inputs.md): how the CLI turns its arguments
@@ -62,9 +65,8 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 
 - [Spike: one skills folder for Claude Code and Codex](./design/agents-skills-folder/spikes/skill-discovery/README.md):
   which skills folder layouts each agent loads, and the layout every repo moves to.
-- [Shared MCP OAuth server](./design/mcp-auth/README.md): `@zgeoff/mcp-auth`, the OAuth server that
-  atc, boxxy, pepys and impz share for their `/mcp` routes, and the migration each app runs to take
-  it.
+- [Shared testing kit](./design/testing-kit/README.md): `@zgeoff/testing` grown into one kit of test
+  helpers with a subpath per area, and each repo's move onto it.
 
 ## Decisions
 
@@ -74,3 +76,7 @@ The docs of tools: how its shared files and packages work, and the steps a contr
   DPoP and refuses DPoP-bound tokens.
 - [0003: The core shares the app's Kysely](./decisions/0003-the-core-shares-the-apps-kysely.md): why
   `@zgeoff/mcp-auth` runs on the app's own Kysely when the app has one.
+- [0004: The clock interface lives in std](./decisions/0004-the-clock-interface-lives-in-std.md):
+  why production code takes its clock from `@zgeoff/std`, and why `sleep` resolves on abort.
+- [0005: Fetch mocking uses msw 3](./decisions/0005-fetch-mocking-uses-msw-3.md): why every repo
+  mocks `fetch` through one msw 3 network with the `fetch/web` interceptor.
