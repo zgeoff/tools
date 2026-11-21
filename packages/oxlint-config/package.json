@@ -41,6 +41,7 @@
     "read-testing-kit-exports.js",
     "read-testing-kit-directory.js",
     "read-module-exports.js",
+    "build-code-without-comments.js",
     "no-require.js",
     "get-imported-name.js",
     "test-shape.js",
