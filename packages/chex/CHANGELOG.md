@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.19](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.18...@zgeoff/chex@0.3.19) (2026-11-21)
+
+
+### Features
+
+* **testing:** add clock, server and fetch subpaths ([#718](https://github.com/zgeoff/tools/issues/718)) ([0a4f758](https://github.com/zgeoff/tools/commit/0a4f758f640778f3f848ca353df649b901e8f5ff))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @zgeoff/rig bumped to 0.2.9
+    * @zgeoff/testing bumped to 0.3.3
+
 ## [0.3.18](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.3.17...@zgeoff/chex@0.3.18) (2026-11-21)
 
 
