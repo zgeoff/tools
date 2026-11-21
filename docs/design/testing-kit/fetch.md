@@ -15,14 +15,17 @@ code that msw can't reach, such as a child process. `@zgeoff/testing/server` nee
 ```mermaid
 flowchart LR
   code[code under test] -->|"fetch"| routed[the kit's fetch wrapper]
-  routed -->|"unix or tls option"| native[Bun's fetch]
+  routed -->|"unix option or passthroughHosts host"| native[Bun's fetch]
   routed -->|"other"| msw[msw 3 network]
-  msw -->|"matched"| handlers  msw -->|"passthroughHosts"| native  msw -->|"unmatched"| record[unmatched list]
+  msw -->|"matched"| handlers
+  msw -->|"unmatched"| record[unmatched list]
   record -->|"afterEach"| fail[test fails]
 ```
 
-msw drops Bun's `unix` and `tls` options from a request it passes through, so the kit wraps `fetch`.
-A call with either option skips msw and goes to Bun's own `fetch`.
+msw drops Bun's `unix` and `tls` options from a request that it passes through to a real server. So
+the kit wraps `fetch`, and sends each call with the `unix` option, and each call to a
+`passthroughHosts` host, straight to Bun's own `fetch`. Every other call goes through msw, which
+keeps a handler's answer and the unmatched-request check for it, `tls` option or not.
 
 ## Contracts
 
@@ -54,7 +57,8 @@ error: the test sent requests that no handler matches:
 ```ts
 // @zgeoff/testing/fetch
 function createTestNetwork(options: {
-  readonly handlers: readonly RequestHandler[]; // the defaults, kept after each test's reset  readonly passthroughHosts?: readonly string[]; // default ['127.0.0.1', '[::1]', 'localhost'], so code under test reaches a stub server
+  readonly handlers: readonly RequestHandler[]; // the defaults, kept after each test's reset
+  readonly passthroughHosts?: readonly string[]; // default ['127.0.0.1', '[::1]', 'localhost'], so code under test reaches a stub server
 }): TestNetwork;
 
 interface TestNetwork {
@@ -122,7 +126,8 @@ interface RecordedRequest {
 - When no handler matches a request, the network adds the request to a list, and the `fetch` call
   rejects with msw's error. The `afterEach` fails the test with every request on that list, then
   empties the list.
-- A request to a `passthroughHosts` host passes through to the real network.
+- msw never passes a request through to a real server. A call that the wrapper sends to msw gets a
+  handler's answer, or counts as unmatched.
 - Enabling the network patches `fetch` through msw first, and then wraps the patched
   `globalThis.fetch`. Disabling it removes the wrapper, then msw's patch.
 - The network never intercepts `WebSocket`.
@@ -134,7 +139,8 @@ interface RecordedRequest {
 ## Decisions
 
 - **The kit owns the msw setup.** A repo passes only its handlers. The kit chooses the interceptor,
-  routes `unix` and `tls` calls to Bun's `fetch`, and checks for unmatched requests.
+  routes `unix` calls and calls to loopback hosts to Bun's `fetch`, and checks for unmatched
+  requests.
 - **Unmatched requests fail the test in `afterEach`.** Code under test can catch a rejected fetch,
   so a test that relied on the rejection alone could pass.
 - **Stub servers have their own subpath,** so a repo that tests a child process installs no msw.
@@ -143,6 +149,8 @@ interface RecordedRequest {
 
 - The wording of the unmatched-request error, apart from listing each method and URL.
 - Which types `@zgeoff/testing/fetch` and `@zgeoff/testing/server` export beside the ones above.
+- How the kit tests `./fetch` itself, given that a second `createTestNetwork` call in one process
+  throws, such as in a `bun test` subprocess with a preload of its own.
 
 ## Out of scope
 

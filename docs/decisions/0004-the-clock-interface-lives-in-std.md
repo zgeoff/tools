@@ -31,7 +31,6 @@ clock is `createFakeClock`, exported by the subpath `@zgeoff/testing/clock`.
 | Option                                     | Why not                                                                                            |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------- |
 | a fake that fits each repo's own interface | the fake carries every method name, and both a `sleep` that resolves and one that rejects on abort |
-| the interface in `@zgeoff/testing`         | production code would import a test package                                                        |
 | a `sleep` that rejects on abort            | every caller wraps its `sleep` in a `try`, for an abort it made itself                             |
 
 ## Consequences

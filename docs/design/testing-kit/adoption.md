@@ -54,28 +54,28 @@ release that publishes the kit.
    release-please.
 5. **One PR per repo,** in any order, each after the release. Each PR bumps the three packages,
    lists `@zgeoff/testing/preload` in its test preload, moves the repo's clock to `Clock` and its
-   fetch mocking to msw 3, and replaces its local copies, which [Each repo](#each-repo) lists.
+   fetch mocking to msw 3, and replaces its local copies, which [Each repo](#each-repo) lists. Each
+   `start` call in a `beforeAll` passes `cleanup: 'manual'`, as in step 2.
 6. **skills: the testing skill,** after the release. Its rules point at the kit's subpaths in place
    of hand-written helpers, and its HTTP reference shows `createTestNetwork`.
 
 ## Each repo
 
-The table lists the copies that a search of each repo found when this design was written. Each repo
-PR first searches the repo's test files and `test-utils/` folders for every name the kit exports,
-and replaces what it finds too. "Clock" lists the methods of the clock object that the repo's
-production code passes around, and "none" means the repo has none. "msw" gives the major version the
-repo installs. In the last column, each description names the kit export that replaces it.
+The table lists the copies that a search of each public repo found when this design was written. The
+private repos get the same move, through their own work items. Each repo PR first searches the
+repo's test files and `test-utils/` folders for every name the kit exports, and replaces what it
+finds too. "Clock" lists the methods of the clock object that the repo's production code passes
+around, and "none" means the repo has none. "msw" gives the major version the repo installs. In the
+last column, each description names the kit export that replaces it.
 
 | Repo      | Clock                                 | msw  | Local copies the kit replaces                                                                                                                        |
 | --------- | ------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | atc       | `now`, `schedule`                     | none | `createStubBin`, `setupTempDir`, `registerTestCleanup`, `waitFor`, `runCommand`, `takeFreePort`                                                      |
 | boxxy     | `now`, `schedule`                     | 3    | `setupTempDir`, `registerTestCleanup`, `writeTreeFiles`, `waitFor`, the msw setup (`createTestNetwork`)                                              |
-| osrs      | `now`, `schedule`                     | 2.15 | `createManualClock`, `runClockUntil`                                                                                                                 |
 | impz      | `now`, `startTimer`, `sleep`          | 2.15 | `createStubBin`, `createStubAnsweringBin`, `createCommandLinks`, `claimFreePorts`, `buildRoutedFetch`, `waitFor`, the fake clock (`createFakeClock`) |
 | nixie     | `now`, `sleep` that resolves on abort | 2.15 | `createStubProgram`, `buildTestClock`, `createRunTemplate`, the msw setup (`createTestNetwork`)                                                      |
 | stu       | `now`, `sleep` that rejects on abort  | none | the fake clock (`createFakeClock`), the stub servers (`startStubServer`)                                                                             |
 | vers      | none                                  | 2.15 | `createStubCommand`, `waitFor`, the msw setup (`createTestNetwork`)                                                                                  |
-| llm       | none                                  | 2.15 | the msw setup (`createTestNetwork`)                                                                                                                  |
 | auto-mode | none                                  | 2.15 | the msw setup (`createTestNetwork`)                                                                                                                  |
 | cloud     | none                                  | 3    | `createGitOrigin`, the unhandled-request check (`createTestNetwork`)                                                                                 |
 | pepys     | none                                  | 3    | `readFreePort`, the msw setup (`createTestNetwork`)                                                                                                  |

@@ -73,7 +73,8 @@ cpSync(template, dir.path, { recursive: true }); // the test copies it, and neve
 // @zgeoff/testing/fs
 interface ReadTemplateOptions {
   readonly name: string;
-  readonly root: string; // the inputs' globs resolve under this folder  readonly inputs: readonly string[]; // globs; a template is reused while the name and each matched file's relative path and contents stay the same
+  readonly root: string; // the inputs' globs resolve under this folder
+  readonly inputs: readonly string[]; // globs; a template is reused while the name and each matched file's relative path and contents stay the same
   readonly write: (directory: string) => Promise<void>; // builds the template into an empty folder
   readonly staleLockMs?: number; // default 120_000; a lock older than this belongs to a dead build
 }
