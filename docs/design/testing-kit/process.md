@@ -2,9 +2,10 @@
 
 - **Status:** draft
 
-The root export holds the helpers almost every test file needs: `waitFor`, `updateEnv`,
-`removeEnvOverrides` and `registerTestCleanup`. `./preload` wires their global hook. `./process`
-runs programs and claims ports, and `./mocks` holds the stub functions for `mock()`.
+The root export of the [testing kit](./README.md), `@zgeoff/testing`, holds the helpers that almost
+every test file needs: `waitFor`, `updateEnv`, `removeEnvOverrides` and `registerTestCleanup`.
+`@zgeoff/testing/preload` restores the env after each test. `@zgeoff/testing/process` runs programs
+and claims free ports, and `@zgeoff/testing/mocks` holds stub functions to pass to Bun's `mock()`.
 
 ## Shape
 
@@ -12,9 +13,9 @@ runs programs and claims ports, and `./mocks` holds the stub functions for `mock
 flowchart LR
   test --> waitFor
   test --> updateEnv
-  test -->|"run, start, claimFreePorts"| process["./process"]
+  test -->|"run, start, claimFreePorts"| process["@zgeoff/testing/process"]
   process -->|"stop, release"| cleanup[registerTestCleanup]
-  preload["./preload"] -->|"afterEach"| restore[restore env]
+  preload["@zgeoff/testing/preload"] -->|"afterEach"| restore[restore env]
   cleanup -->|"onTestFinished"| bun[bun:test]
 ```
 
@@ -32,17 +33,17 @@ const line = await waitFor(() => readLogLine(logPath, 'ready'), {
 ```
 
 ```ts
-// root export
-function waitFor<T>(attempt: () => T | Promise<T>, options?: WaitForOptions): Promise<T>; // existing signature
+// @zgeoff/testing
+function waitFor<T>(attempt: () => T | Promise<T>, options?: WaitForOptions): Promise<T>;
 
 interface WaitForOptions {
-  readonly intervalMs?: number; // existing; default 20
-  readonly timeoutMs?: number; // existing; default 5000
-  readonly label?: string; // existing; names what the test waits for, in the timeout message
+  readonly intervalMs?: number; // default 20
+  readonly timeoutMs?: number; // default 5000
+  readonly label?: string; // names what the test waits for, in the timeout message
   readonly signal?: AbortSignal; // an abort stops the wait and rejects with signal.reason
   readonly progress?: () => unknown; // when its value changes between attempts (Object.is), the deadline starts again
   readonly now?: () => number; // default performance.now
-  readonly sleep?: (delayMs: number) => Promise<void>; // default Bun.sleep; also times a hung attempt
+  readonly sleep?: (delayMs: number) => Promise<void>; // default Bun.sleep
 }
 ```
 
@@ -54,7 +55,7 @@ updateEnv('HOME', undefined); // deletes it until the test ends
 ```
 
 ```ts
-// root export, both existing signatures
+// @zgeoff/testing
 function updateEnv(name: string, value: string | undefined): void;
 function removeEnvOverrides(): void; // puts back every value updateEnv changed; for a repo that wires its own preload
 ```
@@ -67,8 +68,9 @@ await release(); // early release; the after-test run then skips it
 ```
 
 ```ts
-// root export
-function registerTestCleanup<T>(release: () => T): () => T; // a second call returns the first call's result
+// @zgeoff/testing
+// The returned function runs `release` at most once; a later call returns the first call's result.
+function registerTestCleanup<T>(release: () => T): () => T;
 ```
 
 ### The preload
@@ -76,11 +78,12 @@ function registerTestCleanup<T>(release: () => T): () => T; // a second call ret
 ```toml
 # a repo's bunfig.toml
 [test]
-preload = ["@zgeoff/testing/preload", "./test-utils/preload.ts"]
+preload = ["@zgeoff/testing/preload", "./test-utils/network.ts"]
 ```
 
-Importing `@zgeoff/testing/preload` registers an `afterEach` that calls `removeEnvOverrides`. The
-test network registers its own hooks, as [fetch.md](./fetch.md) says.
+`@zgeoff/testing/preload` registers one `afterEach` that calls `removeEnvOverrides`. A repo that
+mocks fetch lists its network module beside it, and `createTestNetwork` registers that module's
+hooks, as [fetch.md](./fetch.md) says.
 
 ### Processes
 
@@ -94,32 +97,20 @@ await using server = await start([process.execPath, 'serve.ts'], {
 ```
 
 ```ts
-// ./process. Every type keeps its existing fields; only StartOptions gains one.
+// @zgeoff/testing/process. Only the fields shown change; every other field stays as the code has it.
 function run(command: readonly string[], options?: RunOptions): Promise<RunResult>;
 function start(command: readonly string[], options?: StartOptions): Promise<ProcessHandle>;
-function readStreamUntil(stream: ReadableStream<Uint8Array>, text: string): Promise<string>; // existing, moved from ./helpers
-
-interface RunOptions {
-  readonly args?;
-  readonly env?;
-  readonly cwd?;
-  readonly input?;
-  readonly timeoutMs?;
-}
-interface RunResult {
-  readonly exitCode: number;
-  readonly stdout: string;
-  readonly stderr: string;
-}
+// resolves with everything read from the stream once the text appears
+function readStreamUntil(stream: ReadableStream<Uint8Array>, text: string): Promise<string>;
 
 interface StartOptions {
   // …existing fields: args, env, cwd, port, ready, readyTimeoutMs
-  readonly cleanup?: 'test' | 'manual'; // default 'test'
+  readonly cleanup?: 'test' | 'manual'; // default 'test'; see the README's Cleanup section
 }
 
 interface ProcessHandle extends AsyncDisposable {
   // …existing fields: url, port, pid, readyLine, write, waitForLine, output
-  readonly stop: (signal?: Signal) => Promise<number>; // existing; also releases the port claim
+  readonly stop: (signal?: Signal) => Promise<number>; // now also releases the port claim
 }
 ```
 
@@ -134,56 +125,67 @@ ports.release(); // early release; otherwise after the test
 ```
 
 ```ts
-// ./process
+// @zgeoff/testing/process
 function claimFreePorts(
   count: number,
-  options?: { readonly cleanup?: 'test' | 'manual' },
+  options?: { readonly cleanup?: 'test' | 'manual' }, // default 'test'
 ): { take(): number; release(): void };
 ```
 
-`readFreePort` is removed: `claimFreePorts(1).take()` replaces it.
-
 ### Stub functions
 
-`./mocks` exports `makeAnswerQueue`, `makeRepeatingAnswerQueue`, `makeResolvingStub`,
-`makeRejectingStub` and `createBlockingStubKit`, each with its existing signature.
+`@zgeoff/testing/mocks` keeps the five helpers it takes from `./helpers`, with their signatures:
+
+- `makeAnswerQueue(answers)` returns a function that gives the next answer on each call, and throws
+  once they run out;
+- `makeRepeatingAnswerQueue(answers)` gives the next answer on each call, and repeats the last one;
+- `makeResolvingStub(value)` and `makeRejectingStub(error)` return a `mock()` that resolves with the
+  value or rejects with the error;
+- `createBlockingStubKit(value)` returns a `mock()` that reports its first call and waits for the
+  test to release it.
 
 ## Constraints
 
-- `waitFor` measures its deadline with `now`, which defaults to `performance.now`, so a change of
-  the wall clock never ends a wait early.
-- `waitFor` starts no attempt after the deadline. A hung attempt races `sleep` for the time left,
-  and still ends the wait at the deadline.
-- When `progress` is set, `waitFor` reads it after each attempt. A wait whose progress value keeps
-  changing runs past `timeoutMs`.
+- `waitFor` measures its deadline with `now`, so a change of the wall clock never ends a wait early.
+- `waitFor` never starts an attempt after the deadline. While an attempt hangs, `waitFor` races it
+  against `sleep` for the time left, and rejects at the deadline. The hung attempt keeps running,
+  and `waitFor` ignores its result.
+- A wait resolves with any value the attempt returns, `false`, `null` and `undefined` included. Only
+  a throw or a rejection asks for another try.
+- When `progress` is set, `waitFor` reads it after each attempt. A wait whose progress value changes
+  before each deadline has no limit.
 - `registerTestCleanup` runs its releases after the test in reverse order of registration. It runs
   every release, even after one throws, and then throws an `AggregateError` of every failure.
 - A release runs at most once, whether the test calls it early or the after-test run calls it.
 - `registerTestCleanup` adds one `onTestFinished` hook per test, however many releases the test
-  registers. Call it inside a test or a `beforeEach`. The README's [Cleanup](./README.md#cleanup)
-  section says what a `beforeAll` fixture does.
-- `run` and `start` pass the child an explicit env: `process.env` merged with `options.env`. A Bun
-  child started with no `env` gets the env the process started with and misses each `updateEnv`
+  registers. A test calls it inside a test or a `beforeEach`. In a `beforeAll`, Bun runs the hook at
+  once, so a fixture made there passes `cleanup: 'manual'`, as the README's
+  [Cleanup](./README.md#cleanup) section shows.
+- `run` and `start` pass the child an explicit env: `process.env`, with `options.env` on top. A Bun
+  child started with no `env` gets the env the process started with, and misses each `updateEnv`
   change.
 - `run` and `start` start the child in its own process group. A timeout or a `stop` signals the
   whole group.
 - When a signal to a process group fails with `ESRCH` or `EPERM`, the kit treats the group as gone.
   macOS returns `EPERM` for a group whose leader has exited.
-- With `cleanup: 'test'`, `start` registers its `stop` with `registerTestCleanup`, so a test that
-  forgets `await using` still leaves no process behind.
+- With `cleanup: 'test'`, `start` registers its `stop` with `registerTestCleanup`. A test that
+  forgets `await using` still has its process stopped.
 - When `port` is not set, `start` takes its port from `claimFreePorts(1)` and holds the claim until
   `stop`.
+- A port claim keeps out every other kit caller, in any process, for as long as it lasts. A program
+  that binds the port without the kit can still take it.
 - On Linux, `claimFreePorts` picks each port below the start of the kernel's ephemeral range, which
   it reads from `ip_local_port_range`. It holds each port by binding an abstract unix socket named
   after the port, and skips a port that `/proc/net/tcp` or `/proc/net/tcp6` lists as busy.
-- A process that binds a claimed port without a claim can still race for it.
+- On macOS, `claimFreePorts` binds port 0 to pick each port and holds nothing, so a parallel test
+  can race for the port.
 
 ## Decisions
 
 - **`waitFor` retries on a throw.** The attempt returns the value the test wants, or throws to ask
   for another try, so the attempt's last error becomes the timeout's cause.
-- **The preload is opt-in by import.** A repo lists `@zgeoff/testing/preload` in `bunfig.toml`, and
-  a test file never imports it.
+- **A repo lists the preload in `bunfig.toml`.** A test file never imports it, so every file gets
+  the env restore, including a file whose author forgot it.
 
 ## Builder decides
 

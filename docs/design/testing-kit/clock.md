@@ -1,11 +1,12 @@
 # Clock
 
 - **Status:** draft
-- **Decision records:** [0004](../../decisions/0004-the-clock-interface-lives-in-std.md)
+- **Decision records:**
+  [0004, the clock interface lives in std](../../decisions/0004-the-clock-interface-lives-in-std.md)
 
 Production code reads time and waits through one `Clock` interface from `@zgeoff/std`, passed in as
-an argument. A test passes the fake clock from `@zgeoff/testing/clock` in its place, and moves time
-forward by hand.
+an argument. A test passes in the fake clock from `@zgeoff/testing/clock`, a subpath of the
+[testing kit](./README.md), and moves time forward by hand.
 
 ## Shape
 
@@ -65,7 +66,7 @@ clock.delays; // → [500, 1000], every delay asked for, in order
 
 ```ts
 await runClockUntil(clock, () => job.state === 'done', { maxMs: 60_000 });
-// advances to each next due time, with one setImmediate turn between steps
+// steps the clock to each next due time, with one setImmediate turn between steps
 // or throws: Error('the condition stayed false for 60000 ms of clock time')
 ```
 
@@ -91,38 +92,43 @@ function runClockUntil(
 - `schedule` and `sleep` treat a negative delay as 0.
 - `cancel` is idempotent, and a cancel after the timer fired does nothing.
 - An aborted `sleep` resolves at once and removes its abort listener. A `sleep` given a signal that
-  is already aborted resolves at once without waiting.
-- `systemClock.sleep` resolves on abort too, so the fake and the real clock behave the same.
-- `advance` fires every timer and resolves every sleep due at or before the new time, in due order.
-  It sets `now()` to each one's due time before it fires that one.
+  is already aborted resolves without waiting. `systemClock` and the fake both behave this way.
+- `advance(durationMs)` moves the clock to a target time, `now()` plus `durationMs`. On the way, it
+  fires each timer and resolves each sleep that is due at or before the target, in due order, and
+  sets `now()` to each one's due time before it fires that one.
 - Two timers due at the same time fire in the order they were scheduled.
-- A timer that a firing timer schedules fires in the same `advance` when it falls due by the new
-  time.
-- `advance` never fires a timer cancelled earlier in the same `advance`.
-- `runClockUntil` checks `isMet` after each step and stops once it returns true. Between steps it
-  waits for one `setImmediate` turn, so the promises that the fired timers resolved settle.
-- When nothing is pending, `runClockUntil` yields a macrotask without moving time, and throws after
-  100 such rounds in a row.
-- `runClockUntil` throws once the clock has moved `maxMs` past where it started. When the next due
-  time falls past that limit, it advances to the limit, checks `isMet` once more, and then throws.
-- `@zgeoff/std` never depends on `@zgeoff/testing` in any dependency field. `check:release-workflow`
-  fails on a dependency cycle, and the fake clock makes `testing` depend on `std`.
+- When a firing timer schedules a new timer that is due at or before the target, the same `advance`
+  fires the new timer too.
+- `advance` never fires a timer that an earlier timer in the same `advance` cancelled.
+- `runClockUntil` checks `isMet` first, and returns at once when it is already true. Otherwise each
+  step moves the clock to the next due time, waits for one `setImmediate` turn so that the code
+  woken by the step can run, and checks `isMet` again.
+- When nothing is pending, a step waits for one `setImmediate` turn without moving the clock. After
+  100 such steps in a row, `runClockUntil` throws
+  `Error('nothing is scheduled and the condition is still false')`. Async code that wakes no timer
+  needs a few turns to settle, and 100 bounds a test that waits on nothing.
+- `runClockUntil` stops at `maxMs` past the time it started. When the next due time falls past that
+  limit, it moves the clock to the limit and checks `isMet` once more. It resolves when that check
+  is true, and throws otherwise.
+- `@zgeoff/std` never depends on `@zgeoff/testing` in any dependency field. The fake clock makes
+  `@zgeoff/testing` depend on `@zgeoff/std`, so a dependency back would make a cycle, and the tools
+  repo's `check:release-workflow` fails on a cycle.
 
 ## Decisions
 
 - **A consumer takes a `Pick` of `Clock`.** A component that only reads time takes
   `Pick<Clock, 'now'>`, so its tests pass `{ now: () => fixedMs }` with no fake.
-- **`sleep` resolves on abort.** A caller checks `signal.aborted` after the sleep, so an aborted
-  backoff never shows up as an error to catch.
+- **`sleep` resolves on abort.** A cancel is something the caller asked for, so the caller checks
+  `signal.aborted` after the sleep and has no error to catch.
 - **`schedule(fire, delayMs)` takes the callback first,** as `setTimeout` does.
 
 ## Builder decides
 
-- Whether `systemClock.schedule` uses `setTimeout` and `clearTimeout`, or `Bun.sleep` with a flag.
-- The internal timer queue.
+- How `systemClock.schedule` cancels: `clearTimeout`, or a flag that a `Bun.sleep` callback checks.
+- The fake clock's internal timer queue.
 
 ## Out of scope
 
-- Temporal values. A function that takes a `Temporal.Instant` as an argument keeps it, and a clock
-  still returns epoch milliseconds.
-- Faking `Date` or the global timers. The kit fakes only what code receives as a `Clock`.
+- Temporal values. A function that takes a `Temporal.Instant` argument keeps that argument, and
+  `Clock.now()` returns epoch milliseconds.
+- Faking `Date` or the global timers. The fake replaces only what code receives as a `Clock`.

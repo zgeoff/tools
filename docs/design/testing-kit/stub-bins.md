@@ -2,9 +2,10 @@
 
 - **Status:** draft
 
-`./bin` writes a stand-in for a command, such as `gh` or `op`, into a folder that a test puts first
-on `PATH`. The stand-in answers each call from a list the test gives, records every call to a log,
-and fails loudly on a call nobody scripted.
+`@zgeoff/testing/bin`, a subpath of the [testing kit](./README.md), writes a stand-in for a command,
+such as `gh` or `op`, into a folder that a test puts first on `PATH`. The stand-in answers each call
+from a list that the test gives, and records every call to a log in that folder. A call that matches
+nothing in the list exits 97 with its argv on stderr.
 
 ## Shape
 
@@ -41,25 +42,29 @@ gh.readCalls();
 ```
 
 ```ts
-const sudo = createStubBin(bin, 'sudo', { script: '#!/bin/sh\nexec "$@"\n' });
+const sudo = createStubBin(bin, 'sudo', { script: '#!/bin/sh\nexec "$@"\n' }); // runs the caller's script
+const silent = createStubBin(bin, 'notify-send'); // every call exits 0 with no output
 linkCommands(bin, ['git', 'jq']); // symlinks the real git and jq from PATH into bin
 readStubCalls(bin); // → every call to every stand-in in bin, in call order
 ```
 
 ```ts
-// ./bin
+// @zgeoff/testing/bin
 function createStubBin(directory: string, name: string, options?: StubBinOptions): StubBin;
 function readStubCalls(directory: string): readonly StubCall[]; // a folder with no log reads as []
 function linkCommands(directory: string, names: readonly string[]): void; // throws on a name PATH lacks
 
+// existing, and async: writes a sudo stand-in that answers `sudo -n true` and records each other call to `record`
+function createStubSudo(directory: string, record: string): Promise<void>;
+
 type StubBinOptions =
   | {
-      readonly answers?: readonly StubAnswer[]; // no answers: every call exits 0 with no output
+      readonly answers?: readonly StubAnswer[]; // left out: every call exits 0; given, even as []: an unmatched call exits 97
       readonly recordEnv?: readonly string[]; // env names to copy into each call's record
-      readonly recordStdin?: boolean; // default false: the stand-in never reads stdin
+      readonly recordStdin?: boolean; // default false
     }
   | {
-      readonly script: string; // a script with its own shebang
+      readonly script: string; // a script with its own shebang, run in place of answers
       readonly recordEnv?: readonly string[];
       readonly recordStdin?: boolean;
     };
@@ -81,44 +86,43 @@ interface StubCall {
   readonly argv: readonly string[]; // exactly as the stand-in received them
   readonly cwd: string;
   readonly env: Readonly<Record<string, string>>; // only the recordEnv names that were set
-  readonly stdin: string; // '' unless recordStdin; with it, all of stdin up to EOF, or '' when stdin is a terminal
+  readonly stdin: string; // '' without recordStdin; with it, all of stdin up to EOF, or '' when stdin is a terminal
 }
 ```
 
-`createStubSudo` moves to `./bin` with its existing signature.
-
 ## Constraints
 
-- `createStubBin`, `readStubCalls` and `linkCommands` are synchronous.
 - `createStubBin` writes each stand-in to a staged name in the same folder and renames it into
   place, so rewriting a stand-in that a process still runs never fails with `ETXTBSY`.
-- An answers stand-in is a Bun script whose shebang names `process.execPath`, with its answers in a
-  JSON file beside it. It needs no shell and quotes nothing.
+- A stand-in with answers is a Bun script whose shebang names `process.execPath`, with its answers
+  in a JSON file beside it. It runs no shell, so the answer text reaches stdout and stderr byte for
+  byte.
 - The stand-in picks the first answer whose `args` prefix matches and that has not answered yet.
   When every matching answer has answered, the last matching one answers again.
 - The stand-in keeps which answers have answered in a state file beside its answers file, and
   updates it under a lock, so stand-ins that run at the same time never give one answer twice.
-- Calling `createStubBin` again for the same name replaces its answers and resets that state. It
-  keeps the call log.
-- With `recordStdin`, a caller that keeps stdin open without writing EOF makes the stand-in wait.
-  Without it, the stand-in never reads stdin.
-- A call that matches no answer writes `unexpected: <name> <argv…>` to stderr, records the call, and
-  exits 97.
+- An unmatched call writes `unexpected: <name> <argv…>` to stderr, and exits 97 after the stand-in
+  records it.
 - Every stand-in in one folder appends to one `calls.jsonl` in that folder, one JSON object per
   call, so `readStubCalls` gives the order across commands.
-- A stand-in records its call before it answers, so a call that exits 97 is in the log.
-- A `script` stand-in records its call through a wrapper, so `readCalls` works for it too.
+- A `script` stand-in runs the caller's script behind a wrapper that records the call first. With
+  `recordStdin`, the wrapper reads stdin to EOF, records it, and passes the same bytes to the
+  script.
+- With `recordStdin`, a caller that keeps stdin open without an EOF makes the stand-in wait.
+- Calling `createStubBin` again for a name replaces that stand-in whole, answers or script, and
+  resets its answer state. It keeps the call log.
 
 ## Decisions
 
-- **A loud miss.** An unscripted call fails with its own exit code, 97, and its argv on stderr. A
-  test whose code swallows the failure still sees the call in the log.
-- **Answers by argv prefix.** A test names the subcommand it scripts and ignores flags it does not
-  care about.
+- **An unmatched call fails with its own exit code, 97, and its argv on stderr.** A test whose code
+  swallows the failure still sees the call in the log.
+- **Answers match by argv prefix.** A test names the subcommand it scripts and ignores flags it does
+  not care about.
+- **The functions are synchronous, apart from `createStubSudo`.** A test sets up its stand-ins
+  before it runs the code under test, with no `await`.
 
 ## Builder decides
 
-- The names of the staged file, the answers file and the wrapper.
-- How the wrapper of a `script` stand-in records the call.
-- The lock the state file uses.
-- Whether `readCalls` reads the log once per call or caches it.
+- The names of the staged file, the answers file, the state file and the wrapper.
+- The lock that guards the state file.
+- Whether `readCalls` reads the log on each call or caches it.
