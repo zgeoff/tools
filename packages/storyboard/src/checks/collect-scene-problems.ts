@@ -80,7 +80,7 @@ function collectElementProblems(path: string, element: SVGElementInfo): ScenePro
   const allowed = ALLOWED_ATTRIBUTES.get(element.tag);
   const problems: SceneProblem[] = [];
 
-  if (element.tag === 'script') {
+  if (element.tag.toLowerCase() === 'script') {
     problems.push({ rule: 'links', message: `${path} holds a <script>` });
   }
 
@@ -124,7 +124,7 @@ function collectAttributeProblems(
     });
   }
 
-  if (/^(?:xlink:)?href$/u.test(site.name) && !SAME_FILE_LINK.test(site.value)) {
+  if (/^(?:xlink:)?href$/iu.test(site.name) && !SAME_FILE_LINK.test(site.value)) {
     problems.push({
       rule: 'links',
       message: `${site.path} has an href to "${site.value}" on <${site.tag}>`,
@@ -143,7 +143,7 @@ function collectAttributeProblems(
   return problems;
 }
 
-const URL_CALL = /url\(\s*(?<target>[^)]*)\)/gu;
+const URL_CALL = /url\(\s*(?<target>[^)]*)\)/giu;
 
 function collectURLProblems(path: string, where: string, text: string): SceneProblem[] {
   return [...text.matchAll(URL_CALL)].flatMap((call) => {
@@ -168,11 +168,11 @@ function collectStyleProblems(path: string, style: SVGElementInfo): SceneProblem
     problems.push({ rule: 'style', message: `${path} has an @ rule in its <style>` });
   }
 
-  if (/url\s*\(/u.test(css)) {
+  if (/url\s*\(/iu.test(css)) {
     problems.push({ rule: 'style', message: `${path} has a url() in its <style>` });
   }
 
-  if (/(?:^|[\s;{])(?:animation|transition)[\w-]*\s*:/u.test(css)) {
+  if (/(?:^|[\s;{])(?:animation|transition)[\w-]*\s*:/iu.test(css)) {
     problems.push({
       rule: 'style',
       message: `${path} has an animation or transition property in its <style>`,

@@ -120,3 +120,16 @@ test('#collectSceneProblems fails a built file that is missing from the commit, 
     { rule: 'stale', message: expect.stringContaining('missing') },
   ]);
 });
+
+test.each([
+  { rule: 'links', inner: '<rect width="1" height="1" fill="URL(https://a.test/x)"/>' },
+  { rule: 'links', inner: '<use HREF="https://a.test/a.svg#x"/>' },
+  { rule: 'style', inner: '<style>.a { ANIMATION: spin 1s; }</style>' },
+  { rule: 'style', inner: '<style>.a { TRANSITION: opacity 1s; }</style>' },
+  { rule: 'style', inner: '<style>.a { fill: URL(#x); }</style>' },
+])('#collectSceneProblems fails an upper-case form of $inner, under $rule', (row) => {
+  const ctx = setupTest();
+  const input = ctx.buildInput([ctx.wrapSVG(row.inner)]);
+
+  expect(collectSceneProblems(input).map((problem) => problem.rule)).toContain(row.rule);
+});

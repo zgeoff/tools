@@ -27,6 +27,7 @@ export function buildAnimatedElement(
   const wrappedAmbients = ambients.filter((ambient) => ambient.props.transform !== undefined);
 
   checkAmbientConflicts(plain, plainAmbients);
+  checkTransformConflicts(animations, ambients);
 
   const animateElements = [
     ...buildPlainAnimates(element, plain, timing),
@@ -67,6 +68,26 @@ function checkAmbientConflicts(
         `an Ambient and an Animate share the attribute "${ambient.props.attribute}" of one element`,
       );
     }
+  }
+}
+
+function checkTransformConflicts(
+  animations: readonly AnimationNode[],
+  ambients: readonly AmbientNode[],
+): void {
+  const isAnimated = animations.some(
+    (animation) => animation.transform !== undefined || animation.attribute === 'transform',
+  );
+
+  const isAmbient = ambients.some(
+    (ambient) => ambient.props.transform !== undefined || ambient.props.attribute === 'transform',
+  );
+
+  if (isAnimated && isAmbient) {
+    throw new SceneError(
+      'ambient-conflict',
+      'an Ambient and an Animate both move the transform of one element',
+    );
   }
 }
 
