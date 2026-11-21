@@ -2,9 +2,8 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { copyFile, mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readRunFolderPrefix, writeTreeFiles } from '@zgeoff/testing/fs';
 import { $ } from 'bun';
-import { readRunFolderPrefix } from '../test-utils/read-run-folder-prefix.ts';
-import { writeTreeFiles } from '../test-utils/write-tree-files.ts';
 
 async function setupTest() {
   const checkout = await mkdtemp(join(tmpdir(), readRunFolderPrefix('run-knip-')));
