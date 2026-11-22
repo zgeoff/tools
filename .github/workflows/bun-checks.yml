@@ -30,8 +30,9 @@
 # package.json does not define fails the run before any script runs, so a
 # renamed script cannot drop a check without notice. The synced caller passes
 # the BUN_CHECK_SCRIPTS, NODE_VERSION and BUN_CHECK_TIMEOUT_MINUTES repo
-# variables, so a repo changes the list, adds Node or sets the jobs' time
-# limit without editing the caller.
+# variables, so a repo changes the list, adds Node or sets the test jobs' time
+# limit without editing the caller. A job that runs no tests has a limit of
+# its own, 5 minutes: gitleaks, plan, static and, in a public repo, checks.
 #
 # The profile comes from github.event.repository.private, which in a reusable
 # workflow reads the caller's event. The private input is the fallback for an
@@ -64,7 +65,8 @@ on:
       timeout-minutes:
         # The same limit as the synced caller's fallback, for a caller that
         # passes none.
-        description: Timeout for each job that installs and runs scripts, in minutes
+        description:
+          Timeout for each job that runs tests, in minutes; the jobs that run none stop at 5
         type: number
         required: false
         default: 20
@@ -172,7 +174,7 @@ jobs:
       ${{ !((github.event.repository && github.event.repository.private) ||
       (!github.event.repository && inputs.private)) }}
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.timeout-minutes }}
+    timeout-minutes: 5
     permissions:
       contents: read
     env:
@@ -418,7 +420,10 @@ jobs:
       ${{ !cancelled() || !((github.event.repository && github.event.repository.private) ||
       (!github.event.repository && inputs.private)) }}
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.timeout-minutes }}
+    # The private profile's job runs the tests; the public profile's runs none.
+    timeout-minutes:
+      ${{ ((github.event.repository && github.event.repository.private) || (!github.event.repository
+      && inputs.private)) && inputs.timeout-minutes || 5 }}
     # No permissions block, as in the gitleaks job: in a private repo this job
     # runs the scan.
     env:

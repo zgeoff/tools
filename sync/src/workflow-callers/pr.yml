@@ -8,7 +8,7 @@
 # list of package scripts that replaces the standard list (audit deadcode
 # format:check lint typecheck test, then each lane script),
 # NODE_VERSION, which sets up Node next to Bun, and BUN_CHECK_TIMEOUT_MINUTES,
-# the time limit of each job that runs scripts (20 when unset).
+# the time limit of each job that runs tests (20 when unset).
 name: PR
 
 on:
