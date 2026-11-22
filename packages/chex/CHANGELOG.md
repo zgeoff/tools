@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.6](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.4.5...@zgeoff/chex@0.4.6) (2026-11-22)
+
+
+### Features
+
+* **chex:** keep cold read shas valid; lint changed files type-aware ([#744](https://github.com/zgeoff/tools/issues/744)) ([5e0b86d](https://github.com/zgeoff/tools/commit/5e0b86d04cd92964e1067d05d0989b365ec23fb6))
+
 ## [0.4.5](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.4.4...@zgeoff/chex@0.4.5) (2026-11-21)
 
 
