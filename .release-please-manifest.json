@@ -16,5 +16,5 @@
   "packages/rig": "0.3.2",
   "packages/chex": "0.4.6",
   "packages/testing": "0.4.2",
-  "packages/storyboard": "0.1.2"
+  "packages/storyboard": "0.1.3"
 }
