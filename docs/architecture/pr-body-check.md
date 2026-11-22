@@ -1,76 +1,97 @@
-# The PR body check
+# The PR checks
 
-`chex pr-body` checks that a pull request's description follows the
-[PR template](../../.github/PULL_REQUEST_TEMPLATE.md), so every PR has the same sections and labels.
-The [reusable pr-body workflow](../../.github/workflows/pr-body-check.yml) runs it on each push and
-each edit of a PR. repo-sync writes the stub that calls it, `.github/workflows/pr-body.yml`, into
-every repo, so a repo adds nothing to its `include` list. The workflow reads the body from the API
-when it runs, so a body that another job edited since the event is the one it checks, and it skips a
-bot's PR.
+The body check holds each pull request's description in the zgeoff repos to the
+[PR template](../../.github/PULL_REQUEST_TEMPLATE.md), and the title check holds its title to the
+Conventional Commit rules. Each runs as a reusable workflow in this repo.
+[repo-sync](./repo-sync.md) writes a small caller workflow for each into every repo it syncs, so a
+repo needs no setting to get them.
+
+## The body check
+
+The body check is `chex pr-body`, a command of [chex](../../packages/chex/README.md), the checks
+package in this repo. The [pr-body workflow](../../.github/workflows/pr-body-check.yml) runs it on
+each push to a PR and each edit of its description. The workflow fetches the description from the
+GitHub API when the run starts, so it checks the current text even when the tick-chex job edited the
+description after the push or edit that started the run. The workflow skips a PR that a bot opened.
+Its first job, the pr-body job, runs the command below; its second, the tick-chex job, ticks the
+chex box.
 
 ```sh
-chex pr-body --body-file body.md                                # the shape of the body
-chex pr-body --body-file body.md --base <sha> --head <sha>     # also the prose-check commits
-chex pr-body tick-chex --body-file body.md --passed            # prints the body, chex line ticked
+chex pr-body --body-file body.md                              # the shape of the description
+chex pr-body --body-file body.md --base <sha> --head <sha>   # also the Checks commit hashes
 ```
 
-It prints one line per error, with the section and the fix. It reads the body without its HTML
-comments and without the verify report between `<!-- wringer:report -->` and
-`<!-- /wringer:report -->`, because the template's examples sit in comments and the report is
-written by `bun verify publish`.
+The command prints one line for each error, with the section and the fix. It ignores HTML comments,
+because the template keeps its examples in them. It also ignores the block between
+`<!-- wringer:report -->` and `<!-- /wringer:report -->`. In a repo set up with the
+[wringer](https://github.com/zgeoff/wringer) verify tool, `bun verify publish` writes that block
+into the description after the PR opens.
 
-## The checks
+The description fails on:
 
-- **Headings:** `Description`, then `Next steps`, `Checks` and `Verification`, in that order, and
-  none other. Only `Description` is required. A section with nothing in it fails: delete its
-  heading.
-- **Next steps:** only two labels. Each item under **Needs the owner** is a checkbox. Each item
-  under **Later** ends with an issue ID in brackets, such as `(GEO-124)`.
-- **Code blocks:** at most 50 lines, each 100 characters or fewer, so a block fits on screen on
-  GitHub without a scroll bar.
-- **Placeholders:** a `<word>` left from the template fails, outside code.
-- **Checks:** only the lines `- [ ] chex`, `- [x] Deslop (<commit>)` and
-  `- [x] Cold read (<commit>)`. The chex line passes ticked or unticked, because the `tick-chex` job
-  sets it. Each commit is the one the deslop or cold read ran on.
+- Any heading but `Description`, `Next steps`, `Checks` and `Verification`, or those headings out of
+  that order. A heading with nothing under it also fails: delete it.
+- A bold label line under Next steps other than **Needs the owner** and **Later**, an item under
+  **Needs the owner** that isn't a checkbox, and an item under **Later** that doesn't end with an
+  issue ID in brackets, such as `(GEO-124)`.
+- A code block over 50 lines, or a line in one over 100 characters, which GitHub shows with a scroll
+  bar.
+- A `<word>` placeholder left from the template, outside code.
+- A line under Checks other than `- [ ] chex`, `- [x] Deslop (<commit>)` and
+  `- [x] Cold read (<commit>)`.
 
-With `--base` and `--head`, it also reads the branch's commits. The commit on a Deslop or Cold read
-line fails when it isn't on the branch, or when a commit after it on the branch changes a doc or
-skill file, because the check then ran on text that has since changed. A PR whose branch changes a
-doc or skill file needs a Checks section with all three lines. A later doc fix makes the Deslop and
-Cold read commits stale: run both again, and put the new commits on their lines. Doc and skill files
-are the files that `chex prose` reads when it gets no path, as the
-[chex README](../../packages/chex/README.md) lists.
+Only `Description` is required.
 
-`tick-chex` changes nothing on disk: it prints the body with only the chex line set to `[x]`, or to
-`[ ]` with `--failed`.
+A PR that changes a doc or skill file also needs the Checks section with all three lines. A doc or
+skill file is any file that `chex prose` reads when it gets no path, as the chex README lists.
+
+### The Checks lines
+
+The chex line passes ticked or unticked, because the tick-chex job sets it. The author ticks the
+other two after running the [deslop](https://github.com/zgeoff/skills/tree/main/skills/deslop) and
+[cold-read](https://github.com/zgeoff/skills/tree/main/skills/cold-read) skills, and writes the
+short hash of the commit they checked in the brackets.
+
+With `--base` and `--head`, the command also reads the branch's commits:
+
+- It fails the hash on either line when that commit isn't on the branch.
+- It fails the hash on the Deslop line when a later commit on the branch changes a doc or skill
+  file. Run deslop on that change, and write the new hash on the Deslop line.
+- It keeps the hash on the Cold read line valid after later commits. The cold-read skill caps the
+  reads for each PR, and a fresh cold read always finds something, so a rerun after each fix would
+  never stop.
 
 ## The tick-chex job
 
-The workflow's second job, `tick-chex`, runs `chex prose links skill` on the PR's head. It ticks the
-chex line when those checks clear and unticks it when they fail, and writes the body back only when
-the text changed. A body with no chex line stays as it is. A failed docs check fails the job too, so
-the run shows why the box is unticked. The job runs on `opened`, `reopened` and `synchronize`, and
-never on `edited`, because its own edit of the body would start it again. It skips a PR from a fork,
-whose token cannot write, and a bot's PR. To tick a chex line you added by hand, push a commit.
+The pr-body workflow's second job runs `chex prose links skill` on the PR's head: the prose, links
+and skill checks. It ticks the chex line when all three pass, unticks it when one fails, and fails
+itself too, so the run shows why the box is unticked. It writes the description back only when the
+text changed, and leaves a description with no chex line as it is.
 
-The workflow pins one chex release in its `CHEX` value. In tools, `bun run check:chex-pin` fails
-when no custom manager in `renovate.json` captures that pin or the one in `bun-checks.yml`, so
-Renovate bumps both.
+The job runs when a PR opens, reopens or gets a push, and never on an edit, because its own edit
+would start it again. It skips a PR from a fork, whose token can't write, and a PR that a bot
+opened. To tick a chex line you added by hand, push a commit.
+
+## The chex version
+
+The pr-body workflow pins the chex release it runs in its `CHEX` environment value, and this repo's
+`bun-checks.yml` workflow pins the same release in its own. `bun run check:chex-pin` fails when
+`renovate.json` has no rule that updates both, so Renovate always moves them together.
 
 ## The title check
 
-The [reusable pr-title workflow](../../.github/workflows/pr-title-check.yml) lints the PR title with
-commitlint and `@zgeoff/commitlint-config`, the rules that `chex commits` applies to each commit,
-and prints the fix when it fails. A squash merge makes the title the commit subject. It runs on
-`opened`, `edited`, `reopened` and `synchronize`, so renaming the PR runs it again. repo-sync writes
-its stub, `.github/workflows/pr-title.yml`, into every repo.
+The [pr-title workflow](../../.github/workflows/pr-title-check.yml) lints the PR title with
+commitlint and `@zgeoff/commitlint-config`, the rules that `chex commits` applies to each commit. A
+squash merge makes the title the commit subject, so the title follows the same rules. The workflow
+runs when a PR opens, reopens, gets a push or is edited, so renaming the PR runs the check again.
 
 ## When a check fails
 
-Open the failed job from the PR's checks list. Its log gives one line per error, with the section
-and the fix.
+Open the failed job from the PR's checks list, and read its log.
 
-- **pr-body:** edit the PR description. The edit runs the check again.
-- **tick-chex:** fix what `chex prose links skill` reports, and push. The push runs the docs checks
-  again and ticks the box when they clear.
-- **pr-title:** rename the PR. The rename runs the check again.
+- When the pr-body job fails, its log lists each section and the fix. Edit the PR description, which
+  runs the check again.
+- When the tick-chex job fails, its log holds the output of `chex prose links skill`. Fix what it
+  reports, and push. The push runs the job again, and it ticks the box when the checks pass.
+- When the pr-title job fails, its log gives the commitlint error and the fix. Rename the PR, which
+  runs the check again.

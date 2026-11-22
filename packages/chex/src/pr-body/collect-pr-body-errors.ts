@@ -269,7 +269,9 @@ function collectShaErrors(name: string, sha: string, facts: BranchFacts): string
     ];
   }
 
-  if (state === 'old' && facts.newestDocChange !== undefined) {
+  // A cold read runs on a budget and never comes back empty, so a later doc commit leaves its sha
+  // standing; deslop runs on every doc commit, so its sha must be current.
+  if (state === 'old' && name === 'Deslop' && facts.newestDocChange !== undefined) {
     return [
       `Checks: ${name} (${sha}) is older than commit ${facts.newestDocChange.commit.slice(0, 7)}, which changes ${facts.newestDocChange.files.join(', ')}; re-run that check and update the sha.`,
     ];

@@ -45,16 +45,22 @@ pre-push:
       run: '{clear-git-env} bun x --no-install diet -- bun x --no-install chex uncommitted'
     - name: chex-format:check
       run: '{clear-git-env} bun x --no-install diet -- bun run format:check'
-    # Plain oxlint, without the unused-directive check: a directive for a
-    # type-aware rule reads as unused in plain mode.
+    # Type-aware oxlint on the files the branch changes only. Two threads keep
+    # its peak near 730 MB, which fits beside an agent in a 1.4 GB imp; the
+    # whole repo peaks near 1.2 GB, so CI runs lint:full on the whole tree.
     - name: chex-lint
       files:
         unset $(git rev-parse --local-env-vars); bun
         node_modules/@zgeoff/chex/src/branch/read-branch-files.ts
       glob: '*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}'
       run:
-        '{clear-git-env} bun x --no-install diet -- bun x --no-install oxlint
-        --no-error-on-unmatched-pattern {files}'
+        '{clear-git-env} bun x --no-install diet -- bun x --no-install oxlint --type-aware
+        --type-check --threads=2 --no-error-on-unmatched-pattern {files}'
+    # A repo without the script passes: bun run --if-present exits 0.
+    - name: chex-deadcode
+      run: '{clear-git-env} bun x --no-install diet -- bun run --if-present deadcode'
+    - name: chex-verify-lint
+      run: '{clear-git-env} bun x --no-install diet -- bun run --if-present verify lint'
     # Each file check reads only the files the branch changes that match its
     # glob, so a file the branch leaves unchanged never fails a push. A check
     # whose program the machine lacks prints a notice and passes: CI installs

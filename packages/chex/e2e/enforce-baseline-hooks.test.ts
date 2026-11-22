@@ -325,7 +325,10 @@ test('it fails the push on the lint job when oxlint fails a file the branch chan
 
   expect(result.exitCode).not.toBe(0);
   expect(result.failedJobs).toStrictEqual(['chex-lint']);
-  expect(result.output).toInclude('lint failed: --no-error-on-unmatched-pattern src/kettle.ts');
+
+  expect(result.output).toInclude(
+    'lint failed: --type-aware --type-check --threads=2 --no-error-on-unmatched-pattern src/kettle.ts',
+  );
 });
 
 test('it fails the push on the local-paths job when a commit of the branch adds the home directory', async () => {
