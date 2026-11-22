@@ -1,8 +1,8 @@
 # The PR checks
 
-Two checks keep every pull request in the zgeoff repos to one shape: the body check holds the
-description to the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md), and the title check holds
-the title to the Conventional Commit rules. Each runs as a reusable workflow in this repo.
+The body check holds each pull request's description in the zgeoff repos to the
+[PR template](../../.github/PULL_REQUEST_TEMPLATE.md), and the title check holds its title to the
+Conventional Commit rules. Each runs as a reusable workflow in this repo.
 [repo-sync](./repo-sync.md) writes a small caller workflow for each into every repo it syncs, so a
 repo needs no setting to get them.
 
@@ -74,8 +74,8 @@ opened. To tick a chex line you added by hand, push a commit.
 
 ## The chex version
 
-The pr-body workflow names the chex release it runs in its `CHEX` environment value, and this repo's
-`bun-checks.yml` workflow names the same release in its own. `bun run check:chex-pin` fails when
+The pr-body workflow pins the chex release it runs in its `CHEX` environment value, and this repo's
+`bun-checks.yml` workflow pins the same release in its own. `bun run check:chex-pin` fails when
 `renovate.json` has no rule that updates both, so Renovate always moves them together.
 
 ## The title check
@@ -89,7 +89,7 @@ runs when a PR opens, reopens, gets a push or is edited, so renaming the PR runs
 
 Open the failed job from the PR's checks list, and read its log.
 
-- When the pr-body job fails, its log names each section and the fix. Edit the PR description, which
+- When the pr-body job fails, its log lists each section and the fix. Edit the PR description, which
   runs the check again.
 - When the tick-chex job fails, its log holds the output of `chex prose links skill`. Fix what it
   reports, and push. The push runs the job again, and it ticks the box when the checks pass.
