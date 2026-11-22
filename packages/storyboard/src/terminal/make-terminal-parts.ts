@@ -4,7 +4,7 @@ import { defineHost } from '../components/define-host.ts';
 import type { Host, Steps, StoryNode, TerminalMail, TimedProps, TokenReference } from '../types.ts';
 import { countReadingWords } from '../utils/count-reading-words.ts';
 import { renderTerminal } from './render-terminal.ts';
-import type { TerminalProps } from './terminal-context.ts';
+import type { TerminalProps } from './types.ts';
 
 export interface TerminalParts {
   readonly buildTerminal: (props: TerminalProps) => Host<TerminalMail>;

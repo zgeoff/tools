@@ -18,7 +18,8 @@ import type {
 import { buildStep } from './build-step.ts';
 import { dividerOffset } from './divider-offset.ts';
 import { heightOf } from './height-of.ts';
-import { renderAlert, renderFlash } from './render-alert.ts';
+import { renderAlert } from './render-alert.ts';
+import { renderFlash } from './render-flash.ts';
 import { renderTypedRow } from './render-typed-row.ts';
 import { HEADER_H, rowBaseline } from './row-baseline.ts';
 import type {
@@ -27,7 +28,7 @@ import type {
   TerminalHelpers,
   TerminalLineOption,
   TerminalProps,
-} from './terminal-context.ts';
+} from './types.ts';
 
 // Draws a terminal: its frame, its lines and rows, its status, its veil and its alert borders. The
 // frame, the veil and each alert border grow by one row over one fade as a row enters.

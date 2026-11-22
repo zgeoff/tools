@@ -6,7 +6,7 @@ import type { AnimationNode, StoryNode, TerminalTypeMail } from '../types.ts';
 import { SceneError } from '../utils/scene-error.ts';
 import { buildStep } from './build-step.ts';
 import { ROW_H } from './row-baseline.ts';
-import type { TerminalContext } from './terminal-context.ts';
+import type { TerminalContext } from './types.ts';
 
 export interface RowOrigin {
   readonly x: number;
@@ -48,11 +48,11 @@ export function renderTypedRow(
     children: buildElement('clipPath', { id: ctx.helpers.id(clipID) }, clipRect),
   });
 
-  // The prompt mark is part of the terminal, so it stays through the loop.
+  // The prompt mark shows from the moment its row enters, and the reset takes it away.
   const caret = buildElement(
     'text',
-    { x: origin.x, y: origin.y, class: 'sb-caret', fill: color('blue') },
-    '›',
+    { x: origin.x, y: origin.y, class: 'sb-caret', fill: color('blue'), opacity: 0 },
+    ['›', renderTypedShow(at)],
   );
 
   const typed = buildElement(
@@ -77,7 +77,7 @@ export function renderTypedRow(
   ]);
 }
 
-// The text cuts in as the typing starts.
+// The prompt and the text cut in as the row enters.
 function renderTypedShow(at: number): AnimationNode {
   return buildStep({ attribute: 'opacity', startS: at, durS: CUT_S, from: 0, to: 1 });
 }
