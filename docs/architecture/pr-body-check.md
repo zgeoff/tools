@@ -34,11 +34,12 @@ written by `bun verify publish`.
   sets it. Each commit is the one the deslop or cold read ran on.
 
 With `--base` and `--head`, it also reads the branch's commits. The commit on a Deslop or Cold read
-line fails when it isn't on the branch, or when a commit after it on the branch changes a doc or
-skill file, because the check then ran on text that has since changed. A PR whose branch changes a
-doc or skill file needs a Checks section with all three lines. A later doc fix makes the Deslop and
-Cold read commits stale: run both again, and put the new commits on their lines. Doc and skill files
-are the files that `chex prose` reads when it gets no path, as the
+line fails when it isn't on the branch. The Deslop commit also fails when a commit after it on the
+branch changes a doc or skill file, so a later doc fix needs deslop again and its new commit on the
+Deslop line. The Cold read commit stays valid after a later doc commit: a cold read runs on a budget
+of reads, as the `cold-read` skill says, and running one after every doc fix would never end. A PR
+whose branch changes a doc or skill file needs a Checks section with all three lines. Doc and skill
+files are the files that `chex prose` reads when it gets no path, as the
 [chex README](../../packages/chex/README.md) lists.
 
 `tick-chex` changes nothing on disk: it prints the body with only the chex line set to `[x]`, or to

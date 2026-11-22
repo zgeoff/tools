@@ -331,6 +331,22 @@ test('it fails a Deslop sha older than a later skill edit and names the files', 
   ]);
 });
 
+test('it passes a Cold read sha older than a later skill edit', () => {
+  const ctx = setupTest();
+
+  const body = ctx.buildBody(
+    '## Checks\n\n- [ ] chex\n- [x] Deslop (f00dfee)\n- [x] Cold read (a1b2c3d)\n',
+  );
+
+  const facts = ctx.buildFacts({
+    docFiles: ['skills/demo/SKILL.md'],
+    newestDocChange: { commit: 'f00dfee12345', files: ['skills/demo/SKILL.md'] },
+    shaStates: { a1b2c3d: 'old', f00dfee: 'current' },
+  });
+
+  expect(collectPrBodyErrors(body, facts)).toStrictEqual([]);
+});
+
 test.each([
   [
     'unknown',
