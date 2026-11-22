@@ -36,6 +36,8 @@ export async function start(
       stdin: 'pipe',
       stdout: 'pipe',
       stderr: 'pipe',
+
+      // its own process group, so the stop at test end also reaches each child it forks
       detached: true,
     });
   } catch (error) {
