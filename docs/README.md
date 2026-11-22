@@ -32,6 +32,8 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 - [MCP OAuth server](./architecture/mcp-auth.md): `@zgeoff/mcp-auth`, the OAuth server that atc,
   boxxy, pepys and impz share for their `/mcp` routes, how a grant is stored and revoked, and its
   tokens and limits.
+- [storyboard](./architecture/storyboard.md): `@zgeoff/storyboard`, how a scene's changes are placed
+  in time, how the dark and light files are written, and the two check suites.
 - [The testing kit](./architecture/testing-kit.md): the rules that span the subpaths of
   `@zgeoff/testing`, and why each holds.
 - [format-codemod rules](./architecture/format-codemod-rules.md): the blank lines the codemod adds

@@ -8,8 +8,7 @@
 
   <p>
     <a href="../../docs/README.md">Documentation</a> •
-    <a href="../../docs/design/storyboard/authoring.md">Authoring a scene</a> •
-    <a href="../../docs/design/storyboard/build-and-check.md">Build and check</a>
+    <a href="../../docs/architecture/storyboard.md">How it works</a>
   </p>
 </div>
 
@@ -28,15 +27,15 @@ bunx storyboard new hero
 bun run storyboard
 ```
 
-`storyboard new <scene>` writes the scene under `scripts/storyboard/<scene>/`, and on a repo's first
-scene it also writes the two check suites and a `storyboard` script. `@zgeoff/rig` is an optional
-peer dependency that only the browser suite imports.
+`storyboard new <scene>` writes the scene under `scripts/storyboard/<scene>/`, and when the repo has
+no scene yet it also writes the two check suites and a `storyboard` script. `@zgeoff/rig` is an
+optional peer dependency that only the browser suite imports.
 
 ## Features
 
 - A JSX runtime (`@zgeoff/storyboard/jsx-runtime`) that builds a tree, so a scene needs no React.
-- A two-pass timeline that fails the build, naming the change, when a timing rule breaks.
-  [Authoring a scene](../../docs/design/storyboard/authoring.md) lists the rules.
+- A timeline that fails the build, naming the change, when a timing rule breaks.
+  [How storyboard works](../../docs/architecture/storyboard.md) gives the rules.
 - Terminals, lines, typed prompts, statuses, alerts, flights, pulses, cursors and stamps, and
   `defineHost` and `defineEffect` for parts of your own.
 - Output that is byte-stable: a second build writes the same bytes, and nothing is written when a
@@ -45,9 +44,9 @@ peer dependency that only the browser suite imports.
   its size, and whether it is stale.
 - `@zgeoff/storyboard/browser`: a browser suite that steps each file through its frames in Chrome
   and fails on overlapping text, text outside the view box, and a loop whose last frame differs from
-  its first. [Build and check](../../docs/design/storyboard/build-and-check.md) describes both
-  suites.
+  its first.
 
 ## Documentation
 
-The [docs index](../../docs/README.md) links the design.
+[How storyboard works](../../docs/architecture/storyboard.md) gives the timing rules and the checks,
+and the [docs index](../../docs/README.md) lists every doc.
