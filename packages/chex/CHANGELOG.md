@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.7](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.4.6...@zgeoff/chex@0.4.7) (2026-11-22)
+
+
+### Features
+
+* **chex:** accept a boxxy item ref on a later line ([#757](https://github.com/zgeoff/tools/issues/757)) ([4fa027a](https://github.com/zgeoff/tools/commit/4fa027a5d31028d7d6c681617ff4cb6997ea02b9))
+
 ## [0.4.6](https://github.com/zgeoff/tools/compare/@zgeoff/chex@0.4.5...@zgeoff/chex@0.4.6) (2026-11-22)
 
 
