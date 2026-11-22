@@ -1,7 +1,7 @@
 // oxlint-disable unicorn/no-array-callback-reference -- time.find looks up a reference, and is no iterator method
 // oxlint-disable eslint/id-length -- SVG names its attributes d and r with one letter
 import { buildAnimation } from '../animation/build-animation.ts';
-import { FADE_S, GRID_S } from '../animation/constants.ts';
+import { CUT_S, FADE_S, GRID_S } from '../animation/constants.ts';
 import { buildElement } from '../jsx/build-element.ts';
 import type {
   Host,
@@ -153,6 +153,11 @@ function buildStopsPath(stops: readonly Point[]): string {
     .join(' ');
 }
 
+const HAND_OUTLINE =
+  'M-1.5 1.6C-1.5 .6 -.8 0 0 0C.8 0 1.5 .6 1.5 1.6V8.6C1.5 7.8 2.1 7.2 2.9 7.2C3.7 7.2 4.3 7.8 4.3 8.6V9.6C4.3 8.8 4.9 8.3 5.7 8.3C6.5 8.3 7.1 8.9 7.1 9.7V10.6C7.1 9.9 7.7 9.5 8.4 9.5C9.1 9.5 9.7 10.1 9.7 10.8V16C9.7 19.4 7.6 21.6 4.6 21.6H2.2C.2 21.6 -1.1 20.7 -2.2 19.2L-6 13.8C-6.6 13 -6.4 11.9 -5.6 11.4C-4.8 10.9 -3.8 11.1 -3.2 11.8L-1.5 14Z';
+
+const HAND_FINGERS = 'M1.5 8.6V12.4M4.3 9.6V12.6M7.1 10.6V13';
+
 // The hand glides from `from` to `target`, reaches it half a fade before the change, presses on
 // it, and glides back at `leaves`.
 function renderCursor(
@@ -201,17 +206,33 @@ function renderCursor(
     ],
   });
 
-  const hand = buildElement(
+  const outline = buildElement(
     'path',
     {
-      d: 'M0 0 L0 15 L3.6 11.6 L6.2 17.4 L8.6 16.4 L6.1 10.8 L11 10.8 Z',
-      fill: color('text'),
-      stroke: color('veil'),
-      'stroke-width': 1,
+      d: HAND_OUTLINE,
+      fill: color('terminalStroke'),
+      stroke: color('terminalFill'),
+      'stroke-width': 1.3,
       'stroke-linejoin': 'round',
     },
-    [glide, press],
+    null,
   );
+
+  const fingers = buildElement(
+    'path',
+    {
+      d: HAND_FINGERS,
+      fill: 'none',
+      stroke: color('terminalFill'),
+      'stroke-width': 1,
+      'stroke-linecap': 'round',
+    },
+    null,
+  );
+
+  // The fingertip is the origin, so the hand presses on the point it glides to.
+  const tilted = buildElement('g', { transform: 'scale(1.45) rotate(-14)' }, [outline, fingers]);
+  const hand = buildElement('g', {}, [buildElement('g', {}, [tilted, press]), glide]);
 
   return buildElement('g', { opacity: 0 }, [hand, time.fadeIn(startS), time.fadeOut(endS)]);
 }
@@ -228,7 +249,7 @@ function renderStamp(
   color: (name: string) => TokenReference,
 ): StoryNode {
   const charWidth = 7.4;
-  const width = props.children.length * charWidth + 14;
+  const width = props.children.length * charWidth + 18;
 
   const slam = buildAnimation({
     attribute: 'transform',
@@ -237,8 +258,8 @@ function renderStamp(
     durS: FADE_S,
     keys: [
       [0, 1.7],
-      [0.3, 0.88],
-      [0.6, 1.05],
+      [0.32, 0.88],
+      [0.68, 1.05],
       [1, 1],
     ],
   });
@@ -272,9 +293,26 @@ function renderStamp(
     slammed,
   );
 
-  return buildElement('g', { opacity: 0 }, [
-    placement,
-    time.fadeIn(placed.at),
-    time.fadeOut(time.find(props.until)),
-  ]);
+  // The stamp cuts in as it slams, and fades over half a fade when it goes.
+  const cutsIn = buildAnimation({
+    attribute: 'opacity',
+    startS: placed.at,
+    durS: CUT_S,
+    keys: [
+      [0, 0],
+      [1, 1],
+    ],
+  });
+
+  const goes = buildAnimation({
+    attribute: 'opacity',
+    startS: time.find(props.until),
+    durS: FADE_S / 2,
+    keys: [
+      [0, 1],
+      [1, 0],
+    ],
+  });
+
+  return buildElement('g', { opacity: 0 }, [placement, cutsIn, goes]);
 }
