@@ -64,16 +64,15 @@ with an `at` prop does not make a change of its own: it lands at the change or t
 gives, and its words count toward that change.
 
 The SVG file stores each time as a fraction of the loop, to 4 decimal places. When the rounding
-would reorder two times on one animation, the build fails rather than write an animation that runs
-backwards.
+would reorder two times on one animation, the build fails.
 
 ## The veil
 
 One host acts at a time: from the first change that draws into that host alone, or that a `Beat`
-focuses on it, until another host acts. The package dims every other host with a veil over it. It
-lifts a host's veil one fade before the host acts, so the eye moves before the text arrives. The
-last host's turn ends at the reset, and the first host to act is lit from the start of the loop, so
-the loop's last frame matches its first.
+focuses on it, until another host acts. The package dims every other host with a veil, and lifts a
+host's veil one fade before the host acts, so the eye moves before the text arrives. The last host's
+turn ends at the reset, and the first host to act is lit from the start of the loop, so the loop's
+last frame matches its first.
 
 ## Animations
 
@@ -107,6 +106,5 @@ suite imports rig, so rig is an optional peer dependency of the package.
 ## Exports and setup
 
 The package ships its TypeScript source. `./checks` and `./browser` export only under the `bun`
-condition, so only Bun can import them, which is where `bun test` runs them.
-`storyboard new <scene>` writes a scene and, when the repo has no scene yet, the two suites and the
-`storyboard` script.
+condition, because they run inside `bun test`. `storyboard new <scene>` writes a scene and, when the
+repo has no scene yet, the two suites and the `storyboard` script.
