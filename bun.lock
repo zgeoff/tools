@@ -292,7 +292,7 @@
     },
     "packages/storyboard": {
       "name": "@zgeoff/storyboard",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "bin": {
         "storyboard": "./src/cli.ts",
       },
