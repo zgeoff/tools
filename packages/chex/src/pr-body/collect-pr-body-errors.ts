@@ -146,7 +146,7 @@ const labelOrder: readonly string[] = ['Needs the owner', 'Later'];
 const labelLine = /^\*\*(?<label>[^*]+)\*\*:?\s*$/u;
 const bulletLine = /^[-*+]\s+/u;
 const checkboxBullet = /^[-*+]\s+\[[ xX]\]\s+\S/u;
-const issueEnding = /\((?:[A-Z][A-Z0-9]*-\d+|#\d+|[\w.-]+\/[\w.-]+#\d+)\)\.?$/u;
+const issueEnding = /\((?:[A-Z][A-Z0-9]*-\d+|i-[1-9]\d*|#\d+|[\w.-]+\/[\w.-]+#\d+)\)\.?$/u;
 
 function collectNextStepsErrors(section: BodySection): string[] {
   const errors: string[] = [];
@@ -204,7 +204,7 @@ function collectNextStepsErrors(section: BodySection): string[] {
 
       if (group.label === 'Later' && !issueEnding.test(item.trim())) {
         errors.push(
-          `Next steps: "${item.trim()}" under **Later** does not end with an issue ID in brackets such as (GEO-124) or (#45); file the issue and add it.`,
+          `Next steps: "${item.trim()}" under **Later** does not end with an issue ID in brackets such as (GEO-124), (#45) or (i-124); file the issue and add it.`,
         );
       }
     }
