@@ -41,7 +41,10 @@ type BaseTokenName =
   | 'amber'
   | 'blue'
   | 'violet'
-  | 'green';
+  | 'green'
+  | 'windowClose' // the title bar's three dots
+  | 'windowMinimize'
+  | 'windowZoom';
 interface Tokens<K extends string> {
   values: Record<K | BaseTokenName, TokenValue>; // the base tokens, with the scene's added or overriding
 }
@@ -278,7 +281,7 @@ Every time inside the package is in seconds.
 
 The veil dims each host to 40% while it isn't acting. A host acts from a change that writes to it
 until a change writes to another host. A `Beat` with `focus={handle}` picks the acting host when it
-writes to several or to none.
+writes to several or to none. The first host to act is lit from the start of the loop.
 
 ```ts
 // storyboard module. K is the scene's token names. Every effect also takes `id`, `after` and `at`,
@@ -309,7 +312,13 @@ interface SceneKit<K extends string> {
     props: TimedProps<{ on: Host<TerminalMail>; typing: Steps; sends: Steps; children: string }>,
   ): StoryNode; // marks: typed, sent
   Status(
-    props: TimedProps<{ on: Host<TerminalMail>; tone?: K; read?: boolean; children: string }>,
+    props: TimedProps<{
+      on: Host<TerminalMail>;
+      tone?: K;
+      read?: boolean;
+      flash?: boolean; // flash the frame once in the tone; default: when the tone is green
+      children: string;
+    }>,
   ): StoryNode; // runs until the next Status on that host
   Alert(props: TimedProps<{ on: Host<TerminalMail>; tone: K; until: Reference }>): StoryNode; // a flashing border
 

@@ -3,51 +3,31 @@
 import { buildAnimation } from '../animation/build-animation.ts';
 import { FADE_S } from '../animation/constants.ts';
 import { buildAmbient } from '../components/build-ambient.ts';
-import { buildDef } from '../components/build-def.ts';
 import { buildElement } from '../jsx/build-element.ts';
 import type {
   AnimationNode,
   Delivery,
-  IDReference,
   SceneTime,
   StoryNode,
   TerminalAlertMail,
   TerminalLineMail,
   TerminalMail,
+  TerminalStatusMail,
   TerminalTypeMail,
-  TokenReference,
 } from '../types.ts';
-import { SceneError } from '../utils/scene-error.ts';
 import { buildStep } from './build-step.ts';
-
-export interface TerminalLineOption {
-  readonly text: string;
-  readonly tone?: string | undefined;
-}
-
-export interface TerminalProps {
-  readonly title: string;
-  readonly box: { readonly x: number; readonly y: number; readonly width: number };
-  readonly opens?: string | undefined;
-  readonly status?: string | TerminalLineOption | undefined;
-  readonly lines?: readonly (string | TerminalLineOption)[] | undefined;
-}
-
-export interface TerminalHelpers {
-  readonly color: (name: string) => TokenReference;
-  readonly id: (name: string) => IDReference;
-  readonly url: (name: string) => IDReference;
-}
-
-type GrowAnimations = (attribute: string, offset: (rows: number) => number) => AnimationNode[];
-
-interface TerminalContext {
-  readonly props: TerminalProps;
-  readonly time: SceneTime;
-  readonly helpers: TerminalHelpers;
-  readonly baseRows: number;
-  readonly grow: GrowAnimations;
-}
+import { dividerOffset } from './divider-offset.ts';
+import { heightOf } from './height-of.ts';
+import { renderAlert, renderFlash } from './render-alert.ts';
+import { renderTypedRow } from './render-typed-row.ts';
+import { HEADER_H, rowBaseline } from './row-baseline.ts';
+import type {
+  GrowAnimations,
+  TerminalContext,
+  TerminalHelpers,
+  TerminalLineOption,
+  TerminalProps,
+} from './terminal-context.ts';
 
 // Draws a terminal: its frame, its lines and rows, its status, its veil and its alert borders. The
 // frame, the veil and each alert border grow by one row over one fade as a row enters.
@@ -57,19 +37,20 @@ export function renderTerminal(
   time: SceneTime,
   helpers: TerminalHelpers,
 ): StoryNode {
-  const baseRows = (props.lines ?? []).length;
+  const initialRows = (props.lines ?? []).length;
+  const baseRows = Math.max(1, initialRows);
   const rowDeliveries = collectRowDeliveries(deliveries);
 
   const growth = collectGrowth(
     rowDeliveries.map((row) => row.at),
-    baseRows,
+    initialRows,
   );
 
   const grow: GrowAnimations = (attribute, offset) => {
     const steps = growth.map((step) =>
       buildStep({
         attribute,
-        startS: step.at,
+        startS: step.at - FADE_S,
         durS: FADE_S,
         from: offset(step.rowsBefore),
         to: offset(step.rowsAfter),
@@ -94,11 +75,15 @@ export function renderTerminal(
     return [...steps, shrink];
   };
 
-  const ctx: TerminalContext = { props, time, helpers, baseRows, grow };
-  const rows = rowDeliveries.map((row, index) => renderRow(row, baseRows + index, ctx));
+  const ctx: TerminalContext = { props, time, helpers, baseRows, initialRows, grow };
+  const rows = rowDeliveries.map((row, index) => renderRow(row, initialRows + index, ctx));
 
   const alerts = collectAlertDeliveries(deliveries).map((alert) =>
     renderAlert(alert.at, alert.mail, ctx),
+  );
+
+  const flashes = collectStatusDeliveries(deliveries).flatMap((status) =>
+    status.mail.flash ? [renderFlash(status.at, status.mail.tone, ctx)] : [],
   );
 
   const body = [
@@ -110,6 +95,7 @@ export function renderTerminal(
     renderStatuses(deliveries, ctx),
     renderVeil(ctx),
     alerts,
+    flashes,
   ];
 
   if (props.opens === undefined) {
@@ -140,24 +126,28 @@ interface GrowthStep {
   rowsAfter: number;
 }
 
-// One step for each instant that rows enter, with the rows before and after it.
-function collectGrowth(rowTimes: readonly number[], baseRows: number): GrowthStep[] {
+// One step for each instant that rows enter, with the rows the frame shows before and after it. The
+// frame always shows at least one row, so the first row to enter an empty terminal needs no growth.
+function collectGrowth(rowTimes: readonly number[], initialRows: number): GrowthStep[] {
   const steps: GrowthStep[] = [];
-  let rows = baseRows;
+  let rows = initialRows;
 
   for (const at of rowTimes) {
+    const rowsBefore = Math.max(1, rows);
+
+    rows += 1;
+
+    const rowsAfter = Math.max(1, rows);
     const last = steps.at(-1);
 
     if (last?.at === at) {
-      last.rowsAfter += 1;
+      last.rowsAfter = rowsAfter;
     } else {
-      steps.push({ at, rowsBefore: rows, rowsAfter: rows + 1 });
+      steps.push({ at, rowsBefore, rowsAfter });
     }
-
-    rows += 1;
   }
 
-  return steps;
+  return steps.filter((step) => step.rowsAfter > step.rowsBefore);
 }
 
 function renderRow(row: RowDelivery, index: number, ctx: TerminalContext): StoryNode {
@@ -198,88 +188,6 @@ function renderRow(row: RowDelivery, index: number, ctx: TerminalContext): Story
   return buildElement('g', { opacity: 0 }, [line, fades]);
 }
 
-const ROW_H = 19;
-
-interface RowOrigin {
-  readonly x: number;
-  readonly y: number;
-}
-
-function renderTypedRow(
-  at: number,
-  mail: TerminalTypeMail,
-  origin: RowOrigin,
-  ctx: TerminalContext,
-): StoryNode {
-  const charWidth = 7.8;
-  const color = ctx.helpers.color;
-
-  if (mail.sendsS < mail.typingS) {
-    throw new SceneError('bad-component', `<Type> "${mail.text}" is sent before it is typed`);
-  }
-
-  const clipID = `${ctx.time.key}-clip${Math.round(origin.y)}`;
-  const textX = origin.x + 2 * charWidth;
-
-  const reveal = buildStep({
-    attribute: 'width',
-    startS: at,
-    durS: Math.max(mail.typingS, 0.03),
-    from: 0,
-    to: mail.text.length * charWidth,
-  });
-
-  const dim = buildStep({
-    attribute: 'opacity',
-    startS: at + mail.sendsS,
-    durS: FADE_S,
-    from: 1,
-    to: 0.7,
-  });
-
-  const clipRect = buildElement(
-    'rect',
-    { x: textX, y: origin.y - 13, height: ROW_H, width: 0 },
-    reveal,
-  );
-
-  const clip = buildDef({
-    children: buildElement('clipPath', { id: ctx.helpers.id(clipID) }, clipRect),
-  });
-
-  const caret = buildElement(
-    'text',
-    { x: origin.x, y: origin.y, class: 'sb-line', fill: color('blue') },
-    '›',
-  );
-
-  const typed = buildElement(
-    'text',
-    {
-      x: textX,
-      y: origin.y,
-      class: 'sb-line',
-      fill: color('text'),
-      opacity: 1,
-      'clip-path': ctx.helpers.url(clipID),
-    },
-    [mail.text, dim],
-  );
-
-  const fades = [ctx.time.fadeIn(at), ctx.time.fadeOut(ctx.time.reset)];
-
-  return buildElement('g', { opacity: 0 }, [clip, caret, typed, fades]);
-}
-
-const HEADER_H = 26;
-
-function rowBaseline(index: number): number {
-  const padding = 8;
-  const ascent = 13;
-
-  return HEADER_H + padding + ROW_H * index + ascent;
-}
-
 function collectAlertDeliveries(
   deliveries: readonly Delivery<TerminalMail>[],
 ): { at: number; mail: TerminalAlertMail }[] {
@@ -288,55 +196,12 @@ function collectAlertDeliveries(
   );
 }
 
-function renderAlert(at: number, mail: TerminalAlertMail, ctx: TerminalContext): StoryNode {
-  const box = ctx.props.box;
-  const spanS = ctx.time.find(mail.until) - at;
-
-  if (!(spanS > 0)) {
-    throw new SceneError(
-      'bad-component',
-      `an <Alert> ends at ${mail.until}, which is not after it starts`,
-    );
-  }
-
-  const cycles = Math.max(2, Math.round(spanS / 0.5));
-  const keys: (readonly [number, number])[] = [[0, 0]];
-
-  for (let cycle = 1; cycle <= cycles; cycle += 1) {
-    keys.push([cycle / (cycles + 1), cycle % 2 === 1 ? 1 : 0.35]);
-  }
-
-  keys.push([1, 0]);
-
-  const flash = buildAnimation({ attribute: 'opacity', startS: at, durS: spanS, keys });
-
-  return buildElement(
-    'rect',
-    {
-      x: box.x,
-      y: box.y,
-      width: box.width,
-      height: heightOf(ctx.baseRows),
-      rx: 10,
-      fill: 'none',
-      stroke: ctx.helpers.color(mail.tone),
-      'stroke-width': 1.6,
-      opacity: 0,
-    },
-    [ctx.grow('height', (rows) => heightOf(rows)), flash],
+function collectStatusDeliveries(
+  deliveries: readonly Delivery<TerminalMail>[],
+): { at: number; mail: TerminalStatusMail }[] {
+  return deliveries.flatMap((delivery) =>
+    delivery.payload.form === 'status' ? [{ at: delivery.at, mail: delivery.payload }] : [],
   );
-}
-
-const STATUS_H = 26;
-
-function heightOf(rows: number): number {
-  return dividerOffset(rows) + STATUS_H;
-}
-
-function dividerOffset(rows: number): number {
-  const padding = 8;
-
-  return HEADER_H + padding + ROW_H * rows;
 }
 
 function renderFrame(ctx: TerminalContext): StoryNode {
@@ -364,10 +229,14 @@ function renderHeader(ctx: TerminalContext): StoryNode {
   const box = ctx.props.box;
   const color = ctx.helpers.color;
 
-  const dots = [15, 24, 33].map((offset) =>
+  const dots = [
+    { offset: 15, tone: 'windowClose' },
+    { offset: 24, tone: 'windowMinimize' },
+    { offset: 33, tone: 'windowZoom' },
+  ].map((dot) =>
     buildElement(
       'circle',
-      { cx: box.x + offset, cy: box.y + 13, r: 2.6, fill: color('dimText'), 'fill-opacity': 0.6 },
+      { cx: box.x + dot.offset, cy: box.y + 13, r: 2.6, fill: color(dot.tone), opacity: 0.6 },
       null,
     ),
   );
@@ -388,9 +257,9 @@ function renderHeader(ctx: TerminalContext): StoryNode {
     'line',
     {
       x1: box.x,
-      y1: box.y + HEADER_H - 1,
+      y1: box.y + HEADER_H,
       x2: box.x + box.width,
-      y2: box.y + HEADER_H - 1,
+      y2: box.y + HEADER_H,
       stroke: color('terminalStroke'),
       'stroke-opacity': 0.08,
     },
@@ -471,23 +340,23 @@ function renderStatus(
 ): StoryNode {
   const box = ctx.props.box;
   const tone = ctx.helpers.color(entry.tone ?? 'dimText');
-  const breathing = buildAmbient({ attribute: 'r', periodS: 2.4, values: [3.2, 3.8, 3.2] });
+  const breathing = buildAmbient({ attribute: 'fill-opacity', periodS: 1.2, values: [1, 0.35, 1] });
 
   const dot = buildElement(
     'circle',
-    { cx: box.x + 15, cy: box.y + dividerOffset(ctx.baseRows) + 13, r: 3.2, fill: tone },
+    { cx: box.x + 17, cy: box.y + dividerOffset(ctx.baseRows) + 13, r: 3.2, fill: tone },
     [ctx.grow('cy', (rows) => box.y + dividerOffset(rows) + 13), breathing],
   );
 
   const text = buildElement(
     'text',
     {
-      x: box.x + 26,
-      y: box.y + dividerOffset(ctx.baseRows) + 17,
+      x: box.x + 28,
+      y: box.y + dividerOffset(ctx.baseRows) + 17.2,
       class: 'sb-status',
       fill: tone,
     },
-    [entry.text, ctx.grow('y', (rows) => box.y + dividerOffset(rows) + 17)],
+    [entry.text, ctx.grow('y', (rows) => box.y + dividerOffset(rows) + 17.2)],
   );
 
   const fades = collectStatusFades(entry, next, ctx.time);
@@ -546,11 +415,13 @@ const VEIL_OPACITY = 0.6;
 
 function renderVeil(ctx: TerminalContext): StoryNode {
   const box = ctx.props.box;
+  const isLitAtStart = ctx.time.acting.some((span) => span.fromS <= 0);
 
   const spans = ctx.time.acting.flatMap((span) => {
+    // The veil lifts ahead of the host acting, so it is clear by the time the host acts.
     const lit = buildStep({
       attribute: 'opacity',
-      startS: span.fromS,
+      startS: span.fromS - FADE_S,
       durS: FADE_S,
       from: VEIL_OPACITY,
       to: 0,
@@ -564,7 +435,9 @@ function renderVeil(ctx: TerminalContext): StoryNode {
       to: VEIL_OPACITY,
     });
 
-    return span.toS < ctx.time.reset ? [lit, dim] : [lit];
+    const steps = span.fromS <= 0 ? [] : [lit];
+
+    return span.toS < ctx.time.reset ? [...steps, dim] : steps;
   });
 
   return buildElement(
@@ -576,7 +449,7 @@ function renderVeil(ctx: TerminalContext): StoryNode {
       height: heightOf(ctx.baseRows),
       rx: 10,
       fill: ctx.helpers.color('veil'),
-      opacity: VEIL_OPACITY,
+      opacity: isLitAtStart ? 0 : VEIL_OPACITY,
     },
     [ctx.grow('height', (rows) => heightOf(rows)), spans],
   );
