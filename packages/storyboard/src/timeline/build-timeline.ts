@@ -66,7 +66,7 @@ export function buildTimeline(root: StoryNode, stageS: number): Timeline {
     })),
     tokens: collected.stages[0]?.tokens ?? {},
     placements,
-    acting: collectActingSpans(collected.changes, placement.changeTimesMs, resetS),
+    acting: collectActingSpans(collected.changes, placement.changeTimesMs, resetS, stageS),
     writtenHosts,
     find: (reference) => getInstant(placement, reference, 'a reference').timeMs / 1000,
   };

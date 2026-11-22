@@ -15,4 +15,7 @@ export const BASE_TOKENS: Readonly<Record<BaseTokenName, TokenValue>> = {
   blue: '#82aaff',
   violet: '#c3a6ff',
   green: '#7ee787',
+  windowClose: '#ff7b7b',
+  windowMinimize: '#ffd36b',
+  windowZoom: '#5fd4b0',
 };

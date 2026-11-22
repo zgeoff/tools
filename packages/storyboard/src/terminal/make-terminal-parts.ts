@@ -4,7 +4,7 @@ import { defineHost } from '../components/define-host.ts';
 import type { Host, Steps, StoryNode, TerminalMail, TimedProps, TokenReference } from '../types.ts';
 import { countReadingWords } from '../utils/count-reading-words.ts';
 import { renderTerminal } from './render-terminal.ts';
-import type { TerminalProps } from './render-terminal.ts';
+import type { TerminalProps } from './types.ts';
 
 export interface TerminalParts {
   readonly buildTerminal: (props: TerminalProps) => Host<TerminalMail>;
@@ -20,7 +20,13 @@ export interface TerminalParts {
     props: TimedProps<{ on: Host<TerminalMail>; typing: Steps; sends: Steps; children: string }>,
   ) => StoryNode;
   readonly Status: (
-    props: TimedProps<{ on: Host<TerminalMail>; tone?: string; read?: boolean; children: string }>,
+    props: TimedProps<{
+      on: Host<TerminalMail>;
+      tone?: string;
+      read?: boolean;
+      flash?: boolean;
+      children: string;
+    }>,
   ) => StoryNode;
   readonly Alert: (
     props: TimedProps<{ on: Host<TerminalMail>; tone: string; until: string }>,
@@ -71,11 +77,21 @@ export function makeTerminalParts(color: (name: string) => TokenReference): Term
     }),
   });
 
-  const Status = defineEffect<{ tone?: string; read?: boolean; children: string }, TerminalMail>({
+  const Status = defineEffect<
+    { tone?: string; read?: boolean; flash?: boolean; children: string },
+    TerminalMail
+  >({
     name: 'Status',
     host: buildTerminal,
     need: (props) => ({ words: props.read === true ? countReadingWords(props.children) : 0 }),
-    deliver: (props) => ({ form: 'status', text: props.children, tone: props.tone }),
+
+    // A status in the green tone flashes the frame, unless it says otherwise.
+    deliver: (props) => ({
+      form: 'status',
+      text: props.children,
+      tone: props.tone,
+      flash: props.flash ?? props.tone === 'green',
+    }),
   });
 
   const Alert = defineEffect<{ tone: string; until: string }, TerminalMail>({

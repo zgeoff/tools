@@ -9,6 +9,7 @@ const COMPONENT_RULES = [
   '.sb-caption { font-size: 20px; font-weight: 700; }',
   '.sb-title { font-size: 11.5px; font-weight: 700; }',
   '.sb-line { font-size: 13px; white-space: pre; }',
+  '.sb-caret { font-size: 13.5px; font-weight: 700; }',
   '.sb-status { font-size: 12px; font-weight: 700; }',
   '.sb-stamp { font-size: 10px; font-weight: 800; letter-spacing: .14em; }',
 ];

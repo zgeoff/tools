@@ -18,7 +18,10 @@ export type BaseTokenName =
   | 'amber'
   | 'blue'
   | 'violet'
-  | 'green';
+  | 'green'
+  | 'windowClose'
+  | 'windowMinimize'
+  | 'windowZoom';
 
 export interface Tokens<K extends string> {
   readonly values: Readonly<Record<K | BaseTokenName, TokenValue>>;
@@ -266,6 +269,7 @@ export interface TerminalStatusMail {
   readonly form: 'status';
   readonly text: string;
   readonly tone: string | undefined;
+  readonly flash: boolean;
 }
 
 export interface TerminalAlertMail {
@@ -334,7 +338,13 @@ export interface SceneKit<K extends string> {
     props: TimedProps<{ on: Host<TerminalMail>; typing: Steps; sends: Steps; children: string }>,
   ) => StoryNode;
   readonly Status: (
-    props: TimedProps<{ on: Host<TerminalMail>; tone?: K; read?: boolean; children: string }>,
+    props: TimedProps<{
+      on: Host<TerminalMail>;
+      tone?: K;
+      read?: boolean;
+      flash?: boolean;
+      children: string;
+    }>,
   ) => StoryNode;
   readonly Alert: (
     props: TimedProps<{ on: Host<TerminalMail>; tone: K; until: Reference }>,

@@ -102,6 +102,7 @@ function setupTest() {
     Pulse,
     Cursor,
     host,
+    other: kit.buildTerminal({ title: 'other', box: { x: 300, y: 10, width: 200 } }),
     longText: Array.from({ length: 30 }, () => 'word').join(' '),
     stops: [
       { x: 0, y: 0 },
@@ -309,4 +310,26 @@ test('#buildTimeline fails a stage that sits inside another', () => {
   );
 
   expect(() => ctx.buildAt(root, 6)).toThrow(expect.objectContaining({ code: 'nested-stage' }));
+});
+
+test('#buildTimeline lights the first host from the loop start and each later host from its stage start', () => {
+  const ctx = setupTest();
+
+  const root = (
+    <>
+      {ctx.host}
+      {ctx.other}
+      <ctx.Stage caption="One.">
+        <ctx.Line on={ctx.host}>first</ctx.Line>
+      </ctx.Stage>
+      <ctx.Stage caption="Two.">
+        <ctx.Line on={ctx.other}>second</ctx.Line>
+      </ctx.Stage>
+    </>
+  );
+
+  const timeline = ctx.buildAt(root, 6);
+
+  expect(timeline.acting.get(ctx.host)).toStrictEqual([{ fromS: 0, toS: 6 }]);
+  expect(timeline.acting.get(ctx.other)).toStrictEqual([{ fromS: 6, toS: timeline.resetS }]);
 });
