@@ -17,6 +17,8 @@ export async function run(
     stdin: options.input === undefined ? 'ignore' : new Blob([options.input]),
     stdout: 'pipe',
     stderr: 'pipe',
+
+    // its own process group, so the stop at test end also reaches each child it forks
     detached: true,
   });
 

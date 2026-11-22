@@ -98,33 +98,33 @@ When a signal killed the program, its exit code is 128 plus the signal number: 1
 
 ## Shared test helpers
 
-`@zgeoff/testing/helpers` holds the helpers that tests in any repo reuse, and each is one module:
+Each helper that tests in any repo reuse comes from the subpath of its area:
 
-| Helper                                                            | Does                                                                        |
-| ----------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `makeResolvingStub`, `makeRejectingStub`, `createBlockingStubKit` | build a `mock` that resolves, rejects, or waits until the test lets it go   |
-| `makeAnswerQueue`                                                 | answers each call in order, and throws when a call comes after the last one |
-| `readStreamUntil`                                                 | reads a stream until a line matches                                         |
-| `readRunFolderPrefix`, `writeTreeFiles`                           | name a test's temporary folder and fill it with files                       |
-| `readGitEnv`, `runGit`, `readGitHead`, `createGitCommit`          | run git in a test repo with a fixed identity and no global config           |
-| `waitFor`                                                         | retries a check until it stops throwing, or throws when `timeoutMs` passes  |
-| `updateEnv`, `removeEnvOverrides`                                 | override an environment variable, and put every one back                    |
+| Subpath                   | Helper                                                            | Does                                                                        |
+| ------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `@zgeoff/testing/mocks`   | `makeResolvingStub`, `makeRejectingStub`, `createBlockingStubKit` | build a `mock` that resolves, rejects, or waits until the test lets it go   |
+| `@zgeoff/testing/mocks`   | `makeAnswerQueue`                                                 | answers each call in order, and throws when a call comes after the last one |
+| `@zgeoff/testing/process` | `readStreamUntil`                                                 | reads a stream until a line matches                                         |
+| `@zgeoff/testing/fs`      | `readRunFolderPrefix`, `writeTreeFiles`                           | name a test's temporary folder and fill it with files                       |
+| `@zgeoff/testing/git`     | `readGitEnv`, `runGit`, `readGitHead`, `createGitCommit`          | run git in a test repo with a fixed identity and no global config           |
+| `@zgeoff/testing`         | `waitFor`                                                         | retries a check until it stops throwing, or throws when `timeoutMs` passes  |
+| `@zgeoff/testing`         | `updateEnv`, `removeEnvOverrides`                                 | override an environment variable, and put every one back                    |
+
+[The testing kit](../architecture/testing-kit.md) gives the rules that span these subpaths.
 
 `waitFor` calls the check at once and every `intervalMs` (20 ms by default) until `timeoutMs` (5 s)
 passes. The timeout error names the `label` and keeps the check's last error as its `cause`:
 
 ```ts
-import { waitFor } from '@zgeoff/testing/helpers';
+import { waitFor } from '@zgeoff/testing';
 
 const entries = await waitFor(() => readEntries(ledger), { label: 'the first entry' });
 ```
 
-`updateEnv` records a variable's original value the first time a test overrides it. Add the restore
-to the test preload, so no override outlives its test:
+`updateEnv` records a variable's original value the first time a test overrides it. List the kit's
+preload in `bunfig.toml`, so no override outlives its test:
 
-```ts
-import { afterEach } from 'bun:test';
-import { removeEnvOverrides } from '@zgeoff/testing/helpers';
-
-afterEach(removeEnvOverrides);
+```toml
+[test]
+preload = ["@zgeoff/testing/preload"]
 ```

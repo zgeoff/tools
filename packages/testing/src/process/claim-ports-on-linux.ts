@@ -6,9 +6,9 @@ import type { PortHold } from './types.ts';
 
 const maxPicksPerPort = 200;
 
-// Takes each port from below the kernel's ephemeral range, and holds it with an abstract unix
-// socket named after the port, which is the same name for every process in the network namespace.
-// `source` stands in for what the host says about its ports, for this function's own tests.
+// Holds each port, picked below the ephemeral range, with an abstract unix socket that all processes
+// in the network namespace see. Binding port 0 and freeing it would let another test process take
+// the port before the server binds. `source` stands in for the host's ports in this file's tests.
 export function claimPortsOnLinux(
   count: number,
   source: PortSource = readPortSource(),

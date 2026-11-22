@@ -32,6 +32,8 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 - [MCP OAuth server](./architecture/mcp-auth.md): `@zgeoff/mcp-auth`, the OAuth server that atc,
   boxxy, pepys and impz share for their `/mcp` routes, how a grant is stored and revoked, and its
   tokens and limits.
+- [The testing kit](./architecture/testing-kit.md): the rules that span the subpaths of
+  `@zgeoff/testing`, and why each holds.
 - [format-codemod rules](./architecture/format-codemod-rules.md): the blank lines the codemod adds
   and removes between statements.
 - [format-codemod inputs](./architecture/format-codemod-inputs.md): how the CLI turns its arguments
@@ -60,11 +62,6 @@ The docs of tools: how its shared files and packages work, and the steps a contr
 
 - [Setting up a downstream repo](./runbooks/downstream-repo-setup.md): wire a repo up, and opt in to
   the agent hooks and the pre-push baseline.
-
-## Designs
-
-- [Shared testing kit](./design/testing-kit/README.md): `@zgeoff/testing` grown into one kit of test
-  helpers with a subpath per area, and each repo's move onto it.
 
 ## Decisions
 
