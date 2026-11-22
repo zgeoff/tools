@@ -140,11 +140,11 @@ test('it fails a Later bullet with no issue ID', () => {
   const body = ctx.buildBody('## Next steps\n\n**Later**\n- A requeue button for parked jobs.\n');
 
   expect(collectPrBodyErrors(body)).toStrictEqual([
-    'Next steps: "- A requeue button for parked jobs." under **Later** does not end with an issue ID in brackets such as (GEO-124) or (#45); file the issue and add it.',
+    'Next steps: "- A requeue button for parked jobs." under **Later** does not end with an issue ID in brackets such as (GEO-124), (#45) or (i-124); file the issue and add it.',
   ]);
 });
 
-test.each([['(GEO-124)'], ['(GEO-124).'], ['(#45)'], ['(zgeoff/atc#12)']])(
+test.each([['(GEO-124)'], ['(GEO-124).'], ['(#45)'], ['(zgeoff/atc#12)'], ['(i-124)']])(
   'it accepts a Later bullet that ends with %s',
   (id) => {
     const ctx = setupTest();
