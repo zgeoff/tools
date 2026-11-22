@@ -336,6 +336,11 @@
         "repo": "zgeoff/skills",
         "source": "skills/deslop/SKILL.md",
         "target": ".claude/skills/deslop/SKILL.md"
+      },
+      {
+        "repo": "zgeoff/skills",
+        "source": "skills/deslop/references/agent-hand-back.md",
+        "target": ".claude/skills/deslop/references/agent-hand-back.md"
       }
     ]
   },
