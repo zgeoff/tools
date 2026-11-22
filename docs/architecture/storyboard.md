@@ -110,6 +110,6 @@ suite imports rig, so rig is an optional peer dependency of the package.
 ## Exports and setup
 
 The package ships its TypeScript source. In `package.json`, `./checks` and `./browser` export only
-under the `bun` condition, so only Bun resolves them, because they run inside `bun test`.
+under the `bun` condition. They run inside `bun test`, so only Bun needs to resolve them.
 `storyboard new <scene>` writes a scene and, when the repo has no scene yet, the two suites and the
 `storyboard` script.
