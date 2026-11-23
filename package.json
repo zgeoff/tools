@@ -37,7 +37,7 @@
       "kysely": "0.29.8",
       "lefthook": "2.2.2",
       "msw": "3.0.4",
-      "oxc-parser": "0.158.0",
+      "oxc-parser": "0.159.0",
       "oxfmt": "0.77.0",
       "oxlint": "1.92.0",
       "picomatch": "4.0.7",
