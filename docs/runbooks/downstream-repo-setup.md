@@ -31,12 +31,12 @@ The merge of the repo-sync stub in step 5 starts the repo's first sync, so do th
    Expect: `review.json`.
 
 2. Install the repo-sync GitHub App on the repo. Set the `REPO_SYNC_APP_CLIENT_ID` and
-   `REPO_SYNC_APP_PRIVATE_KEY` repo secrets from the `repo-sync-github-app` item in the `zgeoff`
+   `REPO_SYNC_APP_PRIVATE_KEY` repo secrets from the `repo-sync-github-app` item in the `agents`
    1Password vault:
 
    ```sh
-   gh secret set REPO_SYNC_APP_CLIENT_ID -R zgeoff/<repo> --body "$(op read 'op://zgeoff/repo-sync-github-app/client-id')"
-   op read 'op://zgeoff/repo-sync-github-app/private-key' | gh secret set REPO_SYNC_APP_PRIVATE_KEY -R zgeoff/<repo>
+   gh secret set REPO_SYNC_APP_CLIENT_ID -R zgeoff/<repo> --body "$(op read 'op://agents/repo-sync-github-app/client-id')"
+   op read 'op://agents/repo-sync-github-app/private-key' | gh secret set REPO_SYNC_APP_PRIVATE_KEY -R zgeoff/<repo>
    ```
 
    Expect: `gh secret list -R zgeoff/<repo>` lists both names.
