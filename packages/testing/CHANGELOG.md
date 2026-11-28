@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/zgeoff/tools/compare/@zgeoff/testing@0.4.2...@zgeoff/testing@0.4.3) (2026-11-28)
+
+
+### Bug Fixes
+
+* **testing:** prune stale templates from the template cache ([#779](https://github.com/zgeoff/tools/issues/779)) ([416a435](https://github.com/zgeoff/tools/commit/416a43535962128bcd51a5d1b036824c1cf76b9e))
+
 ## [0.4.2](https://github.com/zgeoff/tools/compare/@zgeoff/testing@0.4.1...@zgeoff/testing@0.4.2) (2026-11-21)
 
 
