@@ -103,16 +103,17 @@ that is unset. They stay on disk because a build such as a release bundle is lar
 memory folder such as `/dev/shm` holds every build in RAM. The kernel's page cache keeps a template
 in use fast to copy. When the home folder can't hold the cache, the kit uses the OS temp folder.
 
-Each call marks its template as used. The first call in a test process deletes each template, of any
-name, that no call has used for a day, or for the hours that
-`ZGEOFF_TESTING_TEMPLATE_MAX_UNUSED_HOURS` sets. It looks in the cache and in the OS temp folder,
-where earlier versions kept it. After a build, the kit also deletes each template of the same name
-that no call has used for an hour.
+Each call takes the template's lock, marks the template as used, checks that it exists, and releases
+the lock. The first call in a test process deletes each template, of any name, that no call has used
+for a day, or for the hours that `ZGEOFF_TESTING_TEMPLATE_MAX_UNUSED_HOURS` sets. It looks in the
+cache and in `zgeoff-testing-templates` under the OS temp folder.
 
-The kit deletes a template only while it holds the template's lock, so it never deletes one that a
-build holds. A reader marks the template before it checks that the template is there. The kit moves
-the template aside, checks the mark again, and moves the template back if a reader marked it in the
-meantime.
+The kit deletes a template only while it holds the template's lock, so it never deletes a template
+that a build or another call holds, and it skips such a template. A call marks a template under that
+lock. When the call marks first, the delete sees a fresh mark and keeps the template. When the
+delete comes first, the call finds the template gone and builds it again. The kit leaves a lock
+folder in place when it deletes a template, and deletes the folder in a later prune, once the lock
+has gone unused for the same time.
 
 `readGitEnv` builds the environment for every git command the kit runs. It takes only `PATH` and the
 `MISE_*` folders of the mise version manager from the test process's environment. A pre-push hook

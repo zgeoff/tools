@@ -13,14 +13,16 @@ test.each([
     groups: [{ folder: 'site-0123456789abcdef', leftovers: [] }],
   },
   {
-    title: 'staging and set-aside folders',
-    entries: ['site-0123456789abcdef.staging-42-a', 'site-0123456789abcdef.removing-42-b'],
+    title: 'a staging folder',
+    entries: ['site-0123456789abcdef.staging-42-a'],
     groups: [
-      {
-        folder: 'site-0123456789abcdef',
-        leftovers: ['site-0123456789abcdef.staging-42-a', 'site-0123456789abcdef.removing-42-b'],
-      },
+      { folder: 'site-0123456789abcdef', leftovers: ['site-0123456789abcdef.staging-42-a'] },
     ],
+  },
+  {
+    title: 'a template with an empty name',
+    entries: ['-0123456789abcdef', '-0123456789abcdef.used'],
+    groups: [{ folder: '-0123456789abcdef', leftovers: [] }],
   },
   {
     title: 'a name that holds hyphens and hex',

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { accessSync, constants, existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildTemplatesRoot } from './build-templates-root.ts';
@@ -26,7 +26,6 @@ export interface ReadTemplateOptions {
 
 const defaultStaleLockMs = 120_000;
 const pollIntervalMs = 50;
-const hourMs = 60 * 60 * 1000;
 
 // Resolves with the path of a template folder that every test worker can copy. The template lives
 // in the user's cache folder, so a later run with the same inputs reuses it with no build. However
@@ -35,7 +34,7 @@ export async function readTemplate(options: ReadTemplateOptions): Promise<string
   const staleLockMs = options.staleLockMs ?? defaultStaleLockMs;
   const templatesRoot = createTemplatesRoot();
 
-  removeUnusedTemplatesOnce(templatesRoot, staleLockMs);
+  removeUnusedTemplatesOnce(templatesRoot);
 
   const hash = await readInputsHash(options.name, options.root, options.inputs);
 
@@ -44,13 +43,6 @@ export async function readTemplate(options: ReadTemplateOptions): Promise<string
   const lockPath = `${template}.lock`;
 
   for (;;) {
-    // A pruner checks the marker again after it moves a template aside, so the marker goes first.
-    markUsed(`${template}.used`);
-
-    if (existsSync(template)) {
-      return template;
-    }
-
     const lock = takeTemplateLock(lockPath, staleLockMs);
 
     if (lock === null) {
@@ -59,18 +51,16 @@ export async function readTemplate(options: ReadTemplateOptions): Promise<string
       continue;
     }
 
+    // Marking and checking happen under the lock that a prune takes, so a prune either sees the new
+    // mark or runs before it, and a template that exists here stays until the caller has copied it.
     try {
-      // A caller that held the lock before this one may have built the template just now.
-      if (!existsSync(template)) {
-        await createTemplate(template, options.write);
+      markUsed(`${template}.used`);
 
-        removeStaleTemplates(templatesRoot, {
-          nowMs: Date.now(),
-          maxUnusedMs: hourMs,
-          staleLockMs,
-          shouldPrune: (candidate) => candidate !== folder && isSameName(candidate, options.name),
-        });
+      if (existsSync(template)) {
+        return template;
       }
+
+      await createTemplate(template, options.write);
     } finally {
       lock.release();
     }
@@ -83,6 +73,7 @@ function createTemplatesRoot(): string {
 
   try {
     mkdirSync(preferred, { recursive: true });
+    accessSync(preferred, constants.W_OK);
 
     return preferred;
   } catch {
@@ -94,16 +85,20 @@ function createTemplatesRoot(): string {
   }
 }
 
+const hourMs = 60 * 60 * 1000;
+
 const prunedRoots = new Set<string>();
 
 const maxUnusedHoursVariable = 'ZGEOFF_TESTING_TEMPLATE_MAX_UNUSED_HOURS';
 
 // Earlier versions kept the cache in the OS temp folder, so each process prunes that folder too.
-function removeUnusedTemplatesOnce(templatesRoot: string, staleLockMs: number): void {
+function removeUnusedTemplatesOnce(templatesRoot: string): void {
   const options = {
     nowMs: Date.now(),
     maxUnusedMs: parseMaxUnusedHours(process.env[maxUnusedHoursVariable]) * hourMs,
-    staleLockMs,
+
+    // A holder of another caller sets its own limit, so a prune judges every lock by the default.
+    staleLockMs: defaultStaleLockMs,
   };
 
   for (const root of [templatesRoot, join(tmpdir(), 'zgeoff-testing-templates')]) {
@@ -156,8 +151,4 @@ async function createTemplate(
       throw error;
     }
   }
-}
-
-function isSameName(candidate: string, name: string): boolean {
-  return /^-[0-9a-f]{16}$/u.test(candidate.slice(name.length)) && candidate.startsWith(name);
 }

@@ -1,12 +1,11 @@
-// The folder of one template, and the staging and set-aside folders beside it. Its marker and lock
+// The folder of one template, and the staging folders beside it. Its marker and lock
 // sit at fixed names beside the folder.
 export interface TemplateGroup {
   readonly folder: string;
   readonly leftovers: readonly string[];
 }
 
-const entryPattern =
-  /^(?<folder>.+-[0-9a-f]{16})(?<suffix>\.used|\.lock|\.staging-.+|\.removing-.+)?$/u;
+const entryPattern = /^(?<folder>.*-[0-9a-f]{16})(?<suffix>\.used|\.lock|\.staging-.+)?$/u;
 
 // Groups the entries of the cache folder by template, and leaves out entries of any other shape.
 export function collectTemplateGroups(entries: readonly string[]): readonly TemplateGroup[] {

@@ -1,4 +1,4 @@
-import { readdirSync, renameSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { collectTemplateGroups } from './collect-template-groups.ts';
 import type { TemplateGroup } from './collect-template-groups.ts';
@@ -11,26 +11,17 @@ export interface StaleTemplateOptions {
   // A template that nothing has used for longer than this is stale.
   readonly maxUnusedMs: number;
 
+  // A lock untouched for longer than this belongs to a dead caller.
   readonly staleLockMs: number;
-
-  // Leaves out each template this rejects. Every template is a candidate when it is unset.
-  readonly shouldPrune?: (folder: string) => boolean;
-
-  // Runs after a pruner has moved a template aside and before it checks the marker again.
-  readonly afterSetAside?: () => void;
 }
 
-// Removes each stale template with its marker, lock and leftovers, under the template's lock. A
-// reader marks before it checks, so the pruner moves the template aside, checks the marker again,
-// and puts the template back when a reader marked it meanwhile.
+// Removes each stale template and its leftovers under its lock, which a reader takes to mark the
+// template, and skips a template whose lock is held. A lock folder with nothing else left goes in
+// a later prune, once the lock has gone unused for the limit.
 export function removeStaleTemplates(templatesRoot: string, options: StaleTemplateOptions): void {
   const entries = readEntries(templatesRoot);
 
   for (const group of collectTemplateGroups(entries)) {
-    if (!(options.shouldPrune?.(group.folder) ?? true)) {
-      continue;
-    }
-
     const lockPaths = readLockPaths(join(templatesRoot, `${group.folder}.lock`));
 
     if (isStale(readLastUsedMs(templatesRoot, group, lockPaths), options)) {
@@ -51,8 +42,13 @@ function readEntries(folder: string): string[] {
   }
 }
 
+// A cache folder that is a file, or not there, holds no templates.
 function isMissingPathError(error: unknown): boolean {
-  return error instanceof Error && 'code' in error && error.code === 'ENOENT';
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+  );
 }
 
 function readLockPaths(lockPath: string): string[] {
@@ -99,7 +95,6 @@ function removeGroup(
   options: StaleTemplateOptions,
 ): void {
   const template = join(templatesRoot, group.folder);
-  const marker = `${template}.used`;
   const lockPath = `${template}.lock`;
   const lock = takeTemplateLock(lockPath, options.staleLockMs);
 
@@ -107,62 +102,28 @@ function removeGroup(
     return;
   }
 
-  let removedLock = false;
+  // Taking the lock refreshed the lock folder, so only the other entries count from here on.
+  const lastUsedMs = readLastUsedMs(templatesRoot, group, []);
 
-  try {
-    // Taking the lock refreshed the lock folder, so only the other entries count from here on, and
-    // a group with nothing else left is a lone lock folder.
-    const lastUsedMs = readLastUsedMs(templatesRoot, group, []);
+  if (lastUsedMs !== null && !isStale(lastUsedMs, options)) {
+    lock.release();
 
-    if (lastUsedMs !== null && !isStale(lastUsedMs, options)) {
-      return;
-    }
-
-    const setAside = buildSetAsidePath(template);
-    const movedTemplate = moveFolder(template, setAside);
-
-    options.afterSetAside?.();
-    const markedMs = readModifiedMs(marker);
-
-    if (movedTemplate && markedMs !== null && !isStale(markedMs, options)) {
-      renameSync(setAside, template);
-
-      return;
-    }
-
-    removeFolder(marker);
-    removeFolder(setAside);
-
-    for (const leftover of group.leftovers) {
-      removeFolder(join(templatesRoot, leftover));
-    }
-
-    const lockAside = buildSetAsidePath(template);
-
-    removedLock = moveFolder(lockPath, lockAside);
-
-    removeFolder(lockAside);
-  } finally {
-    if (!removedLock) {
-      lock.release();
-    }
+    return;
   }
-}
 
-function buildSetAsidePath(template: string): string {
-  return `${template}.removing-${process.pid}-${crypto.randomUUID()}`;
-}
+  const isLockOnly = !existsSync(template) && !existsSync(`${template}.used`);
 
-function moveFolder(from: string, to: string): boolean {
-  try {
-    renameSync(from, to);
+  // Releasing first stops the lock's refresh timer, so it cannot touch a folder that is gone.
+  lock.release();
 
-    return true;
-  } catch (error) {
-    if (isMissingPathError(error)) {
-      return false;
-    }
+  removeFolder(template);
+  removeFolder(`${template}.used`);
 
-    throw error;
+  for (const leftover of group.leftovers) {
+    removeFolder(join(templatesRoot, leftover));
+  }
+
+  if (isLockOnly) {
+    removeFolder(lockPath);
   }
 }

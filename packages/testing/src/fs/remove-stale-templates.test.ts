@@ -1,6 +1,7 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { existsSync, mkdirSync, readdirSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { waitFor } from '../core/wait-for.ts';
 import { createTempDir } from './create-temp-dir.ts';
 import { removeStaleTemplates } from './remove-stale-templates.ts';
 import { takeTemplateLock } from './take-template-lock.ts';
@@ -35,13 +36,8 @@ function setupTest() {
       }
     },
 
-    removeStale: (afterSetAside?: () => void) => {
-      removeStaleTemplates(root, {
-        nowMs,
-        maxUnusedMs: 24 * hourMs,
-        staleLockMs: 120_000,
-        ...(afterSetAside === undefined ? {} : { afterSetAside }),
-      });
+    removeStale: (staleLockMs = 120_000) => {
+      removeStaleTemplates(root, { nowMs, maxUnusedMs: 24 * hourMs, staleLockMs });
     },
 
     // Runs the prune in a process of its own, as a test worker does.
@@ -62,13 +58,61 @@ removeStaleTemplates(process.env.PRUNE_ROOT, {
   };
 }
 
-test('it removes a template of any name that nothing has used for longer than the limit, with its marker and lock', () => {
+test('it removes a template of any name that nothing has used for longer than the limit, with its marker', () => {
   const ctx = setupTest();
 
   ctx.writeUsedTemplate('blog-0123456789abcdef', 25 * ctx.hourMs);
   ctx.removeStale();
 
-  expect(readdirSync(ctx.root)).toStrictEqual([]);
+  expect(readdirSync(ctx.root)).toStrictEqual(['blog-0123456789abcdef.lock']);
+});
+
+test('it removes the lock folder in a later prune, once the lock has gone unused for the limit too', () => {
+  const ctx = setupTest();
+
+  ctx.writeUsedTemplate('blog-0123456789abcdef', 25 * ctx.hourMs);
+  ctx.removeStale();
+
+  const afterFirst = readdirSync(ctx.root);
+  const lockFolder = join(ctx.root, 'blog-0123456789abcdef.lock');
+
+  for (const generation of readdirSync(lockFolder)) {
+    ctx.backdate(join(lockFolder, generation), 25 * ctx.hourMs);
+  }
+
+  ctx.backdate(lockFolder, 25 * ctx.hourMs);
+  ctx.removeStale();
+
+  expect({ afterFirst, afterSecond: readdirSync(ctx.root) }).toStrictEqual({
+    afterFirst: ['blog-0123456789abcdef.lock'],
+    afterSecond: [],
+  });
+});
+
+test('it leaves no timer that keeps refreshing the lock after it removes a template', async () => {
+  const ctx = setupTest();
+
+  ctx.writeUsedTemplate('blog-0123456789abcdef', 25 * ctx.hourMs);
+  ctx.removeStale(80);
+
+  const generations = join(ctx.root, 'blog-0123456789abcdef.lock');
+  const newest = Math.max(...readdirSync(generations).map(Number));
+  const generation = join(generations, String(newest));
+
+  ctx.backdate(generation, 60_000);
+
+  const startedAtMs = performance.now();
+
+  await waitFor(
+    () => {
+      if (performance.now() - startedAtMs < 130) {
+        throw new Error('not yet');
+      }
+    },
+    { intervalMs: 10, timeoutMs: 5000 },
+  );
+
+  expect(ctx.nowMs - statSync(generation).mtimeMs).toBeGreaterThan(50_000);
 });
 
 test('it keeps a template that a call used within the limit', () => {
@@ -120,23 +164,7 @@ test('it removes the staging folder of a dead build beside a stale template', ()
   ctx.backdate(join(ctx.root, 'blog-0123456789abcdef.staging-4242-x'), 25 * ctx.hourMs);
   ctx.removeStale();
 
-  expect(readdirSync(ctx.root)).toStrictEqual([]);
-});
-
-test('it puts a template back when a reader marks it while the prune has it set aside', () => {
-  const ctx = setupTest();
-
-  ctx.writeUsedTemplate('blog-0123456789abcdef', 25 * ctx.hourMs);
-
-  ctx.removeStale(() => {
-    writeFileSync(join(ctx.root, 'blog-0123456789abcdef.used'), '');
-  });
-
-  expect(readdirSync(ctx.root).toSorted()).toStrictEqual([
-    'blog-0123456789abcdef',
-    'blog-0123456789abcdef.lock',
-    'blog-0123456789abcdef.used',
-  ]);
+  expect(readdirSync(ctx.root)).toStrictEqual(['blog-0123456789abcdef.lock']);
 });
 
 test('it lets two processes prune the same cache at once, and each keeps the fresh and locked templates', async () => {
@@ -172,7 +200,11 @@ test('it lets two processes prune the same cache at once, and each keeps the fre
     { exitCode: 0, stderr: '' },
   ]);
 
-  expect(readdirSync(ctx.root).toSorted()).toStrictEqual([
+  expect(
+    readdirSync(ctx.root)
+      .filter((entry) => !entry.startsWith('blog-'))
+      .toSorted(),
+  ).toStrictEqual([
     'docs-aaaaaaaaaaaaaaaa',
     'docs-aaaaaaaaaaaaaaaa.lock',
     'docs-aaaaaaaaaaaaaaaa.used',
