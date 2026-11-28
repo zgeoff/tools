@@ -1,5 +1,14 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, utimesSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { removeEnvOverrides } from '../core/remove-env-overrides.ts';
 import { updateEnv } from '../core/update-env.ts';
@@ -9,13 +18,16 @@ import { readTemplate } from './read-template.ts';
 import { takeTemplateLock } from './take-template-lock.ts';
 import { writeTreeFiles } from './write-tree-files.ts';
 
-// Points the OS temp folder at a folder of this test, so each test has a template cache of its own.
+// Points the cache folder and the OS temp folder at a folder of this test, so each test has a
+// template cache of its own.
 async function setupTest() {
   const tempFolder = createTempDir('template-cache').path;
   const root = createTempDir('template-inputs').path;
 
   onTestFinished(removeEnvOverrides);
-  updateEnv('TMPDIR', tempFolder);
+  updateEnv('XDG_CACHE_HOME', join(tempFolder, 'cache'));
+  updateEnv('TMPDIR', join(tempFolder, 'tmp'));
+  mkdirSync(join(tempFolder, 'tmp'));
 
   await writeTreeFiles(root, { 'src/app.ts': 'export {};\n', 'package.json': '{}\n' });
 
@@ -23,8 +35,23 @@ async function setupTest() {
 
   return {
     root,
-    templatesRoot: join(tempFolder, 'zgeoff-testing-templates'),
+    templatesRoot: join(tempFolder, 'cache', 'zgeoff-testing', 'templates'),
+    oldTemplatesRoot: join(tempFolder, 'tmp', 'zgeoff-testing-templates'),
     builds,
+
+    // Writes a template of another build, as a cache folder holds it, that a call used ageMs ago.
+    writeUsedTemplate: (templatesRoot: string, folder: string, ageMs: number) => {
+      const usedAt = new Date(Date.now() - ageMs);
+
+      mkdirSync(join(templatesRoot, folder, 'site'), { recursive: true });
+      mkdirSync(join(templatesRoot, `${folder}.lock`, '1'), { recursive: true });
+      writeFileSync(join(templatesRoot, `${folder}.lock`, '1', 'released'), '');
+      writeFileSync(join(templatesRoot, `${folder}.used`), '');
+
+      for (const path of [folder, `${folder}.lock`, `${folder}.lock/1`, `${folder}.used`]) {
+        utimesSync(join(templatesRoot, path), usedAt, usedAt);
+      }
+    },
 
     // Builds a one-file site, and notes the folder it built into.
     writeSite: async (directory: string) => {
@@ -55,7 +82,7 @@ async function setupTest() {
   };
 }
 
-test('it builds the template into an empty folder under one folder of the OS temp folder', async () => {
+test("it builds the template into an empty folder under the user's cache folder", async () => {
   const ctx = await setupTest();
 
   const emptyBefore: boolean[] = [];
@@ -197,7 +224,11 @@ test('it removes the staging folder, releases the lock and rethrows when write t
 
   const lockFolder = readdirSync(ctx.templatesRoot).find((entry) => entry.endsWith('.lock'));
 
-  expect(readdirSync(ctx.templatesRoot).filter((entry) => entry !== lockFolder)).toStrictEqual([]);
+  expect(
+    readdirSync(ctx.templatesRoot).filter(
+      (entry) => entry !== lockFolder && !entry.endsWith('.used'),
+    ),
+  ).toStrictEqual([]);
 
   const lockPath = join(ctx.templatesRoot, String(lockFolder));
 
@@ -302,7 +333,7 @@ test('it marks the template as used on each call', async () => {
   expect(Date.now() - statSync(`${template}.used`).mtimeMs).toBeLessThan(60_000);
 });
 
-test('it deletes a template of the same name that no call has used for an hour, after a build', async () => {
+test('it keeps a template of the same name that no call has used for an hour, after a build', async () => {
   const ctx = await setupTest();
   const old = await readTemplate({ ...ctx.buildOptions(), write: ctx.writeSite });
 
@@ -315,17 +346,171 @@ test('it deletes a template of the same name that no call has used for an hour, 
   const fresh = await readTemplate({ ...ctx.buildOptions(), write: ctx.writeSite });
 
   expect({ oldExists: existsSync(old), freshExists: existsSync(fresh) }).toStrictEqual({
-    oldExists: false,
+    oldExists: true,
     freshExists: true,
   });
 });
 
-test('it keeps a template of the same name that a call used within the hour, after a build', async () => {
+test('it marks a template only after it takes the lock, so a prune that holds the lock goes first', async () => {
   const ctx = await setupTest();
-  const recent = await readTemplate({ ...ctx.buildOptions(), write: ctx.writeSite });
+  const template = await readTemplate({ ...ctx.buildOptions(), write: ctx.writeSite });
 
-  await writeTreeFiles(ctx.root, { 'src/app.ts': 'export const changed = true;\n' });
+  const longAgo = new Date(Date.now() - 3 * ctx.hourMs);
+
+  utimesSync(`${template}.used`, longAgo, longAgo);
+
+  const lock = takeTemplateLock(`${template}.lock`, 120_000);
+
+  onTestFinished(() => lock?.release());
+
+  const reading = readTemplate({ ...ctx.buildOptions(), write: ctx.writeSite });
+
+  await ctx.waitUntilElapsed(200);
+
+  const markedWhileLocked = Date.now() - statSync(`${template}.used`).mtimeMs < 60_000;
+
+  lock?.release();
+
+  await reading;
+
+  expect({
+    markedWhileLocked,
+    markedAfter: Date.now() - statSync(`${template}.used`).mtimeMs < 60_000,
+  }).toStrictEqual({ markedWhileLocked: false, markedAfter: true });
+});
+
+test('it judges every lock by the default limit when it prunes, whatever limit the caller sets', async () => {
+  const ctx = await setupTest();
+
+  mkdirSync(ctx.templatesRoot, { recursive: true });
+
+  ctx.writeUsedTemplate(ctx.templatesRoot, 'built-blog-0123456789abcdef', 25 * ctx.hourMs);
+
+  const staging = join(ctx.templatesRoot, 'built-blog-0123456789abcdef.staging-42-a');
+
+  mkdirSync(staging);
+
+  const lock = takeTemplateLock(
+    join(ctx.templatesRoot, 'built-blog-0123456789abcdef.lock'),
+    120_000,
+  );
+
+  onTestFinished(() => lock?.release());
+
+  await ctx.waitUntilElapsed(50);
+
+  await readTemplate({ ...ctx.buildOptions(), write: ctx.writeSite, staleLockMs: 10 });
+
+  expect(existsSync(staging)).toBeTrue();
+});
+
+test('it prunes the cache of a name that is empty', async () => {
+  const ctx = await setupTest();
+
+  mkdirSync(ctx.templatesRoot, { recursive: true });
+
+  ctx.writeUsedTemplate(ctx.templatesRoot, '-0123456789abcdef', 25 * ctx.hourMs);
+
   await readTemplate({ ...ctx.buildOptions(), write: ctx.writeSite });
 
-  expect(existsSync(recent)).toBeTrue();
+  expect(existsSync(join(ctx.templatesRoot, '-0123456789abcdef'))).toBeFalse();
+});
+
+test('it builds when the old cache path is a file', async () => {
+  const ctx = await setupTest();
+
+  writeFileSync(ctx.oldTemplatesRoot, '');
+
+  const template = await readTemplate({ ...ctx.buildOptions(), write: ctx.writeSite });
+
+  expect(existsSync(template)).toBeTrue();
+});
+
+test.skipIf(process.getuid?.() === 0)(
+  'it builds in the OS temp folder when the cache folder is read-only',
+  async () => {
+    const ctx = await setupTest();
+
+    mkdirSync(ctx.templatesRoot, { recursive: true });
+    chmodSync(ctx.templatesRoot, 0o555);
+
+    onTestFinished(() => {
+      if (existsSync(ctx.templatesRoot)) {
+        chmodSync(ctx.templatesRoot, 0o755);
+      }
+    });
+
+    const template = await readTemplate({ ...ctx.buildOptions(), write: ctx.writeSite });
+
+    expect(join(template, '..')).toBe(ctx.oldTemplatesRoot);
+  },
+);
+
+test('it removes a template of another name that no call has used for a day, with its marker', async () => {
+  const ctx = await setupTest();
+
+  mkdirSync(ctx.templatesRoot, { recursive: true });
+
+  ctx.writeUsedTemplate(ctx.templatesRoot, 'built-blog-0123456789abcdef', 25 * ctx.hourMs);
+
+  await readTemplate({ ...ctx.buildOptions(), write: ctx.writeSite });
+
+  expect(
+    readdirSync(ctx.templatesRoot).filter((entry) => entry.startsWith('built-blog')),
+  ).toStrictEqual(['built-blog-0123456789abcdef.lock']);
+});
+
+test('it keeps a template of another name that a call used within the day', async () => {
+  const ctx = await setupTest();
+
+  mkdirSync(ctx.templatesRoot, { recursive: true });
+
+  ctx.writeUsedTemplate(ctx.templatesRoot, 'built-blog-0123456789abcdef', 23 * ctx.hourMs);
+
+  await readTemplate({ ...ctx.buildOptions(), write: ctx.writeSite });
+
+  expect(existsSync(join(ctx.templatesRoot, 'built-blog-0123456789abcdef'))).toBeTrue();
+});
+
+test('it removes a template unused for longer than the hours ZGEOFF_TESTING_TEMPLATE_MAX_UNUSED_HOURS sets', async () => {
+  const ctx = await setupTest();
+
+  updateEnv('ZGEOFF_TESTING_TEMPLATE_MAX_UNUSED_HOURS', '2');
+  mkdirSync(ctx.templatesRoot, { recursive: true });
+
+  ctx.writeUsedTemplate(ctx.templatesRoot, 'built-blog-0123456789abcdef', 3 * ctx.hourMs);
+
+  await readTemplate({ ...ctx.buildOptions(), write: ctx.writeSite });
+
+  expect(existsSync(join(ctx.templatesRoot, 'built-blog-0123456789abcdef'))).toBeFalse();
+});
+
+test.each(['0', '-1', 'a day'])(
+  'it rejects ZGEOFF_TESTING_TEMPLATE_MAX_UNUSED_HOURS set to %p',
+  async (hours) => {
+    const ctx = await setupTest();
+
+    updateEnv('ZGEOFF_TESTING_TEMPLATE_MAX_UNUSED_HOURS', hours);
+
+    const outcome = await Promise.allSettled([
+      readTemplate({ ...ctx.buildOptions(), write: ctx.writeSite }),
+    ]);
+
+    expect(outcome[0]).toMatchObject({
+      status: 'rejected',
+      reason: { message: expect.stringMatching(/must be a positive number of hours/u) },
+    });
+  },
+);
+
+test('it removes a template from the old cache folder under the OS temp folder that no call has used for a day', async () => {
+  const ctx = await setupTest();
+
+  mkdirSync(ctx.oldTemplatesRoot, { recursive: true });
+
+  ctx.writeUsedTemplate(ctx.oldTemplatesRoot, 'built-blog-0123456789abcdef', 25 * ctx.hourMs);
+
+  await readTemplate({ ...ctx.buildOptions(), write: ctx.writeSite });
+
+  expect(readdirSync(ctx.oldTemplatesRoot)).toStrictEqual(['built-blog-0123456789abcdef.lock']);
 });

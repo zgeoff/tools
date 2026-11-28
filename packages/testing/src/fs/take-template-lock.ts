@@ -12,13 +12,32 @@ export interface TemplateLockHooks {
 }
 
 // The highest numbered generation folder is the lock, held while fresh and unreleased. A caller
-// takes it by making the next generation, and never moves or deletes one another caller holds.
+// takes it by making the next generation. A pruner that holds the lock can move the lock folder
+// away, and a caller that finds it gone returns null.
 export function takeTemplateLock(
   lockPath: string,
   staleLockMs: number,
   hooks: TemplateLockHooks = {},
 ): TemplateLock | null {
-  mkdirSync(lockPath, { recursive: true });
+  try {
+    return takeLockGeneration(lockPath, staleLockMs, hooks);
+  } catch (error) {
+    if (isMissingPathError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+function takeLockGeneration(
+  lockPath: string,
+  staleLockMs: number,
+  hooks: TemplateLockHooks,
+): TemplateLock | null {
+  // Bun's recursive mkdir can throw EEXIST when another process makes the folder during the call,
+  // so a plain mkdir runs, and a folder that is already there is fine.
+  makeFolder(lockPath);
 
   const highest = readHighestGeneration(lockPath);
 
@@ -26,8 +45,11 @@ export function takeTemplateLock(
     return null;
   }
 
+  // The seconds since the epoch keep a number rising when a prune has removed the lock folder, so
+  // a contender that paused across the removal cannot outrank a holder that came after it.
+  const generation = Math.max((highest ?? 0) + 1, Math.floor(Date.now() / 1000));
+
   hooks.afterInspect?.();
-  const generation = (highest ?? 0) + 1;
   const generationPath = join(lockPath, String(generation));
 
   if (!makeFolder(generationPath)) {
@@ -45,6 +67,20 @@ export function takeTemplateLock(
   removeLowerGenerations(lockPath, generation);
 
   return holdLock(generationPath, staleLockMs);
+}
+
+function makeFolder(path: string): boolean {
+  try {
+    mkdirSync(path);
+
+    return true;
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'EEXIST') {
+      return false;
+    }
+
+    throw error;
+  }
 }
 
 function readHighestGeneration(lockPath: string): number | null {
@@ -70,20 +106,6 @@ function readIsHeld(generationPath: string, staleLockMs: number): boolean {
     return Date.now() - statSync(generationPath).mtimeMs <= staleLockMs;
   } catch {
     return false;
-  }
-}
-
-function makeFolder(path: string): boolean {
-  try {
-    mkdirSync(path);
-
-    return true;
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'EEXIST') {
-      return false;
-    }
-
-    throw error;
   }
 }
 
@@ -119,4 +141,8 @@ function holdLock(generationPath: string, staleLockMs: number): TemplateLock {
       }
     },
   };
+}
+
+function isMissingPathError(error: unknown): boolean {
+  return error instanceof Error && 'code' in error && error.code === 'ENOENT';
 }

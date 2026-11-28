@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { existsSync, mkdirSync, utimesSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { waitFor } from '../core/wait-for.ts';
 import { createTempDir } from './create-temp-dir.ts';
@@ -78,7 +78,7 @@ test('it leaves the lock of a new holder alone when a build that lost its lock r
 
   const first = takeTemplateLock(ctx.lockPath, 10_000);
 
-  utimesSync(join(ctx.lockPath, '1'), longAgo, longAgo);
+  utimesSync(join(ctx.lockPath, readdirSync(ctx.lockPath)[0] ?? ''), longAgo, longAgo);
   takeTemplateLock(ctx.lockPath, 10_000);
   first?.release();
   expect(takeTemplateLock(ctx.lockPath, 10_000)).toBeNull();
@@ -122,6 +122,26 @@ test('it backs off when it makes a generation after a newer holder cleared it aw
 
   expect(paused).toBeNull();
   expect(holders[0]).not.toBeNull();
+  expect(takeTemplateLock(ctx.lockPath, 10_000)).toBeNull();
+});
+
+test('it leaves a holder alone when a prune removes the lock folder while a contender pauses', () => {
+  const ctx = setupTest();
+
+  ctx.writeStaleLock();
+
+  const holders: ReturnType<typeof takeTemplateLock>[] = [];
+
+  const paused = takeTemplateLock(ctx.lockPath, 10_000, {
+    afterInspect: () => {
+      rmSync(ctx.lockPath, { recursive: true });
+
+      holders.push(takeTemplateLock(ctx.lockPath, 10_000));
+    },
+  });
+
+  expect(holders[0]).not.toBeNull();
+  expect(paused).toBeNull();
   expect(takeTemplateLock(ctx.lockPath, 10_000)).toBeNull();
 });
 
@@ -169,4 +189,16 @@ console.log(takeTemplateLock(${JSON.stringify(ctx.lockPath)}, 10_000) === null ?
   const winners = outputs.filter((output) => output.trim() === 'took');
 
   expect(winners).toHaveLength(1);
+});
+
+test('it returns null when a pruner moves the lock folder away while it takes the lock', () => {
+  const ctx = setupTest();
+
+  const lock = takeTemplateLock(ctx.lockPath, 10_000, {
+    afterInspect: () => {
+      renameSync(ctx.lockPath, `${ctx.lockPath}-set-aside`);
+    },
+  });
+
+  expect(lock).toBeNull();
 });

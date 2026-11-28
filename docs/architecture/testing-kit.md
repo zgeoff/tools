@@ -96,8 +96,23 @@ whose process is gone.
 `readTemplate` builds a folder once and copies it for each test, across test processes. It keys each
 template by a hash of its name and the bytes of each input file, so a change to an input builds a
 new template. Each build goes into a staging folder and is renamed into place, so a reader never
-sees half a template. Two processes that build the same template take turns through a lock. After a
-build, the kit deletes each template of that name that no test has used for an hour.
+sees half a template. Two processes that build the same template take turns through a lock.
+
+The templates live in `zgeoff-testing/templates` under `$XDG_CACHE_HOME`, or under `~/.cache` when
+that is unset. They stay on disk because a build such as a release bundle is large, and a cache in a
+memory folder such as `/dev/shm` holds every build in RAM. The kernel's page cache keeps a template
+in use fast to copy. When the home folder can't hold the cache, the kit uses the OS temp folder.
+
+Each call takes the template's lock, marks the template as used, checks that it exists, and releases
+the lock. The first call in a test process deletes each template, of any name, that no call has used
+for a day, or for the hours that `ZGEOFF_TESTING_TEMPLATE_MAX_UNUSED_HOURS` sets. It looks in the
+cache and in `zgeoff-testing-templates` under the OS temp folder.
+
+The kit deletes a template only while it holds the template's lock, so it skips a template that a
+build or another call holds. A call marks a template under that same lock. When the call marks
+first, the delete sees a fresh mark and keeps the template. When the delete comes first, the call
+finds the template gone and builds it again. The kit leaves a lock folder in place when it deletes a
+template, and deletes the folder in a later prune, once the lock has gone unused for the same time.
 
 `readGitEnv` builds the environment for every git command the kit runs. It takes only `PATH` and the
 `MISE_*` folders of the mise version manager from the test process's environment. A pre-push hook
