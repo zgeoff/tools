@@ -1,9 +1,10 @@
 import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { buildTemplatesRoot } from './build-templates-root.ts';
 import { readInputsHash } from './read-inputs-hash.ts';
 import { removeFolder } from './remove-folder.ts';
-import { removeOldTemplates } from './remove-old-templates.ts';
+import { removeStaleTemplates } from './remove-stale-templates.ts';
 import { takeTemplateLock } from './take-template-lock.ts';
 
 export interface ReadTemplateOptions {
@@ -25,13 +26,16 @@ export interface ReadTemplateOptions {
 
 const defaultStaleLockMs = 120_000;
 const pollIntervalMs = 50;
+const hourMs = 60 * 60 * 1000;
 
 // Resolves with the path of a template folder that every test worker can copy. The template lives
-// in one folder under the OS temp folder, so a later run with the same inputs reuses it with no
-// build. However many callers ask, one of them builds it. Never write into the folder.
+// in the user's cache folder, so a later run with the same inputs reuses it with no build. However
+// many callers ask, one of them builds it. Never write into the folder.
 export async function readTemplate(options: ReadTemplateOptions): Promise<string> {
   const staleLockMs = options.staleLockMs ?? defaultStaleLockMs;
-  const templatesRoot = join(tmpdir(), 'zgeoff-testing-templates');
+  const templatesRoot = createTemplatesRoot();
+
+  removeUnusedTemplatesOnce(templatesRoot, staleLockMs);
 
   const hash = await readInputsHash(options.name, options.root, options.inputs);
 
@@ -39,12 +43,11 @@ export async function readTemplate(options: ReadTemplateOptions): Promise<string
   const template = join(templatesRoot, folder);
   const lockPath = `${template}.lock`;
 
-  mkdirSync(templatesRoot, { recursive: true });
-
   for (;;) {
-    if (existsSync(template)) {
-      markUsed(`${template}.used`);
+    // A pruner checks the marker again after it moves a template aside, so the marker goes first.
+    markUsed(`${template}.used`);
 
+    if (existsSync(template)) {
       return template;
     }
 
@@ -61,12 +64,71 @@ export async function readTemplate(options: ReadTemplateOptions): Promise<string
       if (!existsSync(template)) {
         await createTemplate(template, options.write);
 
-        removeOldTemplates(templatesRoot, options.name, folder, Date.now());
+        removeStaleTemplates(templatesRoot, {
+          nowMs: Date.now(),
+          maxUnusedMs: hourMs,
+          staleLockMs,
+          shouldPrune: (candidate) => candidate !== folder && isSameName(candidate, options.name),
+        });
       }
     } finally {
       lock.release();
     }
   }
+}
+
+// A home folder that can't hold the cache, such as a read-only one, leaves it in the OS temp folder.
+function createTemplatesRoot(): string {
+  const preferred = buildTemplatesRoot(process.env, homedir());
+
+  try {
+    mkdirSync(preferred, { recursive: true });
+
+    return preferred;
+  } catch {
+    const fallback = join(tmpdir(), 'zgeoff-testing-templates');
+
+    mkdirSync(fallback, { recursive: true });
+
+    return fallback;
+  }
+}
+
+const prunedRoots = new Set<string>();
+
+const maxUnusedHoursVariable = 'ZGEOFF_TESTING_TEMPLATE_MAX_UNUSED_HOURS';
+
+// Earlier versions kept the cache in the OS temp folder, so each process prunes that folder too.
+function removeUnusedTemplatesOnce(templatesRoot: string, staleLockMs: number): void {
+  const options = {
+    nowMs: Date.now(),
+    maxUnusedMs: parseMaxUnusedHours(process.env[maxUnusedHoursVariable]) * hourMs,
+    staleLockMs,
+  };
+
+  for (const root of [templatesRoot, join(tmpdir(), 'zgeoff-testing-templates')]) {
+    if (!prunedRoots.has(root)) {
+      prunedRoots.add(root);
+
+      removeStaleTemplates(root, options);
+    }
+  }
+}
+
+const defaultMaxUnusedHours = 24;
+
+function parseMaxUnusedHours(value: string | undefined): number {
+  if (value === undefined || value === '') {
+    return defaultMaxUnusedHours;
+  }
+
+  const hours = Number(value);
+
+  if (!Number.isFinite(hours) || hours <= 0) {
+    throw new Error(`${maxUnusedHoursVariable} must be a positive number of hours, not ${value}`);
+  }
+
+  return hours;
 }
 
 function markUsed(markerPath: string): void {
@@ -94,4 +156,8 @@ async function createTemplate(
       throw error;
     }
   }
+}
+
+function isSameName(candidate: string, name: string): boolean {
+  return /^-[0-9a-f]{16}$/u.test(candidate.slice(name.length)) && candidate.startsWith(name);
 }

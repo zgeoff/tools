@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { existsSync, mkdirSync, utimesSync } from 'node:fs';
+import { existsSync, mkdirSync, renameSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { waitFor } from '../core/wait-for.ts';
 import { createTempDir } from './create-temp-dir.ts';
@@ -169,4 +169,16 @@ console.log(takeTemplateLock(${JSON.stringify(ctx.lockPath)}, 10_000) === null ?
   const winners = outputs.filter((output) => output.trim() === 'took');
 
   expect(winners).toHaveLength(1);
+});
+
+test('it returns null when a pruner moves the lock folder away while it takes the lock', () => {
+  const ctx = setupTest();
+
+  const lock = takeTemplateLock(ctx.lockPath, 10_000, {
+    afterInspect: () => {
+      renameSync(ctx.lockPath, `${ctx.lockPath}-set-aside`);
+    },
+  });
+
+  expect(lock).toBeNull();
 });
