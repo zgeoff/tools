@@ -45,8 +45,11 @@ function takeLockGeneration(
     return null;
   }
 
+  // The seconds since the epoch keep a number rising when a prune has removed the lock folder, so
+  // a contender that paused across the removal cannot outrank a holder that came after it.
+  const generation = Math.max((highest ?? 0) + 1, Math.floor(Date.now() / 1000));
+
   hooks.afterInspect?.();
-  const generation = (highest ?? 0) + 1;
   const generationPath = join(lockPath, String(generation));
 
   if (!makeFolder(generationPath)) {

@@ -89,6 +89,29 @@ test('it removes the lock folder in a later prune, once the lock has gone unused
   });
 });
 
+test('it holds the lock until the template is gone', () => {
+  const ctx = setupTest();
+
+  ctx.writeUsedTemplate('blog-0123456789abcdef', 25 * ctx.hourMs);
+
+  const lockPath = join(ctx.root, 'blog-0123456789abcdef.lock');
+  const heldBeforeDelete: boolean[] = [];
+
+  removeStaleTemplates(ctx.root, {
+    nowMs: ctx.nowMs,
+    maxUnusedMs: 24 * ctx.hourMs,
+    staleLockMs: 120_000,
+    beforeDelete: () => {
+      heldBeforeDelete.push(takeTemplateLock(lockPath, 120_000) === null);
+    },
+  });
+
+  expect({ heldBeforeDelete, remaining: readdirSync(ctx.root) }).toStrictEqual({
+    heldBeforeDelete: [true],
+    remaining: ['blog-0123456789abcdef.lock'],
+  });
+});
+
 test('it leaves no timer that keeps refreshing the lock after it removes a template', async () => {
   const ctx = setupTest();
 

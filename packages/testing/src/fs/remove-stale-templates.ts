@@ -13,6 +13,9 @@ export interface StaleTemplateOptions {
 
   // A lock untouched for longer than this belongs to a dead caller.
   readonly staleLockMs: number;
+
+  // Runs once a prune holds a template's lock, before it deletes anything.
+  readonly beforeDelete?: () => void;
 }
 
 // Removes each stale template and its leftovers under its lock, which a reader takes to mark the
@@ -113,14 +116,18 @@ function removeGroup(
 
   const isLockOnly = !existsSync(template) && !existsSync(`${template}.used`);
 
-  // Releasing first stops the lock's refresh timer, so it cannot touch a folder that is gone.
-  lock.release();
+  try {
+    options.beforeDelete?.();
+    removeFolder(template);
+    removeFolder(`${template}.used`);
 
-  removeFolder(template);
-  removeFolder(`${template}.used`);
-
-  for (const leftover of group.leftovers) {
-    removeFolder(join(templatesRoot, leftover));
+    for (const leftover of group.leftovers) {
+      removeFolder(join(templatesRoot, leftover));
+    }
+  } finally {
+    // The lock stays held until the template is gone, and the release stops the refresh timer
+    // before the lock folder goes.
+    lock.release();
   }
 
   if (isLockOnly) {

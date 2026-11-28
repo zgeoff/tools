@@ -108,12 +108,11 @@ the lock. The first call in a test process deletes each template, of any name, t
 for a day, or for the hours that `ZGEOFF_TESTING_TEMPLATE_MAX_UNUSED_HOURS` sets. It looks in the
 cache and in `zgeoff-testing-templates` under the OS temp folder.
 
-The kit deletes a template only while it holds the template's lock, so it never deletes a template
-that a build or another call holds, and it skips such a template. A call marks a template under that
-lock. When the call marks first, the delete sees a fresh mark and keeps the template. When the
-delete comes first, the call finds the template gone and builds it again. The kit leaves a lock
-folder in place when it deletes a template, and deletes the folder in a later prune, once the lock
-has gone unused for the same time.
+The kit deletes a template only while it holds the template's lock, so it skips a template that a
+build or another call holds. A call marks a template under that same lock. When the call marks
+first, the delete sees a fresh mark and keeps the template. When the delete comes first, the call
+finds the template gone and builds it again. The kit leaves a lock folder in place when it deletes a
+template, and deletes the folder in a later prune, once the lock has gone unused for the same time.
 
 `readGitEnv` builds the environment for every git command the kit runs. It takes only `PATH` and the
 `MISE_*` folders of the mise version manager from the test process's environment. A pre-push hook
